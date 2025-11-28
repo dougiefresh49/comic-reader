@@ -110,7 +110,7 @@ async function main() {
     }
 
     // Save cache
-    // await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
+    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
     console.log(`\n✓ Saved cache to ${CACHE_FILE}`);
 
     console.log(`\n📊 Summary:`);
@@ -230,42 +230,12 @@ async function processPage(
   }
 
   // Step 2: OCR pass
-  const { ocrPredictions, metadata } = await runOCR(
-    predictions,
-    gemini,
-    imageBuffer,
-    {
-      pageName,
-      outDir: OCR_CROPS_DIR,
-    },
-  );
+  const ocrPredictions = await runOCR(predictions, gemini, imageBuffer, {
+    pageName,
+    outDir: OCR_CROPS_DIR,
+  });
 
-  // Save filtered predictions
-  const filteredPredictionsFile = join(
-    PREDICTIONS_DIR,
-    `${pageName}-filtered.json`,
-  );
-  await fs.writeFile(
-    filteredPredictionsFile,
-    JSON.stringify(
-      {
-        page: pageName,
-        timestamp: new Date().toISOString(),
-        total: ocrPredictions.length,
-        removed: {
-          invalidText: metadata.invalidOCRTextCount,
-          textDuplicates: metadata.deduplicatedOCRPredictions,
-        },
-        predictions: ocrPredictions,
-      },
-      null,
-      2,
-    ),
-  );
-  console.log(
-    `   💾 Saved filtered predictions to: ${filteredPredictionsFile}`,
-  );
-
+  // Step 3: Analyze context with Gemini
   const { bubbles, skipped } = await analyzeContext(
     gemini,
     imageBuffer,
@@ -273,7 +243,6 @@ async function processPage(
     pageName,
     {
       skipGemini: options.skipGemini,
-      viewerPath: filteredPredictionsFile,
     },
   );
 

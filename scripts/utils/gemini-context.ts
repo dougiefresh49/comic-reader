@@ -23,7 +23,6 @@ export async function analyzeContext(
   pageName: string,
   options: {
     skipGemini?: boolean;
-    viewerPath?: string;
   },
 ): Promise<{
   bubbles: Bubble[];
@@ -35,7 +34,7 @@ export async function analyzeContext(
       `\n🤖 Analyzing context with Gemini... SKIPPED (--skip-gemini)`,
     );
     console.log(
-      `\n✅ Stopping before Gemini analysis. Review OCR results in: ${options.viewerPath}`,
+      `\n✅ Stopping before Gemini analysis. Review OCR results in viewer file`,
     );
     return { bubbles: [], skipped: [] };
   }
@@ -120,23 +119,48 @@ async function analyzeContextGemini(
 ): Promise<{ type: string; speaker: string | null; emotion: string }> {
   const base64Image = imageBuffer.toString("base64");
 
-  const prompt = `I am providing a comic book page. Focus on the text region containing: '${targetText}' located at coordinates x:${targetLocation.x}, y:${targetLocation.y}, width:${targetLocation.width}, height:${targetLocation.height}.
-
-1. **Classify the Type:**
-   - \`SPEECH\`: Character dialogue.
-   - \`NARRATION\`: Storytelling boxes.
-   - \`CAPTION\`: Floating structural text (e.g., "The End", "New York City").
-   - \`SFX\`: Sound effects (BOOM, POW).
-   - \`BACKGROUND\`: Text in the art that is NOT meant to be read aloud (e.g., a sign on a building, a license plate, a newspaper headline, graffiti).
-
-2. **Identify the Speaker:**
-   - If SPEECH: Identify the character name.
-   - If NARRATION/CAPTION: Return 'Narrator'.
-   - If SFX or BACKGROUND: Return null.
-
-3. **Determine Emotion:** (e.g., 'angry', 'neutral', 'shouting', 'excited', 'sad', 'happy').
-
-Return JSON only: { "type": "...", "speaker": "..." or null, "emotion": "..." }`;
+  const prompt = `I am providing a full comic book page.
+  **Goal:** Analyze the specific text region described below to determine how it should be voice-acted.
+  
+  **Target Region:**
+  * **Text:** "${targetText}"
+  * **Location:** x:${targetLocation.x}, y:${targetLocation.y} (width:${targetLocation.width}, height:${targetLocation.height})
+  
+  **Instructions:**
+  
+  1.  **Locate & Classify:** Find the text on the page. Classify it as one of:
+      * \`SPEECH\`: Character dialogue (look for a tail pointing to a character).
+      * \`NARRATION\`: Square/Rectangular boxes (Storyteller).
+      * \`CAPTION\`: Floating structural text ("The End", "NYC").
+      * \`SFX\`: Sound effects drawn into the art (BOOM, KRAASH).
+      * \`BACKGROUND\`: Text not meant to be read (signs, graffiti, license plates).
+  
+  2.  **Analyze Context (The "Why"):**
+      * **Speaker:** If SPEECH, trace the bubble's tail. Who is it?
+      * **Importance:** Is this a MAIN character (Hero/Villain) or a MINOR character (Civilian/Guard)?
+      * **Voice Description:** If MINOR, describe their voice (e.g., "Gruff male, British accent").
+      * **Emotion:** Look at the character's eyebrows, mouth, and body language.
+  
+  **Output Format:**
+  First, think step-by-step in a <scratchpad> block to confirm your reasoning.
+  Then, provide the final JSON.
+  
+  **Example Output:**
+  <scratchpad>
+  I see the text "Cowabunga!". It is in a round white bubble.
+  The tail points to the turtle with the orange mask (Michelangelo).
+  He is smiling and jumping. This is a MAIN character.
+  </scratchpad>
+  \`\`\`json
+  {
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "character_type": "MAJOR",
+    "voice_description": null,
+    "emotion": "excited"
+  }
+  \`\`\`
+  `;
 
   try {
     const imagePart = createPartFromBase64(base64Image, "image/jpeg");

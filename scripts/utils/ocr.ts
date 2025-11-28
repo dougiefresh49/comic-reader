@@ -46,16 +46,23 @@ export async function runOCR(
 
   const validOCR = withOCR.filter(({ ocr_text }) => isValidText(ocr_text));
   const deduplicatedOCR = deduplicateOCRPredictionsByText(validOCR);
-  return {
-    ocrPredictions: deduplicatedOCR,
-    metadata: {
-      totalOCRPredictions: withOCR.length,
-      validOCRPredictions: validOCR.length,
-      deduplicatedOCRPredictions: deduplicatedOCR.length,
-      invalidOCRTextCount: withOCR.length - validOCR.length,
-      viewerPath,
-    },
-  };
+  const numInvalidOCRPredictions = withOCR.length - deduplicatedOCR.length;
+  const numDeduplicatedOCRPredictions =
+    validOCR.length - deduplicatedOCR.length;
+  const totalOCRTextCount = deduplicatedOCR.reduce(
+    (sum, { ocr_text }) => sum + ocr_text.length,
+    0,
+  );
+  const estMinutesNeeded = totalOCRTextCount / 1000;
+
+  await saveOCRPredictions(deduplicatedOCR, options.pageName, options.outDir, {
+    invalidOCRTextCount: numInvalidOCRPredictions,
+    deduplicatedOCRTextCount: numDeduplicatedOCRPredictions,
+    totalOCRTextCount,
+    estMinutesNeeded,
+  });
+
+  return deduplicatedOCR;
 }
 
 /**
@@ -166,4 +173,38 @@ function deduplicateOCRPredictionsByText(
   );
 
   return unique;
+}
+
+async function saveOCRPredictions(
+  ocrPredictions: OCRPrediction[],
+  pageName: string,
+  outDir: string,
+  metadata: {
+    invalidOCRTextCount: number;
+    deduplicatedOCRTextCount: number;
+    totalOCRTextCount: number;
+    estMinutesNeeded: number;
+  },
+) {
+  const ocrPredictionsFile = join(outDir, `${pageName}-ocr-predictions.json`);
+  await fs.writeFile(
+    ocrPredictionsFile,
+    JSON.stringify(
+      {
+        page: pageName,
+        timestamp: new Date().toISOString(),
+        totalPredictions: ocrPredictions.length,
+        totalTextChars: metadata.totalOCRTextCount,
+        elevenLabsMinutesNeeded: metadata.estMinutesNeeded,
+        removed: {
+          invalidText: metadata.invalidOCRTextCount,
+          textDuplicates: metadata.deduplicatedOCRTextCount,
+        },
+        predictions: ocrPredictions,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`   💾 Saved OCR predictions to: ${ocrPredictionsFile}`);
 }
