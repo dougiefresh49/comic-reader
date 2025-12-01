@@ -59,6 +59,7 @@ async function getPageData(
         y: number;
         width: number;
         height: number;
+        index?: number;
       };
       ocr_text: string;
       type: string;

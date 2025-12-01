@@ -6,6 +6,10 @@ import Image from "next/image";
 interface Bubble {
   id: string;
   box_2d: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
     index?: number;
   };
   ocr_text: string;
