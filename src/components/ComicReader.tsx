@@ -76,39 +76,32 @@ export default function ComicReader({
       const containerRect = container.getBoundingClientRect();
       const imgRect = imgElement.getBoundingClientRect();
 
-      // Calculate the actual rendered image dimensions and position
-      // The image uses object-contain, so it's centered within the container
-      const renderedWidth = imgRect.width;
-      const renderedHeight = imgRect.height;
-      
-      // Calculate offset: where the image starts relative to container
-      // This accounts for object-contain centering
-      const offsetX = imgRect.left - containerRect.left;
-      const offsetY = imgRect.top - containerRect.top;
-      
-      // Calculate expected rendered size based on object-contain
+      // Calculate expected size based on object-contain behavior
+      // object-contain scales the image to fit while maintaining aspect ratio
       const naturalAspect = imgElement.naturalWidth / imgElement.naturalHeight;
       const containerAspect = containerRect.width / containerRect.height;
-      
+
       let expectedWidth: number;
       let expectedHeight: number;
-      let expectedOffsetX: number;
-      let expectedOffsetY: number;
-      
+
       if (naturalAspect > containerAspect) {
         // Image is wider - fit to width
         expectedWidth = containerRect.width;
         expectedHeight = containerRect.width / naturalAspect;
-        expectedOffsetX = 0;
-        expectedOffsetY = (containerRect.height - expectedHeight) / 2;
       } else {
         // Image is taller - fit to height
         expectedHeight = containerRect.height;
         expectedWidth = containerRect.height * naturalAspect;
-        expectedOffsetX = (containerRect.width - expectedWidth) / 2;
-        expectedOffsetY = 0;
       }
-      
+
+      // Calculate offset: where the image should be positioned (object-contain centers it)
+      const offsetX = (containerRect.width - expectedWidth) / 2;
+      const offsetY = (containerRect.height - expectedHeight) / 2;
+
+      // Use the expected dimensions for calculations (not the actual rendered size)
+      const actualRenderedWidth = expectedWidth;
+      const actualRenderedHeight = expectedHeight;
+
       console.log("📐 Image Size Update:", {
         natural: {
           width: imgElement.naturalWidth,
@@ -121,28 +114,24 @@ export default function ComicReader({
           aspect: containerAspect,
         },
         rendered: {
-          width: renderedWidth,
-          height: renderedHeight,
+          width: imgRect.width,
+          height: imgRect.height,
         },
         expected: {
           width: expectedWidth,
           height: expectedHeight,
-          offsetX: expectedOffsetX,
-          offsetY: expectedOffsetY,
-        },
-        actual: {
           offsetX,
           offsetY,
         },
         scale: {
-          x: renderedWidth / imgElement.naturalWidth,
-          y: renderedHeight / imgElement.naturalHeight,
+          x: actualRenderedWidth / imgElement.naturalWidth,
+          y: actualRenderedHeight / imgElement.naturalHeight,
         },
       });
 
       setImageSize({
-        width: renderedWidth,
-        height: renderedHeight,
+        width: actualRenderedWidth,
+        height: actualRenderedHeight,
         naturalWidth: imgElement.naturalWidth,
         naturalHeight: imgElement.naturalHeight,
         offsetX,
@@ -407,7 +396,7 @@ export default function ComicReader({
             const scaleY = imageSize.height / imageSize.naturalHeight;
             // Use the smaller scale to ensure we don't stretch
             const uniformScale = Math.min(scaleX, scaleY);
-            
+
             // Convert to displayed image coordinates using uniform scale
             const displayedX = box.x * uniformScale;
             const displayedY = box.y * uniformScale;
