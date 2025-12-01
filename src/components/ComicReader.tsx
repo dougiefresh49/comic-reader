@@ -1,19 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-
-interface Box2D {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  index?: number;
-}
 
 interface Bubble {
   id: string;
-  box_2d: Box2D;
+  box_2d: {
+    index?: number;
+  };
   ocr_text: string;
   type: "SPEECH" | "NARRATION" | "CAPTION" | "SFX" | "BACKGROUND";
   speaker: string | null;
@@ -48,165 +42,46 @@ export default function ComicReader({
   bookId,
   issueId,
 }: ComicReaderProps) {
-  const [imageSize, setImageSize] = useState<{
-    width: number;
-    height: number;
-    naturalWidth: number;
-    naturalHeight: number;
-    offsetX: number;
-    offsetY: number;
-  } | null>(null);
-  const [activeBubble, setActiveBubble] = useState<string | null>(null);
+  const [currentBubbleIndex, setCurrentBubbleIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isAutoPlay, setIsAutoPlay] = useState(false);
   const [highlightedRange, setHighlightedRange] = useState<{
     start: number;
     end: number;
   } | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const imageRef = useRef<HTMLDivElement>(null);
 
-  // Function to update image size and position
-  const updateImageSize = useCallback(() => {
-    if (imageRef.current) {
-      // Find the actual img element (Next.js Image wraps it)
-      const imgElement = imageRef.current.querySelector("img");
-      if (!imgElement) return;
+  // Filter out ignored bubbles and non-speech bubbles, then sort by index
+  const visibleBubbles = bubbles
+    .filter(
+      (b) =>
+        !b.ignored &&
+        (b.type === "SPEECH" || b.type === "NARRATION" || b.type === "CAPTION"),
+    )
+    .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0));
 
-      const container = imageRef.current;
-      const containerRect = container.getBoundingClientRect();
-      const imgRect = imgElement.getBoundingClientRect();
+  const currentBubble = visibleBubbles[currentBubbleIndex] ?? null;
 
-      // Calculate expected size based on object-contain behavior
-      // object-contain scales the image to fit while maintaining aspect ratio
-      const naturalAspect = imgElement.naturalWidth / imgElement.naturalHeight;
-      const containerAspect = containerRect.width / containerRect.height;
+  // Play current bubble
+  const playCurrentBubble = () => {
+    if (!currentBubble) return;
 
-      let expectedWidth: number;
-      let expectedHeight: number;
-
-      if (naturalAspect > containerAspect) {
-        // Image is wider - fit to width
-        expectedWidth = containerRect.width;
-        expectedHeight = containerRect.width / naturalAspect;
-      } else {
-        // Image is taller - fit to height
-        expectedHeight = containerRect.height;
-        expectedWidth = containerRect.height * naturalAspect;
-      }
-
-      // Calculate offset: where the image should be positioned (object-contain centers it)
-      const offsetX = (containerRect.width - expectedWidth) / 2;
-      const offsetY = (containerRect.height - expectedHeight) / 2;
-
-      // Use the expected dimensions for calculations (not the actual rendered size)
-      const actualRenderedWidth = expectedWidth;
-      const actualRenderedHeight = expectedHeight;
-
-      console.log("📐 Image Size Update:", {
-        natural: {
-          width: imgElement.naturalWidth,
-          height: imgElement.naturalHeight,
-          aspect: naturalAspect,
-        },
-        container: {
-          width: containerRect.width,
-          height: containerRect.height,
-          aspect: containerAspect,
-        },
-        rendered: {
-          width: imgRect.width,
-          height: imgRect.height,
-        },
-        expected: {
-          width: expectedWidth,
-          height: expectedHeight,
-          offsetX,
-          offsetY,
-        },
-        scale: {
-          x: actualRenderedWidth / imgElement.naturalWidth,
-          y: actualRenderedHeight / imgElement.naturalHeight,
-        },
-      });
-
-      setImageSize({
-        width: actualRenderedWidth,
-        height: actualRenderedHeight,
-        naturalWidth: imgElement.naturalWidth,
-        naturalHeight: imgElement.naturalHeight,
-        offsetX,
-        offsetY,
-      });
-    }
-  }, []);
-
-  // Filter out ignored bubbles and non-speech bubbles
-  const visibleBubbles = bubbles.filter(
-    (b) =>
-      !b.ignored &&
-      (b.type === "SPEECH" || b.type === "NARRATION" || b.type === "CAPTION"),
-  );
-
-  // Calculate scale factor between displayed image and natural image size
-  const scaleX = imageSize ? imageSize.width / imageSize.naturalWidth : 1;
-  const scaleY = imageSize ? imageSize.height / imageSize.naturalHeight : 1;
-
-  // Handle image load to get actual dimensions
-  const handleImageLoad = () => {
-    // Use multiple timeouts to ensure the image is fully rendered and positioned
-    setTimeout(updateImageSize, 0);
-    setTimeout(updateImageSize, 50);
-    setTimeout(updateImageSize, 200);
-  };
-
-  // Recalculate on window resize and layout changes
-  useEffect(() => {
-    if (!imageRef.current) return;
-
-    const handleResize = () => {
-      updateImageSize();
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    // Use ResizeObserver to detect when container or image size changes
-    const resizeObserver = new ResizeObserver(() => {
-      updateImageSize();
-    });
-
-    resizeObserver.observe(imageRef.current);
-
-    // Also observe the img element if it exists
-    const imgElement = imageRef.current.querySelector("img");
-    if (imgElement) {
-      resizeObserver.observe(imgElement);
-    }
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      resizeObserver.disconnect();
-    };
-  }, [updateImageSize]);
-
-  // Handle bubble click
-  const handleBubbleClick = (bubble: Bubble) => {
     // Stop any currently playing audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
 
-    setActiveBubble(bubble.id);
     setIsPlaying(true);
     setHighlightedRange(null);
 
     // Load and play audio
-    const audioUrl = `/comics/${bookId}/${issueId}/audio/${bubble.id}.mp3`;
+    const audioUrl = `/comics/${bookId}/${issueId}/audio/${currentBubble.id}.mp3`;
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
     // Get timestamps for this bubble
-    const bubbleTimestamps = timestamps[bubble.id] as
+    const bubbleTimestamps = timestamps[currentBubble.id] as
       | {
           alignment?: CharacterAlignment;
           normalized_alignment?: CharacterAlignment;
@@ -257,42 +132,71 @@ export default function ComicReader({
           intervalId = null;
         }
         setIsPlaying(false);
-        setActiveBubble(null);
         setHighlightedRange(null);
-      };
-
-      const handlePause = () => {
-        setIsPlaying(false);
-      };
-
-      const handlePlay = () => {
-        setIsPlaying(true);
+        // Auto-advance to next bubble if auto-play is enabled
+        if (isAutoPlay) {
+          goToNextBubble();
+        }
       };
 
       audio.addEventListener("ended", handleEnded);
-      audio.addEventListener("pause", handlePause);
-      audio.addEventListener("play", handlePlay);
     } else {
       // No timestamps available, just play audio without highlighting
       audio.addEventListener("ended", () => {
         setIsPlaying(false);
-        setActiveBubble(null);
-      });
-
-      audio.addEventListener("pause", () => {
-        setIsPlaying(false);
-      });
-
-      audio.addEventListener("play", () => {
-        setIsPlaying(true);
+        // Auto-advance to next bubble if auto-play is enabled
+        if (isAutoPlay) {
+          goToNextBubble();
+        }
       });
     }
+
+    audio.addEventListener("pause", () => {
+      setIsPlaying(false);
+    });
+
+    audio.addEventListener("play", () => {
+      setIsPlaying(true);
+    });
 
     audio.play().catch((error) => {
       console.error("Error playing audio:", error);
       setIsPlaying(false);
-      setActiveBubble(null);
     });
+  };
+
+  // Go to next bubble
+  const goToNextBubble = () => {
+    if (currentBubbleIndex < visibleBubbles.length - 1) {
+      setCurrentBubbleIndex(currentBubbleIndex + 1);
+    } else {
+      // Reached the end, stop auto-play
+      setIsAutoPlay(false);
+    }
+  };
+
+  // Pause current audio
+  const pauseAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  // Toggle auto-play
+  const toggleAutoPlay = () => {
+    setIsAutoPlay(!isAutoPlay);
+    // If enabling auto-play and not currently playing, start playing
+    if (!isAutoPlay && !isPlaying && currentBubble) {
+      playCurrentBubble();
+    }
+  };
+
+  // Go to previous bubble
+  const goToPreviousBubble = () => {
+    if (currentBubbleIndex > 0) {
+      setCurrentBubbleIndex(currentBubbleIndex - 1);
+    }
   };
 
   // Cleanup on unmount
@@ -304,6 +208,25 @@ export default function ComicReader({
     };
   }, []);
 
+  // Auto-play when bubble changes (if auto-play is enabled)
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    setIsPlaying(false);
+    setHighlightedRange(null);
+
+    // If auto-play is enabled, automatically play the new bubble
+    if (isAutoPlay && currentBubble) {
+      // Small delay to ensure audio is stopped
+      setTimeout(() => {
+        playCurrentBubble();
+      }, 100);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBubbleIndex, isAutoPlay]);
+
   // Render text with highlighting
   const renderTextWithHighlight = (bubble: Bubble) => {
     const bubbleTimestamps = timestamps[bubble.id];
@@ -311,7 +234,7 @@ export default function ComicReader({
       bubbleTimestamps?.normalized_alignment || bubbleTimestamps?.alignment;
     const text = bubble.textWithCues || bubble.ocr_text;
 
-    if (!alignment || activeBubble !== bubble.id || !highlightedRange) {
+    if (!alignment || !highlightedRange) {
       return <span>{text}</span>;
     }
 
@@ -363,10 +286,27 @@ export default function ComicReader({
     return <>{result}</>;
   };
 
+  if (!currentBubble) {
+    return (
+      <div className="flex justify-center">
+        <div className="relative aspect-[2/3] w-full max-w-2xl">
+          <Image
+            src={pageImage}
+            alt="Comic page"
+            fill
+            className="object-contain"
+            priority
+            sizes="(max-width: 768px) 100vw, 768px"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative flex justify-center">
-      <div ref={imageRef} className="relative aspect-[2/3] w-full max-w-2xl">
-        {/* Comic Page Image */}
+    <div className="relative flex flex-col items-center gap-4">
+      {/* Comic Page Image */}
+      <div className="relative aspect-[2/3] w-full max-w-2xl">
         <Image
           src={pageImage}
           alt="Comic page"
@@ -374,119 +314,75 @@ export default function ComicReader({
           className="object-contain"
           priority
           sizes="(max-width: 768px) 100vw, 768px"
-          onLoad={handleImageLoad}
         />
+      </div>
 
-        {/* Bubble Overlays */}
-        {imageSize &&
-          imageRef.current &&
-          visibleBubbles.map((bubble) => {
-            const box = bubble.box_2d;
-            const isActive = activeBubble === bubble.id;
-            const container = imageRef.current;
-            if (!container) return null;
+      {/* Audio Player Controls */}
+      <div className="w-full max-w-2xl rounded-lg bg-gray-900 p-4 text-white">
+        {/* Bubble Info */}
+        <div className="mb-4">
+          <div className="text-sm text-gray-400">
+            Bubble {currentBubbleIndex + 1} of {visibleBubbles.length}
+          </div>
+          <div className="mt-1 text-lg font-semibold">
+            {currentBubble.speaker || "Narrator"}
+          </div>
+        </div>
 
-            // Get container dimensions
-            const containerRect = container.getBoundingClientRect();
+        {/* Text Display */}
+        <div className="mb-4 min-h-[60px] rounded bg-black/50 p-3 text-sm">
+          {renderTextWithHighlight(currentBubble)}
+        </div>
 
-            // Convert bubble coordinates from natural image pixels to displayed image pixels
-            // Bubble coords are in the original image's pixel space
-            // Use uniform scale to maintain aspect ratio (object-contain behavior)
-            const scaleX = imageSize.width / imageSize.naturalWidth;
-            const scaleY = imageSize.height / imageSize.naturalHeight;
-            // Use the smaller scale to ensure we don't stretch
-            const uniformScale = Math.min(scaleX, scaleY);
+        {/* Controls */}
+        <div className="space-y-3">
+          {/* Main Play/Pause Controls */}
+          <div className="flex items-center justify-between gap-4">
+            <button
+              onClick={goToPreviousBubble}
+              disabled={currentBubbleIndex === 0}
+              className="rounded bg-gray-700 px-4 py-2 transition-colors hover:bg-gray-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
+            >
+              ← Previous
+            </button>
 
-            // Convert to displayed image coordinates using uniform scale
-            const displayedX = box.x * uniformScale;
-            const displayedY = box.y * uniformScale;
-            const displayedWidth = box.width * uniformScale;
-            const displayedHeight = box.height * uniformScale;
-
-            // Calculate position as percentage of container
-            // The image is positioned at offsetX, offsetY within the container
-            const left =
-              ((displayedX + imageSize.offsetX) / containerRect.width) * 100;
-            const top =
-              ((displayedY + imageSize.offsetY) / containerRect.height) * 100;
-            const width = (displayedWidth / containerRect.width) * 100;
-            const height = (displayedHeight / containerRect.height) * 100;
-
-            // Log first bubble for debugging
-            if (bubble.id === visibleBubbles[0]?.id) {
-              console.log("🎈 Bubble Position Calculation:", {
-                bubbleId: bubble.id,
-                original: {
-                  x: box.x,
-                  y: box.y,
-                  width: box.width,
-                  height: box.height,
-                },
-                scale: {
-                  x: scaleX,
-                  y: scaleY,
-                  uniform: uniformScale,
-                },
-                displayed: {
-                  x: displayedX,
-                  y: displayedY,
-                  width: displayedWidth,
-                  height: displayedHeight,
-                },
-                offset: {
-                  x: imageSize.offsetX,
-                  y: imageSize.offsetY,
-                },
-                container: {
-                  width: containerRect.width,
-                  height: containerRect.height,
-                },
-                final: {
-                  left: `${left}%`,
-                  top: `${top}%`,
-                  width: `${width}%`,
-                  height: `${height}%`,
-                },
-              });
-            }
-
-            return (
-              <div
-                key={bubble.id}
-                className="absolute cursor-pointer transition-all"
-                style={{
-                  left: `${left}%`,
-                  top: `${top}%`,
-                  width: `${width}%`,
-                  height: `${height}%`,
-                }}
-                onClick={() => handleBubbleClick(bubble)}
+            {isPlaying ? (
+              <button
+                onClick={pauseAudio}
+                className="flex-1 rounded bg-red-600 px-6 py-3 font-semibold transition-colors hover:bg-red-700"
               >
-                {/* Blank overlay - white rectangle to cover the bubble */}
-                <div
-                  className={`h-full w-full rounded border-2 transition-all ${
-                    isActive
-                      ? "border-yellow-400 bg-yellow-400/20"
-                      : "border-transparent bg-white/90 hover:bg-white/80"
-                  }`}
-                />
+                Pause
+              </button>
+            ) : (
+              <button
+                onClick={playCurrentBubble}
+                className="flex-1 rounded bg-blue-600 px-6 py-3 font-semibold transition-colors hover:bg-blue-700"
+              >
+                Play
+              </button>
+            )}
 
-                {/* Text display when active */}
-                {isActive && (
-                  <div className="absolute inset-0 flex items-center justify-center p-2">
-                    <div className="rounded bg-black/90 p-2 text-xs text-white">
-                      <div className="font-semibold">
-                        {bubble.speaker || "Narrator"}
-                      </div>
-                      <div className="mt-1">
-                        {renderTextWithHighlight(bubble)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+            <button
+              onClick={goToNextBubble}
+              disabled={currentBubbleIndex === visibleBubbles.length - 1}
+              className="rounded bg-gray-700 px-4 py-2 transition-colors hover:bg-gray-600 disabled:cursor-not-allowed disabled:bg-gray-800 disabled:text-gray-500"
+            >
+              Next →
+            </button>
+          </div>
+
+          {/* Auto-play Toggle */}
+          <button
+            onClick={toggleAutoPlay}
+            className={`w-full rounded px-4 py-2 font-medium transition-colors ${
+              isAutoPlay
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-gray-700 hover:bg-gray-600"
+            }`}
+          >
+            {isAutoPlay ? "⏸ Auto-play ON" : "▶ Auto-play OFF"}
+          </button>
+        </div>
       </div>
     </div>
   );
