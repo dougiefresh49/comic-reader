@@ -18,9 +18,20 @@
     "video-download": "node scripts/video-download.js",
     "download-comic-images": "python3 scripts/download_comic_images.py",
     "get-context": "tsx --env-file=.env scripts/get-context.ts",
-    "test-roboflow": "tsx --env-file=.env scripts/test-roboflow-request.ts"
+    "backfill-context": "tsx --env-file=.env scripts/backfill-context.ts",
+    "generate-character-voice-descriptions": "tsx --env-file=.env scripts/generate-character-voice-descriptions.ts",
+    "generate-voice-models": "tsx --env-file=.env scripts/generate-voice-models.ts",
+    "clean-voice-descriptions": "tsx --env-file=.env scripts/clean-voice-descriptions.ts",
+    "generate-audio": "tsx --env-file=.env scripts/generate-audio.ts",
+    "sort-bubbles": "tsx --env-file=.env scripts/sort-bubbles.ts",
+    "sort-bubbles-gemini": "tsx --env-file=.env scripts/sort-bubbles-gemini.ts",
+    "convert-pages-to-webp": "tsx --env-file=.env scripts/convert-pages-to-webp.ts",
+    "copy-to-public": "tsx --env-file=.env scripts/copy-to-public.ts",
+    "generate-manifest": "tsx --env-file=.env scripts/generate-manifest.ts",
+    "regenerate-timestamps": "tsx --env-file=.env scripts/regenerate-timestamps.ts"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.25.1",
     "@google/genai": "^1.30.0",
     "@t3-oss/env-nextjs": "^0.12.0",
     "fs-extra": "^11.3.2",

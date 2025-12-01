@@ -22,20 +22,21 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
 // Paths
-const ASSETS_DIR = join(
+const ISSUE = "issue-2";
+const ISSUE_DIR = join(
   PROJECT_ROOT,
   "assets",
   "comics",
   "tmnt-mmpr-iii",
-  "issue-1",
-  "pages",
+  ISSUE,
 );
-const CACHE_FILE = join(PROJECT_ROOT, "data", "context-cache.json");
-const PREDICTIONS_DIR = join(PROJECT_ROOT, "data", "predictions");
-const OCR_CROPS_DIR = join(PROJECT_ROOT, "data", "ocr-crops");
-
+const ASSETS_DIR = join(ISSUE_DIR, "pages");
+const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+const PREDICTIONS_DIR = join(ISSUE_DIR, "data", "predictions");
+const OCR_CROPS_DIR = join(ISSUE_DIR, "data", "ocr-crops");
+const GEMINI_CONTEXT_DIR = join(ISSUE_DIR, "data", "gemini-context");
 // Concurrency limit
-const LIMIT = pLimit(3);
+const LIMIT = pLimit(2);
 
 // Tolerance for spatial deduplication (5% as per spec)
 const SPATIAL_TOLERANCE = 0.05;
@@ -54,7 +55,7 @@ async function main() {
     console.log("🚀 Starting get-context script...\n");
 
     // Parse command-line arguments
-    const { page: pageNum, useSpatialDedup, skipGemini } = parseArgs();
+    const { page: pageNum, startAt, useSpatialDedup, skipGemini } = parseArgs();
 
     // Initialize Gemini
     const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
@@ -68,7 +69,7 @@ async function main() {
     await fs.ensureDir(dirname(CACHE_FILE));
     await fs.ensureDir(PREDICTIONS_DIR);
     await fs.ensureDir(OCR_CROPS_DIR);
-
+    await fs.ensureDir(GEMINI_CONTEXT_DIR);
     // Load existing cache
     let cache: ContextCache = {};
     try {
@@ -81,7 +82,7 @@ async function main() {
       console.log("No existing cache found, starting fresh\n");
     }
 
-    const pageFiles = await getPageFiles(ASSETS_DIR, pageNum);
+    const pageFiles = await getPageFiles(ASSETS_DIR, pageNum, startAt);
 
     // Process pages with concurrency limit
     const results = await Promise.all(
@@ -118,6 +119,11 @@ async function main() {
       console.log(
         `  Processed single page: page-${String(pageNum).padStart(2, "0")}.jpg`,
       );
+    } else if (startAt !== null) {
+      console.log(
+        `  Processed pages starting from: page-${String(startAt).padStart(2, "0")}.jpg`,
+      );
+      console.log(`  Total pages processed: ${Object.keys(cache).length}`);
     } else {
       console.log(`  Total pages processed: ${Object.keys(cache).length}`);
     }
@@ -138,6 +144,7 @@ async function main() {
  */
 function parseArgs(): {
   page: number | null;
+  startAt: number | null;
   useSpatialDedup: boolean;
   skipGemini: boolean;
 } {
@@ -150,6 +157,7 @@ Usage: npm run get-context [options]
 
 Options:
   --page=N, --page N, -p N     Process only the specified page number (e.g., --page=3 for page-03.jpg)
+  --start-at=N                 Process pages starting from the specified page number (e.g., --start-at=5 processes pages 5, 6, 7, etc.)
   --use-spatial-dedup           Enable spatial deduplication (disabled by default)
   --skip-gemini                 Stop before Gemini analysis (for validation)
   --help, -h                    Show this help message
@@ -157,6 +165,7 @@ Options:
 Examples:
   npm run get-context                           Process all pages
   npm run get-context --page=3                  Process only page-03.jpg
+  npm run get-context --start-at=5              Process pages starting from page-05.jpg onwards
   npm run get-context --page=3 --skip-gemini    Process page-03 but stop before Gemini
   npm run get-context --use-spatial-dedup       Enable spatial deduplication
 `);
@@ -164,6 +173,7 @@ Examples:
   }
 
   let page: number | null = null;
+  let startAt: number | null = null;
   let useSpatialDedup = false;
   let skipGemini = false;
 
@@ -186,6 +196,21 @@ Examples:
         }
       }
     }
+    if (arg.startsWith("--start-at=")) {
+      const startPage = parseInt(arg.split("=")[1] ?? "", 10);
+      if (!isNaN(startPage) && startPage > 0) {
+        startAt = startPage;
+      }
+    }
+    if (arg === "--start-at") {
+      const nextArg = args[i + 1];
+      if (nextArg) {
+        const startPage = parseInt(nextArg, 10);
+        if (!isNaN(startPage) && startPage > 0) {
+          startAt = startPage;
+        }
+      }
+    }
     if (arg === "--use-spatial-dedup") {
       useSpatialDedup = true;
     }
@@ -194,7 +219,7 @@ Examples:
     }
   }
 
-  return { page, useSpatialDedup, skipGemini };
+  return { page, startAt, useSpatialDedup, skipGemini };
 }
 
 /**
@@ -243,6 +268,7 @@ async function processPage(
     pageName,
     {
       skipGemini: options.skipGemini,
+      outDir: GEMINI_CONTEXT_DIR,
     },
   );
 
@@ -263,6 +289,7 @@ async function processPage(
 async function getPageFiles(
   assetsDir: string,
   pageNum: number | null,
+  startAt: number | null,
 ): Promise<string[]> {
   // Get list of page images
   let pageFiles = await glob("page-*.jpg", {
@@ -270,6 +297,8 @@ async function getPageFiles(
     absolute: true,
   });
   pageFiles.sort();
+
+  // If --page is specified, it takes precedence (process only that page)
   if (pageNum !== null) {
     const targetPage = `page-${String(pageNum).padStart(2, "0")}.jpg`;
     pageFiles = pageFiles.filter((path) => {
@@ -284,6 +313,29 @@ async function getPageFiles(
       process.exit(1);
     }
     console.log(`📄 Processing single page: ${targetPage}\n`);
+  } else if (startAt !== null) {
+    // Filter pages starting from the specified page number
+    const startPageStr = `page-${String(startAt).padStart(2, "0")}`;
+    pageFiles = pageFiles.filter((path) => {
+      const filename = path.split("/").pop() ?? "";
+      // Extract page number from filename (e.g., "page-05.jpg" -> 5)
+      const pageMatch = filename.match(/^page-(\d+)\.jpg$/);
+      if (pageMatch) {
+        const pageNumber = parseInt(pageMatch[1] ?? "", 10);
+        return !isNaN(pageNumber) && pageNumber >= startAt;
+      }
+      return false;
+    });
+
+    if (pageFiles.length === 0) {
+      console.error(
+        `❌ No pages found starting from page ${startAt} in ${assetsDir}`,
+      );
+      process.exit(1);
+    }
+    console.log(
+      `📄 Processing pages starting from: ${startPageStr}.jpg (${pageFiles.length} pages)\n`,
+    );
   } else {
     if (pageFiles.length === 0) {
       console.error(`❌ No page images found in ${assetsDir}`);

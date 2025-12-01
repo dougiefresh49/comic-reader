@@ -1,0 +1,31 @@
+{
+  "books": [
+    {
+      "id": "tmnt-mmpr-iii",
+      "name": "TMNT MMPR III",
+      "issues": [
+        {
+          "id": "issue-1",
+          "name": "Issue 1",
+          "pageCount": 26,
+          "bubbleCount": 214,
+          "audioCount": 212,
+          "hasWebP": true,
+          "hasAudio": true,
+          "hasTimestamps": true
+        },
+        {
+          "id": "issue-2",
+          "name": "Issue 2",
+          "pageCount": 24,
+          "bubbleCount": 178,
+          "audioCount": 178,
+          "hasWebP": true,
+          "hasAudio": true,
+          "hasTimestamps": true
+        }
+      ]
+    }
+  ],
+  "generatedAt": "2025-12-01T02:35:45.948Z"
+}
