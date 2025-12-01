@@ -174,7 +174,7 @@ async function main() {
       pagesWebpDest,
       ".webp",
       "WebP pages",
-      overwrite,
+      overwrite ?? false,
     );
     totalCopied += pagesResult.copied;
     totalSkipped += pagesResult.skipped;
@@ -192,7 +192,7 @@ async function main() {
       audioDest,
       ".mp3",
       "Audio",
-      overwrite,
+      overwrite ?? false,
     );
     totalCopied += audioResult.copied;
     totalSkipped += audioResult.skipped;
@@ -268,4 +268,3 @@ async function main() {
 }
 
 main();
-
