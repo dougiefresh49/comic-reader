@@ -92,11 +92,10 @@ export default function ComicReader({
         }
       | undefined;
     const alignment =
-      bubbleTimestamps?.normalized_alignment || bubbleTimestamps?.alignment;
+      bubbleTimestamps?.normalized_alignment ?? bubbleTimestamps?.alignment;
 
     if (
-      alignment &&
-      alignment.character_start_times_seconds &&
+      alignment?.character_start_times_seconds &&
       alignment.character_end_times_seconds
     ) {
       // Set up highlighting based on timestamps
@@ -235,8 +234,8 @@ export default function ComicReader({
   const renderTextWithHighlight = (bubble: Bubble) => {
     const bubbleTimestamps = timestamps[bubble.id];
     const alignment =
-      bubbleTimestamps?.normalized_alignment || bubbleTimestamps?.alignment;
-    const text = bubble.textWithCues || bubble.ocr_text;
+      bubbleTimestamps?.normalized_alignment ?? bubbleTimestamps?.alignment;
+    const text = bubble.textWithCues ?? bubble.ocr_text;
 
     if (!alignment || !highlightedRange) {
       return <span>{text}</span>;
@@ -329,7 +328,7 @@ export default function ComicReader({
             Bubble {currentBubbleIndex + 1} of {visibleBubbles.length}
           </div>
           <div className="mt-1 text-lg font-semibold">
-            {currentBubble.speaker || "Narrator"}
+            {currentBubble.speaker ?? "Narrator"}
           </div>
         </div>
 
