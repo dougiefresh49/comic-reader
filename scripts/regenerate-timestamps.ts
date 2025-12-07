@@ -210,7 +210,7 @@ async function main() {
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
     const ISSUE_DIR = join(COMIC_DIR, issue);
-    const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
     const CASTLIST_FILE = join(COMIC_DIR, "castlist.json");
     const AUDIO_DIR = join(ISSUE_DIR, "audio");
     const TIMESTAMPS_FILE = join(ISSUE_DIR, "audio-timestamps.json");

@@ -18,6 +18,7 @@ export const aliasMap = {
 
   billy: "Blue Ranger",
   "billy cranston": "Blue Ranger",
+  "master splinter": "Splinter",
 
   // Note: "Blue Ranger" wasn't in your file, but Billy was.
   // We will map Billy to Blue Ranger to keep the naming convention consistent.

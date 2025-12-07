@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Generate character voice descriptions from context-cache.json
+ * Generate character voice descriptions from bubbles.json
  *
  * Reads all voice descriptions for each character and uses Gemini 2.5 Flash
  * to generate a single consolidated voice description for Eleven Labs.
@@ -27,7 +27,7 @@ const ISSUE_DIR = join(
   "tmnt-mmpr-iii",
   ISSUE,
 );
-const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
 const OUTPUT_FILE = join(ISSUE_DIR, "character-voice-descriptions.json");
 
 // Path to reference file (existing character voice descriptions)

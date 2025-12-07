@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Backfill script to add missing aiReasoning fields to bubbles in context-cache.json
+ * Backfill script to add missing aiReasoning fields to bubbles in bubbles.json
  *
  * Finds all bubbles without aiReasoning and re-processes them through Gemini
  */
@@ -171,7 +171,7 @@ async function main() {
       issue,
     );
     const ASSETS_DIR = join(ISSUE_DIR, "pages");
-    const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
 
     console.log(`📁 Issue: ${issue}`);
     console.log(`🔑 API Key: ${apiKeyName}\n`);

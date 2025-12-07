@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { readFile } from "fs/promises";
-import { join } from "path";
 import manifest from "~/data/manifest";
 import ComicReader from "~/components/ComicReader";
+import ComicReaderOverlayTest from "~/components/ComicReaderOverlayTest";
+import { getPageData } from "~/server";
 
 interface BookPageProps {
   params: Promise<{
@@ -11,69 +11,6 @@ interface BookPageProps {
     issueId: string;
     pageNumber: string;
   }>;
-}
-
-async function getPageData(
-  bookId: string,
-  issueId: string,
-  pageNumber: string,
-) {
-  // Format page number with leading zero (e.g., "01", "02")
-  const formattedPageNum = String(parseInt(pageNumber, 10)).padStart(2, "0");
-  const pageKey = `page-${formattedPageNum}.jpg`;
-
-  try {
-    // Read context cache from public directory
-    const cachePath = join(
-      process.cwd(),
-      "public",
-      "comics",
-      bookId,
-      issueId,
-      "context-cache.json",
-    );
-    const cacheData = await readFile(cachePath, "utf-8");
-    const cache = JSON.parse(cacheData) as Record<string, unknown[]>;
-
-    // Read timestamps
-    const timestampsPath = join(
-      process.cwd(),
-      "public",
-      "comics",
-      bookId,
-      issueId,
-      "audio-timestamps.json",
-    );
-    let timestamps: Record<string, unknown> = {};
-    try {
-      const timestampsData = await readFile(timestampsPath, "utf-8");
-      timestamps = JSON.parse(timestampsData) as Record<string, unknown>;
-    } catch {
-      // Timestamps file might not exist, that's okay
-    }
-
-    const bubbles = (cache[pageKey] ?? []) as Array<{
-      id: string;
-      box_2d: {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-        index?: number;
-      };
-      ocr_text: string;
-      type: string;
-      speaker: string | null;
-      emotion: string;
-      textWithCues?: string;
-      ignored?: boolean;
-    }>;
-
-    return { bubbles, timestamps };
-  } catch (error) {
-    console.error("Error fetching page data:", error);
-    return { bubbles: [], timestamps: {} };
-  }
 }
 
 export default async function BookPage({ params }: BookPageProps) {
@@ -101,7 +38,11 @@ export default async function BookPage({ params }: BookPageProps) {
   const pageImage = `/comics/${bookId}/${issueId}/pages/page-${formattedPageNum}.webp`;
 
   // Fetch bubble data and timestamps
-  const { bubbles, timestamps } = await getPageData(bookId, issueId, pageNumber);
+  const { bubbles, timestamps } = await getPageData(
+    bookId,
+    issueId,
+    pageNumber,
+  );
 
   const prevPage = pageNum > 1 ? pageNum - 1 : null;
   const nextPage = pageNum < issue.pageCount ? pageNum + 1 : null;
@@ -128,7 +69,16 @@ export default async function BookPage({ params }: BookPageProps) {
         </div>
 
         {/* Interactive Comic Reader */}
-        <ComicReader
+        {/* <ComicReader
+          pageImage={pageImage}
+          bubbles={bubbles}
+          timestamps={timestamps}
+          bookId={bookId}
+          issueId={issueId}
+        /> */}
+
+        {/* Overlay Test Component */}
+        <ComicReaderOverlayTest
           pageImage={pageImage}
           bubbles={bubbles}
           timestamps={timestamps}
@@ -174,4 +124,3 @@ export default async function BookPage({ params }: BookPageProps) {
     </main>
   );
 }
-

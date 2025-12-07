@@ -31,7 +31,7 @@ const ISSUE_DIR = join(
   ISSUE,
 );
 const ASSETS_DIR = join(ISSUE_DIR, "pages");
-const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
 const PREDICTIONS_DIR = join(ISSUE_DIR, "data", "predictions");
 const OCR_CROPS_DIR = join(ISSUE_DIR, "data", "ocr-crops");
 const GEMINI_CONTEXT_DIR = join(ISSUE_DIR, "data", "gemini-context");

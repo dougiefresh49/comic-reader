@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Generate audio files for all bubbles in context-cache.json
+ * Generate audio files for all bubbles in bubbles.json
  *
  * For each bubble:
  * 1. Normalize character name using alias-map
@@ -115,7 +115,15 @@ function findFuzzyMatch(
 
 /**
  * Map emotion string to voice settings for overall tone
- * Adjusts stability and style based on emotional intensity
+ * Uses ElevenLabs v3 stability values:
+ * - 0.0 = Creative (more emotional and expressive, prone to hallucinations)
+ * - 0.5 = Natural (balanced, closest to original voice recording)
+ * - 1.0 = Robust (highly stable, less responsive to prompts, consistent like v2)
+ *
+ * Style amplifies the original speaker's style characteristics.
+ * Higher values increase expressiveness but use more computational resources.
+ *
+ * Based on testing, Creative and Natural produce the best results.
  */
 function getVoiceSettingsFromEmotion(emotion: string): {
   stability?: number;
@@ -125,71 +133,75 @@ function getVoiceSettingsFromEmotion(emotion: string): {
 } {
   const lowerEmotion = emotion.toLowerCase().trim();
 
-  // Default settings (balanced)
-  let stability = 0.5;
-  let style = 0.0;
+  // Default settings (Natural - balanced)
+  let stability: 0.0 | 0.5 | 1.0 = 0.5; // Natural
+  let style = 0.0; // No style amplification by default
   let speed = 1.0;
 
-  // High intensity emotions - lower stability for more expressiveness
+  // High intensity emotions - use Creative (0.0) for maximum expressiveness
   if (
     lowerEmotion.includes("angry") ||
     lowerEmotion.includes("furious") ||
     lowerEmotion.includes("rage") ||
     lowerEmotion.includes("shouting") ||
     lowerEmotion.includes("screaming") ||
-    lowerEmotion.includes("yelling")
+    lowerEmotion.includes("yelling") ||
+    lowerEmotion.includes("ecstatic") ||
+    lowerEmotion.includes("terrified") ||
+    lowerEmotion.includes("distraught")
   ) {
-    stability = 0.3; // More expressive
-    style = 0.3; // More style exaggeration
+    stability = 0.0; // Creative - maximum emotional range
+    style = 0.5; // High style amplification for maximum expressiveness
     speed = 1.1; // Slightly faster
   }
-  // Sad/depressed emotions
+  // Sarcastic/mocking - style is a key characteristic, so amplify it
+  else if (
+    lowerEmotion.includes("sarcastic") ||
+    lowerEmotion.includes("mocking") ||
+    lowerEmotion.includes("snide")
+  ) {
+    stability = 0.0; // Creative - for emotional expressiveness
+    style = 0.5; // High style amplification to emphasize sarcastic/mocking tone
+    speed = 1.0;
+  }
+  // Emotional but moderate intensity - use Creative (0.0)
   else if (
     lowerEmotion.includes("sad") ||
     lowerEmotion.includes("depressed") ||
     lowerEmotion.includes("melancholy") ||
-    lowerEmotion.includes("distraught") ||
-    lowerEmotion.includes("upset")
-  ) {
-    stability = 0.4; // More expressive
-    style = 0.2;
-    speed = 0.9; // Slightly slower
-  }
-  // Excited/happy emotions
-  else if (
+    lowerEmotion.includes("upset") ||
     lowerEmotion.includes("excited") ||
     lowerEmotion.includes("enthusiastic") ||
     lowerEmotion.includes("happy") ||
     lowerEmotion.includes("joyful") ||
-    lowerEmotion.includes("ecstatic")
-  ) {
-    stability = 0.4; // More expressive
-    style = 0.3;
-    speed = 1.1; // Slightly faster
-  }
-  // Fearful/anxious emotions
-  else if (
+    lowerEmotion.includes("surprised") ||
+    lowerEmotion.includes("shocked") ||
+    lowerEmotion.includes("astonished") ||
     lowerEmotion.includes("fear") ||
     lowerEmotion.includes("afraid") ||
     lowerEmotion.includes("anxious") ||
-    lowerEmotion.includes("nervous") ||
-    lowerEmotion.includes("terrified")
+    lowerEmotion.includes("nervous")
   ) {
-    stability = 0.35; // More expressive
-    style = 0.25;
-    speed = 1.05; // Slightly faster
+    stability = 0.0; // Creative - for emotional expressiveness
+    style = 0.3; // Moderate style amplification for emotional content
+    speed =
+      lowerEmotion.includes("sad") || lowerEmotion.includes("depressed")
+        ? 0.9 // Slower for sad emotions
+        : lowerEmotion.includes("excited") || lowerEmotion.includes("happy")
+          ? 1.1 // Faster for happy/excited
+          : 1.0; // Normal for others
   }
-  // Whispering/quiet
+  // Whispering/quiet - use Natural (0.5) for subtlety, no style needed
   else if (
     lowerEmotion.includes("whisper") ||
     lowerEmotion.includes("quiet") ||
     lowerEmotion.includes("hushed")
   ) {
-    stability = 0.5;
-    style = 0.1;
+    stability = 0.5; // Natural - balanced for subtle emotions
+    style = 0.0; // No style amplification for subtle delivery
     speed = 0.95; // Slightly slower
   }
-  // Stoic/calm/neutral
+  // Stoic/calm/neutral - use Robust (1.0) for consistency
   else if (
     lowerEmotion.includes("stoic") ||
     lowerEmotion.includes("calm") ||
@@ -197,30 +209,12 @@ function getVoiceSettingsFromEmotion(emotion: string): {
     lowerEmotion.includes("firm") ||
     lowerEmotion.includes("defiant")
   ) {
-    stability = 0.6; // More stable/consistent
-    style = 0.0; // Less style
+    stability = 1.0; // Robust - highly stable for neutral delivery
+    style = 0.0; // No style amplification for neutral delivery
     speed = 1.0; // Normal speed
   }
-  // Sarcastic/mocking
-  else if (
-    lowerEmotion.includes("sarcastic") ||
-    lowerEmotion.includes("mocking") ||
-    lowerEmotion.includes("snide")
-  ) {
-    stability = 0.4;
-    style = 0.3;
-    speed = 1.0;
-  }
-  // Surprised/shocked
-  else if (
-    lowerEmotion.includes("surprised") ||
-    lowerEmotion.includes("shocked") ||
-    lowerEmotion.includes("astonished")
-  ) {
-    stability = 0.35;
-    style = 0.3;
-    speed = 1.05;
-  }
+  // Default to Natural (0.5) if no match
+  // stability already set to 0.5 above, style = 0.0
 
   return {
     stability,
@@ -228,145 +222,6 @@ function getVoiceSettingsFromEmotion(emotion: string): {
     style,
     speed,
   };
-}
-
-/**
- * Convert Gemini cues to ElevenLabs-compatible audio tags
- * Removes invalid cues and maps common patterns to valid tags
- */
-function convertCuesToElevenLabsTags(text: string): string {
-  // Remove all bracket-enclosed cues that aren't valid ElevenLabs tags
-  // Valid ElevenLabs v3 tags (from documentation):
-  const validTags = new Set([
-    // Emotional/directional
-    "happy",
-    "sad",
-    "excited",
-    "angry",
-    "annoyed",
-    "appalled",
-    "thoughtful",
-    "surprised",
-    "sarcastic",
-    "curious",
-    "crying",
-    "mischievously",
-    // Voice-related
-    "whispers",
-    "whisper",
-    "laughs",
-    "laughing",
-    "laughs harder",
-    "starts laughing",
-    "wheezing",
-    "sighs",
-    "sigh",
-    "exhales",
-    "exhales sharply",
-    "inhales deeply",
-    "clears throat",
-    "chuckles",
-    "giggles",
-    // Sound effects
-    "gunshot",
-    "applause",
-    "clapping",
-    "explosion",
-    "swallows",
-    "gulps",
-    // Pauses
-    "short pause",
-    "long pause",
-    "pauses",
-    "pause",
-    // Special
-    "sings",
-    "woo",
-    "fart",
-    // Shouting variations
-    "shouting",
-    "shout",
-    "screaming",
-    "scream",
-  ]);
-
-  // Extract all bracket-enclosed cues
-  const cuePattern = /\[([^\]]+)\]/g;
-  const cues: string[] = [];
-  let match;
-  while ((match = cuePattern.exec(text)) !== null) {
-    cues.push(match[1]!);
-  }
-
-  // Filter and convert cues
-  const validCues: string[] = [];
-  for (const cue of cues) {
-    const lowerCue = cue.toLowerCase().trim();
-
-    // Check if it's a valid tag (exact match or contains valid tag)
-    let isValid = false;
-    let mappedTag: string | null = null;
-
-    // Direct match
-    if (validTags.has(lowerCue)) {
-      isValid = true;
-      mappedTag = lowerCue;
-    } else {
-      // Try to map common patterns
-      if (lowerCue.includes("whisper") || lowerCue.includes("quiet")) {
-        mappedTag = "whispers";
-        isValid = true;
-      } else if (lowerCue.includes("shout") || lowerCue.includes("yell") || lowerCue.includes("scream")) {
-        mappedTag = "shouting";
-        isValid = true;
-      } else if (lowerCue.includes("laugh") || lowerCue.includes("chuckle")) {
-        mappedTag = "laughs";
-        isValid = true;
-      } else if (lowerCue.includes("sigh") || lowerCue.includes("exhale")) {
-        mappedTag = "sighs";
-        isValid = true;
-      } else if (lowerCue.includes("sarcastic") || lowerCue.includes("sarcasm")) {
-        mappedTag = "sarcastic";
-        isValid = true;
-      } else if (lowerCue.includes("angry") || lowerCue.includes("mad") || lowerCue.includes("furious")) {
-        mappedTag = "angry";
-        isValid = true;
-      } else if (lowerCue.includes("sad") || lowerCue.includes("upset") || lowerCue.includes("distraught")) {
-        mappedTag = "sad";
-        isValid = true;
-      } else if (lowerCue.includes("excited") || lowerCue.includes("enthusiastic")) {
-        mappedTag = "excited";
-        isValid = true;
-      } else if (lowerCue.includes("happy") || lowerCue.includes("joyful")) {
-        mappedTag = "happy";
-        isValid = true;
-      } else if (lowerCue.includes("surprised") || lowerCue.includes("shocked")) {
-        mappedTag = "surprised";
-        isValid = true;
-      } else if (lowerCue.includes("pause") || lowerCue.includes("wait")) {
-        mappedTag = "short pause";
-        isValid = true;
-      }
-    }
-
-    if (isValid && mappedTag) {
-      validCues.push(mappedTag);
-    }
-  }
-
-  // Remove all bracket-enclosed text
-  let cleanedText = text.replace(/\[([^\]]+)\]/g, "").trim();
-
-  // Add valid cues at the beginning
-  if (validCues.length > 0) {
-    const tagsString = validCues.map((tag) => `[${tag}]`).join(" ");
-    cleanedText = `${tagsString} ${cleanedText}`.trim();
-  }
-
-  // Clean up extra whitespace
-  cleanedText = cleanedText.replace(/\s+/g, " ").trim();
-
-  return cleanedText;
 }
 
 /**
@@ -424,7 +279,7 @@ function parseArgs(): { issue: string; page?: string } {
   // Check for help flag
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
-Usage: npm run generate-audio [options]
+Usage: pnpm run generate-audio [options]
 
 Options:
   --issue=N, --issue N        Issue number (e.g., --issue=2 for issue-2, default: issue-2)
@@ -432,10 +287,10 @@ Options:
   --help, -h                  Show this help message
 
 Examples:
-  npm run generate-audio                    Generate audio for all pages in issue-2
-  npm run generate-audio --issue=1         Generate audio for all pages in issue-1
-  npm run generate-audio --page=06         Generate audio for page-06.jpg only
-  npm run generate-audio --issue=1 --page=03  Generate audio for page-03.jpg in issue-1
+  pnpm run generate-audio                    Generate audio for all pages in issue-2
+  pnpm run generate-audio --issue=1         Generate audio for all pages in issue-1
+  pnpm run generate-audio --page=06         Generate audio for page-06.jpg only
+  pnpm run generate-audio --issue=1 --page=03  Generate audio for page-03.jpg in issue-1
 `);
     process.exit(0);
   }
@@ -492,7 +347,7 @@ async function main() {
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
     const ISSUE_DIR = join(COMIC_DIR, issue);
-    const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
     const CASTLIST_FILE = join(COMIC_DIR, "castlist.json");
     const AUDIO_DIR = join(ISSUE_DIR, "audio");
     const NO_MATCH_FILE = join(ISSUE_DIR, "no-match-characters.json");
@@ -583,7 +438,9 @@ async function main() {
       const bubbles = cache[pageName]!;
       console.log(`📄 ${pageName} (${bubbles.length} bubbles)`);
 
-      for (const bubble of bubbles) {
+      // Process bubbles in order (assumed to be correct reading order)
+      for (let i = 0; i < bubbles.length; i++) {
+        const bubble = bubbles[i]!;
         totalBubbles++;
 
         // Skip ignored bubbles
@@ -593,16 +450,11 @@ async function main() {
         }
 
         // Skip if no text
-        let textToUse = bubble.textWithCues || bubble.ocr_text;
+        // textWithCues should already be properly formatted by repair-cues.ts
+        const textToUse = bubble.textWithCues || bubble.ocr_text;
         if (!textToUse || textToUse.trim().length === 0) {
           skipped++;
           continue;
-        }
-
-        // Convert Gemini cues to ElevenLabs-compatible audio tags
-        // This removes invalid cues and maps common patterns to valid tags
-        if (bubble.textWithCues) {
-          textToUse = convertCuesToElevenLabsTags(bubble.textWithCues);
         }
 
         // Get voice ID
@@ -637,11 +489,29 @@ async function main() {
           // Higher style = more expressive
           const voiceSettings = getVoiceSettingsFromEmotion(bubble.emotion);
 
+          // Get previous and next bubble text for continuity
+          // Bubbles are assumed to be in correct reading order
+          const previousBubble = i > 0 ? bubbles[i - 1] : null;
+          const nextBubble = i < bubbles.length - 1 ? bubbles[i + 1] : null;
+
+          // Use textWithCues directly from adjacent bubbles (or ocr_text as fallback)
+          const previousText: string | undefined = previousBubble
+            ? previousBubble.textWithCues ||
+              previousBubble.ocr_text ||
+              undefined
+            : undefined;
+          const nextText: string | undefined = nextBubble
+            ? nextBubble.textWithCues || nextBubble.ocr_text || undefined
+            : undefined;
+
           // Use text-to-speech endpoint with timestamps
-          // Default model (eleven_v3) will be used if modelId is not specified
+          // previousText and nextText help improve continuity between adjacent bubbles
           const response = await client.textToSpeech.convertWithTimestamps(
             voiceId,
             {
+              modelId: "eleven_v3",
+              // previousText: previousText,
+              // nextText: nextText,
               text: textToUse,
               voiceSettings: voiceSettings,
             },
@@ -731,10 +601,7 @@ async function main() {
 
     // Save timestamps
     console.log("⏱️  Saving audio timestamps...");
-    await fs.writeFile(
-      TIMESTAMPS_FILE,
-      JSON.stringify(timestamps, null, 2),
-    );
+    await fs.writeFile(TIMESTAMPS_FILE, JSON.stringify(timestamps, null, 2));
     console.log(
       `   ✓ Saved timestamps for ${Object.keys(timestamps).length} bubbles to ${TIMESTAMPS_FILE}\n`,
     );

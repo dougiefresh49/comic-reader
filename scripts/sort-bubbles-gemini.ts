@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Sort bubbles in context-cache.json using Gemini AI to determine reading order
+ * Sort bubbles in bubbles.json using Gemini AI to determine reading order
  *
  * For each page, sends bubble information to Gemini and asks it to determine
  * the correct reading order based on visual context and narrative flow.
@@ -275,7 +275,7 @@ async function main() {
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
     const ISSUE_DIR = join(COMIC_DIR, issue);
-    const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
     const PAGES_DIR = join(ISSUE_DIR, "pages");
 
     console.log(`📁 Issue: ${issue}`);

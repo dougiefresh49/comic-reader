@@ -2,34 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-
-interface Bubble {
-  id: string;
-  box_2d: {
-    x?: number;
-    y?: number;
-    width?: number;
-    height?: number;
-    index?: number;
-  };
-  ocr_text: string;
-  type: "SPEECH" | "NARRATION" | "CAPTION" | "SFX" | "BACKGROUND";
-  speaker: string | null;
-  emotion: string;
-  textWithCues?: string;
-  ignored?: boolean;
-}
-
-interface CharacterAlignment {
-  characters: string[];
-  character_start_times_seconds: number[];
-  character_end_times_seconds: number[];
-}
-
-interface AudioTimestamps {
-  alignment: CharacterAlignment | null;
-  normalized_alignment: CharacterAlignment | null;
-}
+import type { Bubble, CharacterAlignment, AudioTimestamps } from "~/types";
 
 interface ComicReaderProps {
   pageImage: string;

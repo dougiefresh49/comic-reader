@@ -6,7 +6,7 @@
  * Copies:
  * - WebP page images (from pages-webp/)
  * - Audio files (from audio/)
- * - JSON data files (context-cache.json, audio-timestamps.json)
+ * - JSON data files (bubbles.json, audio-timestamps.json, pages.json)
  * - Castlist (from root comic directory)
  *
  * Files are organized in public/comics/tmnt-mmpr-iii/issue-X/ for Next.js serving
@@ -201,21 +201,38 @@ async function main() {
       `   ✓ Copied: ${audioResult.copied}, Skipped: ${audioResult.skipped}, Errors: ${audioResult.errors}\n`,
     );
 
-    // 3. Copy context-cache.json
-    console.log("📄 Copying context-cache.json...");
-    const contextCacheSource = join(ISSUE_DIR, "context-cache.json");
-    const contextCacheDest = join(PUBLIC_COMIC_DIR, "context-cache.json");
-    if (await fs.pathExists(contextCacheSource)) {
-      if (!overwrite && (await fs.pathExists(contextCacheDest))) {
+    // 3. Copy bubbles.json
+    console.log("📄 Copying bubbles.json...");
+    const bubblesSource = join(ISSUE_DIR, "bubbles.json");
+    const bubblesDest = join(PUBLIC_COMIC_DIR, "bubbles.json");
+    if (await fs.pathExists(bubblesSource)) {
+      if (!overwrite && (await fs.pathExists(bubblesDest))) {
         console.log("   ⏭️  Skipped (already exists)\n");
         totalSkipped++;
       } else {
-        await fs.copy(contextCacheSource, contextCacheDest);
+        await fs.copy(bubblesSource, bubblesDest);
         console.log("   ✓ Copied\n");
         totalCopied++;
       }
     } else {
       console.log("   ⚠️  File not found\n");
+    }
+
+    // 4. Copy pages.json
+    console.log("📄 Copying pages.json...");
+    const pagesSource = join(ISSUE_DIR, "pages.json");
+    const pagesDest = join(PUBLIC_COMIC_DIR, "pages.json");
+    if (await fs.pathExists(pagesSource)) {
+      if (!overwrite && (await fs.pathExists(pagesDest))) {
+        console.log("   ⏭️  Skipped (already exists)\n");
+        totalSkipped++;
+      } else {
+        await fs.copy(pagesSource, pagesDest);
+        console.log("   ✓ Copied\n");
+        totalCopied++;
+      }
+    } else {
+      console.log("   ⚠️  File not found (optional)\n");
     }
 
     // 4. Copy audio-timestamps.json

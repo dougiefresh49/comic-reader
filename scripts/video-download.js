@@ -4,11 +4,11 @@ import path from "path";
 
 // --- CONFIGURATION ---
 // 1. Paste the YouTube URL you want to test
-const YOUTUBE_URL = "https://www.youtube.com/watch?v=OPgQr_WC_Zk"; // Your TMNT clip
+const YOUTUBE_URL = "https://www.youtube.com/watch?v=K3VOf3CBGvw"; // Your TMNT clip
 
 // 2. Define your output folder and file name
 const OUTPUT_DIR = "./video-test-files"; // New folder for video
-const OUTPUT_FILENAME = "test_video.mp4";
+const OUTPUT_FILENAME = "narrator2.mp4";
 // --- END CONFIGURATION ---
 
 const outputPath = path.join(OUTPUT_DIR, OUTPUT_FILENAME);

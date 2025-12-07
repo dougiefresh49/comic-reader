@@ -1,0 +1,13 @@
+---
+description: Enforces the use of pnpm for package management.
+alwaysApply: true
+---
+
+# Package Management Guidelines
+
+- **MUST** use `pnpm` for all package management operations (installing, adding, removing dependencies).
+- **DO NOT** use `npm` or `yarn`.
+- **Ensure** `pnpm-lock.yaml` is always up-to-date and committed.
+- **When adding a new dependency**, use the correct `pnpm` commands, for example:
+  - `pnpm add <package-name>`
+  - `pnpm add -D <dev-dependency-name>`

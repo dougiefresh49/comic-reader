@@ -85,7 +85,7 @@ async function getIssueStats(
 ): Promise<IssueManifest> {
   const pagesWebpDir = join(issuePath, "pages-webp");
   const audioDir = join(issuePath, "audio");
-  const contextCacheFile = join(issuePath, "context-cache.json");
+  const bubblesFile = join(issuePath, "bubbles.json");
   const timestampsFile = join(issuePath, "audio-timestamps.json");
 
   // Count WebP pages
@@ -106,12 +106,12 @@ async function getIssueStats(
     hasAudio = audioCount > 0;
   }
 
-  // Count bubbles from context-cache
+  // Count bubbles from bubbles.json
   let bubbleCount = 0;
-  if (await fs.pathExists(contextCacheFile)) {
+  if (await fs.pathExists(bubblesFile)) {
     try {
       const cache = JSON.parse(
-        await fs.readFile(contextCacheFile, "utf-8"),
+        await fs.readFile(bubblesFile, "utf-8"),
       ) as Record<string, unknown[]>;
       bubbleCount = Object.values(cache).reduce(
         (sum, bubbles) => sum + bubbles.length,
@@ -119,7 +119,7 @@ async function getIssueStats(
       );
     } catch (error) {
       console.warn(
-        `   ⚠️  Could not read context-cache.json for ${issueId}: ${error}`,
+        `   ⚠️  Could not read bubbles.json for ${issueId}: ${error}`,
       );
     }
   }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Sort bubbles in context-cache.json by their position on the page
+ * Sort bubbles in bubbles.json by their position on the page
  *
  * Sorts bubbles by:
  * 1. Y-coordinate (top to bottom)
@@ -110,7 +110,7 @@ async function main() {
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
     const ISSUE_DIR = join(COMIC_DIR, issue);
-    const CACHE_FILE = join(ISSUE_DIR, "context-cache.json");
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
 
     console.log(`📁 Issue: ${issue}`);
     console.log(`📖 Cache: ${CACHE_FILE}`);
