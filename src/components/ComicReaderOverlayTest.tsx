@@ -140,7 +140,10 @@ export default function ComicReaderOverlayTest({
       // If already selected, toggle play/pause
       if (audioRef.current) {
         if (audioRef.current.paused) {
-          audioRef.current.play();
+          audioRef.current.play().catch((error) => {
+            console.error("Error playing audio:", error);
+            setIsPlaying(false);
+          });
         } else {
           audioRef.current.pause();
         }
