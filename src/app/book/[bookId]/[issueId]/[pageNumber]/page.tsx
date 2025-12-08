@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import manifest from "~/data/manifest";
-import ComicReader from "~/components/ComicReader";
-import ComicReaderOverlayTest from "~/components/ComicReaderOverlayTest";
+import ZenComicReader from "~/components/ZenComicReader";
 import { getPageData } from "~/server";
 
 interface BookPageProps {
@@ -47,80 +45,25 @@ export default async function BookPage({ params }: BookPageProps) {
   const prevPage = pageNum > 1 ? pageNum - 1 : null;
   const nextPage = pageNum < issue.pageCount ? pageNum + 1 : null;
 
+  const prevPageLink = prevPage
+    ? `/book/${bookId}/${issueId}/${prevPage}`
+    : null;
+  const nextPageLink = nextPage
+    ? `/book/${bookId}/${issueId}/${nextPage}`
+    : null;
+
   return (
     <main className="min-h-screen bg-black">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-4 flex items-center justify-between text-white">
-          <div>
-            <Link
-              href={`/book/${bookId}`}
-              className="text-sm text-gray-400 hover:text-white"
-            >
-              ← Back to {book.name}
-            </Link>
-            <h1 className="mt-1 text-2xl font-bold">{book.name}</h1>
-            <p className="text-gray-400">{issue.name}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-400">
-              Page {pageNum} of {issue.pageCount}
-            </p>
-          </div>
-        </div>
-
-        {/* Interactive Comic Reader */}
-        {/* <ComicReader
-          pageImage={pageImage}
-          bubbles={bubbles}
-          timestamps={timestamps}
-          bookId={bookId}
-          issueId={issueId}
-        /> */}
-
-        {/* Overlay Test Component */}
-        <ComicReaderOverlayTest
-          pageImage={pageImage}
-          bubbles={bubbles}
-          timestamps={timestamps}
-          bookId={bookId}
-          issueId={issueId}
-        />
-
-        {/* Navigation */}
-        <div className="mt-4 flex justify-center gap-4">
-          {prevPage ? (
-            <Link
-              href={`/book/${bookId}/${issueId}/${prevPage}`}
-              className="rounded bg-gray-700 px-6 py-2 text-white transition-colors hover:bg-gray-600"
-            >
-              ← Previous
-            </Link>
-          ) : (
-            <button
-              disabled
-              className="rounded bg-gray-800 px-6 py-2 text-gray-500"
-            >
-              ← Previous
-            </button>
-          )}
-
-          {nextPage ? (
-            <Link
-              href={`/book/${bookId}/${issueId}/${nextPage}`}
-              className="rounded bg-gray-700 px-6 py-2 text-white transition-colors hover:bg-gray-600"
-            >
-              Next →
-            </Link>
-          ) : (
-            <button
-              disabled
-              className="rounded bg-gray-800 px-6 py-2 text-gray-500"
-            >
-              Next →
-            </button>
-          )}
-        </div>
-      </div>
+      <ZenComicReader
+        pageImage={pageImage}
+        bubbles={bubbles}
+        timestamps={timestamps}
+        bookId={bookId}
+        issueId={issueId}
+        prevPageLink={prevPageLink}
+        nextPageLink={nextPageLink}
+      />
     </main>
   );
 }
+
