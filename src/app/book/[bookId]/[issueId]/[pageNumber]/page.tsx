@@ -60,10 +60,11 @@ export default async function BookPage({ params }: BookPageProps) {
         timestamps={timestamps}
         bookId={bookId}
         issueId={issueId}
+        pageNumber={pageNum}
+        pageCount={issue.pageCount}
         prevPageLink={prevPageLink}
         nextPageLink={nextPageLink}
       />
     </main>
   );
 }
-

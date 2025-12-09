@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Bubble, CharacterAlignment, AudioTimestamps } from "~/types";
+import SpeechBox from "./zen-reader/SpeechBox";
+import PageSelectorSheet from "./zen-reader/PageSelectorSheet";
+import SettingsSheet from "./zen-reader/SettingsSheet";
+import { buildWordTimings, type WordTiming } from "./zen-reader/helpers";
 
 interface ZenComicReaderProps {
   pageImage: string;
@@ -14,7 +18,32 @@ interface ZenComicReaderProps {
   issueId: string;
   prevPageLink?: string | null;
   nextPageLink?: string | null;
+  pageNumber: number;
+  pageCount: number;
 }
+
+const MIN_SWIPE_DISTANCE = 50;
+const MIN_SCALE = 1;
+const MAX_SCALE = 3.5;
+
+function distanceBetween(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function clampScale(value: number) {
+  return Math.min(Math.max(value, MIN_SCALE), MAX_SCALE);
+}
+
+function clampOffset(value: number) {
+  return Math.min(Math.max(value, -520), 520);
+}
+
+const AUTOPLAY_KEY = "zen-reader-autoplay";
 
 export default function ZenComicReader({
   pageImage,
@@ -22,97 +51,54 @@ export default function ZenComicReader({
   timestamps,
   bookId,
   issueId,
-
+  prevPageLink,
   nextPageLink,
+  pageNumber,
+  pageCount,
 }: ZenComicReaderProps) {
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
-  const [autoPlayEnabled, setAutoPlayEnabled] = useState(false);
-  const [highlightedRange, setHighlightedRange] = useState<{
-    start: number;
-    end: number;
-  } | null>(null);
-  const [scale, setScale] = useState(1); // Added scale state
-  const [touchStart, setTouchStart] = useState<number | null>(null); // Added touchStart state
-  const [touchEnd, setTouchEnd] = useState<number | null>(null); // Added touchEnd state
+  const [autoPlayEnabled, setAutoPlayEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(AUTOPLAY_KEY);
+    return stored ? stored === "true" : true;
+  });
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isPageSheetOpen, setIsPageSheetOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const highlightRafRef = useRef<number | null>(null);
+  const wordTimingsRef = useRef<WordTiming[]>([]);
+  const pointerMapRef = useRef<Map<number, { x: number; y: number }>>(
+    new Map(),
+  );
+  const initialPinchRef = useRef<{ distance: number; scale: number } | null>(
+    null,
+  );
+  const swipeStartRef = useRef<number | null>(null);
   const router = useRouter();
 
-  // Filter and sort bubbles
-  const visibleBubbles = bubbles
-    .filter(
-      (b) =>
-        !b.ignored &&
-        (b.type === "SPEECH" ||
-          b.type === "NARRATION" ||
-          b.type === "CAPTION") &&
-        b.style,
-    )
-    .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0));
+  const visibleBubbles = useMemo(
+    () =>
+      bubbles
+        .filter(
+          (b) =>
+            !b.ignored &&
+            (b.type === "SPEECH" ||
+              b.type === "NARRATION" ||
+              b.type === "CAPTION") &&
+            b.style,
+        )
+        .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0)),
+    [bubbles],
+  );
 
-  const selectedBubble = visibleBubbles.find((b) => b.id === selectedBubbleId);
+  const selectedBubble =
+    visibleBubbles.find((b) => b.id === selectedBubbleId) ?? null;
 
-  // Swipe threshold
-  const minSwipeDistance = 50;
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    const touch = e.targetTouches[0];
-    if (touch) {
-      setTouchStart(touch.clientX);
-    }
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    const touch = e.targetTouches[0];
-    if (touch) {
-      setTouchEnd(touch.clientX);
-    }
-  };
-
-  const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    // Only navigate if not zoomed in (to avoid conflict with panning if implemented later, though currently basic zoom)
-    if (scale === 1) {
-      if (isLeftSwipe && nextPageLink) {
-        router.push(nextPageLink);
-      }
-    }
-  };
-
-  // Re-deriving prev link logic effectively for swipe since prop was unused
-  // Actually, better to just rely on buttons for now or fixing the prop.
-  // Let's implement basics first.
-
-  // Handling swipe navigation based on props
-  useEffect(() => {
-    const handleSwipe = () => {
-      if (!touchStart || !touchEnd) return;
-      const distance = touchStart - touchEnd;
-      const isLeftSwipe = distance > minSwipeDistance;
-      const isRightSwipe = distance < -minSwipeDistance;
-
-      if (scale === 1) {
-        if (isLeftSwipe && nextPageLink) {
-          // Navigate Next
-          const link = document.createElement("a");
-          link.href = nextPageLink;
-          link.click();
-        }
-        // For prev link, we need to pass it properly.
-        // I'll ignore back swipe for now or assume user uses browser back or library.
-      }
-    };
-
-    handleSwipe();
-  }, [touchEnd, touchStart, scale, nextPageLink]);
-
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -121,11 +107,43 @@ export default function ZenComicReader({
       if (autoPlayTimerRef.current) {
         clearTimeout(autoPlayTimerRef.current);
       }
+      if (highlightRafRef.current) {
+        cancelAnimationFrame(highlightRafRef.current);
+      }
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(AUTOPLAY_KEY, String(autoPlayEnabled));
+  }, [autoPlayEnabled]);
+
+  const startHighlightLoop = (
+    audio: HTMLAudioElement,
+    timings: WordTiming[],
+  ) => {
+    if (highlightRafRef.current) {
+      cancelAnimationFrame(highlightRafRef.current);
+    }
+
+    const tick = () => {
+      if (!audio) return;
+      if (!audio.paused && !audio.ended) {
+        const currentTime = audio.currentTime;
+        const active = timings.find(
+          (w) =>
+            currentTime >= (w.start ?? 0) &&
+            currentTime <= (w.end ?? w.start ?? 0),
+        );
+        setActiveWordIndex(active?.index ?? null);
+      }
+      highlightRafRef.current = requestAnimationFrame(tick);
+    };
+
+    highlightRafRef.current = requestAnimationFrame(tick);
+  };
+
   const playBubble = (bubble: Bubble) => {
-    // clean up previous
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -134,8 +152,11 @@ export default function ZenComicReader({
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
+    if (highlightRafRef.current) {
+      cancelAnimationFrame(highlightRafRef.current);
+    }
 
-    setHighlightedRange(null);
+    setActiveWordIndex(null);
 
     const audioUrl = `/comics/${bookId}/${issueId}/audio/${bubble.id}.mp3`;
     const audio = new Audio(audioUrl);
@@ -143,89 +164,45 @@ export default function ZenComicReader({
 
     const bubbleTimestamps = timestamps[bubble.id] as
       | {
-          alignment?: CharacterAlignment;
-          normalized_alignment?: CharacterAlignment;
+          alignment?: CharacterAlignment | null;
+          normalized_alignment?: CharacterAlignment | null;
         }
       | undefined;
+
     const alignment =
-      bubbleTimestamps?.normalized_alignment ?? bubbleTimestamps?.alignment;
+      bubbleTimestamps?.normalized_alignment ??
+      bubbleTimestamps?.alignment ??
+      null;
+    const wordTimings = buildWordTimings(alignment);
+    wordTimingsRef.current = wordTimings;
 
-    if (
-      alignment?.character_start_times_seconds &&
-      alignment.character_end_times_seconds
-    ) {
-      let intervalId: NodeJS.Timeout | null = null;
-
-      const updateHighlight = () => {
-        if (audio.paused || audio.ended) {
-          if (intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
-          }
-          return;
-        }
-
-        const currentTime = audio.currentTime;
-        const starts = alignment.character_start_times_seconds;
-        const ends = alignment.character_end_times_seconds;
-
-        for (let i = 0; i < starts.length; i++) {
-          const startTime = starts[i] ?? 0;
-          const endTime = ends[i] ?? 0;
-
-          if (currentTime >= startTime && currentTime <= endTime) {
-            setHighlightedRange({ start: i, end: i });
-            break;
-          }
-        }
-      };
-
-      intervalId = setInterval(updateHighlight, 30); // smoother update
-
-      const handleEnded = () => {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-        setHighlightedRange(null);
-
-        // Handle Auto Play
-        if (autoPlayEnabled) {
-          const currentIndex = visibleBubbles.findIndex(
-            (b) => b.id === bubble.id,
-          );
-          if (currentIndex !== -1 && currentIndex < visibleBubbles.length - 1) {
-            const nextBubble = visibleBubbles[currentIndex + 1];
-            if (nextBubble) {
-              // Wait a moment then play next
-              autoPlayTimerRef.current = setTimeout(() => {
-                setSelectedBubbleId(nextBubble.id);
-                playBubble(nextBubble);
-              }, 500);
-            }
-          }
-        }
-      };
-
-      audio.addEventListener("ended", handleEnded);
-    } else {
-      audio.addEventListener("ended", () => {
-        // Handle Auto Play fallback
-        if (autoPlayEnabled) {
-          const currentIndex = visibleBubbles.findIndex(
-            (b) => b.id === bubble.id,
-          );
-          if (currentIndex !== -1 && currentIndex < visibleBubbles.length - 1) {
-            const nextBubble = visibleBubbles[currentIndex + 1];
-            if (nextBubble) {
-              autoPlayTimerRef.current = setTimeout(() => {
-                setSelectedBubbleId(nextBubble.id);
-                playBubble(nextBubble);
-              }, 500);
-            }
-          }
-        }
-      });
+    if (wordTimings.length) {
+      startHighlightLoop(audio, wordTimings);
     }
+
+    const handleEnded = () => {
+      setActiveWordIndex(null);
+      if (highlightRafRef.current) {
+        cancelAnimationFrame(highlightRafRef.current);
+      }
+
+      if (!autoPlayEnabled) return;
+
+      const currentIndex = visibleBubbles.findIndex((b) => b.id === bubble.id);
+      const hasNext =
+        currentIndex !== -1 && currentIndex < visibleBubbles.length - 1;
+      if (!hasNext) return; // stop at end of page
+
+      const nextBubble = visibleBubbles[currentIndex + 1];
+      if (!nextBubble) return;
+
+      autoPlayTimerRef.current = setTimeout(() => {
+        setSelectedBubbleId(nextBubble.id);
+        playBubble(nextBubble);
+      }, 400);
+    };
+
+    audio.addEventListener("ended", handleEnded);
 
     audio.play().catch((err) => {
       console.error("Audio playback failed", err);
@@ -249,76 +226,105 @@ export default function ZenComicReader({
     }
   };
 
-  const renderTextWithHighlight = (bubble: Bubble) => {
-    const bubbleTimestamps = timestamps[bubble.id];
-    const alignment =
-      bubbleTimestamps?.normalized_alignment ?? bubbleTimestamps?.alignment;
-    const text = bubble.textWithCues ?? bubble.ocr_text;
+  const handlePointerDown = (e: React.PointerEvent) => {
+    const pointers = pointerMapRef.current;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
-    if (!alignment || !highlightedRange) {
-      return <span className="text-lg leading-relaxed text-white">{text}</span>;
+    if (pointers.size === 1 && scale === 1) {
+      swipeStartRef.current = e.clientX;
     }
 
-    const chars = alignment.characters;
-    const result: React.ReactNode[] = [];
-    let textIndex = 0;
-
-    for (let i = 0; i < chars.length; i++) {
-      const char = chars[i] ?? "";
-      const isHighlighted =
-        i >= highlightedRange.start && i <= highlightedRange.end;
-
-      const style = isHighlighted
-        ? "text-cyan-400 font-bold drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"
-        : "text-white/90";
-
-      if (textIndex < text.length) {
-        if (text[textIndex] === char || char === " ") {
-          result.push(
-            <span key={i} className={style}>
-              {text[textIndex]}
-            </span>,
-          );
-          textIndex++;
-        } else {
-          result.push(
-            <span key={i} className={style}>
-              {char}
-            </span>,
-          );
-        }
-      } else {
-        result.push(
-          <span key={i} className={style}>
-            {char}
-          </span>,
-        );
+    if (pointers.size === 2) {
+      const values = Array.from(pointers.values());
+      if (values.length === 2) {
+        const [first, second] = values as [
+          { x: number; y: number },
+          { x: number; y: number },
+        ];
+        initialPinchRef.current = {
+          distance: distanceBetween(first, second),
+          scale,
+        };
       }
     }
-    return <p className="text-lg leading-relaxed">{result}</p>;
   };
 
-  // Zoom handlers
-  const zoomIn = () => setScale((s) => Math.min(s + 0.5, 3));
-  const zoomOut = () => setScale((s) => Math.max(s - 0.5, 1));
-  const resetZoom = () => setScale(1);
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const pointers = pointerMapRef.current;
+    const prev = pointers.get(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.size === 2 && initialPinchRef.current) {
+      const values = Array.from(pointers.values());
+      if (values.length === 2) {
+        const [first, second] = values as [
+          { x: number; y: number },
+          { x: number; y: number },
+        ];
+        const newDistance = distanceBetween(first, second);
+        const ratio = newDistance / (initialPinchRef.current.distance || 1);
+        const nextScale = clampScale(initialPinchRef.current.scale * ratio);
+        setScale(nextScale);
+        return;
+      }
+    }
+
+    if (pointers.size === 1 && scale > 1 && prev) {
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      setOffset((current) => ({
+        x: clampOffset(current.x + dx),
+        y: clampOffset(current.y + dy),
+      }));
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const pointers = pointerMapRef.current;
+    const isPinch = pointers.size === 2;
+
+    pointers.delete(e.pointerId);
+
+    if (pointers.size < 2) {
+      initialPinchRef.current = null;
+    }
+
+    if (!isPinch && scale === 1 && swipeStartRef.current !== null) {
+      const delta = e.clientX - swipeStartRef.current;
+      if (delta > MIN_SWIPE_DISTANCE && prevPageLink) {
+        router.push(prevPageLink);
+      }
+      if (delta < -MIN_SWIPE_DISTANCE && nextPageLink) {
+        router.push(nextPageLink);
+      }
+    }
+
+    swipeStartRef.current = null;
+  };
+
+  const resetView = () => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* Stage Area - Centered Comic Page */}
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black">
       <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
         <div
-          className="relative flex h-full w-full items-center justify-center transition-transform duration-200 ease-out"
-          style={{ transform: `scale(${scale})` }}
+          className="relative flex h-full w-full touch-none items-center justify-center"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
         >
-          <div className="relative aspect-[2/3] h-full max-h-[calc(100vh-100px)] w-auto">
-            {" "}
-            {/* Adjusted max-h */}
+          <div
+            className="relative mx-auto aspect-[2/3] max-h-[calc(100vh-140px)] w-full max-w-[min(100%,calc((100vh-140px)*0.667))] select-none"
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+              transition: "transform 120ms ease-out",
+            }}
+          >
             <Image
               src={pageImage}
               alt="Comic page"
@@ -326,16 +332,14 @@ export default function ZenComicReader({
               className="object-contain"
               priority
             />
-            {/* Bubble Click Targets & Highlights */}
             {visibleBubbles.map((bubble) => {
               if (!bubble.style) return null;
               const isSelected = selectedBubbleId === bubble.id;
-
               return (
                 <button
                   key={bubble.id}
-                  onClick={(e) => {
-                    e.stopPropagation(); // Prevent interfering with swipe/zoom clicks
+                  onClick={(evt) => {
+                    evt.stopPropagation();
                     handleBubbleClick(bubble);
                   }}
                   className={`absolute transition-all duration-300 ${
@@ -349,6 +353,7 @@ export default function ZenComicReader({
                     width: bubble.style.width,
                     height: bubble.style.height,
                   }}
+                  aria-label={`Bubble ${bubble.id}`}
                 />
               );
             })}
@@ -356,13 +361,11 @@ export default function ZenComicReader({
         </div>
       </div>
 
-      {/* Docked Control Bar - Slim Version */}
-      <div className="z-50 flex h-[80px] shrink-0 items-center gap-4 border-t border-neutral-800 bg-neutral-900 px-4">
-        {/* Left Controls - Icons Only */}
-        <div className="flex items-center gap-4">
+      <div className="z-50 flex h-[96px] shrink-0 items-center gap-3 border-t border-neutral-800 bg-neutral-950/95 px-4 backdrop-blur">
+        <div className="flex items-center gap-3">
           <Link
             href={`/book/${bookId}`}
-            className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
             aria-label="Library"
           >
             <svg
@@ -381,8 +384,9 @@ export default function ZenComicReader({
             </svg>
           </Link>
           <button
-            className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Pages"
+            onClick={() => setIsPageSheetOpen(true)}
+            className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Open page selector"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -403,132 +407,72 @@ export default function ZenComicReader({
           </button>
         </div>
 
-        {/* Center: Dynamic Text Display - Text Only */}
-        <div className="relative flex h-[60px] flex-1 items-center justify-center overflow-y-auto rounded-lg border border-neutral-800 bg-black/60 px-4 text-center">
-          {selectedBubble ? (
-            <div className="w-full">
-              {renderTextWithHighlight(selectedBubble)}
-            </div>
-          ) : (
-            <span className="text-sm text-neutral-500 italic">
-              Tap a bubble...
-            </span>
-          )}
-        </div>
+        <SpeechBox
+          bubble={selectedBubble}
+          alignment={
+            selectedBubble
+              ? (timestamps[selectedBubble.id]?.normalized_alignment ??
+                timestamps[selectedBubble.id]?.alignment ??
+                null)
+              : null
+          }
+          activeWordIndex={activeWordIndex}
+          className="flex-1"
+        />
 
-        {/* Right Controls - Zoom & Auto Play & Nav */}
-        <div className="flex items-center justify-end gap-3">
-          {/* Zoom Controls */}
-          <div className="mr-2 flex items-center gap-1 rounded-lg bg-black/30 p-1">
-            <button
-              onClick={zoomOut}
-              className="rounded p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label="Zoom Out"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" x2="16.65" y1="21" y2="16.65" />
-                <line x1="8" x2="14" y1="11" y2="11" />
-              </svg>
-            </button>
-            <button
-              onClick={resetZoom}
-              className="px-1.5 font-mono text-xs text-neutral-500 hover:text-white"
-              aria-label="Reset Zoom"
-            >
-              {Math.round(scale * 100)}%
-            </button>
-            <button
-              onClick={zoomIn}
-              className="rounded p-1.5 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
-              aria-label="Zoom In"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" x2="16.65" y1="21" y2="16.65" />
-                <line x1="11" x2="11" y1="8" y2="14" />
-                <line x1="8" x2="14" y1="11" y2="11" />
-              </svg>
-            </button>
+        <div className="flex items-center gap-3">
+          <div className="rounded-full bg-neutral-800 px-3 py-1 text-xs font-semibold text-neutral-200">
+            Page {pageNumber} / {pageCount}
           </div>
-
-          {/* Auto Play Toggle */}
           <button
-            onClick={() => setAutoPlayEnabled(!autoPlayEnabled)}
-            className="flex items-center justify-center"
-            title="Auto Play"
+            onClick={() => setIsSettingsOpen(true)}
+            className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Open settings"
           >
-            <div
-              className={`h-4 w-8 rounded-full p-0.5 transition-colors duration-300 ${autoPlayEnabled ? "bg-cyan-500" : "bg-neutral-700"}`}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <div
-                className={`h-3 w-3 rounded-full bg-white transition-transform duration-300 ${autoPlayEnabled ? "translate-x-4" : "translate-x-0"}`}
-              />
-            </div>
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c0 .27.11.52.29.71.19.19.44.29.71.29H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+            </svg>
           </button>
-
-          {/* Next Button */}
-          {nextPageLink ? (
-            <Link
-              href={nextPageLink}
-              className="rounded-full bg-neutral-800 p-3 text-white transition-colors hover:bg-neutral-700"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </Link>
-          ) : (
-            <button
-              disabled
-              className="cursor-not-allowed rounded-full bg-neutral-900 p-3 text-neutral-700"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
-          )}
         </div>
       </div>
+
+      <PageSelectorSheet
+        open={isPageSheetOpen}
+        onClose={() => setIsPageSheetOpen(false)}
+        currentPage={pageNumber}
+        pageCount={pageCount}
+        bookId={bookId}
+        issueId={issueId}
+      />
+
+      <SettingsSheet
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        autoPlayEnabled={autoPlayEnabled}
+        onToggleAutoPlay={() => setAutoPlayEnabled((prev) => !prev)}
+        prevPageLink={prevPageLink}
+        nextPageLink={nextPageLink}
+      />
+
+      {scale > 1 && (
+        <button
+          onClick={resetView}
+          className="absolute top-4 right-4 z-50 rounded-full bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-200 shadow-lg backdrop-blur hover:bg-neutral-800"
+        >
+          Reset View
+        </button>
+      )}
     </div>
   );
 }
