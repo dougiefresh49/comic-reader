@@ -19,7 +19,7 @@ interface Props {
 }
 
 function useAutoScroll(
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   wordRefs: React.MutableRefObject<Record<number, HTMLSpanElement | null>>,
   activeIndex: number | null,
 ) {
