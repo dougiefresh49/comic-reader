@@ -401,11 +401,14 @@ export default function ZenComicReader({
         </div>
       </div>
 
-      <div className="z-50 flex h-[96px] shrink-0 items-center gap-3 border-t border-neutral-800 bg-neutral-950/95 px-4 backdrop-blur">
-        <div className="flex items-center gap-3">
+      <div
+        id="zen-reader-footer"
+        className="z-50 flex h-[96px] shrink-0 items-center gap-1 border-t border-neutral-800 bg-neutral-950/95 px-2 backdrop-blur md:gap-3 md:px-4"
+      >
+        <div className="flex items-center gap-1 md:gap-3">
           <Link
             href={`/book/${bookId}`}
-            className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-full p-1 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white md:p-2"
             aria-label="Library"
           >
             <svg
@@ -425,7 +428,7 @@ export default function ZenComicReader({
           </Link>
           <button
             onClick={() => setIsPageSheetOpen(true)}
-            className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-full p-1 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white md:p-2"
             aria-label="Open page selector"
           >
             <svg
@@ -462,13 +465,13 @@ export default function ZenComicReader({
           onTogglePlay={handleTogglePlayPause}
         />
 
-        <div className="flex items-center gap-3">
-          <div className="rounded-full bg-neutral-800 px-3 py-1 text-xs font-semibold text-neutral-200">
+        <div className="flex items-center gap-1 md:gap-3">
+          <div className="hidden rounded-full bg-neutral-800 px-3 py-1 text-xs font-semibold text-neutral-200 md:block">
             Page {pageNumber} / {pageCount}
           </div>
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-full p-1 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white md:p-2"
             aria-label="Open settings"
           >
             <svg
