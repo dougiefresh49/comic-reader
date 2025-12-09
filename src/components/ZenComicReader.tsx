@@ -67,6 +67,7 @@ export default function ZenComicReader({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPageSheetOpen, setIsPageSheetOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -79,6 +80,7 @@ export default function ZenComicReader({
     null,
   );
   const swipeStartRef = useRef<number | null>(null);
+  const autoPlayEnabledRef = useRef<boolean>(autoPlayEnabled);
   const router = useRouter();
 
   const visibleBubbles = useMemo(
@@ -116,6 +118,7 @@ export default function ZenComicReader({
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(AUTOPLAY_KEY, String(autoPlayEnabled));
+    autoPlayEnabledRef.current = autoPlayEnabled;
   }, [autoPlayEnabled]);
 
   const startHighlightLoop = (
@@ -161,6 +164,7 @@ export default function ZenComicReader({
     const audioUrl = `/comics/${bookId}/${issueId}/audio/${bubble.id}.mp3`;
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
+    setIsPlaying(true);
 
     const bubbleTimestamps = timestamps[bubble.id] as
       | {
@@ -186,7 +190,9 @@ export default function ZenComicReader({
         cancelAnimationFrame(highlightRafRef.current);
       }
 
-      if (!autoPlayEnabled) return;
+      setIsPlaying(false);
+
+      if (!autoPlayEnabledRef.current) return;
 
       const currentIndex = visibleBubbles.findIndex((b) => b.id === bubble.id);
       const hasNext =
@@ -203,9 +209,12 @@ export default function ZenComicReader({
     };
 
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("pause", () => setIsPlaying(false));
+    audio.addEventListener("play", () => setIsPlaying(true));
 
     audio.play().catch((err) => {
       console.error("Audio playback failed", err);
+      setIsPlaying(false);
     });
   };
 
@@ -213,9 +222,13 @@ export default function ZenComicReader({
     if (selectedBubbleId === bubble.id) {
       if (audioRef.current) {
         if (audioRef.current.paused) {
-          audioRef.current.play().catch(console.error);
+          audioRef.current
+            .play()
+            .then(() => setIsPlaying(true))
+            .catch(console.error);
         } else {
           audioRef.current.pause();
+          setIsPlaying(false);
         }
       } else {
         playBubble(bubble);
@@ -306,6 +319,33 @@ export default function ZenComicReader({
   const resetView = () => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
+  };
+
+  const handleTogglePlayPause = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      audio
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(console.error);
+    } else {
+      audio.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  const handleToggleAutoPlay = () => {
+    setAutoPlayEnabled((prev) => {
+      const next = !prev;
+      if (!next) {
+        if (autoPlayTimerRef.current) {
+          clearTimeout(autoPlayTimerRef.current);
+          autoPlayTimerRef.current = null;
+        }
+      }
+      return next;
+    });
   };
 
   return (
@@ -418,6 +458,8 @@ export default function ZenComicReader({
           }
           activeWordIndex={activeWordIndex}
           className="flex-1"
+          isPlaying={isPlaying}
+          onTogglePlay={handleTogglePlayPause}
         />
 
         <div className="flex items-center gap-3">
@@ -460,7 +502,7 @@ export default function ZenComicReader({
         open={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         autoPlayEnabled={autoPlayEnabled}
-        onToggleAutoPlay={() => setAutoPlayEnabled((prev) => !prev)}
+        onToggleAutoPlay={handleToggleAutoPlay}
         prevPageLink={prevPageLink}
         nextPageLink={nextPageLink}
       />

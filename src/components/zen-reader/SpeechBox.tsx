@@ -16,6 +16,8 @@ interface Props {
   alignment: Alignment;
   activeWordIndex: number | null;
   className?: string;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
 }
 
 function useAutoScroll(
@@ -50,6 +52,8 @@ export function SpeechBox({
   alignment,
   activeWordIndex,
   className = "",
+  isPlaying = false,
+  onTogglePlay,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const wordRefs = useRef<Record<number, HTMLSpanElement | null>>({});
@@ -80,12 +84,46 @@ export function SpeechBox({
   return (
     <div
       ref={containerRef}
-      className={`flex max-h-[140px] min-h-[72px] flex-col overflow-y-auto rounded-lg border border-neutral-800 bg-black/70 px-3 py-2 ${className}`}
+      className={`flex h-full min-h-[72px] flex-col overflow-hidden rounded-lg border border-neutral-800 bg-black/70 px-3 py-2 ${className}`}
     >
-      <div className="mb-1 text-left text-xs tracking-wide text-cyan-300 uppercase">
-        {stripAudioTags(bubble.speaker ?? "") || "Narrator"}
+      <div className="mb-1 flex items-center justify-between text-left text-xs tracking-wide text-cyan-300 uppercase">
+        <span>{stripAudioTags(bubble.speaker ?? "") || "Narrator"}</span>
+        {onTogglePlay ? (
+          <button
+            onClick={onTogglePlay}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            aria-label={isPlaying ? "Pause audio" : "Play audio"}
+          >
+            {isPlaying ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M8 5.14v13.72L19 12 8 5.14z" />
+              </svg>
+            )}
+          </button>
+        ) : null}
       </div>
-      <div className="text-left text-base leading-relaxed text-white">
+      <div className="flex-1 overflow-y-auto text-left text-base leading-relaxed text-white">
         {tokens.map((token, idx) => {
           if (token.isWord) {
             const wordTiming = wordTimings[wordCursor];

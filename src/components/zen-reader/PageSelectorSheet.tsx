@@ -24,28 +24,40 @@ export function PageSelectorSheet({
   return (
     <BottomSheet open={open} onClose={onClose} title="Pages" height="260px">
       <div className="h-full overflow-x-auto">
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-start gap-3 px-4 py-3">
           {Array.from({ length: pageCount }, (_, i) => i + 1).map((page) => {
             const formatted = String(page).padStart(2, "0");
             const isActive = page === currentPage;
             return (
-              <Link
+              <div
                 key={page}
-                href={`/book/${bookId}/${issueId}/${page}`}
-                className={`group relative flex h-28 w-20 shrink-0 flex-col overflow-hidden rounded-lg border transition-all ${isActive ? "border-cyan-400 shadow-[0_0_0_2px_rgba(34,211,238,0.35)]" : "border-neutral-800 hover:border-neutral-600"}`}
-                onClick={onClose}
+                className="flex shrink-0 flex-col items-center gap-2"
               >
-                <Image
-                  src={`/comics/${bookId}/${issueId}/pages/page-${formatted}.webp`}
-                  alt={`Page ${page}`}
-                  fill
-                  sizes="96px"
-                  className="object-cover"
-                />
-                <div className="pointer-events-none absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/80 to-transparent px-1.5 py-1 text-center text-xs font-semibold text-white">
+                <Link
+                  href={`/book/${bookId}/${issueId}/${page}`}
+                  className={`group relative flex h-28 w-20 flex-col overflow-hidden rounded-lg border-2 transition-all ${
+                    isActive
+                      ? "border-cyan-400 bg-cyan-400/10 shadow-[0_0_12px_rgba(34,211,238,0.5)] ring-2 ring-cyan-400/30"
+                      : "border-neutral-800 hover:border-neutral-600"
+                  }`}
+                  onClick={onClose}
+                >
+                  <Image
+                    src={`/comics/${bookId}/${issueId}/pages/page-${formatted}.webp`}
+                    alt={`Page ${page}`}
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                  />
+                </Link>
+                <span
+                  className={`text-xs font-semibold ${
+                    isActive ? "text-cyan-300" : "text-neutral-400"
+                  }`}
+                >
                   {page}
-                </div>
-              </Link>
+                </span>
+              </div>
             );
           })}
         </div>
