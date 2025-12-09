@@ -90,7 +90,8 @@ export function SpeechBox({
           if (token.isWord) {
             const wordTiming = wordTimings[wordCursor];
             const highlight =
-              wordTiming && activeWordIndex === wordTiming.index;
+              wordTiming?.index !== undefined &&
+              activeWordIndex === wordTiming.index;
             const refIndex = wordTiming?.index ?? wordCursor;
             const element = (
               <span

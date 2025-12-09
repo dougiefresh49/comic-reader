@@ -91,7 +91,7 @@ export function SpeechBox({
   return (
     <div className="relative flex min-h-[78px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/70 px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
       <div className="mb-1 text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
-        {speaker?.trim() || "Narrator"}
+        {speaker?.trim() ?? "Narrator"}
       </div>
       <div
         ref={containerRef}

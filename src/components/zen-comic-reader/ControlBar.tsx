@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 interface ControlBarProps {
   onOpenPages: () => void;
   onOpenSettings: () => void;
@@ -14,7 +16,7 @@ export function ControlBar({
   return (
     <div className="z-50 flex h-[96px] shrink-0 items-center gap-3 border-t border-white/5 bg-neutral-950/95 px-4 backdrop-blur">
       <div className="flex items-center gap-3">
-        <a
+        <Link
           href="/"
           className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Library"
@@ -33,7 +35,7 @@ export function ControlBar({
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             <polyline points="9 22 9 12 15 12 15 22" />
           </svg>
-        </a>
+        </Link>
 
         <button
           onClick={onOpenPages}

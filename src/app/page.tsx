@@ -23,9 +23,6 @@ export default function LibraryPage() {
                 ? `/comics/tmnt-mmpr-iii/${firstIssue.id}/pages/page-01.webp`
                 : null;
 
-              // Get first available issue (has WebP)
-              const availableIssue = book.issues.find((issue) => issue.hasWebP);
-
               return (
                 <Link
                   key={book.id}
