@@ -589,13 +589,16 @@
     "aliases": [],
     "appearances": [
       {
-        "id": "narrator-unknown",
-        "mediaTitle": null,
-        "year": null,
-        "voiceActor": null,
-        "mediaType": "live_action",
-        "youtubeSearchTerms": [],
-        "notes": "Source media not identified during migration.",
+        "id": "narrator-cate-blanchett-lotr",
+        "mediaTitle": "The Lord of the Rings: The Fellowship of the Ring (2001)",
+        "year": 2001,
+        "voiceActor": "Cate Blanchett",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Cate Blanchett LOTR Fellowship narration",
+          "Lord of the Rings Fellowship prologue Galadriel"
+        ],
+        "notes": "Opening narration of Fellowship of the Ring. Warm, authoritative, cinematic.",
         "voice": {
           "voiceId": "l6mRFE6WsbFVDdbMTQyk",
           "voiceType": "ivc",

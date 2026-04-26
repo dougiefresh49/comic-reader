@@ -1,12 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Bubble } from "~/types";
 
-export type BubbleBounds = { x: number; y: number; width: number; height: number };
+export type BubbleBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export type EditChanges = Partial<
-  Pick<Bubble, "ocr_text" | "type" | "speaker" | "emotion" | "textWithCues" | "ignored">
+  Pick<
+    Bubble,
+    "ocr_text" | "type" | "speaker" | "emotion" | "textWithCues" | "ignored"
+  >
 > & {
   bounds?: BubbleBounds;
 };
@@ -36,11 +44,15 @@ function openDB(): Promise<IDBDatabase> {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(new Error(req.error?.message ?? "IDBOpenDBRequest failed"));
+    req.onerror = () =>
+      reject(new Error(req.error?.message ?? "IDBOpenDBRequest failed"));
   });
 }
 
-function idbGet(db: IDBDatabase, key: string): Promise<ReviewEdit[] | undefined> {
+function idbGet(
+  db: IDBDatabase,
+  key: string,
+): Promise<ReviewEdit[] | undefined> {
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const req = tx.objectStore(STORE_NAME).get(key);
@@ -49,7 +61,11 @@ function idbGet(db: IDBDatabase, key: string): Promise<ReviewEdit[] | undefined>
   });
 }
 
-function idbPut(db: IDBDatabase, key: string, value: ReviewEdit[]): Promise<void> {
+function idbPut(
+  db: IDBDatabase,
+  key: string,
+  value: ReviewEdit[],
+): Promise<void> {
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     tx.objectStore(STORE_NAME).put(value, key);
@@ -57,7 +73,10 @@ function idbPut(db: IDBDatabase, key: string, value: ReviewEdit[]): Promise<void
   });
 }
 
-export function mergeEdits(originalBubbles: Bubble[], edits: ReviewEdit[]): LocalBubble[] {
+export function mergeEdits(
+  originalBubbles: Bubble[],
+  edits: ReviewEdit[],
+): LocalBubble[] {
   const map = new Map<string, LocalBubble>();
   for (const b of originalBubbles) {
     map.set(b.id, { ...b });
@@ -243,7 +262,22 @@ export function useReviewEdits(bookId: string, issueId: string) {
     });
   }, []);
 
-  const pendingCount = edits.length;
+  const pendingCount = useMemo(() => {
+    const byBubble = new Map<string, ReviewEdit[]>();
+    for (const edit of edits) {
+      const existing = byBubble.get(edit.bubbleId) ?? [];
+      byBubble.set(edit.bubbleId, [...existing, edit]);
+    }
+    let count = 0;
+    for (const bubbleEdits of byBubble.values()) {
+      const first = bubbleEdits[0];
+      const last = bubbleEdits[bubbleEdits.length - 1];
+      if (!first || !last) continue;
+      if (first.action === "add" && last.action === "delete") continue;
+      count++;
+    }
+    return count;
+  }, [edits]);
 
   return {
     edits,

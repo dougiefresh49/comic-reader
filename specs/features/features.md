@@ -20,7 +20,7 @@ Backlog and status tracker for planned features. Update status here when work st
 
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
-| Review UI — Phase A (annotation) | `pending` | [review-ui-phase-a.md](review-ui-phase-a.md) | Desktop sidebar editor — edit bubbles, adjust bounds, add/delete, export fixes.json |
+| Review UI — Phase A (annotation) | `done` | [review-ui-phase-a.md](review-ui-phase-a.md) | Desktop sidebar editor — edit bubbles, adjust bounds, add/delete, export fixes.json |
 | Review UI — Phase B (live regen) | `blocked` | [review-ui-phase-b.md](review-ui-phase-b.md) | In-browser re-run Gemini / re-generate audio. Needs storage migration first. |
 
 ## Pipeline & Ingestion
