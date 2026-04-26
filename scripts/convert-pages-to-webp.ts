@@ -19,7 +19,12 @@ const PROJECT_ROOT = join(__dirname, "..");
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { issue: string; quality?: number; overwrite?: boolean } {
+function parseArgs(): {
+  book: string;
+  issue: string;
+  quality?: number;
+  overwrite?: boolean;
+} {
   const args = process.argv.slice(2);
 
   // Check for help flag
@@ -28,6 +33,7 @@ function parseArgs(): { issue: string; quality?: number; overwrite?: boolean } {
 Usage: npm run convert-pages-to-webp [options]
 
 Options:
+  --book=NAME, --book NAME     Book name (default: tmnt-mmpr-iii or COMIC_BOOK env var)
   --issue=N, --issue N        Issue number (e.g., --issue=1 for issue-1, default: issue-1)
   --quality=N                 WebP quality (0-100, default: 85)
   --overwrite                 Overwrite existing WebP files
@@ -42,7 +48,8 @@ Examples:
     process.exit(0);
   }
 
-  let issue = "issue-1";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let quality = 85;
   let overwrite = false;
 
@@ -50,6 +57,13 @@ Examples:
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -83,7 +97,7 @@ Examples:
     }
   }
 
-  return { issue, quality, overwrite };
+  return { book, issue, quality, overwrite };
 }
 
 /**
@@ -94,10 +108,10 @@ async function main() {
     console.log("🖼️  Starting JPEG to WebP conversion...\n");
 
     // Parse arguments
-    const { issue, quality, overwrite } = parseArgs();
+    const { book, issue, quality, overwrite } = parseArgs();
 
     // Set up paths
-    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
+    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", book);
     const ISSUE_DIR = join(COMIC_DIR, issue);
     const PAGES_DIR = join(ISSUE_DIR, "pages");
     const OUTPUT_DIR = join(ISSUE_DIR, "pages-webp");
@@ -209,7 +223,9 @@ async function main() {
       console.log(
         `\n💾 Size reduction: ${(totalOriginalSize / 1024 / 1024).toFixed(2)}MB → ${(totalWebPSize / 1024 / 1024).toFixed(2)}MB`,
       );
-      console.log(`   Savings: ${(totalSavings / 1024 / 1024).toFixed(2)}MB (${totalSavingsPercent}%)`);
+      console.log(
+        `   Savings: ${(totalSavings / 1024 / 1024).toFixed(2)}MB (${totalSavingsPercent}%)`,
+      );
     }
     console.log("\n✅ Conversion complete!");
   } catch (error) {
@@ -219,4 +235,3 @@ async function main() {
 }
 
 main();
-

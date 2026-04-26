@@ -11,6 +11,7 @@ import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { GEMINI_MEDIUM } from "./utils/models.js";
 import { env } from "~/env.mjs";
 import type { Bubble } from "./utils/gemini-context.js";
 
@@ -18,29 +19,51 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
-// Get issue number from command line argument or default to issue-1
-const ISSUE = process.argv[2] || "issue-1";
-const ISSUE_DIR = join(
-  PROJECT_ROOT,
-  "assets",
-  "comics",
-  "tmnt-mmpr-iii",
-  ISSUE,
-);
-const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
-const OUTPUT_FILE = join(ISSUE_DIR, "character-voice-descriptions.json");
+function parseArgs(): { book: string; issue: string; referenceIssue: string } {
+  const args = process.argv.slice(2);
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
+  let referenceIssue = issue;
 
-// Path to reference file (existing character voice descriptions)
-// Defaults to issue-1, but can be overridden via command line argument
-const REFERENCE_ISSUE = process.argv[3] || "issue-1";
-const REFERENCE_FILE = join(
-  PROJECT_ROOT,
-  "assets",
-  "comics",
-  "tmnt-mmpr-iii",
-  REFERENCE_ISSUE,
-  "character-voice-descriptions.json",
-);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const next = args[i + 1];
+      if (next) book = next.trim();
+    }
+    if (arg.startsWith("--issue=")) {
+      const issueNum = arg.split("=")[1]?.trim();
+      if (issueNum)
+        issue = issueNum.startsWith("issue-") ? issueNum : `issue-${issueNum}`;
+    }
+    if (arg === "--issue") {
+      const next = args[i + 1];
+      if (next) {
+        issue = next.startsWith("issue-") ? next : `issue-${next}`;
+      }
+    }
+    if (arg.startsWith("--reference-issue=")) {
+      const ref = arg.split("=")[1]?.trim();
+      if (ref) referenceIssue = ref.startsWith("issue-") ? ref : `issue-${ref}`;
+    }
+    if (arg === "--reference-issue") {
+      const next = args[i + 1];
+      if (next)
+        referenceIssue = next.startsWith("issue-") ? next : `issue-${next}`;
+    }
+  }
+
+  // default referenceIssue to issue if not overridden
+  if (!args.some((a) => a.startsWith("--reference-issue"))) {
+    referenceIssue = issue;
+  }
+
+  return { book, issue, referenceIssue };
+}
 
 type ContextCache = Record<string, Bubble[]>;
 type CharacterVoiceMap = Record<string, string>;
@@ -101,7 +124,7 @@ Return ONLY a single, concise voice description (2-3 sentences maximum) that can
     const textPart = createPartFromText(prompt);
 
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: GEMINI_MEDIUM,
       contents: [textPart],
     });
 
@@ -132,18 +155,20 @@ Return ONLY a single, concise voice description (2-3 sentences maximum) that can
 /**
  * Load existing character voice descriptions from reference file
  */
-async function loadExistingDescriptions(): Promise<CharacterVoiceMap> {
+async function loadExistingDescriptions(
+  referenceFile: string,
+): Promise<CharacterVoiceMap> {
   try {
-    if (await fs.pathExists(REFERENCE_FILE)) {
-      const existing = await fs.readFile(REFERENCE_FILE, "utf-8");
+    if (await fs.pathExists(referenceFile)) {
+      const existing = await fs.readFile(referenceFile, "utf-8");
       const parsed = JSON.parse(existing) as CharacterVoiceMap;
       console.log(
-        `   ✓ Loaded ${Object.keys(parsed).length} existing character descriptions from ${REFERENCE_FILE}\n`,
+        `   ✓ Loaded ${Object.keys(parsed).length} existing character descriptions from ${referenceFile}\n`,
       );
       return parsed;
     } else {
       console.log(
-        `   ℹ️  No reference file found at ${REFERENCE_FILE}, will generate all descriptions\n`,
+        `   ℹ️  No reference file found at ${referenceFile}, will generate all descriptions\n`,
       );
       return {};
     }
@@ -161,17 +186,31 @@ async function loadExistingDescriptions(): Promise<CharacterVoiceMap> {
  */
 async function main() {
   try {
+    const { book, issue, referenceIssue } = parseArgs();
+
+    const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
+    const OUTPUT_FILE = join(ISSUE_DIR, "character-voice-descriptions.json");
+    const REFERENCE_FILE = join(
+      PROJECT_ROOT,
+      "assets",
+      "comics",
+      book,
+      referenceIssue,
+      "character-voice-descriptions.json",
+    );
+
     console.log("🎤 Starting character voice description generation...\n");
-    console.log(`📁 Processing issue: ${ISSUE}`);
-    if (REFERENCE_ISSUE !== ISSUE) {
-      console.log(`📚 Using reference from: ${REFERENCE_ISSUE}\n`);
+    console.log(`📁 Processing issue: ${issue}`);
+    if (referenceIssue !== issue) {
+      console.log(`📚 Using reference from: ${referenceIssue}\n`);
     } else {
       console.log();
     }
 
     // Load existing descriptions from reference file
     console.log("📖 Loading existing character voice descriptions...");
-    const existingDescriptions = await loadExistingDescriptions();
+    const existingDescriptions = await loadExistingDescriptions(REFERENCE_FILE);
 
     // Initialize Gemini with GEMINI_API_KEY_2
     const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY_2 });

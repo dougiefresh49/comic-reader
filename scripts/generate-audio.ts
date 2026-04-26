@@ -273,7 +273,7 @@ function getVoiceId(
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { issue: string; page?: string } {
+function parseArgs(): { book: string; issue: string; page?: string } {
   const args = process.argv.slice(2);
 
   // Check for help flag
@@ -295,13 +295,21 @@ Examples:
     process.exit(0);
   }
 
-  let issue = "issue-2";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let page: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -331,7 +339,7 @@ Examples:
     }
   }
 
-  return { issue, page };
+  return { book, issue, page };
 }
 
 /**
@@ -342,13 +350,13 @@ async function main() {
     console.log("🎙️  Starting audio generation...\n");
 
     // Parse arguments
-    const { issue, page } = parseArgs();
+    const { book, issue, page } = parseArgs();
 
     // Set up paths
-    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
+    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", book);
     const ISSUE_DIR = join(COMIC_DIR, issue);
     const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
-    const CASTLIST_FILE = join(COMIC_DIR, "castlist.json");
+    const CASTLIST_FILE = join(ISSUE_DIR, "castlist.json");
     const AUDIO_DIR = join(ISSUE_DIR, "audio");
     const NO_MATCH_FILE = join(ISSUE_DIR, "no-match-characters.json");
     const TIMESTAMPS_FILE = join(ISSUE_DIR, "audio-timestamps.json");

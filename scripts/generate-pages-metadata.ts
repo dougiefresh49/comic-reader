@@ -22,7 +22,7 @@ const PROJECT_ROOT = join(__dirname, "..");
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { issue: string; overwrite?: boolean } {
+function parseArgs(): { book: string; issue: string; overwrite?: boolean } {
   const args = process.argv.slice(2);
 
   // Check for help flag
@@ -31,6 +31,7 @@ function parseArgs(): { issue: string; overwrite?: boolean } {
 Usage: npm run generate-pages-metadata [options]
 
 Options:
+  --book=NAME, --book NAME     Book name (default: tmnt-mmpr-iii or COMIC_BOOK env var)
   --issue=N, --issue N        Issue number (e.g., --issue=1 for issue-1, default: issue-1)
   --overwrite                  Overwrite existing pages.json file
   --help, -h                  Show this help message
@@ -43,13 +44,21 @@ Examples:
     process.exit(0);
   }
 
-  let issue = "issue-1";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let overwrite = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -68,7 +77,7 @@ Examples:
     }
   }
 
-  return { issue, overwrite };
+  return { book, issue, overwrite };
 }
 
 interface PageMetadata {
@@ -85,15 +94,9 @@ interface PagesManifest {
  */
 async function main() {
   try {
-    const { issue, overwrite } = parseArgs();
+    const { book, issue, overwrite } = parseArgs();
 
-    const ASSETS_DIR = join(
-      PROJECT_ROOT,
-      "assets",
-      "comics",
-      "tmnt-mmpr-iii",
-      issue,
-    );
+    const ASSETS_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
     const PAGES_DIR = join(ASSETS_DIR, "pages");
     const OUTPUT_FILE = join(ASSETS_DIR, "pages.json");
 
@@ -157,9 +160,7 @@ async function main() {
           height: metadata.height,
         };
 
-        console.log(
-          `   ✅ ${filename}: ${metadata.width}x${metadata.height}`,
-        );
+        console.log(`   ✅ ${filename}: ${metadata.width}x${metadata.height}`);
         processed++;
       } catch (error) {
         console.error(`   ❌ ${filename}: ${error}`);
@@ -183,4 +184,3 @@ async function main() {
 }
 
 main();
-

@@ -1,19 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * Generate voice models for characters using ElevenLabs API
+ * Generate voice models for new characters using ElevenLabs API.
  *
- * Reads source-material.json and creates voice models via:
- * 1. POST /v1/text-to-voice/design (design the voice)
- * 2. POST /v1/text-to-voice (create the voice from preview)
+ * Reads new-characters.json (character → voice description) and creates
+ * voice_design voices for characters whose registry appearance has
+ * mediaType "voice_design" and no voice yet.
  *
- * Outputs castlist.json with { characterName: voiceId }
+ * After creating voices, writes back to the registry, generates
+ * cast-selections.json, and derives castlist.json for generate-audio.
  */
 
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { env } from "~/env.mjs";
+import {
+  loadRegistry,
+  saveRegistry,
+  loadCastSelections,
+  saveCastSelections,
+} from "./utils/registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,7 +28,6 @@ const PROJECT_ROOT = join(__dirname, "..");
 
 const ELEVENLABS_API_BASE = "https://api.elevenlabs.io";
 
-type CharacterVoiceMap = Record<string, string>;
 type CastList = Record<string, string>;
 
 interface VoiceDesignRequest {
@@ -57,34 +63,35 @@ interface VoiceCreateResponse {
   [key: string]: unknown;
 }
 
-/**
- * Parse command-line arguments
- */
-function parseArgs(): { issue: string } {
+function parseArgs(): { book: string; issue: string } {
   const args = process.argv.slice(2);
 
-  // Check for help flag
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
-Usage: npm run generate-voice-models [options]
+Usage: pnpm generate-voice-models -- --book <name> --issue <n>
 
 Options:
-  --issue=N, --issue N        Issue number (e.g., --issue=1 for issue-1, default: issue-1)
-  --help, -h                  Show this help message
-
-Examples:
-  npm run generate-voice-models                    Generate voices for issue-1
-  npm run generate-voice-models --issue=2         Generate voices for issue-2
+  --book=NAME, --book NAME     Book name
+  --issue=N, --issue N         Issue number
+  --help, -h                   Show this help message
 `);
     process.exit(0);
   }
 
-  let issue = "issue-1";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -100,12 +107,9 @@ Examples:
     }
   }
 
-  return { issue };
+  return { book, issue };
 }
 
-/**
- * Design a voice using ElevenLabs API
- */
 async function designVoice(
   apiKey: string,
   voiceDescription: string,
@@ -139,13 +143,9 @@ async function designVoice(
     throw new Error("No voice previews returned from design API");
   }
 
-  // Return the first preview (user can manually select if needed)
   return data.previews[0]!;
 }
 
-/**
- * Create a voice from a generated preview
- */
 async function createVoice(
   apiKey: string,
   characterName: string,
@@ -184,151 +184,172 @@ async function createVoice(
   return data.voice_id;
 }
 
-/**
- * Main execution
- */
 async function main() {
   try {
     console.log("🎤 Starting voice model generation...\n");
 
-    // Parse arguments
-    const { issue } = parseArgs();
+    const { book, issue } = parseArgs();
 
-    // Set up paths
-    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
-    const ISSUE_DIR = join(COMIC_DIR, issue);
-    const INPUT_FILE = join(COMIC_DIR, "source-material.json");
-    const OUTPUT_FILE = join(ISSUE_DIR, "castlist.json");
+    const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+    const NEW_CHARS_FILE = join(ISSUE_DIR, "new-characters.json");
+    const CASTLIST_FILE = join(ISSUE_DIR, "castlist.json");
 
-    console.log(`📁 Issue: ${issue}`);
-    console.log(`📖 Input: ${INPUT_FILE}`);
-    console.log(`💾 Output: ${OUTPUT_FILE}\n`);
+    console.log(`📁 Issue: ${book}/${issue}`);
+    console.log(`📖 Input: ${NEW_CHARS_FILE}`);
+    console.log(`💾 Output: ${CASTLIST_FILE}\n`);
 
-    // Check API key
     const apiKey = env.ELEVENLABS_API_KEY;
     if (!apiKey) {
-      console.error("❌ ELEVENLABS_API_KEY not found in environment variables");
+      console.error("❌ ELEVENLABS_API_KEY not found");
       process.exit(1);
     }
 
-    // Load source material
-    console.log("📖 Loading source material...");
-    let voiceDescriptions: CharacterVoiceMap = {};
-    try {
-      const existing = await fs.readFile(INPUT_FILE, "utf-8");
-      voiceDescriptions = JSON.parse(existing) as CharacterVoiceMap;
-      console.log(
-        `   ✓ Loaded ${Object.keys(voiceDescriptions).length} characters\n`,
+    // Load new-characters.json (character → voice description)
+    if (!(await fs.pathExists(NEW_CHARS_FILE))) {
+      console.error(`❌ Not found: ${NEW_CHARS_FILE}`);
+      console.error(
+        `   Run clean-voice-descriptions and find-voice-sources first.`,
       );
-    } catch (error) {
-      console.error(`❌ Failed to load source material: ${error}`);
-      console.error(`   Input file: ${INPUT_FILE}`);
       process.exit(1);
     }
 
-    if (Object.keys(voiceDescriptions).length === 0) {
-      console.log("⚠️  No character voice descriptions found!");
-      return;
+    const newChars = (await fs.readJson(NEW_CHARS_FILE)) as Record<
+      string,
+      string
+    >;
+    const characterNames = Object.keys(newChars).sort();
+
+    if (characterNames.length === 0) {
+      console.log("ℹ️  No new characters — skipping voice creation.");
+    } else {
+      console.log(`📋 ${characterNames.length} new character(s) to process\n`);
     }
 
-    // Validate structure
-    console.log("🔍 Validating source material structure...");
-    const invalidEntries: string[] = [];
-    for (const [characterName, description] of Object.entries(
-      voiceDescriptions,
-    )) {
-      if (!characterName || typeof characterName !== "string") {
-        invalidEntries.push(`Invalid character name: ${String(characterName)}`);
-      }
-      if (!description || typeof description !== "string") {
-        invalidEntries.push(
-          `Invalid description for "${characterName}": ${String(description)}`,
-        );
-      }
-      if (description && description.trim().length === 0) {
-        invalidEntries.push(`Empty description for "${characterName}"`);
-      }
-    }
-
-    if (invalidEntries.length > 0) {
-      console.error("❌ Validation errors found:");
-      for (const error of invalidEntries) {
-        console.error(`   - ${error}`);
-      }
-      process.exit(1);
-    }
-    console.log("   ✓ All entries are valid\n");
-
-    // Display characters with preview
-    console.log("📋 Characters to process:");
-    const characters = Object.keys(voiceDescriptions).sort();
-    for (const characterName of characters) {
-      const description = voiceDescriptions[characterName]!;
-      const preview =
-        description.length > 80
-          ? `${description.slice(0, 80)}...`
-          : description;
-      console.log(`   - ${characterName}`);
-      console.log(`     "${preview}"`);
-    }
-    console.log();
-
-    // Generate voice models
-    console.log("🎙️  Generating voice models...\n");
-    const castList: CastList = {};
+    const registry = await loadRegistry();
     let processed = 0;
+    let skipped = 0;
     let errors = 0;
 
-    for (const characterName of characters) {
-      const voiceDescription = voiceDescriptions[characterName]!;
-      console.log(
-        `   [${processed + 1}/${characters.length}] Processing ${characterName}...`,
+    // Process new characters
+    for (const characterName of characterNames) {
+      const voiceDescription = newChars[characterName]!;
+      const entry = registry[characterName];
+
+      // Find a pending voice_design appearance (mediaType === "voice_design", voice === null)
+      const pendingDesign = entry?.appearances.find(
+        (a) => a.mediaType === "voice_design" && a.voice === null,
       );
 
-      try {
-        // Step 1: Design the voice
-        console.log(`      🎨 Designing voice...`);
-        const preview = await designVoice(apiKey, voiceDescription);
+      // Find an appearance with needs_model status (IVC clips are ready)
+      const pendingIvc = entry?.appearances.find(
+        (a) =>
+          a.mediaType !== "voice_design" && a.voice?.status === "needs_model",
+      );
+
+      if (pendingDesign) {
         console.log(
-          `         ✓ Generated preview (ID: ${preview.generated_voice_id})`,
+          `   [${processed + skipped + errors + 1}/${characterNames.length}] ${characterName} (voice_design)`,
         );
 
-        // Step 2: Create the voice
-        console.log(`      🎭 Creating voice model...`);
-        const voiceId = await createVoice(
-          apiKey,
-          characterName,
-          voiceDescription,
-          preview.generated_voice_id,
-        );
-        castList[characterName] = voiceId;
-        console.log(`         ✓ Created voice (ID: ${voiceId})`);
+        try {
+          console.log(`      🎨 Designing voice...`);
+          const preview = await designVoice(apiKey, voiceDescription);
+          console.log(`         ✓ Preview ID: ${preview.generated_voice_id}`);
 
-        processed++;
+          console.log(`      🎭 Creating voice model...`);
+          const voiceId = await createVoice(
+            apiKey,
+            characterName,
+            voiceDescription,
+            preview.generated_voice_id,
+          );
+          console.log(`         ✓ Voice ID: ${voiceId}`);
 
-        // Wait 2 seconds between API calls to prevent rate limiting
-        // Skip delay on last character
-        if (processed < characters.length) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          // Write back to registry
+          pendingDesign.voice = {
+            voiceId,
+            voiceType: "voice_design",
+            status: "ready",
+            createdAt: new Date().toISOString(),
+          };
+
+          processed++;
+
+          if (processed < characterNames.length) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+          }
+        } catch (error) {
+          console.error(
+            `      ❌ ${error instanceof Error ? error.message : String(error)}`,
+          );
+          errors++;
         }
-      } catch (error) {
-        console.error(
-          `      ❌ Error: ${error instanceof Error ? error.message : String(error)}`,
+      } else if (pendingIvc) {
+        // IVC with clips ready — placeholder for when IVC creation is implemented
+        console.log(
+          `   [${processed + skipped + errors + 1}/${characterNames.length}] ${characterName} (IVC needs_model — skipping, implement IVC creation separately)`,
         );
-        errors++;
+        skipped++;
+      } else if (entry?.appearances.some((a) => a.voice?.status === "ready")) {
+        console.log(
+          `   [${processed + skipped + errors + 1}/${characterNames.length}] ${characterName} — already ready, skipping`,
+        );
+        skipped++;
+      } else {
+        // No registry entry or appearance not yet selected (needs_clips)
+        console.log(
+          `   [${processed + skipped + errors + 1}/${characterNames.length}] ${characterName} — no pending voice model (needs_clips or not set up)`,
+        );
+        skipped++;
       }
     }
 
-    // Save output
-    console.log("\n💾 Saving cast list...");
-    await fs.writeFile(OUTPUT_FILE, JSON.stringify(castList, null, 2));
-    console.log(`   ✓ Saved to ${OUTPUT_FILE}\n`);
+    // Save registry with any new voice IDs
+    if (processed > 0) {
+      await saveRegistry(registry);
+      console.log(`\n💾 Registry updated with ${processed} new voice(s)`);
+    }
 
-    // Summary
-    console.log("📊 Summary:");
-    console.log(`   Processed: ${processed}`);
-    console.log(`   Errors: ${errors}`);
-    console.log(`   Total characters: ${characters.length}`);
+    // Build cast-selections.json: start from known-character selections
+    // (written by find-voice-sources) and add newly created new-character voices
+    const castSelections = await loadCastSelections(ISSUE_DIR);
+
+    for (const characterName of characterNames) {
+      const entry = registry[characterName];
+      if (!entry) continue;
+
+      // Find the ready appearance for this character
+      const readyApp = entry.appearances.find(
+        (a) => a.voice?.status === "ready",
+      );
+      if (readyApp) {
+        castSelections[characterName] = {
+          appearanceId: readyApp.id,
+          voiceId: readyApp.voice!.voiceId,
+        };
+      }
+    }
+
+    await saveCastSelections(ISSUE_DIR, castSelections);
+    console.log(
+      `\n💾 cast-selections.json updated (${Object.keys(castSelections).length} total characters)`,
+    );
+
+    // Derive castlist.json from cast-selections for generate-audio compatibility
+    const castList: CastList = {};
+    for (const [character, selection] of Object.entries(castSelections)) {
+      castList[character] = selection.voiceId;
+    }
+
+    await fs.writeFile(CASTLIST_FILE, JSON.stringify(castList, null, 2));
+    console.log(
+      `💾 castlist.json derived (${Object.keys(castList).length} characters) → ${CASTLIST_FILE}`,
+    );
+
+    console.log("\n📊 Summary:");
+    console.log(`   Created: ${processed}`);
+    console.log(`   Skipped: ${skipped}`);
+    console.log(`   Errors:  ${errors}`);
     console.log("\n✅ Voice model generation complete!");
   } catch (error) {
     console.error("❌ Error:", error);

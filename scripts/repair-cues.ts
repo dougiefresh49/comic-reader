@@ -11,6 +11,7 @@ import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { GEMINI_FAST } from "./utils/models.js";
 import { env } from "~/env.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -226,7 +227,7 @@ ${elevenLabsDocs}
     const textPart = createPartFromText(prompt);
 
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: GEMINI_FAST,
       contents: [textPart],
     });
 

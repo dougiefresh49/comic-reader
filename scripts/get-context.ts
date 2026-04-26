@@ -21,23 +21,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
-// Paths
-const ISSUE = "issue-2";
-const ISSUE_DIR = join(
-  PROJECT_ROOT,
-  "assets",
-  "comics",
-  "tmnt-mmpr-iii",
-  ISSUE,
-);
-const ASSETS_DIR = join(ISSUE_DIR, "pages");
-const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
-const PREDICTIONS_DIR = join(ISSUE_DIR, "data", "predictions");
-const OCR_CROPS_DIR = join(ISSUE_DIR, "data", "ocr-crops");
-const GEMINI_CONTEXT_DIR = join(ISSUE_DIR, "data", "gemini-context");
-// Concurrency limit
-const LIMIT = pLimit(2);
-
 // Tolerance for spatial deduplication (5% as per spec)
 const SPATIAL_TOLERANCE = 0.05;
 
@@ -55,7 +38,22 @@ async function main() {
     console.log("🚀 Starting get-context script...\n");
 
     // Parse command-line arguments
-    const { page: pageNum, startAt, useSpatialDedup, skipGemini } = parseArgs();
+    const {
+      book,
+      issue,
+      page: pageNum,
+      startAt,
+      useSpatialDedup,
+      skipGemini,
+    } = parseArgs();
+
+    const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+    const ASSETS_DIR = join(ISSUE_DIR, "pages");
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
+    const PREDICTIONS_DIR = join(ISSUE_DIR, "data", "predictions");
+    const OCR_CROPS_DIR = join(ISSUE_DIR, "data", "ocr-crops");
+    const GEMINI_CONTEXT_DIR = join(ISSUE_DIR, "data", "gemini-context");
+    const LIMIT = pLimit(2);
 
     // Initialize Gemini
     const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
@@ -96,10 +94,16 @@ async function main() {
             return { pageName, bubbles: cache[pageName] };
           }
 
-          const bubbles = await processPage(pagePath, gemini, {
-            useSpatialDedup,
-            skipGemini,
-          });
+          const bubbles = await processPage(
+            pagePath,
+            gemini,
+            {
+              predictionsDir: PREDICTIONS_DIR,
+              ocrCropsDir: OCR_CROPS_DIR,
+              geminiContextDir: GEMINI_CONTEXT_DIR,
+            },
+            { useSpatialDedup, skipGemini },
+          );
           return { pageName, bubbles };
         }),
       ),
@@ -143,6 +147,8 @@ async function main() {
  * Parse command-line arguments
  */
 function parseArgs(): {
+  book: string;
+  issue: string;
   page: number | null;
   startAt: number | null;
   useSpatialDedup: boolean;
@@ -172,6 +178,8 @@ Examples:
     process.exit(0);
   }
 
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let page: number | null = null;
   let startAt: number | null = null;
   let useSpatialDedup = false;
@@ -181,6 +189,26 @@ Examples:
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
+    if (arg.startsWith("--issue=")) {
+      const issueNum = arg.split("=")[1]?.trim();
+      if (issueNum) {
+        issue = issueNum.startsWith("issue-") ? issueNum : `issue-${issueNum}`;
+      }
+    }
+    if (arg === "--issue") {
+      const nextArg = args[i + 1];
+      if (nextArg) {
+        const issueNum = nextArg.trim();
+        issue = issueNum.startsWith("issue-") ? issueNum : `issue-${issueNum}`;
+      }
+    }
     if (arg.startsWith("--page=")) {
       const pageNum = parseInt(arg.split("=")[1] ?? "", 10);
       if (!isNaN(pageNum) && pageNum > 0) {
@@ -219,7 +247,7 @@ Examples:
     }
   }
 
-  return { page, startAt, useSpatialDedup, skipGemini };
+  return { book, issue, page, startAt, useSpatialDedup, skipGemini };
 }
 
 /**
@@ -228,6 +256,11 @@ Examples:
 async function processPage(
   pagePath: string,
   gemini: GoogleGenAI,
+  dirs: {
+    predictionsDir: string;
+    ocrCropsDir: string;
+    geminiContextDir: string;
+  },
   options: {
     useSpatialDedup: boolean;
     skipGemini: boolean;
@@ -243,7 +276,7 @@ async function processPage(
 
   // Step 1: Detect text regions with Roboflow
   const predictions = await detectTextRegions(imageBuffer, {
-    outDir: PREDICTIONS_DIR,
+    outDir: dirs.predictionsDir,
     pageName,
     useSpatialDedup: options.useSpatialDedup,
     spatialDedupTolerance: SPATIAL_TOLERANCE,
@@ -257,7 +290,7 @@ async function processPage(
   // Step 2: OCR pass
   const ocrPredictions = await runOCR(predictions, gemini, imageBuffer, {
     pageName,
-    outDir: OCR_CROPS_DIR,
+    outDir: dirs.ocrCropsDir,
   });
 
   // Step 3: Analyze context with Gemini
@@ -268,7 +301,7 @@ async function processPage(
     pageName,
     {
       skipGemini: options.skipGemini,
-      outDir: GEMINI_CONTEXT_DIR,
+      outDir: dirs.geminiContextDir,
     },
   );
 

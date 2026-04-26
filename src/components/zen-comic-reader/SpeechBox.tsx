@@ -8,6 +8,8 @@ interface SpeechBoxProps {
   text: string;
   words: WordTiming[];
   activeWordIndex: number | null;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
 }
 
 export function SpeechBox({
@@ -15,6 +17,8 @@ export function SpeechBox({
   text,
   words,
   activeWordIndex,
+  isPlaying,
+  onTogglePlay,
 }: SpeechBoxProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLSpanElement | null>(null);
@@ -90,8 +94,44 @@ export function SpeechBox({
 
   return (
     <div className="relative flex min-h-[78px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/70 px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-      <div className="mb-1 text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
-        {speaker?.trim() ?? "Narrator"}
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
+          {speaker?.trim() ?? "Narrator"}
+        </span>
+        {onTogglePlay && (
+          <button
+            onClick={onTogglePlay}
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M8 5.14v13.72L19 12 8 5.14z" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
       <div
         ref={containerRef}

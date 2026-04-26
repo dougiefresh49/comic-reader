@@ -23,7 +23,7 @@ const PROJECT_ROOT = join(__dirname, "..");
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { issue: string; overwrite?: boolean } {
+function parseArgs(): { book: string; issue: string; overwrite?: boolean } {
   const args = process.argv.slice(2);
 
   // Check for help flag
@@ -44,13 +44,21 @@ Examples:
     process.exit(0);
   }
 
-  let issue = "issue-1";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let overwrite = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -69,7 +77,7 @@ Examples:
     }
   }
 
-  return { issue, overwrite };
+  return { book, issue, overwrite };
 }
 
 /**
@@ -134,16 +142,16 @@ async function main() {
     console.log("📦 Starting copy to public directory...\n");
 
     // Parse arguments
-    const { issue, overwrite } = parseArgs();
+    const { book, issue, overwrite } = parseArgs();
 
     // Set up paths
-    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
+    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", book);
     const ISSUE_DIR = join(COMIC_DIR, issue);
     const PUBLIC_COMIC_DIR = join(
       PROJECT_ROOT,
       "public",
       "comics",
-      "tmnt-mmpr-iii",
+      book,
       issue,
     );
 
@@ -252,9 +260,9 @@ async function main() {
       console.log("   ⚠️  File not found\n");
     }
 
-    // 5. Copy castlist.json (from root comic directory)
+    // 5. Copy castlist.json (from issue directory)
     console.log("🎭 Copying castlist.json...");
-    const castlistSource = join(COMIC_DIR, "castlist.json");
+    const castlistSource = join(ISSUE_DIR, "castlist.json");
     const castlistDest = join(PUBLIC_COMIC_DIR, "castlist.json");
     if (await fs.pathExists(castlistSource)) {
       if (!overwrite && (await fs.pathExists(castlistDest))) {

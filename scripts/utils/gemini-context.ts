@@ -1,4 +1,5 @@
 import fs from "fs-extra";
+import { GEMINI_HIGH } from "./models.js";
 import {
   createPartFromBase64,
   createPartFromText,
@@ -172,7 +173,7 @@ export async function analyzeContextGemini(
     const textPart = createPartFromText(prompt);
 
     const response = await gemini.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: GEMINI_HIGH,
       contents: [imagePart, textPart],
     });
 

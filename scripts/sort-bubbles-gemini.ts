@@ -10,6 +10,7 @@
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { GEMINI_MEDIUM } from "./utils/models.js";
 import {
   GoogleGenAI,
   createPartFromText,
@@ -43,6 +44,7 @@ interface SortingResult {
  * Parse command-line arguments
  */
 function parseArgs(): {
+  book: string;
   issue: string;
   page?: string;
   apiKeyName: "GEMINI_API_KEY" | "GEMINI_API_KEY_2";
@@ -71,7 +73,8 @@ Examples:
     process.exit(0);
   }
 
-  let issue = "issue-1";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let page: string | undefined;
   let apiKeyName: "GEMINI_API_KEY" | "GEMINI_API_KEY_2" = "GEMINI_API_KEY";
   let dryRun = false;
@@ -80,6 +83,13 @@ Examples:
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -126,7 +136,7 @@ Examples:
     }
   }
 
-  return { issue, page, apiKeyName, dryRun };
+  return { book, issue, page, apiKeyName, dryRun };
 }
 
 /**
@@ -184,7 +194,7 @@ Return the bubble IDs in the order they should be read.`;
     const textPart = createPartFromText(prompt);
 
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: GEMINI_MEDIUM,
       contents: [imagePart, textPart],
     });
 
@@ -270,10 +280,10 @@ async function main() {
     console.log("🔄 Starting AI-powered bubble sorting...\n");
 
     // Parse arguments
-    const { issue, page, apiKeyName, dryRun } = parseArgs();
+    const { book, issue, page, apiKeyName, dryRun } = parseArgs();
 
     // Set up paths
-    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
+    const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", book);
     const ISSUE_DIR = join(COMIC_DIR, issue);
     const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
     const PAGES_DIR = join(ISSUE_DIR, "pages");
