@@ -32,9 +32,14 @@
     "generate-pages-metadata": "tsx --env-file=.env scripts/generate-pages-metadata.ts",
     "add-bubble-styles": "tsx --env-file=.env scripts/add-bubble-styles.ts",
     "repair-cues": "tsx --env-file=.env scripts/repair-cues.ts",
-    "clip-audio-segments": "tsx scripts/clip-audio-segments.ts"
+    "clip-audio-segments": "tsx scripts/clip-audio-segments.ts",
+    "find-voice-sources": "tsx --env-file=.env scripts/find-voice-sources.ts",
+    "manage-registry": "tsx --env-file=.env scripts/manage-registry.ts",
+    "ingest": "tsx --env-file=.env scripts/ingest.ts",
+    "scrape-pages": "tsx --env-file=.env scripts/scrape-pages.ts"
   },
   "dependencies": {
+    "@browserbasehq/stagehand": "^3.2.1",
     "@elevenlabs/elevenlabs-js": "^2.25.1",
     "@google/genai": "^1.30.0",
     "@t3-oss/env-nextjs": "^0.12.0",

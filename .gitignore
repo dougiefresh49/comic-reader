@@ -45,5 +45,11 @@ yarn-error.log*
 # idea files
 .idea
 
-/assets/*
+/assets/**/audio/*
+/assets/**/data/ocr-crops/*
+/assets/**/data/predictions/*
+/assets/**/pages-webp/*
 /video-test-files/*
+assets/**/checkpoint.json
+/assets/**/new-characters.json
+/assets/**/known-characters.json
