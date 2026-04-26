@@ -1,0 +1,191 @@
+[
+  {
+    "id": "page-22_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 166.7705841064453,
+      "y": 365.989501953125,
+      "width": 285.2661590576172,
+      "height": 137.37506103515625,
+      "confidence": 0.946975588798523,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-001-x166-y365.jpg"
+    },
+    "ocr_text": "THIS THING IS TOO VALUABLE TO--",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  },
+  {
+    "id": "page-22_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 153.5111083984375,
+      "y": 69.74928283691406,
+      "width": 341.2677307128906,
+      "height": 143.65711975097656,
+      "confidence": 0.9331169128417969,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-002-x153-y69.jpg"
+    },
+    "ocr_text": "MS. STERLING, WE NEED TO GET YOU TO A SECURE--",
+    "type": "SPEECH",
+    "speaker": "Soldier",
+    "emotion": "Urgent",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Professional, urgent male military voice, American accent",
+    "textWithCues": "[Urgently] Ms. Sterling, we need to get you to a secure--",
+    "aiReasoning": "I have located the text bubble at the top left of the page.\nThe text is \"MS. STERLING, WE NEED TO GET YOU TO A SECURE--\" inside a standard speech bubble.\nThe tail points to a male soldier/guard in tactical gear standing to the left of a woman with white hair (Ms. Sterling).\nSince he is an unnamed character in uniform, I will classify him as an EXTRA.\nHis side appears to be NEUTRAL (military/security personnel doing their job, seemingly allied against the attacker given the context).\nHis expression is serious and focused. The situation is urgent as they are likely under attack or in a combat zone.\nThe text ends with a double dash \"--\", indicating he is interrupted by the woman's response in the next bubble.\nVoice description should be a standard urgent military male voice."
+  },
+  {
+    "id": "page-22_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 133.3867645263672,
+      "y": 728.4096069335938,
+      "width": 223.83045959472656,
+      "height": 139.1685791015625,
+      "confidence": 0.8966869711875916,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-003-x133-y728.jpg"
+    },
+    "ocr_text": "GRACE STERLING. WE FINALLY MEET.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Threatening and ominous",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, commanding, menacing male voice with a slight metallic reverb due to the helmet.",
+    "textWithCues": "[Ominously, making a dramatic entrance] GRACE STERLING. WE FINALLY MEET.",
+    "aiReasoning": "The text \"GRACE STERLING. WE FINALLY MEET.\" is located in a speech bubble in the second panel.\nThe tail of the bubble points to the character wearing a fusion of the Green Ranger suit and Shredder armor.\nIn the subsequent panel, the Red Ranger addresses this character as \"Shredder\". Therefore, the speaker is Shredder.\nShredder is a primary antagonist, so his importance is `MAJOR` and his side is `VILLAIN`.\nThe visual shows him lunging forward in an attack or dramatic entrance pose. The tone is threatening and ominous, marking a confrontation.\nThere are no special font effects indicating screaming or whispering, but the dramatic context suggests a commanding, menacing tone."
+  },
+  {
+    "id": "page-22_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 704.9232788085938,
+      "y": 2821.34521484375,
+      "width": 330.24310302734375,
+      "height": 128.9423828125,
+      "confidence": 0.7843316197395325,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-004-x704-y2821.jpg"
+    },
+    "ocr_text": "ONLY ONE WAY TO FIND OUT.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Determined",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Confidently, bracing for combat] Only one way to find out.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"ONLY ONE WAY TO FIND OUT.\" is in the bottom panel of the page. It is inside a speech bubble.\n2.  **Context**:\n    *   **Visuals**: The bubble has a tail pointing to the left, towards the Red Ranger's helmet. The opposing bubbles (Shredder's) point to the right.\n    *   **Speaker**: This is the Red Ranger. He is not in the provided \"Unique Characters\" list (Soldier, Shredder), so I will label him \"Red Ranger\".\n    *   **Side**: HERO.\n    *   **Importance**: MAJOR.\n    *   **Emotion**: The Red Ranger is locked in a sword struggle with Shredder. He is responding to a taunt. His body language is active/combat-ready. The emotion is determination and confidence.\n3.  **Performance Cues**:\n    *   The line is a direct retort to \"Do you really think you can best me all by yourself?\".\n    *   It's a classic hero one-liner. It should be delivered with grit and confidence, accepting the challenge.\n    *   No shouting formatting (bold/jagged), so it's a normal speaking volume, perhaps slightly strained from the physical effort of the sword lock or just coolly confident. Given it's Power Rangers, \"cool confidence\" is the standard."
+  },
+  {
+    "id": "page-22_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 775.4996948242188,
+      "y": 2597.924072265625,
+      "width": 199.358154296875,
+      "height": 102.980712890625,
+      "confidence": 0.7836943864822388,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-005-x775-y2597.jpg"
+    },
+    "ocr_text": "THE RED RANGER.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Arrogant and menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Menacingly] The Red Ranger.",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   The text \"THE RED RANGER.\" is located in the bottom panel of the page.\n    *   It is inside a rounded speech bubble with a tail pointing to the character on the right (the villain in green/gold armor).\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The character is the villain wearing a mix of the Green Ranger's suit and Shredder's armor. In the panel immediately preceding this one (Panel 3), the Red Ranger explicitly addresses him as \"SHREDDER\". The provided \"Unique Characters\" list includes \"Shredder\". Therefore, the speaker is \"Shredder\".\n    *   **Side:** `VILLAIN`. He is fighting the Red Ranger and threatening the protagonist.\n    *   **Importance:** `MAJOR`. He is the primary antagonist of the scene/arc.\n    *   **Emotion:** Even though his face is masked, the context of the sword fight and the dialogue (\"Do you really think you can best me...\") implies confidence, arrogance, and menace. He is acknowledging his opponent with a sense of superiority.\n\n3.  **Performance Cues:**\n    *   The text is bolded \"THE **RED RANGER**.\", suggesting emphasis on the title/identity.\n    *   The bubble is standard (not jagged or dotted), so volume is normal but projected for combat.\n    *   Tone: The character is likely sneering behind the mask. He is sizing up his opponent. It's a dramatic acknowledgement.\n    *   Cue: `[Menacingly]` or `[With arrogant recognition]`. I will use `[Menacingly]` as it fits the villain archetype well.\n\n4.  **Final JSON Construction:**\n    *   Type: SPEECH\n    *   Speaker: Shredder\n    *   CharacterType: MAJOR\n    *   Side: VILLAIN\n    *   Emotion: Arrogant, menacing\n    *   TextWithCues: \"[Menacingly] The Red Ranger.\""
+  },
+  {
+    "id": "page-22_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 641.4931640625,
+      "y": 1320.5089111328125,
+      "width": 244.14605712890625,
+      "height": 205.6956787109375,
+      "confidence": 0.6940750479698181,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-006-x641-y1320.jpg"
+    },
+    "ocr_text": "NOT TODAY, SHREDDER.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Defiant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Heroic, commanding young adult male, American accent, clear and strong",
+    "textWithCues": "[Firmly and defiantly] Not today, Shredder.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"NOT TODAY, SHREDDER.\" is in a standard speech bubble in the middle panel. The tail points to the Red Ranger. Type is `SPEECH`.\n2.  **Context:**\n    *   **Speaker:** The character is wearing the Red Power Ranger suit. The list of unique characters includes \"Red Ranger\". I will use that name.\n    *   **Side:** Power Rangers are heroes. Side is `HERO`.\n    *   **Importance:** The Red Ranger is a protagonist. Importance is `MAJOR`.\n    *   **Voice Description:** Even though he is major, a description helps context. He should sound like a classic heroic leader: young adult male, American accent, strong, brave, and authoritative.\n    *   **Emotion:** He is blocking a sword strike from the villain. His posture is strong and grounded. The line is a classic \"shut down\" of the villain's momentum. The emotion is determined, defiant, and cool under pressure.\n3.  **Performance Cues:**\n    *   The text is standard case (comic caps). No shout bubble.\n    *   The action is a sword block. There is physical effort, but the line is delivered with confidence to interrupt the villain.\n    *   Cue: `[Defiantly, while blocking an attack]` or `[Firmly and heroic]`.\n    *   Text: \"Not today, Shredder.\"\n\nFinal JSON construction:\n*   Speaker: Red Ranger\n*   Text: \"NOT TODAY, SHREDDER.\" -> \"[Firmly and defiantly] Not today, Shredder.\""
+  },
+  {
+    "id": "page-22_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 866.372802734375,
+      "y": 2708.200927734375,
+      "width": 318.3045654296875,
+      "height": 127.7470703125,
+      "confidence": 0.5866657495498657,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-007-x866-y2708.jpg"
+    },
+    "ocr_text": "DO YOU REALLY THINK YOU CAN BEST ME ALL BY YOURSELF?",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Arrogant and taunting",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Mocking arrogance] Do you *really* think you can best me all by yourself?",
+    "aiReasoning": "The text \"DO YOU REALLY THINK YOU CAN BEST ME ALL BY YOURSELF?\" is located in the bottom panel of the page.\n1.  **Type:** It is in a standard speech bubble with a tail pointing to a character. Type is `SPEECH`.\n2.  **Speaker:** The tail points to the character on the right side of the panel, who is wearing green armor with a Shredder-style helmet. In the middle panel, the Red Ranger addresses this character as \"Shredder\". The provided unique character list includes \"Shredder\". Therefore, the speaker is **Shredder**.\n3.  **Context:** Shredder is a primary antagonist (`MAJOR` importance) and a `VILLAIN`. He is currently in a sword lock with the Red Ranger. His body language suggests confidence and dominance.\n4.  **Voice/Performance:** Since he is a major villain, his voice is typically deep, commanding, and menacing. Here, he is taunting the hero. The word \"REALLY\" is bolded, indicating emphasis/sarcastic disbelief."
+  },
+  {
+    "id": "page-22_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 116.87107849121094,
+      "y": 895.9862670898438,
+      "width": 280.99183654785156,
+      "height": 187.26409912109375,
+      "confidence": 0.49924468994140625,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-008-x116-y895.jpg"
+    },
+    "ocr_text": "PITY YOU AND I DIDN'T GET TO KNOW EACH OTH BETTER. THE THINGS WE COUL HAVE--",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Mocking and menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Leaping through the air, mocking tone] Pity you and I didn't get to know each other better. The things we could have--",
+    "aiReasoning": "1.  **Locate & Classify**: The text is in a speech bubble in the second panel. The tail points to the character in the air, wearing green armor and a cape.\n    *   Text: \"PITY YOU AND I DIDN'T GET TO KNOW EACH OTHER BETTER. THE THINGS WE COULD HAVE--\"\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The character is the Green Ranger Shredder. The provided unique characters list includes \"Shredder\". I will identify him as \"Shredder\".\n    *   **Side**: He is attacking a civilian/scientist and fighting the Power Rangers. Clearly a `VILLAIN`.\n    *   **Importance**: Shredder is a primary antagonist. `MAJOR`.\n    *   **Voice Description**: Since he is MAJOR, this is optional per instructions, but generally Shredder has a deep, commanding, and menacing voice.\n    *   **Emotion**: He is leaping to attack. His words are mocking and sadistic (\"Pity...\"). He is about to kill or capture someone.\n\n3.  **Performance Cues**:\n    *   The text ends with \"--\", indicating he is cut off, likely by the Red Ranger's intervention in the next panel.\n    *   The tone should be arrogant and threatening.\n    *   I will correct the OCR typos (\"OTH\" -> \"OTHER\", \"COUL\" -> \"COULD\") for the final script."
+  },
+  {
+    "id": "page-22_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 238.94366455078125,
+      "y": 202.67965698242188,
+      "width": 311.3421630859375,
+      "height": 159.369384765625,
+      "confidence": 0.418304443359375,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-009-x238-y202.jpg"
+    },
+    "ocr_text": "NO, YOU NEED TO MOBILIZE AND SWEEP THE TECHNODROME.",
+    "type": "SPEECH",
+    "speaker": "Grace Sterling",
+    "emotion": "urgent",
+    "characterType": "MINOR",
+    "side": "HERO",
+    "voiceDescription": "Mature female voice, authoritative, commanding, intelligent, American accent",
+    "textWithCues": "[Interrupting firmly] No, you need to mobilize and sweep the Technodrome.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top panel. The tail points to a woman with white/grey hair wearing a lab coat. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The soldier addresses her as \"Ms. Sterling\" in the preceding bubble, and Shredder calls her \"Grace Sterling\" in the next panel. She is not in the provided list of unique characters (Soldier, Shredder, Red Ranger). I will name her \"Grace Sterling\".\n    *   **Side:** She is commanding troops to attack the Technodrome (a villainous base), and is being targeted by Shredder. She is on the `HERO` side.\n    *   **Importance:** She is a named character with specific dialogue and plot relevance, but not one of the main titular heroes. Classification: `MINOR`.\n    *   **Voice Description:** She appears to be a mature woman (grey hair), in a position of authority (giving orders to soldiers), and is professional/scientific (lab coat). Voice should be: \"Mature female voice, authoritative, commanding, intelligent, American accent.\"\n    *   **Emotion:** She is urgent and determined. She is refusing an evacuation order (\"No...\") to prioritize the mission. Her face is stern.\n3.  **Performance Cues:**\n    *   She is cutting off the soldier.\n    *   She is giving a direct command.\n    *   The tone is firm and urgent.\n    *   Text handling: \"No, you need to mobilize and sweep the Technodrome.\""
+  }
+]

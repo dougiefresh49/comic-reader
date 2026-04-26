@@ -1,0 +1,23 @@
+[
+  {
+    "id": "page-09_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1509.2900390625,
+      "y": 2472.59912109375,
+      "width": 332.771728515625,
+      "height": 178.827392578125,
+      "confidence": 0.6402037739753723,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-001-x1509-y2472.jpg"
+    },
+    "ocr_text": "YEAH, I LIKED THE OTHER VIDEO GAME WAY BETTER.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Pained but sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Winded, groaning slightly] Yeah, I liked the other video game way better.",
+    "aiReasoning": "I have located the text \"YEAH, I LIKED THE OTHER VIDEO GAME WAY BETTER.\" in the bottom right panel.\nIt is a speech bubble connected to the Ninja Turtle with the orange bandana, who is Michelangelo.\nMichelangelo is a MAJOR HERO character.\nContext: He has just dodged or taken a glancing blow from a massive energy attack (evidenced by the \"FWOOOSH\" SFX and his previous \"OUCH\" bubble). He is lying on the ground in the snow.\nTone: He is making a quip/joke despite being in pain. It's sarcastic and references the situation being like a difficult video game level.\nDelivery: Should sound slightly pained or winded, but maintaining his signature humorous, lighthearted attitude."
+  }
+]

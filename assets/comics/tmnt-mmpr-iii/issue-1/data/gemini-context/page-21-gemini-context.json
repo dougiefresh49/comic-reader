@@ -1,0 +1,262 @@
+[
+  {
+    "id": "page-21_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 577.6726684570312,
+      "y": 130.075439453125,
+      "width": 262.98828125,
+      "height": 157.30255126953125,
+      "confidence": 0.9463930130004883,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-001-x577-y130.jpg"
+    },
+    "ocr_text": "YOU AREN'T RANGERS. AND YOU'LL NEVER--",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Defiant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Heroic, young adult male voice, confident and determined",
+    "textWithCues": "[Defiantly] You aren't Rangers. And you'll never--",
+    "aiReasoning": "The user wants me to identify and voice-act a specific text bubble.\n**Text:** \"YOU AREN'T RANGERS. AND YOU'LL NEVER--\"\n**Loc/Context:** Top left panel. The Green Ranger is flying towards Rocksteady (the rhino villain in armor). The Green Ranger is speaking.\n**Classification:** SPEECH.\n**Speaker:** Green Ranger (Hero, Major).\n**Action:** He is attacking mid-air and delivering a line before being punched in the next panel (indicated by the cut-off \"--\").\n**Emotion:** Defiant, authoritative, confrontational.\n**Cues:** He is asserting that the villains are fakes. The sentence is cut off abruptly by the action in the subsequent panel.\n**Voice:** Heroic, young male, determined.\n\nStep 1: Identify region. Top left panel, second bubble.\nStep 2: Speaker is Green Ranger.\nStep 3: Importance is MAJOR. Side is HERO.\nStep 4: Voice acting cues. He is confident/defiant. The line is an interruption.\n\nJSON construction:\n- type: SPEECH\n- speaker: Green Ranger\n- characterType: MAJOR\n- side: HERO\n- emotion: Defiant/Confrontational\n- textWithCues: \"[Defiantly] You aren't Rangers. And you'll never--\""
+  },
+  {
+    "id": "page-21_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1220.1007080078125,
+      "y": 757.7530517578125,
+      "width": 261.87109375,
+      "height": 125.9979248046875,
+      "confidence": 0.9225603938102722,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-002-x1220-y757.jpg"
+    },
+    "ocr_text": "YOU SURE ABOUT THAT, GREENIE?",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Mocking confidence",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice, tough and aggressive",
+    "textWithCues": "[Gruffly, mocking] You sure about that, Greenie?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"YOU SURE ABOUT THAT, GREENIE?\" is in a speech bubble in the top-right panel. The tail points to the large Rhino character (Rocksteady) who is punching the Green Ranger. Classification is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is the mutant rhino, Rocksteady. He is not the Green Ranger (who is being punched). Since he is a distinct, named character not in the provided list, I will name him \"Rocksteady\".\n    *   **Side:** He is fighting a Power Ranger, so he is a `VILLAIN`.\n    *   **Importance:** He is a named secondary character (henchman), fitting the `MINOR` category definition (like Bulk/Skull).\n    *   **Voice Description:** Rocksteady is known for being a brute. A deep, gravelly, rough, and tough male voice fits him. He is exerting himself physically but still has breath to taunt.\n    *   **Emotion:** He is mid-combat, having just landed a solid hit. He is smug, mocking, and aggressive.\n3.  **Performance Cues:**\n    *   The Green Ranger just said \"You'll never--\" before getting cut off.\n    *   Rocksteady finishes the thought with a taunt.\n    *   The delivery should be cocky and gruff.\n    *   Cues: `[Mockingly]`, `[Gruffly]`."
+  },
+  {
+    "id": "page-21_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 268.50030517578125,
+      "y": 76.987548828125,
+      "width": 363.41839599609375,
+      "height": 126.41207885742188,
+      "confidence": 0.9212786555290222,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-003-x268-y76.jpg"
+    },
+    "ocr_text": "I DON'T CARE WHAT YOU LOOK LIKE.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Defiant, brave, and assertive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Defiantly] I don't care what you look like.",
+    "aiReasoning": "The text \"I DON'T CARE WHAT YOU LOOK LIKE.\" is inside a standard speech bubble in the top-left panel.\nThe tail of the speech bubble points to the Green Ranger, who is leaping towards the camera/Rocksteady.\nThe Green Ranger is a designated `MAJOR` character and a `HERO`.\nThe context is a battle; the Green Ranger is confronting an enemy (Rocksteady) who appears monstrous. The line is a heroic rejection of intimidation.\nThe tone should be defiant, brave, and assertive.\nSince the character is `MAJOR`, I will not provide a specific AI voice description as per the instructions (which specify it for MINOR/EXTRA), but I will ensure the emotion and cues guide the performance."
+  },
+  {
+    "id": "page-21_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 409.6161193847656,
+      "y": 2402.9814453125,
+      "width": 228.42745971679688,
+      "height": 194.64453125,
+      "confidence": 0.9077872633934021,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-004-x409-y2402.jpg"
+    },
+    "ocr_text": "...COUGH... COUGH... COUGH...",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Painful, winded",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Strained, choking on dust and in pain] ...Cough... cough... cough...",
+    "aiReasoning": "I see the text \"...COUGH... COUGH... COUGH...\" in a speech bubble with a tail pointing to the Green Ranger.\nThe location is the bottom-left panel where the Green Ranger is lying on the ground amidst dust/debris.\nThe speaker is the Green Ranger (identified in the unique characters list).\nHe is a HERO and a MAJOR character.\nContext: He has just been thrown violently by Rocksteady and slammed into the ground. He is recovering from the impact and inhaling dust.\nEmotion: Pain, winded, physical distress.\nPerformance Cues: The text is purely sounds of coughing. The delivery should be strained, weak, and sounding like someone who just had the wind knocked out of them."
+  },
+  {
+    "id": "page-21_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1209.797607421875,
+      "y": 938.1935424804688,
+      "width": 382.912841796875,
+      "height": 120.45684814453125,
+      "confidence": 0.8755624294281006,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-005-x1209-y938.jpg"
+    },
+    "ocr_text": "BOOM GOES THE DYNAMITE!",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Triumphant and Aggressive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gruff, brutish male voice",
+    "textWithCues": "[Shouting triumphantly as he lands a punch] BOOM GOES THE DYNAMITE!",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"BOOM GOES THE DYNAMITE!\" is found in a speech bubble in the second panel (middle tier). The bubble has a tail connecting to the character delivering the punch. Therefore, it is `SPEECH`.\n\n2.  **Context**:\n    *   **Speaker**: The character is a large, rhino-themed humanoid villain. Based on the provided unique characters list and visual recognition of TMNT characters, this is **Rocksteady**.\n    *   **Side**: He is attacking the Green Ranger. He is a `VILLAIN`.\n    *   **Importance**: Rocksteady is a well-known, named character. He is `MAJOR`.\n    *   **Voice Description**: Since he is `MAJOR`, I technically don't need to generate a generic description, but for context: he typically has a deep, gruff, low-intelligence \"tough guy\" voice.\n    *   **Emotion**: He is mid-punch, delivering a massive blow. He is shouting a catchphrase with glee and aggression. The emotion is triumphant and violent.\n\n3.  **Performance Cues**:\n    *   The text is all-caps and ends with an exclamation point.\n    *   The context is a violent action (punching someone in the face).\n    *   The phrase is a confident exclamation.\n    *   Cue: `[Shouting triumphantly]` or `[Yelling with impact]`."
+  },
+  {
+    "id": "page-21_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 910.1453247070312,
+      "y": 1446.4371337890625,
+      "width": 300.28704833984375,
+      "height": 130.8414306640625,
+      "confidence": 0.8366485238075256,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-006-x910-y1446.jpg"
+    },
+    "ocr_text": "LOOK, ROCK! POWER RANGER PIÑATAS!",
+    "type": "SPEECH",
+    "speaker": "Bebop",
+    "emotion": "Excited and mocking",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Raspy, high-energy, street-punk male voice with a thick New York accent",
+    "textWithCues": "[Shouting playfully] Look, Rock! Power Ranger piñatas!",
+    "aiReasoning": "**Step 1: Locate & Classify**\nThe text \"LOOK, ROCK! POWER RANGER PIÑATAS!\" is in a speech bubble in the middle panel.\nThe bubble has a tail. It points towards the character Rocksteady (the Rhino).\nClassification: `SPEECH`.\n\n**Step 2: Analyze Context**\n*   **Speaker Identification:** The text addresses \"Rock\". \"Rock\" is a nickname for Rocksteady (the Rhino character visible in the panel). Therefore, the speaker is talking *to* Rocksteady. The character most likely to be fighting alongside Rocksteady and bantering with him is his partner, **Bebop** (the Warthog). Although Bebop is not fully visible in this specific panel (or is off-panel), the dialogue context confirms his identity. In the subsequent panel, Bebop and Rocksteady are shown standing together.\n*   **Side:** `VILLAIN`. They are attacking the Green Ranger.\n*   **Importance:** `MINOR` (Named secondary character/Henchman). While iconic, they serve as henchmen to the main villains (Shredder/Rita) relative to the \"Major\" category definition.\n*   **Voice Description:** Bebop typically has a raspy, African-American (or sometimes just general street-punk) accent, high-energy, goofy, and tough.\n*   **Emotion:** The character is making a joke about the Green Ranger flying through the air like a piñata. The tone is mocking, enthusiastic, and aggressive.\n*   **Visuals:** The text is in bold caps with exclamation points, indicating a loud volume/shout.\n\n**Step 3: Performance Cues**\n*   **Tone:** Mocking and excited.\n*   **Volume:** Shouting (due to combat context and exclamation marks).\n*   **Text:** \"LOOK, ROCK! POWER RANGER PIÑATAS!\" -> \"[Shouting/Mocking] Look, Rock! Power Ranger piñatas!\"\n\n**Conclusion for JSON:**\n*   Type: SPEECH\n*   Speaker: Bebop\n*   CharacterType: MINOR\n*   Side: VILLAIN\n*   Voice: Raspy, street-punk male voice, high energy.\n*   Emotion: Excited/Mocking.\n*   TextWithCues: \"[Excitedly mocking] Look, Rock! Power Ranger piñatas!\""
+  },
+  {
+    "id": "page-21_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1069.7330322265625,
+      "y": 758.8356323242188,
+      "width": 154.8939208984375,
+      "height": 91.99713134765625,
+      "confidence": 0.8147130608558655,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-007-x1069-y758.jpg"
+    },
+    "ocr_text": "HRMPH.",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Exertion",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice",
+    "textWithCues": "[Grunts with heavy effort while punching] Hrmph.",
+    "aiReasoning": "I have located the text \"HRMPH.\" in the top right panel (Panel 2).\nThe text is in a speech bubble with a small tail pointing towards the character in the rhino armor.\nThis character is identified as **Rocksteady** in the unique characters list.\nHe is a villain (fighting the Green Ranger).\nSince he is a named character from the TMNT franchise and central to this scene, he is a **MAJOR** character (or a very significant MINOR one, but given the list provided, I will treat him as a known entity).\nThe action in the panel is Rocksteady punching the Green Ranger's shield/field.\nThe text \"HRMPH.\" represents a grunt of physical exertion.\nThe tone is aggressive and strained.\n\n**Classification:**\n*   Type: SPEECH\n*   Speaker: Rocksteady\n*   Side: VILLAIN\n*   Character Type: MAJOR (He is a primary antagonist in this crossover event).\n*   Emotion: Exertion/Physical Effort.\n*   Text cues: Since it's a sound effect written as dialogue, I should indicate it's a grunt.\n\n**JSON Construction:**\n*   `type`: \"SPEECH\"\n*   `speaker`: \"Rocksteady\"\n*   `characterType`: \"MAJOR\"\n*   `side`: \"VILLAIN\"\n*   `emotion`: \"Exertion\"\n*   `textWithCues`: \"[Grunts with effort] Hrmph.\""
+  },
+  {
+    "id": "page-21_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 80.87454986572266,
+      "y": 2207.11767578125,
+      "width": 360.84508514404297,
+      "height": 204.403564453125,
+      "confidence": 0.7910101413726807,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-008-x80-y2207.jpg"
+    },
+    "ocr_text": "I THINK WE HURT HIM, B.",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Casual observation",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, unintelligent male voice with a rough street-thug accent",
+    "textWithCues": "[Gruffly, addressing his partner] I think we hurt him, B.",
+    "aiReasoning": "The user wants me to analyze the text \"I THINK WE HURT HIM, B.\" in the bottom-left panel.\n\n1.  **Locate & Classify**: The text is in a standard speech bubble with a tail pointing upwards and to the right, off-panel. This follows the action where the Green Ranger was punched by Rocksteady.\n2.  **Context**:\n    *   **Speaker Identity**: The text ends with \"B.\", which is a nickname Rocksteady uses for his partner Bebop. The previous panel shows Rocksteady punching the Ranger. In the subsequent panel (bottom right), the two villains are standing together. The dialogue flow suggests Rocksteady (the hitter) is speaking to Bebop.\n    *   **Character**: Rocksteady (Mutant Rhino).\n    *   **Side**: VILLAIN.\n    *   **Importance**: MINOR (Named secondary character, henchman).\n    *   **Voice**: Rocksteady is a large, mutant rhino. His voice is traditionally depicted as deep, gravelly, and unintelligent, often with a rough street-thug accent.\n    *   **Emotion**: He is observing the result of his punch. He sounds casually satisfied or surprised by the Ranger's fragility (\"Already?\").\n3.  **Performance Cues**:\n    *   Tone: Gruff, casual, talking to a friend/partner.\n    *   Cues: `[Gruffly]`, `[Deep voice]`."
+  },
+  {
+    "id": "page-21_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 1151.99072265625,
+      "y": 2315.453857421875,
+      "width": 237.7625732421875,
+      "height": 137.72412109375,
+      "confidence": 0.786516010761261,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-009-x1151-y2315.jpg"
+    },
+    "ocr_text": "YEAH. WHAT IS IT THEY SAY?",
+    "type": "SPEECH",
+    "speaker": "Bebop",
+    "emotion": "mocking",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Rough, raspy, street-punk male voice with a smug attitude",
+    "textWithCues": "[Smugly, setting up a joke] Yeah. What is it they say?",
+    "aiReasoning": "1.  **Target Text:** \"YEAH. WHAT IS IT THEY SAY?\"\n2.  **Location:** Bottom right panel, middle speech bubble.\n3.  **Classification:** `SPEECH` (Standard bubble with tail).\n4.  **Context Analysis:**\n    *   **Visuals:** The panel shows two large mutant villains standing over a defeated Green Ranger.\n    *   **Characters:**\n        *   Left figure: Warthog mutant with a mohawk, vest, and tusks. This is **Bebop**.\n        *   Right figure: Rhino mutant with a horn and camo pants. This is **Rocksteady**.\n    *   **Bubble Tail:** The tail of the specific bubble \"YEAH. WHAT IS IT THEY SAY?\" points to the character on the left (the Warthog). Therefore, the speaker is **Bebop**.\n    *   **Conversation Flow:**\n        *   Rocksteady (top bubble): \"NAH. I THINK WE CAN HURT HIM WAY MORE.\"\n        *   Bebop (middle bubble - TARGET): \"YEAH. WHAT IS IT THEY SAY?\"\n        *   Rocksteady (bottom bubble): \"IT'S MORPHIN--\"\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR (Named, iconic character listed in instructions).\n    *   **Voice:** Bebop typically has a rough, street-smart, slightly high-pitched or squeaky/raspy punk voice (often stylized African American accents in various adaptations).\n    *   **Emotion:** He is being smug, cruel, and playful. He is setting up a mock catchphrase to taunt the Green Ranger.\n5.  **Performance Cues:**\n    *   The tone should be sadistic but casual, like a cat playing with a mouse.\n    *   He is agreeing with his partner and setting up a punchline.\n    *   No shouting, just conversational mockery."
+  },
+  {
+    "id": "page-21_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 1264.0576171875,
+      "y": 2196.68701171875,
+      "width": 294.9683837890625,
+      "height": 175.165771484375,
+      "confidence": 0.7251174449920654,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-010-x1264-y2196.jpg"
+    },
+    "ocr_text": "NAH. I THINK WE CAN HURT HIM WAY MORE.",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Sadistic and menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Gruff, deep, raspy male voice, thugs/henchman tone",
+    "textWithCues": "[Dismissively] Nah. [Sinisterly] I think we can hurt him way more.",
+    "aiReasoning": "The text is located in the bottom right panel.\nThe text is inside a speech bubble with a tail pointing to the character on the right.\nThe character on the right is a large rhino mutant in military gear. This is **Rocksteady**.\nRocksteady is a major villain in the TMNT franchise.\nThe context involves Rocksteady and Bebop standing over a defeated Green Ranger in a crater.\nThe previous dialogue (likely from Rocksteady to Bebop, calling him \"B\") questioned if they hurt him too quickly (\"Already?\").\nIn this bubble, Rocksteady dismisses that concern (\"Nah\") and suggests they can inflict more pain.\nHis tone should be cruel, sadistic, and menacing. He is a tough thug."
+  },
+  {
+    "id": "page-21_b11",
+    "box_2d": {
+      "index": 11,
+      "x": 1152.376953125,
+      "y": 2315.50634765625,
+      "width": 373.366943359375,
+      "height": 205.733154296875,
+      "confidence": 0.6315616965293884,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-012-x1152-y2315.jpg"
+    },
+    "ocr_text": "IT'S MORPHIN--",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Mocking and taunting",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, gravelly voice, mocking the hero's catchphrase] IT'S MORPHIN--"
+  },
+  {
+    "id": "page-21_b12",
+    "box_2d": {
+      "index": 12,
+      "x": 78.27214050292969,
+      "y": 2323.8388671875,
+      "width": 375.5306854248047,
+      "height": 98.8447265625,
+      "confidence": 0.5556798577308655,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-21/page-21-crop-013-x78-y2323.jpg"
+    },
+    "ocr_text": "ALREADY?",
+    "type": "SPEECH",
+    "speaker": "Bebop",
+    "emotion": "Surprised and disappointed",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Gruff, street-smart male voice with a punk attitude, slightly nasally or raspy",
+    "textWithCues": "[Surprised and disappointed] Already?",
+    "aiReasoning": "I have located the text \"ALREADY?\" in the bottom left panel.\nThe dialogue sequence is:\n1. \"I THINK WE HURT HIM, B.\" (Spoken by Rocksteady, addressing Bebop as \"B\").\n2. \"ALREADY?\" (Spoken by Bebop in response).\nTherefore, the speaker is Bebop.\nBebop is a Villain. He is a named secondary character, so I will classify him as MINOR (following the example of Bulk/Skull).\nHis voice is typically depicted as rough, street-smart, and punk-ish.\nThe emotion is surprise and disappointment—he expected the fight to last longer or the Ranger to be tougher.\nThe text is a question."
+  }
+]

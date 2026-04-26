@@ -1,0 +1,227 @@
+[
+  {
+    "id": "page-06_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 646.0303344726562,
+      "y": 2007.312744140625,
+      "width": 193.356201171875,
+      "height": 109.369140625,
+      "confidence": 0.9377599954605103,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-001-x646-y2007.jpg"
+    },
+    "ocr_text": "I FEAR NOTHING.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Stoic and defiant",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, commanding, menacing male voice with a metallic rasp",
+    "textWithCues": "[Coldly and firmly] I fear nothing.",
+    "aiReasoning": "I have located the text \"I FEAR NOTHING.\" in the middle-left panel.\n**Type:** The text is in a speech bubble with a tail. It is `SPEECH`.\n**Speaker:** The tail points to the character in the foreground wearing the Shredder helmet and purple cape. The other character (Lord Zedd) addresses him as \"Oroku Saki\" in the preceding bubble. Therefore, the speaker is **Shredder**.\n**Context:** Lord Zedd is psychoanalyzing Shredder, suggesting that peace is terrifying to a warrior. Shredder responds defensively and stoically.\n**Side:** Shredder is a primary antagonist. Side is `VILLAIN`.\n**Importance:** He is a main character. Importance is `MAJOR`.\n**Voice:** Deep, menacing, authoritative, often with a metallic resonance due to the mask.\n**Emotion:** Stoic, defiant, cold. He is denying a weakness.\n**Cues:** The delivery should be low and firm, shutting down the suggestion that he is afraid."
+  },
+  {
+    "id": "page-06_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1075.4910888671875,
+      "y": 1560.7567138671875,
+      "width": 228.4505615234375,
+      "height": 203.9248046875,
+      "confidence": 0.9363488554954529,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-002-x1075-y1560.jpg"
+    },
+    "ocr_text": "AND THEN WE WILL BOTH BE FREE.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Manipulative and solemn",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, menacing, and authoritative male voice",
+    "textWithCues": "[Promising darkly] And then we will both be free.",
+    "aiReasoning": "The text \"AND THEN WE WILL BOTH BE FREE.\" is located in the middle-right panel.\nThe speaker is the character in the red muscle suit with silver armor. This is clearly **Lord Zedd** from the Power Rangers universe. He is a distinct character from Shredder.\nContext: Zedd is making a deal with Shredder, promising freedom in exchange for destroying Zordon.\nVoice: Deep, raspy, commanding, and sinister.\nTone: Manipulative, making a solemn vow/promise.\nClassification: SPEECH.\nSide: VILLAIN.\nImportance: MAJOR (Main villain)."
+  },
+  {
+    "id": "page-06_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 241.11154174804688,
+      "y": 1487.111083984375,
+      "width": 320.7159118652344,
+      "height": 259.1353759765625,
+      "confidence": 0.9345953464508057,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-003-x241-y1487.jpg"
+    },
+    "ocr_text": "WHEN THE WAR IS ALL YOU KNOW, IT CAN BE TERRIFYING WHEN YOU CAN'T SEE BEYOND IT.",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  },
+  {
+    "id": "page-06_b04",
+    "box_2d": {
+      "index": 9,
+      "x": 1393.9205322265625,
+      "y": 2212.943359375,
+      "width": 474.221923828125,
+      "height": 223.324951171875,
+      "confidence": 0.6419872045516968,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-010-x1393-y2212.jpg"
+    },
+    "ocr_text": "THE RAT WAS A THORN IN MY SIDE I'M PLEASED TO SEE REMOVED. NOTHING MORE.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Cold, dismissive, and stoic",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Coldly, while walking away] The rat was a thorn in my side I'm pleased to see removed. [Firmly] Nothing more.",
+    "aiReasoning": "The user wants me to analyze the speech bubble in the bottom right panel: \"THE RAT WAS A THORN IN MY SIDE I'M PLEASED TO SEE REMOVED. NOTHING MORE.\"\n\n1.  **Locate & Classify:**\n    *   The text is in a standard speech bubble.\n    *   The tail points to the character on the right in the silhouette.\n    *   This character has the distinctive helmet and cape of the Shredder.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The silhouette is clearly Shredder (Oroku Saki), confirmed by his helmet shape and the conversation in previous panels where Lord Zedd addresses him as \"Oroku Saki\".\n    *   **Character Type:** `MAJOR` (Shredder is a main villain).\n    *   **Side:** `VILLAIN`.\n    *   **Emotion/Context:** In the previous panel, Lord Zedd asks if Shredder is \"mourning [his] fallen adversary\" (Splinter/The Rat). Shredder is walking away into the shadows, turning his back. His response is a denial of sentimentality. He is trying to sound cold, pragmatic, and unbothered, though the act of walking away might suggest he is hiding his face. The tone is dismissive and final.\n\n3.  **Performance Cues:**\n    *   He is not shouting, but he is firm.\n    *   The delivery should be cold and emotionless to contrast Zedd's teasing/observation.\n    *   \"Nothing more.\" is a sentence fragment meant to shut down the conversation completely. It needs a tone of finality.\n    *   Cues: [Coldly], [Dismissively], [Firmly].\n\n4.  **Drafting Output:**\n    *   Speaker: Shredder\n    *   Emotion: Cold, dismissive.\n    *   Text: \"[Coldly, while walking away] The rat was a thorn in my side I'm pleased to see removed. [Firmly] Nothing more.\""
+  },
+  {
+    "id": "page-06_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 178.59693908691406,
+      "y": 401.40863037109375,
+      "width": 193.41993713378906,
+      "height": 110.46096801757812,
+      "confidence": 0.9315099120140076,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-005-x178-y401.jpg"
+    },
+    "ocr_text": "A GRAND FINALE.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Solemn, dramatic, and reflective",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Solemnly, with theatrical gravity] A grand finale.",
+    "aiReasoning": "**1. Locate & Classify:**\n*   **Target Text:** \"A GRAND FINALE.\"\n*   **Location:** First panel, bottom-left speech bubble.\n*   **Type:** `SPEECH`. It is a standard speech bubble with a tail (part of a connected chain of bubbles).\n\n**2. Analyze Context:**\n*   **Speaker:** The bubble chain connects to Shredder's position (specifically his arm/claw holding the debris). In the subsequent panel, Shredder continues this thought process (\"NOT... THIS. WE DESERVED BETTER.\"), confirming he is the one speaking about the \"grand finale\" he and his rival should have had.\n    *   **Identity:** Shredder.\n*   **Side:** `VILLAIN`.\n*   **Importance:** `MAJOR`.\n*   **Emotion:** Shredder is holding the remains of his enemy (Splinter). He is monologuing about the epic death they *should* have had (\"battling... high above the city... hot lava\"). The tone is solemn, dramatic, and tinged with disappointment because the reality didn't match this fantasy.\n*   **Voice Description:** Not required for MAJOR characters per instructions.\n\n**3. Performance Cues:**\n*   **Tone:** The line is the conclusion of a theatrical description of an epic battle. It should be delivered with gravitas and a sense of \"what could have been.\" It is solemn and dramatic.\n*   **Volume:** Normal, but with weight.\n*   **Cues:** `[Solemnly, with theatrical gravity]` or `[Deep, reflective tone]`."
+  },
+  {
+    "id": "page-06_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 77.53154754638672,
+      "y": 252.42759704589844,
+      "width": 293.2936477661133,
+      "height": 153.09046936035156,
+      "confidence": 0.919775664806366,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-006-x77-y252.jpg"
+    },
+    "ocr_text": "SOMETHING WORTHY OF OUR YEARS OF CONFLICT.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Solemn, reflective, disappointed",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Solemnly, imagining an epic battle that never happened] Something worthy of our years of conflict.",
+    "aiReasoning": "I have located the text \"SOMETHING WORTHY OF OUR YEARS OF CONFLICT.\" in the top panel.\nIt is inside a speech bubble. The bubbles in this panel are connected. The lowest bubble \"A GRAND FINALE.\" has a tail pointing to the hand holding the dust.\nThe hand belongs to the character in the second panel, who is Shredder (identified by the helmet and the address \"Oroku Saki\" in the third panel).\nShredder is a MAJOR character and a VILLAIN.\nContext: Shredder is holding the remains (dust/goo) of his enemy (Splinter/The Rat). He is monologuing about the epic battle he *wanted* to have (\"High above the city...\", \"Suspended over lava\"), comparing it to the disappointing reality (\"Not... this.\").\nEmotion: The tone is solemn, reflective, and disappointed. He has a sense of warrior's honor and feels cheated out of a proper climax to their rivalry.\nThere are no visual cues for volume (bold/jagged), so it is a normal volume, perhaps lower and slower due to the gravity of the moment.\n\nSteps:\n1.  **Locate**: Top panel, middle bubble.\n2.  **Classify**: SPEECH.\n3.  **Speaker**: Shredder.\n4.  **Context**: Lamenting the anticlimactic death of his rival.\n5.  **Cues**: Solemn, reflective, deep voice."
+  },
+  {
+    "id": "page-06_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 967.912353515625,
+      "y": 1379.9368896484375,
+      "width": 347.9207763671875,
+      "height": 186.7452392578125,
+      "confidence": 0.9051163196563721,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-007-x967-y1379.jpg"
+    },
+    "ocr_text": "GOOD. THEN WHEN THE TIME IS RIGHT, YOU WILL DESTROY ZORDON FOR ME.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Satisfied, menacing, commanding",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, raspy, satisfied tone] Good. Then when the time is right, you will destroy Zordon for me.",
+    "aiReasoning": "The text \"GOOD. THEN WHEN THE TIME IS RIGHT, YOU WILL DESTROY ZORDON FOR ME.\" is located in a speech bubble in the middle-right panel.\nThe speaker is the character with the exposed brain and metal grill face, holding a staff. This is **Lord Zedd**.\nHe is a **VILLAIN** and a **MAJOR** character in this crossover.\nThe context implies he is striking a deal or giving a command to Shredder (Oroku Saki).\nHis tone should be menacing, authoritative, and satisfied.\nSince he is a MAJOR character, I do not need to generate a generic voice description.\nThe emotion is one of calculated satisfaction and command."
+  },
+  {
+    "id": "page-06_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1453.5555419921875,
+      "y": 638.4463500976562,
+      "width": 280.110107421875,
+      "height": 128.72247314453125,
+      "confidence": 0.8994801640510559,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-008-x1453-y638.jpg"
+    },
+    "ocr_text": "MOURNING YOUR FALLEN ADVERSARY?",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  },
+  {
+    "id": "page-06_b09",
+    "box_2d": {
+      "index": 11,
+      "x": 553.3153686523438,
+      "y": 633.1369018554688,
+      "width": 290.94464111328125,
+      "height": 196.80816650390625,
+      "confidence": 0.5306307077407837,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-012-x553-y633.jpg"
+    },
+    "ocr_text": "NOT... THIS. WE DESERVED BETTER.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Disappointed, Solemn",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep voice, solemn and disappointed] Not... this. We deserved better.",
+    "aiReasoning": "I have located the text \"NOT... THIS. WE DESERVED BETTER.\" in the second panel.\n- **Type:** It is in a speech bubble with a tail pointing to the character in the foreground. This is `SPEECH`.\n- **Speaker:** The character is wearing the iconic Shredder helmet and armor. In the subsequent panel, the red character (Lord Zedd) addresses him as \"Oroku Saki\". Therefore, the speaker is **Shredder**.\n- **Side:** Shredder is a **VILLAIN**.\n- **Importance:** He is a primary antagonist, so **MAJOR**.\n- **Context:** Shredder is looking at his claws, which appear to have black residue on them (likely remains of a foe). He is expressing disappointment that the conflict ended this way, rather than a \"grand finale\" mentioned in the previous bubble. He feels the end was anticlimactic or unworthy.\n- **Emotion:** The emotion is one of disappointment, solemnity, and a twisted sense of honor. He isn't shouting; he's reflecting on the unsatisfactory conclusion to a rivalry.\n- **Performance Cues:** The text has an ellipsis (\"NOT... THIS.\"), suggesting a pause and a realization. The tone should be deep, grave, and disappointed."
+  },
+  {
+    "id": "page-06_b10",
+    "box_2d": {
+      "index": 10,
+      "x": 94.28001403808594,
+      "y": 75.36856079101562,
+      "width": 436.92176818847656,
+      "height": 170.9822235107422,
+      "confidence": 0.6227985620498657,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-011-x94-y75.jpg"
+    },
+    "ocr_text": "YOU AND I, BATTLING IT OUT HIGH ABOVE THE CITY OR SUSPENDED OVER A FIELD OF HOT LAVA.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Solemn and reflective",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Solemnly, envisioning a grand battle] You and I, battling it out high above the city or suspended over a field of hot lava.",
+    "aiReasoning": "The text is located in the top-left speech bubble of the first panel.\nThe bubble points towards a character's hand/arm, which is shown to be wearing Shredder's armor (blades).\nThe subsequent panels confirm Shredder is the one mourning his \"fallen adversary\" (implied to be Splinter).\nThe dialogue describes a hypothetical epic battle scenario, contrasting it with the reality of the situation (ashes).\nSpeaker: Shredder.\nType: SPEECH.\nCharacter Importance: MAJOR.\nSide: VILLAIN.\nEmotion: Solemn, reflective, regretful, longing for a \"warrior's end\"."
+  },
+  {
+    "id": "page-06_b11",
+    "box_2d": {
+      "index": 12,
+      "x": 294.3926086425781,
+      "y": 1357.1400146484375,
+      "width": 367.6256408691406,
+      "height": 152.2862548828125,
+      "confidence": 0.4230177700519562,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-06/page-06-crop-013-x294-y1357.jpg"
+    },
+    "ocr_text": "YOU'LL COME TO REALIZE I GAVE YOU A GIFT TODAY, OROKU SAKI.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Arrogant, manipulative, and commanding",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, ominous tone, speaking with supreme confidence] You'll come to realize I gave you a gift today, Oroku Saki.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"YOU'LL COME TO REALIZE I GAVE YOU A GIFT TODAY, OROKU SAKI.\" is in a speech bubble in the third panel (middle-left). The tail points to the character Lord Zedd. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is Lord Zedd (identified visually by his red muscle suit and silver exoskeleton). He is listed in the unique characters. Speaker is \"Lord Zedd\".\n    *   **Side:** Lord Zedd is a `VILLAIN`.\n    *   **Importance:** He is a primary antagonist, so `MAJOR`.\n    *   **Emotion:** Zedd is standing confidently, lecturing Shredder. His tone is likely superior, manipulative, and commanding. He is framing a situation to his advantage.\n3.  **Performance Cues:**\n    *   The delivery should be deep and raspy (classic Zedd voice).\n    *   The tone is ominous and calculating. He is offering a twisted perspective (\"a gift\").\n    *   Using Shredder's real name adds weight.\n    *   Cues: `[Deep, ominous tone]`, emphasis on \"gift\"."
+  }
+]

@@ -1,0 +1,660 @@
+{
+  "Alpha 5": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "alpha-5-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "G4FycwjZbrUlO5rnrTGm",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.933Z",
+          "voiceDescription": "A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality."
+        }
+      }
+    ]
+  },
+  "Armored Villain": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "armored-villain-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "P70H4nshzpgpGx0vAA3z",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, booming, gravelly male voice with a distinct metallic rasp. It sounds powerfully aggressive, brutish, and menacingly authoritative."
+        }
+      }
+    ]
+  },
+  "Bebop": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "bebop-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "FCFJMCa9ZFu4325AUU3w",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A rough, raspy, and gravelly male voice with a distinct street-punk attitude. It possesses a high-energy, often aggressive and smug tone, delivered with a thick New York accent."
+        }
+      }
+    ]
+  },
+  "Black Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "black-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "cuy9NDFuCyOdZU0vkcym",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A confident, cool, and youthful male voice with an American accent. The tone is steady and assured, reflecting his reliable and strong presence."
+        }
+      }
+    ]
+  },
+  "Blue Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "blue-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "eggrlJySU29RodqjhIkX",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": null
+        }
+      }
+    ]
+  },
+  "Dr. Boyd": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "dr-boyd-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Zhgd6Vgnj3TFlPqeH2Ke",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "An intelligent, articulate male voice with an American accent. It maintains a professional demeanor but carries an underlying tone of defensiveness and stress, reflecting a character under pressure."
+        }
+      }
+    ]
+  },
+  "Foot Elite": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "foot-elite-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Uo9kYf3kXKz03qyoPMpG",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, disciplined, and authoritative male voice that is calm yet menacing. It is articulate and resonant, conveying a fanatical conviction, with a slight muffled quality from a mask that does not hinder its clear projection."
+        }
+      }
+    ]
+  },
+  "Foot Soldier": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "foot-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "8EsHn25qWtDd2mWwmiYQ",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A fanatical, raspy male voice, gruff and often muffled by a mask, with an American accent. It conveys an intense, zealous aggression, characteristic of a disciplined ninja cultist or professional henchman, occasionally sounding breathless."
+        }
+      }
+    ]
+  },
+  "Grace Sterling": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "grace-sterling-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "CBRFW97Lj0x8Fbaic4x2",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A mature female voice, authoritative and commanding, conveying intelligence and unwavering confidence. She speaks with a clear American accent."
+        }
+      }
+    ]
+  },
+  "Green Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "green-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "fDCFh0Z04XCcSmBoHT4j",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge."
+        }
+      }
+    ]
+  },
+  "Leonardo": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "leonardo-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "1sca4ecJ4XyU7M176Ei0",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A clear, young adult male voice with an American accent. It is disciplined and authoritative, reflecting his leadership role with a generally serious and focused tone."
+        }
+      }
+    ]
+  },
+  "Lord Zedd": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "lord-zedd-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "xZHSfy1jtZKEX5ypvdGU",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, gravelly, booming, and terrifying male voice with a commanding and authoritative tone."
+        }
+      }
+    ]
+  },
+  "Pink Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "pink-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "E8CavmYRhEEZqRb2s4nt",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A youthful American female voice, energetic and distinctly sassy. It projects confidence and a heroic spirit, suitable for a dynamic and courageous character."
+        }
+      }
+    ]
+  },
+  "Red Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "red-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "R8tHGp6yBIKs45odIPD1",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation."
+        }
+      }
+    ]
+  },
+  "Rezar": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rezar-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "EYiikCfvEGJXIrjaniJV",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": null
+        }
+      }
+    ]
+  },
+  "Rita Repulsa": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rita-repulsa-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "fpszSg5AsrBuI5R9aidj",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A shrill, raspy female voice with a strong theatrical quality. It should convey a wicked, commanding, and sharp presence, embodying her villainous authority."
+        }
+      }
+    ]
+  },
+  "Rock Soldier": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rock-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Z0QRcWFZLNfSWpPpb0br",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, heavy, gravelly male voice, resonating with the sound of grinding stones. It possesses a rough, monstrous quality, projecting an authoritative and intimidating presence."
+        }
+      }
+    ]
+  },
+  "Rocksteady": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rocksteady-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "FBptoKFxS8EhO4XO87xt",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, gravelly, brutish male voice, characterized by a rough, unintelligent street-thug accent. It projects a tough, aggressive persona, befitting a powerful yet dim-witted henchman."
+        }
+      }
+    ]
+  },
+  "Soldier": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "kaQG4rvOTzT2F2yIXtSN",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A commanding, professional male voice with a clear American accent, reflecting a strong military background. It is often urgent, capable of being loud when necessary, and carries an air of unwavering authority."
+        }
+      }
+    ]
+  },
+  "Warbunny": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "warbunny-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Ur4iSnAWauOSA2qdwx6b",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, booming, gravelly, and guttural male voice, monstrous and brutish. It projects an aggressively arrogant, theatrical barbarian warlord persona, capable of also sounding primitive and submissive."
+        }
+      }
+    ]
+  },
+  "Yellow Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "yellow-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "hBYwgU1d9wzr397yTscG",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A young, energetic female voice with a clear American accent. She speaks with a lively and spirited tone, reflecting her youthful enthusiasm."
+        }
+      }
+    ]
+  },
+  "Zordon": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "zordon-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "NvO7pjO09CWuF87LH2iA",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "Zordon's voice is deep, booming, resonant, and authoritative, embodying a wise male presence. It possesses a slight ethereal quality, hinting at his bodiless form, and occasionally carries a subtle electronic echo."
+        }
+      }
+    ]
+  },
+  "Donatello": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "donatello-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Rob Paulsen",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Donatello voice Rob Paulsen",
+          "Donatello 2012 funny moments"
+        ],
+        "notes": "Rob Paulsen previously voiced Raphael in the 1987 series.",
+        "voice": {
+          "voiceId": "2sV2XnVqQ2RShkIOGFvZ",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:59.713Z",
+          "voiceDescription": "A teenage male voice with an intelligent, articulate American accent. It's confident and often sarcastic, carrying a relaxed yet inquisitive tone with a subtle tech-nerd inflection."
+        }
+      }
+    ]
+  },
+  "Karai": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "karai-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Kelly Hu",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Karai and Shredder",
+          "Kelly Hu Karai moments",
+          "Karai transformation 2012"
+        ],
+        "notes": "A reimagined version of the character as Shredder's adopted daughter and Splinter's biological daughter.",
+        "voice": {
+          "voiceId": "anwrO52UeU1FtcsB1tHj",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:07:11.791Z",
+          "voiceDescription": "A confident, disciplined, and intelligent female voice. It possesses a clear, articulate tone with a steady, controlled cadence, reflecting a sharp mind and formidable presence."
+        }
+      }
+    ]
+  },
+  "Master Splinter": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "master-splinter-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Hoon Lee",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Hoon Lee Master Splinter clips",
+          "TMNT 2012 Splinter vs Shredder"
+        ],
+        "notes": "Nickelodeon series; this version of Splinter is notably taller and more physically formidable.",
+        "voice": {
+          "voiceId": "6G3IoJHUBafcI3SyzELE",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:07:50.222Z",
+          "voiceDescription": "A wise, elderly male voice that is calm and authoritative, yet firm when necessary. It is delivered with a distinct Japanese accent."
+        }
+      }
+    ]
+  },
+  "Michelangelo": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "michelangelo-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Greg Cipes",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Michelangelo funny",
+          "Greg Cipes Michelangelo voice"
+        ],
+        "notes": "Nickelodeon CGI series; introduced the 'Booyakasha' catchphrase.",
+        "voice": {
+          "voiceId": "oFMuHQNZ0Bh0jz5SJXQy",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:08:41.327Z",
+          "voiceDescription": "A young, high-energy American male voice with a distinct surfer dude accent. The tone is typically playful and enthusiastic, ready for action or a good time."
+        }
+      }
+    ]
+  },
+  "Narrator": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "narrator-unknown",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [],
+        "notes": "Source media not identified during migration.",
+        "voice": {
+          "voiceId": "l6mRFE6WsbFVDdbMTQyk",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:10:31.263Z",
+          "voiceDescription": "A deep, resonant, and wise male voice with a philosophical storytelling tone. It's serious, authoritative, and cinematic, delivering narration with both epic gravitas and professional clarity."
+        }
+      }
+    ]
+  },
+  "Raphael": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "raphael-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1990,
+        "voiceActor": "Josh Pais",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "TMNT 1990 Raphael clips",
+          "Josh Pais Raphael interview"
+        ],
+        "notes": "Only actor in the original film trilogy to both voice the character and perform in the physical suit.",
+        "voice": {
+          "voiceId": "RbsOf5RuEmcgV4XgAWDA",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:11:49.062Z",
+          "voiceDescription": "A gruff, gritty young male voice with a deep tone. It features a thick, street-smart Brooklyn/New York accent, embodying a tough and rebellious character."
+        }
+      }
+    ]
+  },
+  "Shredder": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "shredder-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Kevin Michael Richardson",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Shredder clips",
+          "Kevin Michael Richardson Shredder",
+          "Shredder vs Splinter 2012 final fight"
+        ],
+        "notes": "Nickelodeon CGI series; depicts Shredder as a primary antagonist throughout.",
+        "voice": {
+          "voiceId": "zyz29XaJBhGHDfyrCD7d",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:12:58.822Z",
+          "voiceDescription": "A deep, authoritative, and menacing male voice. It possesses a raspy, metallic quality, conveying a cold, calculating intelligence."
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,152 @@
+[
+  {
+    "id": "page-13_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1587.5880126953125,
+      "y": 1637.1336669921875,
+      "width": 280.1085205078125,
+      "height": 173.7225341796875,
+      "confidence": 0.7653784155845642,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-001-x1587-y1637.jpg"
+    },
+    "ocr_text": "UM...ZACK, MAYBE WE WORK ON THE STANDUP LATER?",
+    "type": "SPEECH",
+    "speaker": "Yellow Ranger",
+    "emotion": "Sarcastic and exasperated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young female voice, energetic, American accent",
+    "textWithCues": "[Exasperated, dodging fire] Um... Zack, maybe we work on the standup later?",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   Target text: \"UM...ZACK, MAYBE WE WORK ON THE STANDUP LATER?\"\n    *   Visual location: Bottom right panel, top speech bubble.\n    *   Type: `SPEECH` (rounded bubble with tail).\n\n2.  **Analyze Context:**\n    *   **Speaker:** The bubble tail points to the **Yellow Ranger** (Trini). She is in the foreground of the bottom-right panel.\n    *   **Addressee:** She addresses \"Zack\" (the Black Ranger), referencing the \"standup\" (bad joke) made in the previous panel by a teammate (visually the Blue Ranger, but she attributes the behavior to Zack or speaks to Zack generally).\n    *   **Side:** `HERO` (Power Ranger).\n    *   **Importance:** `MAJOR` (Member of the main Ranger team).\n    *   **Voice Description:** Young female, American accent, brave but annoyed. (Though MAJOR characters don't strictly require description per instructions, it aids the \"AI generator\" context).\n    *   **Emotion:** The text is sarcastic (\"maybe we work on the standup later?\") and exasperated (\"Um...\"). The context is a high-danger fight (dodging fire), so there is urgency.\n\n3.  **Performance Cues:**\n    *   \"Um...\" -> Hesitation/Annoyance.\n    *   \"Zack,\" -> Direct address.\n    *   \"Maybe we work on the standup later?\" -> Sarcastic rhetorical question.\n    *   Action: She is physically dodging a blast of fire (indicated by \"FWOOSH\" and her pose).\n    *   Cue: `[Exasperated, dodging fire]` or `[Sarcastic urgency]`.\n\n4.  **Final Polish:**\n    *   Speaker Name: \"Yellow Ranger\".\n    *   Text: \"[Exasperated, dodging fire] Um... Zack, maybe we work on the standup later?\""
+  },
+  {
+    "id": "page-13_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 653.5621948242188,
+      "y": 2191.7763671875,
+      "width": 269.043212890625,
+      "height": 174.469482421875,
+      "confidence": 0.6827293038368225,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-002-x653-y2191.jpg"
+    },
+    "ocr_text": "A SLOWPOKE! GET IT?",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "Playful and energetic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting the punchline enthusiastically while dodging] A SLOWPOKE! [Beat] GET IT?",
+    "aiReasoning": "1.  **Locate & Classify**: The target text \"A SLOWPOKE! GET IT?\" is inside a speech bubble in the bottom-left panel. The tail of the bubble connects to the Black Ranger who is flipping upside down to dodge an ice blast.\n    *   Type: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The character is wearing the Black Power Ranger suit (black with diamonds). In the adjacent panel, another character addresses him as \"Zack\". The provided list of unique characters only includes \"Yellow Ranger\", and this character is visually distinct (Black suit vs Yellow suit). Therefore, I will identify him as \"Black Ranger\".\n    *   **Side**: `HERO`.\n    *   **Importance**: `MAJOR` (He is one of the Power Rangers).\n    *   **Emotion**: He is in the middle of a battle but maintaining a lighthearted, quippy demeanor. He is telling a joke (\"What do you get when you cross a turtle with a porcupine? A slowpoke!\"). He is enthusiastic and playful, seeking a reaction to his pun.\n\n3.  **Performance Cues**:\n    *   **Volume**: He is shouting to be heard over the combat and the sound of the ice blast (`SHHHH KRAK`). The text is in bold.\n    *   **Tone**: Comedic, energetic, self-satisfied with the joke.\n    *   **Delivery**: He shouts the punchline (\"A SLOWPOKE!\") with emphasis, then quickly asks for validation (\"GET IT?\")."
+  },
+  {
+    "id": "page-13_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 577.9868774414062,
+      "y": 1956.4837646484375,
+      "width": 349.43402099609375,
+      "height": 192.8958740234375,
+      "confidence": 0.6816746592521667,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-003-x577-y1956.jpg"
+    },
+    "ocr_text": "HEY MIKEY, WHAT DO YOU GET WHEN YOU CROSS A TURTLE WITH A PORCUPINE?",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "Playful and energetic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Loudly, shouting mid-air to a teammate] Hey Mikey, what do you get when you cross a turtle with a porcupine?",
+    "aiReasoning": "I have located the text \"HEY MIKEY, WHAT DO YOU GET WHEN YOU CROSS A TURTLE WITH A PORCUPINE?\" in the bottom left panel.\nThe text is inside a speech bubble with a tail pointing to the character diving downwards.\nThis character is wearing the Black Ranger suit (black with diamond patterns).\nIn the subsequent panel, the Yellow Ranger replies, \"UM... ZACK...\", confirming the speaker is Zack, the Black Ranger.\nTherefore, the speaker is the Black Ranger.\nHe is a Hero (Power Ranger).\nHe is a Major character.\nContext: He is dodging an ice blast attack while cracking a joke to his teammate (Mikey/Michelangelo, presumably nearby).\nTone: Playful, high-energy, banter. He is setting up a punchline."
+  },
+  {
+    "id": "page-13_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 459.29791259765625,
+      "y": 503.2952575683594,
+      "width": 202.4937744140625,
+      "height": 126.58071899414062,
+      "confidence": 0.645500659942627,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-004-x459-y503.jpg"
+    },
+    "ocr_text": "MASTER SAY HAVE FUN!",
+    "type": "SPEECH",
+    "speaker": "Red Mutant Ranger",
+    "emotion": "Sadistic excitement",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice, sounds low-intelligence and aggressive",
+    "textWithCues": "[Shouting with sadistic glee] Master say have fun!",
+    "aiReasoning": "I see the text \"MASTER SAY HAVE FUN!\".\nIt is in a standard speech bubble with a tail pointing to the large, muscular character in red armor wielding a bone weapon.\nThis character is distinct from the \"Black Ranger\" and \"Yellow Ranger\" listed in the unique characters. The dialogue (\"Two big bad mutant rangers\") suggests this is a \"Mutant Ranger\". Specifically, the red one.\nThe grammar \"Master say\" suggests a brutish, low-intelligence character archetype (Hulk-speak).\nThe character is attacking, so the volume is loud. The emotion is sadistic excitement (he is \"having fun\" destroying things).\nSide is Villain. Importance is MINOR (named or specific henchman, not a generic extra).\nVoice should be deep, gravelly, and dumb."
+  },
+  {
+    "id": "page-13_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 455.5964050292969,
+      "y": 861.489013671875,
+      "width": 227.55276489257812,
+      "height": 199.6512451171875,
+      "confidence": 0.5915126800537109,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-005-x455-y861.jpg"
+    },
+    "ocr_text": "SMASH RANGERS. CRUSH RANGERS. GOOD!",
+    "type": "SPEECH",
+    "speaker": "Red Mutant Ranger",
+    "emotion": "Aggressive excitement",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice. Very low intelligence, primitive sentence structure. Aggressive and loud.",
+    "textWithCues": "[Shouting, primitive cadence] SMASH RANGERS. CRUSH RANGERS. [Satisfied grunt] GOOD!",
+    "aiReasoning": "The text region contains \"SMASH RANGERS. CRUSH RANGERS. GOOD!\".\nThe speech bubble has a tail pointing to the large, muscular character in the Red Ranger suit with a rhino head.\nBased on the provided unique characters list, this is the \"Red Mutant Ranger\" (who is visually Rocksteady from TMNT).\nThe character is a Villain.\nThe speech style is primitive (\"Master say\", \"Smash rangers\"), indicating low intelligence.\nThe tone is aggressive and enthusiastic about violence.\nSince he is a named henchman (Rocksteady) in a specific form, he fits the \"MINOR\" category (Named secondary character), which allows for a voice description. The description should emphasize his brutish, dumb nature.\nVisual context: He is swinging a weapon at the Black Ranger."
+  },
+  {
+    "id": "page-13_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1526.857421875,
+      "y": 1815.273193359375,
+      "width": 297.9954833984375,
+      "height": 411.114990234375,
+      "confidence": 0.5707926154136658,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-006-x1526-y1815.jpg"
+    },
+    "ocr_text": "YOU KNOW, WHEN BAD GUYS AREN'T SHOOTIN FIRE AND ICE AT US?",
+    "type": "SPEECH",
+    "speaker": "Yellow Ranger",
+    "emotion": "Sarcastic/Exasperated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sarcastic] You know, when bad guys aren't shootin fire and ice at us?",
+    "aiReasoning": "The text is located in a speech bubble in the bottom right panel.\nThe text reads: \"YOU KNOW, WHEN BAD GUYS AREN'T SHOOTIN FIRE AND ICE AT US?\"\nThe speech bubble is connected to a previous bubble: \"UM... ZACK, MAYBE WE WORK ON THE STANDUP LATER?\"\nThe tail of the first bubble points to the Yellow Ranger, who is standing in the foreground of the panel, reacting to a blast of fire.\nThe speaker addresses \"Zack\" (The Black Ranger), identifying them as a teammate.\nThe speaker refers to \"bad guys\" attacking \"us\", confirming they are a HERO.\nThe speaker is the Yellow Ranger, a MAJOR character.\nThe tone is sarcastic and exasperated, reacting to the Black Ranger's joke (\"standup\") while in a life-threatening situation (being shot at with fire and ice).\nThe prompt text transcription uses \"SHOOTIN\", I will adhere to that.\n\nType: SPEECH\nSpeaker: Yellow Ranger\nCharacterType: MAJOR\nSide: HERO\nEmotion: Sarcastic/Exasperated\nTextWithCues: \"[Sarcastic] You know, when bad guys aren't shootin fire and ice at us?\""
+  },
+  {
+    "id": "page-13_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 351.2152404785156,
+      "y": 385.6943359375,
+      "width": 153.04937744140625,
+      "height": 268.0009765625,
+      "confidence": 0.40164726972579956,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-13/page-13-crop-007-x351-y385.jpg"
+    },
+    "ocr_text": "a bunch of SCARED PUSSIES.",
+    "type": "SPEECH",
+    "speaker": "Red Mutant Ranger",
+    "emotion": "Mocking and aggressive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice. Sounds like a strong, aggressive, dim-witted thug.",
+    "textWithCues": "[Mocking/Gruffly] A bunch of SCARED AUSSIES."
+  }
+]

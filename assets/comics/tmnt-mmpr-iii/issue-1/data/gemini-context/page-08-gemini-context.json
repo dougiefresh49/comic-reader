@@ -1,0 +1,155 @@
+[
+  {
+    "id": "page-08_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 960.84228515625,
+      "y": 790.8960571289062,
+      "width": 439.696044921875,
+      "height": 929.6370239257812,
+      "confidence": 0.9432422518730164,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-001-x960-y790.jpg"
+    },
+    "ocr_text": "DUD THIS K ONE O AWESO. SCR YOU MEAN THE KIND WHERE IF YOU FALL OFF... YOU DIE? WE GOTTA WORK ON YOUR DEFINITION OF \"AWESOME,\" MICHELANGELO.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo & Red Ranger",
+    "emotion": "Humorous banter amidst action",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Two male voices in banter. Speaker 1 (Michelangelo): Youthful, high-energy, 'surfer dude' accent, enthusiastic. Speaker 2 (Red Ranger): Commanding, serious American teen male, dry and sarcastic tone.",
+    "textWithCues": "Michelangelo: [Shouting enthusiastically over the wind] Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\n\nRed Ranger: [Loudly, skeptical] You mean the kind where if you fall off... you die?\n\nMichelangelo: [Excitedly] Exactly!\n\nRed Ranger: [Deadpan, exasperated] We gotta work on your definition of \"awesome,\" Michelangelo.",
+    "aiReasoning": "I have located the text region on the page. It encompasses a conversation between two characters in the top-right panel sequence.\nThe visuals show the Teenage Mutant Ninja Turtles and the Mighty Morphin Power Rangers fighting on a snowy bridge/train structure.\nThe dialogue flows as follows:\n1.  **Michelangelo** (Top Right, Green Turtle with Orange mask): \"Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\"\n2.  **Red Ranger** (Center, Red Suit): \"You mean the kind where if you fall off... you die?\"\n3.  **Michelangelo**: \"Exactly!\"\n4.  **Red Ranger**: \"We gotta work on your definition of 'awesome,' Michelangelo.\"\n\n**Classifications:**\n*   **Type:** SPEECH (Dialogue bubbles with tails).\n*   **Speaker:** The text represents a back-and-forth dialogue between **Michelangelo** and the **Red Ranger**. Since I need to fill a single `speaker` field, I will list both to be accurate to the content of the region.\n*   **Side:** HERO (Both belong to the protagonist teams).\n*   **Importance:** MAJOR (Both are main characters).\n*   **Voice Description:** I need to describe two distinct voices. Michelangelo is known for his \"surfer dude\" party-dude persona. The Red Ranger (Jason) is the leader, usually more serious but capable of dry wit.\n*   **Emotion:** Michelangelo is feeling the thrill/fun of the fight (\"Crazy awesome\"). The Red Ranger is being practical/sarcastic about the danger.\n\n**Performance Cues:**\n*   The characters are in the middle of a physical fight in a snowy, windy environment. They would be projecting their voices (loud/shouting).\n*   Mikey's line should be read with high energy and enthusiasm.\n*   The Red Ranger's response is skeptical and deadpan.\n*   The text \"...\" indicates a dramatic pause.\n*   \"Exactly!\" is a punchy, happy affirmation.\n*   The final line is a deadpan quip."
+  },
+  {
+    "id": "page-08_b02",
+    "box_2d": {
+      "index": 3,
+      "x": 1250.976806640625,
+      "y": 929.4911499023438,
+      "width": 536.095947265625,
+      "height": 633.4913940429688,
+      "confidence": 0.9091278314590454,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-004-x1250-y929.jpg"
+    },
+    "ocr_text": "DUDES, DOESN'T THIS KINDA FEEL LIKE ONE OF THOSE CRAZY AWESOME VINTAGE SIDE SCROLLER VIDEO GAMES?",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Excited and playful",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young male, high-energy, 'surfer dude' accent, American, playful",
+    "textWithCues": "[Excitedly, mid-combat] Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?",
+    "aiReasoning": "1.  **Locate & Classify:** The text block is clearly visible in a white speech bubble with a tail. The tail points upwards towards a character (implied to be one of the Turtles based on context).\n    *   Type: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The text in the bubble immediately following this one says, \"We gotta work on your definition of 'awesome,' Michelangelo.\" This explicitly identifies the speaker of the target text as **Michelangelo**.\n    *   **Side:** He is a Teenage Mutant Ninja Turtle, so he is a `HERO`.\n    *   **Importance:** He is a titular character, so `MAJOR`.\n    *   **Voice Description:** (Although MAJOR characters don't strictly require this per instructions, I'll add it for completeness) Young male, high-energy, \"surfer dude\" accent, American, playful.\n    *   **Emotion:** He is making a meta-joke about the situation being like a video game. The tone is enthusiastic, excited, and humorous amidst combat.\n\n3.  **Performance Cues:**\n    *   The text starts with \"DUDES,\" which is a quintessential \"surfer\" greeting. It should be drawn out slightly or punched with enthusiasm.\n    *   The phrase \"CRAZY AWESOME VINTAGE SIDE SCROLLER VIDEO GAMES\" indicates high excitement and geeky joy.\n    *   The character is in the middle of a battle, so there might be a high-energy projection to his voice, but the primary emotion is fun/playfulness.\n    *   Cues: `[Excitedly, with a surfer accent]`, `[Enthusiastic]`.\n\n4.  **Final Polish:**\n    *   Text: \"Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\"\n    *   Cues added: \"[Excitedly, mid-combat] Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\""
+  },
+  {
+    "id": "page-08_b03",
+    "box_2d": {
+      "index": 4,
+      "x": 628.18310546875,
+      "y": 2161.047119140625,
+      "width": 220.39581298828125,
+      "height": 218.9765625,
+      "confidence": 0.9041974544525146,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-005-x628-y2161.jpg"
+    },
+    "ocr_text": "LET THE FIRE OF OUR CAUSE...",
+    "type": "SPEECH",
+    "speaker": "Foot Soldier",
+    "emotion": "Fanatical",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Fanatical, ominous male voice, sounding like a disciplined ninja cultist",
+    "textWithCues": "[Chanting with intense, fanatical fervor] Let the fire of our cause...",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"LET THE FIRE OF OUR CAUSE...\" is in a speech bubble located in the bottom-left panel of the page. It connects via a tail to one of the hooded ninja figures (Foot Soldiers) charging up a red energy attack. This is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to a member of the Foot Clan. This character is not Michelangelo or the Red Ranger. They are a generic enemy unit. I will name the speaker \"Foot Soldier\".\n    *   **Side**: They are fighting the heroes, so `VILLAIN`.\n    *   **Importance**: They are unnamed henchmen, so `EXTRA`.\n    *   **Voice Description**: As a villainous extra in a ninja clan chanting a creed, the voice should be disciplined, fanatical, and ominous. It is likely a male voice.\n    *   **Emotion**: The characters are reciting a mantra (\"We live for the Foot, We die for the Foot\") while summoning magic. The emotion is focused, ritualistic zeal.\n\n3.  **Performance Cues**:\n    *   The text is part of a sentence that continues into the next panel (\"...engulf all those who stand against it!\").\n    *   The delivery should sound like an incantation or a battle cry building up power.\n    *   The ellipsis \"...\" indicates a slight pause or a lead-in to the next line.\n    *   Cues: `[Chanting with rising intensity]` or `[Ritualistic tone]`.\n\n4.  **Final Polish**:\n    *   Text: \"Let the fire of our cause...\"\n    *   Cues added: `[Chanting with intense, fanatical fervor] Let the fire of our cause...`"
+  },
+  {
+    "id": "page-08_b04",
+    "box_2d": {
+      "index": 5,
+      "x": 1371.3670654296875,
+      "y": 1474.8109130859375,
+      "width": 193.32470703125,
+      "height": 90.514404296875,
+      "confidence": 0.8987038731575012,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-006-x1371-y1474.jpg"
+    },
+    "ocr_text": "EXACTLY!",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Enthusiastic and carefree",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Excitedly] EXACTLY!",
+    "aiReasoning": "The text is \"EXACTLY!\" in a speech bubble.\nThe bubble is connected via a tail extension to the previous bubble spoken by Michelangelo (the turtle in the orange mask/green gear).\nThe conversation flow is:\n1. Michelangelo: \"Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\"\n2. Red Ranger: \"You mean the kind where if you fall off... you die?\"\n3. Michelangelo: \"EXACTLY!\"\nMichelangelo is a MAJOR character and a HERO.\nHe is enthusiastic about the comparison, even the dangerous part.\nThe text ends in an exclamation mark, indicating volume and energy."
+  },
+  {
+    "id": "page-08_b05",
+    "box_2d": {
+      "index": 6,
+      "x": 1050.8477783203125,
+      "y": 2136.74853515625,
+      "width": 329.0794677734375,
+      "height": 163.066162109375,
+      "confidence": 0.8848382234573364,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-007-x1050-y2136.jpg"
+    },
+    "ocr_text": "...ENGULF ALL THOSE WHO STAND AGAINST IT!",
+    "type": "SPEECH",
+    "speaker": "Foot Soldier",
+    "emotion": "Shouting/Fanatical",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Fanatical, raspy male voice, intense and aggressive",
+    "textWithCues": "[Shouting with intense effort] ...engulf all those who stand against it!",
+    "aiReasoning": "I have located the text \"...ENGULF ALL THOSE WHO STAND AGAINST IT!\" in the middle-right panel.\nType: SPEECH bubble.\nSpeaker: The tail points to a masked figure shooting a red energy beam. This is a generic \"Foot Soldier\" (identified in the unique characters list provided).\nSide: VILLAIN (Fighting the heroes).\nImportance: EXTRA (Unnamed minion).\nVoice Description: Needs to sound fanatical and aggressive. These soldiers are chanting a creed (\"We live for the Foot...\") while attacking. A raspy, intense male voice fits well.\nEmotion: High intensity, shouting, exertion from the attack.\nCues: The text starts with ellipses, indicating it completes the sentence from the previous panel (\"Let the fire of our cause...\"). It is a dramatic, shouted proclamation accompanying a magical attack."
+  },
+  {
+    "id": "page-08_b06",
+    "box_2d": {
+      "index": 8,
+      "x": 1018.428466796875,
+      "y": 2394.075439453125,
+      "width": 298.1060791015625,
+      "height": 570.919677734375,
+      "confidence": 0.8669496178627014,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-009-x1018-y2394.jpg"
+    },
+    "ocr_text": "WAIT, THEY CAN THROW FIREBALLS NOW? AMONG OTHER THINGS. I WANNA THROW FIREBALLS.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Surprised then envious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Teen male voice, energetic, American accent",
+    "textWithCues": "[Surprised] Wait, they can throw fireballs now? [Pink Ranger, straining while dodging] Among other things. [Green Ranger, jealous tone] I wanna throw fireballs.",
+    "aiReasoning": "I have located the text in the bottom right panel.\nThe text consists of three connected bubbles:\n1. \"WAIT, THEY CAN THROW FIREBALLS NOW?\" - The tail points clearly to the Green Ranger's helmet on the right side of the panel.\n2. \"AMONG OTHER THINGS.\" - The tail points to the Pink Ranger, who is diving upside down to dodge a laser beam.\n3. \"I WANNA THROW FIREBALLS.\" - The tail points back to the Green Ranger (originating from the bottom right).\n\nContext:\n- The speakers are the Green Ranger (Tommy) and the Pink Ranger (Kimberly).\n- They are fighting Foot Soldiers who are using magic/fireballs.\n- The tone is lighthearted banter amidst action. The Green Ranger is surprised by the enemy's ability and then childishly envious of it.\n\nSpeaker Identification:\n- The prompts asks to reuse names if applicable. The provided list has \"Michelangelo\", \"Red Ranger\", \"Foot Soldier\".\n- The Green Ranger is clearly a different character (Green suit, distinct from the Red Ranger and the Turtles). I will name him \"Green Ranger\".\n- Since the text block contains dialogue from two characters, I will attribute the block to the primary speaker (Green Ranger, who has 2/3 lines) and indicate the switch in the text cues.\n\nVoice & Emotion:\n- Green Ranger: Surprised, then playful/jealous. Male teen voice.\n- Pink Ranger: Strained (she is physically dodging), matter-of-fact. Female teen voice.\n\nSide: HERO\nImportance: MAJOR"
+  },
+  {
+    "id": "page-08_b07",
+    "box_2d": {
+      "index": 10,
+      "x": 77.72286224365234,
+      "y": 2191.5078125,
+      "width": 363.29126739501953,
+      "height": 221.697998046875,
+      "confidence": 0.8395782113075256,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-011-x77-y2191.jpg"
+    },
+    "ocr_text": "WE LIVE FOR THE FOOT. WE DIE FOR THE FOOT.",
+    "type": "SPEECH",
+    "speaker": "Foot Soldier",
+    "emotion": "Fanatical",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Muffled, raspy male voice, zealous and robotic tone",
+    "textWithCues": "[Chanting faithfully] We live for the Foot. We die for the Foot.",
+    "aiReasoning": "I have located the text \"WE LIVE FOR THE FOOT. WE DIE FOR THE FOOT.\" in the bottom-left panel.\nThe text appears in two separate speech bubbles originating from the Foot Soldiers (specifically the one standing on the ledge and the one in the foreground).\nThe speaker is a \"Foot Soldier\" (identified in the unique character list and visually consistent with TMNT lore).\nThey are VILLAINs.\nImportance is EXTRA (unnamed minions).\nThe tone is a fanatical, cult-like chant or oath.\nVoice should be muffled (masks), male, serious, and zealous."
+  }
+]

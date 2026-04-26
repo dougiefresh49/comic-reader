@@ -1,0 +1,191 @@
+[
+  {
+    "id": "page-11_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1063.9034423828125,
+      "y": 990.3500366210938,
+      "width": 404.3369140625,
+      "height": 127.00970458984375,
+      "confidence": 0.6934383511543274,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-001-x1063-y990.jpg"
+    },
+    "ocr_text": "\"I'M NOT CERTAIN HOW LONG THEY'LL LAST, BUT--\"",
+    "type": "SPEECH",
+    "speaker": "Billy Cranston",
+    "emotion": "Concerned/Cautious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Intellectual, articulate young male voice. Serious and focused.",
+    "textWithCues": "[Serious, cautionary tone] I'm not certain how long they'll last, but--",
+    "aiReasoning": "I have located the text \"I'M NOT CERTAIN HOW LONG THEY'LL LAST, BUT--\" in the middle right panel.\nThe text is enclosed in a yellow rectangular box with a blue border.\nWhile visually a caption/narration box, the use of \"I\" and the conversational flow (\"Donatello and I have been experimenting...\") indicates this is character dialogue, specifically a voice-over or communication line.\nThe speaker is discussing technical experiments with Donatello and \"residual energy\" for morphing. This role fits **Billy Cranston** (The Blue Ranger), the team's tech expert who is established as working with Donatello. Billy is depicted in the panels above (blue hoodie, glasses) and below (blue shirt, glasses).\nHe is a **Hero** and a **Major** character.\nThe emotion is intellectual but cautious/concerned, as he admits uncertainty about the duration of their solution.\nThe text ends with distinct double dashes \"--\", indicating he is trailing off or being interrupted by the next speaker (Zordon, in the blue box)."
+  },
+  {
+    "id": "page-11_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 755.1914672851562,
+      "y": 78.62998962402344,
+      "width": 483.80682373046875,
+      "height": 160.93603515625,
+      "confidence": 0.6717947721481323,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-002-x755-y78.jpg"
+    },
+    "ocr_text": "\"ZORDON, WITHOUT JASON AND TRINI, WE WON'T BE ABLE TO CALL THE MEGAZORD!\"",
+    "type": "SPEECH",
+    "speaker": "Billy Cranston",
+    "emotion": "Urgent concern",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Urgently] Zordon, without Jason and Trini, we won't be able to call the Megazord!",
+    "aiReasoning": "I see the text \"ZORDON, WITHOUT JASON AND TRINI, WE WON'T BE ABLE TO CALL THE MEGAZORD!\".\nThe text is in a speech bubble with a specific icon (Triceratops Power Coin) attached to it.\nThe tail of the speech bubble points directly to the character in the blue jacket and glasses.\nThis character is Billy Cranston (the Blue Ranger).\nContext: The team is assembling, but two members (Jason and Trini) are missing. Billy, being the technical expert, is pointing out the logistical impossibility of forming their giant robot (Megazord) without the full team.\nThe speaker is Billy Cranston.\nImportance is MAJOR.\nSide is HERO.\nEmotion is urgent and concerned. He is raising a critical issue while moving into action."
+  },
+  {
+    "id": "page-11_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 406.1405029296875,
+      "y": 624.612548828125,
+      "width": 363.32464599609375,
+      "height": 205.7559814453125,
+      "confidence": 0.5947685241699219,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-003-x406-y624.jpg"
+    },
+    "ocr_text": "LORD ZEDD AND SHREDDER BELIEVE THEY CAN EXPLOIT OUR GRIEF, BUT THEY ARE SADLY MISTAKEN.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Determined",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Deep, booming, resonant, wise, authoritative male voice with a slight electronic echo",
+    "textWithCues": "[Deep, authoritative tone] Lord Zedd and Shredder believe they can exploit our grief, but they are sadly mistaken.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"LORD ZEDD AND SHREDDER BELIEVE THEY CAN EXPLOIT OUR GRIEF, BUT THEY ARE SADLY MISTAKEN.\" is in a speech bubble in the first panel.\n2.  **Context:**\n    *   **Visuals:** The bubble tail connects to the previous bubble, which comes from the large, glowing blue head in the tube. This character is visually identifiable as Zordon.\n    *   **Speaker Identity:** Zordon. The prompt lists \"Billy Cranston\" as a unique character, but this is clearly not him. Zordon is named in the narrative box in the adjacent panel.\n    *   **Side:** HERO (The mentor of the Power Rangers).\n    *   **Importance:** MAJOR (He is the leader/mentor figure).\n    *   **Voice:** Zordon is known for a deep, booming, resonant, and wise voice, often with a slight electronic or ethereal quality.\n    *   **Emotion:** Serious, determined, reassuring, authoritative. He is rallying the team despite their grief.\n3.  **Performance Cues:**\n    *   The text is standard dialogue, not shouted (no jagged edges, no bolding indicating high volume).\n    *   The tone should be commanding and stoic.\n    *   Context cues: He is countering the villains' assumptions.\n    *   Drafting cues: `[Deep, resonant, authoritative tone] Lord Zedd and Shredder believe they can exploit our grief, but they are sadly mistaken.`"
+  },
+  {
+    "id": "page-11_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1534.829833984375,
+      "y": 988.2935180664062,
+      "width": 358.933349609375,
+      "height": 192.05560302734375,
+      "confidence": 0.5810117721557617,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-004-x1534-y988.jpg"
+    },
+    "ocr_text": "\"IT'S OUR BEST AND ONLY OPTION. WE'LL CONTACT JASON AND SEE IF THEY CAN JOIN YOU, BUT UNTIL THEN...",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Serious and decisive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Deep, resonant, booming male voice, wise and authoritative, with a slight ethereal quality",
+    "textWithCues": "[Authoritative and grave] It's our best and only option. [Reassuringly] We'll contact Jason and see if they can join you, [ominous pause] but until then...",
+    "aiReasoning": "1.  **Locate & Classify**: The target text is \"IT'S OUR BEST AND ONLY OPTION. WE'LL CONTACT JASON AND SEE IF THEY CAN JOIN YOU, BUT UNTIL THEN...\". It is located in a rectangular box with a light blue outline in the middle-right of the page. This is a voice-over or communication box. Since it represents character dialogue, I will classify it as `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker Identity**: The text flows from a discussion about technical solutions (\"Donatello and I have been experimenting...\"). The previous box (yellow outline) expresses doubt (\"I'm not certain how long they'll last...\"). The target box (blue outline) responds decisively (\"It's our best and only option.\").\n    *   **Clues**:\n        *   \"We'll contact Jason and see if they can join **you**\" implies the speaker is *not* physically with the field team (the \"you\"). This rules out the characters shown standing in the group (Billy, Zack, Kim, Tommy, Turtles).\n        *   \"We'll contact Jason\" suggests the speaker is at the Command Center coordinating the team.\n        *   The blue/cyan outline of the box matches the color of Zordon in his tube (top left) and his final blessing text (\"...May the Power protect you\") in the bottom left.\n        *   The tone is authoritative and commanding, characteristic of a mentor.\n    *   **Conclusion**: The speaker is **Zordon**.\n    *   **Side**: HERO.\n    *   **Importance**: MAJOR.\n    *   **Voice**: Zordon has a deep, resonant, booming voice. It should sound wise, grave, and authoritative (often with a slight echo or ethereal quality).\n    *   **Emotion**: Serious, urgent, and decisive. He is making a tough command call in a crisis.\n\n3.  **Performance Cues**:\n    *   The line \"It's our best and only option\" should be delivered with finality and gravity.\n    *   \"We'll contact Jason...\" should sound reassuring and procedural.\n    *   \"...but until then...\" serves as a transition to action, building tension."
+  },
+  {
+    "id": "page-11_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 130.92706298828125,
+      "y": 515.9647216796875,
+      "width": 326.6678161621094,
+      "height": 165.36688232421875,
+      "confidence": 0.5385715961456299,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-005-x130-y515.jpg"
+    },
+    "ocr_text": "ALPHA, TRIANGULATE THE TELEPORTER. SEND EVERYONE.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Deep, authoritative voice] Alpha, triangulate the teleporter. Send everyone.",
+    "aiReasoning": "The text \"ALPHA, TRIANGULATE THE TELEPORTER. SEND EVERYONE.\" is located in the top-left panel.\nThe speech bubble has a tail originating from the large blue head in the energy tube. This character is Zordon.\nZordon is a MAJOR character and a HERO (mentor to the Power Rangers).\nHis expression is serious and urgent. He is issuing a command to his assistant, Alpha.\nZordon's voice is typically depicted as deep, resonant, and booming.\nThe text is not bolded or in a jagged bubble, so he isn't screaming, but he is projecting authority."
+  },
+  {
+    "id": "page-11_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 138.72169494628906,
+      "y": 2492.81396484375,
+      "width": 242.8964080810547,
+      "height": 145.8408203125,
+      "confidence": 0.5299485921859741,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-006-x138-y2492.jpg"
+    },
+    "ocr_text": "\"...MAY THE POWER PROTECT YOU.\"",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  },
+  {
+    "id": "page-11_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1260.949462890625,
+      "y": 86.78913879394531,
+      "width": 370.4124755859375,
+      "height": 140.86228942871094,
+      "confidence": 0.5273101329803467,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-007-x1260-y86.jpg"
+    },
+    "ocr_text": "\"THAT MIGHT NOT ACTUALLY BE TRUE, TOMMY.",
+    "type": "SPEECH",
+    "speaker": "Billy Cranston",
+    "emotion": "Analytical and reassuring",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Matter-of-factly, slightly out of breath from running] That might not actually be true, Tommy.",
+    "aiReasoning": "1.  **Locate & Classify**: The text is located in the top right of the page. It is inside a yellow rectangular box with a blue outline and a Triceratops coin icon on the left. In this comic style (Power Rangers), these boxes with character icons represent dialogue (SPEECH), often spoken via communicators or as internal monologue/voice-over while in action. The text is \"THAT MIGHT NOT ACTUALLY BE TRUE, TOMMY.\"\n\n2.  **Analyze Context**:\n    *   **Speaker**: The Triceratops coin symbol is associated with the Blue Ranger. The character Billy Cranston (Blue Ranger) is visible in the panel (the young man with glasses and a blue shirt running alongside the character in green). The dialogue is intellectual and corrective, fitting Billy's personality. The list of unique characters includes \"Billy Cranston\".\n    *   **Side**: HERO (Power Ranger).\n    *   **Importance**: MAJOR (Main cast member).\n    *   **Emotion**: Billy is correcting Tommy's pessimistic statement with a logical fact. His expression in the panel is focused and determined as he runs. The tone is helpful, analytical, and reassuring.\n\n3.  **Performance Cues**:\n    *   The dialogue is a direct response to the previous bubble.\n    *   He is running, so there might be slight breathlessness, but he is generally calm and composed.\n    *   Emphasis on \"actually\" to indicate a correction.\n    *   Tone: Intellectual, matter-of-fact."
+  },
+  {
+    "id": "page-11_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 98.59032440185547,
+      "y": 980.7376708984375,
+      "width": 379.13065338134766,
+      "height": 220.1842041015625,
+      "confidence": 0.5115083456039429,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-008-x98-y980.jpg"
+    },
+    "ocr_text": "\"DONATELLO AND I HAVE BEEN EXPERIMENTING WITH THE ORIGINAL SHADOW MORPHERS.",
+    "type": "SPEECH",
+    "speaker": "Billy Cranston",
+    "emotion": "Serious and informative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Explaining confidently over comms] Donatello and I have been experimenting with the original Shadow Morphers.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"DONATELLO AND I HAVE BEEN EXPERIMENTING WITH THE ORIGINAL SHADOW MORPHERS.\" is located in a rectangular box with a yellow outline and a blue interior, positioned in the middle-left panel.\n    *   **Visual Indicators**: The box features a Triceratops Power Coin icon in the top-left corner.\n    *   **Classification**: Although it is a rectangular box (often associated with Narration), the presence of the character-specific icon (Triceratops = Blue Ranger) and the first-person content (\"Donatello and I...\") indicates this is character dialogue, likely spoken over a communication link or as a voiceover. For voice acting purposes, this is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The text mentions \"Donatello and I...\". The speaker is the person working with Donatello. The Triceratops coin identifies the speaker as **Billy Cranston** (the Blue Ranger).\n    *   **Side**: Billy is a Power Ranger, so he is a `HERO`.\n    *   **Importance**: He is a member of the main cast, so `MAJOR`.\n    *   **Emotion**: Billy is explaining a technical solution to a critical problem (the inability to call the Megazord). His tone would be intelligent, serious, and reassuring.\n    *   **Voice Description**: Since he is a `MAJOR` character, no description is needed per instructions.\n\n3.  **Performance Cues**:\n    *   **Tone**: Informative, serious, confident.\n    *   **Delivery**: Since it's in a box with no tail, it's likely over a comms device.\n    *   **Cues**: `[Explaining over comms]` or `[Confidently]`."
+  },
+  {
+    "id": "page-11_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 506.29290771484375,
+      "y": 1550.822509765625,
+      "width": 469.1680908203125,
+      "height": 212.8994140625,
+      "confidence": 0.49176982045173645,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-009-x506-y1550.jpg"
+    },
+    "ocr_text": "\"EVEN WITHOUT THE POWER COINS NEARBY, THERE SHOULD BE ENOUGH RESIDUAL ENERGY TO ALLOW RAPHAEL AND MICHELANGELO TO MORPH.",
+    "type": "SPEECH",
+    "speaker": "Billy Cranston",
+    "emotion": "analytical",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Intelligent, articulate young male voice, calm and scientific tone, American accent",
+    "textWithCues": "[Explaining confidently] Even without the Power Coins nearby, there should be enough residual energy to allow Raphael and Michelangelo to morph.",
+    "aiReasoning": "The text is located in a yellow rectangular box with a character icon (partially visible, linked to previous boxes with the Triceratops coin).\nText: \"EVEN WITHOUT THE POWER COINS NEARBY, THERE SHOULD BE ENOUGH RESIDUAL ENERGY TO ALLOW RAPHAEL AND MICHELANGELO TO MORPH.\"\nContext: The speaker is explaining a technical workaround for the heroes to transform. The previous box says \"Donatello and I have been experimenting...\", identifying the speaker as the team's tech expert working with Donatello.\nSpeaker: **Billy Cranston** (Blue Ranger).\nSide: HERO.\nImportance: MAJOR.\nEmotion: Analytical, intelligent, informative. The character is providing a scientific solution.\nClassification: SPEECH (It is first-person dialogue, though presented in a caption box for voice-over effect)."
+  }
+]

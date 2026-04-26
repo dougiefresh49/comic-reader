@@ -1,0 +1,40 @@
+[
+  {
+    "id": "page-15_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 207.54373168945312,
+      "y": 2346.431396484375,
+      "width": 275.6944885253906,
+      "height": 83.886962890625,
+      "confidence": 0.650789201259613,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-15/page-15-crop-001-x207-y2346.jpg"
+    },
+    "ocr_text": "ECTO-WHATTA?",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Confused and incredulous",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Confused, rough Brooklyn accent] Ecto-whatta?",
+    "aiReasoning": "1.  **Identify Text Region**: The bounding box coordinates (x:207, y:2346) correspond to the speech bubble in the bottom-left panel containing the text \"ECTO-WHATTA?\".\n2.  **Classify Type**: It is a speech bubble with a tail pointing to a character. Type: `SPEECH`.\n3.  **Identify Speaker**: The tail points to the Red Ranger, who is a Teenage Mutant Ninja Turtle in this crossover (Mighty Morphin Power Rangers/Teenage Mutant Ninja Turtles). The Red Ranger turtle uses sais (seen in previous panels), identifying him as **Raphael**.\n4.  **Determine Context**:\n    *   **Side**: HERO.\n    *   **Importance**: MAJOR (Raphael is a main protagonist).\n    *   **Situation**: The Blue Ranger (Donatello) just shouted \"Pick on an ectothermic animal your own size!\" while kicking a villain. Raphael, known for being the \"muscle\" and having a street-smart attitude, doesn't understand the scientific term \"ectothermic\".\n    *   **Emotion**: Confusion, incredulity, impatience.\n5.  **Voice Description**: Since the character is MAJOR, a description is not strictly required per instructions (\"If MINOR or EXTRA...\"), but his voice is iconic: rough, Brooklyn accent, tough-guy attitude.\n6.  **Draft Cues**: The text \"ECTO-WHATTA?\" is a slangy, confused response. He is baffled by the big word. The delivery should be blunt and perplexed.\n    *   *Draft*: \"[Confused, rough voice] Ecto-whatta?\""
+  },
+  {
+    "id": "page-15_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 670.341064453125,
+      "y": 2350.166259765625,
+      "width": 373.70947265625,
+      "height": 125.944091796875,
+      "confidence": 0.4375242292881012,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-15/page-15-crop-002-x670-y2350.jpg"
+    },
+    "ocr_text": "ECTOTHERMIC. TURTLE AND CROCODILES ARE BOTH COLD-BLOODED",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  }
+]

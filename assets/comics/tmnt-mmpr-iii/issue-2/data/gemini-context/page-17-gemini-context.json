@@ -1,0 +1,238 @@
+[
+  {
+    "id": "page-17_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1032.5247802734375,
+      "y": 1283.84765625,
+      "width": 193.412109375,
+      "height": 160.5714111328125,
+      "confidence": 0.9059019684791565,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-001-x1032-y1283.jpg"
+    },
+    "ocr_text": "NO. I MEAN... KARAI IS LYING.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Suspicious and realizing",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, disciplined, leader-like, clear and serious tone.",
+    "textWithCues": "[Firmly] NO. [Pauses, thinking] I MEAN... [With conviction] KARAI IS LYING.",
+    "aiReasoning": "I have located the text bubble containing \"NO. I MEAN... KARAI IS LYING.\" in the middle panel on the right side.\nThe bubble has a tail pointing to the Ninja Turtle with the blue mask. This is Leonardo.\nLeonardo is a main protagonist (Hero/Major).\nHis facial expression is serious, eyes narrowed, looking slightly down or away in thought before locking back in. He is realizing a deception.\nThe text starts with a firm negation \"NO.\", followed by a pause \"...\" as he clarifies his thought process, and then a definitive statement \"KARAI IS LYING.\"\nThis is a moment of realization interrupting the previous conversation about hiding."
+  },
+  {
+    "id": "page-17_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 772.46533203125,
+      "y": 568.7151489257812,
+      "width": 375.8211669921875,
+      "height": 174.586669921875,
+      "confidence": 0.8825325965881348,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-002-x772-y568.jpg"
+    },
+    "ocr_text": "I'M TRYING. IT'S HARD TO HACK THE COMMAND CENTER'S SAFEGUARDS.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "Strained focus",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Strained, typing furiously] I'm trying. It's hard to hack the Command Center's safeguards.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"I'M TRYING. IT'S HARD TO HACK THE COMMAND CENTER'S SAFEGUARDS.\" is in a speech bubble in the top right panel. The tail points to the character at the computer. Type is `SPEECH`.\n2.  **Identify Speaker:** The character is a Ninja Turtle wearing a purple mask and tech goggles. In the previous speech bubble, the female character addresses him as \"Donnie\". This is Donatello. He is not in the provided \"Unique Characters\" list (only Leonardo is), so I will create the new name \"Donatello\".\n3.  **Determine Context:**\n    *   **Side:** HERO (TMNT).\n    *   **Importance:** MAJOR (Main protagonist team).\n    *   **Emotion:** He is focused on the screen, teeth slightly gritted, body tense. He is responding to a request for a task that is proving difficult (\"It's hard to hack...\"). He sounds stressed and concentrated.\n4.  **Performance Cues:**\n    *   The dialogue \"I'm trying\" suggests a snapping or strained response to pressure.\n    *   He is physically typing/hacking while speaking.\n    *   Cue: `[Strained, typing furiously]` or `[Focused frustration]`."
+  },
+  {
+    "id": "page-17_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1064.3953857421875,
+      "y": 2180.334716796875,
+      "width": 261.0400390625,
+      "height": 131.2060546875,
+      "confidence": 0.8413417339324951,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-003-x1064-y2180.jpg"
+    },
+    "ocr_text": "WE NEED TO GO HELP THE OTHERS.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "Serious and pragmatic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Firmly, stating a fact] We need to go help the others.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"WE NEED TO GO HELP THE OTHERS.\" is in a standard speech bubble in the middle-right panel. The tail points to the character in the background sitting at the computer console.\n2.  **Context:**\n    *   **Speaker:** The character at the console is established in the first panel as \"Donnie\" (Donatello). He wears a purple mask (though colors are muted here, the context and mask shape confirm it). The other turtle in the foreground is Leonardo. So, the speaker is **Donatello**.\n    *   **Side:** HERO.\n    *   **Importance:** MAJOR (One of the TMNT).\n    *   **Emotion:** Serious, urgent, and pragmatic. He is validating Trini's argument against Leonardo's hesitation. He is concerned about the \"blood on our hands\" mentioned by Trini.\n3.  **Performance Cues:** Donatello is usually the logical voice. He is stating a necessary course of action. The tone should be firm and reasoned, not shouting, but urgent given the stakes."
+  },
+  {
+    "id": "page-17_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 489.346435546875,
+      "y": 1508.155029296875,
+      "width": 339.791748046875,
+      "height": 241.5361328125,
+      "confidence": 0.8323094248771667,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-004-x489-y1508.jpg"
+    },
+    "ocr_text": "BUT THEY DON'T SEEM TO BE AFTER ANYTHING IN SYDNEY OR JAPAN.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Analytical",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Thoughtfully, analyzing the situation] But they don't seem to be after anything in Sydney or Japan.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"BUT THEY DON'T SEEM TO BE AFTER ANYTHING IN SYDNEY OR JAPAN.\" is in a standard speech bubble in the middle-left panel.\n2.  **Speaker Identification**: The bubble's tail connects to the previous bubble (\"EVERY ATTACK...\"), which has a tail pointing to the Ninja Turtle with the blue bandana. This is Leonardo.\n3.  **Context**: Leonardo is analyzing the enemy's movements. He notes a pattern (\"acquisition\") but points out a contradiction in the current attacks (\"don't seem to be after anything\"). He is skeptical and thinking tactically.\n4.  **Side/Importance**: Leonardo is a `HERO` and a `MAJOR` character.\n5.  **Performance Cues**: He is in the middle of deducing a trap. His tone should be thoughtful, serious, and analytical. He is highlighting a discrepancy in the data."
+  },
+  {
+    "id": "page-17_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 255.0882110595703,
+      "y": 287.3370666503906,
+      "width": 376.47154235839844,
+      "height": 166.902099609375,
+      "confidence": 0.821764349937439,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-005-x255-y287.jpg"
+    },
+    "ocr_text": "DONNIE, CAN YOU CLEAN UP AND TRIANGULATE THEIR LOCATION?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Serious and focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, American accent, serious, authoritative, calm leader tone",
+    "textWithCues": "[Authoritative, focused] Donnie, can you clean up and triangulate their location?",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   The text \"DONNIE, CAN YOU CLEAN UP AND TRIANGULATE THEIR LOCATION?\" is in a standard white speech bubble in the top panel.\n    *   The tail of the speech bubble points to the Teenage Mutant Ninja Turtle with the blue mask.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The turtle with the blue mask is Leonardo. This matches the list of unique characters provided.\n    *   **Side:** Leonardo is a `HERO`.\n    *   **Importance:** He is a `MAJOR` character (Team leader).\n    *   **Emotion:** His expression is serious and focused. His brow is furrowed, and he is looking intently, likely at a screen or at Donatello. The scene involves strategic planning (\"triangulate location\"), implying a tactical, serious mood.\n    *   **Context:** He is issuing a directive/request to Donatello (the tech expert) to find an enemy signal. It is a command disguised as a question.\n\n3.  **Performance Cues:**\n    *   **Tone:** Authoritative, calm, focused, leadership voice. Not shouting, not whispering.\n    *   **Text Processing:** \"Donnie, can you clean up and triangulate their location?\"\n    *   **Cues:** Add `[Authoritative, focused]` to indicate his leadership role and the seriousness of the task.\n\n4.  **JSON Construction:**\n    *   Type: SPEECH\n    *   Speaker: Leonardo\n    *   CharacterType: MAJOR\n    *   Side: HERO\n    *   VoiceDescription: Serious, authoritative young adult male voice.\n    *   Emotion: Serious/Focused\n    *   TextWithCues: \"[Authoritative, focused] Donnie, can you clean up and triangulate their location?\""
+  },
+  {
+    "id": "page-17_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 89.64228820800781,
+      "y": 1500.4288330078125,
+      "width": 391.5540313720703,
+      "height": 158.3951416015625,
+      "confidence": 0.7831121683120728,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-006-x89-y1500.jpg"
+    },
+    "ocr_text": "EVERY ATTACK FOR THE LAST FEW MONTHS HAS BEEN ABOUT ACQUISITION.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Analytical",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Serious, thoughtful tone] Every attack for the last few months has been about acquisition.",
+    "aiReasoning": "The text \"EVERY ATTACK FOR THE LAST FEW MONTHS HAS BEEN ABOUT ACQUISITION.\" is located in a speech bubble in the middle-left panel.\nThe tail of the speech bubble points clearly to Leonardo (the Ninja Turtle with the blue mask).\nLeonardo is a main character (MAJOR) and a HERO.\nHe appears serious and focused, analyzing the enemy's strategy. He is pointing out a pattern to the others.\nThe tone should be analytical, firm, and thoughtful."
+  },
+  {
+    "id": "page-17_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 933.6992797851562,
+      "y": 2054.811767578125,
+      "width": 153.49969482421875,
+      "height": 178.455322265625,
+      "confidence": 0.7774491310119629,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-007-x933-y2054.jpg"
+    },
+    "ocr_text": "TRINI'S RIGHT, BRO.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "Serious and logical agreement",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Calm, serious tone] Trini's right, bro.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"TRINI'S RIGHT, BRO.\" is in a speech bubble in the middle-right panel. The bubble tail points towards the character sitting at the computer console in the background.\n2.  **Analyze Context:**\n    *   **Speaker:** The character at the computer is wearing a purple mask and has a bo staff (visible in the top panel). This is **Donatello**.\n    *   **Side:** **HERO**.\n    *   **Importance:** **MAJOR** (He is one of the main TMNT characters).\n    *   **Context:** Trini (the Yellow Ranger) is arguing with Leonardo that they need to take action despite his reservations. Donatello interjects to support Trini's logic.\n    *   **Emotion:** Serious, rational, and supportive. He is acting as the voice of reason alongside Trini.\n3.  **Performance Cues:**\n    *   The delivery should be calm but firm. He is backing up a serious point about \"blood on our hands.\"\n    *   There is no shouting or whispering indicated by the font.\n    *   Cue: [Serious, agreeing] or [Reasonable tone]."
+  },
+  {
+    "id": "page-17_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 78.05320739746094,
+      "y": 176.98548889160156,
+      "width": 252.5319366455078,
+      "height": 138.36619567871094,
+      "confidence": 0.7312762141227722,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-008-x78-y176.jpg"
+    },
+    "ocr_text": "...TO DESTROY YOU BOTH.",
+    "type": "SPEECH",
+    "speaker": "Karai",
+    "emotion": "Threatening",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Sharp, confident, dangerous female voice",
+    "textWithCues": "[Threateningly] ...to destroy you both.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"...TO DESTROY YOU BOTH.\" is in a speech bubble in the top-left panel (x:78, y:176). The bubble has a tail pointing off-panel (upwards and left). It is classified as `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Visuals**: The panel shows the heroes (Red Ranger, Leonardo, Yellow Ranger, Donatello) in the Turtle Lair. Donatello is at a computer.\n    *   **Dialogue Flow**:\n        *   Bubble: \"...TO DESTROY YOU BOTH.\"\n        *   Trini (Yellow Ranger): \"Donnie, can you clean up and triangulate their location?\" -> This implies the first bubble is a transmission/recording they are listening to.\n        *   Leonardo (Panel 2): \"...Karai is lying.\" -> This explicitly identifies the source of the information (the transmission) as Karai.\n    *   **Speaker**: Inferred as **Karai**. She is not in the list of unique characters provided, so I will use her name.\n    *   **Side**: `VILLAIN`. She is an antagonist issuing a threat (or a feint).\n    *   **Importance**: `MINOR`. She is a named secondary character (lieutenant to the main villain, Shredder).\n    *   **Voice Description**: Since she is a MINOR character, I need a description. Karai is a skilled ninja commander. Voice should be \"Sharp, confident, dangerous female voice\".\n    *   **Emotion**: The text is a threat (\"destroy you both\"). The tone should be menacing and serious.\n\n3.  **Performance Cues**:\n    *   The text starts with ellipses \"...\", indicating the middle or end of a sentence.\n    *   The content is a threat.\n    *   No shouting cues (bold text/jagged bubble).\n    *   Cue: `[Threateningly]` or `[Coldly]`. Let's use `[Threateningly]` to capture the intent of \"destroy\".\n\n4.  **Final JSON Construction**:\n    *   Type: SPEECH\n    *   Speaker: Karai\n    *   CharacterType: MINOR\n    *   Side: VILLAIN\n    *   VoiceDescription: Sharp, confident, dangerous female voice\n    *   Emotion: Threatening\n    *   TextWithCues: \"[Threateningly] ...to destroy you both.\""
+  },
+  {
+    "id": "page-17_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 703.5116577148438,
+      "y": 721.5855712890625,
+      "width": 273.07080078125,
+      "height": 119.22821044921875,
+      "confidence": 0.7272611856460571,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-009-x703-y721.jpg"
+    },
+    "ocr_text": "SOMETHING'S WRONG.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Suspicious and concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, calm, authoritative leader voice.",
+    "textWithCues": "[Suspiciously, realizing] Something's wrong.",
+    "aiReasoning": "I have located the text \"SOMETHING'S WRONG.\" in the first panel of the page.\nThe text is inside a speech bubble.\nThe tail of the speech bubble points to the character Leonardo (the Turtle with the blue mask and katanas).\nLeonardo is a major hero character.\nIn the context, the team is trying to track a signal. Donatello mentions difficulty hacking safeguards. Leonardo interrupts with a realization that the situation feels off. His expression in the subsequent panels is serious and suspicious (\"Karai is lying\").\nTherefore, the line should be delivered with a tone of sudden realization and deep suspicion/concern. It is a \"gut feeling\" moment.\n\n**Classification:** SPEECH\n**Speaker:** Leonardo\n**Character Type:** MAJOR\n**Side:** HERO\n**Emotion:** Suspicious, concerned, intuitive.\n**Cues:** [Suspiciously], [Realizing]"
+  },
+  {
+    "id": "page-17_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 761.9217529296875,
+      "y": 2361.89892578125,
+      "width": 354.01025390625,
+      "height": 176.16015625,
+      "confidence": 0.7066447138786316,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-010-x761-y2361.jpg"
+    },
+    "ocr_text": "UNLESS THAT'S EXACTLY WHAT THEY WANT US TO DO.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Suspicious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, heroic, leader-like tone, American accent",
+    "textWithCues": "[Suspiciously] Unless that's exactly what they want us to do.",
+    "aiReasoning": "1.  **Locate & Classify**: The target text is \"UNLESS THAT'S EXACTLY WHAT THEY WANT US TO DO.\" located in a speech bubble in the bottom panel. The tail of the bubble points to the character in the red and white suit (Red Ranger).\n    *   Type: `SPEECH`\n\n2.  **Analyze Context**:\n    *   **Speaker**: The character is the Red Power Ranger (Jason Lee Scott). He is not listed in the \"Unique Characters\" provided (Leonardo, Donatello, Karai). He is clearly a different character. I will name him \"Red Ranger\".\n    *   **Side**: `HERO` (Power Ranger).\n    *   **Importance**: `MAJOR` (Part of the main cast in this crossover).\n    *   **Voice Description**: Even though he is MAJOR, since he is a newly identified character in this context, I will provide a description: \"Young adult male, heroic, leader-like tone, American accent.\"\n    *   **Emotion**: The Red Ranger has a serious, concerned expression. He is analyzing the situation and realizing it might be a trap. The emotion is suspicion or realization.\n\n3.  **Performance Cues**:\n    *   **Context**: Trini (Yellow Ranger) just suggested they go help the others. Jason interrupts with a counter-thought, suggesting the attacks are a diversion/trap.\n    *   **Tone**: Wary, serious, contemplative.\n    *   **Text Processing**: The text is standard dialogue (not bold, not jagged). I will convert to sentence case.\n    *   **Cues**: Add `[Suspiciously]` or `[Realizing]` to indicate the shift in logic.\n\n    *Draft*: \"[Suspiciously] Unless that's exactly what they want us to do.\""
+  },
+  {
+    "id": "page-17_b11",
+    "box_2d": {
+      "index": 11,
+      "x": 788.4659423828125,
+      "y": 1076.3131103515625,
+      "width": 390.060546875,
+      "height": 233.5137939453125,
+      "confidence": 0.45323053002357483,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-012-x788-y1076.jpg"
+    },
+    "ocr_text": "OF COURSE THERE IS. MY FRIENDS AND YOUR BROTHERS ARE IN DANGER AND WE'RE HIDING IN THE SEWERS.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Frustrated and urgent",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Snapping in frustration] Of course there is. My friends and your brothers are in danger and we're hiding in the sewers.",
+    "aiReasoning": "1.  **Locate Text:** The text \"OF COURSE THERE IS. MY FRIENDS AND YOUR BROTHERS ARE IN DANGER AND WE'RE HIDING IN THE SEWERS.\" is in the second panel of the page.\n2.  **Identify Speaker:** The speech bubble has a tail pointing to the human character on the left in the red suit. This is the **Red Ranger** (Jason). The prompt provides \"Red Ranger\" in the unique characters list.\n3.  **Context:**\n    *   **Speaker:** Red Ranger.\n    *   **Type:** SPEECH.\n    *   **Side:** HERO.\n    *   **Character Type:** MAJOR.\n    *   **Emotion:** He looks frustrated and angry. He is reacting to Donatello's previous line \"Something's wrong\" (referring to a computer glitch) by interpreting it as the moral wrongness of their current situation (hiding while friends are in danger).\n    *   **Voice Description:** (Major character, so not strictly required by prompt instructions, but he has a young adult, command-style, American male voice).\n4.  **Performance Cues:**\n    *   **Tone:** Frustrated, snappy, urgent. He is venting his impatience.\n    *   **Volume:** Normal to elevated (heated argument), but not screaming (bubble is smooth).\n    *   **Emphasis:** \"Of course there is\" is a snappy retort. The rest is an explanation of his frustration.\n    *   **Cue insertion:** `[Frustrated]` or `[Snapping]`."
+  }
+]

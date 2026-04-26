@@ -1,0 +1,200 @@
+[
+  {
+    "id": "page-19_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1337.0733642578125,
+      "y": 91.45330810546875,
+      "width": 267.37353515625,
+      "height": 152.3931121826172,
+      "confidence": 0.9656198620796204,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-001-x1337-y91.jpg"
+    },
+    "ocr_text": "HOME SWEET HOME.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Sinister satisfaction",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, menacing, and authoritative male voice.",
+    "textWithCues": "[Deep, ominous tone] Home sweet home.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"HOME SWEET HOME.\" is in a speech bubble in the top right of the first panel. The tail points to the character in the grey armor with the helmet.\n2.  **Analyze Context**:\n    *   **Speaker**: The character is visually identifiable as The Shredder (from TMNT). He is also explicitly named in the second panel dialogue (\"MY OBJECTIVE IS CLEAR, SHREDDER.\").\n    *   **Side**: Villain.\n    *   **Importance**: MAJOR (Main antagonist).\n    *   **Voice Description**: Deep, resonant, gravelly, menacing, and authoritative.\n    *   **Emotion**: The character is standing amidst fire and destruction (or a villainous base). The line \"Home sweet home\" is delivered with dark irony or a grim sense of satisfaction/belonging in this chaotic environment.\n3.  **Performance Cues**:\n    *   The delivery should be slow and ominous.\n    *   Tone: Sinister satisfaction."
+  },
+  {
+    "id": "page-19_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 202.5140380859375,
+      "y": 1420.15478515625,
+      "width": 304.3427734375,
+      "height": 115.1966552734375,
+      "confidence": 0.9616205096244812,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-002-x202-y1420.jpg"
+    },
+    "ocr_text": "MS. STERLING, ARE YOU--",
+    "type": "SPEECH",
+    "speaker": "Scientist",
+    "emotion": "Alarmed",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Nervous, educated male voice, American accent",
+    "textWithCues": "[Alarmed, cut off] Ms. Sterling, are you--",
+    "aiReasoning": "The text \"MS. STERLING, ARE YOU--\" is in a speech bubble in the middle-left panel.\nThe tail points to a man in a white lab coat and glasses.\nHe is not Shredder. He appears to be a subordinate to the blonde woman (Ms. Sterling).\nHe is an `EXTRA` (unnamed scientist/assistant).\nSide: They are being attacked by Shredder and Zedd's forces, so they are the victims here, likely `NEUTRAL` or allied with the protagonists' interests in this moment (though often these organizations are antagonists themselves). I will classify as `NEUTRAL`.\nVoice: He looks alarmed and is being interrupted. He sounds like a nervous intellectual.\nEmotion: Confusion, Alarm.\nText needs to indicate the interruption."
+  },
+  {
+    "id": "page-19_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1024.8026123046875,
+      "y": 2041.9393310546875,
+      "width": 358.628173828125,
+      "height": 140.4954833984375,
+      "confidence": 0.9604586958885193,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-003-x1024-y2041.jpg"
+    },
+    "ocr_text": "TAKE THEM DOWN. FULL SPREAD. FIRE AT WILL!",
+    "type": "SPEECH",
+    "speaker": "Soldier",
+    "emotion": "Urgent, Commanding",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Commanding, loud, urgent male voice, military tone",
+    "textWithCues": "[Shouting commands over gunfire] Take them down! Full spread! Fire at will!",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"TAKE THEM DOWN. FULL SPREAD. FIRE AT WILL!\" is in a speech bubble in the bottom right panel. The tail points to a soldier/guard in the foreground firing a weapon. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The speaker is a uniformed soldier or security guard. He is not Shredder or the Scientist mentioned in the unique characters list. He is an unnamed extra. I will call him \"Soldier\".\n    *   **Side:** These soldiers are defending a base against Shredder and Lord Zedd (Villains). Therefore, they are opposing the villains. In the context of \"Hero vs Villain\", generic security forces are typically `NEUTRAL` or aligned with the `HERO` side. I will classify as `NEUTRAL` (as in Lawful Neutral security).\n    *   **Importance:** `EXTRA`.\n    *   **Voice Description:** He is a military commander or squad leader. He needs to sound professional, authoritative, and loud. \"Neutral Extra: Commanding, loud, urgent male voice, military tone\".\n    *   **Emotion:** Urgent, aggressive, focused. He is shouting orders in a firefight.\n3.  **Performance Cues:**\n    *   The text is commands.\n    *   The context is a loud battle (SFX: SH-KOW).\n    *   He must be shouting to be heard.\n    *   Text: \"TAKE THEM DOWN. FULL SPREAD. FIRE AT WILL!\"\n    *   Rewritten: \"[Shouting commands over gunfire] Take them down! Full spread! Fire at will!\""
+  },
+  {
+    "id": "page-19_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1058.30419921875,
+      "y": 1837.5357666015625,
+      "width": 470.225830078125,
+      "height": 160.847412109375,
+      "confidence": 0.9588735103607178,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-004-x1058-y1837.jpg"
+    },
+    "ocr_text": "THE QUESTION IS... WILL YOU ACCOMPLISH YOURS, OR LET YOUR EGO GET IN THE WAY?",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Condescending and challenging",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, raspy, booming male voice with a metallic resonance. Authoritative, terrifying, and arrogant.",
+    "textWithCues": "[Condescendingly] The question is... [dramatic pause] will you accomplish yours, or let your ego get in the way?",
+    "aiReasoning": "I have located the text bubble in the middle right panel.\nThe text is: \"THE QUESTION IS... WILL YOU ACCOMPLISH YOURS, OR LET YOUR EGO GET IN THE WAY?\"\nThe bubble is connected to the previous bubble: \"MY OBJECTIVE IS CLEAR, SHREDDER.\"\nBoth bubbles have tails pointing to the character in the red bio-mechanical suit holding a 'Z' staff. This character is Lord Zedd (from Power Rangers). He is addressing Shredder, whose helmet is visible in the foreground.\nContext: This is a crossover (TMNT x Power Rangers). Lord Zedd is a Major Villain.\nSpeaker: Lord Zedd. Since he is not in the \"Unique Characters\" list provided (Shredder, Scientist, Soldier), and is clearly a distinct named character, I will use \"Lord Zedd\".\nSide: VILLAIN.\nImportance: MAJOR.\nVoice: Lord Zedd has a very iconic deep, raspy, booming, and menacing voice. The tone here is condescending and challenging, questioning Shredder's competence and checking his pride.\nCues:\n- \"...\" indicates a dramatic pause.\n- The sentence is a rhetorical challenge/taunt.\n- Tone should be authoritative but mocking/condescending."
+  },
+  {
+    "id": "page-19_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 132.21710205078125,
+      "y": 1663.48828125,
+      "width": 185.98428344726562,
+      "height": 151.0133056640625,
+      "confidence": 0.931309163570404,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-005-x132-y1663.jpg"
+    },
+    "ocr_text": "WE'RE UNDER ATTACK.",
+    "type": "SPEECH",
+    "speaker": "Ms. Sterling",
+    "emotion": "Urgent, Commanding",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Authoritative, professional female voice, American accent, high urgency and stress",
+    "textWithCues": "[Shouting commandingly] We're under attack.",
+    "aiReasoning": "The text \"WE'RE UNDER ATTACK.\" is located in the middle-left panel.\nIt is inside a speech bubble with a tail pointing to a blonde woman in the foreground.\nContext:\n- Another character (the man in the lab coat) yells \"MS. STERLING, ARE YOU--\", identifying the woman as Ms. Sterling.\n- She is shouting orders (\"ACTIVATE ALL DEFENSES...\") in response to an intrusion by Shredder and Lord Zedd (Villains).\n- Therefore, she is likely a NEUTRAL party (head of a facility/organization) or HERO side relative to the attackers.\n- She is a named character (\"Ms. Sterling\"), so Importance is MINOR.\n- Her expression is urgent and serious; she is in a combat situation.\n- The text is bold, indicating loudness/shouting.\n\nClassification: SPEECH.\nSpeaker: Ms. Sterling.\nSide: NEUTRAL (Defending a human facility against villains).\nVoice: Professional, authoritative female voice, shouting with urgency."
+  },
+  {
+    "id": "page-19_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 114.21392822265625,
+      "y": 1515.9676513671875,
+      "width": 272.6911926269531,
+      "height": 164.9326171875,
+      "confidence": 0.9306137561798096,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-006-x114-y1515.jpg"
+    },
+    "ocr_text": "ACTIVATE ALL DEFENSES AND SCRAMBLE ALL TROOPS.",
+    "type": "SPEECH",
+    "speaker": "Ms. Sterling",
+    "emotion": "Urgent, Commanding",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Authoritative, sharp female voice, American accent, professional but under high stress",
+    "textWithCues": "[Shouting orders] Activate all defenses and scramble all troops.",
+    "aiReasoning": "The text \"ACTIVATE ALL DEFENSES AND SCRAMBLE ALL TROOPS.\" is in a speech bubble in the middle-left panel.\nThe bubble's tail points to the blonde woman with a bob haircut.\nAnother character (a soldier in red) addresses her as \"Ms. Sterling\" in the adjacent bubble (\"Ms. Sterling, are you--\"), confirming her identity.\nMs. Sterling is a named character, but not a main \"hero\" (Turtle/Ranger) or main \"villain\" (Shredder/Zedd) in the primary sense, though she is an antagonist in the lore. In this scene, she is defending a base against the main villains. I will classify her as a `MINOR` character (named secondary) and her side as `NEUTRAL` (Corporate/Government defense) or `VILLAIN` (Corporate antagonist). Given she is ordering troops to fire, she acts with authority. I will label her `NEUTRAL` as she represents a third-party human faction here.\nHer facial expression is serious and urgent. She is issuing a command to the base.\nThe text does not have jagged edges, but the context of an attack implies she is projecting her voice loudly."
+  },
+  {
+    "id": "page-19_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1041.82470703125,
+      "y": 1379.4207763671875,
+      "width": 415.3409423828125,
+      "height": 125.6241455078125,
+      "confidence": 0.9014095067977905,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-007-x1041-y1379.jpg"
+    },
+    "ocr_text": "YOU'RE CERTAIN YOU KNOW WHERE YOU'RE GOING?",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Skeptical",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, raspy, menacing, and authoritative male voice with a metallic resonance",
+    "textWithCues": "[Skeptically, deep voice] You're certain you know where you're going?",
+    "aiReasoning": "The text \"YOU'RE CERTAIN YOU KNOW WHERE YOU'RE GOING?\" is inside a speech bubble in the middle-right panel.\nIn this panel, we see Lord Zedd (red muscular figure) walking away and a close-up of Shredder's helmet/face on the right.\nThe tail of this specific speech bubble points towards Shredder's helmet.\nThe subsequent dialogue (\"My objective is clear, Shredder.\") is spoken by Lord Zedd (tail points to him), confirming that the first line was addressed to Zedd by Shredder.\nTherefore, the speaker is Shredder.\nShredder is a MAJOR character and a VILLAIN.\nHis tone is skeptical and authoritative, questioning his ally's sense of direction or plan."
+  },
+  {
+    "id": "page-19_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1212.4051513671875,
+      "y": 1505.1593017578125,
+      "width": 240.39404296875,
+      "height": 145.127197265625,
+      "confidence": 0.8870921730995178,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-008-x1212-y1505.jpg"
+    },
+    "ocr_text": "MY OBJECTIVE IS CLEAR, SHREDDER.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Stern and focused",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, booming, menacing, and authoritative male voice with a metallic rasp",
+    "textWithCues": "[Sternly] My objective is clear, Shredder.",
+    "aiReasoning": "I have located the text bubble containing \"MY OBJECTIVE IS CLEAR, SHREDDER.\"\n1.  **Locate & Classify**: It is a speech bubble (oval shape with a tail).\n2.  **Analyze Context**:\n    *   **Speaker**: The tail of the speech bubble points to the character with red exposed muscle and silver metallic tubes/exoskeleton. This character matches the visual design of **Lord Zedd**.\n    *   **Listener**: He is addressing **Shredder**, whose face is shown in close-up in the foreground of the same panel.\n    *   **Side**: Lord Zedd is a villain.\n    *   **Importance**: He is a **MAJOR** character (Main antagonist from Power Rangers).\n    *   **Emotion**: The statement is declarative and firm. He is asserting his focus compared to Shredder's potential distraction. The tone is authoritative and serious.\n3.  **Performance Cues**:\n    *   The delivery should be deep, menacing, and authoritative. It is a statement of fact and a subtle challenge to his partner.\n    *   No shouting or whispering cues in the art.\n    *   Cue: `[Deep, authoritative voice]` or `[Sternly]`."
+  },
+  {
+    "id": "page-19_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 1197.823974609375,
+      "y": 1383.045654296875,
+      "width": 260.6595458984375,
+      "height": 111.3704833984375,
+      "confidence": 0.5166816711425781,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-009-x1197-y1383.jpg"
+    },
+    "ocr_text": "CERTAIN YOU WHERE YOU'RE GOING?",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Skeptical and condescending",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, booming, gravelly, menacing, and authoritative male voice",
+    "textWithCues": "[Deep, skeptical voice] You're certain you know where you're going?",
+    "aiReasoning": "1.  **Locate & Classify**: The target text is \"YOU'RE CERTAIN YOU KNOW WHERE YOU'RE GOING?\" located in a speech bubble in the middle-right panel. The prompt has a slight typo (\"CERTAIN YOU WHERE YOU'RE GOING?\"), but the location and visual evidence confirm the intended speech bubble. Classification is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The speech bubble's tail points to a character wearing red armor with exposed muscle aesthetics and a helmet with a \"Z\" crest. This is **Lord Zedd** (from Power Rangers). He is holding his iconic Z-staff.\n    *   **Side**: Lord Zedd is a famous antagonist, so `VILLAIN`.\n    *   **Importance**: He is a main character in this crossover event, so `MAJOR`.\n    *   **Voice Description**: Lord Zedd has a very distinct, well-known voice profile: deep, gravelly, booming, and menacing.\n    *   **Emotion**: He is walking with Shredder and questioning his leadership/direction. The tone is skeptical, condescending, and authoritative. He is challenging Shredder's competence.\n\n3.  **Performance Cues**:\n    *   The text is a question challenging the other villain's sense of direction or plan.\n    *   It should be delivered with arrogance and skepticism.\n    *   The voice should be deep and resonant.\n    *   Text cue: \"[Deep, skeptical voice] You're certain you know where you're going?\""
+  }
+]

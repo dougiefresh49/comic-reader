@@ -1,0 +1,277 @@
+[
+  {
+    "id": "page-11_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 891.7560424804688,
+      "y": 629.8978271484375,
+      "width": 313.06121826171875,
+      "height": 457.087890625,
+      "confidence": 0.9541206955909729,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-001-x891-y629.jpg"
+    },
+    "ocr_text": "KIM, STRETCH OUT YOUR-- GOOD CATCH. OUCH.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Strained urgency followed by pain",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young male, energetic 'surfer' accent, physically strained and breathless",
+    "textWithCues": "[Straining, shouting downward] Kim, stretch out your-- [Pink Ranger interrupts] Good catch! [Yanked downward, groans] Ouch.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"KIM, STRETCH OUT YOUR-- GOOD CATCH. OUCH.\" is located in the second panel (the middle strip).\n    *   \"KIM, STRETCH OUT YOUR--\" is in a speech bubble with a tail pointing to the Ninja Turtle with the orange mask (Michelangelo).\n    *   \"GOOD CATCH!\" is in a speech bubble with a tail pointing to the Pink Ranger (Kimberly).\n    *   \"OUCH.\" is in a speech bubble with a tail pointing to Michelangelo.\n    *   This is a `SPEECH` region containing dialogue from two characters, though the prompt groups them into one block. I will identify the primary speaker (Michelangelo) who starts and ends the sequence.\n\n2.  **Analyze Context**:\n    *   **Speaker**: Michelangelo (Ninja Turtle, Orange Mask). The text block also contains a line from the Pink Ranger (\"Good catch!\"), but Michelangelo is the initiator and final speaker.\n    *   **Side**: `HERO` (Teenage Mutant Ninja Turtles).\n    *   **Importance**: `MAJOR` character.\n    *   **Voice Description**: Michelangelo typically has a \"surfer dude\" accent, young, energetic male voice. Here, he is physically straining to hold the Green Ranger while catching the Pink Ranger.\n    *   **Emotion**: The character is straining physically, then experiences sudden pain/jolt from the catch.\n\n3.  **Performance Cues**:\n    *   \"KIM, STRETCH OUT YOUR--\": Spoken with urgency and physical strain (he is hanging by one arm and reaching with the other). The \"--\" indicates he is cut off by the action of her grabbing his nunchuck.\n    *   \"GOOD CATCH\": This line is technically the Pink Ranger's, thanking him or acknowledging the grab. I will annotate this switch in the cues.\n    *   \"OUCH\": Spoken by Michelangelo, a sharp reaction to the sudden weight/jolt."
+  },
+  {
+    "id": "page-11_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1492.4542236328125,
+      "y": 2867.946533203125,
+      "width": 401.2135009765625,
+      "height": 97.010498046875,
+      "confidence": 0.9491742253303528,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-002-x1492-y2867.jpg"
+    },
+    "ocr_text": "\"I KNOW YOU'RE ALL DISAPPOINTED...\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young male voice, calm, authoritative leader tone, slightly serious",
+    "textWithCues": "[Voiceover, somber tone] \"I know you're all disappointed...\"",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"\"I KNOW YOU'RE ALL DISAPPOINTED...\"\" is located in a rectangular box in the bottom right corner. Rectangular boxes without tails are classified as `NARRATION` (or captions). The text inside has quotation marks, indicating it is a voice-over or a spoken line serving as a narrative bridge.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The caption box has a light background with a distinct **blue border**. In this comic series (TMNT/Power Rangers crossover), narrative captions are often color-coded to the character. Leonardo (the leader of the Turtles) wears a blue mask and is present in the panel (right foreground). He is the team leader, and the text (\"I know you're all disappointed...\") is a leadership statement addressing the group's morale after a failure. Therefore, the speaker is **Leonardo**.\n    *   **Side:** Leonardo is a `HERO`.\n    *   **Importance:** He is a `MAJOR` character (one of the TMNT).\n    *   **Emotion:** The team has just failed to stop the villains (Shredder/Rita's forces). Leonardo's previous line was a sarcastic/defeated \"Sigh. Perfect.\" This caption represents a shift to a more serious, comforting, or debriefing tone. The emotion is somber, serious, and empathetic.\n\n3.  **Performance Cues:**\n    *   **Tone:** The text is in quotes, suggesting a voice-over (perhaps from a journal entry or the immediate next scene).\n    *   **Volume:** Normal conversation level, perhaps slightly softer/somber.\n    *   **Stuttering:** The \"...\" at the end indicates a trailing thought or a pause, not fear-based stuttering in this context.\n    *   **Cues:** Add `[Voiceover]` to indicate the source is a caption, and `[somber tone]` to guide the actor.\n\n4.  **Final JSON Construction:**\n    *   Type: `NARRATION`\n    *   Speaker: Leonardo\n    *   CharacterType: MAJOR\n    *   Side: HERO\n    *   Text: \"[Voiceover, somber tone] \\\"I know you're all disappointed...\\\"\""
+  },
+  {
+    "id": "page-11_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1205.423583984375,
+      "y": 1520.2349853515625,
+      "width": 292.6219482421875,
+      "height": 144.2109375,
+      "confidence": 0.9331204295158386,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-003-x1205-y1520.jpg"
+    },
+    "ocr_text": "...OR DIE BY THE FOOT.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Ominously] ...Or die by the Foot.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"...OR DIE BY THE FOOT.\" is found in a speech bubble in the middle-right panel (row 3, column 2). The bubble's tail points into a red energy beam where the villains have just teleported away. This is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The text is a continuation of the sentence starting in the previous panel (\"LIVE BY THE FOOT...\"), spoken by the leader of the villains. This character wears a conical hat, a mask, has glowing red eyes, and commands the Foot Clan. This is visually identified as **Shredder**.\n    *   **Side**: `VILLAIN`.\n    *   **Importance**: The prompt instructions list \"Shredder\" as an example of `MAJOR`. Since this is clearly the main antagonist of the scene giving a dramatic exit line, he fits `MAJOR`.\n    *   **Emotion**: The character is delivering a final ultimatum/warning before vanishing. The tone is threatening, ominous, and commanding.\n    *   **Voice**: Since he is `MAJOR`, a description is not strictly required by the instructions, but the tone is deep and menacing.\n\n3.  **Performance Cues**:\n    *   The text starts with \"...\" indicating a pause or continuation.\n    *   The statement is a threat (\"...or die\").\n    *   The context is a disappearing act, adding an eerie or dramatic quality.\n    *   Suggested cue: `[Ominously]` or `[Threateningly]`."
+  },
+  {
+    "id": "page-11_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 865.2021484375,
+      "y": 1144.3619384765625,
+      "width": 197.689453125,
+      "height": 140.00048828125,
+      "confidence": 0.9235994815826416,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-004-x865-y1144.jpg"
+    },
+    "ocr_text": "I WANT A BOOM STICK.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Envious and whining",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Whining enviously] I WANT A BOOM STICK."
+  },
+  {
+    "id": "page-11_b05",
+    "box_2d": {
+      "index": 10,
+      "x": 809.0956420898438,
+      "y": 986.2783203125,
+      "width": 339.43426513671875,
+      "height": 157.2354736328125,
+      "confidence": 0.5304977893829346,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-011-x809-y986.jpg"
+    },
+    "ocr_text": "OUCH. SORRY.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger and Michelangelo",
+    "emotion": "Pained and Apologetic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Green Ranger, groaning in pain] Ouch. [Michelangelo, sheepishly] Sorry.",
+    "aiReasoning": "I have located the text \"OUCH. SORRY.\" in the second panel.\nThe text consists of two speech bubbles joined together.\nThe tail of the first bubble (\"OUCH.\") points to the Green Ranger, who is upside down and appears to have landed awkwardly or been caught roughly.\nThe tail of the second bubble (\"SORRY.\") points to Michelangelo (identifiable by his orange mask and gear), who is holding the Green Ranger.\nSince the bounding box covers both bubbles and speakers, I will attribute the speech to both characters involved in the interaction.\nGreen Ranger is a Power Ranger (Hero, Major). Michelangelo is a Ninja Turtle (Hero, Major). Michelangelo is in the provided list of unique characters. Green Ranger is not, so I will name him.\nContext: Green Ranger expresses pain from the impact/catch, and Michelangelo apologizes for the clumsiness."
+  },
+  {
+    "id": "page-11_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1073.00341796875,
+      "y": 648.0963134765625,
+      "width": 253.6173095703125,
+      "height": 93.47186279296875,
+      "confidence": 0.8705089092254639,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-006-x1073-y648.jpg"
+    },
+    "ocr_text": "GOOD CATCH!",
+    "type": "SPEECH",
+    "speaker": "Pink Ranger",
+    "emotion": "Relieved and impressed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young female voice, American accent, energetic and heroic.",
+    "textWithCues": "[Relieved and impressed, calling out] Good catch!",
+    "aiReasoning": "1.  **Locate Text:** The text \"GOOD CATCH!\" is located in the second panel, on the right side.\n2.  **Classify:** It is inside a rounded speech bubble with a tail. This is `SPEECH`.\n3.  **Identify Speaker:** The tail of the speech bubble points directly to the **Pink Ranger** (Kimberly), who is hanging upside down, being held by one of the Ninja Turtles (Leonardo). She is not in the provided list of \"Unique Characters\" (Michelangelo, Narrator, Shredder, Green Ranger and Michelangelo), so I will create a new name for her: \"Pink Ranger\".\n4.  **Analyze Context:**\n    *   **Situation:** The characters are falling/sliding down a roof. The Green Ranger is holding onto the roof, a Turtle is holding his leg, and that Turtle is catching the falling Pink Ranger.\n    *   **Side:** She is a `HERO`.\n    *   **Importance:** She is a `MAJOR` character (one of the Power Rangers).\n    *   **Emotion:** She has just been saved from falling off the building. Her tone would be relieved, impressed, and slightly breathless from the exertion/stunt.\n5.  **Draft Cues:** The text ends with an exclamation point. It's a quick, positive reaction to a physical action.\n    *   *Cue:* `[Relieved and impressed, calling up]`\n6.  **Final JSON:** Construct the JSON with these details."
+  },
+  {
+    "id": "page-11_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 699.198486328125,
+      "y": 179.3572235107422,
+      "width": 162.29949951171875,
+      "height": 109.94142150878906,
+      "confidence": 0.8231722712516785,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-007-x699-y179.jpg"
+    },
+    "ocr_text": "OH NO.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "alarmed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Strained, mid-air] Oh no.",
+    "aiReasoning": "I have located the text \"OH NO.\" in the top panel.\n- **Classification:** It is in a speech bubble with a tail pointing to a character, so it is `SPEECH`.\n- **Speaker:** The tail points to the Green Ranger (Tommy Oliver). Although the provided list includes \"Green Ranger and Michelangelo\", this is clearly just the Green Ranger speaking individually. I will use the name \"Green Ranger\".\n- **Side:** He is a Power Ranger, so he is a `HERO`.\n- **Importance:** He is a main character, so `MAJOR`.\n- **Context:** The Green Ranger has just been thrown or is falling through the air (along with the Pink Ranger). He is upside down and flailing. The \"UMPH!\" suggests the initial impact/effort, and \"OH NO.\" is the realization of the precarious situation (falling towards the wooden structure).\n- **Emotion:** Alarmed, startled, strained physically due to the fall.\n- **Cues:** The text is standard size, not bold. It's a quick, reactive statement. He is likely breathless or straining from the physical action."
+  },
+  {
+    "id": "page-11_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 586.594970703125,
+      "y": 90.06100463867188,
+      "width": 196.25396728515625,
+      "height": 115.21456909179688,
+      "confidence": 0.8128175735473633,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-008-x586-y90.jpg"
+    },
+    "ocr_text": "UMPH!",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Strained/Surprised",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Teenage male voice, strained and disoriented",
+    "textWithCues": "[Grunts from sudden impact] UMPH!"
+  },
+  {
+    "id": "page-11_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 645.3827514648438,
+      "y": 1999.73681640625,
+      "width": 500.06085205078125,
+      "height": 169.13623046875,
+      "confidence": 0.6215454339981079,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-009-x645-y1999.jpg"
+    },
+    "ocr_text": "BOW BEFORE THE MASTERS OR BE BROKEN BEFORE THEM. LIVE BY THE FOOT...",
+    "type": "SPEECH",
+    "speaker": "Foot Elite",
+    "emotion": "threatening",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, authoritative, fanatical male voice, clear and projecting despite the mask",
+    "textWithCues": "[Commanding and ominous] BOW BEFORE THE MASTERS OR BE BROKEN BEFORE THEM. [Pausing dramatically] LIVE BY THE FOOT..."
+  },
+  {
+    "id": "page-11_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 773.2490234375,
+      "y": 1498.1036376953125,
+      "width": 304.4791259765625,
+      "height": 204.7623291015625,
+      "confidence": 0.5526642799377441,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-010-x773-y1498.jpg"
+    },
+    "ocr_text": "R FAILURE TODAY T JUST A LESSON, T...A WARNING.",
+    "type": "SPEECH",
+    "speaker": "Foot Elite",
+    "emotion": "Ominous and authoritative",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, resonant, disciplined, and menacing male voice. Sounds like a seasoned martial arts master, calm but dangerous.",
+    "textWithCues": "[Ominously] Your failure today is not just a lesson, but... [darkly] a warning.",
+    "aiReasoning": "The text region corresponds to the speech bubble in the bottom-left panel.\nThe text reads: \"YOUR FAILURE TODAY IS NOT JUST A LESSON, BUT...A WARNING.\"\nThe speaker is a character wearing a bamboo hat (jingasa), a face mask with red eyes, and a cape. This visual design matches the **Foot Elite** Guard from the TMNT franchise. The provided unique characters list includes \"Foot Elite\", so I will use that name.\nThis character is a villain. The tone is threatening and authoritative.\nCharacter importance: They are an elite unit, distinct from generic Foot Soldiers. Given the specific unique character entry \"Foot Elite\", I will classify as `MINOR` (as a named class of character).\nVoice description: Needs to sound dangerous, disciplined, and elite. Not a grunt. Deep, calm, and menacing.\nCues: The text is a stern pronouncement. There is an ellipsis \"...\" indicating a dramatic pause. The tone is ominous.\n\nLocation Check:\nx:773, y:1498 corresponds to the text in the speech bubble of the foreground Foot Elite character.\n\nCorrected Text from Image: \"Your failure today is not just a lesson, but... a warning.\""
+  },
+  {
+    "id": "page-11_b11",
+    "box_2d": {
+      "index": 11,
+      "x": 867.3562622070312,
+      "y": 2230.20703125,
+      "width": 411.04205322265625,
+      "height": 109.072021484375,
+      "confidence": 0.4492490589618683,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-012-x867-y2230.jpg"
+    },
+    "ocr_text": "SIGH PERFECT.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Exasperated, Sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[sighs] Perfect."
+  },
+  {
+    "id": "page-11_b12",
+    "box_2d": {
+      "index": 13,
+      "x": 214.8031005859375,
+      "y": 395.4267883300781,
+      "width": 147.18539428710938,
+      "height": 128.19076538085938,
+      "confidence": 0.4398305118083954,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-014-x214-y395.jpg"
+    },
+    "ocr_text": "AAA",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Panic/Screaming",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Screaming in panic as he falls] AAAGH!",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"AAAGH!\" is located in the bottom-left corner of the first panel. It is within a jagged, colored bubble with a white outline and a tail pointing downward/leftward.\n    *   **Type**: `SPEECH`. Although it looks like a sound effect due to the stylized lettering, the presence of a speech balloon tail indicates it is a vocalization by a character.\n    *   **Text**: The text is clearly \"AAAGH!\", representing a scream.\n\n2.  **Analyze Context**:\n    *   **Scene**: The Power Rangers and TMNT are being blasted off a rooftop by the villains (Foot Clan/Shredder). The characters are tumbling through the air.\n    *   **Speaker Candidates**: In the first panel, we see the Pink Ranger and Green Ranger falling. The tail of the bubble points towards the left, where other characters (like the Red Ranger or Turtles) would be falling.\n    *   **Identity**: The text fill is bright orange. In TMNT comics, speech bubbles or specific SFX-style shouts are often color-coded to the turtles. Orange is Michelangelo's color. Michelangelo is listed in the \"Unique Characters\" list. Given his personality (often the one to scream comically or in panic) and the color match, the speaker is **Michelangelo**.\n    *   **Side**: `HERO`.\n    *   **Importance**: `MAJOR` (He is one of the main TMNT).\n    *   **Emotion**: The character is being thrown forcefully. The jagged bubble implies loudness and pain/fear. The emotion is panic and shock.\n\n3.  **Performance Cues**:\n    *   **Volume**: The bubble is jagged and the text is large/bold/stylized. This indicates `[Screaming]` or `[Shouting]`.\n    *   **Tone**: Panic, falling sensation.\n    *   **Text Refinement**: \"AAAGH!\"\n\n4.  **Final JSON Construction**:\n    *   Speaker: Michelangelo\n    *   Type: SPEECH\n    *   CharacterType: MAJOR\n    *   Side: HERO\n    *   Cues: `[Screaming in panic as he falls] AAAGH!`"
+  },
+  {
+    "id": "page-11_b13",
+    "box_2d": {
+      "index": 14,
+      "x": 745.6327514648438,
+      "y": 2237.384765625,
+      "width": 549.2290649414062,
+      "height": 240.075439453125,
+      "confidence": 0.4193416237831116,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-11/page-11-crop-015-x745-y2237.jpg"
+    },
+    "ocr_text": "ANY GOOD PIZZA JOINTS IN NORTH DAKOTA?",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "Wry humor",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Trying to lighten the mood] Any good pizza joints in North Dakota?",
+    "aiReasoning": "I have located the text \"ANY GOOD PIZZA JOINTS IN NORTH DAKOTA?\" in the bottom panel.\nThe speech bubble has a tail pointing to the Ninja Turtle with the orange mask. This is Michelangelo.\nHe is a `MAJOR` character and a `HERO`.\nThe context is that the team has been defeated or banished to a snowy, desolate location (North Dakota). Leonardo (blue mask) has just sarcastically sighed \"Perfect.\"\nMichelangelo is using humor as a coping mechanism, asking a ridiculous question given the circumstances.\nThere are no bolding or jagged edges to indicate shouting. The tone should be wry, hopeful (comedically), or resigned."
+  }
+]
