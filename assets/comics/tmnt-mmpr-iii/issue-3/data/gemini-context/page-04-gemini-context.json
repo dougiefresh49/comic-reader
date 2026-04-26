@@ -1,0 +1,149 @@
+[
+  {
+    "id": "page-04_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1399,
+      "y": 705,
+      "width": 369,
+      "height": 247,
+      "confidence": 0.930283784866333,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-001-x1399-y705.jpg"
+    },
+    "ocr_text": "A FAILED MIDDLE-AGED ASSASSIN WHO LEECHES OFF THE MORPHIN GRID, BUT STILL CAN'T BEAT A BUNCH OF TEENAGERS?",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "defiant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Mockingly] A failed middle-aged assassin who leeches off the Morphin Grid, but still can't beat a bunch of teenagers?",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble with a tail pointing towards the character in the red suit. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character in the red suit is the Red Ranger (Jason). The previous speech bubble from the villain addresses him as \"Jason\".\n    *   **Side:** The Red Ranger is a `HERO`.\n    *   **Importance:** He is a main character, so `MAJOR`.\n    *   **Emotion:** He is mid-fight, retorting to the villain's taunt. His words are insulting and sarcastic. The emotion is defiant and mocking.\n3.  **Performance Cues:** The text is a direct insult aimed at the villain. A sarcastic, mocking tone is appropriate here."
+  },
+  {
+    "id": "page-04_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1196,
+      "y": 640,
+      "width": 278,
+      "height": 145,
+      "confidence": 0.9291772246360779,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-002-x1196-y640.jpg"
+    },
+    "ocr_text": "AND IS THAT SUPPOSED TO BE YOU?",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "sarcastic, defiant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Sarcastically] AND IS THAT SUPPOSED TO BE YOU?"
+  },
+  {
+    "id": "page-04_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 541,
+      "y": 578,
+      "width": 312,
+      "height": 316,
+      "confidence": 0.9117116928100586,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-003-x541-y578.jpg"
+    },
+    "ocr_text": "IMAGINE HOW GREAT YOU COULD BE WITH A PROPER MENTOR.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "manipulative",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Manipulative] Imagine how great you could be with a proper mentor.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"IMAGINE HOW GREAT YOU COULD BE WITH A PROPER MENTOR.\" is in a speech bubble. The tail points to the character on the left. This is SPEECH.\n2.  **Analyze Context:**\n    *   **Speaker:** The character on the left is a mashup of Shredder and the Green Ranger. Since he's a main villain in this crossover, I'll name him \"Green Ranger Shredder\".\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** He is engaging in combat but speaking with a calm, manipulative tone, trying to tempt his opponent (Jason/Red Ranger).\n3.  **Performance Cues:** The text is spoken normally, without shouting. It should sound persuasive and slightly condescending, characteristic of a villain trying to turn a hero. A cue like `[Manipulative]` fits well."
+  },
+  {
+    "id": "page-04_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 620,
+      "y": 400,
+      "width": 207,
+      "height": 164,
+      "confidence": 0.9015418291091919,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-004-x620-y400.jpg"
+    },
+    "ocr_text": "YOU REMIND ME OF...A YOUNG ME.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "arrogant",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "",
+    "textWithCues": "[Condescendingly] You remind me of... a young me."
+  },
+  {
+    "id": "page-04_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 152,
+      "y": 110,
+      "width": 345,
+      "height": 131,
+      "confidence": 0.9008949995040894,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-005-x152-y110.jpg"
+    },
+    "ocr_text": "\"...DON'T FORGET TO SMASH THAT LIKE BUTTON!\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "High-energy, young adult, enthusiastic influencer tone",
+    "textWithCues": "[Enthusiastic, energetic] ...don't forget to smash that like button!",
+    "aiReasoning": "The target text is \"...DON'T FORGET TO SMASH THAT LIKE BUTTON!\". It is located in a rectangular box at the top left of the panel. Based on the structural rules, this is classified as NARRATION, acting as a voice-over or framing device. The text is in quotation marks and is a classic internet influencer catchphrase, suggesting the speaker is an off-panel streamer, podcaster, or similar character. Because the speaker is not identified in the panel and is likely a background framing element, I will classify them as an EXTRA of NEUTRAL side. The performance should reflect a typical, high-energy internet personality."
+  },
+  {
+    "id": "page-04_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 298,
+      "y": 256,
+      "width": 355,
+      "height": 269,
+      "confidence": 0.8710348010063171,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-006-x298-y256.jpg"
+    },
+    "ocr_text": "YOU THROW PUNCHES WITH PURPOSE, JASON. EACH ATTACK LEADING INTO THE NEXT. THERE'S A RAGE INSIDE OF YOU.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "evaluating",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Calmly evaluating] You throw punches with purpose, Jason. Each attack leading into the next. There's a rage inside of you."
+  },
+  {
+    "id": "page-04_b07",
+    "box_2d": {
+      "index": 7,
+      "x": 1481,
+      "y": 948,
+      "width": 335,
+      "height": 383,
+      "confidence": 0.5153008103370667,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-008-x1481-y948.jpg"
+    },
+    "ocr_text": "MIGHT WANNA SPICE UP THAT RESUMÉ, FOOT MASTER.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "mocking",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Mocking] Might wanna spice up that resumé, Foot Master."
+  }
+]

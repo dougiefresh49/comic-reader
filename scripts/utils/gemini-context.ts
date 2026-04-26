@@ -32,6 +32,7 @@ export async function analyzeContext(
   options: {
     skipGemini?: boolean;
     outDir: string;
+    additionalContext?: string;
   },
 ): Promise<{
   bubbles: Bubble[];
@@ -76,6 +77,7 @@ export async function analyzeContext(
         ocr_text,
         box,
         Array.from(uniqueCharacters),
+        options.additionalContext,
       );
 
       console.log(
@@ -154,6 +156,7 @@ export async function analyzeContextGemini(
   targetText: string,
   targetLocation: Box2D,
   uniqueCharacters: string[],
+  additionalContext?: string,
 ): Promise<{
   type: string;
   speaker: string | null;
@@ -166,7 +169,12 @@ export async function analyzeContextGemini(
 }> {
   const base64Image = imageBuffer.toString("base64");
 
-  const prompt = getGeminiPrompt(targetText, targetLocation, uniqueCharacters);
+  const prompt = getGeminiPrompt(
+    targetText,
+    targetLocation,
+    uniqueCharacters,
+    additionalContext,
+  );
 
   try {
     const imagePart = createPartFromBase64(base64Image, "image/jpeg");
@@ -261,13 +269,17 @@ function getGeminiPrompt(
   targetText: string,
   targetLocation: Box2D,
   uniqueCharacters: string[],
+  additionalContext?: string,
 ) {
   const characterList = uniqueCharacters
     .map((character) => `- ${character}`)
     .join("\n");
+  const contextSection = additionalContext
+    ? `\n**Book Context:**\n${additionalContext}\n`
+    : "";
   const prompt = `I am providing a full comic book page.
 **Goal:** Analyze the specific text region described below to determine how it should be voice-acted.
-
+${contextSection}
 **Target Region:**
 * **Text:** "${targetText}"
 * **Location:** x:${targetLocation.x}, y:${targetLocation.y} (width:${targetLocation.width}, height:${targetLocation.height})

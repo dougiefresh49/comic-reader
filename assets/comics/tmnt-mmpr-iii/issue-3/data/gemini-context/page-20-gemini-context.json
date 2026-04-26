@@ -1,0 +1,130 @@
+[
+  {
+    "id": "page-20_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 194,
+      "y": 2407,
+      "width": 405,
+      "height": 152,
+      "confidence": 0.8313365578651428,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-20/page-20-crop-001-x194-y2407.jpg"
+    },
+    "ocr_text": "\"...OR WE'RE GONNA NEED SOME SERIOUS HELP.\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Urgently, with a tone of rising concern] ...or we're gonna need some serious help.",
+    "aiReasoning": "The text \"...OR WE'RE GONNA NEED SOME SERIOUS HELP.\" is in a caption box at the bottom of the page. It features quotation marks and an ellipse at the start, directly connecting it to the Pink Ranger's speech bubble in the panel above (\"BILLY, YOU BETTER MAKE THAT THING WORK REAL QUICK...\"). The box also has a Power Coin icon, confirming it's a Ranger speaking. While it's in a narration box style, it represents continued dialogue from the Pink Ranger. The context is an intense fight scene, and the bottom panel shows ominous red eyes in the bushes, implying a new, large threat. The emotion is urgent and concerned."
+  },
+  {
+    "id": "page-20_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 535,
+      "y": 47,
+      "width": 311,
+      "height": 163,
+      "confidence": 0.7903394103050232,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-20/page-20-crop-002-x535-y47.jpg"
+    },
+    "ocr_text": "TARGETS ACQUIRED. THE MASTER WILL BE PLEASED.",
+    "type": "SPEECH",
+    "speaker": "Robo-Foot Soldier",
+    "emotion": "robotic",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Robotic, emotionless, slightly metallic villain voice. Cold and calculating.",
+    "textWithCues": "[Robotic, monotonous] Targets acquired. The master will be pleased.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"TARGETS ACQUIRED. THE MASTER WILL BE PLEASED.\" is in a speech bubble in the top left panel. The tail points to the silver, samurai-like robotic character. Classification: `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is a robotic foot soldier. I will name it \"Robo-Foot Soldier\".\n    *   **Side:** `VILLAIN` (has a Foot Clan logo, works for \"The Master\", attacking heroes).\n    *   **Importance:** `EXTRA` (appears to be a generic, albeit specialized, troop).\n    *   **Voice Description:** Needs to sound robotic and threatening. \"Robotic, emotionless, slightly metallic villain voice. Cold and calculating.\"\n    *   **Emotion:** Robotic, lacking human emotion.\n3.  **Performance Cues:** Deliver with a monotonous, mechanical cadence."
+  },
+  {
+    "id": "page-20_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 133,
+      "y": 1486,
+      "width": 283,
+      "height": 159,
+      "confidence": 0.749664306640625,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-20/page-20-crop-003-x133-y1486.jpg"
+    },
+    "ocr_text": "MOUSERS? REALLY? WE'RE NOT MICE? WHY?",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "confused, exerted",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Exerted, confused] Mousers? Really? We're not mice? Why?",
+    "aiReasoning": "I see the text \"MOUSERS? REALLY? WE'RE NOT MICE? WHY?\". It's in a standard speech bubble.\nThe speaker is Raphael (the Ninja Turtle with the red mask). He is fighting robot enemies.\nHe is a HERO and a MAJOR character.\nHis expression and action suggest he is exerting himself in combat while being genuinely confused and slightly annoyed by the naming convention of the robots attacking them."
+  },
+  {
+    "id": "page-20_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 491,
+      "y": 1924,
+      "width": 358,
+      "height": 182,
+      "confidence": 0.6981632113456726,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-20/page-20-crop-004-x491-y1924.jpg"
+    },
+    "ocr_text": "I THINK THEY'VE BROADENED THEIR HORIZONS, DUDE.",
+    "type": "SPEECH",
+    "speaker": "Pink Ranger",
+    "emotion": "witty, exerting effort",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Straining slightly, sarcastically] I think they've broadened their horizons, dude.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"I THINK THEY'VE BROADENED THEIR HORIZONS, DUDE.\" is in a standard speech bubble in the middle panel. It's `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to the Pink Ranger, who is actively fighting off robotic Mousers. She is clearly a different character from the provided list (Narrator, Robo-Foot Soldier, Raphael). I will name her `Pink Ranger`.\n    *   **Side:** She is fighting the robotic villains alongside the Turtles. She is a `HERO`.\n    *   **Importance:** As a Power Ranger, she is part of the main cast. `MAJOR`.\n    *   **Voice Description:** Not required for MAJOR characters, but generally a youthful, energetic female voice.\n    *   **Emotion:** She is mid-combat, exerting physical effort, but also delivering a witty, sarcastic response to Raphael's confusion about the Mousers.\n3.  **Performance Cues:** The line should be delivered with a sense of physical exertion due to the fight, combined with a casual, slightly sarcastic tone given the \"dude\" at the end. I'll add `[Straining slightly, sarcastically]` to guide the performance."
+  },
+  {
+    "id": "page-20_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1328,
+      "y": 989,
+      "width": 267,
+      "height": 203,
+      "confidence": 0.36144620180130005,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-20/page-20-crop-005-x1328-y989.jpg"
+    },
+    "ocr_text": "WARBUNNY SMILES WITH SHARPENED FANGS AT A CHANCE FOR REVENGE.",
+    "type": "SPEECH",
+    "speaker": "Warbunny",
+    "emotion": "menacing",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, slightly robotic, menacing and aggressive voice",
+    "textWithCues": "[Menacingly] Warbunny smiles with sharpened fangs at a chance for revenge."
+  },
+  {
+    "id": "page-20_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1399,
+      "y": 1188,
+      "width": 231,
+      "height": 134,
+      "confidence": 0.3450993597507477,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-20/page-20-crop-006-x1399-y1188.jpg"
+    },
+    "ocr_text": "MOUSERS, DESTROY!",
+    "type": "SPEECH",
+    "speaker": "Warbunny",
+    "emotion": "commanding",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Robotic, menacing, slightly high-pitched villain voice",
+    "textWithCues": "[Commanding shout] Mousers, destroy!",
+    "aiReasoning": "I see the text \"MOUSERS, DESTROY!\". It is in a speech bubble.\nThe tail points to the pink robotic character with bunny ears. This matches the name \"Warbunny\" from the provided list and the text itself (\"Warbunny smiles...\").\nWarbunny is a villain. Since it's a named monster/henchman, I'll classify it as MINOR.\nThe character is giving an aggressive command. The voice should be robotic and menacing."
+  }
+]

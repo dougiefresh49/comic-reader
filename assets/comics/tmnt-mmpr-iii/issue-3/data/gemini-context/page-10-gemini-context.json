@@ -1,0 +1,196 @@
+[
+  {
+    "id": "page-10_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 84,
+      "y": 78,
+      "width": 289,
+      "height": 119,
+      "confidence": 0.9028594493865967,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-001-x84-y78.jpg"
+    },
+    "ocr_text": "\"PREDICTABLE TO THE LAST.\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Calm, steady, and focused teenage male voice, inner monologue",
+    "textWithCues": "[Internal Monologue, steady] \"Predictable to the last.\""
+  },
+  {
+    "id": "page-10_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 72,
+      "y": 2319,
+      "width": 288,
+      "height": 169,
+      "confidence": 0.8809803128242493,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-002-x72-y2319.jpg"
+    },
+    "ocr_text": "BRO, YOU GOTTA GET OUT OF THERE NOW.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "urgent, panicked",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Urgent, over radio] Bro, you gotta get out of there now!",
+    "aiReasoning": "The target text \"BRO, YOU GOTTA GET OUT OF THERE NOW.\" is inside a speech bubble with a jagged border and a jagged tail pointing towards Leonardo. In comic book visual language, this specifically indicates a voice transmitted over an electronic device, like a radio or communicator. Given the informal address \"Bro\" and the context of the Turtles working as a team, this is almost certainly one of Leonardo's brothers warning him of the collapsing environment (\"RUMBLE RUMBLE\"). Michelangelo or Raphael are the most likely candidates to use \"Bro\" in this urgent context; I will assign this to Michelangelo. As a core member of the team, he is a MAJOR HERO. The situation is dangerous, so the emotion is urgent and panicked. The bolded \"NOW\" suggests he is raising his voice."
+  },
+  {
+    "id": "page-10_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1233,
+      "y": 703,
+      "width": 228,
+      "height": 110,
+      "confidence": 0.8543696403503418,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-003-x1233-y703.jpg"
+    },
+    "ocr_text": "EVERYONE ON ME!",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "determined, commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Confident, authoritative young male voice",
+    "textWithCues": "[Shouting authoritatively] EVERYONE ON ME!",
+    "aiReasoning": "I have located the text \"EVERYONE ON ME!\" in the top panel. It's in a speech bubble with a tail pointing directly to the Red Power Ranger. This makes it SPEECH.\nThe speaker is the Red Ranger, who is a HERO and a MAJOR character in this crossover context.\nHe is charging forward, looking determined, and giving a command to his team. The context suggests a loud, authoritative voice.\nI will add a cue for him to shout the command."
+  },
+  {
+    "id": "page-10_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1474,
+      "y": 2290,
+      "width": 364,
+      "height": 173,
+      "confidence": 0.8487474918365479,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-004-x1474-y2290.jpg"
+    },
+    "ocr_text": "DONNIE, CAN WE TRACK THIS THING WHEN IT GOES UNDERGROUND?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "urgent",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Urgently] Donnie, can we track this thing when it goes underground?",
+    "aiReasoning": "The target text is \"DONNIE, CAN WE TRACK THIS THING WHEN IT GOES UNDERGROUND?\". It is located in a speech bubble in the final panel, with the tail pointing towards a silhouetted character.\nBased on the visual context of the page, the character is a Teenage Mutant Ninja Turtle (indicated by the shell and body shape). Looking closely at the silhouette, the weapons protruding from the back appear to be two swords, which identifies the character as Leonardo. In the preceding panels, Leonardo is heavily involved in the action and is seen running/evading, which matches the silhouette's pose.\nLeonardo is a main character (MAJOR) and a HERO. The situation is tense as they are dealing with an enemy going underground while debris falls, so his tone would be urgent and focused on the tactical situation."
+  },
+  {
+    "id": "page-10_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1635,
+      "y": 2731,
+      "width": 201,
+      "height": 142,
+      "confidence": 0.8419404625892639,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-005-x1635-y2731.jpg"
+    },
+    "ocr_text": "WE COULD, BUT...",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "hesitant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Hesitantly] We could, but...",
+    "aiReasoning": "1. **Locate & Classify:** The text \"WE COULD, BUT...\" is located in the bottom right panel in a speech bubble. It's a standard speech bubble with a tail pointing off-panel to the left. Classified as `SPEECH`.\n2. **Analyze Context:** The preceding bubble asks \"DONNIE, CAN WE TRACK THIS THING WHEN IT GOES UNDERGROUND?\". The response \"WE COULD, BUT...\" is a direct answer to that question. Therefore, the speaker is Donatello. Although Donatello is not in the provided character list, he is a distinct major character (seen in panel 1 with a purple mask), so I will use his name. He is a `HERO` and a `MAJOR` character. The context is tense, with a building collapsing or shaking, and he is trailing off, indicating a problem or complication.\n3. **Performance Cues:** The text ends with an ellipsis (\"...\"), indicating hesitation or trailing off. I'll add a cue to reflect this."
+  },
+  {
+    "id": "page-10_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 186,
+      "y": 1117,
+      "width": 170,
+      "height": 158,
+      "confidence": 0.8326517343521118,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-006-x186-y1117.jpg"
+    },
+    "ocr_text": "IN A MINUTE.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Firmly, mid-fight] In a minute."
+  },
+  {
+    "id": "page-10_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1303,
+      "y": 797,
+      "width": 247,
+      "height": 136,
+      "confidence": 0.8254340291023254,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-007-x1303-y797.jpg"
+    },
+    "ocr_text": "LEO, WE NEED YOUR HELP!",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "urgent",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Shouting urgently] LEO, WE NEED YOUR HELP!",
+    "aiReasoning": "I located the text \"LEO, WE NEED YOUR HELP!\". It's in a speech bubble in the top panel.\nThe tail points to the Red Ranger, who is running alongside Donatello and the Yellow Ranger.\nHe is a HERO and a MAJOR character.\nThe text is an urgent call to a teammate during action, ending with an exclamation mark.\nThe emotion is urgent and loud."
+  },
+  {
+    "id": "page-10_b08",
+    "box_2d": {
+      "index": 9,
+      "x": 1216,
+      "y": 2291,
+      "width": 205,
+      "height": 295,
+      "confidence": 0.30601629614830017,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-010-x1216-y2291.jpg"
+    },
+    "ocr_text": "LEO, DO YOU READ ME?",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "urgent, concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Over radio, urgently] Leo, do you read me?",
+    "aiReasoning": "The text \"LEO, DO YOU READ ME?\" is in a speech bubble with a jagged tail, indicating it's spoken over a communicator.\nGiven the context of the page, where Red Ranger was previously calling out for Leo's help (\"LEO, WE NEED YOUR HELP!\" in panel 1), and Leo is currently in a dangerous situation (explosions in panel 3, Donnie telling him to get out in panel 4), it's highly likely this is Red Ranger trying to re-establish contact.\nThe character is a HERO and MAJOR.\nThe emotion is urgent and concerned.\nPerformance cues should include an indication that it's over a radio/comms and has an urgent tone."
+  },
+  {
+    "id": "page-10_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 579,
+      "y": 2659,
+      "width": 243,
+      "height": 159,
+      "confidence": 0.4592466354370117,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-10/page-10-crop-009-x579-y2659.jpg"
+    },
+    "ocr_text": "YOU CAN'T RUN FOREVER.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "determined",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Intense, determined] You can't run forever."
+  }
+]

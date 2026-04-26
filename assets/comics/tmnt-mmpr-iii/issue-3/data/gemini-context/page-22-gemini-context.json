@@ -1,0 +1,174 @@
+[
+  {
+    "id": "page-22_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 656,
+      "y": 2352,
+      "width": 197,
+      "height": 177,
+      "confidence": 0.9109030365943909,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-001-x656-y2352.jpg"
+    },
+    "ocr_text": "YEAH, LIKE... A LIGHT. BRIGHT. SHINY.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sarcastically] Yeah, like... a light. Bright. Shiny.",
+    "aiReasoning": "I see the text \"YEAH, LIKE... A LIGHT. BRIGHT. SHINY.\" in a standard speech bubble.\nThe tail points to the character on the right in the silhouette panel. Based on the previous panels, this is Leonardo entering the building with Tommy Oliver.\nLeonardo is a HERO and a MAJOR character.\nHe is responding to Tommy's question about what the light looks like, giving a somewhat sarcastic or deadpan, obvious answer.\nI will add a performance cue for a sarcastic tone."
+  },
+  {
+    "id": "page-22_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 232,
+      "y": 2321,
+      "width": 335,
+      "height": 201,
+      "confidence": 0.9107379913330078,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-002-x232-y2321.jpg"
+    },
+    "ocr_text": "SINCE WE'RE ON OUR OWN, DO YOU KNOW WHAT THIS LIGHT LOOKS LIKE?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "questioning, pragmatic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Pragmatically] Since we're on our own, do you know what this light looks like?",
+    "aiReasoning": "1.  **Locate & Classify:** The target text is in the bottom left corner of the last panel. It's inside a speech bubble with a tail pointing towards a silhouetted figure. This is clearly `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The silhouetted figure has a recognizable shape, specifically the two swords strapped to his back. Given the previous panels featuring him and the provided character list, this is Leonardo.\n    *   **Side:** Leonardo is a `HERO`.\n    *   **Importance:** He is a `MAJOR` character.\n    *   **Emotion:** In the previous panel, he noted \"Of course it couldn't be that easy\" after losing contact with \"Alpha\". Now he's asking a practical question in a slightly frustrating situation. The tone should be questioning, perhaps a bit dry or exasperated.\n3.  **Performance Cues:** The line starts a new thought after acknowledging they are \"on their own.\" A slight sigh or a tone of pragmatic resignation fits well here."
+  },
+  {
+    "id": "page-22_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1532,
+      "y": 1880,
+      "width": 300,
+      "height": 145,
+      "confidence": 0.8610936999320984,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-003-x1532-y1880.jpg"
+    },
+    "ocr_text": "OF COURSE IT COULDN'T BE THAT EASY.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sighs, resignedly] Of course it couldn't be that easy.",
+    "aiReasoning": "I see the text \"OF COURSE IT COULDN'T BE THAT EASY.\" in a speech bubble in the third panel.\nThe tail points to the Ninja Turtle with a blue mask, which is Leonardo.\nLeonardo is a MAJOR HERO character.\nHis expression and body language suggest resignation and mild frustration after an apparent failure to communicate."
+  },
+  {
+    "id": "page-22_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1475,
+      "y": 104,
+      "width": 289,
+      "height": 174,
+      "confidence": 0.8460976481437683,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-004-x1475-y104.jpg"
+    },
+    "ocr_text": "OF COURSE NOT. BUT I DRIVE A ROBOT DRAGON.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "confident",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Confidently] Of course not. But I drive a robot dragon."
+  },
+  {
+    "id": "page-22_b05",
+    "box_2d": {
+      "index": 8,
+      "x": 1146,
+      "y": 2413,
+      "width": 761,
+      "height": 304,
+      "confidence": 0.49500492215156555,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-009-x1146-y2413.jpg"
+    },
+    "ocr_text": "AND NOT FOR EITHER OF YOU.",
+    "type": "SPEECH",
+    "speaker": "Unknown Voice",
+    "emotion": "ominous",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Ominous, threatening, powerful male or female voice depending on the villain",
+    "textWithCues": "[Ominously] And not for either of you."
+  },
+  {
+    "id": "page-22_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1646,
+      "y": 256,
+      "width": 242,
+      "height": 128,
+      "confidence": 0.800447404384613,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-006-x1646-y256.jpg"
+    },
+    "ocr_text": "HOW HARD COULD A CAR BE?",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "confident",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Confidently] How hard could a car be?",
+    "aiReasoning": "I have located the text \"HOW HARD COULD A CAR BE?\" in the top right panel.\nIt's inside a speech bubble, so it's classified as SPEECH.\nThe tail points to the person driving the car, who is wearing green and gold. This matches the known character \"Green Ranger\".\nAs a Power Ranger, he is a HERO and a MAJOR character.\nHe is responding to Leonardo asking if he's driven this before. He just said he hasn't, but he drives a robot dragon. This line is him expressing confidence that driving a car must be easy in comparison.\nThe emotion is confident, perhaps slightly cocky or boastful.\nI will add a performance cue to reflect this confidence."
+  },
+  {
+    "id": "page-22_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 337,
+      "y": 1792,
+      "width": 199,
+      "height": 106,
+      "confidence": 0.7130237817764282,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-007-x337-y1792.jpg"
+    },
+    "ocr_text": "ALPHA?",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "questioning, slightly concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Questioning] Alpha?",
+    "aiReasoning": "I have located the text \"ALPHA?\". It is a speech bubble in the third panel.\nThe tail points to the Green Ranger.\nHe is a HERO and a MAJOR character.\nHe is calling out to someone (\"Alpha\") who hasn't responded, so his emotion is questioning and perhaps slightly concerned.\nI will add a `[Questioning]` cue to the text."
+  },
+  {
+    "id": "page-22_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 55,
+      "y": 105,
+      "width": 436,
+      "height": 139,
+      "confidence": 0.6355621218681335,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-22/page-22-crop-008-x55-y105.jpg"
+    },
+    "ocr_text": "\"...THEY MUST NOT REACH THE LIGHT.\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, resonant, commanding, ominous male voice",
+    "textWithCues": "[Ominous, commanding] ...They must not reach the light.",
+    "aiReasoning": "The text \"...THEY MUST NOT REACH THE LIGHT.\" is located in a rectangular box with a stylized \"Z\" logo in the top left corner of the first panel. This formatting indicates it is NARRATION or a disembodied voice communicating, rather than direct speech from a character present in the scene.\nGiven the \"Z\" logo and the context of the heroes (Leonardo and Green Ranger) trying to reach a goal, this voice is clearly villainous, likely Lord Zedd giving an order. However, since the speaker is not explicitly shown and the provided list includes \"Unknown Voice\", I will use that designation. The tone should be ominous and commanding."
+  }
+]

@@ -1,0 +1,172 @@
+[
+  {
+    "id": "page-14_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 836,
+      "y": 87,
+      "width": 326,
+      "height": 183,
+      "confidence": 0.9445092678070068,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-001-x836-y87.jpg"
+    },
+    "ocr_text": "THEY WANT THIS LOSS TO SCARE US. TO FORCE US TO ACT IN FEAR.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "resolute",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Authoritative, serious tone] They want this loss to SCARE us. To force us to act in FEAR."
+  },
+  {
+    "id": "page-14_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1210,
+      "y": 2766,
+      "width": 425,
+      "height": 209,
+      "confidence": 0.9334583878517151,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-002-x1210-y2766.jpg"
+    },
+    "ocr_text": "\"SO DESPITE THE GRIEF AND ANGER YOU ARE FEELING, I'M ASKING YOU ALL TO FIND A WAY TO PUT THAT ALL ASIDE...\"",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious, empathetic, authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Serious, empathetic] So despite the grief and anger you are feeling, I'm asking you all to find a way to put that all aside...",
+    "aiReasoning": "1.  **Analyze the Target Text:** The text is \"\"SO DESPITE THE GRIEF AND ANGER YOU ARE FEELING, I'M ASKING YOU ALL TO FIND A WAY TO PUT THAT ALL ASIDE...\"\". It's located in a rectangular box with quotation marks in the bottom right panel.\n2.  **Determine Speaker and Type:** The use of quotation marks in rectangular boxes across multiple panels indicates a voiceover from a character. Looking at the first panel, Zordon is giving a speech to the assembled heroes. The content and tone of these voiceover boxes clearly continue his speech. Therefore, the speaker is Zordon, and the type is SPEECH (acting as a voiceover).\n3.  **Context and Emotion:** Zordon is a major hero character, a mentor figure. The text addresses \"grief and anger,\" asking the team to put it aside. The emotion should be serious, empathetic, yet authoritative and commanding.\n4.  **Performance Cues:** The voice actor needs to deliver this with gravity and a sense of leadership. Adding a cue like `[Serious, empathetic]` will help. The text includes an ellipsis, implying a slight pause or that the thought continues."
+  },
+  {
+    "id": "page-14_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1306,
+      "y": 71,
+      "width": 439,
+      "height": 180,
+      "confidence": 0.9184053540229797,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-003-x1306-y71.jpg"
+    },
+    "ocr_text": "IN THE PAST HOUR, I'VE DETECTED SEVERAL INTERDIMENSIONAL ANOMALIES ORIGINATING FROM THE LUNAR SURFACE.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MINOR",
+    "side": "HERO",
+    "voiceDescription": "Nasal, slightly metallic robotic male voice, sounding informative but anxious.",
+    "textWithCues": "[Reporting urgently] In the past hour, I've detected several [emphasize] interdimensional anomalies [continue naturally] originating from the lunar surface.",
+    "aiReasoning": "The text is in a rectangular box, which falls under the `NARRATION` category according to the instructions (\"Square/Rectangular boxes\"). However, the context strongly implies it is spoken by the character in the panel, Alpha 5, who is gesturing towards the hologram correlating with the text's information. Because he is a distinct character not listed in the provided 'Unique Characters' (which only lists Zordon), I will identify him as a new character, Alpha 5. Since he acts as a supporting character, I'll classify him as `MINOR` and provide a voice description. The text contains bold words for emphasis but doesn't indicate shouting. The tone is informative and slightly urgent as he reports a problem."
+  },
+  {
+    "id": "page-14_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 855,
+      "y": 1213,
+      "width": 279,
+      "height": 107,
+      "confidence": 0.9087851047515869,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-004-x855-y1213.jpg"
+    },
+    "ocr_text": "\"THEY'RE GOING AFTER OUR FRIENDS.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Serious] \"They're going after our friends.\"",
+    "aiReasoning": "The target text is \"THEY'RE GOING AFTER OUR FRIENDS.\" located in a rectangular box in the middle panel.\nThe box shape indicates it's NARRATION, acting as a voiceover.\nThe text is in quotation marks and continues the thought from the first panel, clearly indicating it's Zordon speaking over the comms or telepathically.\nZordon is a MAJOR HERO character.\nThe emotion is serious and concerned as he explains the villains' tactics."
+  },
+  {
+    "id": "page-14_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 808,
+      "y": 268,
+      "width": 321,
+      "height": 210,
+      "confidence": 0.9080883860588074,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-005-x808-y268.jpg"
+    },
+    "ocr_text": "THEY WANT US TO LOSE FOCUS AND DO THINGS WE KNOW ARE WRONG.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Gravely] They want us to lose focus and do things we know are wrong."
+  },
+  {
+    "id": "page-14_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1614,
+      "y": 1377,
+      "width": 274,
+      "height": 103,
+      "confidence": 0.8946621417999268,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-006-x1614-y1377.jpg"
+    },
+    "ocr_text": "\"TO BREAK OUR SPIRITS.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Serious] \"To break our spirits.\"",
+    "aiReasoning": "The text '\"TO BREAK OUR SPIRITS.\"' is located in a rectangular box with quotation marks. Based on the rules, rectangular boxes are typically NARRATION. However, the quotation marks and the flow of the text from the previous panels clearly indicate that this is Zordon's dialogue continuing as a voiceover across the montage. I will classify it as NARRATION visually, but assign Zordon as the speaker to ensure the correct voice is used.\n\nSpeaker: Zordon\nImportance: MAJOR\nSide: HERO\nEmotion: Serious, resolute, warning.\nCues: The text is part of a list of the villains' goals. It should be delivered with grave seriousness to emphasize the threat."
+  },
+  {
+    "id": "page-14_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1535,
+      "y": 1202,
+      "width": 246,
+      "height": 150,
+      "confidence": 0.8761828541755676,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-007-x1535-y1202.jpg"
+    },
+    "ocr_text": "\"THEY'RE TRYING TO HURT US. TO ISOLATE US.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Seriously] \"They're trying to hurt us. To isolate us.\""
+  },
+  {
+    "id": "page-14_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 301,
+      "y": 1866,
+      "width": 472,
+      "height": 128,
+      "confidence": 0.8661118745803833,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-008-x301-y1866.jpg"
+    },
+    "ocr_text": "\"THIS IS NOT JUST AN ATTACK ON EARTH, BUT AN ATTACK ON EVERYONE WE HOLD DEAR.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Gravely] \"This is not just an attack on Earth, but an attack on everyone we hold dear.\"",
+    "aiReasoning": "The text is located in a rectangular box with quotation marks in the third panel.\nThis formatting usually denotes a character speaking in a voiceover or a continuation of speech over a montage.\nGiven the preceding panels, this is a continuation of Zordon's speech from the first panel.\nTherefore, the classification is NARRATION (acting as voiceover).\nThe speaker is Zordon, a MAJOR HERO character.\nThe tone of the speech is grave and rallying, emphasizing the severity of the situation."
+  }
+]

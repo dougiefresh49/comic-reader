@@ -1,0 +1,215 @@
+[
+  {
+    "id": "page-18_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 486,
+      "y": 72,
+      "width": 328,
+      "height": 200,
+      "confidence": 0.9210999011993408,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-001-x486-y72.jpg"
+    },
+    "ocr_text": "SO YOU JUST HAD TO LET ALL THE BAD GUYS BECOME RANGERS, HUH?",
+    "type": "SPEECH",
+    "speaker": "Casey Jones",
+    "emotion": "sarcastic, exasperated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Sarcastically, mid-fight] So you just had to let all the bad guys become Rangers, huh?",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top panel, pointing to a character with black hair tied up, wearing a mask and wielding a weapon. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The text bubble tail points to the masked character. In the next bubble, the Red Ranger addresses him as \"Casey\". Thus, the speaker is Casey Jones.\n    *   **Side:** He is fighting alongside the Red Ranger against Foot Soldiers. He is a `HERO`.\n    *   **Importance:** Casey Jones is a core character in the TMNT franchise, making him `MAJOR`.\n    *   **Emotion:** He's asking a sarcastic question while in the middle of a fight. He looks exasperated but focused on combat.\n3.  **Performance Cues:** The line should be delivered with a hint of sarcasm and the physical exertion of a fight. I'll add `[Sarcastically, mid-fight]` to the text."
+  },
+  {
+    "id": "page-18_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1532,
+      "y": 1762,
+      "width": 303,
+      "height": 208,
+      "confidence": 0.8988186717033386,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-002-x1532-y1762.jpg"
+    },
+    "ocr_text": "YOU KNOW THAT'S OUR HOME YOU'RE TALKING ABOUT, KAYLA.",
+    "type": "SPEECH",
+    "speaker": "Blue Ranger",
+    "emotion": "defensive, slightly annoyed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Defensively] You know that's our home you're talking about, Kayla.",
+    "aiReasoning": "I need to analyze the speech bubble containing the text \"YOU KNOW THAT'S OUR HOME YOU'RE TALKING ABOUT, KAYLA.\" in the third panel.\nThe tail of the bubble points to the character in the blue suit with a staff, who appears to be a Blue Ranger fighting alongside other heroes.\nSince the character is not in the provided list, I will name him \"Blue Ranger\".\nHe is a hero, and as part of a Ranger team, he is a MAJOR character.\nThe dialogue is a response to another character (Kayla) complaining about going back to Earth, so the tone should be slightly defensive or protective of their home."
+  },
+  {
+    "id": "page-18_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 203,
+      "y": 864,
+      "width": 374,
+      "height": 215,
+      "confidence": 0.878440260887146,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-003-x203-y864.jpg"
+    },
+    "ocr_text": "THINGS MUST BE PRETTY BAD BACK ON EARTH IF YOU NEED OUR HELP.",
+    "type": "SPEECH",
+    "speaker": "Villain Yellow Ranger",
+    "emotion": "smug, confident",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Tough, smug female voice, mid-combat exertion",
+    "textWithCues": "[Grunts with exertion, speaking smugly] Things must be pretty bad back on Earth if you need our help.",
+    "aiReasoning": "1.  **Locate & Classify:** The target text is a speech bubble in the second panel. Type is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to a character in yellow and black armor with spikes. This is one of the \"bad guys become rangers\" mentioned in panel 1. Since she's not in the provided list (Casey Jones, Blue Ranger), I will name her \"Villain Yellow Ranger\".\n    *   **Side:** She is a villain who has temporarily become a Ranger, fighting alongside heroes. I'll classify her as `VILLAIN` based on her origin, though she's acting as an ally here.\n    *   **Importance:** `MINOR` named/specific character in this context.\n    *   **Voice Description:** Tough, smug, female voice.\n    *   **Emotion:** She looks confident and is mid-combat, implying exertion but maintaining a smug attitude.\n3.  **Performance Cues:** Add a grunt for the physical action and indicate a smug tone. \"[Grunts, speaking smugly] Things must be pretty bad back on Earth if you need our help.\""
+  },
+  {
+    "id": "page-18_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1251,
+      "y": 857,
+      "width": 269,
+      "height": 180,
+      "confidence": 0.7764283418655396,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-004-x1251-y857.jpg"
+    },
+    "ocr_text": "ON A SCALE OF ONE TO TERRIBLE...",
+    "type": "SPEECH",
+    "speaker": "Blue Ranger",
+    "emotion": "deadpan, exhausted",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Tired, deadpan] On a scale of one to terrible..."
+  },
+  {
+    "id": "page-18_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1207,
+      "y": 599,
+      "width": 268,
+      "height": 158,
+      "confidence": 0.6960879564285278,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-005-x1207-y599.jpg"
+    },
+    "ocr_text": "IT'S BEEN A LONG WEEK, CASEY.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "weary",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[sighs wearily] It's been a long week, Casey."
+  },
+  {
+    "id": "page-18_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 56,
+      "y": 1950,
+      "width": 267,
+      "height": 178,
+      "confidence": 0.5673841834068298,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-006-x56-y1950.jpg"
+    },
+    "ocr_text": "ARE WE REALLY GOING BACK TO EARTH? ZOW YAH!",
+    "type": "SPEECH",
+    "speaker": "Villain Green Ranger",
+    "emotion": "questioning, aggressive",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Energetic, slightly aggressive female voice, mid-combat",
+    "textWithCues": "[Curious, mid-fight] Are we really going back to Earth? [Shouting, attacking] Zow yah!",
+    "aiReasoning": "I need to analyze the text \"ARE WE REALLY GOING BACK TO EARTH? ZOW YAH!\".\nIt is in a standard speech bubble with a tail pointing to a female character in a green and black Ranger-like suit.\nBased on the context of the page (\"bad guys become Rangers\"), she is a villain. Since she is unnamed in this panel, I will classify her as an EXTRA and call her \"Villain Green Ranger\".\nShe is mid-attack, so the first part is a question asked during combat, and the second part (\"ZOW YAH!\") is a battle cry or kiai.\nHer tone should be energetic and aggressive."
+  },
+  {
+    "id": "page-18_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1119,
+      "y": 353,
+      "width": 277,
+      "height": 348,
+      "confidence": 0.5550677180290222,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-007-x1119-y353.jpg"
+    },
+    "ocr_text": "WHAT, WERE THINGS GETTING TOO EASY FOR YA? IT'S BEEN LONG WE",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "defensive, tired",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Defensively] What, were things getting too easy for ya? [Sighs] It's been a long week, Casey.",
+    "aiReasoning": "The text is located in two connected speech bubbles in the top right panel. The tail of the bottom bubble points towards the Red Ranger. This classifies it as SPEECH. The speaker is a MAJOR character, a HERO. He is responding to Casey Jones' taunt. His tone is defensive and tired, indicating he's had a rough time recently. I'll add performance cues to reflect this exasperated, defensive tone."
+  },
+  {
+    "id": "page-18_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1640,
+      "y": 1498,
+      "width": 282,
+      "height": 155,
+      "confidence": 0.5499401688575745,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-008-x1640-y1498.jpg"
+    },
+    "ocr_text": "...I'D SAY IT'S ABOUT...A FOURTEEN.",
+    "type": "SPEECH",
+    "speaker": "Yellow Ranger",
+    "emotion": "strained, serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Strained from exertion, pausing for emphasis] ...I'd say it's about... a fourteen.",
+    "aiReasoning": "I need to analyze the text \"...I'D SAY IT'S ABOUT...A FOURTEEN.\" in the middle panel.\n1.  **Classification:** It's a speech bubble.\n2.  **Speaker:** The tail points to the classic Yellow Ranger (Trini), who is mid-kick against a blue alien. Although not on the user's explicit \"unique characters\" list, she is clearly a distinct major character from the \"Villain Yellow Ranger\" also present in the panel. I will label her \"Yellow Ranger\".\n3.  **Side/Importance:** She is a HERO and a MAJOR character in the Power Rangers universe.\n4.  **Emotion/Tone:** She is delivering the punchline to a quip about how bad things are, while actively fighting. The tone should be slightly strained from physical exertion but serious about the gravity of the situation. The ellipses suggest deliberate pauses.\n5.  **Cues:** Add a cue for physical exertion and respect the pauses."
+  },
+  {
+    "id": "page-18_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 1461,
+      "y": 2378,
+      "width": 256,
+      "height": 172,
+      "confidence": 0.5238136649131775,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-010-x1461-y2378.jpg"
+    },
+    "ocr_text": "AND WHAT A LOVELY PLACE IT IS, ZAK.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sarcastically] And what a lovely place it is, Zak.",
+    "aiReasoning": "The text \"AND WHAT A LOVELY PLACE IT IS, ZAK.\" is in a speech bubble in the bottom panel.\nThe tail points to the character with the purple bandana, who is Donatello from the Teenage Mutant Ninja Turtles.\nDonatello is a HERO and a MAJOR character.\nHe is responding to the dialogue in the previous panel, delivering a sarcastic or lighthearted quip during the fight.\nThere are no bold words or jagged bubbles indicating yelling."
+  },
+  {
+    "id": "page-18_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 134,
+      "y": 2136,
+      "width": 246,
+      "height": 163,
+      "confidence": 0.47927290201187134,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-18/page-18-crop-011-x134-y2136.jpg"
+    },
+    "ocr_text": "ANY EXCUSE TO GET OUT OF HERE.",
+    "type": "SPEECH",
+    "speaker": "Villain Green Ranger",
+    "emotion": "dismissive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Dismissively] Any excuse to get out of here.",
+    "aiReasoning": "I see the text \"ANY EXCUSE TO GET OUT OF HERE.\". It's in a standard speech bubble.\nThe tail points to the character in the green and black ranger suit, identified in the list as \"Villain Green Ranger\".\nThe character is an antagonist, so the side is \"VILLAIN\". As a named, specific Evil Ranger (Kayla, as established in a connected bubble), she falls under \"MAJOR\" characters for this specific crossover storyline context.\nThe emotion seems dismissive or cynical about their current location, spoken casually while engaged in combat."
+  }
+]

@@ -1,0 +1,300 @@
+[
+  {
+    "id": "page-13_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1095,
+      "y": 1257,
+      "width": 268,
+      "height": 153,
+      "confidence": 0.9184463620185852,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-001-x1095-y1257.jpg"
+    },
+    "ocr_text": "WHAT MATTERS IS WE'RE ALL STILL HERE.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "serious, reassuring",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Reassuringly] What matters is we're all still here.",
+    "aiReasoning": "I see the text \"WHAT MATTERS IS WE'RE ALL STILL HERE.\" in a speech bubble in the middle right panel.\nThe tail points to the Red Ranger.\nHe is a HERO and a MAJOR character.\nHe is looking at the group, trying to be reassuring and practical after a pessimistic exchange between Donatello and Michelangelo.\nThe tone should be calm and reassuring."
+  },
+  {
+    "id": "page-13_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1116,
+      "y": 2168,
+      "width": 248,
+      "height": 171,
+      "confidence": 0.9180035591125488,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-002-x1116-y2168.jpg"
+    },
+    "ocr_text": "THAT'S EXACTLY WHAT THEY WANT US TO DO.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Calmly, serious] That's exactly what they want us to do.",
+    "aiReasoning": "The target text is \"THAT'S EXACTLY WHAT THEY WANT US TO DO.\" located in a speech bubble. The tail of the bubble points to the Teenage Mutant Ninja Turtle with the blue mask, who is Leonardo. Based on the instructions, since he is not in the provided unique character list, I will use \"Leonardo\". He is a hero and a major character. In this context, he is responding to Raphael's impulsive plan to blow up the moon, pointing out that it's likely a trap. His facial expression is serious and analytical. The tone should be calm, serious, and authoritative."
+  },
+  {
+    "id": "page-13_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1113,
+      "y": 1420,
+      "width": 302,
+      "height": 222,
+      "confidence": 0.9138643145561218,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-003-x1113-y1420.jpg"
+    },
+    "ocr_text": "EVERYONE RELAX, OKAY? WHEN ZORDON RETURNS, HE'LL TELL US WHAT TO DO.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "calm, authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Calmly] Everyone relax, okay? When Zordon returns, he'll tell us what to do."
+  },
+  {
+    "id": "page-13_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1120,
+      "y": 2565,
+      "width": 311,
+      "height": 175,
+      "confidence": 0.9132199883460999,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-004-x1120-y2565.jpg"
+    },
+    "ocr_text": "I'M SORRY. WEREN'T YOU DONE WITH US? BECAUSE...",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Sarcastically] I'm sorry. Weren't you done with us? Because...",
+    "aiReasoning": "The text is \"I'M SORRY. WEREN'T YOU DONE WITH US? BECAUSE...\" in a speech bubble.\nThe tail points towards the left side of the bottom right panel, indicating the speaker is the partially visible character there, which matches Raphael from the adjacent panel who was just speaking. He is interrupting or responding to Leonardo.\nRaphael is a HERO and a MAJOR character.\nHis tone is sarcastic and argumentative."
+  },
+  {
+    "id": "page-13_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 593,
+      "y": 1217,
+      "width": 234,
+      "height": 173,
+      "confidence": 0.9079926609992981,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-005-x593-y1217.jpg"
+    },
+    "ocr_text": "THEN I DO THE RIGHT THING ALL THE TIME.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "joking",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Jokingly] Then I do the right thing all the time.",
+    "aiReasoning": "I found the text \"THEN I DO THE RIGHT THING ALL THE TIME.\" in the second row of panels, left side.\nIt is in a standard speech bubble, so the type is SPEECH.\nThe tail of the bubble points to the Teenage Mutant Ninja Turtle wearing an orange mask. While he is not in the provided list of characters, he is clearly Michelangelo, a main character.\nHe is a HERO and his importance is MAJOR.\nHe is responding to the Black Ranger's comment about doing the right thing feeling like losing. Michelangelo's response is a self-deprecating joke, implying he loses a lot. He has a slight, almost wry smile. The emotion is joking or lighthearted.\nI will add a cue to indicate the joking tone."
+  },
+  {
+    "id": "page-13_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 453,
+      "y": 197,
+      "width": 303,
+      "height": 295,
+      "confidence": 0.9029296040534973,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-006-x453-y197.jpg"
+    },
+    "ocr_text": "SO THERE WEREN'T ANY CASUALTIES? THANKFUL NO. WE G GRACE AND PEOPLE OU TIME.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, American accent, natural leader",
+    "textWithCues": "[Asking with concern] So there weren't any casualties? [Female voice, reassuringly] Thankfully, no. We got Grace and her people out in time.",
+    "aiReasoning": "I need to analyze the text block provided: \"SO THERE WEREN'T ANY CASUALTIES? THANKFUL NO. WE G GRACE AND PEOPLE OU TIME.\"\nLooking at the image at the specified coordinates (top-left panel), this text corresponds to two separate speech bubbles that have been merged by OCR.\n1. The first bubble says: \"SO THERE WEREN'T ANY CASUALTIES?\" The tail points to the man in the red and black jacket, who is Jason (the Red Ranger out of uniform).\n2. The second bubble says: \"THANKFULLY, NO. WE GOT GRACE AND HER PEOPLE OUT IN TIME.\" The tail points to the woman in pink next to him.\nSince both are heroes and part of the main cast, they are MAJOR characters on the HERO side. The prompt's list of unique characters includes \"Red Ranger\", so I will use that for the speaker field, acknowledging it's a shared dialogue block.\nJason looks concerned, asking a serious question. The woman looks calm, giving a reassuring answer.\nI will clean up the OCR text to match the image exactly and provide separate acting cues for each sentence to guide a voice actor reading the whole block."
+  },
+  {
+    "id": "page-13_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 272,
+      "y": 1199,
+      "width": 286,
+      "height": 227,
+      "confidence": 0.8853328227996826,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-007-x272-y1199.jpg"
+    },
+    "ocr_text": "SOMETIMES DOING THE RIGHT THING FEELS LIKE LOSING.",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "somber",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Somberly] Sometimes doing the right thing feels like losing.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"SOMETIMES DOING THE RIGHT THING FEELS LIKE LOSING.\" is in a speech bubble in the middle-left panel. Type is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail of the speech bubble points to the Black Power Ranger. He is not in the provided list of unique characters (Red Ranger, Leonardo, Raphael, Michelangelo), so I will name him \"Black Ranger\".\n    *   **Side:** He is a `HERO`.\n    *   **Importance:** He is a main character in this crossover, so `MAJOR`.\n    *   **Emotion:** He has his arms crossed and is looking down slightly. The text is a sad observation about their situation. The emotion is somber or reflective.\n3.  **Performance Cues:** The text is normal. The tone should be quiet and a bit sad. Adding a cue like `[Somberly]` fits well."
+  },
+  {
+    "id": "page-13_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1552,
+      "y": 1803,
+      "width": 322,
+      "height": 142,
+      "confidence": 0.8756479024887085,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-008-x1552-y1803.jpg"
+    },
+    "ocr_text": "OR JUST GLOWER IN DISAPPOINTMENT.",
+    "type": "SPEECH",
+    "speaker": "Tommy Oliver",
+    "emotion": "sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Sarcastically] Or just glower in disappointment."
+  },
+  {
+    "id": "page-13_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 522,
+      "y": 1933,
+      "width": 526,
+      "height": 192,
+      "confidence": 0.823163628578186,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-009-x522-y1933.jpg"
+    },
+    "ocr_text": "LOOK, NO ONE WANTS TO SAY IT, BUT MAYBE, IF WE'D STUCK TOGETHER, WE WOULDN'T BE MINUS ONE TECHNODROME.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "frustrated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Frustrated, blunt] Look, no one wants to say it, but maybe, if we'd stuck together, we wouldn't be minus one Technodrome.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is inside a speech bubble with a tail pointing to a character. This makes it `SPEECH`.\n2.  **Analyze Context:** The tail points to the Teenage Mutant Ninja Turtle wearing a red mask. According to the character list and general knowledge, this is Raphael. He is a `HERO` and a `MAJOR` character. His arms are crossed, and his expression is serious and slightly annoyed, indicating frustration with the situation.\n3.  **Performance Cues:** The text is a blunt statement pointing out a perceived mistake. The delivery should reflect Raphael's typical gruff, straightforward, and slightly aggressive demeanor. A cue like `[Frustrated, blunt]` is appropriate here."
+  },
+  {
+    "id": "page-13_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 555,
+      "y": 337,
+      "width": 305,
+      "height": 253,
+      "confidence": 0.757976233959198,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-010-x555-y337.jpg"
+    },
+    "ocr_text": "THANKFULLY, NO. WE GOT GRACE AND HER PEOPLE OUT IN TIME.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "relieved, serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[With a relieved sigh] Thankfully, no. We got Grace and her people out in time.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"THANKFULLY, NO. WE GOT GRACE AND HER PEOPLE OUT IN TIME.\" is in a speech bubble in the top panel. It's classified as `SPEECH`.\n2.  **Analyze Context:** The tail of the speech bubble points to the male character in the black jacket on the left. Based on the character designs in this comic (TMNT/Power Rangers crossover), this is Jason Lee Scott, the Red Ranger, in his civilian clothes. He is a `HERO` and a `MAJOR` character.\n3.  **Performance Cues:** He is answering a question about casualties. His response indicates relief that no one died, but the situation is still serious. A tone of relief combined with a serious demeanor is appropriate. A slight sigh could precede the line."
+  },
+  {
+    "id": "page-13_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 684,
+      "y": 2129,
+      "width": 363,
+      "height": 229,
+      "confidence": 0.6341685652732849,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-011-x684-y2129.jpg"
+    },
+    "ocr_text": "WHICH IS WHY I VOTE WE JUMP IN OUR GIANT ROBOTS, BLOW UP THE MOON, AND FINISH THIS THING ONCE AND FOR ALL.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "frustrated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Frustrated] WHICH IS WHY I VOTE WE JUMP IN OUR GIANT ROBOTS, BLOW UP THE MOON, AND FINISH THIS THING ONCE AND FOR ALL.",
+    "aiReasoning": "The target text is in a speech bubble in the bottom left panel.\nThe tail points to Raphael, the Ninja Turtle with the red mask.\nHe is a MAJOR character and a HERO.\nHe looks frustrated, impatient, and is suggesting an aggressive plan while crossing his arms.\nThe tone is typical Raphael - blunt and action-oriented."
+  },
+  {
+    "id": "page-13_b12",
+    "box_2d": {
+      "index": 11,
+      "x": 1199,
+      "y": 2757,
+      "width": 262,
+      "height": 122,
+      "confidence": 0.514910876750946,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-012-x1199-y2757.jpg"
+    },
+    "ocr_text": "LEONARDO IS CORRECT, RAPHAEL.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Authoritative, booming voice] Leonardo is correct, Raphael.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"LEONARDO IS CORRECT, RAPHAEL.\" is in a blue, oval-ish speech bubble in the bottom right panel. The text is blue. A tail connects it to the blue pillar of light in the background. This indicates speech from a disembodied or technological source. Type: `SPEECH`.\n2.  **Analyze Context:** The preceding dialogue mentions waiting for Zordon to return. The blue pillar of light and the distinct blue text/bubble are classic visual cues for Zordon in Power Rangers comics.\n    *   **Speaker:** Zordon (He is not in the provided list, but clearly a distinct character based on context and visual cues).\n    *   **Side:** HERO.\n    *   **Importance:** MAJOR (He is the mentor figure for the Rangers).\n    *   **Emotion:** Calm, authoritative, decisive.\n3.  **Performance Cues:** Zordon's voice is typically booming, echoing, and wise. He is interrupting the bickering to deliver a definitive statement. I'll add cues to reflect this authoritative, disembodied nature."
+  },
+  {
+    "id": "page-13_b13",
+    "box_2d": {
+      "index": 14,
+      "x": 973,
+      "y": 255,
+      "width": 272,
+      "height": 336,
+      "confidence": 0.34129178524017334,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-015-x973-y255.jpg"
+    },
+    "ocr_text": "DON'T KNO I'D CALL IT A V SHREDDER ON THOSE PEOPLE WE'D BE FORC SAVE THEM COULD ESC",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "thoughtful, slightly frustrated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Thoughtful] Don't know if I'd call it a victory. Shredder only let those people live so we'd be forced to save them and he could escape.",
+    "aiReasoning": "1.  **Locate & Classify:** The text region corresponds to the speech bubble in the top right of the first panel: \"DON'T KNOW IF I'D CALL IT A VICTORY. SHREDDER ONLY LET THOSE PEOPLE LIVE SO WE'D BE FORCED TO SAVE THEM AND HE COULD ESCAPE.\" The tail points directly to the Ninja Turtle with the purple mask and the letter 'D' on his belt.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is clearly Donatello. Although not explicitly listed in the provided unique characters, he is a primary protagonist. I will label him \"Donatello\".\n    *   **Side:** HERO\n    *   **Importance:** MAJOR\n    *   **Emotion:** He looks thoughtful and perhaps slightly frustrated or realistic about the situation, realizing it wasn't a clean win.\n3.  **Performance Cues:** The delivery should be analytical and slightly somber, reflecting the realization that they were manipulated. Adding a cue like `[Thoughtful]` or `[Analytical]` sets the right mood."
+  },
+  {
+    "id": "page-13_b14",
+    "box_2d": {
+      "index": 13,
+      "x": 1217,
+      "y": 266,
+      "width": 199,
+      "height": 211,
+      "confidence": 0.37108471989631653,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-13/page-13-crop-014-x1217-y266.jpg"
+    },
+    "ocr_text": "NOW IF VICTORY. ONLY LET LE LIVE SO RCED TO M AND HE SCAPE.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "analytical, serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Thoughtful, analytical] Don't know if I'd call it a victory. [Slight pause] Shredder only let those people live so we'd be forced to save them, and he could escape.",
+    "aiReasoning": "1.  **Locate & Classify:** The target region corresponds to the speech bubble in the top right of the first panel. The text is actually \"DON'T KNOW IF I'D CALL IT A VICTORY. SHREDDER ONLY LET THOSE PEOPLE LIVE SO WE'D BE FORCED TO SAVE THEM AND HE COULD ESCAPE.\" The provided OCR was fragmented. This is clearly a `SPEECH` bubble.\n2.  **Analyze Context:** The tail of the speech bubble points to the Teenage Mutant Ninja Turtle wearing a purple mask. Based on the provided character list and general knowledge, this is Donatello. He is a `HERO` and a `MAJOR` character. His body language (leaning slightly, gesturing with one hand) and the content of his speech (analyzing Shredder's tactical move) suggest a thoughtful, serious, and somewhat cynical emotion. He's pointing out that their \"win\" was actually a strategic manipulation by the villain.\n3.  **Performance Cues:** The voice actor should deliver this with an analytical tone, perhaps starting with a slight sigh of realization. There are no bold or italicized words, so the volume is normal. A pause before explaining Shredder's motive would add dramatic effect."
+  }
+]

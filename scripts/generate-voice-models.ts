@@ -213,9 +213,10 @@ async function main() {
       process.exit(1);
     }
 
+    type NewCharEntry = string | { description: string; named?: boolean };
     const newChars = (await fs.readJson(NEW_CHARS_FILE)) as Record<
       string,
-      string
+      NewCharEntry
     >;
     const characterNames = Object.keys(newChars).sort();
 
@@ -232,7 +233,9 @@ async function main() {
 
     // Process new characters
     for (const characterName of characterNames) {
-      const voiceDescription = newChars[characterName]!;
+      const rawEntry = newChars[characterName]!;
+      const voiceDescription =
+        typeof rawEntry === "string" ? rawEntry : rawEntry.description;
       const entry = registry[characterName];
 
       // Find a pending voice_design appearance (mediaType === "voice_design", voice === null)

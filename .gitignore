@@ -53,3 +53,4 @@ yarn-error.log*
 assets/**/checkpoint.json
 /assets/**/new-characters.json
 /assets/**/known-characters.json
+/assets/**/data/wiki-cache.txt

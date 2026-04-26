@@ -1,0 +1,279 @@
+[
+  {
+    "id": "page-15_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 50,
+      "y": 2025,
+      "width": 563,
+      "height": 132,
+      "confidence": 0.9272218942642212,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-001-x50-y2025.jpg"
+    },
+    "ocr_text": "\"BECAUSE I DON'T KNOW WHAT YOU'RE WALKING INTO, YOU MAY NEED TO GET OUT IN A HURRY.\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Cautionary tone] \"Because I don't know what you're walking into, you may need to get out in a hurry.\"",
+    "aiReasoning": "The target text is in a rectangular box, which usually indicates NARRATION. However, the quotation marks and context make it clear this is a continuation of Zordon's dialogue serving as a voiceover for the scene change to the Rad Bug. Therefore, the speaker is Zordon. He is a MAJOR HERO. His tone here is serious and cautionary, explaining why he provided them with a getaway vehicle."
+  },
+  {
+    "id": "page-15_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 367,
+      "y": 1290,
+      "width": 422,
+      "height": 234,
+      "confidence": 0.9082938432693481,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-002-x367-y1290.jpg"
+    },
+    "ocr_text": "IT IS SAID TO HOLD A WEAPON THAT WILL SAVE US IN OUR DARKEST HOUR, SO I'M SENDING TOMMY THERE TO INVESTIGATE.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Speaking with grave authority] IT IS SAID TO HOLD A WEAPON THAT WILL SAVE US IN OUR DARKEST HOUR, SO I'M SENDING TOMMY THERE TO INVESTIGATE.",
+    "aiReasoning": "I see the text \"IT IS SAID TO HOLD A WEAPON THAT WILL SAVE US IN OUR DARKEST HOUR, SO I'M SENDING TOMMY THERE TO INVESTIGATE.\" in a standard speech bubble.\nThe tail points off-panel to the right, but the context of the previous and subsequent panels makes it clear that the speaker is Zordon, who is giving instructions to Tommy and Leonardo.\nThe speaker is Zordon, a major hero character.\nThe emotion is serious and authoritative, as he is discussing a crucial mission and a \"darkest hour.\"\nSince Zordon is a major character, I do not need to provide a voice description."
+  },
+  {
+    "id": "page-15_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 112,
+      "y": 99,
+      "width": 315,
+      "height": 108,
+      "confidence": 0.906895637512207,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-003-x112-y99.jpg"
+    },
+    "ocr_text": "\"...AND FIGHT TOGETHER.\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Quoting reflectively] \"...and fight together.\"",
+    "aiReasoning": "I see the text \"\"...AND FIGHT TOGETHER.\"\". It is located in a blue rectangular box in the top left corner of the first panel.\nThis style of box typically indicates narration. The blue color often corresponds to Leonardo in TMNT comics.\nThe text is in quotes and ends with an ellipsis, suggesting it's a fragment of a quote. Leonardo's immediate follow-up dialogue (\"You give a speech about teamwork...\") confirms he is reacting to or recalling a speech given by Zordon.\nTherefore, this is Leonardo acting as the narrator, quoting Zordon's previous words.\nImportance is MAJOR (Leonardo). Side is HERO.\nThe emotion is reflective, setting up his subsequent cynical remark."
+  },
+  {
+    "id": "page-15_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1203,
+      "y": 178,
+      "width": 301,
+      "height": 218,
+      "confidence": 0.9041288495063782,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-004-x1203-y178.jpg"
+    },
+    "ocr_text": "LEONARDO, YOU THINK I DON'T TRUST YOU, BUT...IT'S QUITE THE OPPOSITE.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "reassuring",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Reassuringly] Leonardo, you think I don't trust you, but... it's quite the opposite.",
+    "aiReasoning": "I need to analyze the text \"LEONARDO, YOU THINK I DON'T TRUST YOU, BUT...IT'S QUITE THE OPPOSITE.\" located in the top right panel.\nThis is a speech bubble pointing to the large blue face in the tube, which is Zordon.\nZordon is a hero and a major character.\nHe is speaking to Leonardo, reassuring him about his trust. The tone is calm and wise.\nThe ellipsis suggests a slight pause for emphasis.\nI will add a `[Reassuringly]` cue and keep the pause."
+  },
+  {
+    "id": "page-15_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 652,
+      "y": 103,
+      "width": 338,
+      "height": 194,
+      "confidence": 0.8900254368782043,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-005-x652-y103.jpg"
+    },
+    "ocr_text": "YOU GIVE A SPEECH ABOUT TEAMWORK AND THEN TELL ME TO STAY BEHIND.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "frustrated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Frustrated] You give a speech about teamwork and then tell me to stay behind.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble at the top center of the page. The tail points downwards to a silhouetted figure with twin katanas, clearly Leonardo. Therefore, it's `SPEECH`.\n2.  **Analyze Context:** The speaker is Leonardo, talking to Zordon (the giant floating head). Leonardo is a `HERO` and a `MAJOR` character. He is pointing out the contradiction in Zordon's orders, implying he feels sidelined or frustrated.\n3.  **Performance Cues:** The text is regular case (all-caps as is standard, no bold emphasis). The tone is one of frustration and pointing out irony. A cue like `[Frustrated]` or `[Annoyed]` fits well."
+  },
+  {
+    "id": "page-15_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1385,
+      "y": 2050,
+      "width": 267,
+      "height": 171,
+      "confidence": 0.8565965294837952,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-006-x1385-y2050.jpg"
+    },
+    "ocr_text": "REMIND ME TO TELL HIM WHEN WE GET BACK.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "casual",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Casually] REMIND ME TO TELL HIM WHEN WE GET BACK."
+  },
+  {
+    "id": "page-15_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 943,
+      "y": 223,
+      "width": 231,
+      "height": 160,
+      "confidence": 0.8503850698471069,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-007-x943-y223.jpg"
+    },
+    "ocr_text": "YOU SEE THE IRONY IN THAT, RIGHT?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "sarcastic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Teenage male, disciplined, slightly raspy, American accent",
+    "textWithCues": "[Sarcastically] You see the irony in that, right?",
+    "aiReasoning": "1. **Locate & Classify:** The text \"YOU SEE THE IRONY IN THAT, RIGHT?\" is in a standard speech bubble in the top panel. The tail points to the silhouetted figure of a Ninja Turtle. Therefore, it is `SPEECH`.\n2. **Analyze Context:** The silhouetted figure has twin katanas on his back and blue mask tails, identifying him as Leonardo. He is a `HERO` and a `MAJOR` character. He is responding to Zordon, pointing out a contradiction in Zordon's previous statement (\"You give a speech about teamwork and then tell me to stay behind.\"). His tone is mildly challenging or sarcastic.\n3. **Performance Cues:** The text is normal case (well, all caps, but standard for comics), indicating a normal speaking volume. The context implies a sarcastic or pointed delivery. I'll add a bracketed cue to reflect this."
+  },
+  {
+    "id": "page-15_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1235,
+      "y": 716,
+      "width": 458,
+      "height": 213,
+      "confidence": 0.7963817715644836,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-008-x1235-y716.jpg"
+    },
+    "ocr_text": "AT THE MOMENT OF SPLINTER'S DEATH, BILLY DETECTED AN ENERGY SURGE IN AN UNCHARTED REGION OF SPACE.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Serious, authoritative tone] At the moment of Splinter's death, Billy detected an energy surge in an uncharted region of space.",
+    "aiReasoning": "I have located the text \"AT THE MOMENT OF SPLINTER'S DEATH, BILLY DETECTED AN ENERGY SURGE IN AN UNCHARTED REGION OF SPACE.\" within a speech bubble. The bubble's tail points to the large blue face, which is Zordon. Therefore, the type is SPEECH and the speaker is Zordon. Zordon is a MAJOR HERO character. The visual shows a close-up of his eyes, appearing intense and serious. The text conveys important, somewhat grave exposition. The performance should reflect this serious, authoritative, and slightly somber tone."
+  },
+  {
+    "id": "page-15_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 102,
+      "y": 2164,
+      "width": 287,
+      "height": 161,
+      "confidence": 0.7584916353225708,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-009-x102-y2164.jpg"
+    },
+    "ocr_text": "DOES BILLY KNOW YOU'RE TAKING THE RAD BUG?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "curious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Curiously] Does Billy know you're taking the Rad Bug?",
+    "aiReasoning": "I see the text \"DOES BILLY KNOW YOU'RE TAKING THE RAD BUG?\". It is in a standard speech bubble with a tail pointing to the character in the driver's seat.\nThe speaker is Leonardo, one of the Teenage Mutant Ninja Turtles, who is a hero.\nImportance is MAJOR.\nHe is asking a question, likely with a tone of curiosity or mild concern about taking a vehicle without permission."
+  },
+  {
+    "id": "page-15_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 1124,
+      "y": 911,
+      "width": 412,
+      "height": 256,
+      "confidence": 0.7417497634887695,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-010-x1124-y911.jpg"
+    },
+    "ocr_text": "AFTER CONSULTING THE ARCHIVES, I BELIEVE THAT LOCATION MAY IN FACT BE...THE TEMPLE OF THE WHITE LIGHT.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious, informative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Authoritative and serious] AFTER CONSULTING THE ARCHIVES, I BELIEVE THAT LOCATION MAY IN FACT BE... [Pauses dramatically] THE TEMPLE OF THE WHITE LIGHT.",
+    "aiReasoning": "The text is in a speech bubble pointing to the giant blue face, which is Zordon. This is a SPEECH type. Zordon is a MAJOR HERO character. He is delivering important exposition with a dramatic pause. His emotion is serious and informative. The voice should be deep, booming, and authoritative, with a pause at the ellipsis to emphasize the final location name."
+  },
+  {
+    "id": "page-15_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 1564,
+      "y": 1831,
+      "width": 168,
+      "height": 127,
+      "confidence": 0.6030963063240051,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-011-x1564-y1831.jpg"
+    },
+    "ocr_text": "LET ME DO THE SAME.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "earnest",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Earnestly] Let me do the same.",
+    "aiReasoning": "The text \"LET ME DO THE SAME.\" is in a speech bubble pointing to Zordon, the large blue head in the tube. This makes it SPEECH. Zordon is a MAJOR HERO character. In this scene, he is appealing to Leonardo's sense of duty and his relationship with his deceased master, Splinter. Zordon is asking Leonardo to trust him and rely on him. The tone should be earnest, respectful, and dignified. There are no bold words or exclamation marks, so a steady, sincere delivery is needed. I will add a cue like \"[Earnestly]\" to reflect this."
+  },
+  {
+    "id": "page-15_b12",
+    "box_2d": {
+      "index": 11,
+      "x": 602,
+      "y": 1491,
+      "width": 251,
+      "height": 162,
+      "confidence": 0.4949415624141693,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-012-x602-y1491.jpg"
+    },
+    "ocr_text": "I'D LIKE YOU TO ACCOMPANY HIM.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Serious, trusting] I'd like you to accompany him.",
+    "aiReasoning": "I have located the text \"I'D LIKE YOU TO ACCOMPANY HIM.\" in the second panel.\nIt is a speech bubble. The tail is off-screen but it's clearly a continuation of Zordon's speech from the previous bubble, addressing Leonardo.\nThe speaker is Zordon, a MAJOR HERO character.\nHis expression is serious and calm, fitting his role as a mentor giving an important mission.\nThe tone should be authoritative but trusting."
+  },
+  {
+    "id": "page-15_b13",
+    "box_2d": {
+      "index": 12,
+      "x": 1234,
+      "y": 1740,
+      "width": 325,
+      "height": 219,
+      "confidence": 0.35204580426216125,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-15/page-15-crop-013-x1234-y1740.jpg"
+    },
+    "ocr_text": "MASTER SPLINTER ALWAYS RELIED ON YOU WHEN THINGS WERE AT THEIR WORST.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "earnest",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Earnestly] Master Splinter always relied on you when things were at their worst."
+  }
+]

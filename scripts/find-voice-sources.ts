@@ -245,6 +245,13 @@ async function runCharacterMode(
 
 // ── Book mode ─────────────────────────────────────────────────────────────────
 
+type NewCharEntry = string | { description: string; named?: boolean };
+
+function isNamed(entry: NewCharEntry): boolean {
+  if (typeof entry === "string") return true;
+  return entry.named !== false;
+}
+
 async function runBookMode(book: string, issue: string): Promise<void> {
   const issueDir = join(PROJECT_ROOT, "assets", "comics", book, issue);
   const newCharsPath = join(issueDir, "new-characters.json");
@@ -256,11 +263,14 @@ async function runBookMode(book: string, issue: string): Promise<void> {
     process.exit(1);
   }
 
-  const newChars = (await fs.readJson(newCharsPath)) as Record<string, string>;
-  const knownChars: Record<string, string> = (await fs.pathExists(
+  const newChars = (await fs.readJson(newCharsPath)) as Record<
+    string,
+    NewCharEntry
+  >;
+  const knownChars: Record<string, NewCharEntry> = (await fs.pathExists(
     knownCharsPath,
   ))
-    ? ((await fs.readJson(knownCharsPath)) as Record<string, string>)
+    ? ((await fs.readJson(knownCharsPath)) as Record<string, NewCharEntry>)
     : {};
 
   const franchise = book
@@ -268,23 +278,61 @@ async function runBookMode(book: string, issue: string): Promise<void> {
     .map((w) => w.toUpperCase())
     .join(" ");
 
-  const newCharNames = Object.keys(newChars).sort();
+  const allNewCharNames = Object.keys(newChars).sort();
   const knownCharNames = Object.keys(knownChars).sort();
+
+  // Split new characters into named (research) and generic (Voice Design directly)
+  const namedCharNames = allNewCharNames.filter((c) => isNamed(newChars[c]!));
+  const genericCharNames = allNewCharNames.filter(
+    (c) => !isNamed(newChars[c]!),
+  );
+  const newCharNames = namedCharNames;
 
   console.log(`\n🎙️  Voice Sourcing — ${franchise}`);
   console.log(
-    `   ${newCharNames.length} new character(s), ${knownCharNames.length} known\n`,
+    `   ${allNewCharNames.length} new character(s) (${namedCharNames.length} named, ${genericCharNames.length} generic), ${knownCharNames.length} known\n`,
   );
 
   const registry = await loadRegistry();
   const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 
-  // ── Research appearances for new characters ──────────────────────────────
+  // ── Auto-route generic characters directly to Voice Design ───────────────
+  if (genericCharNames.length > 0) {
+    console.log(
+      "─────────────────────────────────────────────────────────────",
+    );
+    console.log("Routing generic characters to Voice Design (no research):\n");
+    for (let i = 0; i < genericCharNames.length; i++) {
+      const character = genericCharNames[i]!;
+      console.log(
+        `   [${i + 1}/${genericCharNames.length}] ${character}... skipped (generic character — Voice Design)`,
+      );
+      if (!registry[character]) {
+        registry[character] = { franchise, aliases: [], appearances: [] };
+      }
+      const designId = `${character.toLowerCase().replace(/\s+/g, "-")}-voice-design`;
+      if (!registry[character]!.appearances.some((a) => a.id === designId)) {
+        registry[character]!.appearances.push({
+          id: designId,
+          mediaTitle: null,
+          year: null,
+          voiceActor: null,
+          mediaType: "voice_design",
+          youtubeSearchTerms: [],
+          notes: "Generic character — auto-routed to Voice Design.",
+          voice: null,
+        });
+      }
+    }
+    console.log();
+  }
+
+  // ── Research appearances for named characters ─────────────────────────────
   if (newCharNames.length > 0) {
     console.log(
       "─────────────────────────────────────────────────────────────",
     );
-    console.log("Researching new characters...\n");
+    console.log("Researching named characters...\n");
 
     for (let i = 0; i < newCharNames.length; i++) {
       const character = newCharNames[i]!;
@@ -342,10 +390,10 @@ async function runBookMode(book: string, issue: string): Promise<void> {
     await saveRegistry(registry);
   }
 
-  // Save voice-sourcing-suggestions.json for reference
+  // Save voice-sourcing-suggestions.json for reference (all new chars)
   const suggestionsPath = join(issueDir, "voice-sourcing-suggestions.json");
   const suggestions: Record<string, MediaAppearance[]> = {};
-  for (const character of newCharNames) {
+  for (const character of allNewCharNames) {
     suggestions[character] = (registry[character]?.appearances ?? [])
       .filter((a) => a.mediaTitle)
       .map((a) => ({
@@ -532,7 +580,7 @@ async function runBookMode(book: string, issue: string): Promise<void> {
   });
 
   console.log(
-    `\n✅ Registry updated — ${newCharNames.length} new, ${knownCharNames.length} known`,
+    `\n✅ Registry updated — ${allNewCharNames.length} new (${namedCharNames.length} named, ${genericCharNames.length} generic → Voice Design), ${knownCharNames.length} known`,
   );
 
   if (needsClips.length > 0) {

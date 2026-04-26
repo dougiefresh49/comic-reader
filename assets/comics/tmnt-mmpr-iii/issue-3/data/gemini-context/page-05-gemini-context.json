@@ -1,0 +1,191 @@
+[
+  {
+    "id": "page-05_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 113,
+      "y": 99,
+      "width": 293,
+      "height": 191,
+      "confidence": 0.9445199966430664,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-001-x113-y99.jpg"
+    },
+    "ocr_text": "TRINI, I JUST HAD A PARTICULARLY TERRIFYING REVELATION.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "alarmed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Alarmed, mid-fight] Trini, I just had a particularly terrifying revelation."
+  },
+  {
+    "id": "page-05_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 129,
+      "y": 1313,
+      "width": 345,
+      "height": 233,
+      "confidence": 0.9380879998207092,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-002-x129-y1313.jpg"
+    },
+    "ocr_text": "SO, IF THEY FOUND A WAY TO TAP INTO ANY POWER COIN OR THE MORPHIN GRID DIRECTLY...",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "analytical, concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Slightly out of breath, analytical] So, if they found a way to tap into any Power Coin or the Morphin Grid directly..."
+  },
+  {
+    "id": "page-05_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 156,
+      "y": 534,
+      "width": 347,
+      "height": 197,
+      "confidence": 0.9263848066329956,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-003-x156-y534.jpg"
+    },
+    "ocr_text": "DONNIE, COULD IT MAYBE WAIT UNTIL AFTER WE’RE DONE FIGHTING?",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "exasperated, strained",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Straining mid-fight] Donnie, could it maybe wait until after we're done fighting?"
+  },
+  {
+    "id": "page-05_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 141,
+      "y": 1880,
+      "width": 285,
+      "height": 119,
+      "confidence": 0.7138214707374573,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-004-x141-y1880.jpg"
+    },
+    "ocr_text": "...DOES THAT MEAN THAT AS WE FIGHT--",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "strained realization",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Straining slightly, realization dawning] ...Does that mean that as we fight--"
+  },
+  {
+    "id": "page-05_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1183,
+      "y": 2377,
+      "width": 231,
+      "height": 187,
+      "confidence": 0.6985174417495728,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-005-x1183-y2377.jpg"
+    },
+    "ocr_text": "OKAY. SO IT IS AS BAD AS I THOUGHT. GREAT.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "sarcastic, resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sarcastically, with a sigh] Okay. So it is as bad as I thought. Great."
+  },
+  {
+    "id": "page-05_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 580,
+      "y": 1890,
+      "width": 284,
+      "height": 147,
+      "confidence": 0.6776466369628906,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-006-x580-y1890.jpg"
+    },
+    "ocr_text": "THEY GET STRONGER AND WE GET WEAKER.",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "grim realization",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Grimly, emphasizing the bad news] THEY GET STRONGER AND WE GET WEAKER.",
+    "aiReasoning": "I see the text \"THEY GET STRONGER AND WE GET WEAKER.\" in a speech bubble. The tail points to Trini, the Yellow Ranger. She is finishing Donatello's sentence with a grim realization. Trini is a major hero character. The text is bolded for emphasis, highlighting the severity of their situation."
+  },
+  {
+    "id": "page-05_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1405,
+      "y": 2454,
+      "width": 254,
+      "height": 145,
+      "confidence": 0.6256696581840515,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-007-x1405-y2454.jpg"
+    },
+    "ocr_text": "NOPE. IT'S SOOO MUCH WORSE.",
+    "type": "SPEECH",
+    "speaker": "Mysterious Enemy",
+    "emotion": "gloating, menacing",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, intimidating, and smug voice",
+    "textWithCues": "[Menacingly] NOPE. IT'S SOOO MUCH WORSE.",
+    "aiReasoning": "The text \"NOPE. IT'S SOOO MUCH WORSE.\" is in a standard speech bubble in the final panel. The tail points to a large, dark, indistinct shape (possibly a large fist or an arm) in the right foreground, indicating a new, threatening enemy has arrived or is speaking off-camera just entering the frame. Since the speaker is not clearly identifiable as one of the main cast from the visible art, I will classify them as an EXTRA villain. The tone is gloating and menacing, responding to Donatello's dismay."
+  },
+  {
+    "id": "page-05_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1585,
+      "y": 466,
+      "width": 303,
+      "height": 188,
+      "confidence": 0.5603460669517517,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-008-x1585-y466.jpg"
+    },
+    "ocr_text": "UNFORTUNATELY. SO...",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Strained, resigned] Unfortunately... so..."
+  },
+  {
+    "id": "page-05_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 1331,
+      "y": 60,
+      "width": 451,
+      "height": 197,
+      "confidence": 0.5297642350196838,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-009-x1331-y60.jpg"
+    },
+    "ocr_text": "TOMMY ISN'T HERE, BUT...SHREDDER IS STILL ABLE TO SHADOW MORPH INTO THE GREEN RANGER, CORRECT?",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "analytical, concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Thoughtfully, with growing concern] Tommy isn't here, but... Shredder is still able to shadow morph into the Green Ranger, correct?",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top right panel. The tail points off-panel to the left, indicating someone speaking to the character in the panel (Trini). Classification: `SPEECH`.\n2.  **Analyze Context:** In the previous panel, a voice says \"TRINI, I JUST HAD A PARTICULARLY TERRIFYING REVELATION.\" Trini replies, \"DONNIE, COULD IT MAYBE WAIT...\". This target text continues the thought from the first voice. Therefore, the speaker is Donatello. He is a `HERO` and `MAJOR` character. He is having a realization, so the emotion is analytical but concerned.\n3.  **Performance Cues:** The text has an ellipsis \"...\", indicating a pause. The context is a \"terrifying revelation\". The delivery should sound like he's piecing things together aloud with growing worry."
+  }
+]

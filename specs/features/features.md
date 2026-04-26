@@ -31,6 +31,7 @@ Backlog and status tracker for planned features. Update status here when work st
 | Automated image ingestion (Stagehand) | `done` | — | `scripts/scrape-pages.ts` — Phase 3 |
 | Voice clip sourcing assistant | `done` | — | `scripts/find-voice-sources.ts` — Phase 4, uses GEMINI_HIGH |
 | Global character registry | `done` | [character-registry.md](character-registry.md) | `data/character-registry.json` + `scripts/manage-registry.ts`. Migrated 29 characters from tmnt-mmpr-iii. |
+| Book-aware context | `done` | [book-aware-context.md](book-aware-context.md) | `book-config.json` (franchise context + wiki URLs) + `character-roster.json` (cross-page/issue name consistency) + character classification (named vs generic) to skip research for background characters. |
 
 ## Infrastructure
 
@@ -39,11 +40,24 @@ Backlog and status tracker for planned features. Update status here when work st
 | Asset storage migration (S3 / Supabase / Vercel Blob) | `pending` | — | Currently `public/` on Vercel — won't scale. Prerequisite for Review UI Phase B. |
 | Auth (Clerk or Supabase) | `pending` | — | Noted as known need, not yet specced |
 
+## Episode Generation
+
+Specs in `specs/features/episode-generation/`. Two output modes: motion comic (free, Ken Burns + existing audio) and full cinematic (Venice.ai image + video generation). See [00-overview.md](episode-generation/00-overview.md) for architecture, cost estimates, and CLI interface.
+
+| Feature | Status | Spec | Notes |
+|---------|--------|------|-------|
+| Motion Comic MVP | `pending` | [01-motion-comic-mvp.md](episode-generation/01-motion-comic-mvp.md) | `pnpm motion-comic` — Ken Burns + ElevenLabs audio + FFmpeg. No Venice. |
+| Character Setup | `pending` | [02-character-setup.md](episode-generation/02-character-setup.md) | `visualDescription` registry field + seedream reference images + series.json aesthetic lock |
+| Shot Planning | `pending` | [03-shot-planning.md](episode-generation/03-shot-planning.md) | Gemini Vision per page → shot-plan.json. Last free gate before Venice spend. |
+| Storyboard | `pending` | [04-storyboard.md](episode-generation/04-storyboard.md) | Venice image generation per shot (seedream + flux-2-max-edit). ~$5–15/issue. |
+| Video Clips | `pending` | [05-video-clips.md](episode-generation/05-video-clips.md) | Venice video queue per panel (kling-3.0 for faces, seedance-2.0 for atmosphere). ~$15–50/issue. |
+| Assembly | `pending` | [06-assembly.md](episode-generation/06-assembly.md) | FFmpeg concat + ElevenLabs audio mix + optional Venice music. |
+| Review System | `pending` | [review-system.md](episode-generation/review-system.md) | Human-gated review at each phase. Static HTML galleries + terminal prompts. No AI at review time. |
+
 ## Future / Ideas
 
 | Idea | Notes |
 |------|-------|
 | Sound effects for onomatopoeia | BOOM, CRASH etc. trigger actual SFX clips |
-| Background music | Ambient score per page/scene |
-| Video generation | Use panels + audio as script to generate animated episode |
 | Roboflow model retraining | Model has improved since initial setup — may reduce need for manual bounds corrections |
+| Episode web player | `/episode/[bookId]/[issueId]` route in Next.js app — after assembly pipeline ships |

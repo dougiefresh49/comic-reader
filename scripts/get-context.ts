@@ -10,6 +10,8 @@
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import https from "https";
+import http from "http";
 import { glob } from "glob";
 import { GoogleGenAI } from "@google/genai";
 import pLimit from "p-limit";
@@ -17,6 +19,13 @@ import { env } from "~/env.mjs";
 import { runOCR } from "./utils/ocr.js";
 import { detectTextRegions } from "./utils/roboflow.js";
 import { analyzeContext, type Bubble } from "./utils/gemini-context.js";
+import {
+  loadBookConfig,
+  loadRoster,
+  saveRoster,
+  formatRosterForPrompt,
+  addCharacterToRoster,
+} from "./utils/roster.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
@@ -29,6 +38,39 @@ type ContextCache = Record<string, Bubble[]>;
 /* ------- EXECUTION ------- */
 main();
 /* ---------------------------- */
+
+function fetchText(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const protocol = url.startsWith("https") ? https : http;
+    const request = protocol.get(url, (response) => {
+      if (response.statusCode === 301 || response.statusCode === 302) {
+        fetchText(response.headers.location!).then(resolve).catch(reject);
+        return;
+      }
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode} for ${url}`));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      response.on("data", (chunk: Buffer) => chunks.push(chunk));
+      response.on("end", () =>
+        resolve(Buffer.concat(chunks).toString("utf-8")),
+      );
+      response.on("error", reject);
+    });
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /**
  * Main execution
@@ -48,11 +90,13 @@ async function main() {
     } = parseArgs();
 
     const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+    const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
     const ASSETS_DIR = join(ISSUE_DIR, "pages");
     const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
     const PREDICTIONS_DIR = join(ISSUE_DIR, "data", "predictions");
     const OCR_CROPS_DIR = join(ISSUE_DIR, "data", "ocr-crops");
     const GEMINI_CONTEXT_DIR = join(ISSUE_DIR, "data", "gemini-context");
+    const WIKI_CACHE_FILE = join(ISSUE_DIR, "data", "wiki-cache.txt");
     const LIMIT = pLimit(2);
 
     // Initialize Gemini
@@ -62,6 +106,57 @@ async function main() {
       console.error("❌ Gemini client required but not provided");
       process.exit(1);
     }
+
+    // Load book config + roster
+    const bookConfig = await loadBookConfig(BOOK_DIR);
+    let roster = await loadRoster(BOOK_DIR);
+    if (bookConfig) console.log(`📚 Book: ${bookConfig.title}`);
+    if (Object.keys(roster).length > 0) {
+      console.log(
+        `🎭 Roster: ${Object.keys(roster).length} character(s) loaded\n`,
+      );
+    }
+
+    // Fetch + cache wiki content if configured
+    const characterContextInstruction =
+      bookConfig?.characterContext ??
+      "Use your knowledge of comics and pop culture to identify characters by their proper canonical names where possible.";
+    let wikiContent: string | null = null;
+    const wikiUrl = bookConfig?.wikiUrls?.[issue];
+    if (wikiUrl) {
+      if (await fs.pathExists(WIKI_CACHE_FILE)) {
+        wikiContent = await fs.readFile(WIKI_CACHE_FILE, "utf-8");
+        console.log(
+          `📖 Wiki content loaded from cache (${wikiContent.length} chars)\n`,
+        );
+      } else {
+        try {
+          console.log(`🌐 Fetching wiki content from ${wikiUrl}...`);
+          const html = await fetchText(wikiUrl);
+          wikiContent = stripHtml(html);
+          await fs.ensureDir(dirname(WIKI_CACHE_FILE));
+          await fs.writeFile(WIKI_CACHE_FILE, wikiContent, "utf-8");
+          console.log(
+            `   ✓ Cached wiki content (${wikiContent.length} chars)\n`,
+          );
+        } catch (err) {
+          console.warn(
+            `⚠️  Wiki fetch failed: ${err instanceof Error ? err.message : String(err)} — continuing without it\n`,
+          );
+        }
+      }
+    }
+
+    // Build additional context injected into every page prompt
+    const contextParts: string[] = [characterContextInstruction];
+    const rosterFormatted = formatRosterForPrompt(roster);
+    if (rosterFormatted) contextParts.push(rosterFormatted);
+    if (wikiContent) {
+      contextParts.push(
+        `Reference — issue wiki page (use for character identification):\n${wikiContent}`,
+      );
+    }
+    const additionalContext = contextParts.join("\n\n");
 
     // Ensure data directories exist
     await fs.ensureDir(dirname(CACHE_FILE));
@@ -102,7 +197,7 @@ async function main() {
               ocrCropsDir: OCR_CROPS_DIR,
               geminiContextDir: GEMINI_CONTEXT_DIR,
             },
-            { useSpatialDedup, skipGemini },
+            { useSpatialDedup, skipGemini, additionalContext },
           );
           return { pageName, bubbles };
         }),
@@ -112,6 +207,32 @@ async function main() {
     // Update cache
     for (const { pageName, bubbles } of results) {
       cache[pageName] = bubbles;
+    }
+
+    // Update roster with any new characters found this run
+    let rosterUpdated = false;
+    for (const { pageName, bubbles } of results) {
+      const pageNumStr = pageName.replace("page-", "");
+      const pageNumber = parseInt(pageNumStr, 10);
+      const safePageNumber = isNaN(pageNumber) ? 0 : pageNumber;
+      for (const bubble of bubbles) {
+        if (bubble.speaker && bubble.type === "SPEECH") {
+          const before = Object.keys(roster).length;
+          roster = addCharacterToRoster(
+            roster,
+            bubble.speaker,
+            issue,
+            safePageNumber,
+          );
+          if (Object.keys(roster).length > before) rosterUpdated = true;
+        }
+      }
+    }
+    if (rosterUpdated) {
+      await saveRoster(BOOK_DIR, roster);
+      console.log(
+        `\n📝 Roster updated: ${Object.keys(roster).length} character(s) total`,
+      );
     }
 
     // Save cache
@@ -264,6 +385,7 @@ async function processPage(
   options: {
     useSpatialDedup: boolean;
     skipGemini: boolean;
+    additionalContext?: string;
   },
 ): Promise<Bubble[]> {
   const pageName = pagePath.split("/").pop()?.replace(".jpg", "") ?? "unknown";
@@ -302,6 +424,7 @@ async function processPage(
     {
       skipGemini: options.skipGemini,
       outDir: dirs.geminiContextDir,
+      additionalContext: options.additionalContext,
     },
   );
 

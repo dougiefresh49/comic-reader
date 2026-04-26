@@ -1,0 +1,84 @@
+[
+  {
+    "id": "page-24_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 759,
+      "y": 302,
+      "width": 397,
+      "height": 348,
+      "confidence": 0.9340119361877441,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-24/page-24-crop-001-x759-y302.jpg"
+    },
+    "ocr_text": "AND DESPITE ALL YOUR GREAT DEEDS, THE UNIVERSE WILL ONLY REMEMBER THAT YOUR WORLD WAS THE FIRST TO FALL.",
+    "type": "SPEECH",
+    "speaker": "Transformed Villain",
+    "emotion": "Menacing and triumphant",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Menacingly, with grand finality] AND DESPITE ALL YOUR GREAT DEEDS, THE UNIVERSE WILL ONLY REMEMBER THAT YOUR WORLD WAS THE FIRST TO FALL.",
+    "aiReasoning": "1. **Locate & Classify:** The text \"AND DESPITE ALL YOUR GREAT DEEDS...\" is inside a speech bubble with a tail pointing to the large monstrous character in the center. It's SPEECH.\n2. **Analyze Context:**\n    * **Speaker:** The large, heavily armored villain with an exposed brain-like head and red glowing eyes. He mentions his \"transformation\" and threatens Zordon, indicating he is a major antagonist. Let's refer to him as \"Transformed Villain\".\n    * **Side:** VILLAIN.\n    * **Importance:** MAJOR (He is the central figure delivering a climactic monologue).\n    * **Emotion:** Triumphant, menacing, grandly evil. He is gloating about his vision of the future.\n3. **Performance Cues:** The line is the climax of his monologue, delivered with absolute certainty and malice. A deep, echoing, and threatening delivery fits best."
+  },
+  {
+    "id": "page-24_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 112,
+      "y": 137,
+      "width": 294,
+      "height": 137,
+      "confidence": 0.9303497076034546,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-24/page-24-crop-002-x112-y137.jpg"
+    },
+    "ocr_text": "...SOMETHING I HAVE KNOWN ALL ALONG.",
+    "type": "SPEECH",
+    "speaker": "Transformed Villain",
+    "emotion": "confident, menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Ominously] ...something I have known all along."
+  },
+  {
+    "id": "page-24_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 541,
+      "y": 158,
+      "width": 330,
+      "height": 197,
+      "confidence": 0.9287648797035217,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-24/page-24-crop-003-x541-y158.jpg"
+    },
+    "ocr_text": "THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.",
+    "type": "SPEECH",
+    "speaker": "Transformed Villain",
+    "emotion": "threatening",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Threateningly] THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.",
+    "aiReasoning": "I have located the text \"THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.\" in the second speech bubble from the top left. The tail points to the large, monstrous character in the center of the image.\nBased on the provided list, this character is the \"Transformed Villain\". Given his menacing appearance and the explicit threat against \"Zordon and all your friends,\" he is clearly a MAJOR VILLAIN.\nThe tone of the speech is highly threatening and confident, declaring the imminent destruction of the heroes. The voice actor should deliver this with an ominous and powerful tone."
+  },
+  {
+    "id": "page-24_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 212,
+      "y": 261,
+      "width": 382,
+      "height": 181,
+      "confidence": 0.9165944457054138,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-24/page-24-crop-004-x212-y261.jpg"
+    },
+    "ocr_text": "THANKS TO MY TRANSFORMATION, I CAN SEE THE FUTURE SO CLEARLY.",
+    "type": "SPEECH",
+    "speaker": "Transformed Villain",
+    "emotion": "confident",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Gloating] THANKS TO MY TRANSFORMATION, I CAN SEE THE FUTURE SO CLEARLY."
+  }
+]

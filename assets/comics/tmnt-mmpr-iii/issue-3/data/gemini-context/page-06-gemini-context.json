@@ -1,0 +1,257 @@
+[
+  {
+    "id": "page-06_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 90,
+      "y": 834,
+      "width": 306,
+      "height": 160,
+      "confidence": 0.9266795516014099,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-001-x90-y834.jpg"
+    },
+    "ocr_text": "THE TECHNODROME... OR...THE MUTAGEN?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "questioning, focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Grunts with effort] The Technodrome... [pauses] or... the mutagen?"
+  },
+  {
+    "id": "page-06_b02",
+    "box_2d": {
+      "index": 12,
+      "x": 1550,
+      "y": 1525,
+      "width": 316,
+      "height": 392,
+      "confidence": 0.30639156699180603,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-013-x1550-y1525.jpg"
+    },
+    "ocr_text": "A WARRIOR OF YESTERDAY, DOOMED TO FAIL. JUST LIKE YOUR MASTER.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant, mocking",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, raspy, menacing, arrogant male voice",
+    "textWithCues": "[Arrogantly] A warrior of yesterday, doomed to fail. [Mockingly] Just like your master."
+  },
+  {
+    "id": "page-06_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 389,
+      "y": 2633,
+      "width": 266,
+      "height": 162,
+      "confidence": 0.8790913820266724,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-003-x389-y2633.jpg"
+    },
+    "ocr_text": "YOU DON'T DESERVE AN ANSWER.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant, dismissive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Dismissively] You don't deserve an answer.",
+    "aiReasoning": "1.  **Locate:** The text \"YOU DON'T DESERVE AN ANSWER.\" is found in the bottom-left panel inside a speech bubble.\n2.  **Classify:** It's `SPEECH`.\n3.  **Speaker:** The bubble's tail points to the silhouette of Lord Zedd, who is in the foreground.\n4.  **Side/Importance:** Lord Zedd is a `VILLAIN` and a `MAJOR` character.\n5.  **Emotion/Tone:** He is arrogantly dismissing Leonardo's previous question. The tone should be haughty, cold, and superior.\n6.  **Cues:** Add a cue to reflect his arrogant dismissal."
+  },
+  {
+    "id": "page-06_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 165,
+      "y": 1167,
+      "width": 261,
+      "height": 115,
+      "confidence": 0.8784221410751343,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-004-x165-y1167.jpg"
+    },
+    "ocr_text": "HOW UNINSPIRING.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant, bored",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Bored and dismissive] HOW UNINSPIRING.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"HOW UNINSPIRING.\" is located in a speech bubble in the lower-left section of the top panel. The tail points downwards, indicating the speaker is the red character, Lord Zedd, who is currently parrying an attack. Classification: SPEECH.\n2.  **Analyze Context:**\n    *   **Speaker:** Lord Zedd.\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** Lord Zedd is easily defending against Leonardo's attack and finds the fight boring and predictable. He is arrogant and dismissive.\n3.  **Performance Cues:** The line should be delivered with a bored, disappointed, and arrogant tone to reflect his unimpressed state."
+  },
+  {
+    "id": "page-06_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 50,
+      "y": 471,
+      "width": 261,
+      "height": 146,
+      "confidence": 0.8773183822631836,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-005-x50-y471.jpg"
+    },
+    "ocr_text": "WHAT DID YOU REALLY COME FOR, ZEDD?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "demanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Demanding] What did you really come for, Zedd?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"WHAT DID YOU REALLY COME FOR, ZEDD?\" is inside a speech bubble in the top panel. The tail points to the Teenage Mutant Ninja Turtle wearing a blue mask. This is SPEECH.\n2.  **Analyze Context:** The speaker is Leonardo. He is a HERO and a MAJOR character. He is mid-leap, attacking Lord Zedd, and asking a probing question. His emotion is determined and interrogating.\n3.  **Performance Cues:** The text is standard, but the context is an active fight. A demanding tone fits perfectly as he presses Zedd for information while attacking."
+  },
+  {
+    "id": "page-06_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 342,
+      "y": 2791,
+      "width": 275,
+      "height": 193,
+      "confidence": 0.8770220279693604,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-006-x342-y2791.jpg"
+    },
+    "ocr_text": "SHREDDER SAID YOU MIGHT PROVE A WORTHY CHALLENGE...",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "taunting, slightly disappointed",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, raspy, echoing, menacing male voice, regal but twisted, theatrical",
+    "textWithCues": "[Menacingly, with a hint of disappointment] Shredder said you might prove a worthy challenge..."
+  },
+  {
+    "id": "page-06_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 100,
+      "y": 1038,
+      "width": 191,
+      "height": 156,
+      "confidence": 0.8605022430419922,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-007-x100-y1038.jpg"
+    },
+    "ocr_text": "PARRY. THRUST. REPEAT.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "bored",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "N/A",
+    "textWithCues": "[Monotonous, bored tone] Parry. Thrust. Repeat."
+  },
+  {
+    "id": "page-06_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 63,
+      "y": 73,
+      "width": 567,
+      "height": 109,
+      "confidence": 0.8425535559654236,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-008-x63-y73.jpg"
+    },
+    "ocr_text": "TECHNODROME LAB.",
+    "type": "CAPTION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, clear, objective narrator voice.",
+    "textWithCues": "[Objective narrator voice] TECHNODROME LAB.",
+    "aiReasoning": "The text \"TECHNODROME LAB.\" is floating at the top left of the page. It is not inside a speech bubble or narration box. It serves to establish the location of the scene. Therefore, it is a CAPTION. It should be read neutrally by a narrator to set the scene."
+  },
+  {
+    "id": "page-06_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 73,
+      "y": 287,
+      "width": 380,
+      "height": 179,
+      "confidence": 0.8383626341819763,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-009-x73-y287.jpg"
+    },
+    "ocr_text": "EVERYONE IS OUTSIDE FIGHTING, BUT YOU'RE DOWN HERE, SKULKING AROUND.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "determined",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Determined, mid-action] Everyone is outside fighting, but you're down here, skulking around.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"EVERYONE IS OUTSIDE FIGHTING, BUT YOU'RE DOWN HERE, SKULKING AROUND.\" is in a speech bubble in the top-left panel. The tail points to the Ninja Turtle with the blue mask. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is Leonardo (blue mask, katanas).\n    *   **Side:** HERO\n    *   **Importance:** MAJOR\n    *   **Emotion:** He is mid-air, attacking Lord Zedd. He looks determined and is questioning Zedd's presence in the lab instead of the main battlefield.\n3.  **Performance Cues:** The text is standard, but the action is dynamic. He is attacking while speaking. The tone should be forceful and inquisitive.\n    *   Cue: `[Determined, mid-action]`"
+  },
+  {
+    "id": "page-06_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 243,
+      "y": 1438,
+      "width": 257,
+      "height": 171,
+      "confidence": 0.7846354842185974,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-010-x243-y1438.jpg"
+    },
+    "ocr_text": "YOU DIDN'T ANSWER MY QUESTION.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "forceful, annoyed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Forcefully, annoyed] You didn't answer my question."
+  },
+  {
+    "id": "page-06_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 1552,
+      "y": 1525,
+      "width": 317,
+      "height": 139,
+      "confidence": 0.7829170823097229,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-011-x1552-y1525.jpg"
+    },
+    "ocr_text": "A WARRIOR OF YESTERDAY, DOOMED TO FAIL.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant, dismissive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "",
+    "textWithCues": "[Arrogantly] A warrior of yesterday, doomed to fail.",
+    "aiReasoning": "I have located the text \"A WARRIOR OF YESTERDAY, DOOMED TO FAIL.\" in the top right panel.\nIt is a speech bubble with a tail pointing to Lord Zedd.\nLord Zedd is a major villain.\nHe is standing confidently, looking down at Leonardo, delivering a taunting insult. The emotion is arrogant and dismissive.\nI will add a cue for an arrogant tone."
+  },
+  {
+    "id": "page-06_b12",
+    "box_2d": {
+      "index": 11,
+      "x": 808,
+      "y": 2052,
+      "width": 285,
+      "height": 368,
+      "confidence": 0.7768241167068481,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-012-x808-y2052.jpg"
+    },
+    "ocr_text": "...BUT YOU'RE SLOW AND PREDICTABLE.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant, condescending",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Arrogantly] ...but you're slow and predictable.",
+    "aiReasoning": "I need to analyze the text bubble containing \"...BUT YOU'RE SLOW AND PREDICTABLE.\"\nThis text is located in the bottom middle panel.\nIt is a speech bubble, and the tail points to Lord Zedd, who is striking Leonardo.\nLord Zedd is a MAJOR VILLAIN character.\nHe is effortlessly deflecting Leonardo's attack, so his emotion is arrogant, condescending, and dismissive.\nThe text continues a thought from the previous panel, indicating a slight pause.\nI will add performance cues to reflect this arrogant tone."
+  }
+]

@@ -4,6 +4,8 @@ import { join } from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
+import { loadRoster, getRosterAliasMap } from "./utils/roster.js";
+import type { CharacterVoiceEntry } from "./generate-character-voice-descriptions.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -38,43 +40,69 @@ function parseArgs(): { book: string; issue: string } {
   return { book, issue };
 }
 
-type CharacterVoiceMap = Record<string, string>;
+type LegacyOrNewEntry = string | CharacterVoiceEntry;
+type NormalizedMap = Record<string, CharacterVoiceEntry>;
+
+function normalizeEntry(value: LegacyOrNewEntry): CharacterVoiceEntry {
+  if (typeof value === "string") return { description: value, named: true };
+  return value;
+}
 
 async function main() {
   const { book, issue } = parseArgs();
   const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+  const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
   const INPUT_PATH = join(ISSUE_DIR, "character-voice-descriptions.json");
   const NEW_CHARS_PATH = join(ISSUE_DIR, "new-characters.json");
   const KNOWN_CHARS_PATH = join(ISSUE_DIR, "known-characters.json");
 
-  const rawData = (await fs.readJson(INPUT_PATH)) as CharacterVoiceMap;
-  const cleanedData: CharacterVoiceMap = {};
+  const rawData = (await fs.readJson(INPUT_PATH)) as Record<
+    string,
+    LegacyOrNewEntry
+  >;
+  const cleanedData: NormalizedMap = {};
+
+  // Load roster aliases (take precedence over static alias-map)
+  const roster = await loadRoster(BOOK_DIR);
+  const rosterAliasMap = getRosterAliasMap(roster);
 
   console.log(`Processing ${Object.keys(rawData).length} entries...`);
 
-  for (const [originalName, description] of Object.entries(rawData)) {
-    const canonicalName = getCanonicalName(originalName);
+  for (const [originalName, rawEntry] of Object.entries(rawData)) {
+    const entry = normalizeEntry(rawEntry);
+
+    // Roster aliases take precedence, then fall through to static alias-map
+    const lowerName = originalName.toLowerCase().trim();
+    const canonicalName =
+      rosterAliasMap[lowerName] ?? getCanonicalName(originalName);
 
     if (cleanedData[canonicalName]) {
-      if (description.length > cleanedData[canonicalName]!.length) {
-        cleanedData[canonicalName] = description;
+      if (
+        entry.description.length >
+        cleanedData[canonicalName]!.description.length
+      ) {
+        cleanedData[canonicalName] = {
+          ...cleanedData[canonicalName]!,
+          description: entry.description,
+          named: entry.named,
+        };
       }
     } else {
-      cleanedData[canonicalName] = description;
+      cleanedData[canonicalName] = entry;
     }
   }
 
   // Cross-reference with registry to split into new vs known
   const registry = await loadRegistry();
-  const newChars: CharacterVoiceMap = {};
-  const knownChars: CharacterVoiceMap = {};
+  const newChars: NormalizedMap = {};
+  const knownChars: NormalizedMap = {};
 
-  for (const [name, description] of Object.entries(cleanedData)) {
-    const entry = registry[name];
-    if (entry && hasReadyVoice(entry)) {
-      knownChars[name] = description;
+  for (const [name, entry] of Object.entries(cleanedData)) {
+    const regEntry = registry[name];
+    if (regEntry && hasReadyVoice(regEntry)) {
+      knownChars[name] = entry;
     } else {
-      newChars[name] = description;
+      newChars[name] = entry;
     }
   }
 

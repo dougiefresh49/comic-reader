@@ -1,0 +1,44 @@
+[
+  {
+    "id": "page-17_b01",
+    "box_2d": {
+      "index": 1,
+      "x": 535,
+      "y": 1220,
+      "width": 351,
+      "height": 733,
+      "confidence": 0.4929175078868866,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-17/page-17-crop-002-x535-y1220.jpg"
+    },
+    "ocr_text": "SPEAK FOR YOURSELF, GOALIE MAN. HEY DONNIE! DID MIKEY HAPPEN TO COME ALONG?",
+    "type": "SPEECH",
+    "speaker": "Green Dimension X Ranger",
+    "emotion": "playful",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Energetic female voice, slightly tomboyish",
+    "textWithCues": "[Playfully teasing] Speak for yourself, goalie man. [Calling out loudly] Hey Donnie! Did Mikey happen to come along?"
+  },
+  {
+    "id": "page-17_b02",
+    "box_2d": {
+      "index": 3,
+      "x": 813,
+      "y": 751,
+      "width": 650,
+      "height": 658,
+      "confidence": 0.3008396625518799,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-17/page-17-crop-004-x813-y751.jpg"
+    },
+    "ocr_text": "...BUT DIMENSION X IS A BIG PLACE, AND IT ONLY HAS SO MANY RANGERS TO PROTECT IT. NICE OF YOU TO BRING SOME MORE BAD GUYS WITH YOU. THE NEUTRINOS COULD USE A BREAK FROM CHASING DOWN WHAT'S LEFT OF KRANG'S ARMY.",
+    "type": "SPEECH",
+    "speaker": "Pink Dimension X Ranger",
+    "emotion": "confident, playful banter",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Confidently] ...But Dimension X is a big place, and it only has so many Rangers to protect it. [Playfully sarcastic] Nice of you to bring some more bad guys with you. The Neutrinos could use a break from chasing down what's left of Krang's army.",
+    "aiReasoning": "I see the text \"...BUT DIMENSION X IS A BIG PLACE...\". It is in a set of connected speech bubbles.\nThe tails of the top two bubbles clearly point to the character in pink and black armor holding a staff.\nThe provided list of unique characters only includes \"Green Dimension X Ranger\", but this is clearly a different character. I will name her \"Pink Dimension X Ranger\".\nThe speaker is a HERO, part of the main team, so Importance is MAJOR.\nShe is speaking confidently and engaging in typical superhero banter, suggesting a playful or slightly sarcastic tone."
+  }
+]

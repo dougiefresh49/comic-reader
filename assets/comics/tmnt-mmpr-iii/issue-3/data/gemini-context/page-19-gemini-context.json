@@ -1,0 +1,213 @@
+[
+  {
+    "id": "page-19_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 240,
+      "y": 647,
+      "width": 298,
+      "height": 192,
+      "confidence": 0.8927270770072937,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-001-x240-y647.jpg"
+    },
+    "ocr_text": "I CAN'T BELIEVE IT. THE VILLAGE. THE TEMPLE. IT'S ALL GONE.",
+    "type": "SPEECH",
+    "speaker": "Pink Ranger",
+    "emotion": "shocked",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Stunned] I can't believe it. The village. The temple. It's all gone."
+  },
+  {
+    "id": "page-19_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1070,
+      "y": 1655,
+      "width": 242,
+      "height": 146,
+      "confidence": 0.8757734298706055,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-002-x1070-y1655.jpg"
+    },
+    "ocr_text": "BILLY, I DON'T LIKE THIS...",
+    "type": "SPEECH",
+    "speaker": "Pink Ranger",
+    "emotion": "uneasy",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Uneasy] Billy, I don't like this...",
+    "aiReasoning": "I see the text \"BILLY, I DON'T LIKE THIS...\". It is a standard speech bubble with a tail pointing to the Pink Ranger.\nThe speaker is the Pink Ranger, a major hero character.\nShe is looking at a ruined landscape and expressing concern, as indicated by the text and the ellipsis. Her emotion is uneasy or worried."
+  },
+  {
+    "id": "page-19_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1095,
+      "y": 1897,
+      "width": 182,
+      "height": 124,
+      "confidence": 0.8668407797813416,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-003-x1095-y1897.jpg"
+    },
+    "ocr_text": "YO, GOOD GUYS...",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "alert",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Alert] Yo, good guys...",
+    "aiReasoning": "I found the text \"YO, GOOD GUYS...\" in a speech bubble in the bottom right panel.\nThe tail points to Raphael, the Ninja Turtle with the red mask.\nHe is a MAJOR HERO character.\nHis expression and the context of the dialogue (\"Feel that rumbling? Something's coming.\") suggest he is alert and warning the others.\nThe ellipsis indicates a slight pause or a trailing off as he senses the danger."
+  },
+  {
+    "id": "page-19_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 301,
+      "y": 1924,
+      "width": 241,
+      "height": 151,
+      "confidence": 0.8580342531204224,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-004-x301-y1924.jpg"
+    },
+    "ocr_text": "...YOU GETTING ANYTHING?",
+    "type": "SPEECH",
+    "speaker": "Pink Ranger",
+    "emotion": "inquiring, slightly anxious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Slight pause, inquiring] ...You getting anything?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"...YOU GETTING ANYTHING?\" is in a speech bubble in the bottom left panel. The tail points to the Pink Ranger. Classification: `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** Pink Ranger.\n    *   **Side:** HERO.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** Inquiring, slightly anxious. She's following up on her previous line (\"Billy, I don't like this...\") while he examines an object.\n3.  **Performance Cues:** The ellipsis indicates a pause. The tone is a direct, somewhat concerned question.\n    *   Rewrite: \"[Slight pause, inquiring] ...You getting anything?\""
+  },
+  {
+    "id": "page-19_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 612,
+      "y": 1009,
+      "width": 225,
+      "height": 165,
+      "confidence": 0.8579426407814026,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-005-x612-y1009.jpg"
+    },
+    "ocr_text": "LOOKS LIKE WE MISSED A HECK OF A BATTLE.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "serious, observant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Gruffly] Looks like we missed a heck of a battle.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"LOOKS LIKE WE MISSED A HECK OF A BATTLE.\" is found in the top panel. It's enclosed in a speech bubble with a tail. Therefore, it's `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail of the speech bubble points directly to the character in the circular inset panel on the right. This character is a Teenage Mutant Ninja Turtle wearing a red mask. From the provided list and general knowledge, this is **Raphael**.\n    *   **Side:** The Turtles are protagonists, so he is a `HERO`.\n    *   **Importance:** Raphael is a main character, making him `MAJOR`.\n    *   **Voice Description:** Not required for MAJOR characters as per instructions.\n    *   **Emotion:** Raphael is looking at a destroyed village/temple. His expression is serious, with narrowed eyes. The dialogue \"Too bad\" (in the connected bubble) indicates he's disappointed he missed the fight. His tone for this specific line should be a tough-guy observation, slightly gruff.\n3.  **Performance Cues:** The text is normally formatted, indicating a conversational but tough tone. I'll add a cue to reflect his gruff nature and observation of the scene."
+  },
+  {
+    "id": "page-19_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 345,
+      "y": 821,
+      "width": 322,
+      "height": 201,
+      "confidence": 0.8534258604049683,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-006-x345-y821.jpg"
+    },
+    "ocr_text": "EVERYTHING WAS IN A LOT BETTER SHAPE THE LAST TIME WE WERE HERE.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "reflective",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Reflective] Everything was in a lot better shape the last time we were here."
+  },
+  {
+    "id": "page-19_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1103,
+      "y": 2023,
+      "width": 262,
+      "height": 174,
+      "confidence": 0.8120557069778442,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-007-x1103-y2023.jpg"
+    },
+    "ocr_text": "FEEL THAT RUMBLING? SOMETHING'S COMING.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "alert",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Alert] Feel that rumbling? Something's coming."
+  },
+  {
+    "id": "page-19_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 983,
+      "y": 1555,
+      "width": 232,
+      "height": 109,
+      "confidence": 0.7977328896522522,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-008-x983-y1555.jpg"
+    },
+    "ocr_text": "OR A NIGHTMARE.",
+    "type": "SPEECH",
+    "speaker": "Pink Ranger",
+    "emotion": "worried, ominous",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Ominously] Or a nightmare.",
+    "aiReasoning": "I see the text \"OR A NIGHTMARE.\" in a speech bubble.\nThe tail points to the Pink Ranger.\nShe is a major hero character.\nShe is responding to another character's positive comment with a dark, worried thought, setting a tense mood.\nThe performance should be serious and ominous."
+  },
+  {
+    "id": "page-19_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 744,
+      "y": 1324,
+      "width": 492,
+      "height": 189,
+      "confidence": 0.6038630604743958,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-009-x744-y1324.jpg"
+    },
+    "ocr_text": "THIS PLACE DOES FEEL TOTALLY FAMILIAR. LIKE OUT OF A TOTALLY AWESOME DREAM.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "relaxed, amazed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Casually] This place does feel totally familiar. [Slightly awestruck] Like out of a totally awesome dream.",
+    "aiReasoning": "Target text is \"THIS PLACE DOES FEEL TOTALLY FAMILIAR. LIKE OUT OF A TOTALLY AWESOME DREAM.\"\nIt's in standard speech bubbles in the middle panel.\nThe tail points to the orange-masked ninja turtle sitting on the rubble.\nThe provided character list only has Pink Ranger and Raphael. This turtle has an orange mask, so it's a new character: Michelangelo.\nHe is a Hero and a Major character.\nHe looks relaxed, sitting down casually despite the ruined surroundings.\nHis dialogue reflects his typical laid-back, \"surfer\" personality.\nI will add cues for a casual, slightly amazed delivery."
+  },
+  {
+    "id": "page-19_b10",
+    "box_2d": {
+      "index": 10,
+      "x": 249,
+      "y": 2542,
+      "width": 189,
+      "height": 162,
+      "confidence": 0.5290271043777466,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-011-x249-y2542.jpg"
+    },
+    "ocr_text": "WAVES. THIS MIGHT TAKE--",
+    "type": "SPEECH",
+    "speaker": "Blue Ranger",
+    "emotion": "analytical, focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Analytical] ...waves. This might take--",
+    "aiReasoning": "I see the text \"WAVES. THIS MIGHT TAKE--\". It is in a normal speech bubble in the bottom left panel.\nThe speaker is the Blue Ranger (Hero), who is examining a glowing green shard. He is a major character.\nImportance is MAJOR. He is speaking in an analytical, scientific tone, and the dashes indicate he is abruptly interrupted by the events in the next panel."
+  }
+]

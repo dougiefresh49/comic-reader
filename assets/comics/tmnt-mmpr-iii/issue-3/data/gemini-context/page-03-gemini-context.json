@@ -1,0 +1,217 @@
+[
+  {
+    "id": "page-03_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 757,
+      "y": 637,
+      "width": 326,
+      "height": 152,
+      "confidence": 0.9110577702522278,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-001-x757-y637.jpg"
+    },
+    "ocr_text": "BUT SERIOUSLY... NINJAS, ALIENS, SCARY EVIL RANGERS?!?",
+    "type": "SPEECH",
+    "speaker": "Skull",
+    "emotion": "panicked, incredulous",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Nasally, slightly whiny, higher-pitched young male voice",
+    "textWithCues": "[Panicked and incredulous] But seriously... ninjas, aliens, scary evil rangers?!?",
+    "aiReasoning": "1. Locate: The text is in a speech bubble in the second panel.\n2. Classify: It's `SPEECH`.\n3. Analyze Speaker: The tail points off-panel, but following the dialogue flow from the previous panel (\"Well, Skull... this is the end\" -> \"Bulk, you always say that\" -> \"And I'm nearly almost always right\"), this line is a continuation of that conversation. The next lines are \"What's not trying to kill us?\" and \"You're not gonna say all this on the stream, right?\", followed by Bulk replying. Therefore, this is Skull speaking.\n4. Side: `NEUTRAL`. They are civilian bystanders/reporters.\n5. Importance: `MINOR`.\n6. Voice Description: Nasally, slightly whiny, higher-pitched young male voice.\n7. Emotion: He is listing dangerous things, using \"?!?\" punctuation, indicating panic and incredulity.\n8. Performance Cues: Add a panicked tone and a pause for the ellipsis."
+  },
+  {
+    "id": "page-03_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1168,
+      "y": 106,
+      "width": 214,
+      "height": 180,
+      "confidence": 0.9064061045646667,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-002-x1168-y106.jpg"
+    },
+    "ocr_text": "WELL, SKULL... THIS IS THE END.",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "dramatic, resigned",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, slightly goofy but dramatic male voice, trying to sound like a serious reporter",
+    "textWithCues": "[Dramatic sigh] Well, Skull... this is the end."
+  },
+  {
+    "id": "page-03_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1207,
+      "y": 361,
+      "width": 219,
+      "height": 197,
+      "confidence": 0.8951435089111328,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-003-x1207-y361.jpg"
+    },
+    "ocr_text": "AND I'M NEARLY ALMOST ALWAYS RIGHT.",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "defensively confident",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Brash, slightly pompous, overconfident male voice, American accent",
+    "textWithCues": "[Defensively confident] And I'm nearly almost always right.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"AND I'M NEARLY ALMOST ALWAYS RIGHT.\" is in the first panel, inside a speech bubble. The tail points off-panel, but context is key here.\n2.  **Analyze Context:**\n    *   The first bubble says \"WELL, SKULL... THIS IS THE END.\" This implies Bulk is speaking to Skull.\n    *   The second bubble replies \"BULK, YOU ALWAYS SAY THAT.\" This confirms Skull is talking to Bulk.\n    *   The target bubble \"AND I'M NEARLY ALMOST ALWAYS RIGHT.\" is a response to Skull, so the speaker is Bulk. The visual \"REC\" overlay indicates we are looking through a camera viewfinder. Later panels show Bulk speaking while Skull films.\n    *   **Speaker:** Bulk\n    *   **Side:** NEUTRAL (they are comic relief civilian bystanders trying to get a scoop).\n    *   **Importance:** MINOR.\n    *   **Voice Description:** Brash, slightly pompous, overconfident male voice.\n    *   **Emotion:** Defending his own dramatic nature, unearned confidence.\n3.  **Performance Cues:** Standard speech. The line is meant to be funny because \"nearly almost always\" is contradictory.\n    *   `textWithCues`: \"[Defensively confident] And I'm nearly almost always right.\""
+  },
+  {
+    "id": "page-03_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 831,
+      "y": 963,
+      "width": 271,
+      "height": 171,
+      "confidence": 0.8943384289741516,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-004-x831-y963.jpg"
+    },
+    "ocr_text": "OH, OF COURSE NOT. I'M GONNA BE HEROIC.",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "sarcastic, confident",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, slightly goofy and arrogant male teen/young adult voice.",
+    "textWithCues": "[Sarcastically, full of unearned confidence] Oh, of course not. I'm gonna be heroic."
+  },
+  {
+    "id": "page-03_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 998,
+      "y": 1297,
+      "width": 407,
+      "height": 275,
+      "confidence": 0.8835533261299133,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-005-x998-y1297.jpg"
+    },
+    "ocr_text": "NOT MANY WOULD VENTURE SO CLOSE TO DANGER, BUT CHANNEL SIX VIEWERS DESERVE TO SEE THE TRUTH FIRST HAND.",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "faux-dramatic, performing",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Loud, slightly goofy male voice, trying to sound like a professional, brave reporter",
+    "textWithCues": "[Faux-dramatic reporter voice] Not many would venture so close to danger, but Channel Six viewers deserve to see the truth first hand."
+  },
+  {
+    "id": "page-03_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 169,
+      "y": 2370,
+      "width": 296,
+      "height": 280,
+      "confidence": 0.8805371522903442,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-006-x169-y2370.jpg"
+    },
+    "ocr_text": "AND IF YOU'D LIKE TO REWARD MY BRAVERY, AND THAT OF MY FAITHFUL SIDEKICK, SKULL...",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "terrified",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Teenage male, slightly deep and pompous voice, trying to sound confident but clearly terrified.",
+    "textWithCues": "[Trembling, voice shaking as he tries to maintain his presenter persona] And if you'd like to reward my bravery... and that of my faithful sidekick, Skull...",
+    "aiReasoning": "I see the text \"AND IF YOU'D LIKE TO REWARD MY BRAVERY, AND THAT OF MY FAITHFUL SIDEKICK, SKULL...\" in a standard speech bubble in the bottom panel.\nThe tail points to the character who previously identified himself as \"Intern Farkas Bulkmeier\". Given the character list, this is \"Bulk\".\nHe is a civilian recording the battle, so his side is NEUTRAL.\nHis importance is MINOR as he is a named, recurring comedic relief character.\nHe is sweating profusely and has wide, terrified eyes, contrasting with his attempt to sound heroic and beg for rewards. The ellipsis at the end suggests he's trailing off, likely frozen in fear.\nI will add cues to reflect his trembling voice and nervous state while he tries to maintain his 'reporter' persona."
+  },
+  {
+    "id": "page-03_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 803,
+      "y": 775,
+      "width": 249,
+      "height": 177,
+      "confidence": 0.8798094987869263,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-007-x803-y775.jpg"
+    },
+    "ocr_text": "WHAT'S NOT TRYING TO KILL US?",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "exasperated",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Gruff, slightly whiny, comical young adult male voice",
+    "textWithCues": "[Exasperated] What's not trying to kill us?",
+    "aiReasoning": "I have located the text \"WHAT'S NOT TRYING TO KILL US?\". It is a speech bubble in the second panel.\nThe tail of the bubble connects to the previous bubble \"BUT SERIOUSLY... NINJAS, ALIENS, SCARY EVIL RANGERS?!?\", whose tail points off-panel towards where Bulk is located in the next panel. The dialogue flow confirms this is Bulk speaking to Skull.\nBulk is a known character, considered MINOR in the grand scheme of Power Rangers/TMNT but named here. He acts as comic relief and a bystander, so he is NEUTRAL.\nHis emotion here is exasperated and scared by the chaotic situation around them."
+  },
+  {
+    "id": "page-03_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 503,
+      "y": 1223,
+      "width": 530,
+      "height": 217,
+      "confidence": 0.8739750981330872,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-008-x503-y1223.jpg"
+    },
+    "ocr_text": "THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.",
+    "type": "SPEECH",
+    "speaker": "Bulk",
+    "emotion": "serious, fake professional",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Boisterous, slightly gruff male voice, trying to sound like a professional and serious news anchor",
+    "textWithCues": "[In a fake, serious reporter voice] THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.",
+    "aiReasoning": "I have located the text \"THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.\" in the middle panel. It's in a speech bubble.\nThe tail of the bubble points to the character holding the microphone, who identifies himself in the text as \"Farkas Bulkmeier\". This matches the character \"Bulk\".\nBulk is a neutral/civilian character. He is a named secondary character, so his importance is MINOR.\nHe is putting on a \"serious news reporter\" persona for the camera. His expression is intense and focused.\nThe performance should reflect him trying to sound professional and brave despite the chaotic situation."
+  },
+  {
+    "id": "page-03_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 1247,
+      "y": 261,
+      "width": 287,
+      "height": 136,
+      "confidence": 0.869662344455719,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-009-x1247-y261.jpg"
+    },
+    "ocr_text": "BULK, YOU ALWAYS SAY THAT.",
+    "type": "SPEECH",
+    "speaker": "Skull",
+    "emotion": "exasperated",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Nasally, slightly higher-pitched, goofy male voice.",
+    "textWithCues": "[Exasperated] Bulk, you always say that."
+  },
+  {
+    "id": "page-03_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 937,
+      "y": 844,
+      "width": 357,
+      "height": 168,
+      "confidence": 0.7548872232437134,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-010-x937-y844.jpg"
+    },
+    "ocr_text": "YOU’RE NOT GONNA SAY ALL THIS ON THE STREAM, RIGHT?",
+    "type": "SPEECH",
+    "speaker": "Skull",
+    "emotion": "anxious, questioning",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "High-pitched, slightly nasally teenage/young adult male voice, American accent",
+    "textWithCues": "[Anxiously] You're not gonna say all this on the stream, right?"
+  }
+]
