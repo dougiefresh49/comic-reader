@@ -17,9 +17,8 @@
     "emotion": "confused",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Gruff, raspy, dim-witted monster voice, slightly slow delivery",
-    "textWithCues": "[Confused, realization dawning slowly] Wait, you mean they were talking to us?",
-    "aiReasoning": "The text \"WAIT, YOU MEAN THEY WERE TALKING TO US?\" is in a speech bubble pointing to the bulky, blue alien character in the bottom-left panel. This character is recognizable as Squatt from Power Rangers, who serves as a dim-witted minion for the villains.\nThe context is that he and his partner (Baboo) have just teleported in with Baxter Stockman, and are struggling to follow basic technical instructions, realizing belatedly that they were supposed to be doing something.\nHis expression and the text itself indicate confusion and a slow realization. He is a MINOR villain character."
+    "voiceDescription": "High-pitched, raspy, goofy goblin-like male voice",
+    "textWithCues": "[Confused] Wait, you mean they were talking to us?"
   },
   {
     "id": "page-08_b02",
@@ -36,12 +35,12 @@
     "ocr_text": "I DON'T CARE. WE LOSE THE TECHNODROME, WE LOSE THE WORLD.",
     "type": "SPEECH",
     "speaker": "Director",
-    "emotion": "resolute and desperate",
+    "emotion": "resolute",
     "characterType": "MINOR",
-    "side": "NEUTRAL",
-    "voiceDescription": "Stern, commanding adult female voice, American accent, sounding strained and urgent over the sounds of battle",
-    "textWithCues": "[Commanding, raising voice over battle] I DON'T CARE. WE LOSE THE TECHNODROME, WE LOSE THE WORLD.",
-    "aiReasoning": "I see the text \"I DON'T CARE. WE LOSE THE TECHNODROME, WE LOSE THE WORLD.\" in a speech bubble in the first panel.\nThe speaker is the woman with white hair in a lab coat, who is addressed as \"Director\" by the soldier next to her.\nShe is defending the base against attackers, making her likely a NEUTRAL or HERO character (government/military). I will classify her as a MINOR character named \"Director\" on the NEUTRAL side.\nShe is in the middle of a battle and looks determined and stressed. Her voice should be commanding but strained."
+    "side": "HERO",
+    "voiceDescription": "Authoritative, stressed, determined adult female voice, sounding like a commander in a combat zone",
+    "textWithCues": "[Firmly, under stress] I don't care. We lose the Technodrome, we lose the world.",
+    "aiReasoning": "1. **Locate & Classify:** The text \"I DON'T CARE. WE LOSE THE TECHNODROME, WE LOSE THE WORLD.\" is in a speech bubble in the top panel. The tail points to the blonde woman in the white lab coat and green top. This is SPEECH.\n2. **Analyze Context:**\n    * **Speaker:** A soldier in the previous bubble addresses her as \"Director\". Since I don't have a more specific canonical name for her from the immediate context, I will use \"Director\".\n    * **Side:** She is commanding troops defending against Foot Soldiers and Putty Patrollers (villains), so she is on the side of Earth's defense, acting as a HERO or at least an allied force.\n    * **Importance:** MINOR. She is a named/titled secondary character with speaking lines directing the action, but not a main cast member.\n    * **Voice Description:** Hero Minor: Authoritative, stressed, determined adult female voice. Needs to sound like a commander in a high-stress combat situation.\n    * **Emotion:** Resolute, determined, slightly desperate given the overwhelming odds.\n3. **Performance Cues:** The text is a direct command/statement of stakes in a loud, chaotic environment.\n    * **Cues:** Add a tag for a firm, commanding tone. `[Firmly, under stress]` \"I don't care. We lose the Technodrome, we lose the world.\""
   },
   {
     "id": "page-08_b03",
@@ -58,12 +57,12 @@
     "ocr_text": "...DISPATCH THE REST OF THE SECURITY DRONES. ENGAGE ALL COUNTER- MEASURES.",
     "type": "SPEECH",
     "speaker": "Director",
-    "emotion": "urgent, commanding",
+    "emotion": "commanding",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Authoritative, commanding adult female voice, American accent, speaking under pressure",
-    "textWithCues": "[Speaking into commlink, commanding] ...Dispatch the rest of the security drones. Engage all counter-measures.",
-    "aiReasoning": "I see the text \"...DISPATCH THE REST OF THE SECURITY DRONES. ENGAGE ALL COUNTER- MEASURES.\" in a speech bubble in the top left panel.\nThe tail points to the woman in the white coat holding a gun and touching her earpiece. Another character later addresses her as \"Director\". So, the speaker is the Director.\nShe is defending a facility from Foot Soldiers, so she is on the side of Earth's defenders (NEUTRAL/HERO). I'll classify her as NEUTRAL.\nHer importance is MINOR.\nShe is speaking urgently and authoritatively into a commlink."
+    "voiceDescription": "Authoritative, urgent female voice, American accent",
+    "textWithCues": "[Over radio, urgent and commanding] ...Dispatch the rest of the security drones. Engage all counter-measures.",
+    "aiReasoning": "The text is in a jagged speech bubble with a jagged tail, indicating a radio transmission, PA system, or electronic voice. The tail comes from off-panel or is just generally broadcasting over the scene. Given the context of the panel, where a woman is later addressed as \"Director\" and is giving orders to defending forces against an attack, it's highly probable this is the Director issuing a broadcast command.\nThe character \"Director\" is listed in the unique characters. I will assign this speech to her.\nShe is a generic military/agency commander defending Earth, so \"NEUTRAL\" is a good fit for her side (not a main hero or villain). She is a MINOR character.\nThe emotion is urgent and commanding due to the chaotic battle.\nI'll add cues to reflect the radio/electronic nature of the bubble and the commanding tone."
   },
   {
     "id": "page-08_b04",
@@ -79,13 +78,12 @@
     },
     "ocr_text": "MASTER SHREDDER, THE GRAVITY WELL IS IN PLACE.",
     "type": "SPEECH",
-    "speaker": "Villain Scientist",
-    "emotion": "confident",
-    "characterType": "MINOR",
+    "speaker": "Baxter Stockman",
+    "emotion": "confident, smug",
+    "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Smug, confident male voice, mid-30s, professional but arrogant tone",
-    "textWithCues": "[Speaking into radio, confidently] Master Shredder, the gravity well is in place.",
-    "aiReasoning": "I see the text \"MASTER SHREDDER, THE GRAVITY WELL IS IN PLACE.\". It is in a standard speech bubble pointing to a human male character with glasses and a lab coat.\nThe speaker is addressing Master Shredder, indicating he is on the villain's side. Since he is not in the provided character list, I will name him \"Villain Scientist\".\nImportance is MINOR as he seems to be a secondary character relaying technical information.\nHis expression is confident and slightly smug. He is speaking into a walkie-talkie."
+    "textWithCues": "[Speaking into radio confidently] Master Shredder, the gravity well is in place.",
+    "aiReasoning": "1. **Locate & Classify:** The text \"MASTER SHREDDER, THE GRAVITY WELL IS IN PLACE.\" is located in the bottom right panel. It is inside a speech bubble with a tail pointing to the man with glasses holding a radio. Therefore, it is `SPEECH`.\n2. **Analyze Context:**\n   - **Speaker:** The character is wearing a lab coat, glasses, and speaking to \"Master Shredder\" about the Technodrome. This matches the canonical TMNT character Baxter Stockman.\n   - **Side:** He is working for Shredder, making him a `VILLAIN`.\n   - **Importance:** Baxter Stockman is a prominent named villain, so he is `MAJOR`.\n   - **Emotion:** His facial expression is a smug, confident smile. He is reporting a successful technical operation.\n3. **Performance Cues:** He is speaking into a handheld radio. He sounds confident and pleased with himself. I will add a cue to reflect him speaking into a device and his smug tone."
   },
   {
     "id": "page-08_b05",
@@ -102,12 +100,11 @@
     "ocr_text": "OPS IS PICKING UP AN INCOMING ENERGY SURGE.",
     "type": "SPEECH",
     "speaker": "Soldier",
-    "emotion": "alert",
+    "emotion": "urgent",
     "characterType": "EXTRA",
     "side": "NEUTRAL",
-    "voiceDescription": "Professional, slightly tense male voice, military/security tone.",
-    "textWithCues": "[Urgently] Ops is picking up an incoming energy surge.",
-    "aiReasoning": "The text is in a speech bubble in the top right panel.\nThe speaker is a security guard or soldier reporting to the woman identified previously as \"Director\".\nSince he is an unnamed guard, his importance is EXTRA. He appears to be on the defending side, so NEUTRAL or HERO. I will use NEUTRAL.\nHis expression is serious and alert. He is relaying urgent information in a combat situation.\nThe voice should be a typical military/security extra: professional but tense."
+    "voiceDescription": "Generic male soldier voice, American accent, urgent and professional tone",
+    "textWithCues": "[Urgently reporting] Ops is picking up an incoming energy surge."
   },
   {
     "id": "page-08_b06",
@@ -127,8 +124,8 @@
     "emotion": "panicked",
     "characterType": "EXTRA",
     "side": "NEUTRAL",
-    "voiceDescription": "Generic male military extra, panicked and overwhelmed, American accent",
-    "textWithCues": "[Urgent, stressed] DIRECTOR, THERE ARE TOO MANY OF THEM."
+    "voiceDescription": "Panicked, strained male voice, mid-battle",
+    "textWithCues": "[Panicking] Director, there are too many of them."
   },
   {
     "id": "page-08_b07",
@@ -143,14 +140,14 @@
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-08/page-08-crop-007-x112-y1266.jpg"
     },
     "ocr_text": "\"...THEY THINK THIS IS SOMETHING ELSE.\"",
-    "type": "SPEECH",
-    "speaker": "Soldier",
-    "emotion": "alarmed",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
     "characterType": "EXTRA",
-    "side": "HERO",
-    "voiceDescription": "Male, typical soldier voice, serious, slightly alarmed tone.",
-    "textWithCues": "[Alarmed, dreading] ...they think this is something else.",
-    "aiReasoning": "The text \"...THEY THINK THIS IS SOMETHING ELSE.\" is in a rectangular box, but the quotation marks and the context of the previous panel strongly indicate it is a continuation of the Soldier's dialogue (\"No, ma'am...\"). Therefore, I will classify it as SPEECH. The speaker is the generic Soldier character. He is an EXTRA on the HERO (or at least defending) side. His emotion is alarmed or full of dread as he realizes the threat is different from what they expected. The voice should be a typical, serious male soldier. I will add a cue for the dread in his voice."
+    "side": "NEUTRAL",
+    "voiceDescription": "Gruff male voice, slightly panicked but trying to maintain military composure, American accent",
+    "textWithCues": "[Ominous realization] ...they think this is something else.",
+    "aiReasoning": "The target text is in a rectangular box at the top of the middle panel, continuing a thought from the previous panel (\"No, ma'am...\"). This is a voice-over technique where dialogue acts as a caption for the next scene. Visually, it's a narration box, but the speaker is clearly the \"Soldier\" from the previous panel. The tone is foreboding as he realizes the enemy has a different objective.\n\nSpeaker: Soldier\nCharacter Type: EXTRA\nSide: NEUTRAL\nEmotion: Realization, dread"
   },
   {
     "id": "page-08_b08",
@@ -170,9 +167,9 @@
     "emotion": "confused",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Gruff but goofy monster voice, slightly dim-witted tone",
+    "voiceDescription": "High-pitched, gravelly, dopey, slightly nervous male monster voice",
     "textWithCues": "[Confused] Baboo, was it slot A into port C and turn or slot B into port A?",
-    "aiReasoning": "The text is in a regular speech bubble in the bottom left panel.\nThe tail of the bubble points towards the bulky, grey character on the right side of the panel.\nThe text addresses \"Baboo\", implying the speaker is talking to the blue, bat-like character on the left (who is Baboo). Given the classic pairing of Rita Repulsa's minions, the speaker (the grey character) is Squatt.\nSquatt is a named secondary villain character, making him MINOR.\nHe is asking a technical question and seems unsure, indicating a confused emotion."
+    "aiReasoning": "I located the text \"BABOO, WAS IT SLOT A INTO PORT C AND TURN OR SLOT B INTO PORT A?\" in the bottom left panel. It's in a standard speech bubble pointing to the blue, ape-like creature.\nThis character is canonically known as Squatt from Power Rangers. He is speaking to Baboo.\nSquatt is a Villain, and as a named henchman, he is a Minor character.\nHe appears confused by the technical instructions. His canonical voice is high-pitched, gravelly, and dopey."
   },
   {
     "id": "page-08_b09",
@@ -188,12 +185,12 @@
     },
     "ocr_text": "THE TECHNODROME WILL BE OPERATIONAL MOMENTARILY.",
     "type": "SPEECH",
-    "speaker": "Villain Scientist",
+    "speaker": "Baxter Stockman",
     "emotion": "confident",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Confident, slightly intellectual male voice, smug undertone",
-    "textWithCues": "[Confidently] The Technodrome will be operational momentarily."
+    "voiceDescription": "Smug, intelligent, slightly nasal male voice",
+    "textWithCues": "[Confident] The Technodrome will be operational momentarily."
   },
   {
     "id": "page-08_b10",
@@ -209,13 +206,13 @@
     },
     "ocr_text": "TELEPORTATION COMPLETE. WE'RE IN. ENGAGING EXODUS PROTOCOL.",
     "type": "SPEECH",
-    "speaker": "Villain Scientist",
+    "speaker": "Baxter Stockman",
     "emotion": "confident",
-    "characterType": "MINOR",
+    "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Smug, arrogant, middle-aged male voice, slightly nasal",
-    "textWithCues": "[Speaking over comms] Teleportation complete. We're in. Engaging Exodus Protocol.",
-    "aiReasoning": "I see the text \"TELEPORTATION COMPLETE. WE'RE IN. ENGAGING EXODUS PROTOCOL.\" split across two connected bubbles with a jagged tail.\nThe jagged tail indicates an electronic transmission or radio voice. The tail points towards the group teleporting in, specifically near the Villain Scientist (Baxter Stockman), who appears to be leading this group (Squatt and Baboo are with him).\nThe speaker is the Villain Scientist, reporting their successful arrival.\nHis importance is MINOR (a named secondary villain).\nHe is on the VILLAIN side.\nHis emotion is confident and authoritative as he executes the plan.\nI will add a cue to indicate the radio transmission effect."
+    "voiceDescription": "Smug, arrogant male voice, confident",
+    "textWithCues": "[Confidently] Teleportation complete. We're in. Engaging Exodus Protocol.",
+    "aiReasoning": "The text region contains two separate speech bubbles. \"TELEPORTATION COMPLETE. WE'RE IN.\" is spoken by Squatt. \"ENGAGING EXODUS PROTOCOL.\" is spoken by Baxter Stockman. Since they are grouped in the prompt as a single region, I must provide one analysis. Baxter Stockman is the central figure and the one executing the primary action (\"Exodus Protocol\"), so I will assign him as the speaker for the entire block for the sake of the schema, using a confident tone suitable for his character arriving successfully.\n\nType is SPEECH.\nSpeaker is Baxter Stockman.\nHe is a MAJOR character.\nSide is VILLAIN.\nEmotion is confident, focused."
   },
   {
     "id": "page-08_b11",
@@ -234,10 +231,10 @@
     "speaker": "Director",
     "emotion": "confident",
     "characterType": "MINOR",
-    "side": "HERO",
-    "voiceDescription": "Authoritative, professional female voice, mid-30s to 40s.",
+    "side": "NEUTRAL",
+    "voiceDescription": "Authoritative, confident female voice, mid-range pitch, firm and professional delivery.",
     "textWithCues": "[Confidently] We can handle all the monsters they throw at us.",
-    "aiReasoning": "1.  Locate the text: \"WE CAN HANDLE ALL THE MONSTERS THEY THROW AT US.\" in the top right panel.\n2.  Identify the type: Speech bubble with a tail pointing to a character. Type is SPEECH.\n3.  Identify the speaker: The tail points to the blonde woman in the lab coat. Another soldier previously addressed her as \"Director\". I will use \"Director\".\n4.  Character Type: She is a named/titled character leading the defense. MINOR.\n5.  Side: She is defending a facility from an attack by ninjas/monsters (Foot Clan). I will classify her side as NEUTRAL or HERO. Given she is defending Earth (\"lose the world\"), I'll classify as HERO for this scene.\n6.  Emotion: She looks determined and defiant, trying to reassure her soldier despite the overwhelming odds.\n7.  Voice Description: Professional, authoritative female voice, mid-30s to 40s.\n8.  Performance Cues: She is speaking firmly to reassure the soldier. A confident, slightly strained tone fits."
+    "aiReasoning": "The text \"WE CAN HANDLE ALL THE MONSTERS THEY THROW AT US.\" is in a standard speech bubble pointing to the woman in the lab coat in the top right inset panel.\nBased on the first panel where a soldier addresses her, her name is \"Director\".\nShe is commanding soldiers defending against an attack, making her a MINOR character. Given she is likely part of an organization like TCRI or EPF defending the Technodrome from Shredder's forces, she operates in a grey area, so NEUTRAL is a fitting side.\nHer expression is resolute and confident, dismissing the soldier's concerns. Her voice should sound authoritative."
   },
   {
     "id": "page-08_b12",
@@ -251,14 +248,15 @@
       "class": "speech bubble",
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-08/page-08-crop-012-x100-y2434.jpg"
     },
-    "ocr_text": "There is no text in this image. It appears to be a drawing of a bowl of rice, where the black marks represent individual grains or texture.",
+    "ocr_text": "The image provided does not contain any text; it appears to be a close-up illustration of a bowl of rice or a similar texture from a comic.",
     "type": "SPEECH",
     "speaker": "Squatt",
     "emotion": "confused",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Goofy, nasal, high-pitched monstrous male voice",
-    "textWithCues": "[Confused] Baboo, was it slot A into port C and turn or slot B into port A?"
+    "voiceDescription": "Raspy, gruff, and bumbling male voice, slightly dim-witted tone",
+    "textWithCues": "[Confused] Baboo, was it slot A into port C and turn, or slot B into port A?",
+    "aiReasoning": "The user prompt provides a heavily hallucinated OCR text string (\"The image provided does not contain any text... bowl of rice...\") but gives specific coordinates `x:100, y:2434`.\nLooking at the comic page, these coordinates correspond to the top-left area of the bottom-left panel.\nThe text bubble in this location is \"BABOO, WAS IT SLOT A INTO PORT C AND TURN OR SLOT B INTO PORT A?\".\nThe tail of this speech bubble points to the shorter, bulkier blue alien character on the right side of that panel. This character is known canonically as Squatt from the Power Rangers franchise.\nSquatt is a named secondary villain character, so his Importance is MINOR, and his Side is VILLAIN.\nIn the panel, he looks confused while trying to operate alien machinery.\nHis voice in the TV show is typically raspy, gruff, and bumbling, fitting a somewhat dim-witted minion.\nI will format the text with a `[Confused]` cue to guide the voice actor."
   },
   {
     "id": "page-08_b13",
@@ -275,12 +273,12 @@
     "ocr_text": "TELEPORTATION COMPLETE. WE'RE IN.",
     "type": "SPEECH",
     "speaker": "Squatt",
-    "emotion": "confident",
+    "emotion": "reporting",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Gruff, slightly dopey monstrous voice, alien henchman",
-    "textWithCues": "[Confidently] Teleportation complete. We're in.",
-    "aiReasoning": "I need to identify the speaker for the text \"TELEPORTATION COMPLETE. WE'RE IN.\"\nThe text is located in the middle panel.\nIt is a speech bubble with a tail pointing to the large, blue, horned, chubby alien character on the left.\nBased on the provided character list and visual appearance (standard Power Rangers lore), this is Squatt.\nHe is a villain henchman, so his side is VILLAIN and importance is MINOR.\nHe is reporting their successful arrival, so he sounds confident.\nI'll describe his voice as a gruff, slightly dopey monster voice."
+    "voiceDescription": "Gruff, slightly nasal, cartoonish monster voice",
+    "textWithCues": "[Reporting status] Teleportation complete. We're in.",
+    "aiReasoning": "I need to analyze the text \"TELEPORTATION COMPLETE. WE'RE IN.\" in the middle panel.\nThe text is in a regular speech bubble.\nThe tail points to the bulky, blue, armored alien character on the left side of the teleportation group.\nBased on the provided character list and Power Rangers lore, this character is Squatt.\nHe is a minor villain.\nHe is stating a fact/reporting status, so the tone should be relatively neutral but fitting for his character type (a monster henchman).\nThe emotion is informative.\nI will add a performance cue to indicate he is reporting."
   },
   {
     "id": "page-08_b15",
@@ -297,10 +295,10 @@
     "ocr_text": "NO, MA'AM...",
     "type": "SPEECH",
     "speaker": "Soldier",
-    "emotion": "anxious",
+    "emotion": "hesitant",
     "characterType": "EXTRA",
     "side": "NEUTRAL",
-    "voiceDescription": "Male soldier, standard American accent, sounds anxious and hesitant.",
+    "voiceDescription": "Standard male military voice, slightly nervous",
     "textWithCues": "[Hesitantly] No, ma'am..."
   }
 ]

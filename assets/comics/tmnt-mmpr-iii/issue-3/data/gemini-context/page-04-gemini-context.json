@@ -11,14 +11,13 @@
       "class": "speech bubble",
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-04/page-04-crop-001-x1399-y705.jpg"
     },
-    "ocr_text": "A FAILED MIDDLE-AGED ASSASSIN WHO LEECHES OFF THE MORPHIN GRID, BUT STILL CAN'T BEAT A BUNCH OF TEENAGERS?",
+    "ocr_text": "A FAILED MIDDLE-AGED ASSASSIN WHO LEECHES OFF THE MORPHIN GRID, BUT STILL CAN’T BEAT A BUNCH OF TEENAGERS?",
     "type": "SPEECH",
-    "speaker": "Red Ranger",
-    "emotion": "defiant",
+    "speaker": "Jason Lee Scott",
+    "emotion": "mocking",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Mockingly] A failed middle-aged assassin who leeches off the Morphin Grid, but still can't beat a bunch of teenagers?",
-    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble with a tail pointing towards the character in the red suit. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character in the red suit is the Red Ranger (Jason). The previous speech bubble from the villain addresses him as \"Jason\".\n    *   **Side:** The Red Ranger is a `HERO`.\n    *   **Importance:** He is a main character, so `MAJOR`.\n    *   **Emotion:** He is mid-fight, retorting to the villain's taunt. His words are insulting and sarcastic. The emotion is defiant and mocking.\n3.  **Performance Cues:** The text is a direct insult aimed at the villain. A sarcastic, mocking tone is appropriate here."
+    "textWithCues": "[Defiantly mocking] A failed middle-aged assassin who leeches off the Morphin Grid, but still can't beat a bunch of teenagers?"
   },
   {
     "id": "page-04_b02",
@@ -34,12 +33,11 @@
     },
     "ocr_text": "AND IS THAT SUPPOSED TO BE YOU?",
     "type": "SPEECH",
-    "speaker": "Red Ranger",
-    "emotion": "sarcastic, defiant",
+    "speaker": "Jason Lee Scott",
+    "emotion": "sarcastic, challenging",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Sarcastically] AND IS THAT SUPPOSED TO BE YOU?"
+    "textWithCues": "[Sarcastically] And is that supposed to be you?"
   },
   {
     "id": "page-04_b03",
@@ -59,8 +57,8 @@
     "emotion": "manipulative",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Manipulative] Imagine how great you could be with a proper mentor.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"IMAGINE HOW GREAT YOU COULD BE WITH A PROPER MENTOR.\" is in a speech bubble. The tail points to the character on the left. This is SPEECH.\n2.  **Analyze Context:**\n    *   **Speaker:** The character on the left is a mashup of Shredder and the Green Ranger. Since he's a main villain in this crossover, I'll name him \"Green Ranger Shredder\".\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** He is engaging in combat but speaking with a calm, manipulative tone, trying to tempt his opponent (Jason/Red Ranger).\n3.  **Performance Cues:** The text is spoken normally, without shouting. It should sound persuasive and slightly condescending, characteristic of a villain trying to turn a hero. A cue like `[Manipulative]` fits well."
+    "voiceDescription": null,
+    "textWithCues": "[Manipulatively] Imagine how great you could be with a proper mentor."
   },
   {
     "id": "page-04_b04",
@@ -80,8 +78,8 @@
     "emotion": "arrogant",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "",
-    "textWithCues": "[Condescendingly] You remind me of... a young me."
+    "voiceDescription": null,
+    "textWithCues": "[Arrogantly, with a dramatic pause] You remind me of... a young me."
   },
   {
     "id": "page-04_b05",
@@ -101,9 +99,9 @@
     "emotion": "Neutral",
     "characterType": "EXTRA",
     "side": "NEUTRAL",
-    "voiceDescription": "High-energy, young adult, enthusiastic influencer tone",
-    "textWithCues": "[Enthusiastic, energetic] ...don't forget to smash that like button!",
-    "aiReasoning": "The target text is \"...DON'T FORGET TO SMASH THAT LIKE BUTTON!\". It is located in a rectangular box at the top left of the panel. Based on the structural rules, this is classified as NARRATION, acting as a voice-over or framing device. The text is in quotation marks and is a classic internet influencer catchphrase, suggesting the speaker is an off-panel streamer, podcaster, or similar character. Because the speaker is not identified in the panel and is likely a background framing element, I will classify them as an EXTRA of NEUTRAL side. The performance should reflect a typical, high-energy internet personality."
+    "voiceDescription": "Energetic, upbeat male voice, typical 'YouTuber' style",
+    "textWithCues": "[Upbeat, energetic] ...don't forget to smash that like button!",
+    "aiReasoning": "I see the text \"...DON'T FORGET TO SMASH THAT LIKE BUTTON!\". It's in a rectangular box, which usually indicates narration or a voiceover.\nGiven the phrasing, it sounds like an audio broadcast, likely from a podcaster or streamer (perhaps Bulk & Skull, though I can't be certain without more context).\nSince it's an off-screen voiceover, I will classify it as NARRATION.\nThe speaker is an EXTRA (Streamer/Podcaster).\nThe side is NEUTRAL.\nThe tone is energetic and promotional."
   },
   {
     "id": "page-04_b06",
@@ -120,10 +118,10 @@
     "ocr_text": "YOU THROW PUNCHES WITH PURPOSE, JASON. EACH ATTACK LEADING INTO THE NEXT. THERE'S A RAGE INSIDE OF YOU.",
     "type": "SPEECH",
     "speaker": "Green Ranger Shredder",
-    "emotion": "evaluating",
+    "emotion": "observant, analytical",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Calmly evaluating] You throw punches with purpose, Jason. Each attack leading into the next. There's a rage inside of you."
+    "textWithCues": "[Observant, calm tone] You throw punches with purpose, Jason. Each attack leading into the next. There's a rage inside of you."
   },
   {
     "id": "page-04_b07",
@@ -139,11 +137,10 @@
     },
     "ocr_text": "MIGHT WANNA SPICE UP THAT RESUMÉ, FOOT MASTER.",
     "type": "SPEECH",
-    "speaker": "Red Ranger",
-    "emotion": "mocking",
+    "speaker": "Jason Lee Scott",
+    "emotion": "sarcastic",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Mocking] Might wanna spice up that resumé, Foot Master."
+    "textWithCues": "[Sarcastically] Might wanna spice up that resumé, Foot Master."
   }
 ]

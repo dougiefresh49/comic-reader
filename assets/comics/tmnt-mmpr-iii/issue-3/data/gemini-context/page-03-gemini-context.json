@@ -13,13 +13,13 @@
     },
     "ocr_text": "BUT SERIOUSLY... NINJAS, ALIENS, SCARY EVIL RANGERS?!?",
     "type": "SPEECH",
-    "speaker": "Skull",
-    "emotion": "panicked, incredulous",
+    "speaker": "Bulk",
+    "emotion": "panicked and exasperated",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Nasally, slightly whiny, higher-pitched young male voice",
-    "textWithCues": "[Panicked and incredulous] But seriously... ninjas, aliens, scary evil rangers?!?",
-    "aiReasoning": "1. Locate: The text is in a speech bubble in the second panel.\n2. Classify: It's `SPEECH`.\n3. Analyze Speaker: The tail points off-panel, but following the dialogue flow from the previous panel (\"Well, Skull... this is the end\" -> \"Bulk, you always say that\" -> \"And I'm nearly almost always right\"), this line is a continuation of that conversation. The next lines are \"What's not trying to kill us?\" and \"You're not gonna say all this on the stream, right?\", followed by Bulk replying. Therefore, this is Skull speaking.\n4. Side: `NEUTRAL`. They are civilian bystanders/reporters.\n5. Importance: `MINOR`.\n6. Voice Description: Nasally, slightly whiny, higher-pitched young male voice.\n7. Emotion: He is listing dangerous things, using \"?!?\" punctuation, indicating panic and incredulity.\n8. Performance Cues: Add a panicked tone and a pause for the ellipsis."
+    "voiceDescription": "Young adult male, slightly nasal, dramatic, easily panicked",
+    "textWithCues": "[Panicked and exasperated, voice raising in pitch] But seriously... ninjas, aliens, scary evil Rangers?!?",
+    "aiReasoning": "I need to analyze the text \"BUT SERIOUSLY... NINJAS, ALIENS, SCARY EVIL RANGERS?!?\".\nThis is a speech bubble in the second panel.\nFollowing the dialogue flow from the first panel, the characters speaking off-screen are Bulk and Skull.\nBulk starts in panel 1: \"Well, Skull... this is the end.\" Skull replies, then Bulk again.\nIn panel 2, the tail for the target text points off to the left. Given the context of the next few bubbles (a mini-freakout followed by a decision to act \"heroic\" for the camera stream), this is Bulk speaking.\nBulk is a named secondary character, so he is classified as MINOR and NEUTRAL.\nHe is currently overwhelmed by the crazy situation they are in (ninjas, aliens, etc.).\nHis emotion is panicked and exasperated. The \"?!?\" punctuation emphasizes his disbelief and panic.\nI will add performance cues to reflect this panicked, exasperated tone."
   },
   {
     "id": "page-03_b02",
@@ -36,11 +36,12 @@
     "ocr_text": "WELL, SKULL... THIS IS THE END.",
     "type": "SPEECH",
     "speaker": "Bulk",
-    "emotion": "dramatic, resigned",
+    "emotion": "melodramatic, resigned",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Deep, slightly goofy but dramatic male voice, trying to sound like a serious reporter",
-    "textWithCues": "[Dramatic sigh] Well, Skull... this is the end."
+    "voiceDescription": "Comedic teenage male, slightly deep, dramatic and goofy tone",
+    "textWithCues": "[Sighs dramatically] Well, Skull... this is the end.",
+    "aiReasoning": "I see the text \"WELL, SKULL... THIS IS THE END.\". It is in a standard speech bubble.\nThe speaker is addressing \"Skull\", and the reply identifies the speaker as \"Bulk\".\nBulk is a known character from Power Rangers, usually comedic relief.\nImportance is MINOR. He is being melodramatic about the situation."
   },
   {
     "id": "page-03_b03",
@@ -57,12 +58,12 @@
     "ocr_text": "AND I'M NEARLY ALMOST ALWAYS RIGHT.",
     "type": "SPEECH",
     "speaker": "Bulk",
-    "emotion": "defensively confident",
+    "emotion": "defensive",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Brash, slightly pompous, overconfident male voice, American accent",
-    "textWithCues": "[Defensively confident] And I'm nearly almost always right.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"AND I'M NEARLY ALMOST ALWAYS RIGHT.\" is in the first panel, inside a speech bubble. The tail points off-panel, but context is key here.\n2.  **Analyze Context:**\n    *   The first bubble says \"WELL, SKULL... THIS IS THE END.\" This implies Bulk is speaking to Skull.\n    *   The second bubble replies \"BULK, YOU ALWAYS SAY THAT.\" This confirms Skull is talking to Bulk.\n    *   The target bubble \"AND I'M NEARLY ALMOST ALWAYS RIGHT.\" is a response to Skull, so the speaker is Bulk. The visual \"REC\" overlay indicates we are looking through a camera viewfinder. Later panels show Bulk speaking while Skull films.\n    *   **Speaker:** Bulk\n    *   **Side:** NEUTRAL (they are comic relief civilian bystanders trying to get a scoop).\n    *   **Importance:** MINOR.\n    *   **Voice Description:** Brash, slightly pompous, overconfident male voice.\n    *   **Emotion:** Defending his own dramatic nature, unearned confidence.\n3.  **Performance Cues:** Standard speech. The line is meant to be funny because \"nearly almost always\" is contradictory.\n    *   `textWithCues`: \"[Defensively confident] And I'm nearly almost always right.\""
+    "voiceDescription": "Deep, slightly goofy, somewhat pompous male voice, American accent",
+    "textWithCues": "[defensively] AND I'M NEARLY ALMOST ALWAYS RIGHT.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"AND I'M NEARLY ALMOST ALWAYS RIGHT.\" is inside a speech bubble in the top right panel. It's part of an off-screen conversation. The bubble type is a standard speech bubble, indicating `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The preceding bubbles in the sequence are \"WELL, SKULL... THIS IS THE END.\" (Bulk) and \"BULK, YOU ALWAYS SAY THAT.\" (Skull). The target text is the logical response from the first speaker, defending his statement. Therefore, the speaker is Bulk.\n    *   **Side:** Bulk is a classic `NEUTRAL` character in Power Rangers, often caught in the crossfire.\n    *   **Importance:** He is a named, recurring character, so `MINOR`.\n    *   **Voice Description:** Bulk has a distinct, somewhat deep, pompous, but often foolish-sounding voice.\n    *   **Emotion:** He is being defensive here, justifying his frequent claims that \"this is the end.\"\n3.  **Performance Cues:** The text is plain, not bolded or italicized. A defensive tone fits best."
   },
   {
     "id": "page-03_b04",
@@ -79,11 +80,12 @@
     "ocr_text": "OH, OF COURSE NOT. I'M GONNA BE HEROIC.",
     "type": "SPEECH",
     "speaker": "Bulk",
-    "emotion": "sarcastic, confident",
+    "emotion": "sarcastic confidence",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Deep, slightly goofy and arrogant male teen/young adult voice.",
-    "textWithCues": "[Sarcastically, full of unearned confidence] Oh, of course not. I'm gonna be heroic."
+    "voiceDescription": "Deep, slightly goofy, overconfident young adult male voice.",
+    "textWithCues": "[Sarcastically confident] Oh, of course not. I'm gonna be heroic.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"OH, OF COURSE NOT. I'M GONNA BE HEROIC.\" is in a speech bubble in the second panel. The tail points downwards, off-panel, but context dictates it's a conversation between Bulk and Skull. It is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The conversation is happening behind the camera. Skull asks a question, and Bulk replies. We see Bulk in the next panel holding a microphone, establishing he's the one \"hosting\" the stream. The speaker is Bulk.\n    *   **Side:** Bulk is a `NEUTRAL` (comic relief) character.\n    *   **Importance:** `MINOR`.\n    *   **Voice Description:** Deep, slightly goofy, overconfident young adult male voice.\n    *   **Emotion:** He is being sarcastic and feigning bravery for his intended audience.\n3.  **Performance Cues:** He's brushing off Skull's worry. A sarcastic or dismissive tone fits perfectly."
   },
   {
     "id": "page-03_b05",
@@ -100,11 +102,12 @@
     "ocr_text": "NOT MANY WOULD VENTURE SO CLOSE TO DANGER, BUT CHANNEL SIX VIEWERS DESERVE TO SEE THE TRUTH FIRST HAND.",
     "type": "SPEECH",
     "speaker": "Bulk",
-    "emotion": "faux-dramatic, performing",
+    "emotion": "faux-bravery",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Loud, slightly goofy male voice, trying to sound like a professional, brave reporter",
-    "textWithCues": "[Faux-dramatic reporter voice] Not many would venture so close to danger, but Channel Six viewers deserve to see the truth first hand."
+    "voiceDescription": "Male, deep, slightly goofy voice attempting a serious, dramatic news reporter persona.",
+    "textWithCues": "[Speaking dramatically to the camera, feigning bravery] Not many would venture so close to danger, but Channel Six viewers deserve to see the truth first hand.",
+    "aiReasoning": "The text \"NOT MANY WOULD VENTURE SO CLOSE TO DANGER, BUT CHANNEL SIX VIEWERS DESERVE TO SEE THE TRUTH FIRST HAND.\" is in a speech bubble. The tail points to the character holding the microphone, who identified himself in the previous bubble as \"Intern Farkas Bulkmeier\", commonly known as Bulk. He is a minor comic relief character from Power Rangers, usually neutral but leaning towards good. He is trying to act like a brave, professional reporter for the camera, although his wide eyes show he's actually scared. I'll add cues to reflect this \"faux-bravery\" reporter persona."
   },
   {
     "id": "page-03_b06",
@@ -124,9 +127,8 @@
     "emotion": "terrified",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Teenage male, slightly deep and pompous voice, trying to sound confident but clearly terrified.",
-    "textWithCues": "[Trembling, voice shaking as he tries to maintain his presenter persona] And if you'd like to reward my bravery... and that of my faithful sidekick, Skull...",
-    "aiReasoning": "I see the text \"AND IF YOU'D LIKE TO REWARD MY BRAVERY, AND THAT OF MY FAITHFUL SIDEKICK, SKULL...\" in a standard speech bubble in the bottom panel.\nThe tail points to the character who previously identified himself as \"Intern Farkas Bulkmeier\". Given the character list, this is \"Bulk\".\nHe is a civilian recording the battle, so his side is NEUTRAL.\nHis importance is MINOR as he is a named, recurring comedic relief character.\nHe is sweating profusely and has wide, terrified eyes, contrasting with his attempt to sound heroic and beg for rewards. The ellipsis at the end suggests he's trailing off, likely frozen in fear.\nI will add cues to reflect his trembling voice and nervous state while he tries to maintain his 'reporter' persona."
+    "voiceDescription": "Loud, boisterous, slightly nasal male voice, confident but prone to cowardice",
+    "textWithCues": "[Nervously trailing off] And if you'd like to reward my b-bravery, and that of my faithful sidekick, Skull..."
   },
   {
     "id": "page-03_b07",
@@ -146,9 +148,8 @@
     "emotion": "exasperated",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Gruff, slightly whiny, comical young adult male voice",
-    "textWithCues": "[Exasperated] What's not trying to kill us?",
-    "aiReasoning": "I have located the text \"WHAT'S NOT TRYING TO KILL US?\". It is a speech bubble in the second panel.\nThe tail of the bubble connects to the previous bubble \"BUT SERIOUSLY... NINJAS, ALIENS, SCARY EVIL RANGERS?!?\", whose tail points off-panel towards where Bulk is located in the next panel. The dialogue flow confirms this is Bulk speaking to Skull.\nBulk is a known character, considered MINOR in the grand scheme of Power Rangers/TMNT but named here. He acts as comic relief and a bystander, so he is NEUTRAL.\nHis emotion here is exasperated and scared by the chaotic situation around them."
+    "voiceDescription": "Deeper, slightly goofy, blustering teenage male voice",
+    "textWithCues": "[Exasperated] WHAT'S NOT TRYING TO KILL US?"
   },
   {
     "id": "page-03_b08",
@@ -165,12 +166,12 @@
     "ocr_text": "THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.",
     "type": "SPEECH",
     "speaker": "Bulk",
-    "emotion": "serious, fake professional",
+    "emotion": "putting on a brave, dramatic reporter persona",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Boisterous, slightly gruff male voice, trying to sound like a professional and serious news anchor",
-    "textWithCues": "[In a fake, serious reporter voice] THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.",
-    "aiReasoning": "I have located the text \"THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.\" in the middle panel. It's in a speech bubble.\nThe tail of the bubble points to the character holding the microphone, who identifies himself in the text as \"Farkas Bulkmeier\". This matches the character \"Bulk\".\nBulk is a neutral/civilian character. He is a named secondary character, so his importance is MINOR.\nHe is putting on a \"serious news reporter\" persona for the camera. His expression is intense and focused.\nThe performance should reflect him trying to sound professional and brave despite the chaotic situation."
+    "voiceDescription": "Deep, boisterous male voice, trying to sound professional but a bit goofy.",
+    "textWithCues": "[Adopting a dramatic, fake news anchor persona] This is Intern Farkas Bulkmeier bringing you exclusive footage of the Power Rangers battling another hostile alien invasion.",
+    "aiReasoning": "I located the text \"THIS IS INTERN FARKAS BULKMEIER BRINGING YOU EXCLUSIVE FOOTAGE OF THE POWER RANGERS BATTLING ANOTHER HOSTILE ALIEN INVASION.\". It's a speech bubble.\nThe tail points to the larger man holding a microphone. Based on my knowledge and the text itself, this is Bulk.\nBulk is a MINOR character, generally NEUTRAL (comic relief civilian).\nHis emotion here is trying to be \"heroic\" and professional, putting on a brave face for the camera as a reporter.\nI'll add a cue to reflect him putting on a fake news anchor voice."
   },
   {
     "id": "page-03_b09",
@@ -187,11 +188,12 @@
     "ocr_text": "BULK, YOU ALWAYS SAY THAT.",
     "type": "SPEECH",
     "speaker": "Skull",
-    "emotion": "exasperated",
+    "emotion": "matter-of-fact",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Nasally, slightly higher-pitched, goofy male voice.",
-    "textWithCues": "[Exasperated] Bulk, you always say that."
+    "voiceDescription": "Goofy, slightly nasal male voice, American accent",
+    "textWithCues": "[Matter-of-factly] Bulk, you always say that.",
+    "aiReasoning": "The text \"BULK, YOU ALWAYS SAY THAT.\" is located in a speech bubble in the top right panel. The tail points off-panel, but the conversation is clearly between Bulk and his constant companion, Skull. The text addresses \"Bulk\", so the speaker is Skull. Skull is a named, secondary character (MINOR) who is generally NEUTRAL (comic relief civilian). His voice is typically goofy and slightly high-pitched or nasal. He is responding to Bulk's dramatic claim that \"this is the end\", so his tone should be matter-of-fact or slightly exasperated, as he's heard it before."
   },
   {
     "id": "page-03_b10",
@@ -205,13 +207,14 @@
       "class": "speech bubble",
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-03/page-03-crop-010-x937-y844.jpg"
     },
-    "ocr_text": "YOU’RE NOT GONNA SAY ALL THIS ON THE STREAM, RIGHT?",
+    "ocr_text": "YOU'RE NOT GONNA SAY ALL THIS ON THE STREAM, RIGHT?",
     "type": "SPEECH",
     "speaker": "Skull",
-    "emotion": "anxious, questioning",
+    "emotion": "incredulous",
     "characterType": "MINOR",
     "side": "NEUTRAL",
-    "voiceDescription": "High-pitched, slightly nasally teenage/young adult male voice, American accent",
-    "textWithCues": "[Anxiously] You're not gonna say all this on the stream, right?"
+    "voiceDescription": "Nasally, slightly high-pitched teenage male voice",
+    "textWithCues": "[Incredulous] You're not gonna say all this on the stream, right?",
+    "aiReasoning": "The text is located in a speech bubble in the second panel. The conversation is happening off-screen as a voice-over for a video recording (indicated by the 'REC' graphic).\nBased on the flow of conversation and the next panel where Bulk is the \"reporter\" and Skull is the \"cameraman\", Bulk is freaking out about the monsters.\nThe dialogue order is likely:\nBulk: \"But seriously... ninjas, aliens, scary evil rangers?!?\"\nBulk: \"What's not trying to kill us?\"\nSkull: \"You're not gonna say all this on the stream, right?\"\nBulk: \"Oh, of course not. I'm gonna be heroic.\"\nTherefore, the target text is spoken by Skull, who is questioning Bulk's plan for the broadcast.\nSkull is a minor character with a distinctively nasally, slightly higher-pitched voice compared to Bulk."
   }
 ]

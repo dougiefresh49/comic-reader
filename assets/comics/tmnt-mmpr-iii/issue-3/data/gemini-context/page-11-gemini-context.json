@@ -16,9 +16,9 @@
     "speaker": "Narrator",
     "emotion": "Neutral",
     "characterType": "MAJOR",
-    "side": "VILLAIN",
-    "voiceDescription": "Deep, raspy, menacing male voice",
-    "textWithCues": "[Sinister, calculating tone] \"But I don't intend to leave them anywhere to run to.\""
+    "side": "HERO",
+    "textWithCues": "[Determined] \"But I don't intend to leave them anywhere to run to.\"",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"\"BUT I DON'T INTEND TO LEAVE THEM ANYWHERE TO RUN TO.\"\" is in a teal rectangular box in the bottom right panel. According to the rules, rectangular boxes are `NARRATION`. However, the quotation marks and the teal color (matching Leonardo's mask) strongly imply this is a character's voiceover, specifically Leonardo's, responding to a previous comment (likely from Donatello, given the purple box in the first panel).\n2.  **Analyze Context:**\n    *   Speaker: Leonardo (inferred from color coding and context).\n    *   Side: HERO.\n    *   Importance: MAJOR.\n    *   Emotion: The characters in the panel look serious and determined as they watch the massive structure above. The text itself conveys a strong, resolute counter-plan.\n3.  **Performance Cues:** The line is a determined statement of intent. `[Determined]` is a fitting cue."
   },
   {
     "id": "page-11_b02",
@@ -36,11 +36,10 @@
     "type": "NARRATION",
     "speaker": "Narrator",
     "emotion": "Neutral",
-    "characterType": "MAJOR",
+    "characterType": "EXTRA",
     "side": "NEUTRAL",
-    "voiceDescription": "Clear, observational tone, slightly tense",
-    "textWithCues": "[Observational, slight pause] ...They're heading in another direction.",
-    "aiReasoning": "The text \"...THEY'RE HEADING IN ANOTHER DIRECTION.\" is located in a purple rectangular box at the top left of the page. This indicates it is NARRATION, likely representing an off-panel voice or a character's voiceover. The presence of quotation marks suggests it's a piece of dialogue being presented narratively. Given the context of a giant flying fortress (the Technodrome) appearing, the speaker is likely observing this event. Since the specific character isn't explicitly identifiable from the box alone, I will use \"Narrator\" as the speaker. The tone should be observant and perhaps slightly tense given the massive threatening object. The ellipsis at the beginning suggests a continuation of a previous thought or a slight pause before speaking."
+    "voiceDescription": "Clear, observant, slightly tense voice",
+    "textWithCues": "[Observant] ...They're heading in another direction."
   },
   {
     "id": "page-11_b03",
@@ -56,12 +55,12 @@
     },
     "ocr_text": "BUT, MASTER SHREDDER, THE TURTLES AND RANGERS ARE ON THE RUN. WE SHOULD CONTINUE TO ADVANCE UNTIL--",
     "type": "SPEECH",
-    "speaker": "Putty Foot Soldier",
-    "emotion": "questioning, urgent",
+    "speaker": "Foot Soldier",
+    "emotion": "eager",
     "characterType": "EXTRA",
     "side": "VILLAIN",
-    "voiceDescription": "Villain Extra: Subservient, slightly gravelly male voice",
-    "textWithCues": "[Respectfully but urgently] But, Master Shredder, the Turtles and Rangers are on the run. We should continue to advance until--"
+    "voiceDescription": "Subservient male voice, slightly urgent, muffled slightly by a mask",
+    "textWithCues": "[Subserviently, slightly urgent] But, Master Shredder, the Turtles and Rangers are on the run. We should continue to advance until--"
   },
   {
     "id": "page-11_b04",
@@ -77,12 +76,12 @@
     },
     "ocr_text": "WARRIORS AROUND THE WORLD, DISENGAGE AND RETURN TO THE MOON PALACE.",
     "type": "SPEECH",
-    "speaker": "Green Ranger Shredder",
-    "emotion": "commanding",
+    "speaker": "Shredder",
+    "emotion": "authoritative, commanding",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Authoritatively, projecting his voice] Warriors around the world, disengage and return to the Moon Palace.",
-    "aiReasoning": "The target text is \"WARRIORS AROUND THE WORLD, DISENGAGE AND RETURN TO THE MOON PALACE.\" This is located in a speech bubble in the middle panel.\nThe tail of the speech bubble points to the character wearing the green and gold armor with a cape, who is addressed as \"Master Shredder\" in the next bubble. Because he is wearing a mashup of Shredder's armor and the Green Ranger's suit, I will name him \"Green Ranger Shredder\". He is clearly a major villain.\nHe is issuing a command to his troops globally, so his tone should be authoritative and projecting."
+    "textWithCues": "[Commanding] Warriors around the world, disengage and return to the Moon Palace.",
+    "aiReasoning": "I see the text \"WARRIORS AROUND THE WORLD, DISENGAGE AND RETURN TO THE MOON PALACE.\" in a speech bubble.\nThe tail points to Shredder, who is wearing a modified Green Ranger suit.\nHe is a major villain giving a global command. The tone should be authoritative and commanding."
   },
   {
     "id": "page-11_b05",
@@ -98,10 +97,11 @@
     },
     "ocr_text": "AND WE WILL.",
     "type": "SPEECH",
-    "speaker": "Green Ranger Shredder",
-    "emotion": "confident",
+    "speaker": "Shredder",
+    "emotion": "confident, authoritative",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Confidently] And we will."
+    "textWithCues": "[Confidently] And we will.",
+    "aiReasoning": "1. **Locate & Classify:** The text \"AND WE WILL.\" is in a speech bubble in the middle panel. The tail points to Shredder (in Green Ranger armor). It is `SPEECH`.\n2. **Analyze Context:** The speaker is Shredder. He is a `VILLAIN` and a `MAJOR` character. The emotion is confident and authoritative, as he is interrupting a subordinate to state his plan.\n3. **Performance Cues:** He is cutting off the Foot Soldier's sentence. The delivery should be firm and resolute. Add a `[Confidently]` cue."
   }
 ]

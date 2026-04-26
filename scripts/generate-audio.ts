@@ -273,7 +273,12 @@ function getVoiceId(
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { book: string; issue: string; page?: string } {
+function parseArgs(): {
+  book: string;
+  issue: string;
+  page?: string;
+  onlyFlagged: boolean;
+} {
   const args = process.argv.slice(2);
 
   // Check for help flag
@@ -284,13 +289,14 @@ Usage: pnpm run generate-audio [options]
 Options:
   --issue=N, --issue N        Issue number (e.g., --issue=2 for issue-2, default: issue-2)
   --page=N, --page N          Process only a specific page (e.g., --page=06 for page-06.jpg)
+  --only-flagged              Only regenerate bubbles marked needsAudio=true (set by apply-fixes)
   --help, -h                  Show this help message
 
 Examples:
-  pnpm run generate-audio                    Generate audio for all pages in issue-2
-  pnpm run generate-audio --issue=1         Generate audio for all pages in issue-1
-  pnpm run generate-audio --page=06         Generate audio for page-06.jpg only
-  pnpm run generate-audio --issue=1 --page=03  Generate audio for page-03.jpg in issue-1
+  pnpm run generate-audio                          Generate audio for all pages in issue-2
+  pnpm run generate-audio --issue=1               Generate audio for all pages in issue-1
+  pnpm run generate-audio --page=06               Generate audio for page-06.jpg only
+  pnpm run generate-audio --issue=1 --only-flagged  Regenerate only fixed bubbles
 `);
     process.exit(0);
   }
@@ -298,6 +304,7 @@ Examples:
   let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
   let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let page: string | undefined;
+  let onlyFlagged = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -326,7 +333,6 @@ Examples:
     if (arg.startsWith("--page=")) {
       const pageNum = arg.split("=")[1]?.trim();
       if (pageNum) {
-        // Normalize page number (e.g., "6" -> "06", "06" -> "06")
         page = pageNum.padStart(2, "0");
       }
     }
@@ -337,9 +343,12 @@ Examples:
         page = pageNum.padStart(2, "0");
       }
     }
+    if (arg === "--only-flagged") {
+      onlyFlagged = true;
+    }
   }
 
-  return { book, issue, page };
+  return { book, issue, page, onlyFlagged };
 }
 
 /**
@@ -350,7 +359,7 @@ async function main() {
     console.log("🎙️  Starting audio generation...\n");
 
     // Parse arguments
-    const { book, issue, page } = parseArgs();
+    const { book, issue, page, onlyFlagged } = parseArgs();
 
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", book);
@@ -365,7 +374,9 @@ async function main() {
     console.log(`📖 Cache: ${CACHE_FILE}`);
     console.log(`🎭 Castlist: ${CASTLIST_FILE}`);
     console.log(`💾 Audio output: ${AUDIO_DIR}`);
-    console.log(`⏱️  Timestamps: ${TIMESTAMPS_FILE}\n`);
+    console.log(`⏱️  Timestamps: ${TIMESTAMPS_FILE}`);
+    if (onlyFlagged) console.log(`⚡ Mode: only-flagged (needsAudio bubbles)`);
+    console.log();
 
     // Check API key
     const apiKey = env.ELEVENLABS_API_KEY;
@@ -453,6 +464,12 @@ async function main() {
 
         // Skip ignored bubbles
         if (bubble.ignored) {
+          skipped++;
+          continue;
+        }
+
+        // In --only-flagged mode, skip bubbles not marked for regeneration
+        if (onlyFlagged && !bubble.needsAudio) {
           skipped++;
           continue;
         }
@@ -586,6 +603,9 @@ async function main() {
               : null,
           };
 
+          // Clear the flag now that audio has been regenerated
+          if (bubble.needsAudio) delete bubble.needsAudio;
+
           processed++;
 
           // Wait 500ms between API calls to prevent rate limiting
@@ -607,12 +627,26 @@ async function main() {
       console.log();
     }
 
-    // Save timestamps
+    // Save timestamps — merge into existing file in --only-flagged mode
     console.log("⏱️  Saving audio timestamps...");
-    await fs.writeFile(TIMESTAMPS_FILE, JSON.stringify(timestamps, null, 2));
-    console.log(
-      `   ✓ Saved timestamps for ${Object.keys(timestamps).length} bubbles to ${TIMESTAMPS_FILE}\n`,
+    let finalTimestamps = timestamps;
+    if (onlyFlagged && (await fs.pathExists(TIMESTAMPS_FILE))) {
+      const existing = (await fs.readJson(TIMESTAMPS_FILE)) as TimestampsMap;
+      finalTimestamps = { ...existing, ...timestamps };
+    }
+    await fs.writeFile(
+      TIMESTAMPS_FILE,
+      JSON.stringify(finalTimestamps, null, 2),
     );
+    console.log(
+      `   ✓ Saved timestamps for ${Object.keys(finalTimestamps).length} bubbles to ${TIMESTAMPS_FILE}\n`,
+    );
+
+    // In --only-flagged mode, write bubbles.json back to clear needsAudio flags
+    if (onlyFlagged) {
+      await fs.writeJson(CACHE_FILE, cache, { spaces: 2 });
+      console.log(`   ✓ Cleared needsAudio flags in bubbles.json\n`);
+    }
 
     // Save no-match characters
     if (noMatches.length > 0) {

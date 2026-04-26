@@ -15,11 +15,10 @@
     "type": "NARRATION",
     "speaker": "Narrator",
     "emotion": "Neutral",
-    "characterType": "EXTRA",
-    "side": "NEUTRAL",
-    "voiceDescription": "Tense, concerned voice observing the action with growing alarm.",
-    "textWithCues": "[Tense, muttering] This is out of control...",
-    "aiReasoning": "The target text is \"THIS IS OUT OF CONTROL...\". It is located in a rectangular box with a red border in the bottom right panel. The text is enclosed in quotation marks.\nBecause it is in a rectangular box, it functions as `NARRATION` or a voiceover. The quotation marks suggest it's a direct quote from a character observing the scene, acting as the narrator for this moment.\nThe context of the text implies a reaction to the chaotic fight happening in the panels above. The speaker is unknown, but the tone is clearly one of concern or realization that things are escalating.\nSince the specific character isn't identified, I will classify the speaker generically as a \"Narrator\" or \"Voiceover\".\nThe ellipsis at the end indicates the voice trailing off or pausing in realization.\nI will add performance cues to reflect a tense, observant tone with a slight pause at the end."
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Frustrated, realizing he is losing the upper hand] \"This is out of control...\"",
+    "aiReasoning": "I see the text \"\"THIS IS OUT OF CONTROL...\"\" in a red rectangular box in the bottom right panel.\nSince it's a rectangular box, I will classify it as NARRATION, which in this case represents a character's internal monologue or a broadcast over comms.\nThe red color of the box strongly suggests a villain, and given the context of the Krang android body getting smashed with a mutagen canister, it is most likely Krang reacting to the situation.\nThe importance is MAJOR.\nThe emotion is frustration and a sense of losing control, indicated by the text itself and the trailing ellipsis."
   },
   {
     "id": "page-07_b02",
@@ -34,13 +33,13 @@
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-07/page-07-crop-002-x133-y2811.jpg"
     },
     "ocr_text": "BECAUSE SOMETIMES THE OLD WAYS ARE THE BEST WAYS.",
-    "type": "NARRATION",
-    "speaker": "Narrator",
-    "emotion": "Neutral",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "confident, resolute",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Internal thought, resolute] Because sometimes the old ways are the best ways."
+    "textWithCues": "[Confidently] Because sometimes the old ways are the best ways.",
+    "aiReasoning": "The text \"BECAUSE SOMETIMES THE OLD WAYS ARE THE BEST WAYS.\" is in an oval speech bubble in the bottom left panel. The tail points off-panel to the left, from where the canister is being thrown. Given the flow of the conversation in the preceding panels (\"A teacher passing knowledge...\", \"It's called... a legacy.\"), this is a continuation of Leonardo's monologue as he fights. He is justifying his actions or tactics. Therefore, the speaker is Leonardo. He is a Hero and a Major character. The emotion is confident and resolute, fitting an action quip."
   },
   {
     "id": "page-07_b03",
@@ -56,12 +55,12 @@
     },
     "ocr_text": "A TEACHER PASSING KNOWLEDGE ON TO HIS STUDENTS.",
     "type": "SPEECH",
-    "speaker": "Leonardo",
-    "emotion": "determined",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant",
     "characterType": "MAJOR",
-    "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Determined] A teacher passing knowledge on to his students."
+    "side": "VILLAIN",
+    "textWithCues": "[Arrogantly lecturing] A teacher passing knowledge on to his students.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"A TEACHER PASSING KNOWLEDGE ON TO HIS STUDENTS.\" is located in a speech bubble in the middle panel. The tail of the bubble points to the red, muscular villain with an exposed brain. This is SPEECH.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is clearly Lord Zedd from Power Rangers, based on his appearance (red flesh, metal armor, exposed brain, Z-staff).\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** He is speaking in a haughty, lecturing tone while engaged in combat. He's rationalizing his violent actions as \"teaching\".\n3.  **Performance Cues:** The text is standard, not bolded or shouted. The tone should be arrogant and pedantic, typical of a villain monologuing during a fight."
   },
   {
     "id": "page-07_b04",
@@ -78,12 +77,10 @@
     "ocr_text": "YOU KNOW THERE'S ANOTHER WORD FOR THAT--",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "snarky",
+    "emotion": "Sarcastic",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Snarky, while dodging] You know there's another word for that--",
-    "aiReasoning": "The text \"YOU KNOW THERE'S ANOTHER WORD FOR THAT--\" is in a speech bubble pointing to Leonardo, who is dodging backward from an attack. This is `SPEECH`.\nThe speaker is Leonardo, a `HERO` and a `MAJOR` character.\nHe is engaged in banter during combat, setting up a retort. His expression isn't clearly visible as he's facing away/in motion, but the context of the dialogue is slightly snarky or conversational despite the fight.\nThe dash at the end indicates he's either interrupted or deliberately trailing off before delivering the punchline."
+    "textWithCues": "[Conversational, slightly sarcastic] YOU KNOW THERE'S ANOTHER WORD FOR THAT--"
   },
   {
     "id": "page-07_b05",
@@ -100,11 +97,11 @@
     "ocr_text": "IT'S CALLED... A LEGACY.",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "determined",
+    "emotion": "determined, forceful",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Determined, pausing for dramatic effect before the final word] It's called... a legacy.",
-    "aiReasoning": "The target text is \"IT'S CALLED... A LEGACY.\" located in a speech bubble in the fourth panel.\nThe tail points to the blue-masked Ninja Turtle, who is Leonardo.\nLeonardo is a major hero character.\nHe is currently delivering a strong punch to the enemy, so his tone should be forceful and determined.\nThe ellipsis suggests a dramatic pause right before the word \"LEGACY\", coinciding with the impact of the punch."
+    "textWithCues": "[Determined, delivering a blow] It's called... a legacy.",
+    "aiReasoning": "The text \"IT'S CALLED... A LEGACY.\" is in a speech bubble pointing to Leonardo, the blue-masked Ninja Turtle. He is currently punching the villain, Lord Zedd, in the face. The tone is determined and forceful, emphasizing the point he's making while delivering a strong attack. The ellipsis suggests a dramatic pause before the final word."
   },
   {
     "id": "page-07_b06",
@@ -120,12 +117,12 @@
     },
     "ocr_text": "LIKE MY MASTER.",
     "type": "SPEECH",
-    "speaker": "Cyborg Villain",
-    "emotion": "intense",
+    "speaker": "Lord Zedd",
+    "emotion": "serious",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, slightly distorted robotic/cyborg male voice, authoritative and menacing",
-    "textWithCues": "[Harsh, distorted voice] LIKE MY MASTER."
+    "textWithCues": "[Serious] Like my master.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"LIKE MY MASTER.\" is found in the top panel within a speech bubble. The tail points off-panel to the left.\n2.  **Analyze Context:** The main character in the panel is Leonardo, who reacts to this statement in the subsequent bubbles. Based on the characters present in the rest of the page (Leonardo fighting a red, muscular villain), the off-panel speaker is the villain he is currently engaged with. Consulting the provided list of unique characters, this villain is Lord Zedd. Zedd is a major villain.\n3.  **Performance Cues:** The text is a straightforward statement, likely completing a thought from the previous page. A serious, villainous tone is appropriate."
   },
   {
     "id": "page-07_b07",
@@ -141,13 +138,12 @@
     },
     "ocr_text": "FORGING THEM.",
     "type": "SPEECH",
-    "speaker": "Cyborg Villain",
-    "emotion": "aggressive, menacing",
+    "speaker": "Lord Zedd",
+    "emotion": "authoritative, forceful",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "",
-    "textWithCues": "[Menacingly, with exertion] Forging them.",
-    "aiReasoning": "The text \"FORGING THEM.\" is located in a speech bubble in the middle panel. The tail of the bubble points towards the red, robotic character with an exposed brain, who is attacking Leonardo. Based on the provided character list, this is the 'Cyborg Villain'. The character is actively engaged in combat, bringing a weapon down hard, which suggests a tone of exertion and malice. As a villain delivering a line about 'forging' students while attacking them, the delivery should be menacing and aggressive."
+    "voiceDescription": null,
+    "textWithCues": "[Forcefully] Forging them."
   },
   {
     "id": "page-07_b08",
@@ -161,12 +157,34 @@
       "class": "speech bubble",
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-07/page-07-crop-008-x356-y265.jpg"
     },
-    "ocr_text": "... OOOOOKAY.",
+    "ocr_text": "... OOOOKAY.",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "hesitant, skeptical",
+    "emotion": "hesitant, awkward",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Hesitantly, drawn out] ... oooookay."
+    "textWithCues": "[Hesitantly] ... Oooookay.",
+    "aiReasoning": "The text is \"... OOOOKAY.\" located in a speech bubble connected to a sequence starting with \"LIKE MY MASTER.\" in the first panel.\nThe panel shows a close-up of Leonardo's face, reacting to something. The flow of dialogue suggests Leonardo is the one speaking, pausing and reacting awkwardly before continuing his sentence in the next panel (\"YOU KNOW THERE'S ANOTHER WORD FOR THAT--\").\nThe speaker is Leonardo, a MAJOR character and HERO.\nThe \"...\" and drawn out \"OOOO\" indicate a hesitant, awkward pause.\nI will add a cue for hesitation/awkwardness."
+  },
+  {
+    "id": "page-07_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 801,
+      "y": 443,
+      "width": 208,
+      "height": 68,
+      "confidence": 0.31574803590774536,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-07/page-07-crop-010-x801-y443.jpg"
+    },
+    "ocr_text": "There is no legible text in the provided image. It appears to be a blank area within a comic book panel.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "arrogant, forceful",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Forcefully, punctuating a strike] Forging them.",
+    "aiReasoning": "The provided text string in the prompt (\"There is no legible text...\") appears to be an error from the text extraction process, likely due to a misaligned bounding box or an OCR failure. Based on the provided coordinates (scaled) and the bounding box dimensions (width:208, height:68), the most probable intended target is the short speech bubble \"FORGING THEM.\" located in the middle-right of the main action panel. \n\nI will analyze this text. The speaker is Lord Zedd, who is currently attacking Leonardo with his staff. He is continuing his previous thought (\"A TEACHER PASSING KNOWLEDGE ON TO HIS STUDENTS.\"), framing his violent attack as \"forging\" his \"student\". He is a major villain character. The delivery should be forceful, arrogant, and physical, as it accompanies a strike."
   }
 ]

@@ -13,12 +13,11 @@
     },
     "ocr_text": "JOIN US AND I WILL GUIDE YOU WITHOUT JUDGMENT.",
     "type": "SPEECH",
-    "speaker": "Shredder",
-    "emotion": "manipulative",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "persuasive",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": null,
-    "textWithCues": "[Persuasive, authoritative tone] Join us and I will guide you without judgment."
+    "textWithCues": "[Persuasively] Join us and I will guide you without judgment."
   },
   {
     "id": "page-09_b02",
@@ -38,9 +37,9 @@
     "emotion": "sarcastic, disgusted",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "Young male, confident, athletic, slightly exasperated",
-    "textWithCues": "[Sarcastically] Please... don't make me throw up in my helmet.",
-    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble pointing to the Red Ranger in the middle-left panel. It is classified as `SPEECH`.\n2.  **Analyze Context:** The speaker is the Red Ranger (Jason). He is a `HERO` and a `MAJOR` character. He is responding to Shredder's grand villain speech. His expression is hidden by the helmet, but his posture and the dialogue itself indicate sarcasm and disgust.\n3.  **Performance Cues:** The text includes an ellipsis after \"PLEASE\", indicating a pause. The tone should be dripping with sarcasm and mild disgust at Shredder's cliché villain offer."
+    "voiceDescription": "",
+    "textWithCues": "[Sarcastically, with mock disgust] Please... don't make me throw up in my helmet.",
+    "aiReasoning": "I see the text \"PLEASE... DON'T MAKE ME THROW UP IN MY HELMET.\" in a speech bubble.\nThe tail points to the Red Ranger (Jason).\nHe is a HERO, MAJOR importance.\nHe is responding to Shredder's grandstanding with sarcasm and disgust."
   },
   {
     "id": "page-09_b03",
@@ -56,11 +55,12 @@
     },
     "ocr_text": "JASON, I'VE BEEN WHERE YOU ARE.",
     "type": "SPEECH",
-    "speaker": "Shredder",
+    "speaker": "Green Ranger Shredder",
     "emotion": "manipulative",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Calmly, manipulating] Jason, I've been where you are."
+    "voiceDescription": null,
+    "textWithCues": "[Manipulative tone] JASON, I'VE BEEN WHERE YOU ARE."
   },
   {
     "id": "page-09_b04",
@@ -76,12 +76,12 @@
     },
     "ocr_text": "VERY WELL. STOCKMAN, WHENEVER YOU'RE READY...",
     "type": "SPEECH",
-    "speaker": "Shredder",
-    "emotion": "commanding",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "calm, commanding",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, menacing, raspy male voice, commanding tone",
-    "textWithCues": "[Commanding, slightly disappointed] Very well. [Pause] Stockman, whenever you're ready..."
+    "textWithCues": "[Calmly, issuing a command] Very well. Stockman, whenever you're ready...",
+    "aiReasoning": "The text \"VERY WELL. STOCKMAN, WHENEVER YOU'RE READY...\" is in a speech bubble.\nThe tail points to the character in green armor with a helmet, identified from the context list as Green Ranger Shredder.\nShredder is a main villain, so Importance is MAJOR and Side is VILLAIN.\nHe has just been rejected by the Red Ranger and is now calmly ordering Baxter Stockman to initiate an attack (which results in the explosion in the next panel). His expression (though masked) and posture suggest a calm, authoritative, and slightly disappointed demeanor.\nI will add a cue for a calm, commanding tone."
   },
   {
     "id": "page-09_b05",
@@ -100,10 +100,9 @@
     "speaker": "Female Soldier",
     "emotion": "frustrated",
     "characterType": "EXTRA",
-    "side": "NEUTRAL",
-    "voiceDescription": "Authoritative female voice, mid-30s, expressing sudden frustration.",
-    "textWithCues": "[Frustrated] Damn it.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"DAMN IT.\" is in a speech bubble in the middle panel. The tail points to a female character with white hair holding a gun amidst falling debris. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to a woman in tactical gear commanding the other soldiers. She is not one of the uniquely identified characters (Shredder, Red Ranger). I will label her as \"Female Soldier\" or \"Commander\". Given she's leading the squad, \"Commander\" might be slightly better, but \"Female Soldier\" is safe. Let's go with \"Female Soldier\".\n    *   **Side:** These appear to be generic human soldiers caught in the villain's attack. They are likely `NEUTRAL` or allied with the heroes, but primarily serve as collateral damage here. `NEUTRAL` fits best.\n    *   **Importance:** She is an unnamed generic character, so `EXTRA`.\n    *   **Voice Description:** As an extra, she needs a voice description. She is in a combat situation, so an authoritative but currently stressed female voice. \"Authoritative female voice, mid-30s, expressing sudden frustration.\"\n    *   **Emotion:** She is looking up at falling rocks, clearly annoyed and recognizing the danger. Frustrated.\n3.  **Performance Cues:** The text is simple. It's an exclamation of frustration. Adding a bracketed cue like `[Frustrated]` will help the actor."
+    "side": "HERO",
+    "voiceDescription": "Firm, authoritative adult female voice",
+    "textWithCues": "[Frustrated] Damn it."
   },
   {
     "id": "page-09_b06",
@@ -119,12 +118,12 @@
     },
     "ocr_text": "SO MUCH PROMISE, SO LITTLE VISION.",
     "type": "SPEECH",
-    "speaker": "Shredder",
+    "speaker": "Green Ranger Shredder",
     "emotion": "condescending",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Condescendingly] SO MUCH PROMISE, SO LITTLE VISION.",
-    "aiReasoning": "The text is \"SO MUCH PROMISE, SO LITTLE VISION.\" found in a speech bubble in the second row, middle panel.\nThe tail points to Shredder, who currently possesses Green Ranger powers.\nShredder is a Major Villain.\nThe tone is arrogant, condescending, and dismissive of the Red Ranger's earlier retort."
+    "textWithCues": "[Condescendingly] So much promise, so little vision.",
+    "aiReasoning": "I have located the text \"SO MUCH PROMISE, SO LITTLE VISION.\" in the second panel.\nThe speech bubble's tail points to the character wearing the green ranger armor combined with Shredder's helmet. This is Green Ranger Shredder.\nHe is a major villain.\nHis tone here is condescending and arrogant as he reacts to the Red Ranger's rejection of his offer.\nI will add a cue for a condescending tone."
   },
   {
     "id": "page-09_b07",
@@ -140,12 +139,11 @@
     },
     "ocr_text": "NOW, WOULD YOU LIKE TO CONTINUE FIGHTING ME OR DEPART TO SAVE A FEW INSIGNIFICANT LIVES?",
     "type": "SPEECH",
-    "speaker": "Shredder",
-    "emotion": "taunting",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "arrogant, manipulative",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Tauntingly] NOW, WOULD YOU LIKE TO CONTINUE FIGHTING ME OR DEPART TO SAVE A FEW INSIGNIFICANT LIVES?",
-    "aiReasoning": "The text is in a speech bubble in the final panel.\nThe tail points to the villain character, who is a hybrid of the Green Ranger and Shredder. Given the provided character list, and his role/appearance (Shredder helmet/cape, working with Stockman), \"Shredder\" is the most appropriate name to use from the list.\nHe is a MAJOR VILLAIN.\nHe is giving the Red Ranger a sadistic choice after causing an explosion. His tone should be taunting and arrogant.\nThere are no special text formatting cues (like bold or jagged edges), so a steady, arrogant delivery is best."
+    "textWithCues": "[Arrogantly mocking] Now, would you like to continue fighting me, or depart to save a few insignificant lives?"
   },
   {
     "id": "page-09_b08",
@@ -161,12 +159,12 @@
     },
     "ocr_text": "FIGHTING TO FEEL THE POWER OF DESTRUCTION, BUT ASHAMED OF YOUR TRUE MOTIVES.",
     "type": "SPEECH",
-    "speaker": "Shredder",
-    "emotion": "manipulative",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "taunting, analytical",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Manipulative tone] Fighting to feel the power of destruction, but ashamed of your true motives.",
-    "aiReasoning": "The text \"FIGHTING TO FEEL THE POWER OF DESTRUCTION, BUT ASHAMED OF YOUR TRUE MOTIVES.\" is in a speech bubble in the top panel.\nThe tail of the bubble points to the character in green and purple armor, who is Shredder.\nShredder is a Villain and a Major character.\nHe is speaking calmly but manipulatively to the Red Ranger, trying to get into his head. There is no indication of shouting or whispering."
+    "voiceDescription": "N/A",
+    "textWithCues": "[Commanding, analytical] FIGHTING to feel the power of DESTRUCTION... but ASHAMED of your TRUE MOTIVES."
   },
   {
     "id": "page-09_b10",
@@ -182,13 +180,13 @@
     },
     "ocr_text": "EVERYONE DOWN! TAKE COVER!!!",
     "type": "SPEECH",
-    "speaker": "Soldier",
-    "emotion": "urgent, commanding",
+    "speaker": "Female Soldier",
+    "emotion": "urgent",
     "characterType": "EXTRA",
     "side": "NEUTRAL",
-    "voiceDescription": "Gruff, commanding male voice, military tone, urgent, American accent",
+    "voiceDescription": "Authoritative, urgent female voice, mid-30s, military commanding tone",
     "textWithCues": "[Shouting urgently] EVERYONE DOWN! TAKE COVER!!!",
-    "aiReasoning": "The target text is \"EVERYONE DOWN! TAKE COVER!!!\" located in a speech bubble.\nThe tail points to a generic male soldier in green fatigue armor on the right side of the panel, not the prominent female character in the center.\nThis is a generic extra character. They are under attack, so likely neutral or hero aligned military. I'll classify as NEUTRAL EXTRA.\nThe context is an explosion and falling debris. The character is yelling an urgent command to others.\nThe voice should reflect a military man yelling in a crisis."
+    "aiReasoning": "The text \"EVERYONE DOWN! TAKE COVER!!!\" is in a standard speech bubble in the third panel.\nThe tail points to the blonde female character in military/tactical gear, who is commanding the other soldiers while debris falls around them. Based on the provided list, she is the \"Female Soldier\".\nShe is trying to protect her squad from the villain's attack, putting her on the `NEUTRAL` (or allied/good) side.\nShe is a generic or unnamed character, so her importance is `EXTRA`.\nThe text is in all caps with multiple exclamation marks, indicating shouting. The context of falling debris implies extreme urgency."
   },
   {
     "id": "page-09_b11",
@@ -208,7 +206,8 @@
     "emotion": "shocked, desperate",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Stunned and desperate] No.",
-    "aiReasoning": "The target text is \"NO.\" located in the bottom panel.\nIt is in a speech bubble with a tail pointing to the Red Ranger in the foreground.\nThe classification is SPEECH.\nThe speaker is the Red Ranger (MAJOR character, HERO).\nThe context is that an explosion just happened behind him, and people are falling to their deaths. He is looking back in horror and reaching out helplessly.\nHis emotion is shock, horror, and desperation.\nThe speech bubble is small and smooth, suggesting a stunned or breathless utterance rather than a loud scream, despite the intense situation.\nI will add performance cues to reflect his shocked and desperate state."
+    "voiceDescription": "",
+    "textWithCues": "[Shocked, desperate] No.",
+    "aiReasoning": "The text \"NO.\" is located in the bottom panel, in a small speech bubble.\nThe tail points to the Red Ranger, who is looking over his shoulder towards the area where the explosion occurred in the previous panels.\nThe Red Ranger is a HERO and a MAJOR character.\nThe context is that an explosion just happened, putting soldiers in danger (as seen in the panel above). His reaction is one of shock and desperation as he realizes people are going to get hurt.\nThe bubble is simple, not jagged, so it's a quiet but intense expression of horror, not a scream."
   }
 ]

@@ -22,6 +22,8 @@ export interface Bubble {
   textWithCues?: string;
   aiReasoning?: string;
   ignored?: boolean;
+  needsAudio?: boolean;
+  needsOcr?: boolean;
 }
 
 export async function analyzeContext(

@@ -1,6 +1,6 @@
 # Phase 0 — Motion Comic MVP
 
-## Status: `pending`
+## Status: `done`
 ## Prerequisites: Finished issue in `assets/comics/<book>/issue-<n>/` (pages-webp/, audio/, bubbles.json)
 ## Cost: ~$0 (no Venice calls)
 

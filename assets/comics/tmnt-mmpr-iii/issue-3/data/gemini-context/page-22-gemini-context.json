@@ -17,8 +17,9 @@
     "emotion": "sarcastic",
     "characterType": "MAJOR",
     "side": "HERO",
+    "voiceDescription": "",
     "textWithCues": "[Sarcastically] Yeah, like... a light. Bright. Shiny.",
-    "aiReasoning": "I see the text \"YEAH, LIKE... A LIGHT. BRIGHT. SHINY.\" in a standard speech bubble.\nThe tail points to the character on the right in the silhouette panel. Based on the previous panels, this is Leonardo entering the building with Tommy Oliver.\nLeonardo is a HERO and a MAJOR character.\nHe is responding to Tommy's question about what the light looks like, giving a somewhat sarcastic or deadpan, obvious answer.\nI will add a performance cue for a sarcastic tone."
+    "aiReasoning": "1.  **Locate & Classify:** The text \"YEAH, LIKE... A LIGHT. BRIGHT. SHINY.\" is in a speech bubble in the bottom panel. It's clearly dialogue. Classification: SPEECH.\n2.  **Analyze Context:**\n    *   **Speaker:** The speech bubble's tail points to the silhouette of the Teenage Mutant Ninja Turtle, who was identified in previous panels as Leonardo.\n    *   **Side:** HERO.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** The dialogue is a response to Tommy asking if he knows what the \"light\" looks like. Leonardo's response is dry and unhelpful, indicating sarcasm.\n3.  **Performance Cues:** The ellipses indicate a pause. The overall tone should be sarcastic and deadpan. I'll add a cue to reflect this."
   },
   {
     "id": "page-22_b02",
@@ -35,12 +36,11 @@
     "ocr_text": "SINCE WE'RE ON OUR OWN, DO YOU KNOW WHAT THIS LIGHT LOOKS LIKE?",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "questioning, pragmatic",
+    "emotion": "inquiring",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Pragmatically] Since we're on our own, do you know what this light looks like?",
-    "aiReasoning": "1.  **Locate & Classify:** The target text is in the bottom left corner of the last panel. It's inside a speech bubble with a tail pointing towards a silhouetted figure. This is clearly `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The silhouetted figure has a recognizable shape, specifically the two swords strapped to his back. Given the previous panels featuring him and the provided character list, this is Leonardo.\n    *   **Side:** Leonardo is a `HERO`.\n    *   **Importance:** He is a `MAJOR` character.\n    *   **Emotion:** In the previous panel, he noted \"Of course it couldn't be that easy\" after losing contact with \"Alpha\". Now he's asking a practical question in a slightly frustrating situation. The tone should be questioning, perhaps a bit dry or exasperated.\n3.  **Performance Cues:** The line starts a new thought after acknowledging they are \"on their own.\" A slight sigh or a tone of pragmatic resignation fits well here."
+    "textWithCues": "[Inquiring] Since we're on our own, do you know what this light looks like?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"SINCE WE'RE ON OUR OWN, DO YOU KNOW WHAT THIS LIGHT LOOKS LIKE?\" is located in the bottom panel, in a standard speech bubble. The tail points to the silhouette character on the left. This is classified as `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The silhouette has twin swords on his back, a shell, and a bandana. Based on the previous panels where the characters are fully visible, this is Leonardo.\n    *   **Side:** `HERO`\n    *   **Importance:** `MAJOR`\n    *   **Emotion:** They have just lost contact with their guide (Alpha) and are entering a mysterious, potentially dangerous place. Leonardo is asking a practical question but likely feeling a bit of uncertainty given the situation. The tone is inquiring.\n3.  **Performance Cues:** The text is standard, no bolding or special bubble shape. A straightforward but slightly concerned or genuinely questioning tone is appropriate. A cue like `[Inquiring]` fits well."
   },
   {
     "id": "page-22_b03",
@@ -60,8 +60,8 @@
     "emotion": "resigned",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Sighs, resignedly] Of course it couldn't be that easy.",
-    "aiReasoning": "I see the text \"OF COURSE IT COULDN'T BE THAT EASY.\" in a speech bubble in the third panel.\nThe tail points to the Ninja Turtle with a blue mask, which is Leonardo.\nLeonardo is a MAJOR HERO character.\nHis expression and body language suggest resignation and mild frustration after an apparent failure to communicate."
+    "voiceDescription": null,
+    "textWithCues": "[sighs] Of course it couldn't be that easy."
   },
   {
     "id": "page-22_b04",
@@ -77,11 +77,11 @@
     },
     "ocr_text": "OF COURSE NOT. BUT I DRIVE A ROBOT DRAGON.",
     "type": "SPEECH",
-    "speaker": "Green Ranger",
+    "speaker": "Tommy Oliver",
     "emotion": "confident",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
+    "voiceDescription": "",
     "textWithCues": "[Confidently] Of course not. But I drive a robot dragon."
   },
   {
@@ -98,12 +98,13 @@
     },
     "ocr_text": "AND NOT FOR EITHER OF YOU.",
     "type": "SPEECH",
-    "speaker": "Unknown Voice",
-    "emotion": "ominous",
-    "characterType": "MAJOR",
+    "speaker": "Unknown Character",
+    "emotion": "menacing",
+    "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Ominous, threatening, powerful male or female voice depending on the villain",
-    "textWithCues": "[Ominously] And not for either of you."
+    "voiceDescription": "Deep, ominous, threatening male voice coming from the shadows",
+    "textWithCues": "[Ominously] And not for either of you.",
+    "aiReasoning": "The target text \"AND NOT FOR EITHER OF YOU.\" is in a standard speech bubble in the final panel.\nThe tail of the bubble points off-panel to the right, indicating an unseen speaker.\nGiven the context—Leonardo and Tommy are looking for a \"light\" in an unfamiliar, seemingly hostile location, and this voice interrupts them with a threat—the speaker is clearly an antagonist.\nSince the character is not visible, I will classify them as an \"Unknown Character\" on the \"VILLAIN\" side. For the purpose of voice generation, I'll treat them as a \"MINOR\" character to provide a descriptive voice prompt, envisioning a deep, menacing tone typical of a villain's entrance from the shadows.\nThe emotion is ominous and threatening."
   },
   {
     "id": "page-22_b06",
@@ -119,13 +120,12 @@
     },
     "ocr_text": "HOW HARD COULD A CAR BE?",
     "type": "SPEECH",
-    "speaker": "Green Ranger",
-    "emotion": "confident",
+    "speaker": "Tommy Oliver",
+    "emotion": "confident, slightly cocky",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Confidently] How hard could a car be?",
-    "aiReasoning": "I have located the text \"HOW HARD COULD A CAR BE?\" in the top right panel.\nIt's inside a speech bubble, so it's classified as SPEECH.\nThe tail points to the person driving the car, who is wearing green and gold. This matches the known character \"Green Ranger\".\nAs a Power Ranger, he is a HERO and a MAJOR character.\nHe is responding to Leonardo asking if he's driven this before. He just said he hasn't, but he drives a robot dragon. This line is him expressing confidence that driving a car must be easy in comparison.\nThe emotion is confident, perhaps slightly cocky or boastful.\nI will add a performance cue to reflect this confidence."
+    "voiceDescription": "",
+    "textWithCues": "[Confidently] How hard could a car be?"
   },
   {
     "id": "page-22_b07",
@@ -141,13 +141,12 @@
     },
     "ocr_text": "ALPHA?",
     "type": "SPEECH",
-    "speaker": "Green Ranger",
-    "emotion": "questioning, slightly concerned",
+    "speaker": "Tommy Oliver",
+    "emotion": "questioning, confused",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Questioning] Alpha?",
-    "aiReasoning": "I have located the text \"ALPHA?\". It is a speech bubble in the third panel.\nThe tail points to the Green Ranger.\nHe is a HERO and a MAJOR character.\nHe is calling out to someone (\"Alpha\") who hasn't responded, so his emotion is questioning and perhaps slightly concerned.\nI will add a `[Questioning]` cue to the text."
+    "voiceDescription": null,
+    "textWithCues": "[Confused] Alpha?"
   },
   {
     "id": "page-22_b08",
@@ -167,8 +166,8 @@
     "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, resonant, commanding, ominous male voice",
-    "textWithCues": "[Ominous, commanding] ...They must not reach the light.",
-    "aiReasoning": "The text \"...THEY MUST NOT REACH THE LIGHT.\" is located in a rectangular box with a stylized \"Z\" logo in the top left corner of the first panel. This formatting indicates it is NARRATION or a disembodied voice communicating, rather than direct speech from a character present in the scene.\nGiven the \"Z\" logo and the context of the heroes (Leonardo and Green Ranger) trying to reach a goal, this voice is clearly villainous, likely Lord Zedd giving an order. However, since the speaker is not explicitly shown and the provided list includes \"Unknown Voice\", I will use that designation. The tone should be ominous and commanding."
+    "voiceDescription": "Deep, raspy, authoritative, echoing villain voice",
+    "textWithCues": "[Menacingly] ...They must not reach the light.",
+    "aiReasoning": "The text \"...THEY MUST NOT REACH THE LIGHT.\" is located in a rectangular caption box at the top left of the first panel. The box features a stylized \"Z\" logo. Based on the crossover context (Power Rangers and TMNT), this \"Z\" indicates the voiceover/narration belongs to the major villain, Lord Zedd. Therefore, the speaker is Lord Zedd. He is a major villain character. The tone should be menacing and commanding."
   }
 ]

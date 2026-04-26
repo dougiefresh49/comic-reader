@@ -13,12 +13,12 @@
     },
     "ocr_text": "AND DESPITE ALL YOUR GREAT DEEDS, THE UNIVERSE WILL ONLY REMEMBER THAT YOUR WORLD WAS THE FIRST TO FALL.",
     "type": "SPEECH",
-    "speaker": "Transformed Villain",
-    "emotion": "Menacing and triumphant",
+    "speaker": "Shredder",
+    "emotion": "gloating, menacing",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Menacingly, with grand finality] AND DESPITE ALL YOUR GREAT DEEDS, THE UNIVERSE WILL ONLY REMEMBER THAT YOUR WORLD WAS THE FIRST TO FALL.",
-    "aiReasoning": "1. **Locate & Classify:** The text \"AND DESPITE ALL YOUR GREAT DEEDS...\" is inside a speech bubble with a tail pointing to the large monstrous character in the center. It's SPEECH.\n2. **Analyze Context:**\n    * **Speaker:** The large, heavily armored villain with an exposed brain-like head and red glowing eyes. He mentions his \"transformation\" and threatens Zordon, indicating he is a major antagonist. Let's refer to him as \"Transformed Villain\".\n    * **Side:** VILLAIN.\n    * **Importance:** MAJOR (He is the central figure delivering a climactic monologue).\n    * **Emotion:** Triumphant, menacing, grandly evil. He is gloating about his vision of the future.\n3. **Performance Cues:** The line is the climax of his monologue, delivered with absolute certainty and malice. A deep, echoing, and threatening delivery fits best."
+    "textWithCues": "[Menacingly, with grandiosity] AND DESPITE ALL YOUR GREAT DEEDS, THE UNIVERSE WILL ONLY REMEMBER THAT YOUR WORLD WAS THE FIRST TO FALL.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is located in a speech bubble in the upper right/center area. The tail points to the central, monstrous villain character. This makes it a `SPEECH` type.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is visually a fusion of the Shredder (TMNT) and Lord Zedd (Power Rangers), wielding Zedd's staff. Based on the dialogue (\"my transformation\", knowing Zordon), this is the Shredder after taking over the Command Center and using its power. The proper canonical name for the base character is \"Shredder\".\n    *   **Side:** `VILLAIN`.\n    *   **Importance:** `MAJOR`.\n    *   **Emotion:** The character is gloating, menacing, and confident in his ultimate victory. He is delivering a villainous monologue.\n3.  **Performance Cues:** The tone should be grandiose and threatening. I will add cues to reflect this final, devastating declaration."
   },
   {
     "id": "page-24_b02",
@@ -34,11 +34,11 @@
     },
     "ocr_text": "...SOMETHING I HAVE KNOWN ALL ALONG.",
     "type": "SPEECH",
-    "speaker": "Transformed Villain",
+    "speaker": "Shredder",
     "emotion": "confident, menacing",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Ominously] ...something I have known all along."
+    "textWithCues": "[Pausing briefly, speaking with a dark, triumphant certainty] ...something I have known all along."
   },
   {
     "id": "page-24_b03",
@@ -54,12 +54,12 @@
     },
     "ocr_text": "THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.",
     "type": "SPEECH",
-    "speaker": "Transformed Villain",
-    "emotion": "threatening",
+    "speaker": "Shredder",
+    "emotion": "menacing, powerful",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Threateningly] THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.",
-    "aiReasoning": "I have located the text \"THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.\" in the second speech bubble from the top left. The tail points to the large, monstrous character in the center of the image.\nBased on the provided list, this character is the \"Transformed Villain\". Given his menacing appearance and the explicit threat against \"Zordon and all your friends,\" he is clearly a MAJOR VILLAIN.\nThe tone of the speech is highly threatening and confident, declaring the imminent destruction of the heroes. The voice actor should deliver this with an ominous and powerful tone."
+    "textWithCues": "[Menacingly] This temple will crumble. Zordon and all your friends will die.",
+    "aiReasoning": "The target text \"THIS TEMPLE WILL CRUMBLE. ZORDON AND ALL YOUR FRIENDS WILL DIE.\" is located in a speech bubble in the upper middle area.\nThe tail points to the central, transformed villain character. Based on the provided character list and visual design (helmet shape beneath the new additions), this is Shredder, who has undergone a transformation (as mentioned in the adjacent bubble).\nShredder is a MAJOR VILLAIN.\nHis posture and dialogue convey a sense of absolute power, menace, and impending doom. The delivery should be deep, confident, and threatening."
   },
   {
     "id": "page-24_b04",
@@ -75,10 +75,10 @@
     },
     "ocr_text": "THANKS TO MY TRANSFORMATION, I CAN SEE THE FUTURE SO CLEARLY.",
     "type": "SPEECH",
-    "speaker": "Transformed Villain",
-    "emotion": "confident",
+    "speaker": "Shredder",
+    "emotion": "arrogant, menacing, reveling in power",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Gloating] THANKS TO MY TRANSFORMATION, I CAN SEE THE FUTURE SO CLEARLY."
+    "textWithCues": "[reveling in his new power] Thanks to my transformation, I can see the future so clearly."
   }
 ]

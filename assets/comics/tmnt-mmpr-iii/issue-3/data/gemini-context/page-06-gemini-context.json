@@ -14,10 +14,10 @@
     "ocr_text": "THE TECHNODROME... OR...THE MUTAGEN?",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "questioning, focused",
+    "emotion": "determined",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Grunts with effort] The Technodrome... [pauses] or... the mutagen?"
+    "textWithCues": "[Determined, with slight pauses for exertion] THE TECHNODROME... OR...THE MUTAGEN?"
   },
   {
     "id": "page-06_b02",
@@ -34,11 +34,12 @@
     "ocr_text": "A WARRIOR OF YESTERDAY, DOOMED TO FAIL. JUST LIKE YOUR MASTER.",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "arrogant, mocking",
+    "emotion": "arrogant, taunting",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, raspy, menacing, arrogant male voice",
-    "textWithCues": "[Arrogantly] A warrior of yesterday, doomed to fail. [Mockingly] Just like your master."
+    "voiceDescription": "",
+    "textWithCues": "[Arrogantly] A warrior of yesterday, doomed to fail... [Pause] Just like your master.",
+    "aiReasoning": "I see the text \"A WARRIOR OF YESTERDAY, DOOMED TO FAIL. JUST LIKE YOUR MASTER.\". It is in standard speech bubbles.\nThe speaker is Lord Zedd, who is fighting Leonardo. He is standing confidently.\nImportance is MAJOR. He is speaking in an arrogant, taunting manner."
   },
   {
     "id": "page-06_b03",
@@ -55,11 +56,12 @@
     "ocr_text": "YOU DON'T DESERVE AN ANSWER.",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "arrogant, dismissive",
+    "emotion": "dismissive",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Dismissively] You don't deserve an answer.",
-    "aiReasoning": "1.  **Locate:** The text \"YOU DON'T DESERVE AN ANSWER.\" is found in the bottom-left panel inside a speech bubble.\n2.  **Classify:** It's `SPEECH`.\n3.  **Speaker:** The bubble's tail points to the silhouette of Lord Zedd, who is in the foreground.\n4.  **Side/Importance:** Lord Zedd is a `VILLAIN` and a `MAJOR` character.\n5.  **Emotion/Tone:** He is arrogantly dismissing Leonardo's previous question. The tone should be haughty, cold, and superior.\n6.  **Cues:** Add a cue to reflect his arrogant dismissal."
+    "voiceDescription": null,
+    "textWithCues": "[Coldly dismissive] You don't deserve an answer.",
+    "aiReasoning": "I have located the text \"YOU DON'T DESERVE AN ANSWER.\" in the bottom left panel.\nIt is a speech bubble. The tail points to the silhouetted figure in the foreground, who is identifiable as Lord Zedd based on the rest of the page and his design (exposed spine/brain texture, metal visor).\nLord Zedd is a major villain.\nHe is casually dodging Leonardo's attack and dismissing his question, showing arrogance and superiority. The delivery should be cold and dismissive."
   },
   {
     "id": "page-06_b04",
@@ -76,11 +78,11 @@
     "ocr_text": "HOW UNINSPIRING.",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "arrogant, bored",
+    "emotion": "arrogant, dismissive",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Bored and dismissive] HOW UNINSPIRING.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"HOW UNINSPIRING.\" is located in a speech bubble in the lower-left section of the top panel. The tail points downwards, indicating the speaker is the red character, Lord Zedd, who is currently parrying an attack. Classification: SPEECH.\n2.  **Analyze Context:**\n    *   **Speaker:** Lord Zedd.\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** Lord Zedd is easily defending against Leonardo's attack and finds the fight boring and predictable. He is arrogant and dismissive.\n3.  **Performance Cues:** The line should be delivered with a bored, disappointed, and arrogant tone to reflect his unimpressed state."
+    "textWithCues": "[Dismissively] How uninspiring.",
+    "aiReasoning": "I see the text \"HOW UNINSPIRING.\" in a standard speech bubble.\nThe tail points towards the red, metallic-looking character, who is Lord Zedd.\nLord Zedd is a MAJOR VILLAIN.\nHe is blocking Leonardo's attack effortlessly and commenting on his fighting style, expressing boredom and arrogance.\nThe delivery should be dismissive and superior."
   },
   {
     "id": "page-06_b05",
@@ -102,7 +104,7 @@
     "side": "HERO",
     "voiceDescription": "",
     "textWithCues": "[Demanding] What did you really come for, Zedd?",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"WHAT DID YOU REALLY COME FOR, ZEDD?\" is inside a speech bubble in the top panel. The tail points to the Teenage Mutant Ninja Turtle wearing a blue mask. This is SPEECH.\n2.  **Analyze Context:** The speaker is Leonardo. He is a HERO and a MAJOR character. He is mid-leap, attacking Lord Zedd, and asking a probing question. His emotion is determined and interrogating.\n3.  **Performance Cues:** The text is standard, but the context is an active fight. A demanding tone fits perfectly as he presses Zedd for information while attacking."
+    "aiReasoning": "I have located the text \"WHAT DID YOU REALLY COME FOR, ZEDD?\" in the top left panel. It's in a speech bubble with a tail pointing to the blue-masked Ninja Turtle.\nThe speaker is Leonardo, a major hero character.\nHe is mid-attack, demanding an answer from Lord Zedd. His tone should be intense and pressing, reflecting the combat situation."
   },
   {
     "id": "page-06_b06",
@@ -119,11 +121,10 @@
     "ocr_text": "SHREDDER SAID YOU MIGHT PROVE A WORTHY CHALLENGE...",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "taunting, slightly disappointed",
+    "emotion": "condescending",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, raspy, echoing, menacing male voice, regal but twisted, theatrical",
-    "textWithCues": "[Menacingly, with a hint of disappointment] Shredder said you might prove a worthy challenge..."
+    "textWithCues": "[Condescendingly] Shredder said you might prove a worthy challenge..."
   },
   {
     "id": "page-06_b07",
@@ -140,11 +141,10 @@
     "ocr_text": "PARRY. THRUST. REPEAT.",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "bored",
+    "emotion": "unimpressed",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "N/A",
-    "textWithCues": "[Monotonous, bored tone] Parry. Thrust. Repeat."
+    "textWithCues": "[Monotone, condescending] Parry. Thrust. Repeat."
   },
   {
     "id": "page-06_b08",
@@ -162,11 +162,11 @@
     "type": "CAPTION",
     "speaker": "Narrator",
     "emotion": "Neutral",
-    "characterType": "EXTRA",
+    "characterType": "N/A",
     "side": "NEUTRAL",
-    "voiceDescription": "Deep, clear, objective narrator voice.",
-    "textWithCues": "[Objective narrator voice] TECHNODROME LAB.",
-    "aiReasoning": "The text \"TECHNODROME LAB.\" is floating at the top left of the page. It is not inside a speech bubble or narration box. It serves to establish the location of the scene. Therefore, it is a CAPTION. It should be read neutrally by a narrator to set the scene."
+    "voiceDescription": "Deep, authoritative, neutral narrator voice",
+    "textWithCues": "Technodrome Lab.",
+    "aiReasoning": "The text \"TECHNODROME LAB.\" is located at the top left of the page within a red rectangular box. This is a classic comic book convention for establishing the location of the scene. According to the provided definitions, this falls under `CAPTION` as it is structural text setting the scene, similar to \"NYC\" or \"The End\". It does not belong to a specific character. It should be read with a neutral, authoritative voice, typical of a narrator."
   },
   {
     "id": "page-06_b09",
@@ -180,15 +180,13 @@
       "class": "speech bubble",
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-06/page-06-crop-009-x73-y287.jpg"
     },
-    "ocr_text": "EVERYONE IS OUTSIDE FIGHTING, BUT YOU'RE DOWN HERE, SKULKING AROUND.",
+    "ocr_text": "EVERYONE IS OUTSIDE FIGHTING, BUT YOU’RE DOWN HERE, SKULKING AROUND.",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "determined",
+    "emotion": "assertive",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Determined, mid-action] Everyone is outside fighting, but you're down here, skulking around.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"EVERYONE IS OUTSIDE FIGHTING, BUT YOU'RE DOWN HERE, SKULKING AROUND.\" is in a speech bubble in the top-left panel. The tail points to the Ninja Turtle with the blue mask. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is Leonardo (blue mask, katanas).\n    *   **Side:** HERO\n    *   **Importance:** MAJOR\n    *   **Emotion:** He is mid-air, attacking Lord Zedd. He looks determined and is questioning Zedd's presence in the lab instead of the main battlefield.\n3.  **Performance Cues:** The text is standard, but the action is dynamic. He is attacking while speaking. The tone should be forceful and inquisitive.\n    *   Cue: `[Determined, mid-action]`"
+    "textWithCues": "[Assertively] Everyone is outside fighting, but you're down here, skulking around."
   },
   {
     "id": "page-06_b10",
@@ -205,11 +203,10 @@
     "ocr_text": "YOU DIDN'T ANSWER MY QUESTION.",
     "type": "SPEECH",
     "speaker": "Leonardo",
-    "emotion": "forceful, annoyed",
+    "emotion": "Persistent, focused",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Forcefully, annoyed] You didn't answer my question."
+    "textWithCues": "[Persistent] YOU DIDN'T ANSWER MY QUESTION."
   },
   {
     "id": "page-06_b11",
@@ -226,12 +223,10 @@
     "ocr_text": "A WARRIOR OF YESTERDAY, DOOMED TO FAIL.",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "arrogant, dismissive",
+    "emotion": "arrogant, mocking",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "",
-    "textWithCues": "[Arrogantly] A warrior of yesterday, doomed to fail.",
-    "aiReasoning": "I have located the text \"A WARRIOR OF YESTERDAY, DOOMED TO FAIL.\" in the top right panel.\nIt is a speech bubble with a tail pointing to Lord Zedd.\nLord Zedd is a major villain.\nHe is standing confidently, looking down at Leonardo, delivering a taunting insult. The emotion is arrogant and dismissive.\nI will add a cue for an arrogant tone."
+    "textWithCues": "[Arrogantly] A warrior of yesterday, doomed to fail."
   },
   {
     "id": "page-06_b12",
@@ -248,10 +243,9 @@
     "ocr_text": "...BUT YOU'RE SLOW AND PREDICTABLE.",
     "type": "SPEECH",
     "speaker": "Lord Zedd",
-    "emotion": "arrogant, condescending",
+    "emotion": "arrogant, dismissive",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Arrogantly] ...but you're slow and predictable.",
-    "aiReasoning": "I need to analyze the text bubble containing \"...BUT YOU'RE SLOW AND PREDICTABLE.\"\nThis text is located in the bottom middle panel.\nIt is a speech bubble, and the tail points to Lord Zedd, who is striking Leonardo.\nLord Zedd is a MAJOR VILLAIN character.\nHe is effortlessly deflecting Leonardo's attack, so his emotion is arrogant, condescending, and dismissive.\nThe text continues a thought from the previous panel, indicating a slight pause.\nI will add performance cues to reflect this arrogant tone."
+    "textWithCues": "[Dismissively] ...but you're slow and predictable."
   }
 ]

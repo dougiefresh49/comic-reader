@@ -14,10 +14,12 @@
     "ocr_text": "THEY WANT THIS LOSS TO SCARE US. TO FORCE US TO ACT IN FEAR.",
     "type": "SPEECH",
     "speaker": "Zordon",
-    "emotion": "resolute",
+    "emotion": "serious, solemn",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Authoritative, serious tone] They want this loss to SCARE us. To force us to act in FEAR."
+    "voiceDescription": "Deep, resonant, wise, and echoing male voice.",
+    "textWithCues": "[Speaking with deep, resonant authority] They want this loss to scare us. To force us to act in fear.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble with a tail pointing downwards. It's classified as `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points towards the large, floating blue head in the energy tube. This is a classic Power Rangers character, Zordon.\n    *   **Side:** Zordon is a mentor and leader to the Power Rangers, making him a `HERO`.\n    *   **Importance:** As the creator of the Power Rangers, he is a `MAJOR` character.\n    *   **Emotion:** He is discussing a \"loss\" and warning against acting in \"fear.\" His expression is solemn and serious. His tone should be wise, resonant, and calming but firm.\n3.  **Performance Cues:** Zordon's voice is typically deep, echoing, and authoritative. The delivery should be measured and serious. I'll add a cue to reflect this."
   },
   {
     "id": "page-14_b02",
@@ -32,14 +34,14 @@
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-002-x1210-y2766.jpg"
     },
     "ocr_text": "\"SO DESPITE THE GRIEF AND ANGER YOU ARE FEELING, I'M ASKING YOU ALL TO FIND A WAY TO PUT THAT ALL ASIDE...\"",
-    "type": "SPEECH",
-    "speaker": "Zordon",
-    "emotion": "serious, empathetic, authoritative",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Serious, empathetic] So despite the grief and anger you are feeling, I'm asking you all to find a way to put that all aside...",
-    "aiReasoning": "1.  **Analyze the Target Text:** The text is \"\"SO DESPITE THE GRIEF AND ANGER YOU ARE FEELING, I'M ASKING YOU ALL TO FIND A WAY TO PUT THAT ALL ASIDE...\"\". It's located in a rectangular box with quotation marks in the bottom right panel.\n2.  **Determine Speaker and Type:** The use of quotation marks in rectangular boxes across multiple panels indicates a voiceover from a character. Looking at the first panel, Zordon is giving a speech to the assembled heroes. The content and tone of these voiceover boxes clearly continue his speech. Therefore, the speaker is Zordon, and the type is SPEECH (acting as a voiceover).\n3.  **Context and Emotion:** Zordon is a major hero character, a mentor figure. The text addresses \"grief and anger,\" asking the team to put it aside. The emotion should be serious, empathetic, yet authoritative and commanding.\n4.  **Performance Cues:** The voice actor needs to deliver this with gravity and a sense of leadership. Adding a cue like `[Serious, empathetic]` will help. The text includes an ellipsis, implying a slight pause or that the thought continues."
+    "voiceDescription": null,
+    "textWithCues": "[Solemnly] \"So despite the grief and anger you are feeling, I'm asking you all to find a way to put that all aside...\"",
+    "aiReasoning": "The target text is in a rectangular box and enclosed in quotation marks. Following the structural rules, it is classified as NARRATION, but the quotation marks and context clearly indicate it is a voiceover continuation of Zordon's speech from the first panel.\nThe speaker is Zordon (Major, Hero).\nThe emotional context is heavy; he acknowledges their \"grief and anger\" but asks them to push past it. The tone should be solemn, empathetic, yet authoritative as a leader.\nI will add cues to reflect this solemn and pleading tone."
   },
   {
     "id": "page-14_b03",
@@ -54,14 +56,14 @@
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-003-x1306-y71.jpg"
     },
     "ocr_text": "IN THE PAST HOUR, I'VE DETECTED SEVERAL INTERDIMENSIONAL ANOMALIES ORIGINATING FROM THE LUNAR SURFACE.",
-    "type": "NARRATION",
-    "speaker": "Narrator",
-    "emotion": "Neutral",
-    "characterType": "MINOR",
+    "type": "SPEECH",
+    "speaker": "Alpha 5",
+    "emotion": "urgent, informative",
+    "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "Nasal, slightly metallic robotic male voice, sounding informative but anxious.",
-    "textWithCues": "[Reporting urgently] In the past hour, I've detected several [emphasize] interdimensional anomalies [continue naturally] originating from the lunar surface.",
-    "aiReasoning": "The text is in a rectangular box, which falls under the `NARRATION` category according to the instructions (\"Square/Rectangular boxes\"). However, the context strongly implies it is spoken by the character in the panel, Alpha 5, who is gesturing towards the hologram correlating with the text's information. Because he is a distinct character not listed in the provided 'Unique Characters' (which only lists Zordon), I will identify him as a new character, Alpha 5. Since he acts as a supporting character, I'll classify him as `MINOR` and provide a voice description. The text contains bold words for emphasis but doesn't indicate shouting. The tone is informative and slightly urgent as he reports a problem."
+    "voiceDescription": "High-pitched, synthesized/robotic male voice, often sounds stressed",
+    "textWithCues": "[Urgently] In the past hour, I've detected several interdimensional anomalies originating from the lunar surface.",
+    "aiReasoning": "I see the text \"IN THE PAST HOUR, I'VE DETECTED SEVERAL INTERDIMENSIONAL ANOMALIES ORIGINATING FROM THE LUNAR SURFACE.\". It is in a speech bubble with a tail pointing to the robotic character.\nUsing my knowledge of the Power Rangers franchise, this character is Alpha 5.\nHe is a HERO and a MAJOR character (main supporting cast).\nHis voice is typically high-pitched, somewhat robotic/synthesized, and often conveys a sense of urgency or mild panic when delivering bad news.\nThe emotion here is informative but urgent given the context of the anomalies."
   },
   {
     "id": "page-14_b04",
@@ -81,8 +83,7 @@
     "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Serious] \"They're going after our friends.\"",
-    "aiReasoning": "The target text is \"THEY'RE GOING AFTER OUR FRIENDS.\" located in a rectangular box in the middle panel.\nThe box shape indicates it's NARRATION, acting as a voiceover.\nThe text is in quotation marks and continues the thought from the first panel, clearly indicating it's Zordon speaking over the comms or telepathically.\nZordon is a MAJOR HERO character.\nThe emotion is serious and concerned as he explains the villains' tactics."
+    "textWithCues": "[Grave and serious tone] \"They're going after our friends."
   },
   {
     "id": "page-14_b05",
@@ -102,8 +103,7 @@
     "emotion": "serious",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Gravely] They want us to lose focus and do things we know are wrong."
+    "textWithCues": "THEY WANT US TO LOSE FOCUS AND DO THINGS WE KNOW ARE WRONG."
   },
   {
     "id": "page-14_b06",
@@ -123,9 +123,8 @@
     "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Serious] \"To break our spirits.\"",
-    "aiReasoning": "The text '\"TO BREAK OUR SPIRITS.\"' is located in a rectangular box with quotation marks. Based on the rules, rectangular boxes are typically NARRATION. However, the quotation marks and the flow of the text from the previous panels clearly indicate that this is Zordon's dialogue continuing as a voiceover across the montage. I will classify it as NARRATION visually, but assign Zordon as the speaker to ensure the correct voice is used.\n\nSpeaker: Zordon\nImportance: MAJOR\nSide: HERO\nEmotion: Serious, resolute, warning.\nCues: The text is part of a list of the villains' goals. It should be delivered with grave seriousness to emphasize the threat."
+    "textWithCues": "[Somber] \"To break our spirits.\"",
+    "aiReasoning": "The target text is \"TO BREAK OUR SPIRITS.\" located in a rectangular, blue caption box. This box style, combined with the quotation marks, indicates it is a voice-over continuation of Zordon's speech from the first panel.\nTherefore, the classification is NARRATION, and the speaker is Zordon.\nZordon is a MAJOR HERO character. The tone of his speech is serious and somber as he describes the villains' psychological tactics against the Rangers and Turtles.\nI will add a performance cue to reflect this somber tone."
   },
   {
     "id": "page-14_b07",
@@ -140,13 +139,13 @@
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-14/page-14-crop-007-x1535-y1202.jpg"
     },
     "ocr_text": "\"THEY'RE TRYING TO HURT US. TO ISOLATE US.",
-    "type": "SPEECH",
-    "speaker": "Zordon",
-    "emotion": "serious",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Seriously] \"They're trying to hurt us. To isolate us.\""
+    "textWithCues": "[Voiceover, serious] \"They're trying to hurt us. To isolate us.\"",
+    "aiReasoning": "The target text is \"THEY'RE TRYING TO HURT US. TO ISOLATE US.\". It is located in a light blue rectangular box in the middle right panel.\nBased on the visual style (light blue box, dark blue text) and the quotation marks, this is a continuation of Zordon's dialogue from the first panel, acting as a voiceover narration across the subsequent panels.\nBecause it's in a rectangular box, I will classify it as `NARRATION`, but the speaker is clearly `Zordon`.\nZordon is a `MAJOR` character on the `HERO` side.\nHis tone here is serious, warning the team about their enemies' psychological tactics. He is speaking with authority and concern.\nI will add a `[Voiceover]` and `[Serious]` cue to guide the performance."
   },
   {
     "id": "page-14_b08",
@@ -166,7 +165,7 @@
     "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Gravely] \"This is not just an attack on Earth, but an attack on everyone we hold dear.\"",
-    "aiReasoning": "The text is located in a rectangular box with quotation marks in the third panel.\nThis formatting usually denotes a character speaking in a voiceover or a continuation of speech over a montage.\nGiven the preceding panels, this is a continuation of Zordon's speech from the first panel.\nTherefore, the classification is NARRATION (acting as voiceover).\nThe speaker is Zordon, a MAJOR HERO character.\nThe tone of the speech is grave and rallying, emphasizing the severity of the situation."
+    "voiceDescription": "Deep, resonant, booming male voice, authoritative and wise, ethereal quality",
+    "textWithCues": "[Speaking with grave importance] \"This is not just an attack on Earth, but an attack on everyone we hold dear.\""
   }
 ]

@@ -13,12 +13,11 @@
     },
     "ocr_text": "YEAH, WELL...IT RANDOMLY SUCKS.",
     "type": "SPEECH",
-    "speaker": "Zack",
+    "speaker": "Black Ranger",
     "emotion": "annoyed",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Annoyed] Yeah, well... it randomly sucks.",
-    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the first panel. The tail points to the Black Power Ranger. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The dialogue flow confirms this is \"Zack\" (the Black Ranger), who is responding to the Red Ranger.\n    *   **Side:** The Black Ranger is a `HERO`.\n    *   **Importance:** `MAJOR` character.\n    *   **Emotion:** He is complaining about their situation while in the middle of a fight. He sounds annoyed and sarcastic.\n3.  **Performance Cues:** The ellipsis indicates a slight pause. The delivery should be frustrated and a bit exasperated."
+    "textWithCues": "[Annoyed] Yeah, well... it randomly sucks."
   },
   {
     "id": "page-16_b02",
@@ -35,11 +34,10 @@
     "ocr_text": "AND THIS ISN'T EVEN THAT BAD. I'VE SEEN IT SO MUCH WORSE.",
     "type": "SPEECH",
     "speaker": "Donatello",
-    "emotion": "matter-of-fact",
+    "emotion": "strained",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Matter-of-factly] And this isn't even that bad. I've seen it so much worse."
+    "textWithCues": "[strained] And this isn't even THAT bad. I've seen it SO MUCH worse."
   },
   {
     "id": "page-16_b03",
@@ -56,11 +54,10 @@
     "ocr_text": "I DON'T KNOW. THESE WERE THE LAST COORDINATES APRIL SENT OVER.",
     "type": "SPEECH",
     "speaker": "Donatello",
-    "emotion": "urgent, stressed",
+    "emotion": "urgent, strained",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Urgently, mid-fight] I don't know. These were the last coordinates April sent over."
+    "textWithCues": "[Strained, urgent] I don't know. These were the last coordinates April sent over."
   },
   {
     "id": "page-16_b04",
@@ -76,13 +73,12 @@
     },
     "ocr_text": "SORRY TO CUT IT SO CLOSE, DONNIE...",
     "type": "SPEECH",
-    "speaker": "Unknown Hero",
-    "emotion": "confident",
+    "speaker": "Off-Screen Ally",
+    "emotion": "confident, arriving",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "Confident, reassuring heroic voice",
-    "textWithCues": "[Confident] Sorry to cut it so close, Donnie...",
-    "aiReasoning": "The text \"SORRY TO CUT IT SO CLOSE, DONNIE...\" is in a standard speech bubble. The tail points off-panel, indicating the speaker is not visible in this frame. Given the context—Donatello sent a distress signal and this character is attacking the enemy while apologizing for being late—the speaker is clearly a hero coming to the rescue. Without seeing them, I will label the speaker \"Unknown Hero\". The tone should be confident and reassuring."
+    "textWithCues": "[Calling out confidently from off-screen] Sorry to cut it so close, Donnie...",
+    "aiReasoning": "The target text \"SORRY TO CUT IT SO CLOSE, DONNIE...\" is in a standard speech bubble in the bottom right panel.\nThe tail points off-panel to the right, indicating an unseen character is speaking.\nThe text is addressed to \"Donnie\" (Donatello) right after he mentions sending a distress signal, and accompanies energy blasts hitting enemies. This clearly indicates an arriving ally (Hero).\nSince the character is off-screen, I cannot visually identify them as a specific canon character, so I must use a descriptive name like \"Off-Screen Ally\". Because they are part of the main rescue/team dynamic, their importance is likely MAJOR.\nThe tone should be confident and heroic, announcing their arrival. The ellipsis suggests a slight trailing off or a dramatic pause."
   },
   {
     "id": "page-16_b05",
@@ -102,8 +98,8 @@
     "emotion": "urgent",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Urgently] Donnie, where are they?"
+    "textWithCues": "[Shouting urgently] Donnie, where are they?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"DONNIE, WHERE ARE THEY?\" is inside a speech bubble in the second panel. The tail of the bubble points directly to the Yellow Ranger. Therefore, it is classified as `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character speaking is the Yellow Ranger (Trini Kwan). I will use \"Yellow Ranger\" as the identifier.\n    *   **Side:** She is a member of the Power Rangers, making her a `HERO`.\n    *   **Importance:** As a core Power Ranger, she is a `MAJOR` character.\n    *   **Voice Description:** Not required for major characters.\n    *   **Emotion:** She is actively engaged in combat and asking for critical information. Her tone is urgent and intense.\n3.  **Performance Cues:** The situation is a chaotic battle. She needs to project her voice to be heard over the noise, and the question is time-sensitive. I will add `[Shouting urgently]` as a performance cue."
   },
   {
     "id": "page-16_b06",
@@ -119,12 +115,12 @@
     },
     "ocr_text": "IT WAS RANDOM, ZACK.",
     "type": "SPEECH",
-    "speaker": "Donatello",
-    "emotion": "factual, slightly strained",
+    "speaker": "Off-Screen Ally",
+    "emotion": "matter-of-fact",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[matter-of-factly, with slight effort] It was random, Zack.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"IT WAS RANDOM, ZACK.\" is in a standard speech bubble in the top panel. It is classified as `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail of the bubble points downwards and to the right, directing towards the purple-masked ninja turtle, Donatello, who is engaged in combat.\n    *   **Side:** Donatello is a `HERO`.\n    *   **Importance:** As a main character of the franchise, he is `MAJOR`.\n    *   **Emotion:** He is stating a fact in response to a complaint while fighting. The tone is likely factual but slightly strained due to physical exertion.\n3.  **Performance Cues:** The text is normally capitalized (as is standard). Given the context of a battle, adding a cue for slight exertion or a matter-of-fact tone works best."
+    "textWithCues": "[Matter-of-factly] It was random, Zack.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"IT WAS RANDOM, ZACK.\" is found in a speech bubble in the top-left area of the first panel. The tail points off-panel to the left. This is SPEECH.\n2.  **Analyze Context:** The dialogue is a response to the question \"Why did we get stuck with Planet Sandstorm?\". Since the response addresses \"Zack,\" the first speaker is Zack (Black Ranger). The speaker of the target text is answering him from off-panel. I will use \"Off-Screen Ally\" from the provided character list. They are a HERO, and likely a MAJOR character (another Ranger or Turtle). The tone is matter-of-fact, answering a complaint during battle.\n3.  **Performance Cues:** The text is straightforward. Adding a cue like `[Matter-of-factly]` or `[Strained]` to reflect talking during combat fits well."
   },
   {
     "id": "page-16_b07",
@@ -141,12 +137,11 @@
     "ocr_text": "I SENT OUT A DISTRESS SIGNAL AS SOON AS WE--",
     "type": "SPEECH",
     "speaker": "Donatello",
-    "emotion": "urgent, strained, interrupted",
+    "emotion": "urgent, interrupted",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Urgently, fighting] I sent out a distress signal as soon as we--",
-    "aiReasoning": "1.  **Locate & Classify:** The target text is \"I SENT OUT A DISTRESS SIGNAL AS SOON AS WE--\". It is located in the bottom left panel inside a speech bubble. The tail points to Donatello. This is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** Donatello (purple mask). He is one of the unique characters listed.\n    *   **Side:** HERO.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** He is in the middle of combat, sounding urgent and slightly strained as he fights off attackers. The \"--\" at the end indicates he is suddenly interrupted.\n3.  **Performance Cues:** The line needs to be delivered with the urgency of someone in a fight, and it must cut off sharply at the end due to the interruption.\n    *   Cues to add: `[Urgently, strained]` to reflect the combat situation, and the abrupt stop is already indicated by the dashes but maybe add a note like `[cut off]`. Let's just use standard punctuation."
+    "textWithCues": "[Urgent, mid-combat] I sent out a distress signal as soon as we--",
+    "aiReasoning": "I see the text \"I SENT OUT A DISTRESS SIGNAL AS SOON AS WE--\". It is in a standard speech bubble.\nThe tail points to the Teenage Mutant Ninja Turtle wearing a purple mask, which is Donatello.\nDonatello is a major hero character.\nHe is in the middle of a fight and his sentence ends with an em dash \"--\", indicating he is interrupted or cut off by the enemy attacking him in the next panel/bubble."
   },
   {
     "id": "page-16_b08",
@@ -162,12 +157,12 @@
     },
     "ocr_text": "WHY DID WE GET STUCK WITH PLANET SANDSTORM?",
     "type": "SPEECH",
-    "speaker": "Zack",
-    "emotion": "annoyed",
+    "speaker": "Black Ranger",
+    "emotion": "exasperated",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Annoyed] Why did we get stuck with Planet Sandstorm?",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"WHY DID WE GET STUCK WITH PLANET SANDSTORM?\" is in a speech bubble in the top panel. The tail points downwards. It's `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points down towards the Black Ranger. The subsequent dialogue (\"IT WAS RANDOM, ZACK.\") confirms the speaker is Zack.\n    *   **Side:** `HERO`.\n    *   **Importance:** `MAJOR`.\n    *   **Emotion:** He is annoyed/complaining about their current situation while fighting.\n3.  **Performance Cues:** The text is standard comic lettering. He's mid-combat but the tone is clearly a complaint.\n    *   *Tone:* Annoyed, complaining.\n    *   *Cues:* `[Annoyed]` or `[Complaining]`."
+    "textWithCues": "[Exasperated] Why did we get stuck with Planet Sandstorm?",
+    "aiReasoning": "The target text is \"WHY DID WE GET STUCK WITH PLANET SANDSTORM?\".\nThis is a speech bubble in the top panel.\nThe tail points towards the Black Ranger, who is fighting in the background. The subsequent reply addresses him as \"Zack\", confirming his identity.\nHe is a HERO and a MAJOR character.\nHe is expressing annoyance or frustration at the environment they are fighting in.\nThe performance cue should reflect a mid-battle complaint, slightly exasperated."
   },
   {
     "id": "page-16_b09",
@@ -183,13 +178,12 @@
     },
     "ocr_text": "HA HA, FOOL! THEY WON'T MAKE IT IN--",
     "type": "SPEECH",
-    "speaker": "Winged Monster",
-    "emotion": "gloating",
-    "characterType": "EXTRA",
+    "speaker": "Goldar",
+    "emotion": "arrogant, mocking, suddenly interrupted",
+    "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Raspy, arrogant, threatening monstrous male voice",
-    "textWithCues": "[Laughing arrogantly] HA HA, [shouting] FOOL! THEY WON'T MAKE IT IN--",
-    "aiReasoning": "I have located the text \"HA HA, FOOL! THEY WON'T MAKE IT IN--\". It is in a speech bubble in the bottom-left panel.\nThe tail of the bubble points to a winged, golden-armored monster attacking Donatello.\nThis character is a villain fighting the heroes. I will name him \"Winged Monster\".\nHis importance is EXTRA for this scene.\nThe text starts with a laugh and ends with a dash, indicating he is interrupted. The bolding on \"FOOL!\" suggests emphasis or shouting."
+    "textWithCues": "[Laughs arrogantly] Ha ha, fool! They won't make it in-- [cut off suddenly]",
+    "aiReasoning": "The text is \"HA HA, FOOL! THEY WON'T MAKE IT IN--\" in a standard speech bubble with a tail pointing to the golden, winged monster.\nThe speaker is Goldar (a major Power Rangers villain). He is a VILLAIN.\nHis importance is MAJOR.\nHe is laughing and taunting Donatello, but the sentence is cut off with dashes, indicating he is interrupted mid-sentence (likely by the laser blast shown in the adjacent panel)."
   },
   {
     "id": "page-16_b10",
@@ -209,9 +203,9 @@
     "emotion": "focused",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "",
-    "textWithCues": "[Focused] These were the last coordinates April sent over.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"THESE WERE THE LAST COORDINATES APRIL SENT OVER.\" is in a speech bubble in the middle panel. The tail points directly to Donatello (purple mask). Classification is SPEECH.\n2.  **Analyze Context:** The speaker is Donatello, a Ninja Turtle. He is a HERO and a MAJOR character. He is currently engaged in combat, swinging his bo staff while conversing with the Yellow Ranger. His expression is focused on the fight, but he is providing necessary information.\n3.  **Performance Cues:** The text is spoken amidst physical exertion. The tone is informative but urgent due to the battle context. I will add a cue indicating focus or slight physical strain."
+    "voiceDescription": null,
+    "textWithCues": "[Informative, slightly tense] These were the last coordinates April sent over.",
+    "aiReasoning": "The text \"THESE WERE THE LAST COORDINATES APRIL SENT OVER.\" is located in a speech bubble in the middle panel.\nThe tail of the bubble points to Donatello (the Ninja Turtle with the purple mask).\nDonatello is a major character and a hero.\nHe is engaged in combat and responding to the Yellow Ranger's question about the whereabouts of others. His tone should be informative but slightly tense due to the situation.\nI will correct the slight typo in the prompt's text (\"THOSE\" to \"THESE\") to match the image accurately."
   },
   {
     "id": "page-16_b11",
@@ -229,10 +223,9 @@
     "type": "CAPTION",
     "speaker": "Narrator",
     "emotion": "Neutral",
-    "characterType": "N/A",
+    "characterType": "MAJOR",
     "side": "NEUTRAL",
-    "voiceDescription": "Deep, dramatic, authoritative male narrator voice.",
-    "textWithCues": "[Dramatically] DIMENSION X.",
-    "aiReasoning": "The text \"DIMENSION X\" is located at the top left of the page. It is stylized floating text that sets the scene/location for the panels. This fits the definition of a CAPTION. As a location title, it does not have a specific character speaker, but rather a narrator establishing the setting. The tone should be dramatic and authoritative to fit the sci-fi action comic context."
+    "voiceDescription": "Deep, authoritative male announcer voice, setting the scene.",
+    "textWithCues": "DIMENSION X."
   }
 ]

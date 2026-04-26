@@ -1,42 +1,17 @@
-export const aliasMap = {
-  // Power Rangers
-  tommy: "Green Ranger",
-  "tommy oliver": "Green Ranger",
-  "green ranger": "Green Ranger",
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 
-  jason: "Red Ranger",
-  "red ranger": "Red Ranger",
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ALIAS_MAP_PATH = join(__dirname, "..", "data", "alias-map.json");
 
-  kimberly: "Pink Ranger",
-  "pink ranger": "Pink Ranger",
-
-  trini: "Yellow Ranger",
-  "yellow ranger": "Yellow Ranger",
-
-  zack: "Black Ranger",
-  "black ranger": "Black Ranger",
-
-  billy: "Blue Ranger",
-  "billy cranston": "Blue Ranger",
-  "master splinter": "Splinter",
-
-  "villain green ranger": "Green Dimension X Ranger",
-
-  // Support Characters
-  "ms. sterling": "Grace Sterling",
-  "grace sterling": "Grace Sterling",
-
-  // Groups (Map to the dominant speaker or a generic group voice if needed)
-  "jason and kimberly": "Red Ranger", // Default to Jason for now, or create a 'Group' entry
-  "michelangelo & red ranger": "Michelangelo", // Default to Mikey for shared lines
-  "yellow turtle ranger": "Michelangelo", // Default to Mikey for shared lines
-  scientist: "Dr. Boyd", // Default to Mikey for shared lines
-};
+export const aliasMap: Record<string, string> = JSON.parse(
+  readFileSync(ALIAS_MAP_PATH, "utf-8"),
+);
 
 // Helper to normalize names (trim, lowercase) for lookup
-export const getCanonicalName = (name: string) => {
+export const getCanonicalName = (name: string): string => {
   const cleanName = name.toLowerCase().trim();
-  // Return the alias if it exists, otherwise return the original name (Title Cased)
-  // This preserves names like "Shredder" or "Leonardo" that aren't in the alias map.
-  return aliasMap[cleanName as keyof typeof aliasMap] || name;
+  return aliasMap[cleanName] ?? name;
 };

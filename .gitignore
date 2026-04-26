@@ -46,6 +46,7 @@ yarn-error.log*
 .idea
 
 /assets/**/audio/*
+/assets/episodes/
 /assets/**/data/ocr-crops/*
 /assets/**/data/predictions/*
 /assets/**/pages-webp/*
@@ -54,3 +55,4 @@ assets/**/checkpoint.json
 /assets/**/new-characters.json
 /assets/**/known-characters.json
 /assets/**/data/wiki-cache.txt
+/assets/**/data/reviewed-speakers.json

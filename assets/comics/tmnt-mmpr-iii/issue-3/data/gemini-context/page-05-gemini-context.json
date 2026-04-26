@@ -14,11 +14,12 @@
     "ocr_text": "TRINI, I JUST HAD A PARTICULARLY TERRIFYING REVELATION.",
     "type": "SPEECH",
     "speaker": "Donatello",
-    "emotion": "alarmed",
+    "emotion": "worried",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": null,
-    "textWithCues": "[Alarmed, mid-fight] Trini, I just had a particularly terrifying revelation."
+    "voiceDescription": "",
+    "textWithCues": "[Worried] Trini, I just had a particularly terrifying revelation.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top left panel. It's a `SPEECH` type.\n2.  **Analyze Context:** The tail points downwards out of the panel. The next bubble is from the Yellow Ranger (Trini), addressing \"Donnie\". Donatello is seen later on the page having this ongoing conversation. Therefore, the speaker is Donatello. He is a `HERO` and a `MAJOR` character. His emotion here is worry or alarm based on the phrase \"terrifying revelation\".\n3.  **Performance Cues:** The text is normal, but conveys a sense of sudden, worried realization. A `[Worried]` cue is appropriate."
   },
   {
     "id": "page-05_b02",
@@ -38,7 +39,8 @@
     "emotion": "analytical, concerned",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Slightly out of breath, analytical] So, if they found a way to tap into any Power Coin or the Morphin Grid directly..."
+    "textWithCues": "[Analytical, thinking aloud while fighting] So, if they found a way to tap into any power coin or the Morphin Grid directly...",
+    "aiReasoning": "I need to analyze the text \"SO, IF THEY FOUND A WAY TO TAP INTO ANY POWER COIN OR THE MORPHIN GRID DIRECTLY...\".\nThe text is in a regular speech bubble, so it's SPEECH.\nThe tail points to the purple-masked turtle, who is Donatello.\nDonatello is a main character and a HERO.\nHe is in the middle of a fight but also thinking through a problem out loud. He's coming to a concerning conclusion. The ellipsis indicates a trailing thought leading into the next panel.\nThe performance should reflect someone thinking analytically while in motion."
   },
   {
     "id": "page-05_b03",
@@ -52,14 +54,14 @@
       "class": "speech bubble",
       "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-003-x156-y534.jpg"
     },
-    "ocr_text": "DONNIE, COULD IT MAYBE WAIT UNTIL AFTER WE’RE DONE FIGHTING?",
+    "ocr_text": "DONNIE, COULD IT MAYBE WAIT UNTIL AFTER WE'RE DONE FIGHTING?",
     "type": "SPEECH",
     "speaker": "Trini",
-    "emotion": "exasperated, strained",
+    "emotion": "exasperated",
     "characterType": "MAJOR",
     "side": "HERO",
     "voiceDescription": null,
-    "textWithCues": "[Straining mid-fight] Donnie, could it maybe wait until after we're done fighting?"
+    "textWithCues": "[Exasperated] Donnie, could it maybe wait until after we're done fighting?"
   },
   {
     "id": "page-05_b04",
@@ -76,11 +78,11 @@
     "ocr_text": "...DOES THAT MEAN THAT AS WE FIGHT--",
     "type": "SPEECH",
     "speaker": "Donatello",
-    "emotion": "strained realization",
+    "emotion": "straining, realization",
     "characterType": "MAJOR",
     "side": "HERO",
     "voiceDescription": null,
-    "textWithCues": "[Straining slightly, realization dawning] ...Does that mean that as we fight--"
+    "textWithCues": "[straining mid-strike] ...Does that mean that as we fight--"
   },
   {
     "id": "page-05_b05",
@@ -100,7 +102,8 @@
     "emotion": "sarcastic, resigned",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Sarcastically, with a sigh] Okay. So it is as bad as I thought. Great."
+    "voiceDescription": null,
+    "textWithCues": "[Sarcastically] Okay. So it is as bad as I thought. Great."
   },
   {
     "id": "page-05_b06",
@@ -120,8 +123,9 @@
     "emotion": "grim realization",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Grimly, emphasizing the bad news] THEY GET STRONGER AND WE GET WEAKER.",
-    "aiReasoning": "I see the text \"THEY GET STRONGER AND WE GET WEAKER.\" in a speech bubble. The tail points to Trini, the Yellow Ranger. She is finishing Donatello's sentence with a grim realization. Trini is a major hero character. The text is bolded for emphasis, highlighting the severity of their situation."
+    "voiceDescription": null,
+    "textWithCues": "[Grim realization] They get stronger and we get weaker.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"THEY GET STRONGER AND WE GET WEAKER.\" is in a speech bubble in the bottom right corner of the bottom left panel, but its tail extends into the bottom right panel. It is character dialogue.\n    *   Type: `SPEECH`\n\n2.  **Analyze Context:**\n    *   **Speaker:** The tail of the speech bubble points directly to the Yellow Ranger in the adjacent panel. From the provided character list and general knowledge, the Yellow Ranger is Trini.\n    *   **Side:** The Power Rangers are heroes.\n    *   **Importance:** Trini is a core member of the Power Rangers. Classification is `MAJOR`.\n    *   **Emotion:** She is finishing Donatello's sentence (\"...DOES THAT MEAN THAT AS WE FIGHT--\"), realizing the grim truth of their situation. The tone should reflect this dark realization.\n\n3.  **Performance Cues:** The text is a stark, concluding statement to Donnie's hypothetical. A cue indicating realization or dread is appropriate.\n    *   Text to actor: `[Grim realization]` \"They get stronger and we get weaker.\""
   },
   {
     "id": "page-05_b07",
@@ -137,13 +141,11 @@
     },
     "ocr_text": "NOPE. IT'S SOOO MUCH WORSE.",
     "type": "SPEECH",
-    "speaker": "Mysterious Enemy",
-    "emotion": "gloating, menacing",
-    "characterType": "EXTRA",
-    "side": "VILLAIN",
-    "voiceDescription": "Deep, gravelly, intimidating, and smug voice",
-    "textWithCues": "[Menacingly] NOPE. IT'S SOOO MUCH WORSE.",
-    "aiReasoning": "The text \"NOPE. IT'S SOOO MUCH WORSE.\" is in a standard speech bubble in the final panel. The tail points to a large, dark, indistinct shape (possibly a large fist or an arm) in the right foreground, indicating a new, threatening enemy has arrived or is speaking off-camera just entering the frame. Since the speaker is not clearly identifiable as one of the main cast from the visible art, I will classify them as an EXTRA villain. The tone is gloating and menacing, responding to Donatello's dismay."
+    "speaker": "Trini",
+    "emotion": "resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sighs heavily] NOPE. IT'S SOOO MUCH WORSE."
   },
   {
     "id": "page-05_b08",
@@ -160,11 +162,11 @@
     "ocr_text": "UNFORTUNATELY. SO...",
     "type": "SPEECH",
     "speaker": "Trini",
-    "emotion": "resigned",
+    "emotion": "strained, grim",
     "characterType": "MAJOR",
     "side": "HERO",
     "voiceDescription": null,
-    "textWithCues": "[Strained, resigned] Unfortunately... so..."
+    "textWithCues": "[Strained from exertion] Unfortunately. [Pause] So..."
   },
   {
     "id": "page-05_b09",
@@ -185,7 +187,7 @@
     "characterType": "MAJOR",
     "side": "HERO",
     "voiceDescription": "",
-    "textWithCues": "[Thoughtfully, with growing concern] Tommy isn't here, but... Shredder is still able to shadow morph into the Green Ranger, correct?",
-    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top right panel. The tail points off-panel to the left, indicating someone speaking to the character in the panel (Trini). Classification: `SPEECH`.\n2.  **Analyze Context:** In the previous panel, a voice says \"TRINI, I JUST HAD A PARTICULARLY TERRIFYING REVELATION.\" Trini replies, \"DONNIE, COULD IT MAYBE WAIT...\". This target text continues the thought from the first voice. Therefore, the speaker is Donatello. He is a `HERO` and `MAJOR` character. He is having a realization, so the emotion is analytical but concerned.\n3.  **Performance Cues:** The text has an ellipsis \"...\", indicating a pause. The context is a \"terrifying revelation\". The delivery should sound like he's piecing things together aloud with growing worry."
+    "textWithCues": "[Analytical, slightly concerned] Tommy isn't here, but... Shredder is still able to shadow morph into the Green Ranger, correct?",
+    "aiReasoning": "1.  **Locate & Classify:** The target text is in a speech bubble in the top right panel. The tail points off-panel to the left.\n2.  **Analyze Context:** Following the flow of the conversation from the first panel, Donatello initiates the conversation (\"Trini, I just had a particularly terrifying revelation.\"), Trini responds (\"Donnie, could it maybe wait...\"), and then this bubble continues Donatello's thought. The speaker is Donatello. He is a major hero character.\n3.  **Performance Cues:** Donatello is in the middle of a realization while fighting. The tone is inquisitive, analytical, and slightly concerned as he builds up to his \"terrifying revelation\". The ellipsis indicates a pause for thought."
   }
 ]

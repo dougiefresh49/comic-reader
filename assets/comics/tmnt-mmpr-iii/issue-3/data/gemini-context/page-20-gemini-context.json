@@ -17,8 +17,9 @@
     "emotion": "Neutral",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Urgently, with a tone of rising concern] ...or we're gonna need some serious help.",
-    "aiReasoning": "The text \"...OR WE'RE GONNA NEED SOME SERIOUS HELP.\" is in a caption box at the bottom of the page. It features quotation marks and an ellipse at the start, directly connecting it to the Pink Ranger's speech bubble in the panel above (\"BILLY, YOU BETTER MAKE THAT THING WORK REAL QUICK...\"). The box also has a Power Coin icon, confirming it's a Ranger speaking. While it's in a narration box style, it represents continued dialogue from the Pink Ranger. The context is an intense fight scene, and the bottom panel shows ominous red eyes in the bushes, implying a new, large threat. The emotion is urgent and concerned."
+    "voiceDescription": "",
+    "textWithCues": "[Concerned voiceover] ...or we're gonna need some serious help.",
+    "aiReasoning": "The text is in a yellow rectangular box at the bottom of the page. This indicates it is a form of narration.\nThe box contains a small icon of the Pterodactyl Power Coin, which belongs to Kimberly Hart, the Pink Ranger.\nFurthermore, the text begins with an ellipsis (\"...OR...\"), which directly continues her spoken dialogue from the panel above (\"BILLY, YOU BETTER MAKE THAT THING WORK REAL QUICK...\").\nTherefore, this is a character-driven narration (voiceover) by Kimberly.\nAs a Power Ranger, she is a HERO and a MAJOR character.\nThe context is a tough battle, and the art shows a menacing figure hiding in the bushes, making the tone concerned and urgent.\nI will add a cue for a concerned voiceover."
   },
   {
     "id": "page-20_b02",
@@ -34,13 +35,13 @@
     },
     "ocr_text": "TARGETS ACQUIRED. THE MASTER WILL BE PLEASED.",
     "type": "SPEECH",
-    "speaker": "Robo-Foot Soldier",
-    "emotion": "robotic",
+    "speaker": "Robotic Foot Soldier",
+    "emotion": "emotionless",
     "characterType": "EXTRA",
     "side": "VILLAIN",
-    "voiceDescription": "Robotic, emotionless, slightly metallic villain voice. Cold and calculating.",
-    "textWithCues": "[Robotic, monotonous] Targets acquired. The master will be pleased.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"TARGETS ACQUIRED. THE MASTER WILL BE PLEASED.\" is in a speech bubble in the top left panel. The tail points to the silver, samurai-like robotic character. Classification: `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is a robotic foot soldier. I will name it \"Robo-Foot Soldier\".\n    *   **Side:** `VILLAIN` (has a Foot Clan logo, works for \"The Master\", attacking heroes).\n    *   **Importance:** `EXTRA` (appears to be a generic, albeit specialized, troop).\n    *   **Voice Description:** Needs to sound robotic and threatening. \"Robotic, emotionless, slightly metallic villain voice. Cold and calculating.\"\n    *   **Emotion:** Robotic, lacking human emotion.\n3.  **Performance Cues:** Deliver with a monotonous, mechanical cadence."
+    "voiceDescription": "Robotic, monotone, slightly menacing male voice",
+    "textWithCues": "[Monotone, robotic] Targets acquired. The master will be pleased.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"TARGETS ACQUIRED. THE MASTER WILL BE PLEASED.\" is in a standard speech bubble in the top panel, pointing to a robotic figure with Foot Clan imagery. It's a SPEECH type.\n2.  **Analyze Context:** The speaker is a robotic minion, likely a generic enemy troop for this crossover. Its role is an EXTRA on the VILLAIN side. The voice should sound robotic and emotionless, given its appearance and dialogue.\n3.  **Performance Cues:** The text is standard, implying a flat, declarative delivery typical of a robot."
   },
   {
     "id": "page-20_b03",
@@ -57,11 +58,12 @@
     "ocr_text": "MOUSERS? REALLY? WE'RE NOT MICE? WHY?",
     "type": "SPEECH",
     "speaker": "Raphael",
-    "emotion": "confused, exerted",
+    "emotion": "annoyed",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Exerted, confused] Mousers? Really? We're not mice? Why?",
-    "aiReasoning": "I see the text \"MOUSERS? REALLY? WE'RE NOT MICE? WHY?\". It's in a standard speech bubble.\nThe speaker is Raphael (the Ninja Turtle with the red mask). He is fighting robot enemies.\nHe is a HERO and a MAJOR character.\nHis expression and action suggest he is exerting himself in combat while being genuinely confused and slightly annoyed by the naming convention of the robots attacking them."
+    "voiceDescription": "Gruff, Brooklyn accent, sarcastic male voice",
+    "textWithCues": "[Annoyed, mid-combat] Mousers? Really? We're not mice? Why?",
+    "aiReasoning": "The target text is in a speech bubble pointing to Raphael, the red-masked Ninja Turtle.\nHe is a major hero character fighting off robotic enemies called Mousers.\nHe is expressing annoyance or exasperation at the fact that these robots are attacking them, even though they are turtles, not mice.\nThe emotion is sarcastic annoyance while in the middle of combat."
   },
   {
     "id": "page-20_b04",
@@ -77,12 +79,13 @@
     },
     "ocr_text": "I THINK THEY'VE BROADENED THEIR HORIZONS, DUDE.",
     "type": "SPEECH",
-    "speaker": "Pink Ranger",
-    "emotion": "witty, exerting effort",
+    "speaker": "Michelangelo",
+    "emotion": "amused",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Straining slightly, sarcastically] I think they've broadened their horizons, dude.",
-    "aiReasoning": "1.  **Locate & Classify:** The text \"I THINK THEY'VE BROADENED THEIR HORIZONS, DUDE.\" is in a standard speech bubble in the middle panel. It's `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to the Pink Ranger, who is actively fighting off robotic Mousers. She is clearly a different character from the provided list (Narrator, Robo-Foot Soldier, Raphael). I will name her `Pink Ranger`.\n    *   **Side:** She is fighting the robotic villains alongside the Turtles. She is a `HERO`.\n    *   **Importance:** As a Power Ranger, she is part of the main cast. `MAJOR`.\n    *   **Voice Description:** Not required for MAJOR characters, but generally a youthful, energetic female voice.\n    *   **Emotion:** She is mid-combat, exerting physical effort, but also delivering a witty, sarcastic response to Raphael's confusion about the Mousers.\n3.  **Performance Cues:** The line should be delivered with a sense of physical exertion due to the fight, combined with a casual, slightly sarcastic tone given the \"dude\" at the end. I'll add `[Straining slightly, sarcastically]` to guide the performance."
+    "voiceDescription": "",
+    "textWithCues": "[Casually while fighting] I think they've broadened their horizons, dude.",
+    "aiReasoning": "I need to analyze the speech bubble containing \"I THINK THEY'VE BROADENED THEIR HORIZONS, DUDE.\"\nLooking at the second panel, this text is a response to Raphael's question about Mousers.\nTracing the tail of the speech bubble, it passes the Pink Ranger and points towards the turtle in the background wielding nunchucks and wearing an orange mask.\nUsing my knowledge of the Teenage Mutant Ninja Turtles franchise, this character is Michelangelo.\nHe is a main character (MAJOR) and a HERO.\nHe is speaking casually to his brother while in the middle of a fight."
   },
   {
     "id": "page-20_b05",
@@ -102,8 +105,9 @@
     "emotion": "menacing",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, slightly robotic, menacing and aggressive voice",
-    "textWithCues": "[Menacingly] Warbunny smiles with sharpened fangs at a chance for revenge."
+    "voiceDescription": "Deep, slightly robotic, aggressive male voice",
+    "textWithCues": "[Menacingly] Warbunny smiles with sharpened fangs at a chance for revenge.",
+    "aiReasoning": "The target text is in a speech bubble in the first panel.\nThe tail points to the large, pink, robotic rabbit character.\nThe character refers to himself in the third person as \"Warbunny\". Since he names himself and isn't a core main character like the Turtles or Rangers, I will classify him as a MINOR villain.\nHe is speaking about revenge with a smile, indicating a menacing and eager tone.\nI will describe his voice as deep, slightly robotic, and aggressive to fit his appearance."
   },
   {
     "id": "page-20_b06",
@@ -119,12 +123,12 @@
     },
     "ocr_text": "MOUSERS, DESTROY!",
     "type": "SPEECH",
-    "speaker": "Warbunny",
+    "speaker": "Blue Robot Minion",
     "emotion": "commanding",
     "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Robotic, menacing, slightly high-pitched villain voice",
-    "textWithCues": "[Commanding shout] Mousers, destroy!",
-    "aiReasoning": "I see the text \"MOUSERS, DESTROY!\". It is in a speech bubble.\nThe tail points to the pink robotic character with bunny ears. This matches the name \"Warbunny\" from the provided list and the text itself (\"Warbunny smiles...\").\nWarbunny is a villain. Since it's a named monster/henchman, I'll classify it as MINOR.\nThe character is giving an aggressive command. The voice should be robotic and menacing."
+    "voiceDescription": "Synthetic, metallic, aggressive male voice, commanding tone",
+    "textWithCues": "[Commanding shout] MOUSERS, DESTROY!",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"MOUSERS, DESTROY!\" is inside a speech bubble with a tail pointing to the blue robotic character on the right side of the top panel. It is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to a blue robotic character. This character is not explicitly named in the provided list (Narrator, Robotic Foot Soldier, Raphael, Michelangelo, Warbunny). I will use a descriptive name: \"Blue Robot Minion\".\n    *   **Side:** `VILLAIN`. It is commanding the Mousers to attack the heroes.\n    *   **Importance:** `MINOR`. It has a distinct design and speaking role, but doesn't seem to be a main villain like Shredder or Krang.\n    *   **Voice Description:** As a robotic villain, a metallic, synthetic, and aggressive male voice would be appropriate.\n    *   **Emotion:** The character is pointing and giving an order with an exclamation mark. The emotion is commanding and aggressive.\n3.  **Performance Cues:** The text is an order, indicated by the exclamation point and the character's body language (pointing). It should be shouted commandingly.\n    *   `[Commanding shout] MOUSERS, DESTROY!`"
   }
 ]

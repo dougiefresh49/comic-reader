@@ -35,9 +35,18 @@ interface Bubble {
   textWithCues?: string;
   aiReasoning?: string;
   ignored?: boolean;
+  needsAudio?: boolean;
+  needsOcr?: boolean;
   style?: BubbleStyle;
   [key: string]: unknown;
 }
+
+const AUDIO_AFFECTING_FIELDS = new Set<string>([
+  "speaker",
+  "ocr_text",
+  "textWithCues",
+  "type",
+]);
 
 type BubblesCache = Record<string, Bubble[]>;
 
@@ -49,7 +58,10 @@ interface FixBounds {
 }
 
 type FixChanges = Partial<
-  Pick<Bubble, "speaker" | "emotion" | "ocr_text" | "type" | "textWithCues" | "ignored">
+  Pick<
+    Bubble,
+    "speaker" | "emotion" | "ocr_text" | "type" | "textWithCues" | "ignored"
+  >
 > & { bounds?: FixBounds };
 
 type FixEntry =
@@ -117,8 +129,12 @@ function applyFix(cache: BubblesCache, fix: FixEntry): void {
         const { bounds, ...rest } = fix.changes;
         Object.assign(bubble, rest);
         if (bounds) bubble.style = boundsToStyle(bounds);
+        const affectsAudio = Object.keys(fix.changes).some((k) =>
+          AUDIO_AFFECTING_FIELDS.has(k),
+        );
+        if (affectsAudio && !bubble.ignored) bubble.needsAudio = true;
         console.log(
-          `  [update] ${fix.bubbleId} on ${pageKey}: ${Object.keys(fix.changes).join(", ")}`,
+          `  [update] ${fix.bubbleId} on ${pageKey}: ${Object.keys(fix.changes).join(", ")}${affectsAudio ? " ⚡ needsAudio" : ""}`,
         );
         return;
       }
@@ -134,6 +150,7 @@ function applyFix(cache: BubblesCache, fix: FixEntry): void {
     const { bounds, ...rest } = fix.data;
     const style = bounds ? boundsToStyle(bounds) : undefined;
 
+    const hasText = !!(rest.ocr_text?.trim() || rest.textWithCues?.trim());
     const newBubble: Bubble = {
       id: fix.bubbleId,
       box_2d: {},
@@ -142,6 +159,8 @@ function applyFix(cache: BubblesCache, fix: FixEntry): void {
       speaker: rest.speaker ?? null,
       emotion: rest.emotion ?? "",
       textWithCues: rest.textWithCues,
+      needsAudio: true,
+      needsOcr: !hasText ? true : undefined,
       style,
       ...rest,
     };
@@ -150,7 +169,10 @@ function applyFix(cache: BubblesCache, fix: FixEntry): void {
     delete newBubble.bounds;
 
     cache[key]!.push(newBubble);
-    console.log(`  [add] ${fix.bubbleId} added to ${key}`);
+    const flags = [!hasText ? "needsOcr" : null, "needsAudio"]
+      .filter(Boolean)
+      .join(", ");
+    console.log(`  [add] ${fix.bubbleId} added to ${key} ⚡ ${flags}`);
     return;
   }
 }
@@ -187,7 +209,9 @@ async function main() {
 
   const cache = (await fs.readJson(bubblesPath)) as BubblesCache;
 
-  console.log(`\nApplying ${fixes.length} fix(es) to ${bookId}/${issueId}...\n`);
+  console.log(
+    `\nApplying ${fixes.length} fix(es) to ${bookId}/${issueId}...\n`,
+  );
 
   for (const fix of fixes) {
     applyFix(cache, fix);

@@ -35,10 +35,12 @@ const PIPELINE_STEPS: PipelineStep[] = [
   { id: "generate-pages-metadata" },
   { id: "convert-pages-to-webp" },
   { id: "get-context" },
+  { id: "review-speakers" },
   { id: "sort-bubbles-gemini" },
   { id: "add-bubble-styles" },
   { id: "generate-character-voice-descriptions" },
   { id: "clean-voice-descriptions" },
+  { id: "review-new-characters" },
   { id: "find-voice-sources" },
   {
     id: "generate-voice-models",
@@ -56,6 +58,7 @@ function parseArgs(): {
   issue: string;
   fromStep?: string;
   dryRun: boolean;
+  auto: boolean;
 } {
   const args = process.argv.slice(2);
 
@@ -68,6 +71,7 @@ Options:
   --issue=N, --issue N         Issue number (required)
   --from-step=ID               Force restart from a specific step ID
   --dry-run                    Preview what would run without executing
+  --auto                       Skip interactive prompts (prune-only for review-new-characters)
   --help, -h                   Show this help message
 
 Pipeline steps:
@@ -77,6 +81,7 @@ Examples:
   pnpm ingest -- --book tmnt-mmpr --issue 4
   pnpm ingest -- --book tmnt-mmpr --issue 4 --from-step generate-audio
   pnpm ingest -- --book tmnt-mmpr --issue 4 --dry-run
+  pnpm ingest -- --book tmnt-mmpr --issue 4 --auto
 `);
     process.exit(0);
   }
@@ -85,6 +90,7 @@ Examples:
   let issue = "";
   let fromStep: string | undefined;
   let dryRun = false;
+  let auto = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -113,6 +119,9 @@ Examples:
     if (arg === "--dry-run") {
       dryRun = true;
     }
+    if (arg === "--auto") {
+      auto = true;
+    }
   }
 
   if (!book) {
@@ -124,7 +133,7 @@ Examples:
     process.exit(1);
   }
 
-  return { book, issue, fromStep, dryRun };
+  return { book, issue, fromStep, dryRun, auto };
 }
 
 function checkpointPath(book: string, issue: string): string {
@@ -161,6 +170,7 @@ async function runPnpmScript(
   scriptName: string,
   book: string,
   issue: string,
+  extraArgs: string[] = [],
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const env = {
@@ -171,7 +181,7 @@ async function runPnpmScript(
 
     const child = spawn(
       "pnpm",
-      [scriptName, "--", `--book=${book}`, `--issue=${issue}`],
+      [scriptName, "--", `--book=${book}`, `--issue=${issue}`, ...extraArgs],
       {
         stdio: "inherit",
         env,
@@ -241,7 +251,7 @@ async function promptContinue(message: string): Promise<void> {
 }
 
 async function main() {
-  const { book, issue, fromStep, dryRun } = parseArgs();
+  const { book, issue, fromStep, dryRun, auto } = parseArgs();
 
   console.log(`\n📚 Comic Ingest Pipeline`);
   console.log(`   Book:  ${book}`);
@@ -322,7 +332,8 @@ async function main() {
             `   ⚠️  No script named "${step.id}" in package.json — skipping`,
           );
         } else {
-          await runPnpmScript(step.id, book, issue);
+          const extraArgs = auto ? ["--auto"] : [];
+          await runPnpmScript(step.id, book, issue, extraArgs);
         }
       }
 

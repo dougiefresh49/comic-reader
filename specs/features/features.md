@@ -32,6 +32,8 @@ Backlog and status tracker for planned features. Update status here when work st
 | Voice clip sourcing assistant | `done` | — | `scripts/find-voice-sources.ts` — Phase 4, uses GEMINI_HIGH |
 | Global character registry | `done` | [character-registry.md](character-registry.md) | `data/character-registry.json` + `scripts/manage-registry.ts`. Migrated 29 characters from tmnt-mmpr-iii. |
 | Book-aware context | `done` | [book-aware-context.md](book-aware-context.md) | `book-config.json` (franchise context + wiki URLs) + `character-roster.json` (cross-page/issue name consistency) + character classification (named vs generic) to skip research for background characters. |
+| Interactive alias review | `pending` | [interactive-alias-review.md](interactive-alias-review.md) | Step 8.5 — per-character guided menu [1] New / [2] Alias to existing list. Prunes stale characters against bubbles.json first. Needs UX update from free-text to guided menu. |
+| Review speakers | `done` | [review-speakers.md](review-speakers.md) | Step 4.5 post-get-context — review/correct all speaker names in bubbles.json before any processing. [1] Accept / [2] Edit / [3] Choose from confirmed+registry list. Auto-accepts known registry characters. Fixes names at the source so alias-map stays clean. |
 
 ## Infrastructure
 
@@ -46,7 +48,7 @@ Specs in `specs/features/episode-generation/`. Two output modes: motion comic (f
 
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
-| Motion Comic MVP | `pending` | [01-motion-comic-mvp.md](episode-generation/01-motion-comic-mvp.md) | `pnpm motion-comic` — Ken Burns + ElevenLabs audio + FFmpeg. No Venice. |
+| Motion Comic MVP | `done` | [01-motion-comic-mvp.md](episode-generation/01-motion-comic-mvp.md) | `pnpm motion-comic` — Ken Burns + ElevenLabs audio + FFmpeg. No Venice. |
 | Character Setup | `pending` | [02-character-setup.md](episode-generation/02-character-setup.md) | `visualDescription` registry field + seedream reference images + series.json aesthetic lock |
 | Shot Planning | `pending` | [03-shot-planning.md](episode-generation/03-shot-planning.md) | Gemini Vision per page → shot-plan.json. Last free gate before Venice spend. |
 | Storyboard | `pending` | [04-storyboard.md](episode-generation/04-storyboard.md) | Venice image generation per shot (seedream + flux-2-max-edit). ~$5–15/issue. |

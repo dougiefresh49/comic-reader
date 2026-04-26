@@ -17,8 +17,8 @@
     "emotion": "threatening",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Commanding] Complete the modification in twelve hours, or breathing will be the least of your concerns.",
-    "aiReasoning": "I see the text \"COMPLETE THE MODIFICATION IN TWELVE HOURS, OR BREATHING WILL BE THE LEAST OF YOUR CONCERNS.\" in a standard speech bubble.\nThe tail points to the character on the left who is throwing the scientist. Based on the dialogue in the other panels, this is Shredder (Oroku Saki).\nShredder is a MAJOR VILLAIN.\nHe is delivering a forceful threat while physically tossing someone, so his emotion is threatening and commanding."
+    "voiceDescription": null,
+    "textWithCues": "[Threateningly] Complete the modification in twelve hours, or breathing will be the least of your concerns."
   },
   {
     "id": "page-21_b02",
@@ -35,12 +35,11 @@
     "ocr_text": "WITHOUT THE FOOT CLAN, YOU ARE NOTHING.",
     "type": "SPEECH",
     "speaker": "Shredder",
-    "emotion": "authoritative, cold",
+    "emotion": "authoritative, arrogant, cold",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "",
-    "textWithCues": "[Coldly authoritative] WITHOUT THE FOOT CLAN, YOU ARE NOTHING.",
-    "aiReasoning": "The text \"WITHOUT THE FOOT CLAN, YOU ARE NOTHING.\" is in a speech bubble in the top right panel. The tail of the bubble, along with the subsequent dialogue, indicates that Shredder is speaking to Baxter Stockman. Shredder is a major villain. He is speaking with cold authority, putting Stockman in his place after Stockman expressed fear."
+    "textWithCues": "[Coldly authoritative] Without the Foot Clan, you are nothing.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"WITHOUT THE FOOT CLAN, YOU ARE NOTHING.\" is inside a speech bubble in the top right panel. It is classified as `SPEECH`.\n2.  **Analyze Context:** The tail of the speech bubble points to the character in the spiky armor and helmet, who is Shredder. Shredder is a `MAJOR` character and a `VILLAIN`. In this scene, he is asserting dominance over a subordinate who is expressing fear. His emotion is cold, authoritative, and arrogant.\n3.  **Performance Cues:** The line should be delivered with a menacing, superior tone, emphasizing his power and the insignificance of others."
   },
   {
     "id": "page-21_b03",
@@ -57,10 +56,11 @@
     "ocr_text": "THE LIVES OF EVERYONE IN MY SERVICE ARE MEANINGLESS AND INCONSEQUENTIAL.",
     "type": "SPEECH",
     "speaker": "Shredder",
-    "emotion": "cold, ruthless",
+    "emotion": "cold, commanding, dismissive",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Coldly and authoritatively] The lives of everyone in my service are meaningless and inconsequential."
+    "textWithCues": "[Coldly, asserting his dominance] The lives of everyone in my service are meaningless and inconsequential.",
+    "aiReasoning": "I have located the text \"THE LIVES OF EVERYONE IN MY SERVICE ARE MEANINGLESS AND INCONSEQUENTIAL.\" in the top right panel.\nIt is in a standard speech bubble, so it is SPEECH.\nThe tail points to the imposing figure standing on the structure, looking out at space. The character in the previous panel addressed him as \"Master Shredder\". Therefore, the speaker is Shredder.\nShredder is a MAJOR character and a VILLAIN.\nThe text conveys a cruel, calculating, and grandiose attitude. He is dismissing the value of his followers in pursuit of his larger goals.\nThe emotion should be cold, authoritative, and slightly megalomaniacal."
   },
   {
     "id": "page-21_b04",
@@ -80,9 +80,8 @@
     "emotion": "authoritative",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": null,
-    "textWithCues": "[Authoritatively] You asked for power, and I have provided.",
-    "aiReasoning": "The text \"YOU ASKED FOR POWER, AND I HAVE PROVIDED.\" is in a speech bubble in the middle panel. The tail points towards the silhouette of Shredder, who has just thrown the other character to the ground.\nShredder is a Major Villain.\nHis tone is authoritative, commanding, and menacing as he dictates terms."
+    "voiceDescription": "Deep, raspy, authoritative, and menacing Japanese male voice",
+    "textWithCues": "[Commanding] You asked for power, and I have provided."
   },
   {
     "id": "page-21_b05",
@@ -99,12 +98,12 @@
     "ocr_text": "BUT I AM ON THE PRECIPICE OF ETERNITY, AND I WILL NOT LET YOUR FEAR STAND IN MY WAY.",
     "type": "SPEECH",
     "speaker": "Shredder",
-    "emotion": "arrogant, commanding",
+    "emotion": "authoritative, grandiose",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "",
-    "textWithCues": "[Commanding, arrogant] But I am on the precipice of eternity, and I will not let your fear stand in my way.",
-    "aiReasoning": "The text \"BUT I AM ON THE PRECIPICE OF ETERNITY, AND I WILL NOT LET YOUR FEAR STAND IN MY WAY.\" is found in a speech bubble in the top right panel.\nThe tail points to the armored figure, who is established as Master Shredder based on the dialogue from the frightened man (\"I'm sorry, Master Shredder\").\nShredder is a major villain.\nHis body language is imposing, standing above the other character. The dialogue is arrogant and commanding, dismissing the other character's fear in favor of his own grand ambition."
+    "voiceDescription": null,
+    "textWithCues": "[Authoritative, grandiose declaration] BUT I AM ON THE PRECIPICE OF ETERNITY, AND I WILL NOT LET YOUR FEAR STAND IN MY WAY.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top right panel. The tail points towards the armored figure standing on the structure. This is `SPEECH`.\n2.  **Analyze Context:** The speaker is Shredder, identifiable by his iconic helmet, cape, and armor, and the context of the conversation where the other character addresses him as \"Master Shredder\". He is a `MAJOR` `VILLAIN`. He is making a grand, arrogant declaration about his imminent power, dismissing the other character's mundane fears. The emotion is authoritative, grandiose, and utterly confident.\n3.  **Performance Cues:** The line is a dramatic proclamation. It needs to sound powerful and unwavering. A cue like `[Authoritative, grandiose]` or `[Booming declaration]` is appropriate to convey his sense of scale and ambition."
   },
   {
     "id": "page-21_b06",
@@ -121,11 +120,12 @@
     "ocr_text": "I SEE YOU FINALLY DECIDE TO COME OUT OF YOUR--",
     "type": "SPEECH",
     "speaker": "Baxter Stockman",
-    "emotion": "nervous, interrupted",
-    "characterType": "MAJOR",
+    "emotion": "hurried, interrupted",
+    "characterType": "MINOR",
     "side": "VILLAIN",
-    "voiceDescription": "Nasally, nervous, intellectual male voice",
-    "textWithCues": "[Running, looking back] I see you finally decide to come out of your--"
+    "voiceDescription": "Nasally, anxious male voice, sniveling scientist archetype",
+    "textWithCues": "[Hurried, slightly breathless] I see you finally decide to come out of your--",
+    "aiReasoning": "The text \"I SEE YOU FINALLY DECIDE TO COME OUT OF YOUR--\" is in a speech bubble in the bottom-left panel.\nThe tail of the bubble points to the character in the white lab coat who is running away.\nBased on the top panel, this character is Baxter Stockman.\nHe is a known villain/henchman character in the TMNT franchise, making him a MINOR character for voice casting purposes.\nHe has just been thrown to the ground by Shredder and is now running away, looking back over his shoulder. The dashes at the end indicate he is interrupted mid-sentence.\nHis tone should be hurried, slightly breathless from running, and perhaps a bit defensive or anxious before getting cut off."
   },
   {
     "id": "page-21_b07",
@@ -141,12 +141,11 @@
     },
     "ocr_text": "I CAN FEEL THEM MOVING AGAINST US, OROKU SAKI.",
     "type": "SPEECH",
-    "speaker": "Mutated Villain",
-    "emotion": "ominous and confident",
+    "speaker": "Lord Zedd",
+    "emotion": "ominous",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Deep, resonant, slightly distorted villainous voice, exuding new-found power",
-    "textWithCues": "[Sinister and composed] I can feel them moving against us, Oroku Saki."
+    "textWithCues": "[Ominously] I can feel them moving against us, Oroku Saki."
   },
   {
     "id": "page-21_b08",
@@ -162,11 +161,12 @@
     },
     "ocr_text": "WHAT HAS HAPPENED? THE MUTAGEN.",
     "type": "SPEECH",
-    "speaker": "Shredder",
-    "emotion": "shocked",
+    "speaker": "Lord Zedd",
+    "emotion": "surprised",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Shouting, demanding] What has happened? The mutagen."
+    "textWithCues": "[Surprised] What has happened? The mutagen.",
+    "aiReasoning": "The text is in a speech bubble.\nThe tail points to the left, indicating the speaker is the character from the previous panel who was just speaking to Oroku Saki (Shredder). This character has the visual hallmarks of Lord Zedd (metal bands, visor) but with green, mutated skin. He is reacting to Shredder stepping out of the shadows in his new, mutated form.\nSpeaker: Lord Zedd.\nImportance: Major Villain.\nEmotion: Surprised, confused, demanding an explanation.\nPerformance: He is taken aback by Shredder's transformation."
   },
   {
     "id": "page-21_b09",
@@ -186,7 +186,8 @@
     "emotion": "incredulous",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Incredulous] You're worried about... the air?"
+    "textWithCues": "[Incredulous, condescending tone] You're worried about... [pauses in disbelief] the air?",
+    "aiReasoning": "The text \"YOU'RE WORRIED ABOUT...THE AIR?\" is in a speech bubble in the top left panel. The tail points off-panel to the right. The character shown in the panel is Baxter Stockman, looking terrified and sweating. In the subsequent bubbles, Stockman addresses the speaker as \"MASTER SHREDDER\", confirming the speaker of this line is Shredder.\nShredder is a MAJOR VILLAIN. His tone here is clearly one of disbelief and condescension at Stockman's fear of the vacuum of space while they are on the \"precipice of eternity\".\nThe ellipsis suggests a pause, emphasizing his incredulity. The performance should reflect this arrogant disbelief."
   },
   {
     "id": "page-21_b10",
@@ -203,12 +204,10 @@
     "ocr_text": "IT'S JUST THAT THE IDEA OF MAGIC BEING THE ONLY THING BETWEEN ME AND THE VACUUM OF SPACE IS--",
     "type": "SPEECH",
     "speaker": "Baxter Stockman",
-    "emotion": "Terrified, panicked",
-    "characterType": "MINOR",
+    "emotion": "terrified",
+    "characterType": "MAJOR",
     "side": "VILLAIN",
-    "voiceDescription": "Nasal, nerdy, highly anxious male voice",
-    "textWithCues": "[Frantic, speaking quickly] It's just that the idea of magic being the only thing between me and the vacuum of space is--",
-    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the first panel, pointing to the character with glasses. This is `SPEECH`.\n2.  **Analyze Context:** The character is Baxter Stockman, a known villain in the TMNT universe, currently serving Shredder. He is a named secondary antagonist, so his importance is `MINOR`. He is on the `VILLAIN` side. He is sweating, wide-eyed, and looks extremely panicked about being in space with only magic protecting him.\n3.  **Performance Cues:** His expression is one of sheer terror. The text ends with a double dash \"--\", indicating he is abruptly cut off or too scared to finish the sentence. The delivery should be fast, anxious, and terrified."
+    "textWithCues": "[Panicking, rambling] It's just that the idea of magic being the only thing between me and the vacuum of space is--"
   },
   {
     "id": "page-21_b11",
@@ -225,9 +224,9 @@
     "ocr_text": "I WARNED YOU--",
     "type": "SPEECH",
     "speaker": "Baxter Stockman",
-    "emotion": "scared, urgent",
+    "emotion": "terrified",
     "characterType": "MAJOR",
     "side": "VILLAIN",
-    "textWithCues": "[Calling out nervously] I warned you--"
+    "textWithCues": "[Panicking, cutting himself off] I warned you--"
   }
 ]

@@ -1,0 +1,54 @@
+{
+  "Alpha 5": {
+    "appearanceId": "alpha-5-voice-design",
+    "voiceId": "G4FycwjZbrUlO5rnrTGm"
+  },
+  "Blue Ranger": {
+    "appearanceId": "blue-ranger-voice-design",
+    "voiceId": "eggrlJySU29RodqjhIkX"
+  },
+  "Foot Soldier": {
+    "appearanceId": "foot-soldier-voice-design",
+    "voiceId": "8EsHn25qWtDd2mWwmiYQ"
+  },
+  "Green Ranger": {
+    "appearanceId": "green-ranger-voice-design",
+    "voiceId": "fDCFh0Z04XCcSmBoHT4j"
+  },
+  "Leonardo": {
+    "appearanceId": "leonardo-voice-design",
+    "voiceId": "1sca4ecJ4XyU7M176Ei0"
+  },
+  "Lord Zedd": {
+    "appearanceId": "lord-zedd-voice-design",
+    "voiceId": "xZHSfy1jtZKEX5ypvdGU"
+  },
+  "Narrator": {
+    "appearanceId": "narrator-cate-blanchett-lotr",
+    "voiceId": "l6mRFE6WsbFVDdbMTQyk"
+  },
+  "Raphael": {
+    "appearanceId": "raphael-teenage-mutant-ninja-turtles",
+    "voiceId": "RbsOf5RuEmcgV4XgAWDA"
+  },
+  "Red Ranger": {
+    "appearanceId": "red-ranger-voice-design",
+    "voiceId": "R8tHGp6yBIKs45odIPD1"
+  },
+  "Shredder": {
+    "appearanceId": "shredder-teenage-mutant-ninja-turtles",
+    "voiceId": "zyz29XaJBhGHDfyrCD7d"
+  },
+  "Soldier": {
+    "appearanceId": "soldier-voice-design",
+    "voiceId": "kaQG4rvOTzT2F2yIXtSN"
+  },
+  "Warbunny": {
+    "appearanceId": "warbunny-voice-design",
+    "voiceId": "Ur4iSnAWauOSA2qdwx6b"
+  },
+  "Zordon": {
+    "appearanceId": "zordon-voice-design",
+    "voiceId": "NvO7pjO09CWuF87LH2iA"
+  }
+}

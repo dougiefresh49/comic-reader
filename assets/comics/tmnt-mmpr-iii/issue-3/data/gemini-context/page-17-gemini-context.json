@@ -13,12 +13,12 @@
     },
     "ocr_text": "SPEAK FOR YOURSELF, GOALIE MAN. HEY DONNIE! DID MIKEY HAPPEN TO COME ALONG?",
     "type": "SPEECH",
-    "speaker": "Green Dimension X Ranger",
-    "emotion": "playful",
+    "speaker": "Casey Jones",
+    "emotion": "cocky, casual mid-battle banter",
     "characterType": "MAJOR",
     "side": "HERO",
-    "voiceDescription": "Energetic female voice, slightly tomboyish",
-    "textWithCues": "[Playfully teasing] Speak for yourself, goalie man. [Calling out loudly] Hey Donnie! Did Mikey happen to come along?"
+    "voiceDescription": "",
+    "textWithCues": "[Cocky taunt] Speak for yourself, goalie man. [Calls out cheerfully] Hey Donnie! Did Mikey happen to come along?"
   },
   {
     "id": "page-17_b02",
@@ -34,11 +34,11 @@
     },
     "ocr_text": "...BUT DIMENSION X IS A BIG PLACE, AND IT ONLY HAS SO MANY RANGERS TO PROTECT IT. NICE OF YOU TO BRING SOME MORE BAD GUYS WITH YOU. THE NEUTRINOS COULD USE A BREAK FROM CHASING DOWN WHAT'S LEFT OF KRANG'S ARMY.",
     "type": "SPEECH",
-    "speaker": "Pink Dimension X Ranger",
-    "emotion": "confident, playful banter",
+    "speaker": "Casey Jones",
+    "emotion": "confident",
     "characterType": "MAJOR",
     "side": "HERO",
-    "textWithCues": "[Confidently] ...But Dimension X is a big place, and it only has so many Rangers to protect it. [Playfully sarcastic] Nice of you to bring some more bad guys with you. The Neutrinos could use a break from chasing down what's left of Krang's army.",
-    "aiReasoning": "I see the text \"...BUT DIMENSION X IS A BIG PLACE...\". It is in a set of connected speech bubbles.\nThe tails of the top two bubbles clearly point to the character in pink and black armor holding a staff.\nThe provided list of unique characters only includes \"Green Dimension X Ranger\", but this is clearly a different character. I will name her \"Pink Dimension X Ranger\".\nThe speaker is a HERO, part of the main team, so Importance is MAJOR.\nShe is speaking confidently and engaging in typical superhero banter, suggesting a playful or slightly sarcastic tone."
+    "textWithCues": "[Energetic] ...But Dimension X is a big place, and it only has so many Rangers to protect it. [Sarcastically] Nice of you to bring some more bad guys with you. The Neutrinos could use a break from chasing down what's left of Krang's army.",
+    "aiReasoning": "Text is in a speech bubble pointing to the pink Ranger-suited character.\nThis character wields a hockey stick and is referred to as \"Goalie Man\" by the blue character below. This identifies him as Casey Jones.\nHe is a HERO, a MAJOR character in the TMNT universe.\nThe text is standard dialogue, no special formatting for shouting. The tone is confident, slightly sarcastic about bringing more bad guys.\nI will add cues for a confident, slightly sarcastic tone mid-combat."
   }
 ]
