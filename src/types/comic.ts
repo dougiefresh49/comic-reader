@@ -16,6 +16,7 @@ export interface Bubble {
   speaker: string | null;
   emotion: string;
   textWithCues?: string;
+  aiReasoning?: string;
   ignored?: boolean;
   style?: {
     left: string;

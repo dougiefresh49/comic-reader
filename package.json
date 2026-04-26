@@ -32,7 +32,8 @@
     "generate-pages-metadata": "tsx --env-file=.env scripts/generate-pages-metadata.ts",
     "add-bubble-styles": "tsx --env-file=.env scripts/add-bubble-styles.ts",
     "repair-cues": "tsx --env-file=.env scripts/repair-cues.ts",
-    "clip-audio-segments": "tsx scripts/clip-audio-segments.ts"
+    "clip-audio-segments": "tsx scripts/clip-audio-segments.ts",
+    "apply-fixes": "tsx --env-file=.env scripts/apply-fixes.ts"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.25.1",
