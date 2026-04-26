@@ -59,3 +59,57 @@ export async function getPageData(
   }
 }
 
+export interface IssueData {
+  allBubbles: Record<string, Bubble[]>;
+  characters: string[];
+}
+
+export async function getIssueData(
+  bookId: string,
+  issueId: string,
+): Promise<IssueData> {
+  const bubblesPath = join(
+    process.cwd(),
+    "public",
+    "comics",
+    bookId,
+    issueId,
+    "bubbles.json",
+  );
+
+  let allBubbles: Record<string, Bubble[]> = {};
+  try {
+    const raw = await readFile(bubblesPath, "utf-8");
+    allBubbles = JSON.parse(raw) as Record<string, Bubble[]>;
+  } catch {
+    // no-op — return empty
+  }
+
+  let characters: string[] = [];
+  try {
+    const castPath = join(
+      process.cwd(),
+      "public",
+      "comics",
+      bookId,
+      issueId,
+      "castlist.json",
+    );
+    const castRaw = await readFile(castPath, "utf-8");
+    characters = Object.keys(
+      JSON.parse(castRaw) as Record<string, unknown>,
+    ).sort();
+  } catch {
+    // Derive from bubbles
+    const seen = new Set<string>();
+    for (const bubbles of Object.values(allBubbles)) {
+      for (const b of bubbles) {
+        if (b.speaker) seen.add(b.speaker);
+      }
+    }
+    characters = Array.from(seen).sort();
+  }
+
+  return { allBubbles, characters };
+}
+

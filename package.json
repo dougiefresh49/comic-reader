@@ -36,7 +36,8 @@
     "find-voice-sources": "tsx --env-file=.env scripts/find-voice-sources.ts",
     "manage-registry": "tsx --env-file=.env scripts/manage-registry.ts",
     "ingest": "tsx --env-file=.env scripts/ingest.ts",
-    "scrape-pages": "tsx --env-file=.env scripts/scrape-pages.ts"
+    "scrape-pages": "tsx --env-file=.env scripts/scrape-pages.ts",
+    "apply-fixes": "tsx --env-file=.env scripts/apply-fixes.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",
