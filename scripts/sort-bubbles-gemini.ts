@@ -16,6 +16,7 @@ import {
   createPartFromText,
   createPartFromBase64,
 } from "@google/genai";
+import sharp from "sharp";
 import { env } from "~/env.mjs";
 import type { Bubble } from "./utils/gemini-context.js";
 
@@ -341,7 +342,7 @@ async function main() {
     console.log(`🔀 Sorting bubbles using Gemini AI...\n`);
     const sortedCache: ContextCache = { ...cache };
     let totalPages = 0;
-    let totalReordered = 0;
+    let totalModified = 0;
     let errors = 0;
 
     for (const pageName of pages) {
@@ -366,16 +367,41 @@ async function main() {
         }
 
         const pageImage = await fs.readFile(pageImagePath);
+        const pageMeta = await sharp(pageImage).metadata();
+        const imgWidth = pageMeta.width ?? 0;
+        const imgHeight = pageMeta.height ?? 0;
 
         // Prepare bubble data for Gemini
-        const bubblesForSorting: BubbleForSorting[] = bubbles.map((b) => ({
-          id: b.id,
-          text: b.textWithCues || b.ocr_text,
-          x: b.box_2d.x ?? 0,
-          y: b.box_2d.y ?? 0,
-          width: b.box_2d.width ?? 0,
-          height: b.box_2d.height ?? 0,
-        }));
+        const bubblesForSorting: BubbleForSorting[] = bubbles.map((b) => {
+          let x = b.box_2d.x ?? 0;
+          let y = b.box_2d.y ?? 0;
+          let width = b.box_2d.width ?? 0;
+          let height = b.box_2d.height ?? 0;
+          // Fall back to style percentages for manually-added bubbles with empty box_2d
+          if (
+            x === 0 &&
+            y === 0 &&
+            width === 0 &&
+            height === 0 &&
+            b.style &&
+            imgWidth &&
+            imgHeight
+          ) {
+            const pct = (s: string | undefined) => parseFloat(s ?? "0") / 100;
+            x = Math.floor(pct(b.style.left) * imgWidth);
+            y = Math.floor(pct(b.style.top) * imgHeight);
+            width = Math.max(1, Math.floor(pct(b.style.width) * imgWidth));
+            height = Math.max(1, Math.floor(pct(b.style.height) * imgHeight));
+          }
+          return {
+            id: b.id,
+            text: b.textWithCues || b.ocr_text,
+            x,
+            y,
+            width,
+            height,
+          };
+        });
 
         // Get reading order from Gemini
         const sortingResult = await getReadingOrderFromGemini(
@@ -396,11 +422,19 @@ async function main() {
           );
         }
 
+        // Capture original ID order before any mutations
+        const originalOrder = bubbles.map((b) => b.id);
+
         // Reorder bubbles (only include those in orderedIds)
         const bubbleMap = new Map(bubbles.map((b) => [b.id, b]));
         const sortedBubbles = sortingResult.orderedIds
           .map((id) => bubbleMap.get(id))
           .filter((b): b is Bubble => b !== undefined);
+
+        // Determine if Gemini changed the reading order (using original IDs, before renaming)
+        const orderChanged = sortingResult.orderedIds.some(
+          (id, i) => id !== originalOrder[i],
+        );
 
         // Mark duplicates and invalid bubbles as ignored
         const bubblesToIgnore = new Set([
@@ -412,7 +446,6 @@ async function main() {
           console.log(
             `   🗑️  Marking ${bubblesToIgnore.size} bubble(s) as ignored`,
           );
-          // Update the cache to mark these as ignored
           for (const bubble of sortedBubbles) {
             if (bubblesToIgnore.has(bubble.id)) {
               bubble.ignored = true;
@@ -420,34 +453,32 @@ async function main() {
           }
         }
 
-        // Renumber bubble IDs to match their sorted order
-        // Extract page number from first bubble ID (e.g., "page-03_b01" -> "page-03")
-        const pagePrefix = sortedBubbles[0]?.id.match(/^(page-\d+)/)?.[1];
-        if (pagePrefix) {
-          sortedBubbles.forEach((bubble, index) => {
-            const newId = `${pagePrefix}_b${String(index + 1).padStart(2, "0")}`;
-            if (bubble.id !== newId) {
-              console.log(`   🔄 Renumbering: ${bubble.id} → ${newId}`);
-              bubble.id = newId;
-              // Also update the index in box_2d if it exists (box_2d may have extra properties)
-              const box2d = bubble.box_2d as typeof bubble.box_2d & {
-                index?: number;
-              };
-              if (box2d) {
-                box2d.index = index;
-              }
+        // Renumber bubble IDs to match their sorted order.
+        // Derive prefix from pageName so manually-added bubbles (e.g. "new-001")
+        // are renamed correctly alongside regular ones.
+        const pagePrefix = pageName.replace(/\.jpg$/, "");
+        let renamedCount = 0;
+        sortedBubbles.forEach((bubble, index) => {
+          const newId = `${pagePrefix}_b${String(index + 1).padStart(2, "0")}`;
+          if (bubble.id !== newId) {
+            console.log(`   🔄 Renumbering: ${bubble.id} → ${newId}`);
+            bubble.id = newId;
+            renamedCount++;
+            const box2d = bubble.box_2d as typeof bubble.box_2d & {
+              index?: number;
+            };
+            if (box2d) {
+              box2d.index = index;
             }
-          });
-        }
+          }
+        });
 
-        // Check if order changed
-        const orderChanged = sortedBubbles.some(
-          (b, i) => b.id !== bubbles[i]?.id,
-        );
+        const pageModified =
+          orderChanged || renamedCount > 0 || bubblesToIgnore.size > 0;
 
-        if (orderChanged) {
-          totalReordered++;
-          console.log(`   Original: ${bubbles.map((b) => b.id).join(", ")}`);
+        if (pageModified) {
+          totalModified++;
+          console.log(`   Original: ${originalOrder.join(", ")}`);
           console.log(
             `   Sorted:   ${sortedBubbles.map((b) => b.id).join(", ")}`,
           );
@@ -474,11 +505,11 @@ async function main() {
     // Summary
     console.log("📊 Summary:");
     console.log(`   Total pages: ${totalPages}`);
-    console.log(`   Pages reordered: ${totalReordered}`);
+    console.log(`   Pages modified: ${totalModified}`);
     console.log(`   Errors: ${errors}`);
 
     // Save if not dry run
-    if (!dryRun && totalReordered > 0) {
+    if (!dryRun && totalModified > 0) {
       console.log("\n💾 Saving sorted context cache...");
       await fs.writeFile(CACHE_FILE, JSON.stringify(sortedCache, null, 2));
       console.log(`   ✓ Saved to ${CACHE_FILE}\n`);

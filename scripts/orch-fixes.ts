@@ -129,17 +129,17 @@ async function main() {
       script: "apply-fixes",
       args: [`--fixes=${fixesPath}`],
     },
-    // One sort run per page that had bubbles added
-    ...addedPages.map((page) => ({
-      name: `sort-bubbles-gemini (page ${page})`,
-      script: "sort-bubbles-gemini",
-      args: [`--book=${book}`, `--issue=${issue}`, `--page=${page}`],
-    })),
     {
       name: "ocr-flagged-bubbles",
       script: "ocr-flagged-bubbles",
       args: [`--book=${book}`, `--issue=${issue}`],
     },
+    // Sort after OCR so added bubbles have text + style coords for Gemini to work with
+    ...addedPages.map((page) => ({
+      name: `sort-bubbles-gemini (page ${page})`,
+      script: "sort-bubbles-gemini",
+      args: [`--book=${book}`, `--issue=${issue}`, `--page=${page}`],
+    })),
     {
       name: "generate-audio (flagged only)",
       script: "generate-audio",

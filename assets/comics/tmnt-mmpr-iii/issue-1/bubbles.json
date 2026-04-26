@@ -393,7 +393,24 @@
     {
       "id": "page-03_b01",
       "box_2d": {
-        "index": 0,
+        "index": 0
+      },
+      "ocr_text": "THE END.",
+      "type": "NARRATION",
+      "speaker": "Narrator",
+      "emotion": "",
+      "style": {
+        "left": "6.88%",
+        "top": "1.99%",
+        "width": "13.06%",
+        "height": "3.82%"
+      },
+      "textWithCues": "[dramatically] THE END."
+    },
+    {
+      "id": "page-03_b02",
+      "box_2d": {
+        "index": 1,
         "x": 591.49462890625,
         "y": 83.4361343383789,
         "width": 340.247802734375,
@@ -419,9 +436,9 @@
       }
     },
     {
-      "id": "page-03_b02",
+      "id": "page-03_b03",
       "box_2d": {
-        "index": 1,
+        "index": 2,
         "x": 559.7374877929688,
         "y": 177.50335693359375,
         "width": 422.54510498046875,
@@ -447,9 +464,9 @@
       }
     },
     {
-      "id": "page-03_b03",
+      "id": "page-03_b04",
       "box_2d": {
-        "index": 2,
+        "index": 3,
         "x": 676.1735229492188,
         "y": 324.5847473144531,
         "width": 306.97064208984375,
@@ -475,9 +492,9 @@
       }
     },
     {
-      "id": "page-03_b04",
+      "id": "page-03_b05",
       "box_2d": {
-        "index": 3,
+        "index": 4,
         "x": 596.39453125,
         "y": 623.5157470703125,
         "width": 283.1622314453125,
@@ -503,9 +520,9 @@
       }
     },
     {
-      "id": "page-03_b05",
+      "id": "page-03_b06",
       "box_2d": {
-        "index": 4,
+        "index": 5,
         "x": 820.611328125,
         "y": 890.6592407226562,
         "width": 231.5047607421875,
@@ -531,9 +548,9 @@
       }
     },
     {
-      "id": "page-03_b06",
+      "id": "page-03_b07",
       "box_2d": {
-        "index": 5,
+        "index": 6,
         "x": 819.8679809570312,
         "y": 1314.342041015625,
         "width": 315.06427001953125,
@@ -559,9 +576,9 @@
       }
     },
     {
-      "id": "page-03_b07",
+      "id": "page-03_b08",
       "box_2d": {
-        "index": 6,
+        "index": 7,
         "x": 105.75077056884766,
         "y": 1701.080810546875,
         "width": 335.8065719604492,
@@ -587,9 +604,9 @@
       }
     },
     {
-      "id": "page-03_b08",
+      "id": "page-03_b09",
       "box_2d": {
-        "index": 7,
+        "index": 8,
         "x": 761.0025024414062,
         "y": 1752.7552490234375,
         "width": 255.0152587890625,
@@ -615,9 +632,9 @@
       }
     },
     {
-      "id": "page-03_b09",
+      "id": "page-03_b10",
       "box_2d": {
-        "index": 8,
+        "index": 9,
         "x": 782.5005493164062,
         "y": 1876.51123046875,
         "width": 290.63043212890625,
@@ -643,9 +660,9 @@
       }
     },
     {
-      "id": "page-03_b10",
+      "id": "page-03_b11",
       "box_2d": {
-        "index": 9,
+        "index": 10,
         "x": 1420.8565673828125,
         "y": 1788.3968505859375,
         "width": 323.6103515625,
@@ -668,20 +685,6 @@
         "top": "58.40%",
         "width": "16.28%",
         "height": "5.37%"
-      }
-    },
-    {
-      "id": "new-001",
-      "box_2d": {},
-      "ocr_text": "",
-      "type": "NARRATION",
-      "speaker": "Narrator",
-      "emotion": "",
-      "style": {
-        "left": "6.88%",
-        "top": "1.99%",
-        "width": "13.06%",
-        "height": "3.82%"
       }
     }
   ],
@@ -1261,7 +1264,58 @@
     {
       "id": "page-07_b04",
       "box_2d": {
-        "index": 3,
+        "index": 3
+      },
+      "ocr_text": "BRING THE SWING, BUNNY BOY!",
+      "type": "SPEECH",
+      "speaker": "Donatello",
+      "emotion": "",
+      "style": {
+        "left": "53.58%",
+        "top": "21.85%",
+        "width": "14.81%",
+        "height": "3.07%"
+      },
+      "textWithCues": "[shouting] BRING THE SWING, BUNNY BOY!"
+    },
+    {
+      "id": "page-07_b05",
+      "box_2d": {
+        "index": 4
+      },
+      "ocr_text": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT.",
+      "type": "SPEECH",
+      "speaker": "Raphael",
+      "emotion": "",
+      "style": {
+        "left": "69.17%",
+        "top": "21.57%",
+        "width": "25.49%",
+        "height": "5.12%"
+      },
+      "textWithCues": "[Matter-of-factly] The good news is, a rabbit's teeth never stop growing, [smirks] so we don't have to feel bad about knocking any out."
+    },
+    {
+      "id": "page-07_b06",
+      "box_2d": {
+        "index": 5
+      },
+      "ocr_text": "YOU'RE WORSE THAN BILLY.",
+      "type": "SPEECH",
+      "speaker": "Trini",
+      "emotion": "",
+      "style": {
+        "left": "85.37%",
+        "top": "26.50%",
+        "width": "9.58%",
+        "height": "4.87%"
+      },
+      "textWithCues": "[Exasperated] You're worse than Billy."
+    },
+    {
+      "id": "page-07_b07",
+      "box_2d": {
+        "index": 6,
         "x": 817.4210205078125,
         "y": 1524.559326171875,
         "width": 270.7642822265625,
@@ -1286,9 +1340,9 @@
       }
     },
     {
-      "id": "page-07_b05",
+      "id": "page-07_b08",
       "box_2d": {
-        "index": 4,
+        "index": 7,
         "x": 1482.9525146484375,
         "y": 1750.783935546875,
         "width": 226.7447509765625,
@@ -1314,9 +1368,26 @@
       }
     },
     {
-      "id": "page-07_b06",
+      "id": "page-07_b09",
       "box_2d": {
-        "index": 5,
+        "index": 8
+      },
+      "ocr_text": "ARE YOU ALRIGHT?",
+      "type": "SPEECH",
+      "speaker": "Alpha 5",
+      "emotion": "frantic acknowledgment",
+      "style": {
+        "left": "80.36%",
+        "top": "61.24%",
+        "width": "9.50%",
+        "height": "2.70%"
+      },
+      "textWithCues": "[panicked] [shouting] ARE YOU ALRIGHT?"
+    },
+    {
+      "id": "page-07_b10",
+      "box_2d": {
+        "index": 9,
         "x": 1438.26904296875,
         "y": 1935.7686767578125,
         "width": 365.9298095703125,
@@ -1341,9 +1412,9 @@
       }
     },
     {
-      "id": "page-07_b07",
+      "id": "page-07_b11",
       "box_2d": {
-        "index": 6,
+        "index": 10,
         "x": 1441.1119384765625,
         "y": 2320.905517578125,
         "width": 475.3050537109375,
@@ -1365,62 +1436,6 @@
         "top": "75.92%",
         "width": "23.91%",
         "height": "6.73%"
-      }
-    },
-    {
-      "id": "new-004",
-      "box_2d": {},
-      "ocr_text": "",
-      "type": "SPEECH",
-      "speaker": "Donatello",
-      "emotion": "",
-      "style": {
-        "left": "53.58%",
-        "top": "21.85%",
-        "width": "14.81%",
-        "height": "3.07%"
-      }
-    },
-    {
-      "id": "new-005",
-      "box_2d": {},
-      "ocr_text": "",
-      "type": "SPEECH",
-      "speaker": "Raphael",
-      "emotion": "",
-      "style": {
-        "left": "69.17%",
-        "top": "21.57%",
-        "width": "25.49%",
-        "height": "5.12%"
-      }
-    },
-    {
-      "id": "new-006",
-      "box_2d": {},
-      "ocr_text": "",
-      "type": "SPEECH",
-      "speaker": "Trini",
-      "emotion": "",
-      "style": {
-        "left": "85.37%",
-        "top": "26.50%",
-        "width": "9.58%",
-        "height": "4.87%"
-      }
-    },
-    {
-      "id": "new-007",
-      "box_2d": {},
-      "ocr_text": "",
-      "type": "SPEECH",
-      "speaker": "Alpha 5",
-      "emotion": "frantic acknowledgment",
-      "style": {
-        "left": "80.36%",
-        "top": "61.24%",
-        "width": "9.50%",
-        "height": "2.70%"
       }
     }
   ],
@@ -3372,7 +3387,24 @@
     {
       "id": "page-15_b01",
       "box_2d": {
-        "index": 0,
+        "index": 0
+      },
+      "ocr_text": "THE MOON PALACE.",
+      "type": "CAPTION",
+      "speaker": "Narrator",
+      "emotion": "",
+      "style": {
+        "left": "10.81%",
+        "top": "1.80%",
+        "width": "27.41%",
+        "height": "3.66%"
+      },
+      "textWithCues": "[Grandly] THE MOON PALACE."
+    },
+    {
+      "id": "page-15_b02",
+      "box_2d": {
+        "index": 1,
         "x": 254.2700653076172,
         "y": 184.57862854003906,
         "width": 230.38072204589844,
@@ -3398,9 +3430,9 @@
       }
     },
     {
-      "id": "page-15_b02",
+      "id": "page-15_b03",
       "box_2d": {
-        "index": 1,
+        "index": 2,
         "x": 550.3047485351562,
         "y": 210.68040466308594,
         "width": 219.91943359375,
@@ -3426,9 +3458,9 @@
       }
     },
     {
-      "id": "page-15_b03",
+      "id": "page-15_b04",
       "box_2d": {
-        "index": 2,
+        "index": 3,
         "x": 533.7192993164062,
         "y": 292.54608154296875,
         "width": 259.0064697265625,
@@ -3454,9 +3486,9 @@
       }
     },
     {
-      "id": "page-15_b04",
+      "id": "page-15_b05",
       "box_2d": {
-        "index": 3,
+        "index": 4,
         "x": 1048.0050048828125,
         "y": 84.635986328125,
         "width": 219.6492919921875,
@@ -3482,9 +3514,9 @@
       }
     },
     {
-      "id": "page-15_b05",
+      "id": "page-15_b06",
       "box_2d": {
-        "index": 4,
+        "index": 5,
         "x": 1288.313720703125,
         "y": 119.25186920166016,
         "width": 211.872802734375,
@@ -3510,9 +3542,9 @@
       }
     },
     {
-      "id": "page-15_b06",
+      "id": "page-15_b07",
       "box_2d": {
-        "index": 5,
+        "index": 6,
         "x": 1392.6160888671875,
         "y": 229.80142211914062,
         "width": 309.565673828125,
@@ -3538,9 +3570,9 @@
       }
     },
     {
-      "id": "page-15_b07",
+      "id": "page-15_b08",
       "box_2d": {
-        "index": 6,
+        "index": 7,
         "x": 1531.8765869140625,
         "y": 898.1483154296875,
         "width": 270.2637939453125,
@@ -3566,9 +3598,9 @@
       }
     },
     {
-      "id": "page-15_b08",
+      "id": "page-15_b09",
       "box_2d": {
-        "index": 7,
+        "index": 8,
         "x": 77.33369445800781,
         "y": 1287.2208251953125,
         "width": 407.38221740722656,
@@ -3593,9 +3625,9 @@
       }
     },
     {
-      "id": "page-15_b09",
+      "id": "page-15_b10",
       "box_2d": {
-        "index": 8,
+        "index": 9,
         "x": 497.7915954589844,
         "y": 1333.0113525390625,
         "width": 422.8367004394531,
@@ -3621,9 +3653,9 @@
       }
     },
     {
-      "id": "page-15_b10",
+      "id": "page-15_b11",
       "box_2d": {
-        "index": 9,
+        "index": 10,
         "x": 1037.1285400390625,
         "y": 1239.267578125,
         "width": 470.2366943359375,
@@ -3648,9 +3680,9 @@
       }
     },
     {
-      "id": "page-15_b11",
+      "id": "page-15_b12",
       "box_2d": {
-        "index": 10,
+        "index": 11,
         "x": 1687.432861328125,
         "y": 1308.9893798828125,
         "width": 204.2481689453125,
@@ -3675,9 +3707,9 @@
       }
     },
     {
-      "id": "page-15_b12",
+      "id": "page-15_b13",
       "box_2d": {
-        "index": 11,
+        "index": 12,
         "x": 1090.2117919921875,
         "y": 2063.004638671875,
         "width": 811.0179443359375,
@@ -3702,9 +3734,9 @@
       }
     },
     {
-      "id": "page-15_b13",
+      "id": "page-15_b14",
       "box_2d": {
-        "index": 12,
+        "index": 13,
         "x": 1598.574951171875,
         "y": 2258.705810546875,
         "width": 302.3782958984375,
@@ -3727,20 +3759,6 @@
         "top": "73.89%",
         "width": "15.21%",
         "height": "5.44%"
-      }
-    },
-    {
-      "id": "new-020",
-      "box_2d": {},
-      "ocr_text": "",
-      "type": "CAPTION",
-      "speaker": "Narrator",
-      "emotion": "",
-      "style": {
-        "left": "10.81%",
-        "top": "1.80%",
-        "width": "27.41%",
-        "height": "3.66%"
       }
     }
   ],
@@ -4577,9 +4595,11 @@
   ],
   "page-19.jpg": [
     {
-      "id": "new-021",
-      "box_2d": {},
-      "ocr_text": "",
+      "id": "page-19_b01",
+      "box_2d": {
+        "index": 0
+      },
+      "ocr_text": "SHADOW GRID-- ACTIVATE!",
       "type": "SPEECH",
       "speaker": "Rocksteady",
       "emotion": "",
@@ -4588,12 +4608,15 @@
         "top": "2.47%",
         "width": "30.79%",
         "height": "7.59%"
-      }
+      },
+      "textWithCues": "[Shouting] SHADOW GRID-- ACTIVATE!"
     },
     {
-      "id": "new-022",
-      "box_2d": {},
-      "ocr_text": "",
+      "id": "page-19_b02",
+      "box_2d": {
+        "index": 1
+      },
+      "ocr_text": "RRRAAARGH! OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.",
       "type": "SPEECH",
       "speaker": "Bebop",
       "emotion": "",
@@ -4602,40 +4625,13 @@
         "top": "68.94%",
         "width": "27.44%",
         "height": "12.57%"
-      }
-    },
-    {
-      "id": "page-19_b01",
-      "box_2d": {
-        "index": 0,
-        "x": 549.8131713867188,
-        "y": 2281.632080078125,
-        "width": 293.924560546875,
-        "height": 218.312255859375,
-        "confidence": 0.4570445418357849,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-19/page-19-crop-002-x549-y2281.jpg"
       },
-      "ocr_text": "OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.",
-      "type": "SPEECH",
-      "speaker": "Bebop",
-      "emotion": "Strained intensity",
-      "characterType": "MINOR",
-      "side": "VILLAIN",
-      "voiceDescription": "Rough, street-punk male voice, aggressive and gravelly",
-      "textWithCues": "[Strained] OH, that feels like a hot pepper dipped in battery acid!",
-      "aiReasoning": "The user wants me to analyze the speech bubble containing \"OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.\".\n\n1.  **Locate & Classify**:\n    *   The text is in a speech bubble at the bottom right of the main panel.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The tail of the bubble clearly points to the Warthog character in the red and gold armor. This character is **Bebop**. (Note: The user provided \"Rocksteady\" in the unique characters list, who is the Rhino on the left. Since the Warthog is clearly a different character and iconic partner, I will identify him as \"Bebop\").\n    *   **Side**: `VILLAIN`. Bebop is a henchman of Shredder/Rita Repulsa.\n    *   **Importance**: `MINOR`. The definitions categorize \"Named secondary characters\" as MINOR (like Bulk & Skull). Bebop fits this role as a named henchman.\n    *   **Voice Description**: Bebop typically has a rough, street-punk voice, often associated with an African American Vernacular English (AAVE) accent or just a gruff, high-energy thug voice. In this context, he is powered up, so it should sound intense.\n    *   **Emotion**: The character is experiencing an intense physical transformation. The metaphor \"hot pepper dipped in battery acid\" suggests a burning, stinging sensation that is powerful and painful. His posture is crouched and tense.\n\n3.  **Performance Cues**:\n    *   The text describes a visceral burning sensation.\n    *   The character is likely straining against the surge of energy.\n    *   There is no shouting (bold) or whispering indicated by the font, but the context implies high intensity.\n    *   I will add a cue indicating the strained, gritty delivery.",
-      "style": {
-        "left": "27.66%",
-        "top": "74.64%",
-        "width": "14.78%",
-        "height": "7.14%"
-      }
+      "textWithCues": "[Painful roar] RRRAAARGH! [Strained and groaning in pain] OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID."
     },
     {
-      "id": "page-19_b02",
+      "id": "page-19_b03",
       "box_2d": {
-        "index": 1,
+        "index": 2,
         "x": 340.6769714355469,
         "y": 2462.2177734375,
         "width": 251.53970336914062,
@@ -4661,9 +4657,11 @@
       }
     },
     {
-      "id": "new-023",
-      "box_2d": {},
-      "ocr_text": "",
+      "id": "page-19_b04",
+      "box_2d": {
+        "index": 3
+      },
+      "ocr_text": "UM... HOW DID THEY...",
       "type": "SPEECH",
       "speaker": "Raphael",
       "emotion": "",
@@ -4672,12 +4670,15 @@
         "top": "91.19%",
         "width": "9.51%",
         "height": "4.15%"
-      }
+      },
+      "textWithCues": "[confused] UM... [hesitant] HOW DID THEY... [trailing off]"
     },
     {
-      "id": "new-024",
-      "box_2d": {},
-      "ocr_text": "",
+      "id": "page-19_b05",
+      "box_2d": {
+        "index": 4
+      },
+      "ocr_text": "I HAVE NO IDEA.",
       "type": "SPEECH",
       "speaker": "Green Ranger",
       "emotion": "",
@@ -4686,7 +4687,8 @@
         "top": "95.33%",
         "width": "9.59%",
         "height": "2.75%"
-      }
+      },
+      "textWithCues": "[sighs] I have no idea."
     }
   ],
   "page-20.jpg": [
@@ -4858,9 +4860,11 @@
       }
     },
     {
-      "id": "new-025",
-      "box_2d": {},
-      "ocr_text": "",
+      "id": "page-20_b07",
+      "box_2d": {
+        "index": 6
+      },
+      "ocr_text": "RAPHAEL, NO!!!",
       "type": "SPEECH",
       "speaker": "Green Ranger",
       "emotion": "",
@@ -4869,7 +4873,8 @@
         "top": "84.95%",
         "width": "20.66%",
         "height": "7.53%"
-      }
+      },
+      "textWithCues": "[Urgent shouting] RAPHAEL, NO!!!"
     }
   ],
   "page-21.jpg": [
@@ -5975,8 +5980,10 @@
       }
     },
     {
-      "id": "new-028",
-      "box_2d": {},
+      "id": "page-24_b08",
+      "box_2d": {
+        "index": 7
+      },
       "ocr_text": "TO BE CONTINUED...",
       "type": "CAPTION",
       "speaker": "Narrator",

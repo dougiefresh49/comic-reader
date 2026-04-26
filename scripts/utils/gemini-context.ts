@@ -24,6 +24,7 @@ export interface Bubble {
   ignored?: boolean;
   needsAudio?: boolean;
   needsOcr?: boolean;
+  style?: { left?: string; top?: string; width?: string; height?: string };
 }
 
 export async function analyzeContext(

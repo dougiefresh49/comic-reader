@@ -37,8 +37,8 @@ export const manifest: Manifest = {
           "id": "issue-1",
           "name": "Issue 1",
           "pageCount": 26,
-          "bubbleCount": 224,
-          "audioCount": 213,
+          "bubbleCount": 223,
+          "audioCount": 218,
           "hasWebP": true,
           "hasAudio": true,
           "hasTimestamps": true
@@ -66,7 +66,7 @@ export const manifest: Manifest = {
       ]
     }
   ],
-  "generatedAt": "2026-04-26T21:49:42.431Z"
+  "generatedAt": "2026-04-26T23:50:02.674Z"
 } as const;
 
 export default manifest;
