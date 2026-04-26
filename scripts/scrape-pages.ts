@@ -129,6 +129,58 @@ function extFromUrl(url: string): string {
   return match ? match[1]!.toLowerCase().replace("jpeg", "jpg") : "jpg";
 }
 
+interface ScrollablePage {
+  evaluate<T>(fn: () => T): Promise<T>;
+  evaluate<T, A>(fn: (arg: A) => T, arg: A): Promise<T>;
+}
+
+async function scrollToLoadImages(
+  page: ScrollablePage,
+  stepDelayMs = 500,
+  settleMs = 1500,
+): Promise<void> {
+  const scrollStep = 900;
+  let dotsAt = 0;
+
+  process.stdout.write("   Scrolling to trigger lazy-load");
+
+  while (true) {
+    // Scroll down one step and wait for lazy loader to fire
+    await page.evaluate((step) => window.scrollBy(0, step), scrollStep);
+    await new Promise((r) => setTimeout(r, stepDelayMs));
+
+    dotsAt += scrollStep;
+    if (dotsAt >= scrollStep * 5) {
+      process.stdout.write(".");
+      dotsAt = 0;
+    }
+
+    const totalHeight: number = await page.evaluate(
+      () => document.body.scrollHeight,
+    );
+    const scrollY: number = await page.evaluate(
+      () => window.scrollY + window.innerHeight,
+    );
+
+    if (scrollY < totalHeight) continue; // still content below — keep scrolling
+
+    // Reached the bottom — wait longer for any pending lazy loads to settle
+    await new Promise((r) => setTimeout(r, settleMs));
+    const newHeight: number = await page.evaluate(
+      () => document.body.scrollHeight,
+    );
+
+    if (newHeight === totalHeight) break; // height stable — all images loaded
+    // height grew — more images appeared, keep scrolling
+  }
+
+  console.log(" done");
+
+  // Return to top so Stagehand sees the full page
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await new Promise((r) => setTimeout(r, 500));
+}
+
 async function main() {
   const { url: argUrl, book, issue } = parseArgs();
 
@@ -195,6 +247,22 @@ async function main() {
 
     console.log("🔍 Navigating to URL...");
     await page.goto(url, { waitUntil: "load" });
+
+    // Set reading mode to "All pages" (value="1") if the selector exists
+    const modeSet = await page.evaluate(() => {
+      const sel = document.querySelector<HTMLSelectElement>("#selectReadType");
+      if (!sel) return false;
+      sel.value = "1";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    });
+    if (modeSet) {
+      console.log("📖 Reading mode set to All pages");
+      await new Promise((r) => setTimeout(r, 1500)); // wait for page to re-render
+    }
+
+    console.log("📜 Scrolling page to trigger lazy-loaded images...");
+    await scrollToLoadImages(page);
 
     let paginationAttempts = 0;
     const MAX_PAGINATION = 50;
