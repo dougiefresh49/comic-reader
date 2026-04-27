@@ -21,6 +21,7 @@ export interface AppearanceEntry {
   mediaType: MediaType;
   youtubeSearchTerms: string[];
   notes: string | null;
+  visualDescription?: string | null;
   voice: VoiceEntry | null;
 }
 

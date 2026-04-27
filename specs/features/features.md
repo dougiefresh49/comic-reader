@@ -34,13 +34,16 @@ Backlog and status tracker for planned features. Update status here when work st
 | Global character registry | `done` | [character-registry.md](character-registry.md) | `data/character-registry.json` + `scripts/manage-registry.ts`. Migrated 29 characters from tmnt-mmpr-iii. |
 | Book-aware context | `done` | [book-aware-context.md](book-aware-context.md) | `book-config.json` (franchise context + wiki URLs) + `character-roster.json` (cross-page/issue name consistency) + character classification (named vs generic) to skip research for background characters. |
 | Interactive alias review | `pending` | [interactive-alias-review.md](interactive-alias-review.md) | Step 8.5 — per-character guided menu [1] New / [2] Alias to existing list. Prunes stale characters against bubbles.json first. Needs UX update from free-text to guided menu. |
-| Review speakers | `done` | [review-speakers.md](review-speakers.md) | Step 4.5 post-get-context — review/correct all speaker names in bubbles.json before any processing. [1] Accept / [2] Edit / [3] Choose from confirmed+registry list. Auto-accepts known registry characters. Fixes names at the source so alias-map stays clean. |
+| Review speakers (terminal) | `done` | [review-speakers.md](review-speakers.md) | Step 4.5 post-get-context — review/correct all speaker names in bubbles.json before any processing. [1] Accept / [2] Edit / [3] Choose from confirmed+registry list. Auto-accepts known registry characters. Fixes names at the source so alias-map stays clean. |
+| Review speakers (browser UI) | `pending` | [review-speakers-browser.md](review-speakers-browser.md) | Browser version of step 4.5. Pipeline pauses, user reviews in `/admin/.../review/speakers`. Inline alias creation replaces step 8.5 for common case. Requires Phase B (`speaker_reviews` table). |
+| Source page upload + admin dashboard | `pending` | [upload-and-pipeline-trigger.md](upload-and-pipeline-trigger.md) | `upload-source-pages` script + `/admin/new-issue` drag-and-drop page. Moves raw JPEGs to `comic-pages-raw` bucket. `/admin` dashboard shows pipeline status per issue. Requires Phase A+B. |
+| Casting browser UI | `pending` | [casting-browser.md](casting-browser.md) | Browser flow for steps 9–10: Gemini suggestions as cards, yt-dlp clip download server-side, ElevenLabs PVC/Voice Design creation with status polling. Replaces terminal `find-voice-sources` + `generate-voice-models` human pause. Requires Phase A+B + `casting_tasks` table. |
 
 ## Infrastructure
 
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
-| Asset storage migration (S3 / Supabase / Vercel Blob) | `pending` | — | Currently `public/` on Vercel — won't scale. Prerequisite for Review UI Phase B. |
+| Data hosting migration (Supabase DB + Storage) | `pending` | [data-hosting/README.md](data-hosting/README.md) | 5-phase plan: Storage (WebP/MP3), DB schema, frontend refactor, pipeline upload, browser apply-fixes. Prerequisite for Review UI Phase B. |
 | Auth (Clerk or Supabase) | `pending` | — | Noted as known need, not yet specced |
 
 ## Episode Generation
@@ -50,7 +53,7 @@ Specs in `specs/features/episode-generation/`. Two output modes: motion comic (f
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
 | Motion Comic MVP | `done` | [01-motion-comic-mvp.md](episode-generation/01-motion-comic-mvp.md) | `pnpm motion-comic` — Ken Burns + ElevenLabs audio + FFmpeg. No Venice. |
-| Character Setup | `pending` | [02-character-setup.md](episode-generation/02-character-setup.md) | `visualDescription` registry field + seedream reference images + series.json aesthetic lock |
+| Character Setup | `done` | [02-character-setup.md](episode-generation/02-character-setup.md) | `visualDescription` registry field + seedream reference images + series.json aesthetic lock |
 | Shot Planning | `pending` | [03-shot-planning.md](episode-generation/03-shot-planning.md) | Gemini Vision per page → shot-plan.json. Last free gate before Venice spend. |
 | Storyboard | `pending` | [04-storyboard.md](episode-generation/04-storyboard.md) | Venice image generation per shot (seedream + flux-2-max-edit). ~$5–15/issue. |
 | Video Clips | `pending` | [05-video-clips.md](episode-generation/05-video-clips.md) | Venice video queue per panel (kling-3.0 for faces, seedance-2.0 for atmosphere). ~$15–50/issue. |

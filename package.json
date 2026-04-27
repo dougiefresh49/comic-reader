@@ -42,7 +42,8 @@
     "apply-fixes": "tsx --env-file=.env scripts/apply-fixes.ts",
     "ocr-flagged-bubbles": "tsx --env-file=.env scripts/ocr-flagged-bubbles.ts",
     "orch-fixes": "tsx --env-file=.env scripts/orch-fixes.ts",
-    "motion-comic": "tsx --env-file=.env scripts/motion-comic.ts"
+    "motion-comic": "tsx --env-file=.env scripts/motion-comic.ts",
+    "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",

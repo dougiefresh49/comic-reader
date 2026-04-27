@@ -16,6 +16,7 @@ export const env = createEnv({
     GEMINI_API_KEY: z.string(),
     GEMINI_API_KEY_2: z.string(),
     ELEVENLABS_API_KEY: z.string(),
+    VENICE_API_KEY: z.string(),
   },
 
   /**
@@ -39,6 +40,7 @@ export const env = createEnv({
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_API_KEY_2: process.env.GEMINI_API_KEY_2,
     ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
+    VENICE_API_KEY: process.env.VENICE_API_KEY,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**

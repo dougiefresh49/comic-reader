@@ -73,13 +73,13 @@ pnpm generate-episode -- --book tmnt-mmpr-iii --issue 1 --only-step plan-shots
 
 ## Shot Types
 
-| Type | Description | Venice model (later) |
-|------|-------------|---------------------|
-| `establishing` | No characters, location/atmosphere | `seedance-2.0` |
-| `dialogue` | 1–3 characters speaking | `kling-3.0` |
-| `action` | Characters in motion/combat (3+ or fast motion) | `kling-3.0` |
-| `narration` | NARRATION/CAPTION bubbles, no character face | `seedance-2.0` |
-| `reaction` | Character(s) reacting without speaking | `kling-3.0` |
+| Type | Description | Venice model (Phase 4) |
+|------|-------------|----------------------|
+| `establishing` | No characters, location/atmosphere | `VENICE_VIDEO_ATMOSPHERE` (`seedance-2-0-image-to-video`) |
+| `dialogue` | 1–3 characters speaking | `VENICE_VIDEO_CHARACTER` (`kling-o3-pro-reference-to-video`) |
+| `action` | Characters in motion/combat (3+ or fast motion) | `VENICE_VIDEO_CHARACTER` (`kling-o3-pro-reference-to-video`) |
+| `narration` | NARRATION/CAPTION bubbles, no character face | `VENICE_VIDEO_ATMOSPHERE` (`seedance-2-0-image-to-video`) |
+| `reaction` | Character(s) reacting without speaking | `VENICE_VIDEO_CHARACTER` (`kling-o3-pro-reference-to-video`) |
 
 ---
 

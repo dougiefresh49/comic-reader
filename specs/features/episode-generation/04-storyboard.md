@@ -59,43 +59,75 @@ dynamic comic panel composition, mid-shot framing
 
 **4. Select model and endpoint:**
 
-All shots: `POST /image/generate` with `model: "seedream-v5-lite"`
-
-For character shots where reference images exist, use the image editing endpoint instead:
+**Establishing / narration shots (no characters):**
 ```
-POST /images/edit
+POST /image/generate
 {
-  "model": "flux-2-max-edit",
-  "images": [base64_character_reference(s)],
+  "model": "seedream-v5-lite",     // VENICE_IMAGE_STORYBOARD from models.ts
   "prompt": "<built prompt>",
   "negative_prompt": "<series.aesthetic.negativePrompt>",
-  "strength": 0.65
+  "aspect_ratio": "16:9",
+  "format": "png",
+  "hide_watermark": true
+}
+→ { "images": ["<base64-png>"] }   decode images[0] → PNG buffer
+```
+
+**Single-character shots (1 character, reference image exists):**
+```
+POST /image/edit
+{
+  "model": "seedream-v5-lite-edit",  // VENICE_IMAGE_EDIT_CHAR from models.ts
+  "image": "<base64 of character's reference.png>",
+  "prompt": "<built prompt — place this character in the scene>",
+  "aspect_ratio": "16:9"
+}
+→ binary image/png response (write buffer directly — no base64 unwrapping)
+```
+
+Note: The edit endpoint takes **one image** and returns **binary PNG** (not JSON). There is no `negative_prompt` or `strength` parameter on this endpoint.
+
+**Multi-character shots (2+ characters) — fallback:**
+```
+POST /image/generate
+{
+  "model": "seedream-v5-lite",     // VENICE_IMAGE_STORYBOARD from models.ts
+  "prompt": "<built prompt — describe all characters in text>",
+  "negative_prompt": "<series.aesthetic.negativePrompt>",
+  "aspect_ratio": "16:9",
+  "format": "png",
+  "hide_watermark": true
 }
 ```
 
-Include up to 2 character reference images. If 3+ characters, fall back to `/image/generate` with `seedream-v5-lite` (describe all characters in text — multi-reference conditioning is unreliable above 2).
+The `/image/edit` endpoint accepts only a single input image — it cannot composite multiple character references. For 2+ character shots, describe all characters in the text prompt instead.
+
+**Import all model ID strings from `scripts/utils/models.ts` — never hardcode inline.**
 
 **5. Save output:**
 
-`shot-NNN.png` — decoded from base64 response
+`shot-NNN.png` — from `/image/generate`: decode `images[0]` from base64; from `/image/edit`: write binary response directly
 
 `shot-NNN.provenance.json`:
 ```json
 {
   "shotId": "s002",
-  "model": "flux-2-max-edit",
-  "endpoint": "/images/edit",
+  "model": "seedream-v5-lite-edit",
+  "endpoint": "/image/edit",
   "hasFaces": true,
-  "characterRefs": ["raphael", "leonardo"],
+  "characterRefs": ["raphael"],
   "prompt": "...",
-  "negativePrompt": "...",
   "generatedAt": "2026-04-26T00:00:00Z"
 }
 ```
 
-`hasFaces: true` — used in Phase 4 to decide between Kling and Seedance. Any shot with characters present = `hasFaces: true`.
+`hasFaces: true` — used in Phase 4 to select the R2V video model and pass `reference_image_urls`. Any shot with characters present = `hasFaces: true`.
+
+Note: `negativePrompt` is omitted from provenance when using the edit endpoint (that endpoint has no negative_prompt field).
 
 **6. Log Venice balance after every 5 images.**
+
+Balance is returned in the `X-Balance-Remaining` response header on all Venice API calls. Read it from the response header — no separate API call needed.
 
 ---
 
@@ -104,8 +136,9 @@ Include up to 2 character reference images. If 3+ characters, fall back to `/ima
 Before storyboard begins, print:
 ```
 🎨 Storyboard — 23 shots
-   Character shots (flux-2-max-edit): 18 × ~$0.08 = ~$1.44
-   Establishing shots (seedream-v5-lite): 5 × ~$0.04 = ~$0.20
+   Single-char shots (seedream-v5-lite-edit): 12 × ~$0.05 = ~$0.60
+   Multi-char shots (seedream-v5-lite):        6 × ~$0.05 = ~$0.30
+   Establishing shots (seedream-v5-lite):       5 × ~$0.05 = ~$0.25
    Estimated total: ~$1.64
    Current balance: $12.43
 
@@ -176,7 +209,7 @@ Regenerated shots re-run the generation step above, then the review HTML is rege
 ## Prompt Improvement Tips (for implementers)
 
 - The `sceneDescription` in shot-plan.json is the primary lever for image quality. The review gate before storyboard (Phase 2) is specifically for editing these descriptions.
-- `strength: 0.65` for `flux-2-max-edit` is a starting point — too high loses character accuracy, too low loses scene context. May need tuning per shot type.
+- The `seedream-v5-lite-edit` endpoint has no `strength` parameter — prompt wording is the main lever. Describe the target scene clearly; the model retains the character's appearance from the input `reference.png`.
 - For action shots with many characters, a text-only prompt to `seedream-v5-lite` often produces better composition than trying to condition on multiple reference images.
 
 ---
@@ -185,7 +218,10 @@ Regenerated shots re-run the generation step above, then the review HTML is rege
 
 - `assets/episodes/<book>/issue-<n>/shot-plan.json` — shot descriptors
 - `assets/episodes/<book>/series.json` — aesthetic prompts
-- `assets/episodes/<book>/characters/*/reference.png` — character reference images
+- `assets/episodes/<book>/characters/*/reference.png` — character reference images (input to /image/edit)
 - `data/character-registry.json` — `visualDescription` per character
+- `scripts/utils/models.ts` — `VENICE_IMAGE_STORYBOARD` (`seedream-v5-lite`), `VENICE_IMAGE_EDIT_CHAR` (`seedream-v5-lite-edit`)
 - `scripts/utils/venice-client.ts` — Venice API calls
 - `scripts/utils/review-generator.ts` — generates review HTML
+- `docs/venice-ai/image-models.json` — confirmed image model IDs and constraints
+- `docs/venice-ai/image-model-traits.json` — model traits reference

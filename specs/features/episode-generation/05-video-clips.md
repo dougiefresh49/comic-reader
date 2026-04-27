@@ -35,9 +35,15 @@ Per shot:
 Read `shot-NNN.provenance.json` (`hasFaces` field):
 
 ```
-hasFaces === true  → kling-3.0   (no provenance restriction, best for character faces)
-hasFaces === false → seedance-2.0 (best motion quality for environments/atmosphere)
+hasFaces === true  → VENICE_VIDEO_CHARACTER  = "kling-o3-pro-reference-to-video"
+                     R2V model: pass character reference.png(s) via reference_image_urls.
+                     Maintains character identity without needing seedream-sourced input images.
+
+hasFaces === false → VENICE_VIDEO_ATMOSPHERE = "seedance-2-0-image-to-video"
+                     Standard image-to-video. No reference images needed.
 ```
+
+**Import all model ID strings from `scripts/utils/models.ts` — never hardcode inline.**
 
 This decision is automatic — no user input needed.
 
@@ -47,11 +53,12 @@ This decision is automatic — no user input needed.
 
 ### Before starting
 
-Print cost estimate:
+For each shot, call `POST /video/quote` with the same payload as the queue request to get the exact cost. Sum all quotes, then print:
+
 ```
 🎬 Video Generation — 23 shots
-   Character shots (kling-3.0):     18 × ~$1.20 = ~$21.60
-   Atmosphere shots (seedance-2.0):  5 × ~$0.80 = ~$4.00
+   Character shots (kling-o3-pro-reference-to-video): 18 × ~$1.20 = ~$21.60
+   Atmosphere shots (seedance-2-0-image-to-video):     5 × ~$0.80 = ~$4.00
    Estimated total: ~$25.60
    Current balance: $12.43
 
@@ -66,8 +73,13 @@ Print cost estimate:
 
 - Sum audio durations for this shot from `audio-timestamps.json`
 - Add 0.5s tail padding
-- Snap to nearest Venice-supported duration value: `[2, 4, 6, 8, 10]` seconds (round up)
-- Cap at 10s (Venice maximum for queue endpoint)
+- Snap to nearest supported duration value for the selected model (round **up**), then pass as a string (e.g. `"5s"`, `"10s"`)
+
+Supported durations per model:
+- `kling-o3-pro-reference-to-video`: `"3s"` through `"15s"` every second — snap to `Math.ceil(audioDuration + 0.5)`, clamp to `[3, 15]`, format as `"Xs"`
+- `seedance-2-0-image-to-video`: `["4s","5s","8s","10s","12s","15s"]` — snap to first value ≥ audioDuration + 0.5s
+
+See Duration Snapping Reference section below for the lookup table.
 
 **3. Build video prompt**
 
@@ -84,34 +96,45 @@ Keep prompts under ~150 tokens. Venice video prompts should describe motion, not
 ```json
 POST /video/queue
 {
-  "model": "kling-3.0",           // or "seedance-2.0"
+  "model": "kling-o3-pro-reference-to-video",   // VENICE_VIDEO_CHARACTER or VENICE_VIDEO_ATMOSPHERE
   "prompt": "<built prompt>",
-  "image_url": "<base64 of shot-NNN.png>",
-  "duration": 6,                  // snapped value
-  "aspect_ratio": "16:9"
+  "image_url": "<base64 data URI of shot-NNN.png>",
+  "reference_image_urls": ["<base64 data URI of character reference.png>"],  // hasFaces only; omit for atmosphere shots
+  "duration": "6s",               // string enum — model-specific; see Duration Snapping Reference
+  "aspect_ratio": "16:9",
+  "audio": false                  // we provide our own ElevenLabs audio in Phase 5
 }
-→ { "queue_id": "uuid", "quote_usd": 1.20 }
+→ { "model": "...", "queue_id": "uuid" }
 ```
 
-Log the `quote_usd` from the response to running cost tracker.
+Note: There is no `quote_usd` in the queue response. Use `/video/quote` before queueing for cost estimates.
+The `X-Balance-Remaining` response header gives current balance after submission.
 
 **5. Poll for completion**
 
 ```
-GET /video/retrieve?queue_id=<uuid>
-→ { "status": "processing|completed|failed", "video": "<base64>" }
+POST /video/retrieve
+{
+  "model": "kling-o3-pro-reference-to-video",   // same model used to queue
+  "queue_id": "<uuid>"
+}
+→ While processing: JSON { "status": "PROCESSING", "average_execution_time": 45000 }
+→ On completion:    binary video/mp4 response (Content-Type: video/mp4)
+→ On failure:       4xx/5xx error response
 ```
 
-Poll every 15 seconds. Timeout after 10 minutes. On `failed`: log and mark shot for regeneration in `review-state.json`, continue to next shot.
+Poll every 15 seconds. Timeout after 10 minutes. On failure: log and mark shot for regeneration in `review-state.json`, continue to next shot.
 
 **6. Save clip**
 
-Decode base64 video → `assets/episodes/<book>/issue-<n>/videos/shot-NNN.mp4`
+Write binary response body directly to `assets/episodes/<book>/issue-<n>/videos/shot-NNN.mp4` — no base64 decoding needed.
 
 Log:
 ```
-   ✓ s002 — kling-3.0 · 6s · $1.20 (balance: $11.23 remaining)
+   ✓ s002 — kling-o3-pro-reference-to-video · 6s  (balance: $11.23 remaining)
 ```
+
+Read balance from the `X-Balance-Remaining` response header on the `/video/retrieve` completion response.
 
 **7. Update episode-checkpoint.json** after each successful clip.
 
@@ -132,17 +155,28 @@ The checkpoint still tracks per-shot so partial batches survive interruption.
 
 ## Duration Snapping Reference
 
-Venice models only support specific durations. Always round **up** to ensure enough runtime for the dialogue:
+Duration is passed as a **string enum** (e.g. `"5s"`). Supported values vary by model. Always round **up** to ensure enough runtime for the dialogue. Add 0.5s padding before snapping.
 
-| Audio duration | Snapped to |
-|----------------|-----------|
-| ≤ 1.5s | 2s |
-| 1.5–3.5s | 4s |
-| 3.5–5.5s | 6s |
-| 5.5–7.5s | 8s |
-| 7.5s+ | 10s |
+### `kling-o3-pro-reference-to-video` (every second from 3–15s)
 
-If snapped duration < actual audio duration: log a warning. The assembly phase will handle audio that slightly exceeds clip duration.
+```ts
+const raw = audioDuration + 0.5;
+const snapped = Math.max(3, Math.min(15, Math.ceil(raw)));
+const durationStr = `${snapped}s`;
+```
+
+### `seedance-2-0-image-to-video` (fixed set: 4s, 5s, 8s, 10s, 12s, 15s)
+
+| Audio + padding | Snapped to |
+|-----------------|-----------|
+| ≤ 4.0s | `"4s"` |
+| ≤ 5.0s | `"5s"` |
+| ≤ 8.0s | `"8s"` |
+| ≤ 10.0s | `"10s"` |
+| ≤ 12.0s | `"12s"` |
+| > 12.0s | `"15s"` |
+
+If padded audio duration > snapped clip duration: log a warning. The assembly phase will handle audio that slightly overruns the clip.
 
 ---
 
@@ -175,7 +209,7 @@ After all clips are generated:
     <div class="shot">
       <video src="./videos/shot-001.mp4" controls loop></video>
       <div class="shot-meta">
-        <span class="shot-id">s001</span> · p.1 · establishing · seedance-2.0 · 4s<br>
+        <span class="shot-id">s001</span> · p.1 · establishing · seedance-2-0-image-to-video · 4s<br>
         Aerial NYC at night
       </div>
     </div>
@@ -214,11 +248,27 @@ Also write `assets/episodes/<book>/issue-<n>/cost-log.json` with per-shot actual
 
 ---
 
+---
+
+## Venice API Notes
+
+- **Queue:** `POST /video/queue` — submits job, returns `{ model, queue_id }`
+- **Quote:** `POST /video/quote` — same payload as queue, returns cost estimate before committing
+- **Retrieve:** `POST /video/retrieve` with body `{ model, queue_id }` — returns JSON while processing, binary `video/mp4` on completion
+- **Balance:** Read `X-Balance-Remaining` response header (returned on queue, retrieve, and quote responses)
+- **Model IDs:** Always import from `scripts/utils/models.ts` (`VENICE_VIDEO_CHARACTER`, `VENICE_VIDEO_ATMOSPHERE`)
+- **Reference docs:** `docs/venice-ai/video-models.json`, `docs/venice-ai/video-models-descriptions.json`
+
+---
+
 ## Key Files
 
 - `assets/episodes/<book>/issue-<n>/shot-plan.json` — shot descriptors + audio file lists
-- `assets/episodes/<book>/issue-<n>/panels/shot-NNN.provenance.json` — `hasFaces` flag
-- `assets/episodes/<book>/issue-<n>/panels/shot-NNN.png` — panel images
+- `assets/episodes/<book>/issue-<n>/panels/shot-NNN.provenance.json` — `hasFaces` flag + character refs list
+- `assets/episodes/<book>/issue-<n>/panels/shot-NNN.png` — panel images (input to video queue)
+- `assets/episodes/<book>/characters/*/reference.png` — character reference images for `reference_image_urls`
 - `assets/comics/<book>/<issue>/audio-timestamps.json` — bubble durations for snapping
+- `scripts/utils/models.ts` — `VENICE_VIDEO_CHARACTER`, `VENICE_VIDEO_ATMOSPHERE`
 - `scripts/utils/venice-client.ts` — queue submission + polling
 - `scripts/utils/review-generator.ts` — video review HTML
+- `docs/venice-ai/video-models.json` — confirmed model IDs and supported duration values
