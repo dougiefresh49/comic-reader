@@ -1473,7 +1473,7 @@
       "box_2d": {
         "index": 1
       },
-      "ocr_text": "",
+      "ocr_text": "NORTH DAKOTA.",
       "type": "NARRATION",
       "speaker": "Narrator",
       "emotion": "",
@@ -1482,14 +1482,15 @@
         "top": "1.69%",
         "width": "28.51%",
         "height": "4.67%"
-      }
+      },
+      "textWithCues": "[Emphatically] NORTH DAKOTA."
     },
     {
       "id": "page-08_b03",
       "box_2d": {
         "index": 2
       },
-      "ocr_text": "",
+      "ocr_text": "WE GOTTA WORK ON YOUR DEFINITION OF \"AWESOME,\" MICHELANGELO.",
       "type": "SPEECH",
       "speaker": "Red Ranger",
       "emotion": "",
@@ -1498,7 +1499,8 @@
         "top": "49.89%",
         "width": "16.49%",
         "height": "6.09%"
-      }
+      },
+      "textWithCues": "[Exasperated] We gotta work on your definition of [sarcastically] \"awesome,\" Michelangelo."
     },
     {
       "id": "page-08_b04",
