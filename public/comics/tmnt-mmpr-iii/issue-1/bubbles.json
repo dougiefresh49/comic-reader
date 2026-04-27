@@ -14,7 +14,7 @@
       },
       "ocr_text": "SO MUCH FOR REACHING THE COMMAND CENTER.",
       "type": "SPEECH",
-      "speaker": "Leonardo",
+      "speaker": "Green Ranger",
       "emotion": "Frustrated and strained",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -22,8 +22,8 @@
       "textWithCues": "[frustrated grunts] SO MUCH for reaching the Command Center.",
       "aiReasoning": "I have located the text \"SO MUCH FOR REACHING THE COMMAND CENTER.\" at the top left of the page.\nThe text is in a speech bubble with a tail pointing directly to the character Leonardo (the Ninja Turtle with the blue mask), who is currently engaging in sword combat with a Foot Soldier.\nLeonardo is a MAJOR character and a HERO.\nSince he is mid-combat (parrying a sword strike), his voice should sound strained or exerted. The content of the line expresses disappointment or frustration that their plan has failed because their vehicle (the Radbug) crashed.\nTherefore, the cues should reflect physical effort and frustration.",
       "style": {
-        "left": "16.17%",
-        "top": "1.72%",
+        "left": "17.71%",
+        "top": "1.81%",
         "width": "16.63%",
         "height": "4.97%"
       }
@@ -49,8 +49,8 @@
       "textWithCues": "[exhales] [sarcastic] At least with the world ending, I won't have to tell Billy we totaled the Radbug.",
       "aiReasoning": "1.  **Identify the Text Region**: The user wants the text \"AT LEAST WITH THE WORLD ENDING, I WON'T HAVE TO TELL BILLY WE TOTALED THE RADBUG.\" located in the top panel.\n2.  **Locate the Speaker**: The speech bubble has a tail pointing to the character in the Green Ranger suit performing a flying kick in the background.\n3.  **Identify the Character**:\n    *   The visual shows the Green Ranger.\n    *   In the panel below, Leonardo addresses the Green Ranger as \"Tommy\".\n    *   Therefore, the speaker is the Green Ranger (Tommy Oliver).\n    *   The prompt provides \"Green Ranger\" as a known unique character.\n4.  **Analyze Context**:\n    *   **Action**: The Green Ranger is mid-air, delivering a kick to an enemy.\n    *   **Situation**: A vehicle (the Radbug) has presumably just crashed (seen tumbling in the panel below), and they are in a fight.\n    *   **Dialogue Meaning**: He is making a joke (gallows humor) about how the apocalypse (\"world ending\") has a silver lining: he doesn't have to confess to Billy (the Blue Ranger, the tech guy who probably fixed/made the car) that they wrecked the vehicle.\n    *   **Emotion**: Strained (physical exertion from fighting) but lighthearted/sarcastic.\n5.  **Determine Attributes**:\n    *   **Type**: SPEECH.\n    *   **Speaker**: Green Ranger.\n    *   **CharacterType**: MAJOR (Tommy Oliver is a main Power Ranger).\n    *   **Side**: HERO.\n6.  **Formulate Performance Cues**:\n    *   The character is physically exerting himself (kicking).\n    *   The tone is wry/joking.\n    *   Cues: [Strained/Breathless from fighting], [Joking].",
       "style": {
-        "left": "50.53%",
-        "top": "2.33%",
+        "left": "50.56%",
+        "top": "1.87%",
         "width": "18.51%",
         "height": "6.42%"
       }
@@ -386,71 +386,31 @@
         "width": "12.48%",
         "height": "3.73%"
       }
-    },
-    {
-      "id": "page-01_b02",
-      "box_2d": {
-        "index": 1,
-        "x": 799.2477416992188,
-        "y": 3064.5810546875,
-        "width": 191.6737060546875,
-        "height": 90.44140625,
-        "confidence": 0.4175470769405365,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-01/page-01-crop-002-x799-y3064.jpg"
-      },
-      "ocr_text": "comics",
-      "type": "CAPTION",
-      "speaker": "Narrator",
-      "emotion": "Neutral",
-      "characterType": "EXTRA",
-      "side": "NEUTRAL",
-      "voiceDescription": "Neutral, flat, informative announcer voice",
-      "textWithCues": "comics",
-      "aiReasoning": "The user wants me to analyze the text \"comics\" located at the bottom of the page.\n1.  **Locate**: The text is in the black footer bar: \"Read more FREE comics on ReadComicOnline.to\".\n2.  **Classify**: This is not character speech, narration, or sound effects within the story. It is a metadata/watermark added by a hosting site. However, functionally, it acts as a `CAPTION` (text addressed to the reader).\n3.  **Speaker**: There is no character associated with this. It is an external \"Announcer\" or \"Narrator\".\n4.  **Context**: This is an advertisement line. The tone should be informative and promotional, distinct from the dramatic tone of the comic story.\n5.  **Cues**: No specific emotion is required other than clarity. It should be read in a standard commercial announcer voice.\n\nClassification:\n*   Type: CAPTION\n*   Speaker: Narrator (or Announcer)\n*   CharacterType: EXTRA\n*   Side: NEUTRAL\n*   Voice: Professional, clear announcer voice.\n*   Text: \"comics\"",
-      "style": {
-        "left": "40.20%",
-        "top": "97.07%",
-        "width": "9.64%",
-        "height": "2.86%"
-      }
     }
   ],
-  "page-02.jpg": [
-    {
-      "id": "page-02_b01",
-      "box_2d": {
-        "index": 0,
-        "x": 363.8751220703125,
-        "y": 158.09080505371094,
-        "width": 210.77630615234375,
-        "height": 376.58387756347656,
-        "confidence": 0.42598551511764526,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-02/page-02-crop-001-x363-y158.jpg"
-      },
-      "ocr_text": "MIGHTY MORPHIN POWER RANGERS",
-      "type": "CAPTION",
-      "speaker": "Narrator",
-      "emotion": "Neutral",
-      "characterType": "EXTRA",
-      "side": "NEUTRAL",
-      "voiceDescription": "Bold, high-energy, epic male voice, reminiscent of a 90s action TV show intro.",
-      "textWithCues": "[excited, dramatically] MIGHTY MORPHIN POWER RANGERS",
-      "aiReasoning": "1.  **Locate & Classify**: The bounding box [363, 158, 210, 376] corresponds to the top-left portion of the page, covering the stacked logo \"MIGHTY MORPHIN POWER RANGERS\". The OCR text provided (\"Y MO ER RA\") is a fragmented reading of \"MIGHTY MORPHIN POWER RANGERS\". Since this is the title of the series/book on a credits page, it functions as a `CAPTION` (Title).\n\n2.  **Analyze Context**:\n    *   **Speaker**: This is non-diegetic text (not spoken by a character in the scene). It is a Title. The speaker is effectively the `Narrator` or an `Announcer`.\n    *   **Side**: `NEUTRAL` (It is structural text).\n    *   **Importance**: `MAJOR` (It is the title of the book).\n    *   **Voice Description**: Titles for this genre (Action/Superhero) are typically read with a bold, high-energy, \"Saturday Morning Cartoon\" intro voice. It should sound epic and exciting.\n    *   **Emotion**: Energetic, bold, announcing.\n\n3.  **Performance Cues**:\n    *   The raw text \"Y MO ER RA\" is unintelligible garbage OCR. I must correct this to the visible text: \"MIGHTY MORPHIN POWER RANGERS\".\n    *   **Tone**: Add `[Epic, energetic announcer voice]`.\n    *   **Volume**: Implicitly loud and projecting, typical of title calls.\n\n4.  **Final Output Construction**:\n    *   Type: CAPTION\n    *   Speaker: Title Announcer\n    *   Text: \"MIGHTY MORPHIN POWER RANGERS\"",
-      "style": {
-        "left": "18.30%",
-        "top": "5.17%",
-        "width": "10.60%",
-        "height": "12.32%"
-      }
-    }
-  ],
+  "page-02.jpg": [],
   "page-03.jpg": [
     {
       "id": "page-03_b01",
       "box_2d": {
-        "index": 0,
+        "index": 0
+      },
+      "ocr_text": "THE END.",
+      "type": "NARRATION",
+      "speaker": "Narrator",
+      "emotion": "",
+      "style": {
+        "left": "6.88%",
+        "top": "1.99%",
+        "width": "13.06%",
+        "height": "3.82%"
+      },
+      "textWithCues": "[dramatically] THE END."
+    },
+    {
+      "id": "page-03_b02",
+      "box_2d": {
+        "index": 1,
         "x": 591.49462890625,
         "y": 83.4361343383789,
         "width": 340.247802734375,
@@ -469,16 +429,16 @@
       "textWithCues": "[solemnly] There is NO GREATER LOSS than the... LOSS of FAITH.",
       "aiReasoning": "I have located the text box at the top of the page.\nThe text inside reads: \"THERE IS NO GREATER LOSS THAN THE LOSS OF FAITH.\"\nThe box is rectangular with an orange gradient background, distinct from speech bubbles. This indicates it is a caption used for narration.\nThe speaker is the Narrator.\nThe tone is serious, philosophical, and dramatic, setting a heavy mood for the scene depicting a crash and battle.\nI will correct the text provided in the prompt to match the image exactly.",
       "style": {
-        "left": "29.75%",
+        "left": "20.16%",
         "top": "2.73%",
-        "width": "17.12%",
+        "width": "26.71%",
         "height": "3.04%"
       }
     },
     {
-      "id": "page-03_b02",
+      "id": "page-03_b03",
       "box_2d": {
-        "index": 1,
+        "index": 2,
         "x": 559.7374877929688,
         "y": 177.50335693359375,
         "width": 422.54510498046875,
@@ -504,9 +464,9 @@
       }
     },
     {
-      "id": "page-03_b03",
+      "id": "page-03_b04",
       "box_2d": {
-        "index": 2,
+        "index": 3,
         "x": 676.1735229492188,
         "y": 324.5847473144531,
         "width": 306.97064208984375,
@@ -532,9 +492,9 @@
       }
     },
     {
-      "id": "page-03_b04",
+      "id": "page-03_b05",
       "box_2d": {
-        "index": 3,
+        "index": 4,
         "x": 596.39453125,
         "y": 623.5157470703125,
         "width": 283.1622314453125,
@@ -560,9 +520,9 @@
       }
     },
     {
-      "id": "page-03_b05",
+      "id": "page-03_b06",
       "box_2d": {
-        "index": 4,
+        "index": 5,
         "x": 820.611328125,
         "y": 890.6592407226562,
         "width": 231.5047607421875,
@@ -588,9 +548,9 @@
       }
     },
     {
-      "id": "page-03_b06",
+      "id": "page-03_b07",
       "box_2d": {
-        "index": 5,
+        "index": 6,
         "x": 819.8679809570312,
         "y": 1314.342041015625,
         "width": 315.06427001953125,
@@ -616,9 +576,9 @@
       }
     },
     {
-      "id": "page-03_b07",
+      "id": "page-03_b08",
       "box_2d": {
-        "index": 6,
+        "index": 7,
         "x": 105.75077056884766,
         "y": 1701.080810546875,
         "width": 335.8065719604492,
@@ -637,16 +597,16 @@
       "textWithCues": "[dramatic] Seemingly unrelenting, exposing your weaknesses, and wrestling you into submission.",
       "aiReasoning": "The text region contains a rectangular caption box with a light orange gradient background.\nText: \"SEEMINGLY UNRELENTING, EXPOSING YOUR WEAKNESSES, AND WRESTLING YOU INTO SUBMISSION.\"\nThis is narrative text, not spoken dialogue.\nThe speaker is the Narrator.\nThe tone is serious, dramatic, and descriptive of the hardship being depicted (a character being overwhelmed in battle).\nThe voice should be a standard comic book narrator: deep, grave, and storytelling.\nThe side is Neutral.",
       "style": {
-        "left": "5.32%",
-        "top": "55.65%",
+        "left": "6.16%",
+        "top": "55.61%",
         "width": "16.89%",
         "height": "7.74%"
       }
     },
     {
-      "id": "page-03_b08",
+      "id": "page-03_b09",
       "box_2d": {
-        "index": 7,
+        "index": 8,
         "x": 761.0025024414062,
         "y": 1752.7552490234375,
         "width": 255.0152587890625,
@@ -672,9 +632,9 @@
       }
     },
     {
-      "id": "page-03_b09",
+      "id": "page-03_b10",
       "box_2d": {
-        "index": 8,
+        "index": 9,
         "x": 782.5005493164062,
         "y": 1876.51123046875,
         "width": 290.63043212890625,
@@ -700,9 +660,9 @@
       }
     },
     {
-      "id": "page-03_b10",
+      "id": "page-03_b11",
       "box_2d": {
-        "index": 9,
+        "index": 10,
         "x": 1420.8565673828125,
         "y": 1788.3968505859375,
         "width": 323.6103515625,
@@ -721,8 +681,8 @@
       "textWithCues": "[solemn] But in your lowest moment... [long pause] always remember...",
       "aiReasoning": "The user wants to analyze a specific caption box containing the text \"BUT IN YOUR LOWEST MOMENT, ALWAYS REMEMBER...\".\n1.  **Locate & Classify**: The text is in a rectangular orange box in the bottom right panel. It is not a speech bubble with a tail. It is a narrative caption. Therefore, type is `NARRATION`.\n2.  **Analyze Context**:\n    *   **Speaker**: It is an unseen narrator. The text is philosophical, discussing faith, trust, and hardship. It serves as a voice-over for the action where the hero is being defeated.\n    *   **Side**: The tone is sympathetic to the hero's struggle, offering a message of hope amidst despair. It aligns with the `HERO` side.\n    *   **Importance**: While the narrator isn't a visible character, the voice is central to the storytelling here. I will classify the character type as `EXTRA` (as a generic Narrator role) but describe a distinct, important voice.\n    *   **Voice Description**: The text requires a voice that sounds wise, grave, and cinematic. Think of a mentor figure or a classic movie trailer narrator. Deep, resonant, and serious.\n    *   **Emotion**: The emotion is solemn and dramatic, building anticipation for a reveal or a turnaround.\n3.  **Performance Cues**: The text starts with \"BUT\", signaling a shift in tone. \"LOWEST MOMENT\" should be emphasized to highlight the stakes. The ellipses \"...\" at the end indicate a pause or a lead-in to the next page/panel.",
       "style": {
-        "left": "71.47%",
-        "top": "58.50%",
+        "left": "70.23%",
+        "top": "58.40%",
         "width": "16.28%",
         "height": "5.37%"
       }
@@ -750,8 +710,8 @@
       "voiceDescription": "Deep, cinematic, resonant male voice. Calm and reflective storytelling tone.",
       "textWithCues": "...No storm, [short pause] no matter how great, [short pause] will last forever.",
       "style": {
-        "left": "3.79%",
-        "top": "2.27%",
+        "left": "4.55%",
+        "top": "2.41%",
         "width": "19.70%",
         "height": "4.16%"
       }
@@ -786,7 +746,23 @@
     {
       "id": "page-04_b03",
       "box_2d": {
-        "index": 2,
+        "index": 2
+      },
+      "ocr_text": "KEE-YAH!",
+      "type": "SPEECH",
+      "speaker": "Green Ranger",
+      "emotion": "Excited",
+      "style": {
+        "left": "77.79%",
+        "top": "22.73%",
+        "width": "15.29%",
+        "height": "5.35%"
+      }
+    },
+    {
+      "id": "page-04_b04",
+      "box_2d": {
+        "index": 3,
         "x": 1571.9271240234375,
         "y": 1075.4122314453125,
         "width": 327.10302734375,
@@ -797,7 +773,7 @@
       },
       "ocr_text": "YOU'VE NEVER BEATEN ME BEFORE AND YOU WON'T START TODAY.",
       "type": "SPEECH",
-      "speaker": "Green Ranger",
+      "speaker": "Leonardo",
       "emotion": "Arrogant and confident",
       "characterType": "MAJOR",
       "side": "VILLAIN",
@@ -812,9 +788,9 @@
       }
     },
     {
-      "id": "page-04_b04",
+      "id": "page-04_b05",
       "box_2d": {
-        "index": 3,
+        "index": 4,
         "x": 1510.302490234375,
         "y": 1255.1348876953125,
         "width": 322.820556640625,
@@ -825,7 +801,7 @@
       },
       "ocr_text": "POWERED UP OR NOT, YOU'RE STILL NOTHING MORE THAN...",
       "type": "SPEECH",
-      "speaker": "Green Ranger",
+      "speaker": "Leonardo",
       "emotion": "Confident, Taunting",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -839,9 +815,9 @@
       }
     },
     {
-      "id": "page-04_b05",
+      "id": "page-04_b06",
       "box_2d": {
-        "index": 4,
+        "index": 5,
         "x": 1138.0390625,
         "y": 1452.8348388671875,
         "width": 411.611572265625,
@@ -852,7 +828,7 @@
       },
       "ocr_text": "...PRACTICE.",
       "type": "SPEECH",
-      "speaker": "Green Ranger",
+      "speaker": "Leonardo",
       "emotion": "Confident and dismissive",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -921,7 +897,7 @@
         "left": "47.00%",
         "top": "1.86%",
         "width": "14.91%",
-        "height": "3.53%"
+        "height": "4.56%"
       }
     },
     {
@@ -938,7 +914,7 @@
       },
       "ocr_text": "FIGURES MY FIRST TIME IN PARIS IS BATTLING A BARBARIAN BUNNY RABBIT.",
       "type": "SPEECH",
-      "speaker": "Donatello",
+      "speaker": "Yellow Ranger",
       "emotion": "Sarcastic and strained",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -1066,6 +1042,88 @@
       "id": "page-06_b08",
       "box_2d": {
         "index": 7,
+        "x": 340.1185302734375,
+        "y": 2332.757568359375,
+        "width": 376.41534423828125,
+        "height": 148.91552734375,
+        "confidence": 0.900880753993988,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-06/page-06-crop-003-x340-y2332.jpg"
+      },
+      "ocr_text": "I GOTTA SAY, I ADMIRE YOUR CONFIDENCE.",
+      "type": "SPEECH",
+      "speaker": "Donatello",
+      "emotion": "Sarcastic/Amused",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "textWithCues": "[sarcastic] I gotta say, I admire your CONFIDENCE.",
+      "aiReasoning": "I have located the text \"I GOTTA SAY, I ADMIRE YOUR CONFIDENCE.\" in the bottom-left panel.\n1.  **Classification:** It is in a standard speech bubble. Type: `SPEECH`.\n2.  **Speaker:** The bubble tail points clearly to the character in the yellow suit (Yellow Ranger). This character is not in the provided \"Unique Characters\" list (only Donatello is listed), so I will identify her as \"Yellow Ranger\".\n3.  **Context:** The villain (Warbunny) has just made a grandiose speech about his might (\"All those who face me shall quake...\"). The Yellow Ranger is responding to this boasting.\n4.  **Side:** She is a Power Ranger, fighting a monster. Side: `HERO`.\n5.  **Importance:** She is one of the main protagonists. Importance: `MAJOR`.\n6.  **Voice/Tone:** She is making a quip. The tone is dry, sarcastic, or bemused by the monster's ego. She is calm and ready to fight.\n7.  **Cues:** No shouting or whispering indicated. The phrasing suggests a sarcastic compliment. I will add a cue for dry wit or sarcasm.",
+      "style": {
+        "left": "17.11%",
+        "top": "76.31%",
+        "width": "18.93%",
+        "height": "4.87%"
+      }
+    },
+    {
+      "id": "page-06_b09",
+      "box_2d": {
+        "index": 8,
+        "x": 246.3035430908203,
+        "y": 2468.04150390625,
+        "width": 306.2523651123047,
+        "height": 133.41552734375,
+        "confidence": 0.8898298144340515,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-06/page-06-crop-005-x246-y2468.jpg"
+      },
+      "ocr_text": "YEAH. MAYBE HE'LL GO EASY ON YOU.",
+      "type": "SPEECH",
+      "speaker": "Yellow Ranger",
+      "emotion": "Sarcastic banter",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "voiceDescription": "Young male voice, intelligent, articulate but relaxed, American accent",
+      "textWithCues": "[sarcastic] Yeah. Maybe he'll go easy on you.",
+      "aiReasoning": "1.  **Locate & Classify**: The text \"YEAH. MAYBE HE'LL GO EASY ON YOU.\" is in a speech bubble in the bottom left panel.\n2.  **Identify Speaker**: The tail of the speech bubble clearly points to the Ninja Turtle with the purple mask and bo staff. This is **Donatello**.\n3.  **Determine Context**:\n    *   **Side**: Donatello is a **HERO**.\n    *   **Importance**: He is a member of the main cast, so **MAJOR**.\n    *   **Situation**: The Yellow Ranger just commented on the monster's confidence (\"I gotta say, I admire your confidence\"). Donatello is responding with a quip/banter, suggesting that maybe the monster's confidence means he'll be lenient, which is obviously a joke.\n    *   **Tone**: Sarcastic, dry, bantering. It's typical Ninja Turtle humor during a fight.\n4.  **Draft Cues**: The line should be delivered dryly or sarcastically.\n    *   Text: \"Yeah. Maybe he'll go easy on you.\"\n    *   Cue: `[Dryly, joking]`",
+      "style": {
+        "left": "12.39%",
+        "top": "80.73%",
+        "width": "15.41%",
+        "height": "4.36%"
+      }
+    },
+    {
+      "id": "page-06_b10",
+      "box_2d": {
+        "index": 9,
+        "x": 977.7435913085938,
+        "y": 2459.641357421875,
+        "width": 153.95306396484375,
+        "height": 216.8330078125,
+        "confidence": 0.9328519701957703,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-06/page-06-crop-001-x977-y2459.jpg"
+      },
+      "ocr_text": "DOUBT IT.",
+      "type": "SPEECH",
+      "speaker": "Donatello",
+      "emotion": "Dry, cynical, focused",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "textWithCues": "[Dryly] Doubt it.",
+      "aiReasoning": "The text \"DOUBT IT.\" is located in the bottom panel, spoken by the character Donatello (identifiable by the purple mask and bo staff).\nThe bubble has a tail pointing directly to him.\nThe context is a conversation with the Yellow Ranger. The Ranger jokes, \"Maybe he'll go easy on you.\" Donatello, facing a giant monster, responds realistically and curtly.\nThe tone is dry, deadpan, and serious.\nDonatello is a Major Hero.",
+      "style": {
+        "left": "49.18%",
+        "top": "80.46%",
+        "width": "7.74%",
+        "height": "7.09%"
+      }
+    },
+    {
+      "id": "page-06_b11",
+      "box_2d": {
+        "index": 10,
         "x": 1453.2886962890625,
         "y": 1793.302490234375,
         "width": 361.9696044921875,
@@ -1091,9 +1149,9 @@
       }
     },
     {
-      "id": "page-06_b09",
+      "id": "page-06_b12",
       "box_2d": {
-        "index": 8,
+        "index": 11,
         "x": 1589.4169921875,
         "y": 1920.54443359375,
         "width": 306.590087890625,
@@ -1104,7 +1162,7 @@
       },
       "ocr_text": "THAT \"FOOL\" WOULD BE ME, FLOPPY...",
       "type": "SPEECH",
-      "speaker": "Donatello",
+      "speaker": "Raphael",
       "emotion": "taunting",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -1116,88 +1174,6 @@
         "top": "62.82%",
         "width": "15.42%",
         "height": "5.98%"
-      }
-    },
-    {
-      "id": "page-06_b10",
-      "box_2d": {
-        "index": 9,
-        "x": 340.1185302734375,
-        "y": 2332.757568359375,
-        "width": 376.41534423828125,
-        "height": 148.91552734375,
-        "confidence": 0.900880753993988,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-06/page-06-crop-003-x340-y2332.jpg"
-      },
-      "ocr_text": "I GOTTA SAY, I ADMIRE YOUR CONFIDENCE.",
-      "type": "SPEECH",
-      "speaker": "Yellow Ranger",
-      "emotion": "Sarcastic/Amused",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "textWithCues": "[sarcastic] I gotta say, I admire your CONFIDENCE.",
-      "aiReasoning": "I have located the text \"I GOTTA SAY, I ADMIRE YOUR CONFIDENCE.\" in the bottom-left panel.\n1.  **Classification:** It is in a standard speech bubble. Type: `SPEECH`.\n2.  **Speaker:** The bubble tail points clearly to the character in the yellow suit (Yellow Ranger). This character is not in the provided \"Unique Characters\" list (only Donatello is listed), so I will identify her as \"Yellow Ranger\".\n3.  **Context:** The villain (Warbunny) has just made a grandiose speech about his might (\"All those who face me shall quake...\"). The Yellow Ranger is responding to this boasting.\n4.  **Side:** She is a Power Ranger, fighting a monster. Side: `HERO`.\n5.  **Importance:** She is one of the main protagonists. Importance: `MAJOR`.\n6.  **Voice/Tone:** She is making a quip. The tone is dry, sarcastic, or bemused by the monster's ego. She is calm and ready to fight.\n7.  **Cues:** No shouting or whispering indicated. The phrasing suggests a sarcastic compliment. I will add a cue for dry wit or sarcasm.",
-      "style": {
-        "left": "17.11%",
-        "top": "76.31%",
-        "width": "18.93%",
-        "height": "4.87%"
-      }
-    },
-    {
-      "id": "page-06_b11",
-      "box_2d": {
-        "index": 10,
-        "x": 246.3035430908203,
-        "y": 2468.04150390625,
-        "width": 306.2523651123047,
-        "height": 133.41552734375,
-        "confidence": 0.8898298144340515,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-06/page-06-crop-005-x246-y2468.jpg"
-      },
-      "ocr_text": "YEAH. MAYBE HE'LL GO EASY ON YOU.",
-      "type": "SPEECH",
-      "speaker": "Donatello",
-      "emotion": "Sarcastic banter",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "voiceDescription": "Young male voice, intelligent, articulate but relaxed, American accent",
-      "textWithCues": "[sarcastic] Yeah. Maybe he'll go easy on you.",
-      "aiReasoning": "1.  **Locate & Classify**: The text \"YEAH. MAYBE HE'LL GO EASY ON YOU.\" is in a speech bubble in the bottom left panel.\n2.  **Identify Speaker**: The tail of the speech bubble clearly points to the Ninja Turtle with the purple mask and bo staff. This is **Donatello**.\n3.  **Determine Context**:\n    *   **Side**: Donatello is a **HERO**.\n    *   **Importance**: He is a member of the main cast, so **MAJOR**.\n    *   **Situation**: The Yellow Ranger just commented on the monster's confidence (\"I gotta say, I admire your confidence\"). Donatello is responding with a quip/banter, suggesting that maybe the monster's confidence means he'll be lenient, which is obviously a joke.\n    *   **Tone**: Sarcastic, dry, bantering. It's typical Ninja Turtle humor during a fight.\n4.  **Draft Cues**: The line should be delivered dryly or sarcastically.\n    *   Text: \"Yeah. Maybe he'll go easy on you.\"\n    *   Cue: `[Dryly, joking]`",
-      "style": {
-        "left": "12.39%",
-        "top": "80.73%",
-        "width": "15.41%",
-        "height": "4.36%"
-      }
-    },
-    {
-      "id": "page-06_b12",
-      "box_2d": {
-        "index": 11,
-        "x": 977.7435913085938,
-        "y": 2459.641357421875,
-        "width": 153.95306396484375,
-        "height": 216.8330078125,
-        "confidence": 0.9328519701957703,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-06/page-06-crop-001-x977-y2459.jpg"
-      },
-      "ocr_text": "DOUBT IT.",
-      "type": "SPEECH",
-      "speaker": "Donatello",
-      "emotion": "Dry, cynical, focused",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "textWithCues": "[Dryly] Doubt it.",
-      "aiReasoning": "The text \"DOUBT IT.\" is located in the bottom panel, spoken by the character Donatello (identifiable by the purple mask and bo staff).\nThe bubble has a tail pointing directly to him.\nThe context is a conversation with the Yellow Ranger. The Ranger jokes, \"Maybe he'll go easy on you.\" Donatello, facing a giant monster, responds realistically and curtly.\nThe tone is dry, deadpan, and serious.\nDonatello is a Major Hero.",
-      "style": {
-        "left": "49.18%",
-        "top": "80.46%",
-        "width": "7.74%",
-        "height": "7.09%"
       }
     }
   ],
@@ -1288,7 +1264,58 @@
     {
       "id": "page-07_b04",
       "box_2d": {
-        "index": 3,
+        "index": 3
+      },
+      "ocr_text": "BRING THE SWING, BUNNY BOY!",
+      "type": "SPEECH",
+      "speaker": "Donatello",
+      "emotion": "",
+      "style": {
+        "left": "53.58%",
+        "top": "21.85%",
+        "width": "14.81%",
+        "height": "3.07%"
+      },
+      "textWithCues": "[shouting] BRING THE SWING, BUNNY BOY!"
+    },
+    {
+      "id": "page-07_b05",
+      "box_2d": {
+        "index": 4
+      },
+      "ocr_text": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT.",
+      "type": "SPEECH",
+      "speaker": "Raphael",
+      "emotion": "",
+      "style": {
+        "left": "69.17%",
+        "top": "21.57%",
+        "width": "25.49%",
+        "height": "5.12%"
+      },
+      "textWithCues": "[Matter-of-factly] The good news is, a rabbit's teeth never stop growing, [smirks] so we don't have to feel bad about knocking any out."
+    },
+    {
+      "id": "page-07_b06",
+      "box_2d": {
+        "index": 5
+      },
+      "ocr_text": "YOU'RE WORSE THAN BILLY.",
+      "type": "SPEECH",
+      "speaker": "Trini",
+      "emotion": "",
+      "style": {
+        "left": "85.37%",
+        "top": "26.50%",
+        "width": "9.58%",
+        "height": "4.87%"
+      },
+      "textWithCues": "[Exasperated] You're worse than Billy."
+    },
+    {
+      "id": "page-07_b07",
+      "box_2d": {
+        "index": 6,
         "x": 817.4210205078125,
         "y": 1524.559326171875,
         "width": 270.7642822265625,
@@ -1313,9 +1340,9 @@
       }
     },
     {
-      "id": "page-07_b05",
+      "id": "page-07_b08",
       "box_2d": {
-        "index": 4,
+        "index": 7,
         "x": 1482.9525146484375,
         "y": 1750.783935546875,
         "width": 226.7447509765625,
@@ -1341,9 +1368,26 @@
       }
     },
     {
-      "id": "page-07_b06",
+      "id": "page-07_b09",
       "box_2d": {
-        "index": 5,
+        "index": 8
+      },
+      "ocr_text": "ARE YOU ALRIGHT?",
+      "type": "SPEECH",
+      "speaker": "Alpha 5",
+      "emotion": "frantic acknowledgment",
+      "style": {
+        "left": "80.36%",
+        "top": "61.24%",
+        "width": "9.50%",
+        "height": "2.70%"
+      },
+      "textWithCues": "[panicked] [shouting] ARE YOU ALRIGHT?"
+    },
+    {
+      "id": "page-07_b10",
+      "box_2d": {
+        "index": 9,
         "x": 1438.26904296875,
         "y": 1935.7686767578125,
         "width": 365.9298095703125,
@@ -1368,9 +1412,9 @@
       }
     },
     {
-      "id": "page-07_b07",
+      "id": "page-07_b11",
       "box_2d": {
-        "index": 6,
+        "index": 10,
         "x": 1441.1119384765625,
         "y": 2320.905517578125,
         "width": 475.3050537109375,
@@ -1419,15 +1463,47 @@
       "aiReasoning": "1.  **Locate & Classify:** The text block is clearly visible in a white speech bubble with a tail. The tail points upwards towards a character (implied to be one of the Turtles based on context).\n    *   Type: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The text in the bubble immediately following this one says, \"We gotta work on your definition of 'awesome,' Michelangelo.\" This explicitly identifies the speaker of the target text as **Michelangelo**.\n    *   **Side:** He is a Teenage Mutant Ninja Turtle, so he is a `HERO`.\n    *   **Importance:** He is a titular character, so `MAJOR`.\n    *   **Voice Description:** (Although MAJOR characters don't strictly require this per instructions, I'll add it for completeness) Young male, high-energy, \"surfer dude\" accent, American, playful.\n    *   **Emotion:** He is making a meta-joke about the situation being like a video game. The tone is enthusiastic, excited, and humorous amidst combat.\n\n3.  **Performance Cues:**\n    *   The text starts with \"DUDES,\" which is a quintessential \"surfer\" greeting. It should be drawn out slightly or punched with enthusiasm.\n    *   The phrase \"CRAZY AWESOME VINTAGE SIDE SCROLLER VIDEO GAMES\" indicates high excitement and geeky joy.\n    *   The character is in the middle of a battle, so there might be a high-energy projection to his voice, but the primary emotion is fun/playfulness.\n    *   Cues: `[Excitedly, with a surfer accent]`, `[Enthusiastic]`.\n\n4.  **Final Polish:**\n    *   Text: \"Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\"\n    *   Cues added: \"[Excitedly, mid-combat] Dudes, doesn't this kinda feel like one of those crazy awesome vintage side scroller video games?\"",
       "style": {
         "left": "62.93%",
-        "top": "30.41%",
+        "top": "36.23%",
         "width": "26.97%",
-        "height": "20.72%"
+        "height": "6.98%"
       }
     },
     {
       "id": "page-08_b02",
       "box_2d": {
-        "index": 1,
+        "index": 1
+      },
+      "ocr_text": "",
+      "type": "NARRATION",
+      "speaker": "Narrator",
+      "emotion": "",
+      "style": {
+        "left": "6.21%",
+        "top": "1.69%",
+        "width": "28.51%",
+        "height": "4.67%"
+      }
+    },
+    {
+      "id": "page-08_b03",
+      "box_2d": {
+        "index": 2
+      },
+      "ocr_text": "",
+      "type": "SPEECH",
+      "speaker": "Red Ranger",
+      "emotion": "",
+      "style": {
+        "left": "53.19%",
+        "top": "49.89%",
+        "width": "16.49%",
+        "height": "6.09%"
+      }
+    },
+    {
+      "id": "page-08_b04",
+      "box_2d": {
+        "index": 3,
         "x": 1371.3670654296875,
         "y": 1474.8109130859375,
         "width": 193.32470703125,
@@ -1452,9 +1528,9 @@
       }
     },
     {
-      "id": "page-08_b03",
+      "id": "page-08_b05",
       "box_2d": {
-        "index": 2,
+        "index": 4,
         "x": 77.72286224365234,
         "y": 2191.5078125,
         "width": 363.29126739501953,
@@ -1480,9 +1556,9 @@
       }
     },
     {
-      "id": "page-08_b04",
+      "id": "page-08_b06",
       "box_2d": {
-        "index": 3,
+        "index": 5,
         "x": 628.18310546875,
         "y": 2161.047119140625,
         "width": 220.39581298828125,
@@ -1493,7 +1569,7 @@
       },
       "ocr_text": "LET THE FIRE OF OUR CAUSE...",
       "type": "SPEECH",
-      "speaker": "Foot Soldier",
+      "speaker": "Foot Elite",
       "emotion": "Fanatical",
       "characterType": "EXTRA",
       "side": "VILLAIN",
@@ -1508,7 +1584,7 @@
       }
     },
     {
-      "id": "page-08_b05",
+      "id": "page-08_b07",
       "box_2d": {
         "index": 6,
         "x": 1050.8477783203125,
@@ -1521,7 +1597,7 @@
       },
       "ocr_text": "...ENGULF ALL THOSE WHO STAND AGAINST IT!",
       "type": "SPEECH",
-      "speaker": "Foot Soldier",
+      "speaker": "Foot Elite",
       "emotion": "Shouting/Fanatical",
       "characterType": "EXTRA",
       "side": "VILLAIN",
@@ -1536,9 +1612,9 @@
       }
     },
     {
-      "id": "page-08_b06",
+      "id": "page-08_b08",
       "box_2d": {
-        "index": 8,
+        "index": 7,
         "x": 1018.428466796875,
         "y": 2394.075439453125,
         "width": 298.1060791015625,
@@ -1547,20 +1623,52 @@
         "class": "speech bubble",
         "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-08/page-08-crop-009-x1018-y2394.jpg"
       },
-      "ocr_text": "Green Ranger: Wait, they can throw fireballs now? Pink Ranger: Among other things. Green Ranger: I wanna throw fireballs.",
+      "ocr_text": "Wait, they can throw fireballs now?",
       "type": "SPEECH",
-      "speaker": "Green Ranger",
+      "speaker": "Pink Ranger",
       "emotion": "Surprised then envious",
       "characterType": "MAJOR",
       "side": "HERO",
       "voiceDescription": "Teen male voice, energetic, American accent",
-      "textWithCues": "Green Ranger: [surprised] Wait, they can throw fireballs now? Pink Ranger: [straining] Among other things. Green Ranger: [jealous] I wanna throw fireballs.",
+      "textWithCues": "[surprised] Wait, they can throw fireballs now?",
       "aiReasoning": "I have located the text in the bottom right panel.\nThe text consists of three connected bubbles:\n1. \"WAIT, THEY CAN THROW FIREBALLS NOW?\" - The tail points clearly to the Green Ranger's helmet on the right side of the panel.\n2. \"AMONG OTHER THINGS.\" - The tail points to the Pink Ranger, who is diving upside down to dodge a laser beam.\n3. \"I WANNA THROW FIREBALLS.\" - The tail points back to the Green Ranger (originating from the bottom right).\n\nContext:\n- The speakers are the Green Ranger (Tommy) and the Pink Ranger (Kimberly).\n- They are fighting Foot Soldiers who are using magic/fireballs.\n- The tone is lighthearted banter amidst action. The Green Ranger is surprised by the enemy's ability and then childishly envious of it.\n\nSpeaker Identification:\n- The prompts asks to reuse names if applicable. The provided list has \"Michelangelo\", \"Red Ranger\", \"Foot Soldier\".\n- The Green Ranger is clearly a different character (Green suit, distinct from the Red Ranger and the Turtles). I will name him \"Green Ranger\".\n- Since the text block contains dialogue from two characters, I will attribute the block to the primary speaker (Green Ranger, who has 2/3 lines) and indicate the switch in the text cues.\n\nVoice & Emotion:\n- Green Ranger: Surprised, then playful/jealous. Male teen voice.\n- Pink Ranger: Strained (she is physically dodging), matter-of-fact. Female teen voice.\n\nSide: HERO\nImportance: MAJOR",
       "style": {
         "left": "51.23%",
         "top": "78.31%",
         "width": "15.00%",
-        "height": "18.68%"
+        "height": "5.59%"
+      }
+    },
+    {
+      "id": "page-08_b09",
+      "box_2d": {
+        "index": 8
+      },
+      "ocr_text": "Among other things.",
+      "type": "SPEECH",
+      "speaker": "Green Ranger",
+      "emotion": "strained",
+      "style": {
+        "left": "57.65%",
+        "top": "88.38%",
+        "width": "8.64%",
+        "height": "4.37%"
+      }
+    },
+    {
+      "id": "page-08_b10",
+      "box_2d": {
+        "index": 9
+      },
+      "ocr_text": "I wanna throw fireballs.",
+      "type": "SPEECH",
+      "speaker": "Pink Ranger",
+      "emotion": "",
+      "style": {
+        "left": "51.01%",
+        "top": "92.73%",
+        "width": "11.77%",
+        "height": "4.22%"
       }
     }
   ],
@@ -1577,19 +1685,19 @@
         "class": "speech bubble",
         "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-09/page-09-crop-001-x1509-y2472.jpg"
       },
-      "ocr_text": "YEAH, I LIKED THE OTHER VIDEO GAME WAY BETTER.",
+      "ocr_text": "OUCH. YEAH, I LIKED THE OTHER VIDEO GAME WAY BETTER.",
       "type": "SPEECH",
       "speaker": "Michelangelo",
       "emotion": "Pained but sarcastic",
       "characterType": "MAJOR",
       "side": "HERO",
-      "textWithCues": "[pained] [groans] [sarcastic] Yeah, I liked the other video game way better.",
+      "textWithCues": "[pained] [groans] [sarcastic] Ouch. Yeah, I liked the other video game way better.",
       "aiReasoning": "I have located the text \"YEAH, I LIKED THE OTHER VIDEO GAME WAY BETTER.\" in the bottom right panel.\nIt is a speech bubble connected to the Ninja Turtle with the orange bandana, who is Michelangelo.\nMichelangelo is a MAJOR HERO character.\nContext: He has just dodged or taken a glancing blow from a massive energy attack (evidenced by the \"FWOOOSH\" SFX and his previous \"OUCH\" bubble). He is lying on the ground in the snow.\nTone: He is making a quip/joke despite being in pain. It's sarcastic and references the situation being like a difficult video game level.\nDelivery: Should sound slightly pained or winded, but maintaining his signature humorous, lighthearted attitude.",
       "style": {
-        "left": "75.92%",
-        "top": "80.88%",
-        "width": "16.74%",
-        "height": "5.85%"
+        "left": "73.33%",
+        "top": "78.62%",
+        "width": "19.33%",
+        "height": "8.11%"
       }
     }
   ],
@@ -1625,61 +1733,6 @@
       "id": "page-10_b02",
       "box_2d": {
         "index": 1,
-        "x": 1616.180908203125,
-        "y": 530.5172119140625,
-        "width": 289.7601318359375,
-        "height": 194.03887939453125,
-        "confidence": 0.8903367519378662,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-10/page-10-crop-006-x1616-y530.jpg"
-      },
-      "ocr_text": "I GOTTA BE HONEST, MAN. SOMETIMES I JUST SMILE AND NOD.",
-      "type": "SPEECH",
-      "speaker": "Leonardo",
-      "emotion": "Casual, candid, humorous",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "textWithCues": "[casual] I gotta be honest, man... Sometimes I just smile and nod.",
-      "aiReasoning": "The text is located in a speech bubble in the top right panel.\nThe tail of the speech bubble points to the Ninja Turtle with the blue mask.\nBased on the unique character list and visual identification (blue mask), the speaker is **Leonardo**.\nLeonardo is one of the main protagonists, so `characterType` is **MAJOR**.\nThe side is **HERO**.\nSince the character is MAJOR, I do not need to provide a voice description for AI generation, as per instructions.\n**Context:** Leonardo is in the middle of a fight on a train roof. Another character (likely the Red Ranger) just tried to explain the \"superconducting bio metal thingy\". Leonardo is admitting he doesn't understand the technical jargon.\n**Emotion/Tone:** The contrast between the action (fighting) and the dialogue (casual confession) is the source of humor here. The tone is casual, candid, and slightly self-deprecating. He is \"keeping it real.\"\n**Cues:** The delivery should be conversational despite the physical exertion. A slight pause between sentences.",
-      "style": {
-        "left": "81.30%",
-        "top": "16.80%",
-        "width": "14.58%",
-        "height": "6.15%"
-      }
-    },
-    {
-      "id": "page-10_b03",
-      "box_2d": {
-        "index": 2,
-        "x": 1524.2012939453125,
-        "y": 677.6455688476562,
-        "width": 275.3929443359375,
-        "height": 130.226318359375,
-        "confidence": 0.48566707968711853,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-10/page-10-crop-013-x1524-y677.jpg"
-      },
-      "ocr_text": "OH, DON'T WORRY.",
-      "type": "SPEECH",
-      "speaker": "Red Ranger",
-      "emotion": "Friendly and reassuring",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "voiceDescription": "Confident, youthful American male voice, leadership tone but currently casual",
-      "textWithCues": "[reassuring] Oh, don't worry.",
-      "aiReasoning": "The text located at the specified coordinates is \"OH, DON'T WORRY.\" inside a speech bubble in the top right panel.\nThe tail of the speech bubble points to the Red Ranger (Jason), who is jumping alongside Leonardo.\nThe context is a conversation between Leonardo and the Red Ranger. Leonardo just admitted he doesn't understand the technical jargon (\"superconducting bio metal thingy\") and just \"smiles and nods\".\nThe Red Ranger is responding to reassure him, indicating he does the same with his tech-expert teammate (Donatello/Billy).\nThis is a moment of camaraderie and banter between two leaders.\nThe speaker is the Red Ranger. He is a `MAJOR` character and a `HERO`.\nSince he is a MAJOR character, a specific AI voice description isn't strictly required by the prompt's logic (\"If MINOR or EXTRA\"), but the tone should be friendly, youthful, and reassuring.\nThe delivery is casual, not shouting or whispering.\n\nType: SPEECH\nSpeaker: Red Ranger\nCharacter Type: MAJOR\nSide: HERO\nEmotion: Friendly, Reassuring\nText Cues: [Reassuringly, casual banter] Oh, don't worry.",
-      "style": {
-        "left": "76.67%",
-        "top": "21.46%",
-        "width": "13.85%",
-        "height": "4.13%"
-      }
-    },
-    {
-      "id": "page-10_b04",
-      "box_2d": {
-        "index": 3,
         "x": 810.857666015625,
         "y": 763.8539428710938,
         "width": 348.8653564453125,
@@ -1702,6 +1755,61 @@
         "top": "24.20%",
         "width": "17.55%",
         "height": "5.33%"
+      }
+    },
+    {
+      "id": "page-10_b03",
+      "box_2d": {
+        "index": 2,
+        "x": 1616.180908203125,
+        "y": 530.5172119140625,
+        "width": 289.7601318359375,
+        "height": 194.03887939453125,
+        "confidence": 0.8903367519378662,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-10/page-10-crop-006-x1616-y530.jpg"
+      },
+      "ocr_text": "I GOTTA BE HONEST, MAN. SOMETIMES I JUST SMILE AND NOD.",
+      "type": "SPEECH",
+      "speaker": "Red Ranger",
+      "emotion": "Casual, candid, humorous",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "textWithCues": "[casual] I gotta be honest, man... Sometimes I just smile and nod.",
+      "aiReasoning": "The text is located in a speech bubble in the top right panel.\nThe tail of the speech bubble points to the Ninja Turtle with the blue mask.\nBased on the unique character list and visual identification (blue mask), the speaker is **Leonardo**.\nLeonardo is one of the main protagonists, so `characterType` is **MAJOR**.\nThe side is **HERO**.\nSince the character is MAJOR, I do not need to provide a voice description for AI generation, as per instructions.\n**Context:** Leonardo is in the middle of a fight on a train roof. Another character (likely the Red Ranger) just tried to explain the \"superconducting bio metal thingy\". Leonardo is admitting he doesn't understand the technical jargon.\n**Emotion/Tone:** The contrast between the action (fighting) and the dialogue (casual confession) is the source of humor here. The tone is casual, candid, and slightly self-deprecating. He is \"keeping it real.\"\n**Cues:** The delivery should be conversational despite the physical exertion. A slight pause between sentences.",
+      "style": {
+        "left": "81.30%",
+        "top": "16.80%",
+        "width": "14.58%",
+        "height": "6.15%"
+      }
+    },
+    {
+      "id": "page-10_b04",
+      "box_2d": {
+        "index": 3,
+        "x": 1524.2012939453125,
+        "y": 677.6455688476562,
+        "width": 275.3929443359375,
+        "height": 130.226318359375,
+        "confidence": 0.48566707968711853,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-10/page-10-crop-013-x1524-y677.jpg"
+      },
+      "ocr_text": "OH, DON'T WORRY.",
+      "type": "SPEECH",
+      "speaker": "Leonardo",
+      "emotion": "Friendly and reassuring",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "voiceDescription": "Confident, youthful American male voice, leadership tone but currently casual",
+      "textWithCues": "[reassuring] Oh, don't worry.",
+      "aiReasoning": "The text located at the specified coordinates is \"OH, DON'T WORRY.\" inside a speech bubble in the top right panel.\nThe tail of the speech bubble points to the Red Ranger (Jason), who is jumping alongside Leonardo.\nThe context is a conversation between Leonardo and the Red Ranger. Leonardo just admitted he doesn't understand the technical jargon (\"superconducting bio metal thingy\") and just \"smiles and nods\".\nThe Red Ranger is responding to reassure him, indicating he does the same with his tech-expert teammate (Donatello/Billy).\nThis is a moment of camaraderie and banter between two leaders.\nThe speaker is the Red Ranger. He is a `MAJOR` character and a `HERO`.\nSince he is a MAJOR character, a specific AI voice description isn't strictly required by the prompt's logic (\"If MINOR or EXTRA\"), but the tone should be friendly, youthful, and reassuring.\nThe delivery is casual, not shouting or whispering.\n\nType: SPEECH\nSpeaker: Red Ranger\nCharacter Type: MAJOR\nSide: HERO\nEmotion: Friendly, Reassuring\nText Cues: [Reassuringly, casual banter] Oh, don't worry.",
+      "style": {
+        "left": "75.67%",
+        "top": "22.70%",
+        "width": "8.86%",
+        "height": "2.89%"
       }
     },
     {
@@ -1746,7 +1854,7 @@
       },
       "ocr_text": "BE QUICK, FOOT CLAN. THE MASTERS DEMAND SUCCESS.",
       "type": "SPEECH",
-      "speaker": "Foot Soldier",
+      "speaker": "Foot Elite",
       "emotion": "Commanding/Urgent",
       "characterType": "EXTRA",
       "side": "VILLAIN",
@@ -1774,7 +1882,7 @@
       },
       "ocr_text": "COLLECT ALL YOU CAN OR--",
       "type": "SPEECH",
-      "speaker": "Foot Soldier",
+      "speaker": "Foot Elite",
       "emotion": "Urgent/Commanding",
       "characterType": "EXTRA",
       "side": "VILLAIN",
@@ -1802,7 +1910,7 @@
       },
       "ocr_text": "--OR SHREDDER WILL JUST DROP YOU AND BRAINWASH SOME OTHER MORONS.",
       "type": "SPEECH",
-      "speaker": "Pink Ranger",
+      "speaker": "Green Ranger",
       "emotion": "Sarcastic/Mocking",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -1820,34 +1928,6 @@
       "id": "page-10_b09",
       "box_2d": {
         "index": 8,
-        "x": 681.3626098632812,
-        "y": 1761.5972900390625,
-        "width": 432.39739990234375,
-        "height": 155.7681884765625,
-        "confidence": 0.9069736003875732,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-10/page-10-crop-005-x681-y1761.jpg"
-      },
-      "ocr_text": "HONESTLY, HOW DOES HE FILL OUT HIS PURPLE PAJAMA POSSE?",
-      "type": "SPEECH",
-      "speaker": "Pink Ranger",
-      "emotion": "Sarcastic banter",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "voiceDescription": "Teenage female, American accent, confident and sassy",
-      "textWithCues": "[sarcastic] Honestly, how does he fill out his purple pajama posse?",
-      "aiReasoning": "1.  **Locate & Classify**: The text \"HONESTLY, HOW DOES HE FILL OUT HIS PURPLE PAJAMA POSSE?\" is in a speech bubble in the middle panel. The tail points to the character on the left, who is the Pink Ranger.\n2.  **Context**:\n    *   **Speaker**: The visual shows the Pink Ranger (Kimberly Hart). This character is not in the provided list (Leonardo, Foot Soldier), so I will create a new name: \"Pink Ranger\".\n    *   **Side**: `HERO`. She is fighting the villains.\n    *   **Importance**: `MAJOR`. She is a main protagonist in this story.\n    *   **Emotion**: She is being sassy and mocking the Foot Clan soldiers, calling them a \"purple pajama posse\".\n    *   **Action**: She is in the middle of a fight, aiming her bow.\n3.  **Performance Cues**:\n    *   The tone is sarcastic and bantering.\n    *   No shouting is indicated (standard text weight), but she needs to project her voice over the action.\n    *   The line is a joke/insult.",
-      "style": {
-        "left": "34.27%",
-        "top": "55.80%",
-        "width": "21.75%",
-        "height": "4.93%"
-      }
-    },
-    {
-      "id": "page-10_b10",
-      "box_2d": {
-        "index": 9,
         "x": 138.99600219726562,
         "y": 2014.712646484375,
         "width": 406.7452697753906,
@@ -1869,13 +1949,13 @@
         "left": "6.99%",
         "top": "63.82%",
         "width": "20.46%",
-        "height": "5.64%"
+        "height": "8.89%"
       }
     },
     {
-      "id": "page-10_b11",
+      "id": "page-10_b10",
       "box_2d": {
-        "index": 10,
+        "index": 9,
         "x": 1169.7467041015625,
         "y": 2082.51123046875,
         "width": 361.1368408203125,
@@ -1898,34 +1978,6 @@
         "top": "65.96%",
         "width": "18.17%",
         "height": "3.36%"
-      }
-    },
-    {
-      "id": "page-10_b09",
-      "box_2d": {
-        "index": 8,
-        "x": 158.57559204101562,
-        "y": 2143.41650390625,
-        "width": 337.49151611328125,
-        "height": 151.961669921875,
-        "confidence": 0.8203555345535278,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-10/page-10-crop-009-x158-y2143.jpg"
-      },
-      "ocr_text": "PROVIDING US WITH THE POWER TO MAKE CHANGE.",
-      "type": "SPEECH",
-      "speaker": "Foot Elite",
-      "emotion": "determined",
-      "characterType": "EXTRA",
-      "side": "VILLAIN",
-      "voiceDescription": "Stern, disciplined, menacing male voice, authoritative",
-      "textWithCues": "[zealous] PROVIDING US WITH THE POWER TO MAKE CHANGE.",
-      "aiReasoning": "The user wants me to analyze the text \"PROVIDING US WITH THE POWER TO MAKE CHANGE.\"\n1.  **Location:** Bottom left panel.\n2.  **Type:** It is in a speech bubble with a tail pointing to a character. Type is `SPEECH`.\n3.  **Speaker:** The tail points to a character in a red cloak, hood, and mask, holding a weapon with red energy. Looking at the provided unique character list, this matches the visual description of a \"Foot Elite\" (distinct from the generic purple \"Foot Soldier\").\n4.  **Context:**\n    *   **Side:** He is fighting the Power Rangers. Side is `VILLAIN`.\n    *   **Importance:** He is a nameless elite guard, so `EXTRA`.\n    *   **Voice Description:** As an elite warrior of the Foot Clan, the voice should be disciplined, stern, menacing, and authoritative. Not a mindless grunt, but a trained zealot.\n    *   **Emotion/Tone:** The dialogue is a retort to the Pink Ranger, justifying their allegiance to Shredder by comparing it to the Rangers' allegiance to Zordon. It is spoken with conviction and ideological zeal while charging up a magical attack.\n5.  **Cues:** The text is bold but the bubble is standard round. The character is in the middle of a battle and powering up an attack. The delivery should be forceful and determined.\n\n*Step-by-step logic for JSON:*\n*   `type`: SPEECH\n*   `speaker`: Foot Elite\n*   `characterType`: EXTRA\n*   `side`: VILLAIN\n*   `voiceDescription`: Stern, disciplined, menacing male voice.\n*   `emotion`: Zealous/Convicted\n*   `textWithCues`: The character is finishing a sentence started in the previous bubble (\"The same way Zordon recruited you...\"). He is emphasizing the \"power\" and \"change\" aspects.",
-      "style": {
-        "left": "7.98%",
-        "top": "67.89%",
-        "width": "16.98%",
-        "height": "4.81%"
       }
     }
   ],
@@ -1999,7 +2051,7 @@
       },
       "ocr_text": "AAAGH!",
       "type": "SPEECH",
-      "speaker": "Michelangelo",
+      "speaker": "Pink Ranger",
       "emotion": "Panic/Screaming",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -2082,7 +2134,7 @@
       "ocr_text": "I WANT A BOOM STICK.",
       "type": "SPEECH",
       "speaker": "Michelangelo",
-      "emotion": "Envious and whining",
+      "emotion": "Envious and sarcastic whining",
       "characterType": "MAJOR",
       "side": "HERO",
       "textWithCues": "[Whining enviously] I WANT A BOOM STICK.",
@@ -2116,43 +2168,16 @@
       "textWithCues": "[Ominously] Your failure today is not just a lesson, but... [darkly] a warning.",
       "aiReasoning": "The text region corresponds to the speech bubble in the bottom-left panel.\nThe text reads: \"YOUR FAILURE TODAY IS NOT JUST A LESSON, BUT...A WARNING.\"\nThe speaker is a character wearing a bamboo hat (jingasa), a face mask with red eyes, and a cape. This visual design matches the **Foot Elite** Guard from the TMNT franchise. The provided unique characters list includes \"Foot Elite\", so I will use that name.\nThis character is a villain. The tone is threatening and authoritative.\nCharacter importance: They are an elite unit, distinct from generic Foot Soldiers. Given the specific unique character entry \"Foot Elite\", I will classify as `MINOR` (as a named class of character).\nVoice description: Needs to sound dangerous, disciplined, and elite. Not a grunt. Deep, calm, and menacing.\nCues: The text is a stern pronouncement. There is an ellipsis \"...\" indicating a dramatic pause. The tone is ominous.\n\nLocation Check:\nx:773, y:1498 corresponds to the text in the speech bubble of the foreground Foot Elite character.\n\nCorrected Text from Image: \"Your failure today is not just a lesson, but... a warning.\"",
       "style": {
-        "left": "38.90%",
+        "left": "33.72%",
         "top": "49.01%",
-        "width": "15.32%",
-        "height": "6.70%"
+        "width": "20.50%",
+        "height": "4.65%"
       }
     },
     {
       "id": "page-11_b08",
       "box_2d": {
         "index": 7,
-        "x": 1205.423583984375,
-        "y": 1520.2349853515625,
-        "width": 292.6219482421875,
-        "height": 144.2109375,
-        "confidence": 0.9331204295158386,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-11/page-11-crop-003-x1205-y1520.jpg"
-      },
-      "ocr_text": "...OR DIE BY THE FOOT.",
-      "type": "SPEECH",
-      "speaker": "Shredder",
-      "emotion": "Menacing",
-      "characterType": "MAJOR",
-      "side": "VILLAIN",
-      "textWithCues": "[Ominously] ...OR DIE BY THE FOOT.",
-      "aiReasoning": "1.  **Locate & Classify**: The text \"...OR DIE BY THE FOOT.\" is found in a speech bubble in the middle-right panel (row 3, column 2). The bubble's tail points into a red energy beam where the villains have just teleported away. This is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The text is a continuation of the sentence starting in the previous panel (\"LIVE BY THE FOOT...\"), spoken by the leader of the villains. This character wears a conical hat, a mask, has glowing red eyes, and commands the Foot Clan. This is visually identified as **Shredder**.\n    *   **Side**: `VILLAIN`.\n    *   **Importance**: The prompt instructions list \"Shredder\" as an example of `MAJOR`. Since this is clearly the main antagonist of the scene giving a dramatic exit line, he fits `MAJOR`.\n    *   **Emotion**: The character is delivering a final ultimatum/warning before vanishing. The tone is threatening, ominous, and commanding.\n    *   **Voice**: Since he is `MAJOR`, a description is not strictly required by the instructions, but the tone is deep and menacing.\n\n3.  **Performance Cues**:\n    *   The text starts with \"...\" indicating a pause or continuation.\n    *   The statement is a threat (\"...or die\").\n    *   The context is a disappearing act, adding an eerie or dramatic quality.\n    *   Suggested cue: `[Ominously]` or `[Threateningly]`.",
-      "style": {
-        "left": "60.63%",
-        "top": "49.73%",
-        "width": "14.72%",
-        "height": "4.72%"
-      }
-    },
-    {
-      "id": "page-11_b09",
-      "box_2d": {
-        "index": 8,
         "x": 645.3827514648438,
         "y": 1999.73681640625,
         "width": 500.06085205078125,
@@ -2175,6 +2200,33 @@
         "top": "65.42%",
         "width": "25.15%",
         "height": "5.53%"
+      }
+    },
+    {
+      "id": "page-11_b09",
+      "box_2d": {
+        "index": 8,
+        "x": 1205.423583984375,
+        "y": 1520.2349853515625,
+        "width": 292.6219482421875,
+        "height": 144.2109375,
+        "confidence": 0.9331204295158386,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-11/page-11-crop-003-x1205-y1520.jpg"
+      },
+      "ocr_text": "...OR DIE BY THE FOOT.",
+      "type": "SPEECH",
+      "speaker": "Foot Elite",
+      "emotion": "Menacing",
+      "characterType": "MAJOR",
+      "side": "VILLAIN",
+      "textWithCues": "[Ominously] ...OR DIE BY THE FOOT.",
+      "aiReasoning": "1.  **Locate & Classify**: The text \"...OR DIE BY THE FOOT.\" is found in a speech bubble in the middle-right panel (row 3, column 2). The bubble's tail points into a red energy beam where the villains have just teleported away. This is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The text is a continuation of the sentence starting in the previous panel (\"LIVE BY THE FOOT...\"), spoken by the leader of the villains. This character wears a conical hat, a mask, has glowing red eyes, and commands the Foot Clan. This is visually identified as **Shredder**.\n    *   **Side**: `VILLAIN`.\n    *   **Importance**: The prompt instructions list \"Shredder\" as an example of `MAJOR`. Since this is clearly the main antagonist of the scene giving a dramatic exit line, he fits `MAJOR`.\n    *   **Emotion**: The character is delivering a final ultimatum/warning before vanishing. The tone is threatening, ominous, and commanding.\n    *   **Voice**: Since he is `MAJOR`, a description is not strictly required by the instructions, but the tone is deep and menacing.\n\n3.  **Performance Cues**:\n    *   The text starts with \"...\" indicating a pause or continuation.\n    *   The statement is a threat (\"...or die\").\n    *   The context is a disappearing act, adding an eerie or dramatic quality.\n    *   Suggested cue: `[Ominously]` or `[Threateningly]`.",
+      "style": {
+        "left": "60.63%",
+        "top": "49.73%",
+        "width": "14.72%",
+        "height": "4.72%"
       }
     },
     {
@@ -2226,9 +2278,9 @@
       "aiReasoning": "I have located the text \"ANY GOOD PIZZA JOINTS IN NORTH DAKOTA?\" in the bottom panel.\nThe speech bubble has a tail pointing to the Ninja Turtle with the orange mask. This is Michelangelo.\nHe is a `MAJOR` character and a `HERO`.\nThe context is that the team has been defeated or banished to a snowy, desolate location (North Dakota). Leonardo (blue mask) has just sarcastically sighed \"Perfect.\"\nMichelangelo is using humor as a coping mechanism, asking a ridiculous question given the circumstances.\nThere are no bolding or jagged edges to indicate shouting. The tone should be wry, hopeful (comedically), or resigned.",
       "style": {
         "left": "37.51%",
-        "top": "73.19%",
-        "width": "27.63%",
-        "height": "7.85%"
+        "top": "76.12%",
+        "width": "15.67%",
+        "height": "4.92%"
       }
     },
     {
@@ -2292,33 +2344,6 @@
       "id": "page-12_b02",
       "box_2d": {
         "index": 1,
-        "x": 515.732177734375,
-        "y": 398.9891357421875,
-        "width": 264.99603271484375,
-        "height": 137.2471923828125,
-        "confidence": 0.9420878291130066,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-12/page-12-crop-002-x515-y398.jpg"
-      },
-      "ocr_text": "BUT IT'S NOT THAT SIMPLE, ZORDON.",
-      "type": "SPEECH",
-      "speaker": "Jason",
-      "emotion": "Serious, weary, concerned",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "textWithCues": "[serious] [sighs] BUT it's not that simple, Zordon.",
-      "aiReasoning": "1.  **Locate & Classify**: The text \"BUT IT'S NOT THAT SIMPLE, ZORDON.\" is in a standard speech bubble in the top panel. The tail points to the Red Ranger, Jason.\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to the Red Ranger. In the subsequent panel, another character (Trini) says \"Jason's right,\" referring to the points made in this dialogue chain. Therefore, the speaker is Jason.\n    *   **Side**: Hero (Power Ranger).\n    *   **Importance**: Major.\n    *   **Emotion**: Jason is countering Zordon's praise with a harsh reality check. He sounds weary, serious, and stressed about the tactical situation. He is respectful but firm.\n3.  **Performance Cues**:\n    *   The tone should be serious and perhaps a bit tired/weary (\"exhausting\" is mentioned later).\n    *   He is interrupting or pivoting the conversation from a win to the larger problem.\n    *   No shouting or whispering indicated.",
-      "style": {
-        "left": "25.94%",
-        "top": "13.05%",
-        "width": "13.33%",
-        "height": "4.49%"
-      }
-    },
-    {
-      "id": "page-12_b03",
-      "box_2d": {
-        "index": 2,
         "x": 1535.3179931640625,
         "y": 358.30572509765625,
         "width": 366.2403564453125,
@@ -2340,6 +2365,33 @@
         "top": "11.72%",
         "width": "18.42%",
         "height": "7.39%"
+      }
+    },
+    {
+      "id": "page-12_b03",
+      "box_2d": {
+        "index": 2,
+        "x": 515.732177734375,
+        "y": 398.9891357421875,
+        "width": 264.99603271484375,
+        "height": 137.2471923828125,
+        "confidence": 0.9420878291130066,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-12/page-12-crop-002-x515-y398.jpg"
+      },
+      "ocr_text": "BUT IT'S NOT THAT SIMPLE, ZORDON.",
+      "type": "SPEECH",
+      "speaker": "Jason",
+      "emotion": "Serious, weary, concerned",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "textWithCues": "[serious] [sighs] BUT it's not that simple, Zordon.",
+      "aiReasoning": "1.  **Locate & Classify**: The text \"BUT IT'S NOT THAT SIMPLE, ZORDON.\" is in a standard speech bubble in the top panel. The tail points to the Red Ranger, Jason.\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to the Red Ranger. In the subsequent panel, another character (Trini) says \"Jason's right,\" referring to the points made in this dialogue chain. Therefore, the speaker is Jason.\n    *   **Side**: Hero (Power Ranger).\n    *   **Importance**: Major.\n    *   **Emotion**: Jason is countering Zordon's praise with a harsh reality check. He sounds weary, serious, and stressed about the tactical situation. He is respectful but firm.\n3.  **Performance Cues**:\n    *   The tone should be serious and perhaps a bit tired/weary (\"exhausting\" is mentioned later).\n    *   He is interrupting or pivoting the conversation from a win to the larger problem.\n    *   No shouting or whispering indicated.",
+      "style": {
+        "left": "25.94%",
+        "top": "13.05%",
+        "width": "13.33%",
+        "height": "4.49%"
       }
     },
     {
@@ -2411,7 +2463,7 @@
       },
       "ocr_text": "I mean, even with double duty... it's exhausting.",
       "type": "SPEECH",
-      "speaker": "Trini",
+      "speaker": "Donatello",
       "emotion": "Exhausted and concerned",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -2438,7 +2490,7 @@
       },
       "ocr_text": "NOW, SUDDENLY THEY'RE FASTER AND STRONGER AND CAN THROW FIREBALLS?",
       "type": "SPEECH",
-      "speaker": "Raphael",
+      "speaker": "Tommy",
       "emotion": "Frustrated and incredulous",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -2466,7 +2518,7 @@
       },
       "ocr_text": "THEY GET MORE POWERFUL... WE STAY THE SAME.",
       "type": "SPEECH",
-      "speaker": "Tommy",
+      "speaker": "Raphael",
       "emotion": "grim realization",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -2502,9 +2554,9 @@
       "aiReasoning": "The text \"FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY.\" is located in a speech bubble in the bottom left panel.\nThe bubble has a tail pointing to the character Master Splinter (an anthropomorphic rat in a red robe).\nMaster Splinter is a \"MAJOR\" character and a \"HERO\".\nHe is addressing Raphael (implied by \"my son\" in the connected bubble and the context of the conversation).\nThe tone is instructive, wise, and firm. He is counseling patience and focus in the face of adversity.\nThere are no jagged edges to the bubble, so he is not shouting. The text is standard dialogue.\nCharacter expression: Serious, focused, stern but not angry.",
       "style": {
         "left": "26.10%",
-        "top": "87.84%",
+        "top": "88.52%",
         "width": "17.66%",
-        "height": "6.07%"
+        "height": "5.39%"
       }
     },
     {
@@ -2796,7 +2848,7 @@
       },
       "ocr_text": "OKAY... THREE TIMES.",
       "type": "SPEECH",
-      "speaker": "Donatello",
+      "speaker": "Billy",
       "emotion": "dry, corrective",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -3043,7 +3095,7 @@
       },
       "ocr_text": "HE'S GOING WITH A NINJA, REMEMBER?",
       "type": "SPEECH",
-      "speaker": "Green Ranger",
+      "speaker": "Raphael",
       "emotion": "Reassuring and confident",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -3126,7 +3178,7 @@
       },
       "ocr_text": "I appreciate Zordon's faith in us. But... these attacks, they aren't random. Zedd and Shredder are building something.",
       "type": "SPEECH",
-      "speaker": "Raphael",
+      "speaker": "Green Ranger",
       "emotion": "Serious and contemplative",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -3180,7 +3232,7 @@
       },
       "ocr_text": "THAT'S WHAT WE'RE GONNA GO FIND OUT.",
       "type": "SPEECH",
-      "speaker": "Green Ranger",
+      "speaker": "Raphael",
       "emotion": "confident",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -3335,7 +3387,24 @@
     {
       "id": "page-15_b01",
       "box_2d": {
-        "index": 0,
+        "index": 0
+      },
+      "ocr_text": "THE MOON PALACE.",
+      "type": "CAPTION",
+      "speaker": "Narrator",
+      "emotion": "",
+      "style": {
+        "left": "10.81%",
+        "top": "1.80%",
+        "width": "27.41%",
+        "height": "3.66%"
+      },
+      "textWithCues": "[Grandly] THE MOON PALACE."
+    },
+    {
+      "id": "page-15_b02",
+      "box_2d": {
+        "index": 1,
         "x": 254.2700653076172,
         "y": 184.57862854003906,
         "width": 230.38072204589844,
@@ -3361,9 +3430,9 @@
       }
     },
     {
-      "id": "page-15_b02",
+      "id": "page-15_b03",
       "box_2d": {
-        "index": 1,
+        "index": 2,
         "x": 550.3047485351562,
         "y": 210.68040466308594,
         "width": 219.91943359375,
@@ -3389,9 +3458,9 @@
       }
     },
     {
-      "id": "page-15_b03",
+      "id": "page-15_b04",
       "box_2d": {
-        "index": 2,
+        "index": 3,
         "x": 533.7192993164062,
         "y": 292.54608154296875,
         "width": 259.0064697265625,
@@ -3417,9 +3486,9 @@
       }
     },
     {
-      "id": "page-15_b04",
+      "id": "page-15_b05",
       "box_2d": {
-        "index": 3,
+        "index": 4,
         "x": 1048.0050048828125,
         "y": 84.635986328125,
         "width": 219.6492919921875,
@@ -3445,9 +3514,9 @@
       }
     },
     {
-      "id": "page-15_b05",
+      "id": "page-15_b06",
       "box_2d": {
-        "index": 4,
+        "index": 5,
         "x": 1288.313720703125,
         "y": 119.25186920166016,
         "width": 211.872802734375,
@@ -3473,9 +3542,9 @@
       }
     },
     {
-      "id": "page-15_b06",
+      "id": "page-15_b07",
       "box_2d": {
-        "index": 5,
+        "index": 6,
         "x": 1392.6160888671875,
         "y": 229.80142211914062,
         "width": 309.565673828125,
@@ -3501,9 +3570,9 @@
       }
     },
     {
-      "id": "page-15_b07",
+      "id": "page-15_b08",
       "box_2d": {
-        "index": 6,
+        "index": 7,
         "x": 1531.8765869140625,
         "y": 898.1483154296875,
         "width": 270.2637939453125,
@@ -3529,9 +3598,9 @@
       }
     },
     {
-      "id": "page-15_b08",
+      "id": "page-15_b09",
       "box_2d": {
-        "index": 7,
+        "index": 8,
         "x": 77.33369445800781,
         "y": 1287.2208251953125,
         "width": 407.38221740722656,
@@ -3556,9 +3625,9 @@
       }
     },
     {
-      "id": "page-15_b09",
+      "id": "page-15_b10",
       "box_2d": {
-        "index": 8,
+        "index": 9,
         "x": 497.7915954589844,
         "y": 1333.0113525390625,
         "width": 422.8367004394531,
@@ -3584,9 +3653,9 @@
       }
     },
     {
-      "id": "page-15_b10",
+      "id": "page-15_b11",
       "box_2d": {
-        "index": 9,
+        "index": 10,
         "x": 1037.1285400390625,
         "y": 1239.267578125,
         "width": 470.2366943359375,
@@ -3606,14 +3675,14 @@
       "style": {
         "left": "52.17%",
         "top": "40.54%",
-        "width": "23.65%",
+        "width": "38.72%",
         "height": "4.25%"
       }
     },
     {
-      "id": "page-15_b11",
+      "id": "page-15_b12",
       "box_2d": {
-        "index": 10,
+        "index": 11,
         "x": 1687.432861328125,
         "y": 1308.9893798828125,
         "width": 204.2481689453125,
@@ -3638,9 +3707,9 @@
       }
     },
     {
-      "id": "page-15_b12",
+      "id": "page-15_b13",
       "box_2d": {
-        "index": 11,
+        "index": 12,
         "x": 1090.2117919921875,
         "y": 2063.004638671875,
         "width": 811.0179443359375,
@@ -3665,9 +3734,9 @@
       }
     },
     {
-      "id": "page-15_b13",
+      "id": "page-15_b14",
       "box_2d": {
-        "index": 12,
+        "index": 13,
         "x": 1598.574951171875,
         "y": 2258.705810546875,
         "width": 302.3782958984375,
@@ -3678,7 +3747,7 @@
       },
       "ocr_text": "AM I SO EASILY FORGOTTEN?",
       "type": "SPEECH",
-      "speaker": "Rita Repulsa",
+      "speaker": "Lord Zedd",
       "emotion": "Indignant and menacing",
       "characterType": "MAJOR",
       "side": "VILLAIN",
@@ -3772,7 +3841,7 @@
       "style": {
         "left": "49.27%",
         "top": "11.74%",
-        "width": "10.54%",
+        "width": "19.34%",
         "height": "5.37%"
       }
     },
@@ -3851,10 +3920,10 @@
       "textWithCues": "[menacing] And yet you conspire to seize this world without me? [threatening] Do I need to reconsider our alliance already?",
       "aiReasoning": "1.  **Locate & Classify**: The target text \"DO I NEED TO RECONSIDER OUR ALLIANCE ALREADY?\" is located in a speech bubble in the first panel. The bubble actually contains two sentences: \"AND YET YOU CONSPIRE TO SEIZE THIS WORLD WITHOUT ME? DO I NEED TO RECONSIDER OUR ALLIANCE ALREADY?\". The bounding box provided covers this entire speech bubble. Classification is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The bubble's tail points to **Lord Zedd**, the large red muscular figure with the metal exoskeleton and \"Z\" staff. He is a named unique character in the list.\n    *   **Side**: Lord Zedd is a primary antagonist, so `VILLAIN`.\n    *   **Importance**: He is a main character in this story arc, so `MAJOR`.\n    *   **Voice Description**: Since he is `MAJOR`, a specific description isn't strictly required by the prompt instructions, but contextually: Deep, gravelly, menacing, metallic, authoritative (based on the original show's voice by Robert Axelrod).\n    *   **Emotion**: Zedd is suspicious and threatening. He believes his ally (Shredder) might be plotting against him or acting without his permission. The tone is dangerous and commanding.\n\n3.  **Performance Cues**:\n    *   The text provided in the prompt is the second sentence, but the speech bubble contains a preceding sentence (\"And yet you conspire to seize this world without me?\"). For a proper voice acting cue, the full bubble context is needed.\n    *   Tone: The delivery should be deep and intimidating. He is asserting dominance.\n    *   Cues: Start with a suspicious tone for the accusation, then drop pitch/tempo for the threat \"reconsider our alliance\".",
       "style": {
-        "left": "20.08%",
-        "top": "39.81%",
-        "width": "15.37%",
-        "height": "5.15%"
+        "left": "12.65%",
+        "top": "35.97%",
+        "width": "22.80%",
+        "height": "8.99%"
       }
     },
     {
@@ -3905,7 +3974,7 @@
       "textWithCues": "[menacing] And all that I ask in return is that Zordon and his Rangers understand the true meaning of SUFFERING... [short pause] before we take all that they are.",
       "aiReasoning": "The text is located in the third panel, spoken by Lord Zedd (identifiable by his red muscular form and metallic exoskeleton seen in previous panels, and the context of him making demands). The speech bubble originates from off-screen top-left, pointing towards where Zedd stands relative to the cowering Foot Soldier.\nSpeaker: Lord Zedd (listed in unique characters).\nSide: VILLAIN.\nImportance: MAJOR.\nEmotion: Menacing, sadistic, authoritative. He is striking a deal but emphasizing the cruelty he desires.\nText analysis: \"AND ALL THAT I ASK IN RETURN IS THAT ZORDON AND HIS RANGERS UNDERSTAND THE TRUE MEANING OF SUFFERING...BEFORE WE TAKE ALL THAT THEY ARE.\"\nThere is an ellipsis indicating a pause. The tone is dark.",
       "style": {
-        "left": "72.81%",
+        "left": "70.02%",
         "top": "46.59%",
         "width": "21.31%",
         "height": "8.59%"
@@ -4045,10 +4114,10 @@
       "textWithCues": "[modestly] What can I say... Alpha loves presets.",
       "aiReasoning": "I have located the text \"WHAT CAN I SAY. ALPHA LOVES PRESETS.\" in the top row, middle panel.\nThe text is inside a rectangular speech balloon with a yellow/gold border and a Dragon Coin insignia on the left.\nThe tail of the balloon points towards a character partially visible (green suit, gold armor pieces), who is clearly the Green Ranger.\nThe Green Ranger is a MAJOR character (Tommy Oliver) and a HERO.\nContext: Raphael (in the red box) just commented on the teleportation being surprisingly successful/safe. The Green Ranger is responding to explain that the robot Alpha 5 handled the technical details (\"presets\").\nThe tone is casual, modest, and conversational. He is deflecting the praise/surprise to his tech support.\nEmotion: Relaxed, nonchalant.",
       "style": {
-        "left": "26.38%",
-        "top": "2.84%",
-        "width": "19.70%",
-        "height": "26.35%"
+        "left": "28.54%",
+        "top": "23.30%",
+        "width": "17.54%",
+        "height": "5.89%"
       }
     },
     {
@@ -4073,9 +4142,9 @@
       "aiReasoning": "1.  **Locate & Classify**: The text \"DO WE KNOW WHAT WE'RE LOOKING FOR IN HERE?\" is located in a vertical rectangular panel (the second panel from the left). It is inside a yellow/gold rectangular caption box with a Power Ranger coin icon in the corner. In this comic series (Mighty Morphin Power Rangers / Teenage Mutant Ninja Turtles), these colored boxes with icons represent character speech. The yellow/gold box with the Dragonzord coin corresponds to the Green Ranger (Tommy Oliver). Therefore, this is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The text box has the Green Ranger's symbol. The Green Ranger is present in the scene (visible in the large bottom panel and partially in the panel to the right). The dialogue is an exchange with Raphael (red boxes).\n    *   **Side**: `HERO` (Power Ranger).\n    *   **Importance**: `MAJOR` (Main character).\n    *   **Emotion**: The Green Ranger has just arrived in a new, potentially dangerous location (\"the moon\"). He is pivoting from a joke about the teleportation to the mission at hand. He is asking Raphael what their objective is. The tone is practical, inquisitive, and slightly casual.\n\n3.  **Performance Cues**:\n    *   The character is looking around a dark room/facility.\n    *   He is asking a genuine question to his partner.\n    *   Tone should be conversational but focused.\n    *   Cue: `[Looking around, inquisitive]` or `[Curious]`.\n\n4.  **Drafting Output**:\n    *   Text: \"Do we know what we're looking for in here?\"\n    *   Add cues for the inquisitive nature of the line.",
       "style": {
         "left": "47.89%",
-        "top": "3.71%",
+        "top": "24.03%",
         "width": "16.64%",
-        "height": "26.32%"
+        "height": "6.00%"
       }
     },
     {
@@ -4099,7 +4168,7 @@
       "textWithCues": "[Casually, matter-of-factly] Anything that looks expensive or complicated I guess.",
       "voiceDescription": "Gruff, street-smart male voice with a Brooklyn accent",
       "style": {
-        "left": "73.55%",
+        "left": "72.40%",
         "top": "6.61%",
         "width": "18.07%",
         "height": "4.87%"
@@ -4127,7 +4196,7 @@
       "textWithCues": "[excited] [mischievously] And we BREAK whatever we find, right?",
       "aiReasoning": "The text \"AND WE BREAK WHATEVER WE FIND, RIGHT?\" is inside a rectangular caption box with a yellow border.\nContext Analysis:\n1.  **Dialogue Flow**: The scene is a conversation between two characters infiltrating a base.\n    -   Red Box (Top Left): \"You know, when you said you could teleport us...\" -> Identifies Raphael (Red Bandana).\n    -   Yellow/Gold Box (Top Middle): \"What can I say. Alpha loves presets.\" -> Identifies the Green Ranger (Gold Coin symbol).\n    -   Beige/Yellow Box (Top Right): \"Do we know what we're looking for in here?\" -> Same speaker style as the previous yellow box, minus the icon. Use of \"in here\" implies the speaker is physically present.\n    -   Red Box: \"Anything that looks expensive or complicated I guess.\" -> Raphael answering.\n    -   **Target Text (Yellow Box)**: \"AND WE BREAK WHATEVER WE FIND, RIGHT?\" -> Same speaker as the previous yellow box.\n    -   Red Box: \"Oh, absolutely.\" -> Raphael answering.\n2.  **Speaker Identification**: The only characters physically present in the scene (\"in here\") are Raphael and the Green Ranger (Tommy Oliver). The red boxes correspond to Raphael. The yellow/gold boxes correspond to the Green Ranger (matching his gold armor accents and the Dragonzord coin seen earlier).\n3.  **Personality/Tone**: The Green Ranger is confirming the \"rules of engagement\" with Raphael. Raphael is known for being rough and breaking things. Tommy (Green Ranger) sounds like he is getting into the spirit of the mission or verifying the plan with a bit of eagerness/mischief.\n4.  **Visuals**: The box is rectangular, which typically denotes narration, but here functions as dialogue (likely over comms or stylized internal/external speech). Given the interaction, I will classify it as `SPEECH`.",
       "style": {
-        "left": "61.92%",
+        "left": "60.42%",
         "top": "35.60%",
         "width": "18.09%",
         "height": "4.29%"
@@ -4183,7 +4252,7 @@
       "textWithCues": "[mischievously] I figure we can do whatever we want...",
       "aiReasoning": "The text region is a red rectangular box containing the text: \"I FIGURE WE CAN DO WHATEVER WE WANT...\".\nVisually, this is a caption box, typically used for narration or internal monologue. However, contextually, it is part of a conversation.\nIn the previous panel, the Green Ranger asks (in a yellow box with a tail), \"AND WE BREAK WHATEVER WE FIND, RIGHT?\".\nA red box responds, \"OH, ABSOLUTELY.\"\nThe target text follows this red box, continuing the thought.\nThe color red is associated with Raphael (the Turtle with the red bandana seen in the bottom left panel).\nTherefore, the speaker is Raphael.\nSince Raphael is a main protagonist, he is a HERO and MAJOR character.\nHis tone is rebellious, tough, and nonchalant. He is justifying breaking things in the villain's lair.\nAlthough the text is in a box (usually `NARRATION`), it functions entirely as `SPEECH` dialogue. To provide the best voice acting instructions, I will classify it as `SPEECH` attributed to Raphael.\nThe text ends with ellipses \"...\", implying a pause or a sense of open-ended possibility/implication.\n\nSpeaker: Raphael (Teenage Mutant Ninja Turtle)\nTone: Smug, confident, mischievous.",
       "style": {
-        "left": "80.66%",
+        "left": "78.08%",
         "top": "88.64%",
         "width": "12.47%",
         "height": "5.01%"
@@ -4260,7 +4329,7 @@
       },
       "ocr_text": "YEAH. THIS IS BAD.",
       "type": "SPEECH",
-      "speaker": "Raphael",
+      "speaker": "Green Ranger",
       "emotion": "grim realization",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -4399,7 +4468,7 @@
       },
       "ocr_text": "Just two? What a waste.",
       "type": "SPEECH",
-      "speaker": "Rocksteady",
+      "speaker": "Bebop",
       "emotion": "Dismissive and arrogant",
       "characterType": "MINOR",
       "side": "VILLAIN",
@@ -4528,35 +4597,41 @@
     {
       "id": "page-19_b01",
       "box_2d": {
-        "index": 0,
-        "x": 549.8131713867188,
-        "y": 2281.632080078125,
-        "width": 293.924560546875,
-        "height": 218.312255859375,
-        "confidence": 0.4570445418357849,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-19/page-19-crop-002-x549-y2281.jpg"
+        "index": 0
       },
-      "ocr_text": "OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.",
+      "ocr_text": "SHADOW GRID-- ACTIVATE!",
       "type": "SPEECH",
-      "speaker": "Bebop",
-      "emotion": "Strained intensity",
-      "characterType": "MINOR",
-      "side": "VILLAIN",
-      "voiceDescription": "Rough, street-punk male voice, aggressive and gravelly",
-      "textWithCues": "[Strained] OH, that feels like a hot pepper dipped in battery acid!",
-      "aiReasoning": "The user wants me to analyze the speech bubble containing \"OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.\".\n\n1.  **Locate & Classify**:\n    *   The text is in a speech bubble at the bottom right of the main panel.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The tail of the bubble clearly points to the Warthog character in the red and gold armor. This character is **Bebop**. (Note: The user provided \"Rocksteady\" in the unique characters list, who is the Rhino on the left. Since the Warthog is clearly a different character and iconic partner, I will identify him as \"Bebop\").\n    *   **Side**: `VILLAIN`. Bebop is a henchman of Shredder/Rita Repulsa.\n    *   **Importance**: `MINOR`. The definitions categorize \"Named secondary characters\" as MINOR (like Bulk & Skull). Bebop fits this role as a named henchman.\n    *   **Voice Description**: Bebop typically has a rough, street-punk voice, often associated with an African American Vernacular English (AAVE) accent or just a gruff, high-energy thug voice. In this context, he is powered up, so it should sound intense.\n    *   **Emotion**: The character is experiencing an intense physical transformation. The metaphor \"hot pepper dipped in battery acid\" suggests a burning, stinging sensation that is powerful and painful. His posture is crouched and tense.\n\n3.  **Performance Cues**:\n    *   The text describes a visceral burning sensation.\n    *   The character is likely straining against the surge of energy.\n    *   There is no shouting (bold) or whispering indicated by the font, but the context implies high intensity.\n    *   I will add a cue indicating the strained, gritty delivery.",
+      "speaker": "Rocksteady",
+      "emotion": "",
       "style": {
-        "left": "27.66%",
-        "top": "74.64%",
-        "width": "14.78%",
-        "height": "7.14%"
-      }
+        "left": "34.48%",
+        "top": "2.47%",
+        "width": "30.79%",
+        "height": "7.59%"
+      },
+      "textWithCues": "[Shouting] SHADOW GRID-- ACTIVATE!"
     },
     {
       "id": "page-19_b02",
       "box_2d": {
-        "index": 1,
+        "index": 1
+      },
+      "ocr_text": "RRRAAARGH! OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.",
+      "type": "SPEECH",
+      "speaker": "Bebop",
+      "emotion": "",
+      "style": {
+        "left": "24.47%",
+        "top": "68.94%",
+        "width": "27.44%",
+        "height": "12.57%"
+      },
+      "textWithCues": "[Painful roar] RRRAAARGH! [Strained and groaning in pain] OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID."
+    },
+    {
+      "id": "page-19_b03",
+      "box_2d": {
+        "index": 2,
         "x": 340.6769714355469,
         "y": 2462.2177734375,
         "width": 251.53970336914062,
@@ -4580,6 +4655,40 @@
         "width": "12.65%",
         "height": "6.44%"
       }
+    },
+    {
+      "id": "page-19_b04",
+      "box_2d": {
+        "index": 3
+      },
+      "ocr_text": "UM... HOW DID THEY...",
+      "type": "SPEECH",
+      "speaker": "Raphael",
+      "emotion": "",
+      "style": {
+        "left": "63.56%",
+        "top": "91.19%",
+        "width": "9.51%",
+        "height": "4.15%"
+      },
+      "textWithCues": "[confused] UM... [hesitant] HOW DID THEY... [trailing off]"
+    },
+    {
+      "id": "page-19_b05",
+      "box_2d": {
+        "index": 4
+      },
+      "ocr_text": "I HAVE NO IDEA.",
+      "type": "SPEECH",
+      "speaker": "Green Ranger",
+      "emotion": "",
+      "style": {
+        "left": "58.97%",
+        "top": "95.33%",
+        "width": "9.59%",
+        "height": "2.75%"
+      },
+      "textWithCues": "[sighs] I have no idea."
     }
   ],
   "page-20.jpg": [
@@ -4652,7 +4761,7 @@
       },
       "ocr_text": "THEY'RE STILL SLOW, STUPID AND--",
       "type": "SPEECH",
-      "speaker": "Armored Villain",
+      "speaker": "Raphael",
       "emotion": "Mocking and Aggressive",
       "characterType": "MINOR",
       "side": "VILLAIN",
@@ -4680,7 +4789,7 @@
       },
       "ocr_text": "WHO YOU CALLIN' SLOW, YOU TURTLE TWERP!",
       "type": "SPEECH",
-      "speaker": "Armored Villain",
+      "speaker": "Bebop",
       "emotion": "Angry",
       "characterType": "MINOR",
       "side": "VILLAIN",
@@ -4708,7 +4817,7 @@
       },
       "ocr_text": "I'M BIGGER, BADDER AND BETTER THAN YOU'LL EVER BE NOW!",
       "type": "SPEECH",
-      "speaker": "Armored Villain",
+      "speaker": "Bebop",
       "emotion": "Arrogant and triumphant",
       "characterType": "MAJOR",
       "side": "VILLAIN",
@@ -4736,7 +4845,7 @@
       },
       "ocr_text": "FINALLY, I CAN CRACK THAT SHELL IN TWO!",
       "type": "SPEECH",
-      "speaker": "Armored Villain",
+      "speaker": "Bebop",
       "emotion": "Triumphant and sadistic",
       "characterType": "MINOR",
       "side": "VILLAIN",
@@ -4749,6 +4858,23 @@
         "width": "12.61%",
         "height": "5.09%"
       }
+    },
+    {
+      "id": "page-20_b07",
+      "box_2d": {
+        "index": 6
+      },
+      "ocr_text": "RAPHAEL, NO!!!",
+      "type": "SPEECH",
+      "speaker": "Green Ranger",
+      "emotion": "",
+      "style": {
+        "left": "74.24%",
+        "top": "84.95%",
+        "width": "20.66%",
+        "height": "7.53%"
+      },
+      "textWithCues": "[Urgent shouting] RAPHAEL, NO!!!"
     }
   ],
   "page-21.jpg": [
@@ -4903,14 +5029,14 @@
         "class": "speech bubble",
         "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-21/page-21-crop-006-x910-y1446.jpg"
       },
-      "ocr_text": "LOOK, ROCK! POWER RANGER PIÑATAS!",
+      "ocr_text": "LOOK, ROCK! POWER RANGER PIÑATAS! HA!!!",
       "type": "SPEECH",
-      "speaker": "Bebop",
+      "speaker": "Rocksteady",
       "emotion": "Excited and mocking",
       "characterType": "MINOR",
       "side": "VILLAIN",
       "voiceDescription": "Raspy, high-energy, street-punk male voice with a thick New York accent",
-      "textWithCues": "[excited] [sarcastic] LOOK, ROCK! POWER RANGER PIÑATAS!",
+      "textWithCues": "[excited] [sarcastic] LOOK, ROCK! POWER RANGER PIÑATAS! HA!",
       "aiReasoning": "**Step 1: Locate & Classify**\nThe text \"LOOK, ROCK! POWER RANGER PIÑATAS!\" is in a speech bubble in the middle panel.\nThe bubble has a tail. It points towards the character Rocksteady (the Rhino).\nClassification: `SPEECH`.\n\n**Step 2: Analyze Context**\n*   **Speaker Identification:** The text addresses \"Rock\". \"Rock\" is a nickname for Rocksteady (the Rhino character visible in the panel). Therefore, the speaker is talking *to* Rocksteady. The character most likely to be fighting alongside Rocksteady and bantering with him is his partner, **Bebop** (the Warthog). Although Bebop is not fully visible in this specific panel (or is off-panel), the dialogue context confirms his identity. In the subsequent panel, Bebop and Rocksteady are shown standing together.\n*   **Side:** `VILLAIN`. They are attacking the Green Ranger.\n*   **Importance:** `MINOR` (Named secondary character/Henchman). While iconic, they serve as henchmen to the main villains (Shredder/Rita) relative to the \"Major\" category definition.\n*   **Voice Description:** Bebop typically has a raspy, African-American (or sometimes just general street-punk) accent, high-energy, goofy, and tough.\n*   **Emotion:** The character is making a joke about the Green Ranger flying through the air like a piñata. The tone is mocking, enthusiastic, and aggressive.\n*   **Visuals:** The text is in bold caps with exclamation points, indicating a loud volume/shout.\n\n**Step 3: Performance Cues**\n*   **Tone:** Mocking and excited.\n*   **Volume:** Shouting (due to combat context and exclamation marks).\n*   **Text:** \"LOOK, ROCK! POWER RANGER PIÑATAS!\" -> \"[Shouting/Mocking] Look, Rock! Power Ranger piñatas!\"\n\n**Conclusion for JSON:**\n*   Type: SPEECH\n*   Speaker: Bebop\n*   CharacterType: MINOR\n*   Side: VILLAIN\n*   Voice: Raspy, street-punk male voice, high energy.\n*   Emotion: Excited/Mocking.\n*   TextWithCues: \"[Excitedly mocking] Look, Rock! Power Ranger piñatas!\"",
       "style": {
         "left": "45.78%",
@@ -4923,6 +5049,33 @@
       "id": "page-21_b07",
       "box_2d": {
         "index": 6,
+        "x": 409.6161193847656,
+        "y": 2402.9814453125,
+        "width": 228.42745971679688,
+        "height": 194.64453125,
+        "confidence": 0.9077872633934021,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-21/page-21-crop-004-x409-y2402.jpg"
+      },
+      "ocr_text": "...COUGH... COUGH... COUGH...",
+      "type": "SPEECH",
+      "speaker": "Green Ranger",
+      "emotion": "Painful, winded",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "textWithCues": "[strained] [pained] ...Cough... cough... cough...",
+      "aiReasoning": "I see the text \"...COUGH... COUGH... COUGH...\" in a speech bubble with a tail pointing to the Green Ranger.\nThe location is the bottom-left panel where the Green Ranger is lying on the ground amidst dust/debris.\nThe speaker is the Green Ranger (identified in the unique characters list).\nHe is a HERO and a MAJOR character.\nContext: He has just been thrown violently by Rocksteady and slammed into the ground. He is recovering from the impact and inhaling dust.\nEmotion: Pain, winded, physical distress.\nPerformance Cues: The text is purely sounds of coughing. The delivery should be strained, weak, and sounding like someone who just had the wind knocked out of them.",
+      "style": {
+        "left": "20.60%",
+        "top": "78.61%",
+        "width": "11.49%",
+        "height": "6.37%"
+      }
+    },
+    {
+      "id": "page-21_b08",
+      "box_2d": {
+        "index": 7,
         "x": 80.87454986572266,
         "y": 2207.11767578125,
         "width": 360.84508514404297,
@@ -4944,35 +5097,7 @@
         "left": "4.07%",
         "top": "72.20%",
         "width": "18.15%",
-        "height": "6.69%"
-      }
-    },
-    {
-      "id": "page-21_b08",
-      "box_2d": {
-        "index": 7,
-        "x": 1264.0576171875,
-        "y": 2196.68701171875,
-        "width": 294.9683837890625,
-        "height": 175.165771484375,
-        "confidence": 0.7251174449920654,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-21/page-21-crop-010-x1264-y2196.jpg"
-      },
-      "ocr_text": "NAH. I THINK WE CAN HURT HIM WAY MORE.",
-      "type": "SPEECH",
-      "speaker": "Rocksteady",
-      "emotion": "Sadistic and menacing",
-      "characterType": "MAJOR",
-      "side": "VILLAIN",
-      "voiceDescription": "Gruff, deep, raspy male voice, thugs/henchman tone",
-      "textWithCues": "[Dismissively] Nah. [Sinisterly] I think we can hurt him WAY MORE.",
-      "aiReasoning": "The text is located in the bottom right panel.\nThe text is inside a speech bubble with a tail pointing to the character on the right.\nThe character on the right is a large rhino mutant in military gear. This is **Rocksteady**.\nRocksteady is a major villain in the TMNT franchise.\nThe context involves Rocksteady and Bebop standing over a defeated Green Ranger in a crater.\nThe previous dialogue (likely from Rocksteady to Bebop, calling him \"B\") questioned if they hurt him too quickly (\"Already?\").\nIn this bubble, Rocksteady dismisses that concern (\"Nah\") and suggests they can inflict more pain.\nHis tone should be cruel, sadistic, and menacing. He is a tough thug.",
-      "style": {
-        "left": "63.58%",
-        "top": "71.86%",
-        "width": "14.84%",
-        "height": "5.73%"
+        "height": "3.91%"
       }
     },
     {
@@ -5007,6 +5132,34 @@
       "id": "page-21_b10",
       "box_2d": {
         "index": 9,
+        "x": 1264.0576171875,
+        "y": 2196.68701171875,
+        "width": 294.9683837890625,
+        "height": 175.165771484375,
+        "confidence": 0.7251174449920654,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-21/page-21-crop-010-x1264-y2196.jpg"
+      },
+      "ocr_text": "NAH. I THINK WE CAN HURT HIM WAY MORE.",
+      "type": "SPEECH",
+      "speaker": "Rocksteady",
+      "emotion": "Sadistic and menacing",
+      "characterType": "MAJOR",
+      "side": "VILLAIN",
+      "voiceDescription": "Gruff, deep, raspy male voice, thugs/henchman tone",
+      "textWithCues": "[Dismissively] Nah. [Sinisterly] I think we can hurt him WAY MORE.",
+      "aiReasoning": "The text is located in the bottom right panel.\nThe text is inside a speech bubble with a tail pointing to the character on the right.\nThe character on the right is a large rhino mutant in military gear. This is **Rocksteady**.\nRocksteady is a major villain in the TMNT franchise.\nThe context involves Rocksteady and Bebop standing over a defeated Green Ranger in a crater.\nThe previous dialogue (likely from Rocksteady to Bebop, calling him \"B\") questioned if they hurt him too quickly (\"Already?\").\nIn this bubble, Rocksteady dismisses that concern (\"Nah\") and suggests they can inflict more pain.\nHis tone should be cruel, sadistic, and menacing. He is a tough thug.",
+      "style": {
+        "left": "63.58%",
+        "top": "71.86%",
+        "width": "14.84%",
+        "height": "5.73%"
+      }
+    },
+    {
+      "id": "page-21_b11",
+      "box_2d": {
+        "index": 10,
         "x": 1151.99072265625,
         "y": 2315.453857421875,
         "width": 237.7625732421875,
@@ -5032,7 +5185,7 @@
       }
     },
     {
-      "id": "page-21_b11",
+      "id": "page-21_b12",
       "box_2d": {
         "index": 11,
         "x": 1152.376953125,
@@ -5045,7 +5198,7 @@
       },
       "ocr_text": "IT'S MORPHIN--",
       "type": "SPEECH",
-      "speaker": "Rocksteady",
+      "speaker": "Bebop",
       "emotion": "Mocking and taunting",
       "characterType": "MAJOR",
       "side": "VILLAIN",
@@ -5056,33 +5209,6 @@
         "top": "75.74%",
         "width": "18.78%",
         "height": "6.73%"
-      }
-    },
-    {
-      "id": "page-21_b12",
-      "box_2d": {
-        "index": 11,
-        "x": 409.6161193847656,
-        "y": 2402.9814453125,
-        "width": 228.42745971679688,
-        "height": 194.64453125,
-        "confidence": 0.9077872633934021,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-21/page-21-crop-004-x409-y2402.jpg"
-      },
-      "ocr_text": "...COUGH... COUGH... COUGH...",
-      "type": "SPEECH",
-      "speaker": "Green Ranger",
-      "emotion": "Painful, winded",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "textWithCues": "[strained] [pained] ...Cough... cough... cough...",
-      "aiReasoning": "I see the text \"...COUGH... COUGH... COUGH...\" in a speech bubble with a tail pointing to the Green Ranger.\nThe location is the bottom-left panel where the Green Ranger is lying on the ground amidst dust/debris.\nThe speaker is the Green Ranger (identified in the unique characters list).\nHe is a HERO and a MAJOR character.\nContext: He has just been thrown violently by Rocksteady and slammed into the ground. He is recovering from the impact and inhaling dust.\nEmotion: Pain, winded, physical distress.\nPerformance Cues: The text is purely sounds of coughing. The delivery should be strained, weak, and sounding like someone who just had the wind knocked out of them.",
-      "style": {
-        "left": "20.60%",
-        "top": "78.61%",
-        "width": "11.49%",
-        "height": "6.37%"
       }
     }
   ],
@@ -5406,7 +5532,7 @@
       },
       "ocr_text": "I'M CHANGING THE PLAN.",
       "type": "SPEECH",
-      "speaker": "Rock Soldier",
+      "speaker": "Lord Zedd",
       "emotion": "Commanding",
       "characterType": "EXTRA",
       "side": "VILLAIN",
@@ -5434,7 +5560,7 @@
       },
       "ocr_text": "WHAT? BUT WE AGREED--",
       "type": "SPEECH",
-      "speaker": "Rock Soldier",
+      "speaker": "Shredder",
       "emotion": "Shocked and protesting",
       "characterType": "EXTRA",
       "side": "VILLAIN",
@@ -5452,61 +5578,6 @@
       "id": "page-23_b06",
       "box_2d": {
         "index": 5,
-        "x": 888.4970703125,
-        "y": 1054.265625,
-        "width": 511.439453125,
-        "height": 329.897216796875,
-        "confidence": 0.42176324129104614,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-23/page-23-crop-016-x888-y1054.jpg"
-      },
-      "ocr_text": "ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. IS THAT GONNA WORK?",
-      "type": "SPEECH",
-      "speaker": "Leonardo",
-      "emotion": "Urgent and commanding",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "voiceDescription": "Youthful but authoritative male voice, American accent, leader tone",
-      "textWithCues": "[urgent] [exhales sharply] ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. [questioning] IS THAT GONNA WORK?",
-      "aiReasoning": "I have located the text region. It corresponds to two connected speech bubbles in the middle right panel.\nThe text is: \"ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. IS THAT GONNA WORK?\"\nThe tail of the speech bubble points directly to the Turtle with the blue mask. This character is Leonardo.\nLeonardo is a `MAJOR` character and a `HERO`.\nContext: The group is fleeing (\"Run!\", \"We must go\"). Leonardo is coordinating an escape plan via communicator with Alpha while running.\nEmotion: Urgent, commanding, focused, slightly breathless due to physical exertion (running).\n\nCues:\n- \"ALPHA!\" needs to sound like he is hailing someone on a radio/comms.\n- The instruction is fast and decisive.\n- The question at the end is urgent, checking for confirmation.\n- He is running, so breathlessness is appropriate.",
-      "style": {
-        "left": "44.69%",
-        "top": "34.49%",
-        "width": "25.73%",
-        "height": "10.79%"
-      }
-    },
-    {
-      "id": "page-23_b07",
-      "box_2d": {
-        "index": 6,
-        "x": 1353.6099853515625,
-        "y": 1103.8909912109375,
-        "width": 227.329833984375,
-        "height": 142.513671875,
-        "confidence": 0.7377080321311951,
-        "class": "speech bubble",
-        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-23/page-23-crop-011-x1353-y1103.jpg"
-      },
-      "ocr_text": "NOT IF THEY CATCH US FIRST.",
-      "type": "SPEECH",
-      "speaker": "Leonardo",
-      "emotion": "Urgent, pragmatic, focused",
-      "characterType": "MAJOR",
-      "side": "HERO",
-      "textWithCues": "[strained] [urgent] NOT IF THEY CATCH US FIRST.",
-      "aiReasoning": "1.  **Locate Text:** The text \"NOT IF THEY CATCH US FIRST.\" is in a speech bubble in the middle-right panel (Panel 4).\n2.  **Identify Speaker:** The tail of the speech bubble points clearly to the Turtle wearing a blue mask. This is Leonardo.\n3.  **Check Classification:** Leonardo is a main character in TMNT. He is listed in the unique characters provided (implied by the group, explicitly listed in instructions).\n    *   **Speaker:** Leonardo\n    *   **Side:** HERO\n    *   **Importance:** MAJOR\n4.  **Analyze Context:** The group is fleeing (\"Run! ... We must go\"). Someone (likely Donatello off-screen or the Red Ranger via comms/Alpha) suggests teleporting once clear. Michelangelo asks if it will work. Leonardo, running alongside them, adds the pragmatic, urgent condition that they have to survive the escape first.\n5.  **Determine Performance:** Leonardo is running, so he should sound slightly breathless or physically exerted. His tone is urgent and focused on the immediate threat, typical of his leadership role (keeping the team grounded in reality). The text is standard (no bold, no jagged edges), indicating normal volume but high tension.",
-      "style": {
-        "left": "68.09%",
-        "top": "36.11%",
-        "width": "11.44%",
-        "height": "4.66%"
-      }
-    },
-    {
-      "id": "page-23_b08",
-      "box_2d": {
-        "index": 7,
         "x": 117.31198120117188,
         "y": 1765.2913818359375,
         "width": 280.6563415527344,
@@ -5532,9 +5603,9 @@
       }
     },
     {
-      "id": "page-23_b09",
+      "id": "page-23_b07",
       "box_2d": {
-        "index": 8,
+        "index": 6,
         "x": 335.2126159667969,
         "y": 1843.1871337890625,
         "width": 310.0979309082031,
@@ -5545,7 +5616,7 @@
       },
       "ocr_text": "Explanations later. Right now... we must go.",
       "type": "SPEECH",
-      "speaker": "Splinter",
+      "speaker": "Master Splinter",
       "emotion": "Urgent and authoritative",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -5559,9 +5630,9 @@
       }
     },
     {
-      "id": "page-23_b10",
+      "id": "page-23_b08",
       "box_2d": {
-        "index": 9,
+        "index": 7,
         "x": 636.6181640625,
         "y": 1684.300537109375,
         "width": 112.89801025390625,
@@ -5572,7 +5643,7 @@
       },
       "ocr_text": "RUN!",
       "type": "SPEECH",
-      "speaker": "Splinter",
+      "speaker": "Master Splinter",
       "emotion": "Urgent, commanding",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -5586,9 +5657,81 @@
       }
     },
     {
+      "id": "page-23_b09",
+      "box_2d": {
+        "index": 8,
+        "x": 888.4970703125,
+        "y": 1054.265625,
+        "width": 511.439453125,
+        "height": 329.897216796875,
+        "confidence": 0.42176324129104614,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-23/page-23-crop-016-x888-y1054.jpg"
+      },
+      "ocr_text": "ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. I",
+      "type": "SPEECH",
+      "speaker": "Red Ranger",
+      "emotion": "Urgent and commanding",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "voiceDescription": "Youthful but authoritative male voice, American accent, leader tone",
+      "textWithCues": "[urgent] [exhales sharply] ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. ",
+      "aiReasoning": "I have located the text region. It corresponds to two connected speech bubbles in the middle right panel.\nThe text is: \"ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. IS THAT GONNA WORK?\"\nThe tail of the speech bubble points directly to the Turtle with the blue mask. This character is Leonardo.\nLeonardo is a `MAJOR` character and a `HERO`.\nContext: The group is fleeing (\"Run!\", \"We must go\"). Leonardo is coordinating an escape plan via communicator with Alpha while running.\nEmotion: Urgent, commanding, focused, slightly breathless due to physical exertion (running).\n\nCues:\n- \"ALPHA!\" needs to sound like he is hailing someone on a radio/comms.\n- The instruction is fast and decisive.\n- The question at the end is urgent, checking for confirmation.\n- He is running, so breathlessness is appropriate.",
+      "style": {
+        "left": "44.69%",
+        "top": "34.49%",
+        "width": "15.81%",
+        "height": "5.25%"
+      }
+    },
+    {
+      "id": "page-23_b10",
+      "box_2d": {
+        "index": 9
+      },
+      "ocr_text": "IS THAT GONNA WORK?",
+      "type": "SPEECH",
+      "speaker": "Leonardo",
+      "emotion": "",
+      "textWithCues": "[questioning] IS THAT GONNA WORK?",
+      "style": {
+        "left": "59.56%",
+        "top": "38.40%",
+        "width": "9.40%",
+        "height": "3.82%"
+      }
+    },
+    {
       "id": "page-23_b11",
       "box_2d": {
         "index": 10,
+        "x": 1353.6099853515625,
+        "y": 1103.8909912109375,
+        "width": 227.329833984375,
+        "height": 142.513671875,
+        "confidence": 0.7377080321311951,
+        "class": "speech bubble",
+        "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-1/data/ocr-crops/page-23/page-23-crop-011-x1353-y1103.jpg"
+      },
+      "ocr_text": "NOT IF THEY CATCH US FIRST.",
+      "type": "SPEECH",
+      "speaker": "Red Ranger",
+      "emotion": "Urgent, pragmatic, focused",
+      "characterType": "MAJOR",
+      "side": "HERO",
+      "textWithCues": "[strained] [urgent] NOT IF THEY CATCH US FIRST.",
+      "aiReasoning": "1.  **Locate Text:** The text \"NOT IF THEY CATCH US FIRST.\" is in a speech bubble in the middle-right panel (Panel 4).\n2.  **Identify Speaker:** The tail of the speech bubble points clearly to the Turtle wearing a blue mask. This is Leonardo.\n3.  **Check Classification:** Leonardo is a main character in TMNT. He is listed in the unique characters provided (implied by the group, explicitly listed in instructions).\n    *   **Speaker:** Leonardo\n    *   **Side:** HERO\n    *   **Importance:** MAJOR\n4.  **Analyze Context:** The group is fleeing (\"Run! ... We must go\"). Someone (likely Donatello off-screen or the Red Ranger via comms/Alpha) suggests teleporting once clear. Michelangelo asks if it will work. Leonardo, running alongside them, adds the pragmatic, urgent condition that they have to survive the escape first.\n5.  **Determine Performance:** Leonardo is running, so he should sound slightly breathless or physically exerted. His tone is urgent and focused on the immediate threat, typical of his leadership role (keeping the team grounded in reality). The text is standard (no bold, no jagged edges), indicating normal volume but high tension.",
+      "style": {
+        "left": "68.09%",
+        "top": "36.11%",
+        "width": "11.44%",
+        "height": "4.66%"
+      }
+    },
+    {
+      "id": "page-23_b12",
+      "box_2d": {
+        "index": 11,
         "x": 174.29896545410156,
         "y": 2171.349365234375,
         "width": 215.3005828857422,
@@ -5599,7 +5742,7 @@
       },
       "ocr_text": "KEEP GOING, MY SONS.",
       "type": "SPEECH",
-      "speaker": "Splinter",
+      "speaker": "Master Splinter",
       "emotion": "determined and protective",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -5613,9 +5756,9 @@
       }
     },
     {
-      "id": "page-23_b12",
+      "id": "page-23_b13",
       "box_2d": {
-        "index": 11,
+        "index": 12,
         "x": 258.8614807128906,
         "y": 2276.91357421875,
         "width": 353.5389709472656,
@@ -5626,7 +5769,7 @@
       },
       "ocr_text": "NO ONE WILL CATCH YOU. I PROM--",
       "type": "SPEECH",
-      "speaker": "Splinter",
+      "speaker": "Master Splinter",
       "emotion": "Protective, determined, interrupted",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -5767,7 +5910,7 @@
       },
       "ocr_text": "MASTER!",
       "type": "SPEECH",
-      "speaker": "Red Ranger",
+      "speaker": "Leonardo",
       "emotion": "Devastated screaming",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -5795,17 +5938,17 @@
       },
       "ocr_text": "NO.",
       "type": "SPEECH",
-      "speaker": "Red Ranger",
+      "speaker": "Raphael",
       "emotion": "Shocked disbelief",
       "characterType": "MAJOR",
       "side": "HERO",
       "textWithCues": "[breathless] [appalled] No.",
       "aiReasoning": "I see the text \"NO.\" in a standard rounded speech bubble.\nThe bubble's tail points to the Red Ranger character standing in the background, between the screaming Turtle on the left and the shocked Turtle on the right.\nThe scene depicts a catastrophic event (explosion, \"world crashing down\"), and the characters are reacting with horror.\nThe speaker is the Red Ranger (Jason Lee Scott), who is a HERO and a MAJOR character.\nHis posture suggests he is stopping in his tracks or reeling back. The emotion is pure shock and denial. Unlike the \"MASTER!\" shout which implies volume, \"NO.\" is a simple, possibly breathless refusal to accept what just happened.\n\n**Classification:**\n*   Type: SPEECH\n*   Speaker: Red Ranger (New character, not in provided list)\n*   Side: HERO\n*   Importance: MAJOR\n*   Emotion: Shocked disbelief",
       "style": {
-        "left": "44.51%",
+        "left": "48.14%",
         "top": "91.48%",
-        "width": "9.95%",
-        "height": "5.02%"
+        "width": "6.32%",
+        "height": "3.07%"
       }
     },
     {
@@ -5822,7 +5965,7 @@
       },
       "ocr_text": "OH GOD.",
       "type": "SPEECH",
-      "speaker": "Raphael",
+      "speaker": "Green Ranger",
       "emotion": "Horrified, shocked, despairing",
       "characterType": "MAJOR",
       "side": "HERO",
@@ -5834,6 +5977,22 @@
         "top": "90.32%",
         "width": "8.55%",
         "height": "4.72%"
+      }
+    },
+    {
+      "id": "page-24_b08",
+      "box_2d": {
+        "index": 7
+      },
+      "ocr_text": "TO BE CONTINUED...",
+      "type": "CAPTION",
+      "speaker": "Narrator",
+      "emotion": "",
+      "style": {
+        "left": "73.92%",
+        "top": "90.56%",
+        "width": "23.00%",
+        "height": "6.34%"
       }
     }
   ],

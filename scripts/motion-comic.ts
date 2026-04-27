@@ -44,6 +44,7 @@ interface PagePlan {
   bubbleCount: number;
   audioDuration: number;
   videoDuration: number;
+  missingAudio: string[];
 }
 
 // ─── Arg parsing ────────────────────────────────────────────────────────────
@@ -168,10 +169,14 @@ function buildPlans(
 
     let totalAudio = 0;
     let present = 0;
+    const missingAudio: string[] = [];
 
     for (const b of dialogue) {
       const p = join(audioDir, `${b.id}.mp3`);
-      if (!fs.existsSync(p)) continue;
+      if (!fs.existsSync(p)) {
+        missingAudio.push(`${b.id}.mp3`);
+        continue;
+      }
       const dur = bubbleDuration(b.id, ts);
       if (dur === null) continue;
       totalAudio += dur;
@@ -188,6 +193,7 @@ function buildPlans(
       bubbleCount: dialogue.length,
       audioDuration,
       videoDuration: audioDuration + VIDEO_TAIL_S,
+      missingAudio,
     };
   });
 }
@@ -206,11 +212,32 @@ function printPlan(plans: PagePlan[], book: string, issue: string): void {
     const bc = String(p.bubbleCount).padEnd(7);
     const ad = `${p.audioDuration.toFixed(1)}s`.padEnd(14);
     const vd = `${p.videoDuration.toFixed(1)}s`;
-    console.log(`   ${pg}  ${bc}  ${ad}  ${vd}`);
+    const warn =
+      p.missingAudio.length > 0 ? `  ⚠️  ${p.missingAudio.length} missing` : "";
+    console.log(`   ${pg}  ${bc}  ${ad}  ${vd}${warn}`);
   }
 
   console.log(`   ───────────────────────────────────────────────`);
   console.log(`   Total:          ~${mins}m ${secs}s\n`);
+
+  // Missing audio detail
+  const pagesWithMissing = plans.filter((p) => p.missingAudio.length > 0);
+  if (pagesWithMissing.length > 0) {
+    const totalMissing = pagesWithMissing.reduce(
+      (n, p) => n + p.missingAudio.length,
+      0,
+    );
+    console.log(
+      `⚠️  Missing audio files (${totalMissing} file(s) across ${pagesWithMissing.length} page(s)):\n`,
+    );
+    for (const p of pagesWithMissing) {
+      console.log(`   Page ${zeroPad(p.pageNum)}:`);
+      for (const f of p.missingAudio) {
+        console.log(`      • ${f}`);
+      }
+    }
+    console.log();
+  }
 }
 
 // ─── Prompt ──────────────────────────────────────────────────────────────────
