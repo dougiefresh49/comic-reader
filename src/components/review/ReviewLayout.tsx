@@ -52,17 +52,23 @@ export function ReviewLayout({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawMode, setDrawMode] = useState(false);
   const [deleteToast, setDeleteToast] = useState<string | null>(null);
-  const deleteToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const speakerInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     edits,
+    pageOrder,
     applyEdit,
     undoLast,
     canUndo,
     clearAll,
     redoSet,
     toggleRedo,
+    setPageOrder,
+    getPageOrder,
     loaded,
     pendingCount,
   } = useReviewEdits(bookId, issueId);
@@ -72,36 +78,25 @@ export function ReviewLayout({
     [allBubbles, currentPage],
   );
 
-  const localBubbles: LocalBubble[] = useMemo(
-    () => mergeEdits(originalBubbles, edits.filter((e) => {
-      // Only include edits relevant to this page (all updates/deletes to any bubble, adds with matching pageIndex)
-      if (e.action === "add") return e.pageIndex === currentPage;
-      return true;
-    })),
-    [originalBubbles, edits, currentPage],
-  );
+  const localBubbles: LocalBubble[] = useMemo(() => {
+    const merged = mergeEdits(
+      originalBubbles,
+      edits.filter((e) => {
+        if (e.action === "add") return e.pageIndex === currentPage;
+        return true;
+      }),
+    );
+    const order = getPageOrder(currentPage);
+    if (!order) return merged;
+    const idToIndex = new Map(order.map((id, i) => [id, i]));
+    return [...merged].sort((a, b) => {
+      const ai = idToIndex.get(a.id) ?? Infinity;
+      const bi = idToIndex.get(b.id) ?? Infinity;
+      return ai - bi;
+    });
+  }, [originalBubbles, edits, currentPage, getPageOrder]);
 
   const selectedBubble = localBubbles.find((b) => b.id === selectedId) ?? null;
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      if (e.key === "Escape") {
-        if (drawMode) setDrawMode(false);
-        else setSelectedId(null);
-      }
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedId) handleDelete(selectedId);
-      }
-      if (e.key === "ArrowLeft") navigatePage(-1);
-      if (e.key === "ArrowRight") navigatePage(1);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawMode, selectedId, currentPage, issueData.pageCount]);
 
   const navigatePage = useCallback(
     (delta: number) => {
@@ -114,9 +109,75 @@ export function ReviewLayout({
     [issueData.pageCount],
   );
 
+  const handleAdvance = useCallback(() => {
+    const activeBubbles = localBubbles.filter((b) => b._status !== "deleted");
+    if (activeBubbles.length === 0) return;
+    const currentIndex = activeBubbles.findIndex((b) => b.id === selectedId);
+    const nextIndex =
+      currentIndex >= activeBubbles.length - 1 ? 0 : currentIndex + 1;
+    setSelectedId(activeBubbles[nextIndex]!.id);
+  }, [localBubbles, selectedId]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const inFormField =
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement;
+
+      if (e.key === "Escape") {
+        if (drawMode) setDrawMode(false);
+        else setSelectedId(null);
+        return;
+      }
+
+      if (inFormField) return;
+
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedId) handleDelete(selectedId);
+      }
+      if (e.key === "ArrowLeft") navigatePage(-1);
+      if (e.key === "ArrowRight") navigatePage(1);
+      if (e.key === "a") {
+        setDrawMode((v) => !v);
+      }
+      if (e.key === "Enter" && selectedId) {
+        speakerInputRef.current?.focus();
+        speakerInputRef.current?.select();
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const activeBubbles = localBubbles.filter(
+          (b) => b._status !== "deleted",
+        );
+        if (activeBubbles.length === 0) return;
+        const currentIndex = activeBubbles.findIndex(
+          (b) => b.id === selectedId,
+        );
+        const nextIndex = e.shiftKey
+          ? currentIndex <= 0
+            ? activeBubbles.length - 1
+            : currentIndex - 1
+          : currentIndex >= activeBubbles.length - 1
+            ? 0
+            : currentIndex + 1;
+        setSelectedId(activeBubbles[nextIndex]!.id);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawMode, selectedId, currentPage, issueData.pageCount, localBubbles]);
+
   const handleBubbleChange = useCallback(
     (id: string, changes: EditChanges) => {
-      applyEdit({ bubbleId: id, action: "update", changes, timestamp: Date.now() });
+      applyEdit({
+        bubbleId: id,
+        action: "update",
+        changes,
+        timestamp: Date.now(),
+      });
     },
     [applyEdit],
   );
@@ -135,11 +196,20 @@ export function ReviewLayout({
 
   const handleDelete = useCallback(
     (id: string) => {
-      applyEdit({ bubbleId: id, action: "delete", changes: {}, timestamp: Date.now() });
+      applyEdit({
+        bubbleId: id,
+        action: "delete",
+        changes: {},
+        timestamp: Date.now(),
+      });
       setSelectedId(null);
       setDeleteToast(id);
-      if (deleteToastTimerRef.current) clearTimeout(deleteToastTimerRef.current);
-      deleteToastTimerRef.current = setTimeout(() => setDeleteToast(null), 5000);
+      if (deleteToastTimerRef.current)
+        clearTimeout(deleteToastTimerRef.current);
+      deleteToastTimerRef.current = setTimeout(
+        () => setDeleteToast(null),
+        5000,
+      );
     },
     [applyEdit],
   );
@@ -150,7 +220,13 @@ export function ReviewLayout({
       applyEdit({
         bubbleId: tempId,
         action: "add",
-        changes: { bounds, type: "SPEECH", speaker: null, emotion: "", ocr_text: "" },
+        changes: {
+          bounds,
+          type: "SPEECH",
+          speaker: null,
+          emotion: "",
+          ocr_text: "",
+        },
         pageIndex: currentPage,
         timestamp: Date.now(),
       });
@@ -160,11 +236,26 @@ export function ReviewLayout({
     [applyEdit, currentPage],
   );
 
+  const handleSetPageOrder = useCallback(
+    (ids: string[]) => {
+      const originalIds = originalBubbles.map((b) => b.id);
+      const isOriginal =
+        ids.length === originalIds.length &&
+        ids.every((id, i) => id === originalIds[i]);
+      setPageOrder(currentPage, isOriginal ? null : ids);
+    },
+    [originalBubbles, currentPage, setPageOrder],
+  );
+
+  const totalPendingCount = pendingCount + Object.keys(pageOrder).length;
+
   const handleExport = useCallback(() => {
-    const json = buildFixesJson(bookId, issueId, edits);
+    const json = buildFixesJson(bookId, issueId, edits, pageOrder, allBubbles);
     const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -1);
     const filename = `fixes-${bookId}-${issueId}-${ts}.json`;
-    const blob = new Blob([JSON.stringify(json, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(json, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -177,7 +268,7 @@ export function ReviewLayout({
     );
     if (keep === false) return;
     clearAll();
-  }, [bookId, issueId, edits, clearAll]);
+  }, [bookId, issueId, edits, pageOrder, allBubbles, clearAll]);
 
   if (!loaded) {
     return (
@@ -205,13 +296,13 @@ export function ReviewLayout({
         <div className="flex items-center gap-2">
           <button
             onClick={handleExport}
-            disabled={pendingCount === 0}
+            disabled={totalPendingCount === 0}
             className="flex items-center gap-1.5 rounded bg-cyan-700 px-3 py-1 text-xs font-semibold text-white hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Export Fixes
-            {pendingCount > 0 && (
+            {totalPendingCount > 0 && (
               <span className="rounded-full bg-cyan-500 px-1.5 py-0.5 text-[10px]">
-                {pendingCount}
+                {totalPendingCount}
               </span>
             )}
           </button>
@@ -221,7 +312,7 @@ export function ReviewLayout({
             <summary className="cursor-pointer list-none rounded p-1 text-neutral-400 hover:bg-neutral-800">
               ⋯
             </summary>
-            <div className="absolute right-0 top-full z-50 mt-1 w-40 rounded border border-neutral-700 bg-neutral-900 py-1 shadow-lg">
+            <div className="absolute top-full right-0 z-50 mt-1 w-40 rounded border border-neutral-700 bg-neutral-900 py-1 shadow-lg">
               <button
                 onClick={() => {
                   if (window.confirm("Clear all saved edits?")) clearAll();
@@ -283,7 +374,10 @@ export function ReviewLayout({
             characters={characters}
             redoSet={redoSet}
             selectedId={selectedId}
+            speakerRef={speakerInputRef}
             onSelect={setSelectedId}
+            onAdvance={handleAdvance}
+            onSetPageOrder={handleSetPageOrder}
             onChange={handleBubbleChange}
             onMarkRedo={toggleRedo}
             onDelete={handleDelete}

@@ -49,23 +49,16 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-function idbGet(
-  db: IDBDatabase,
-  key: string,
-): Promise<ReviewEdit[] | undefined> {
+function idbGet<T>(db: IDBDatabase, key: string): Promise<T | undefined> {
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const req = tx.objectStore(STORE_NAME).get(key);
-    req.onsuccess = () => resolve(req.result as ReviewEdit[] | undefined);
+    req.onsuccess = () => resolve(req.result as T | undefined);
     req.onerror = () => resolve(undefined);
   });
 }
 
-function idbPut(
-  db: IDBDatabase,
-  key: string,
-  value: ReviewEdit[],
-): Promise<void> {
+function idbPut<T>(db: IDBDatabase, key: string, value: T): Promise<void> {
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     tx.objectStore(STORE_NAME).put(value, key);
@@ -131,7 +124,13 @@ export function mergeEdits(
 type FixEntry =
   | { bubbleId: string; action: "update"; changes: EditChanges }
   | { bubbleId: string; action: "delete" }
-  | { bubbleId: string; action: "add"; pageIndex: number; data: EditChanges };
+  | { bubbleId: string; action: "add"; pageIndex: number; data: EditChanges }
+  | {
+      bubbleId: "__page-reorder__";
+      action: "reorder";
+      pageIndex: number;
+      orderedIds: string[];
+    };
 
 interface FixesJson {
   bookId: string;
@@ -143,6 +142,8 @@ export function buildFixesJson(
   bookId: string,
   issueId: string,
   edits: ReviewEdit[],
+  pageOrder: Record<number, string[]> = {},
+  allBubbles: Record<string, Bubble[]> = {},
 ): FixesJson {
   const byBubble = new Map<string, ReviewEdit[]>();
   for (const edit of edits) {
@@ -190,30 +191,55 @@ export function buildFixesJson(
     }
   }
 
+  // Emit reorder entries for pages whose order differs from original
+  for (const [pageNumStr, orderedIds] of Object.entries(pageOrder)) {
+    const pageNum = Number(pageNumStr);
+    const key = `page-${String(pageNum).padStart(2, "0")}.jpg`;
+    const originalBubbles = allBubbles[key] ?? [];
+    const originalIds = originalBubbles.map((b) => b.id);
+    const isDifferent =
+      orderedIds.length !== originalIds.length ||
+      orderedIds.some((id, i) => id !== originalIds[i]);
+    if (isDifferent) {
+      fixes.push({
+        bubbleId: "__page-reorder__",
+        action: "reorder",
+        pageIndex: pageNum,
+        orderedIds,
+      });
+    }
+  }
+
   return { bookId, issueId, fixes };
 }
 
 export function useReviewEdits(bookId: string, issueId: string) {
   const [edits, setEdits] = useState<ReviewEdit[]>([]);
+  const [pageOrder, setPageOrderState] = useState<Record<number, string[]>>({});
   const [redoSet, setRedoSet] = useState<Set<string>>(new Set());
   const [canUndo, setCanUndo] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const prevEditsRef = useRef<ReviewEdit[] | null>(null);
   const dbRef = useRef<IDBDatabase | null>(null);
   const storeKey = `review-edits-${bookId}-${issueId}`;
+  const pageOrderKey = `review-page-order-${bookId}-${issueId}`;
 
   useEffect(() => {
     openDB()
       .then((db) => {
         dbRef.current = db;
-        return idbGet(db, storeKey);
+        return Promise.all([
+          idbGet<ReviewEdit[]>(db, storeKey),
+          idbGet<Record<number, string[]>>(db, pageOrderKey),
+        ]);
       })
-      .then((saved) => {
-        if (saved) setEdits(saved);
+      .then(([savedEdits, savedPageOrder]) => {
+        if (savedEdits) setEdits(savedEdits);
+        if (savedPageOrder) setPageOrderState(savedPageOrder);
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
-  }, [storeKey]);
+  }, [storeKey, pageOrderKey]);
 
   const persist = useCallback(
     (newEdits: ReviewEdit[]) => {
@@ -249,9 +275,12 @@ export function useReviewEdits(bookId: string, issueId: string) {
     prevEditsRef.current = null;
     setEdits([]);
     persist([]);
+    setPageOrderState({});
+    const db = dbRef.current;
+    if (db) void idbPut(db, pageOrderKey, {});
     setRedoSet(new Set());
     setCanUndo(false);
-  }, [persist]);
+  }, [persist, pageOrderKey]);
 
   const toggleRedo = useCallback((bubbleId: string) => {
     setRedoSet((prev) => {
@@ -261,6 +290,28 @@ export function useReviewEdits(bookId: string, issueId: string) {
       return next;
     });
   }, []);
+
+  const setPageOrder = useCallback(
+    (pageNum: number, ids: string[] | null) => {
+      setPageOrderState((prev) => {
+        const next = { ...prev };
+        if (ids === null) {
+          delete next[pageNum];
+        } else {
+          next[pageNum] = ids;
+        }
+        const db = dbRef.current;
+        if (db) void idbPut(db, pageOrderKey, next);
+        return next;
+      });
+    },
+    [pageOrderKey],
+  );
+
+  const getPageOrder = useCallback(
+    (pageNum: number): string[] | null => pageOrder[pageNum] ?? null,
+    [pageOrder],
+  );
 
   const pendingCount = useMemo(() => {
     const byBubble = new Map<string, ReviewEdit[]>();
@@ -281,12 +332,15 @@ export function useReviewEdits(bookId: string, issueId: string) {
 
   return {
     edits,
+    pageOrder,
     applyEdit,
     undoLast,
     canUndo,
     clearAll,
     redoSet,
     toggleRedo,
+    setPageOrder,
+    getPageOrder,
     loaded,
     pendingCount,
   };

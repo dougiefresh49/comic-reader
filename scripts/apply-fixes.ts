@@ -67,7 +67,13 @@ type FixChanges = Partial<
 type FixEntry =
   | { bubbleId: string; action: "update"; changes: FixChanges }
   | { bubbleId: string; action: "delete" }
-  | { bubbleId: string; action: "add"; pageIndex: number; data: FixChanges };
+  | { bubbleId: string; action: "add"; pageIndex: number; data: FixChanges }
+  | {
+      bubbleId: "__page-reorder__";
+      action: "reorder";
+      pageIndex: number;
+      orderedIds: string[];
+    };
 
 interface FixesJson {
   bookId: string;
@@ -140,6 +146,21 @@ function applyFix(cache: BubblesCache, fix: FixEntry): void {
       }
     }
     console.warn(`  [update] ${fix.bubbleId} not found — skipped`);
+    return;
+  }
+
+  if (fix.action === "reorder") {
+    const key = pageKeyFromIndex(fix.pageIndex);
+    const original = cache[key] ?? [];
+    const idToIndex = new Map(fix.orderedIds.map((id, i) => [id, i]));
+    cache[key] = [...original].sort((a, b) => {
+      const ai = idToIndex.get(a.id) ?? Infinity;
+      const bi = idToIndex.get(b.id) ?? Infinity;
+      return ai - bi;
+    });
+    console.log(
+      `  [reorder] page ${fix.pageIndex}: ${fix.orderedIds.length} bubble(s) reordered`,
+    );
     return;
   }
 
