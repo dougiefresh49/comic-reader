@@ -5,9 +5,7 @@ let _client: SupabaseClient | undefined;
 function getClient(): SupabaseClient {
   _client ??= createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    // Supabase-Vercel integration uses ANON_KEY; local .env uses PUBLISHABLE_KEY
-    (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
   );
   return _client;
 }
