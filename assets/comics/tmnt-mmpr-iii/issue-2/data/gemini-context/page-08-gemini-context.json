@@ -1,0 +1,218 @@
+[
+  {
+    "id": "page-08_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 172.23582458496094,
+      "y": 2001.1602783203125,
+      "width": 251.7932891845703,
+      "height": 151.1998291015625,
+      "confidence": 0.9472026824951172,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-001-x172-y2001.jpg"
+    },
+    "ocr_text": "THEN HE'S NOT HAVING A GOOD TIME.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "serious, grim",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Gruff, tough, deep male voice with a thick New York/Brooklyn accent",
+    "textWithCues": "[Grimly, correcting the previous speaker] Then he's *not* having a good time.",
+    "aiReasoning": "The text \"THEN HE'S NOT HAVING A GOOD TIME.\" is located in a speech bubble in the third tier of the page.\nThe bubble is part of a chain of dialogue originating from Raphael (the red-masked turtle).\nRaphael is reacting to another character stating that Michelangelo has been \"quiet,\" which contradicts the earlier assumption that he was \"having a good time.\"\nRaphael is a Major Hero character. His voice is typically gruff, with a Brooklyn/New York accent.\nThe emotion is serious and grim, correcting a misconception about his brother's state of mind."
+  },
+  {
+    "id": "page-08_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1041.993408203125,
+      "y": 2512.3232421875,
+      "width": 423.801513671875,
+      "height": 131.85400390625,
+      "confidence": 0.9428005814552307,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-002-x1041-y2512.jpg"
+    },
+    "ocr_text": "\"...DON'T LET HIM OUT UNTIL HE MAKES A BAD PUN OR SOMETHING.\"",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Rough, gritty, Brooklyn accent, deep and tough male voice",
+    "textWithCues": "[Voice-over, gruff and authoritative] ...don't let him out until he makes a bad pun or something.",
+    "aiReasoning": "The text region is a rectangular caption box with the text: \"...DON'T LET HIM OUT UNTIL HE MAKES A BAD PUN OR SOMETHING.\"\nThis box is visually distinct as a narrative caption, but contextually, it is a direct continuation of Raphael's speech from the panel immediately above it. In the panel above, Raphael says, \"DO ME A FAVOR...\" with a speech bubble tail. The sentence continues into this caption box over the final image of Michelangelo fighting.\nTherefore:\n- **Type:** NARRATION (visually), but acts as a voice-over.\n- **Speaker:** Raphael (matches the red mask and the sentence flow).\n- **Character Type:** MAJOR.\n- **Side:** HERO.\n- **Emotion:** Serious, protective, gruff. He is giving a warning/instruction to the other characters about his brother's mental state. He isn't joking; he truly believes a quiet Mikey is dangerous, so the return of humor is the signal that he is safe.\n- **Cues:** Since it's a voice-over completing a sentence, there should be a slight pause at the start. The tone should be Raphael's signature rough, Brooklyn-esque seriousness."
+  },
+  {
+    "id": "page-08_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 427.21392822265625,
+      "y": 1302.99365234375,
+      "width": 291.6131591796875,
+      "height": 133.6014404296875,
+      "confidence": 0.936946451663971,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-003-x427-y1302.jpg"
+    },
+    "ocr_text": "AT LEAST HE'S HAVING A GOOD TIME.",
+    "type": "SPEECH",
+    "speaker": "Zack",
+    "emotion": "optimistic observation",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, American accent, smooth and confident tone",
+    "textWithCues": "[Optimistically] At least he's having a good time.",
+    "aiReasoning": "I see the text \"AT LEAST HE'S HAVING A GOOD TIME.\" in a standard smooth speech bubble.\nThe tail points to the character on the left, an African American male in a purple shirt. Based on the \"Billy's archive\" reference and the presence of TMNT characters, this is a Power Rangers crossover. The character is Zack Taylor (Black Ranger).\nHe is not in the provided list of unique characters (Raphael, Narrator), so I will create the name \"Zack\".\nHe is a Hero and a Major character (Ranger).\nHis expression is observing a screen, trying to find a positive aspect of the situation (Mikey fighting monsters). The tone is reassuring or optimistic."
+  },
+  {
+    "id": "page-08_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 585.5065307617188,
+      "y": 2181.4951171875,
+      "width": 368.8145751953125,
+      "height": 115.09814453125,
+      "confidence": 0.9226435422897339,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-004-x585-y2181.jpg"
+    },
+    "ocr_text": "DO ME A FAVOR...",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Serious and concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Serious, grave tone] Do me a favor...",
+    "aiReasoning": "I have located the text \"DO ME A FAVOR...\" in the third panel of the comic page.\n1.  **Type:** It is in a white bubble with a tail pointing to a character, so it is `SPEECH`.\n2.  **Speaker:** The tail points to the Ninja Turtle with the red mask. This is Raphael. The user provided \"Raphael\" in the unique characters list.\n3.  **Context:** Raphael is reacting to the news that Michelangelo (Mikey) is being \"quiet\" while fighting in a pocket dimension. Raphael knows his brother well and states that a quiet Mikey is scary/bad news. He is giving a serious instruction to the human characters (likely the Power Rangers team).\n4.  **Emotion:** Raphael's face is shadowed and serious. He is not making a joke; he is genuinely concerned about his brother's mental state. The tone is grave and authoritative.\n5.  **Cues:** The ellipsis indicates a pause or a lead-in to his specific instruction in the next panel. The delivery should be low, serious, and perhaps a bit ominous.\n\nJSON Construction:\n- type: SPEECH\n- speaker: Raphael\n- characterType: MAJOR\n- side: HERO\n- emotion: Serious, concerned\n- textWithCues: \"[Serious, grave tone] Do me a favor...\""
+  },
+  {
+    "id": "page-08_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 284.602294921875,
+      "y": 2149.759521484375,
+      "width": 299.65106201171875,
+      "height": 204.756103515625,
+      "confidence": 0.9216393828392029,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-005-x284-y2149.jpg"
+    },
+    "ocr_text": "THE ONLY THING SCARIER THAN AN ANGRY MIKEY IS A QUIET ONE.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Serious and foreboding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Gruff, tough male voice with a thick Brooklyn accent",
+    "textWithCues": "[Gravely] The only thing scarier than an angry Mikey is a quiet one.",
+    "aiReasoning": "The user wants me to identify the voice acting parameters for a specific speech bubble on the page.\n**Text:** \"THE ONLY THING SCARIER THAN AN ANGRY MIKEY IS A QUIET ONE.\"\n**Location:** Bottom left area of the page.\n**Type:** This is dialogue in a speech bubble. Type is `SPEECH`.\n**Speaker:** The bubble has a tail pointing towards the panel on the right, specifically to the character **Raphael** (identified by the red mask and sais, and listed in the unique characters).\n**Context:** Raphael is commenting on his brother Mikey's behavior in the pocket dimension. Mikey is fighting seriously and silently, which Raphael notes is unusual and indicates he's not \"having a good time.\" Raphael is warning the others (Zack and the female character) that a quiet Mikey is dangerous.\n**Side:** `HERO` (Teenage Mutant Ninja Turtle).\n**Importance:** `MAJOR`.\n**Voice Description:** Raphael typically has a gruff, tough, street-smart New York/Brooklyn accent. Since he is a `MAJOR` character, I don't strictly need a description per the prompt's \"If MINOR or EXTRA\" rule, but providing a baseline helps.\n**Emotion:** The tone is serious, knowledgeable, and foreboding. He is stating a fact about his brother's nature to warn the others. He isn't shouting, but speaking with weight.\n**Cues:** The delivery should be grave or serious. No stuttering or shouting is indicated by the font."
+  },
+  {
+    "id": "page-08_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1503.896240234375,
+      "y": 1666.1201171875,
+      "width": 214.4251708984375,
+      "height": 149.31201171875,
+      "confidence": 0.882182776927948,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-006-x1503-y1666.jpg"
+    },
+    "ocr_text": "HE CRACKING ANY BAD JOKES?",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Skeptical and inquisitive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Rough, gritty male voice with a thick Brooklyn accent. Tough, cynical, and deep.",
+    "textWithCues": "[Gruff, skeptical tone] He cracking any bad jokes?",
+    "aiReasoning": "I have located the text \"HE CRACKING ANY BAD JOKES?\" in the middle panel of the page.\nThe text is inside a speech bubble with a tail pointing to the Teenage Mutant Ninja Turtle with the red bandana.\nBased on the provided unique character list and general knowledge, this character is **Raphael**.\nRaphael is a **HERO** and a **MAJOR** character.\nHe is standing with his arms crossed, leaning back against a wall. His expression is serious and calm.\nThe context is that another character (Zack) suggested Mikey is \"having a good time\" fighting. Raphael is skeptical and uses Mikey's lack of humor as a gauge for his true mental state. Therefore, his tone is skeptical, checking, and gruff.\nThe text is a question."
+  },
+  {
+    "id": "page-08_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1347.2847900390625,
+      "y": 1793.3873291015625,
+      "width": 352.5721435546875,
+      "height": 131.7169189453125,
+      "confidence": 0.8711284399032593,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-007-x1347-y1793.jpg"
+    },
+    "ocr_text": "UM...NO. HE'S BEEN KINDA QUIET ACTUALLY.",
+    "type": "SPEECH",
+    "speaker": "Zack",
+    "emotion": "concerned and hesitant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Hesitantly looking at the screen] Um... No. [Concerned] He's been kinda quiet actually.",
+    "aiReasoning": "The text region is a speech bubble in the middle panel.\nThe text is: \"UM...NO. HE'S BEEN KINDA QUIET ACTUALLY.\"\nThe tail of the speech bubble points to the character on the left, a young African-American man in a purple shirt.\nBased on the provided list of unique characters (\"Zack\"), and knowledge that the Black Ranger's name is Zack, the speaker is **Zack**.\nZack is a Power Ranger, so he is a **HERO** and a **MAJOR** character.\nThe context is Raphael asking if Mikey is making jokes. Zack checks the monitor/status and replies hesitantly because the answer is negative and worrying.\nEmotion: Concerned, hesitant, serious.\nCues: Start with a hesitation for the \"Um...\", then a serious/concerned delivery for the rest."
+  },
+  {
+    "id": "page-08_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 90.91847229003906,
+      "y": 898.6862182617188,
+      "width": 271.2161102294922,
+      "height": 113.85601806640625,
+      "confidence": 0.831697404384613,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-008-x90-y898.jpg"
+    },
+    "ocr_text": "\"AN HOUR. MAYBE TWO.",
+    "type": "SPEECH",
+    "speaker": "Kimberly",
+    "emotion": "calm",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young female voice, American accent, calm and conversational",
+    "textWithCues": "[Matter-of-factly] An hour. Maybe two."
+  },
+  {
+    "id": "page-08_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 805.7833862304688,
+      "y": 1124.876220703125,
+      "width": 635.1275024414062,
+      "height": 138.3094482421875,
+      "confidence": 0.7706657648086548,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-009-x805-y1124.jpg"
+    },
+    "ocr_text": "\"I'VE LITERALLY THROWN EVERY BAD GUY IN BILLY'S ARCHIVE AT HIM AND NOTHING'S SLOWED HIM DOWN.\"",
+    "type": "SPEECH",
+    "speaker": "Kimberly",
+    "emotion": "serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young female voice, clear American accent, serious and slightly concerned tone",
+    "textWithCues": "[Serious] I've literally thrown every bad guy in Billy's archive at him and nothing's slowed him down.",
+    "aiReasoning": "The user wants me to analyze a specific text box in the provided comic page.\n\n**1. Locate & Classify:**\n*   **Target Text:** \"I'VE LITERALLY THROWN EVERY BAD GUY IN BILLY'S ARCHIVE AT HIM AND NOTHING'S SLOWED HIM DOWN.\"\n*   **Visual location:** It is inside a rectangular box with a pinkish outline, floating over the first panel (the fight scene).\n*   **Classification:** While visually it is a box (often associated with Narration/Captions), the content is clearly dialogue spoken by a character in the scene (just off-panel/voice-over). The color coding of the box borders (Gold for Zack, Pink for Kimberly) links this specific box to the character Kimberly, who speaks in the next panel with a standard speech bubble. Therefore, semantically, this is **SPEECH**.\n\n**2. Analyze Context:**\n*   **Speaker:** The box has a pink border. In the panel immediately below, the character **Kimberly** (Pink Ranger) is shown speaking, and her speech bubble has the same style. The previous caption (\"An hour. Maybe two.\") also has a pink border and a Pterodactyl coin icon (Kimberly's symbol). Thus, the speaker is **Kimberly**.\n*   **Side:** She is a Power Ranger, so **HERO**.\n*   **Importance:** She is a named main character, so **MAJOR**.\n*   **Voice Description:** Young female voice (teenager/young adult), American accent.\n*   **Emotion/Tone:** Kimberly is monitoring a combat simulation. Her tone is serious and observant. She is reporting on the situation. The text \"literally thrown every bad guy... nothing's slowed him down\" suggests she is impressed by the intensity but also concerned because she knows this is fueled by anger (referenced later as \"Angry Mikey\").\n\n**3. Performance Cues:**\n*   **Volume:** The text is standard size, not bolded or jagged. Normal volume.\n*   **Tone:** The statement is factual but carries weight. She is explaining the severity of Mikey's rampage. A tag like `[Serious]` or `[Concerned]` is appropriate.\n*   **Text Processing:** Convert from all-caps to sentence case for the script.\n\n**Conclusion:**\nType: SPEECH\nSpeaker: Kimberly\nEmotion: Serious/Concerned\nCues: [Serious]"
+  },
+  {
+    "id": "page-08_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 134.60494995117188,
+      "y": 756.2374877929688,
+      "width": 261.0353088378906,
+      "height": 125.64923095703125,
+      "confidence": 0.7352724075317383,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-08/page-08-crop-010-x134-y756.jpg"
+    },
+    "ocr_text": "\"HOW LONG'S HE BEEN IN THERE?\"",
+    "type": "SPEECH",
+    "speaker": "Zack",
+    "emotion": "inquisitive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Curiously] How long's he been in there?",
+    "aiReasoning": "The text region is a yellow rectangular box with a Mastodon coin icon on the left. The text inside is in quotation marks: \"HOW LONG'S HE BEEN IN THERE?\".\n1.  **Type:** Although it is a box, the quotation marks and the context of the next panel (where characters are having a conversation) indicate this is spoken dialogue occurring off-panel or voice-over. Therefore, classification is `SPEECH`.\n2.  **Speaker:** The Mastodon coin is the symbol of the Black Power Ranger. In the panel immediately below, we see a young Black man (Zack Taylor) and a young woman (Kimberly Hart) watching a screen. This confirms the speaker is Zack. The provided list of unique characters includes \"Zack\".\n3.  **Side:** Hero (Power Ranger).\n4.  **Importance:** MAJOR.\n5.  **Context:** Zack is watching Michelangelo fight in a pocket dimension on a monitor. He is asking Kimberly how long the fight has been going on.\n6.  **Tone/Emotion:** Inquisitive, conversational. He is asking a simple question.\n7.  **Cues:** The text is a question. He is speaking normally to someone next to him. I will add a cue for the inquisitive tone."
+  }
+]

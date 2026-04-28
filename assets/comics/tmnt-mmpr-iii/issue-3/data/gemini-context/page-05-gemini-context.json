@@ -1,0 +1,193 @@
+[
+  {
+    "id": "page-05_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 113,
+      "y": 99,
+      "width": 293,
+      "height": 191,
+      "confidence": 0.9445199966430664,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-001-x113-y99.jpg"
+    },
+    "ocr_text": "TRINI, I JUST HAD A PARTICULARLY TERRIFYING REVELATION.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "worried",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Worried] Trini, I just had a particularly terrifying revelation.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top left panel. It's a `SPEECH` type.\n2.  **Analyze Context:** The tail points downwards out of the panel. The next bubble is from the Yellow Ranger (Trini), addressing \"Donnie\". Donatello is seen later on the page having this ongoing conversation. Therefore, the speaker is Donatello. He is a `HERO` and a `MAJOR` character. His emotion here is worry or alarm based on the phrase \"terrifying revelation\".\n3.  **Performance Cues:** The text is normal, but conveys a sense of sudden, worried realization. A `[Worried]` cue is appropriate."
+  },
+  {
+    "id": "page-05_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 129,
+      "y": 1313,
+      "width": 345,
+      "height": 233,
+      "confidence": 0.9380879998207092,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-002-x129-y1313.jpg"
+    },
+    "ocr_text": "SO, IF THEY FOUND A WAY TO TAP INTO ANY POWER COIN OR THE MORPHIN GRID DIRECTLY...",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "analytical, concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Analytical, thinking aloud while fighting] So, if they found a way to tap into any power coin or the Morphin Grid directly...",
+    "aiReasoning": "I need to analyze the text \"SO, IF THEY FOUND A WAY TO TAP INTO ANY POWER COIN OR THE MORPHIN GRID DIRECTLY...\".\nThe text is in a regular speech bubble, so it's SPEECH.\nThe tail points to the purple-masked turtle, who is Donatello.\nDonatello is a main character and a HERO.\nHe is in the middle of a fight but also thinking through a problem out loud. He's coming to a concerning conclusion. The ellipsis indicates a trailing thought leading into the next panel.\nThe performance should reflect someone thinking analytically while in motion."
+  },
+  {
+    "id": "page-05_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 156,
+      "y": 534,
+      "width": 347,
+      "height": 197,
+      "confidence": 0.9263848066329956,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-003-x156-y534.jpg"
+    },
+    "ocr_text": "DONNIE, COULD IT MAYBE WAIT UNTIL AFTER WE'RE DONE FIGHTING?",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "exasperated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Exasperated] Donnie, could it maybe wait until after we're done fighting?"
+  },
+  {
+    "id": "page-05_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 141,
+      "y": 1880,
+      "width": 285,
+      "height": 119,
+      "confidence": 0.7138214707374573,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-004-x141-y1880.jpg"
+    },
+    "ocr_text": "...DOES THAT MEAN THAT AS WE FIGHT--",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "straining, realization",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[straining mid-strike] ...Does that mean that as we fight--"
+  },
+  {
+    "id": "page-05_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1183,
+      "y": 2377,
+      "width": 231,
+      "height": 187,
+      "confidence": 0.6985174417495728,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-005-x1183-y2377.jpg"
+    },
+    "ocr_text": "OKAY. SO IT IS AS BAD AS I THOUGHT. GREAT.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "sarcastic, resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Sarcastically] Okay. So it is as bad as I thought. Great."
+  },
+  {
+    "id": "page-05_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 580,
+      "y": 1890,
+      "width": 284,
+      "height": 147,
+      "confidence": 0.6776466369628906,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-006-x580-y1890.jpg"
+    },
+    "ocr_text": "THEY GET STRONGER AND WE GET WEAKER.",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "grim realization",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Grim realization] They get stronger and we get weaker.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"THEY GET STRONGER AND WE GET WEAKER.\" is in a speech bubble in the bottom right corner of the bottom left panel, but its tail extends into the bottom right panel. It is character dialogue.\n    *   Type: `SPEECH`\n\n2.  **Analyze Context:**\n    *   **Speaker:** The tail of the speech bubble points directly to the Yellow Ranger in the adjacent panel. From the provided character list and general knowledge, the Yellow Ranger is Trini.\n    *   **Side:** The Power Rangers are heroes.\n    *   **Importance:** Trini is a core member of the Power Rangers. Classification is `MAJOR`.\n    *   **Emotion:** She is finishing Donatello's sentence (\"...DOES THAT MEAN THAT AS WE FIGHT--\"), realizing the grim truth of their situation. The tone should reflect this dark realization.\n\n3.  **Performance Cues:** The text is a stark, concluding statement to Donnie's hypothetical. A cue indicating realization or dread is appropriate.\n    *   Text to actor: `[Grim realization]` \"They get stronger and we get weaker.\""
+  },
+  {
+    "id": "page-05_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1405,
+      "y": 2454,
+      "width": 254,
+      "height": 145,
+      "confidence": 0.6256696581840515,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-007-x1405-y2454.jpg"
+    },
+    "ocr_text": "NOPE. IT'S SOOO MUCH WORSE.",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Sighs heavily] NOPE. IT'S SOOO MUCH WORSE."
+  },
+  {
+    "id": "page-05_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1585,
+      "y": 466,
+      "width": 303,
+      "height": 188,
+      "confidence": 0.5603460669517517,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-008-x1585-y466.jpg"
+    },
+    "ocr_text": "UNFORTUNATELY. SO...",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "strained, grim",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Strained from exertion] Unfortunately. [Pause] So..."
+  },
+  {
+    "id": "page-05_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 1331,
+      "y": 60,
+      "width": 451,
+      "height": 197,
+      "confidence": 0.5297642350196838,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-05/page-05-crop-009-x1331-y60.jpg"
+    },
+    "ocr_text": "TOMMY ISN'T HERE, BUT...SHREDDER IS STILL ABLE TO SHADOW MORPH INTO THE GREEN RANGER, CORRECT?",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "analytical, concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Analytical, slightly concerned] Tommy isn't here, but... Shredder is still able to shadow morph into the Green Ranger, correct?",
+    "aiReasoning": "1.  **Locate & Classify:** The target text is in a speech bubble in the top right panel. The tail points off-panel to the left.\n2.  **Analyze Context:** Following the flow of the conversation from the first panel, Donatello initiates the conversation (\"Trini, I just had a particularly terrifying revelation.\"), Trini responds (\"Donnie, could it maybe wait...\"), and then this bubble continues Donatello's thought. The speaker is Donatello. He is a major hero character.\n3.  **Performance Cues:** Donatello is in the middle of a realization while fighting. The tone is inquisitive, analytical, and slightly concerned as he builds up to his \"terrifying revelation\". The ellipsis indicates a pause for thought."
+  }
+]

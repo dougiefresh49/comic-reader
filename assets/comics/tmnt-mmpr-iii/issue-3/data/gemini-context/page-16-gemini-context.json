@@ -1,0 +1,231 @@
+[
+  {
+    "id": "page-16_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1003,
+      "y": 550,
+      "width": 232,
+      "height": 169,
+      "confidence": 0.9083305597305298,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-001-x1003-y550.jpg"
+    },
+    "ocr_text": "YEAH, WELL...IT RANDOMLY SUCKS.",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "annoyed",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Annoyed] Yeah, well... it randomly sucks."
+  },
+  {
+    "id": "page-16_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 966,
+      "y": 1177,
+      "width": 459,
+      "height": 203,
+      "confidence": 0.9068881869316101,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-002-x966-y1177.jpg"
+    },
+    "ocr_text": "AND THIS ISN'T EVEN THAT BAD. I'VE SEEN IT SO MUCH WORSE.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "strained",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[strained] And this isn't even THAT bad. I've seen it SO MUCH worse."
+  },
+  {
+    "id": "page-16_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1094,
+      "y": 1759,
+      "width": 322,
+      "height": 277,
+      "confidence": 0.8563010096549988,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-003-x1094-y1759.jpg"
+    },
+    "ocr_text": "I DON'T KNOW. THESE WERE THE LAST COORDINATES APRIL SENT OVER.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "urgent, strained",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Strained, urgent] I don't know. These were the last coordinates April sent over."
+  },
+  {
+    "id": "page-16_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1137,
+      "y": 2782,
+      "width": 252,
+      "height": 208,
+      "confidence": 0.8561563491821289,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-004-x1137-y2782.jpg"
+    },
+    "ocr_text": "SORRY TO CUT IT SO CLOSE, DONNIE...",
+    "type": "SPEECH",
+    "speaker": "Off-Screen Ally",
+    "emotion": "confident, arriving",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Calling out confidently from off-screen] Sorry to cut it so close, Donnie...",
+    "aiReasoning": "The target text \"SORRY TO CUT IT SO CLOSE, DONNIE...\" is in a standard speech bubble in the bottom right panel.\nThe tail points off-panel to the right, indicating an unseen character is speaking.\nThe text is addressed to \"Donnie\" (Donatello) right after he mentions sending a distress signal, and accompanies energy blasts hitting enemies. This clearly indicates an arriving ally (Hero).\nSince the character is off-screen, I cannot visually identify them as a specific canon character, so I must use a descriptive name like \"Off-Screen Ally\". Because they are part of the main rescue/team dynamic, their importance is likely MAJOR.\nThe tone should be confident and heroic, announcing their arrival. The ellipsis suggests a slight trailing off or a dramatic pause."
+  },
+  {
+    "id": "page-16_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 540,
+      "y": 1492,
+      "width": 265,
+      "height": 166,
+      "confidence": 0.7708533406257629,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-005-x540-y1492.jpg"
+    },
+    "ocr_text": "DONNIE, WHERE ARE THEY?",
+    "type": "SPEECH",
+    "speaker": "Yellow Ranger",
+    "emotion": "urgent",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting urgently] Donnie, where are they?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"DONNIE, WHERE ARE THEY?\" is inside a speech bubble in the second panel. The tail of the bubble points directly to the Yellow Ranger. Therefore, it is classified as `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character speaking is the Yellow Ranger (Trini Kwan). I will use \"Yellow Ranger\" as the identifier.\n    *   **Side:** She is a member of the Power Rangers, making her a `HERO`.\n    *   **Importance:** As a core Power Ranger, she is a `MAJOR` character.\n    *   **Voice Description:** Not required for major characters.\n    *   **Emotion:** She is actively engaged in combat and asking for critical information. Her tone is urgent and intense.\n3.  **Performance Cues:** The situation is a chaotic battle. She needs to project her voice to be heard over the noise, and the question is time-sensitive. I will add `[Shouting urgently]` as a performance cue."
+  },
+  {
+    "id": "page-16_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 914,
+      "y": 135,
+      "width": 220,
+      "height": 150,
+      "confidence": 0.7394513487815857,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-006-x914-y135.jpg"
+    },
+    "ocr_text": "IT WAS RANDOM, ZACK.",
+    "type": "SPEECH",
+    "speaker": "Off-Screen Ally",
+    "emotion": "matter-of-fact",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Matter-of-factly] It was random, Zack.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"IT WAS RANDOM, ZACK.\" is found in a speech bubble in the top-left area of the first panel. The tail points off-panel to the left. This is SPEECH.\n2.  **Analyze Context:** The dialogue is a response to the question \"Why did we get stuck with Planet Sandstorm?\". Since the response addresses \"Zack,\" the first speaker is Zack (Black Ranger). The speaker of the target text is answering him from off-panel. I will use \"Off-Screen Ally\" from the provided character list. They are a HERO, and likely a MAJOR character (another Ranger or Turtle). The tone is matter-of-fact, answering a complaint during battle.\n3.  **Performance Cues:** The text is straightforward. Adding a cue like `[Matter-of-factly]` or `[Strained]` to reflect talking during combat fits well."
+  },
+  {
+    "id": "page-16_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 342,
+      "y": 2047,
+      "width": 378,
+      "height": 144,
+      "confidence": 0.7314684987068176,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-007-x342-y2047.jpg"
+    },
+    "ocr_text": "I SENT OUT A DISTRESS SIGNAL AS SOON AS WE--",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "urgent, interrupted",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Urgent, mid-combat] I sent out a distress signal as soon as we--",
+    "aiReasoning": "I see the text \"I SENT OUT A DISTRESS SIGNAL AS SOON AS WE--\". It is in a standard speech bubble.\nThe tail points to the Teenage Mutant Ninja Turtle wearing a purple mask, which is Donatello.\nDonatello is a major hero character.\nHe is in the middle of a fight and his sentence ends with an em dash \"--\", indicating he is interrupted or cut off by the enemy attacking him in the next panel/bubble."
+  },
+  {
+    "id": "page-16_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 599,
+      "y": 116,
+      "width": 315,
+      "height": 174,
+      "confidence": 0.4666762351989746,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-008-x599-y116.jpg"
+    },
+    "ocr_text": "WHY DID WE GET STUCK WITH PLANET SANDSTORM?",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "exasperated",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Exasperated] Why did we get stuck with Planet Sandstorm?",
+    "aiReasoning": "The target text is \"WHY DID WE GET STUCK WITH PLANET SANDSTORM?\".\nThis is a speech bubble in the top panel.\nThe tail points towards the Black Ranger, who is fighting in the background. The subsequent reply addresses him as \"Zack\", confirming his identity.\nHe is a HERO and a MAJOR character.\nHe is expressing annoyance or frustration at the environment they are fighting in.\nThe performance cue should reflect a mid-battle complaint, slightly exasperated."
+  },
+  {
+    "id": "page-16_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 779,
+      "y": 2474,
+      "width": 249,
+      "height": 177,
+      "confidence": 0.4473710358142853,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-009-x779-y2474.jpg"
+    },
+    "ocr_text": "HA HA, FOOL! THEY WON'T MAKE IT IN--",
+    "type": "SPEECH",
+    "speaker": "Goldar",
+    "emotion": "arrogant, mocking, suddenly interrupted",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Laughs arrogantly] Ha ha, fool! They won't make it in-- [cut off suddenly]",
+    "aiReasoning": "The text is \"HA HA, FOOL! THEY WON'T MAKE IT IN--\" in a standard speech bubble with a tail pointing to the golden, winged monster.\nThe speaker is Goldar (a major Power Rangers villain). He is a VILLAIN.\nHis importance is MAJOR.\nHe is laughing and taunting Donatello, but the sentence is cut off with dashes, indicating he is interrupted mid-sentence (likely by the laser blast shown in the adjacent panel)."
+  },
+  {
+    "id": "page-16_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 1095,
+      "y": 1885,
+      "width": 314,
+      "height": 165,
+      "confidence": 0.34546855092048645,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-010-x1095-y1885.jpg"
+    },
+    "ocr_text": "THOSE WERE THE LAST COORDINATES APRIL SENT OVER.",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Informative, slightly tense] These were the last coordinates April sent over.",
+    "aiReasoning": "The text \"THESE WERE THE LAST COORDINATES APRIL SENT OVER.\" is located in a speech bubble in the middle panel.\nThe tail of the bubble points to Donatello (the Ninja Turtle with the purple mask).\nDonatello is a major character and a hero.\nHe is engaged in combat and responding to the Yellow Ranger's question about the whereabouts of others. His tone should be informative but slightly tense due to the situation.\nI will correct the slight typo in the prompt's text (\"THOSE\" to \"THESE\") to match the image accurately."
+  },
+  {
+    "id": "page-16_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 106,
+      "y": 71,
+      "width": 388,
+      "height": 117,
+      "confidence": 0.34087610244750977,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-16/page-16-crop-011-x106-y71.jpg"
+    },
+    "ocr_text": "DIMENSION X.",
+    "type": "CAPTION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, authoritative male announcer voice, setting the scene.",
+    "textWithCues": "DIMENSION X."
+  }
+]

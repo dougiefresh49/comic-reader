@@ -1,0 +1,196 @@
+[
+  {
+    "id": "page-09_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 366.9063720703125,
+      "y": 76.10435485839844,
+      "width": 285.35162353515625,
+      "height": 139.41162109375,
+      "confidence": 0.8547550439834595,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-001-x366-y76.jpg"
+    },
+    "ocr_text": "YOU'RE CERTAIN IT WAS MORPHIN ENERGY?",
+    "type": "SPEECH",
+    "speaker": "Tommy",
+    "emotion": "Serious, Inquisitive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Seriously] You're certain it was Morphin Energy?",
+    "aiReasoning": "The user wants me to analyze a speech bubble from a comic page.\n**Text:** \"YOU'RE CERTAIN IT WAS MORPHIN ENERGY?\"\n**Location:** Top panel, first speech bubble.\n**Visuals:**\n- The bubble has a tail pointing to a character with a ponytail wearing a green t-shirt.\n- This character is standing next to Alpha 5 (robot) and Billy (blue shirt).\n- Based on the context (Power Rangers) and color coding (Green shirt), this is the Green Ranger, Tommy Oliver.\n- He is speaking to Billy (Blue Ranger), who answers in the next bubble.\n- Character Type: MAJOR (Main cast member).\n- Side: HERO.\n- Emotion: Serious, verifying information.\n\n**Performance Cues:**\n- The character is asking a specific, clarifying question.\n- The tone should be serious and inquisitive, seeking confirmation on a dangerous anomaly.\n- No shouting, whispering, or stuttering is indicated visually or textually.\n\n**Speaker Identification:**\n- Green Shirt + Ponytail = Tommy Oliver (Green Ranger).\n\n**JSON Construction:**\n- Type: SPEECH\n- Speaker: Tommy\n- CharacterType: MAJOR\n- Side: HERO\n- Emotion: Serious, Inquisitive\n- TextWithCues: \"[Seriously] You're certain it was Morphin Energy?\""
+  },
+  {
+    "id": "page-09_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 340.7020568847656,
+      "y": 544.6471557617188,
+      "width": 255.69967651367188,
+      "height": 171.78240966796875,
+      "confidence": 0.8408408164978027,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-002-x340-y544.jpg"
+    },
+    "ocr_text": "THAT'S THE THING THOUGH, ZORDON...",
+    "type": "SPEECH",
+    "speaker": "Billy",
+    "emotion": "serious and analytical",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young American male, intelligent, calm and articulate",
+    "textWithCues": "[Interjecting to correct an assumption] That's the thing though, Zordon...",
+    "aiReasoning": "The user wants me to analyze a specific speech bubble containing the text \"THAT'S THE THING THOUGH, ZORDON...\".\n\n1.  **Locate & Classify**:\n    *   The text is in a speech bubble in the middle panel.\n    *   It is clearly `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The bubble's tail points to the young man with glasses and a blue shirt. Based on the Power Rangers franchise (and the context of \"Zordon\", \"Alpha\", \"Lord Zedd\"), this is Billy Cranston, the Blue Ranger. He is a `MAJOR` character. The prompt lists \"Tommy\" as a unique character; the character speaking is distinct from Tommy (who is likely the one in green with the ponytail in the background). So I will name the speaker \"Billy\".\n    *   **Side**: He is a Power Ranger, so `HERO`.\n    *   **Emotion**: He looks serious, analytical, and focused. He is pivoting the conversation to a new, surprising fact.\n    *   **Voice Description**: Intelligent, young American male, articulate, calm.\n\n3.  **Performance Cues**:\n    *   The text ends with an ellipsis \"...\", indicating a pause or that the sentence continues into the next bubble (which it does: \"...IT WASN'T ON THE MOON.\").\n    *   He is correcting the previous assumption (that the energy came from Zedd on the moon).\n    *   Tone should be \"corrective\" or \"interjecting\" but calm. Not shouting or whispering.\n    *   Text: \"That's the thing though, Zordon...\""
+  },
+  {
+    "id": "page-09_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 162.578857421875,
+      "y": 1342.031494140625,
+      "width": 211.61920166015625,
+      "height": 151.144287109375,
+      "confidence": 0.8369295597076416,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-003-x162-y1342.jpg"
+    },
+    "ocr_text": "...IT WASN'T ON THE MOON.",
+    "type": "SPEECH",
+    "speaker": "Billy",
+    "emotion": "Serious and revelatory",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Intelligent, articulate, calm male teen voice",
+    "textWithCues": "[Hesitating slightly for emphasis] ...It wasn't on the moon.",
+    "aiReasoning": "The text region contains \"...IT WASN'T ON THE MOON.\" inside a speech bubble.\nThe tail of the speech bubble points to the character with glasses in the blue shirt.\nBased on the Power Rangers setting (Zordon, Alpha 5) and character design, this is Billy Cranston. The prompt's unique character list includes \"Billy\".\nBilly is a Power Ranger, making him a HERO and a MAJOR character.\nContext: He is explaining technical data to Zordon. He is correcting an assumption or adding a twist to the situation—the energy signature wasn't from Zedd (on the moon) but somewhere else.\nEmotion: Serious, analytical, delivering a plot twist/revelation.\nCues: The ellipsis \"...\" indicates a pause or hesitation before delivering the key piece of information."
+  },
+  {
+    "id": "page-09_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1378.0230712890625,
+      "y": 2350.710693359375,
+      "width": 445.3377685546875,
+      "height": 154.4814453125,
+      "confidence": 0.7770897746086121,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-004-x1378-y2350.jpg"
+    },
+    "ocr_text": "ZORDON, I'M DETECTING TWO MASSIVE ENERGY SIGNATURES TELEPORTING DOWN FROM THE MOON!",
+    "type": "SPEECH",
+    "speaker": "Alpha 5",
+    "emotion": "Alarmed",
+    "characterType": "MINOR",
+    "side": "HERO",
+    "voiceDescription": "High-pitched, frantic, robotic voice",
+    "textWithCues": "[Urgently] Zordon, I'm detecting two massive energy signatures teleporting down from the moon!",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the bottom panel. The tail points to the robot character, Alpha 5. Classification: `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is a robot with a saucer head and a lightning bolt on its chest. This is Alpha 5 from the Power Rangers universe. The name is not in the provided list (Tommy, Billy), so I will use \"Alpha 5\".\n    *   **Side:** Alpha 5 is Zordon's assistant and helps the Rangers. Side: `HERO`.\n    *   **Importance:** He is a named secondary character, similar to Bulk or Skull in the prompt's examples. Classification: `MINOR`.\n    *   **Voice Description:** Alpha 5 traditionally has a distinct high-pitched, neurotic, and robotic voice.\n    *   **Emotion:** He is alerting Zordon to a threat (\"massive energy signatures\"). His body language involves gesturing at the console. The previous panel had his catchphrase \"Aye-yi-yi-yi-yi!\" indicating distress. Emotion: Alarmed/Urgent.\n3.  **Performance Cues:** The text is an urgent report of incoming enemies. It should be delivered quickly and with high anxiety.\n    *   **Cues:** `[Alarmed/Urgent]` or `[Frantic]`."
+  },
+  {
+    "id": "page-09_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 452.4942321777344,
+      "y": 438.114013671875,
+      "width": 285.0854797363281,
+      "height": 124.02911376953125,
+      "confidence": 0.7037137150764465,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-005-x452-y438.jpg"
+    },
+    "ocr_text": "LORD ZEDD IS VERY POWERFUL.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Deep, booming, resonant, wise, bodiless entity voice",
+    "textWithCues": "[Solemnly] Lord Zedd is very powerful.",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   The text \"LORD ZEDD IS VERY POWERFUL.\" is inside a speech bubble.\n    *   The bubble is located in the upper-middle section of the panel, just below the large glass tube containing the blue face.\n    *   Type: `SPEECH`.\n\n2.  **Identify Speaker:**\n    *   I need to trace the conversation flow and bubble tails.\n    *   Bubble 1 (Top): \"YOU'RE CERTAIN IT WAS MORPHIN ENERGY?\" -> Tail points to the giant blue head (Zordon).\n    *   Bubble 2 (Left): \"YES, AT THE MOMENT...\" -> Tail points to the character with glasses in the blue shirt (Billy).\n    *   Bubble 3 (Target): \"LORD ZEDD IS VERY POWERFUL.\" -> The tail is on the top of the bubble and points upward towards the giant blue head (Zordon).\n    *   Bubble 4 (Below): \"THAT'S THE THING THOUGH, ZORDON... IT WASN'T ON THE MOON.\" -> Tail points to Billy. This line is a rebuttal to the previous statement, addressing Zordon by name, which confirms Zordon spoke the previous line.\n    *   Speaker: **Zordon**.\n    *   Zordon is not in the provided list (Tommy, Billy, Alpha 5), so I will use his name.\n\n3.  **Analyze Context:**\n    *   **Side:** HERO (Leader/Mentor of the Power Rangers).\n    *   **Importance:** MAJOR (Central character in the lore).\n    *   **Emotion:** Serious, contemplative, authoritative. He is offering a hypothesis for the energy surge.\n    *   **Voice Description:** N/A (Major character, though typically deep, resonant, and echoing).\n\n4.  **Performance Cues:**\n    *   The statement is a serious observation/warning.\n    *   No shouting or whispering indications.\n    *   Tone should be grave or solemn.\n    *   Draft Text: `[Solemnly] Lord Zedd is very powerful.`\n\n5.  **Final JSON Construction:**\n    *   Type: SPEECH\n    *   Speaker: Zordon\n    *   CharacterType: MAJOR\n    *   Side: HERO\n    *   Emotion: Serious\n    *   TextWithCues: [Solemnly] Lord Zedd is very powerful."
+  },
+  {
+    "id": "page-09_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 109.91943359375,
+      "y": 1823.01806640625,
+      "width": 408.4080810546875,
+      "height": 224.600830078125,
+      "confidence": 0.66122967004776,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-006-x109-y1823.jpg"
+    },
+    "ocr_text": "FASCINATING. BILLY, SEND ME THE LOCATION AND WE'LL CROSS-REFERENCE IT WITH THE ELTARIAN ARCHIVES.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Thoughtful and Authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Deep, resonant voice] Fascinating. [beat] Billy, send me the location and we'll cross-reference it with the Eltarian archives.",
+    "aiReasoning": "The user wants me to analyze the speech bubble containing \"FASCINATING. BILLY, SEND ME THE LOCATION...\" in the third panel.\n1.  **Locate**: The text is in a standard speech bubble. The tail points to the large blue face in the tube, which is Zordon.\n2.  **Context**:\n    *   **Speaker**: Zordon (matches the unique character list).\n    *   **Side**: Hero (Mentor to the Rangers).\n    *   **Importance**: Major.\n    *   **Emotion**: Analytical, calm, authoritative. His face is stoic. He is processing new information (\"Fascinating\") and then issuing a command.\n3.  **Performance Cues**:\n    *   Zordon's voice is traditionally deep, booming, and resonant.\n    *   \"Fascinating.\" needs a thoughtful pause (a beat) after it.\n    *   The rest is a direct command to Billy, spoken with authority but without aggression."
+  },
+  {
+    "id": "page-09_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 216.9913330078125,
+      "y": 210.53594970703125,
+      "width": 456.47503662109375,
+      "height": 256.36981201171875,
+      "confidence": 0.5120537877082825,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-007-x216-y210.jpg"
+    },
+    "ocr_text": "YES, AT THE MOMENT MASTER SPlINTER WAS IONIZED, I PICKED UP A MASSIVE ENERGY SURGE, THE SIZE OF WHICH I'VE NEVER SEEN BEFORE.",
+    "type": "SPEECH",
+    "speaker": "Billy",
+    "emotion": "Serious, analytical",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Analytically] Yes, at the moment Master Splinter was ionized, I picked up a massive energy surge, the size of which I've never seen before.",
+    "aiReasoning": "The text is located in a speech bubble in the top panel.\nThe tail of the bubble points to the character in the blue shirt standing at the console.\nBased on the character design (glasses, blue shirt) and the subsequent panel which gives a close-up of him, this is **Billy** (the Blue Ranger).\nHe is a **MAJOR** character and a **HERO**.\nThe dialogue is technical and responsive to Zordon's question, indicating a serious, analytical tone. He is reporting scientific findings.\nThe text provided in the prompt has a typo \"SPlINTER\", which corresponds to \"Master Splinter\". I will format the text for readability."
+  },
+  {
+    "id": "page-09_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 898.5786743164062,
+      "y": 1342.01416015625,
+      "width": 263.35174560546875,
+      "height": 98.3431396484375,
+      "confidence": 0.4183056056499481,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-008-x898-y1342.jpg"
+    },
+    "ocr_text": "WAIT, I DON'T UNDERSTAND.",
+    "type": "SPEECH",
+    "speaker": "Kimberly",
+    "emotion": "Confused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Teenage female voice, American accent, clear and youthful",
+    "textWithCues": "[Confused] Wait, I don't understand.",
+    "aiReasoning": "The text \"WAIT, I DON'T UNDERSTAND.\" is located in the middle panel of the page.\nIt is enclosed in a speech bubble with a tail pointing to a female character with brown hair in pigtails.\nThis character is standing next to Billy (the character with glasses). Based on the Power Rangers lore and visual appearance, this is Kimberly Hart (the Pink Ranger).\nThe provided list of unique characters includes: Tommy, Billy, Alpha 5, Zordon. Kimberly is not on this list, so I will create a new speaker name \"Kimberly\".\nShe is a MAJOR character (Hero).\nThe emotion is confusion, as indicated by the text and her facial expression (looking at Billy with a puzzled look).\nShe is reacting to Billy's explanation about dimensions and ionized energy.\nThe text does not indicate shouting or whispering. It is a normal speaking volume.\nThe performance should reflect genuine confusion/seeking clarification."
+  },
+  {
+    "id": "page-09_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 522.3081665039062,
+      "y": 2056.135009765625,
+      "width": 260.45037841796875,
+      "height": 125.039306640625,
+      "confidence": 0.4106670618057251,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-09/page-09-crop-009-x522-y2056.jpg"
+    },
+    "ocr_text": "OH NO! AYE-YI-YI-YI-YI!",
+    "type": "SPEECH",
+    "speaker": "Alpha 5",
+    "emotion": "Panicked",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting in sudden alarm] OH NO! AYE-YI-YI-YI-YI!",
+    "aiReasoning": "The text \"OH NO! AYE-YI-YI-YI-YI!\" is located in a jagged, burst-shaped speech bubble in the panel featuring Zordon's face.\nThe catchphrase \"Aye-yi-yi-yi-yi\" is the signature line of the character Alpha 5.\nThe immediate next panel shows Alpha 5 at a console, reacting with lightning bolts (indicating alarm/shock) and speaking the follow-up line.\nTherefore, the speaker is Alpha 5.\nAlpha 5 is a main supporting character for the Power Rangers (Hero side).\nThe jagged bubble shape and the exclamation marks indicate shouting and panic.\nSince Alpha 5 is a listed unique character, I will use that name. Importance is MAJOR."
+  }
+]

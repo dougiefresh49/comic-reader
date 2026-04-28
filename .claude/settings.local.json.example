@@ -1,0 +1,7 @@
+{
+  "env": {
+    "GEMINI_API_KEY": "your-gemini-api-key-here",
+    "ELEVENLABS_API_KEY": "your-elevenlabs-api-key-here",
+    "ROBOFLOW_API_KEY": "your-roboflow-api-key-here"
+  }
+}

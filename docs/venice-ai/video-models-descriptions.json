@@ -1,0 +1,198 @@
+[
+  {
+    "modelName": "Seedance 2.0",
+    "description": "ByteDance's cinematic image-to-video model that transforms images into video with synchronized dialogue, sound effects, and ambient audio."
+  },
+  {
+    "modelName": "Seedance 2.0 R2V",
+    "description": "ByteDance's reference-to-video model that maintains consistent characters and subjects across scenes using up to 9 reference images with native audio."
+  },
+  {
+    "modelName": "Seedance 2.0 Fast",
+    "description": "ByteDance's fast image-to-video model that transforms images into cinematic video with synchronized dialogue, sound effects, and ambient audio."
+  },
+  {
+    "modelName": "Seedance 2.0 Fast R2V",
+    "description": "ByteDance's fast reference-to-video model for character-consistent video generation using up to 9 reference images with native audio."
+  },
+  {
+    "modelName": "Wan 2.7",
+    "description": "Generate videos from a starting image or first-and-last-frame pair."
+  },
+  {
+    "modelName": "Seedance 1.5 Pro",
+    "description": "ByteDance's cinematic image-to-video model with native audio generation, end frame support, and up to 1080p resolution."
+  },
+  {
+    "modelName": "Wan 2.7 Reference",
+    "description": "Generate videos with character and subject consistency from reference images."
+  },
+  {
+    "modelName": "Wan 2.7 Edit",
+    "description": "Edit existing videos with text instructions and an optional reference image."
+  },
+  {
+    "modelName": "Wan 2.6",
+    "description": "High quality image-to-video model with audio support."
+  },
+  {
+    "modelName": "Wan 2.6 Flash",
+    "description": "Fast image-to-video generation with good quality."
+  },
+  {
+    "modelName": "Wan 2.5 Preview",
+    "description": "Uncensored Image-to-Video model"
+  },
+  {
+    "modelName": "Grok Imagine Private",
+    "description": "Transform images into dynamic video animations with audio from xAI."
+  },
+  {
+    "modelName": "Grok Imagine R2V Private",
+    "description": "Generate videos using multiple reference images with xAI's Grok Imagine video model. Use @Image1, @Image2, etc. in prompt to reference specific images."
+  },
+  {
+    "modelName": "Wan 2.1 Pro",
+    "description": "Most uncensored image-to-video model."
+  },
+  {
+    "modelName": "LTX Video 2.0 Fast",
+    "description": "Fast high-fidelity image-to-video with audio generation."
+  },
+  {
+    "modelName": "LTX Video 2.0 Full Quality",
+    "description": "Full quality high-fidelity image-to-video with audio generation."
+  },
+  {
+    "modelName": "LTX Video 2.3 Fast",
+    "description": "Fast high-fidelity image-to-video with audio generation."
+  },
+  {
+    "modelName": "LTX Video 2.3 Full Quality",
+    "description": "Full quality high-fidelity image-to-video with audio generation."
+  },
+  {
+    "modelName": "LTX Video 2.0 19B",
+    "description": "High-fidelity 19B parameter image-to-video with audio generation."
+  },
+  {
+    "modelName": "LTX Video 2.0 19B Distilled",
+    "description": "Fast distilled 19B parameter image-to-video with audio generation."
+  },
+  {
+    "modelName": "Ovi",
+    "description": "Fast and uncensored model based on WAN."
+  },
+  {
+    "modelName": "Kling 2.6 Pro",
+    "description": "Full quality Kling video model with native audio generation."
+  },
+  {
+    "modelName": "Kling 2.5 Turbo Pro",
+    "description": "Full quality Kling video model."
+  },
+  {
+    "modelName": "Kling V3 4K R2V",
+    "description": "Native 4K Kling V3 image-to-video generation with reference element support."
+  },
+  {
+    "modelName": "Kling O3 4K",
+    "description": "Native 4K Kling O3 image-to-video, tuned for stylized and anime motion. Supports optional end image."
+  },
+  {
+    "modelName": "Kling O3 4K R2V",
+    "description": "Native 4K Kling O3 reference-to-video. Combine up to 7 character/object/style references in a single 4K clip."
+  },
+  {
+    "modelName": "Kling O3 Pro",
+    "description": "Premium Kling O3 video generation with highest quality output. Supports optional end image."
+  },
+  {
+    "modelName": "Kling O3 Pro R2V",
+    "description": "Transform images and elements into video with stable character identity. Supports multiple elements with frontal and reference images."
+  },
+  {
+    "modelName": "Kling O3 Standard",
+    "description": "Kling O3 video generation with balanced quality and speed. Supports optional end image."
+  },
+  {
+    "modelName": "Kling O3 Standard R2V",
+    "description": "Transform images and elements into video with stable character identity. Standard tier with balanced quality and speed."
+  },
+  {
+    "modelName": "Kling V3 Pro",
+    "description": "Kling V3 Pro video generation with enhanced quality. Supports start and end frame images."
+  },
+  {
+    "modelName": "Kling V3 Standard",
+    "description": "Kling V3 Standard video generation with balanced quality and speed. Supports start and end frame images."
+  },
+  {
+    "modelName": "Longcat Distilled",
+    "description": "Faster version of Longcat Image-to-Video model"
+  },
+  {
+    "modelName": "Longcat Full Quality",
+    "description": "Longer duration Image-to-Video model"
+  },
+  {
+    "modelName": "Veo 3 Fast",
+    "description": "Faster version of Google's image-to-video model."
+  },
+  {
+    "modelName": "Veo 3 Full Quality",
+    "description": "Full quality version of Google's image-to-video model."
+  },
+  {
+    "modelName": "Veo 3.1 Fast",
+    "description": "Faster version of Google's Veo 3.1 image-to-video model."
+  },
+  {
+    "modelName": "Veo 3.1 Full Quality",
+    "description": "Full quality version of Google's Veo 3.1 image-to-video model."
+  },
+  {
+    "modelName": "PixVerse v5.6",
+    "description": "High-quality image-to-video generation with PixVerse v5.6."
+  },
+  {
+    "modelName": "PixVerse v5.6 Transition",
+    "description": "Create smooth transitions between two images with PixVerse v5.6."
+  },
+  {
+    "modelName": "PixVerse C1",
+    "description": "Animate images into cinematic videos with PixVerse C1, supporting 1080p resolution and native audio."
+  },
+  {
+    "modelName": "PixVerse C1 R2V",
+    "description": "Generate character-consistent videos from reference images with subject and background references."
+  },
+  {
+    "modelName": "PixVerse C1 Transition",
+    "description": "Create seamless cinematic transitions between two images with native audio and up to 1080p."
+  },
+  {
+    "modelName": "Vidu Q3",
+    "description": "High-quality image-to-video generation with Vidu Q3."
+  },
+  {
+    "modelName": "Runway Gen-4.5",
+    "description": "High-quality image-to-video generation powered by Runway Gen-4.5."
+  },
+  {
+    "modelName": "Runway Gen-4 Turbo",
+    "description": "High-quality image-to-video generation powered by Runway Gen-4 Turbo."
+  },
+  {
+    "modelName": "Runway Gen-4 Aleph",
+    "description": "Video-to-video generation with optional image guidance using Runway Gen-4 Aleph."
+  },
+  {
+    "modelName": "Sora 2",
+    "description": "Extremely censored faster OpenAI model."
+  },
+  {
+    "modelName": "Sora 2 Pro",
+    "description": "Extremely censored full quality OpenAI model."
+  }
+]

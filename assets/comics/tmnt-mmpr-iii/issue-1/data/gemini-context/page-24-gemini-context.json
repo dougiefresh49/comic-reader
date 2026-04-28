@@ -1,0 +1,155 @@
+[
+  {
+    "id": "page-24_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 188.9258575439453,
+      "y": 1740.511474609375,
+      "width": 328.2530975341797,
+      "height": 169.7769775390625,
+      "confidence": 0.9827331304550171,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-001-x188-y1740.jpg"
+    },
+    "ocr_text": "THERE IS NO GREATER LOSS THAN THE LOSS OF FAITH.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, solemn, cinematic male voice, wise and grave",
+    "textWithCues": "[Solemnly, with gravitas] There is no greater loss than the loss of faith.",
+    "aiReasoning": "The user wants me to identify and analyze the text \"THERE IS NO GREATER LOSS THAN THE LOSS OF FAITH.\"\n1.  **Classification**: The text is inside a rectangular yellow box with rounded corners. It is not a speech bubble. It is narration.\n2.  **Context**: The scene depicts a massive explosion and destruction. A character (likely Splinter, referred to as \"Master!\") is seemingly being defeated or killed. The narration is philosophical, discussing \"loss\", \"faith\", and \"trust\".\n3.  **Speaker**: This is an omniscient narrator. The tone is grave, serious, and reflective. It sets the thematic weight for the \"To Be Continued\" cliffhanger. It is not a specific character speaking aloud. The color of the box (yellow/orange) might suggest a specific character's internal monologue (possibly Splinter's or a Ranger's), but without definitive proof, treating it as a \"Narrator\" is the standard approach. The voice should be weighty and solemn.\n4.  **Performance**: The text is declarative and heavy. It should be read slowly and with gravitas. No shouting, despite the dramatic visual, as the text box is calm compared to the \"SHKOOOOM\" SFX.\n\n*   **Type**: NARRATION\n*   **Speaker**: Narrator\n*   **Character Type**: EXTRA (as it's a disembodied voice, though arguably the writer's voice)\n*   **Side**: NEUTRAL\n*   **Voice Description**: Deep, solemn, cinematic male voice, wise and grave.\n*   **Emotion**: Serious, Somber.\n*   **Text Cues**: [Solemnly], [Gravely]."
+  },
+  {
+    "id": "page-24_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 337.8908386230469,
+      "y": 1927.8865966796875,
+      "width": 453.2922668457031,
+      "height": 224.7957763671875,
+      "confidence": 0.9778535962104797,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-002-x337-y1927.jpg"
+    },
+    "ocr_text": "NOT IN THE BELIEF OF A POWER BEYOND YOUR OWN PERCEPTION, BUT IN THE ABILITY TO TRUST IN ONE'S SELF AND IN OTHERS.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, grave, cinematic male voice. Serious, philosophical, and slow-paced.",
+    "textWithCues": "[Solemnly] Not in the **belief** of a power beyond your own perception, but in the ability to trust in one's self and in others.",
+    "aiReasoning": "The text is inside a yellow narration box, distinct from the character speech bubbles below.\nThe text reads: \"NOT IN THE BELIEF OF A POWER BEYOND YOUR OWN PERCEPTION, BUT IN THE ABILITY TO TRUST IN ONE'S SELF AND IN OTHERS.\"\nThe word \"BELIEF\" is bolded and italicized for emphasis.\nThe context is a dramatic, possibly tragic moment where a character (likely a villain or a corrupted hero given the red energy) is unleashing power, while the heroes below look on in horror. The narration is philosophical, discussing the nature of faith.\nThe speaker is the Narrator. The tone is serious, grave, and reflective.\nSince it is a narration box, the volume is normal but carrying weight (dramatic narration)."
+  },
+  {
+    "id": "page-24_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1484.8782958984375,
+      "y": 2278.49072265625,
+      "width": 252.835205078125,
+      "height": 134.045166015625,
+      "confidence": 0.9392887949943542,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-003-x1484-y2278.jpg"
+    },
+    "ocr_text": "...COME CRASHING DOWN.",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, serious, dramatic storytelling voice with a sense of finality and doom.",
+    "textWithCues": "[Dramatic pause] ...come [heavily emphasized] crashing down.",
+    "aiReasoning": "The text region contains the words \"...COME CRASHING DOWN.\" inside a rectangular yellow caption box.\nThis is clearly a narration box, continuing the sentence from the previous box (\"TO BE BESIEGED ON ALL SIDES AND FEEL LIKE YOUR ENTIRE WORLD IS ABOUT TO...\").\nThe speaker is the Narrator.\nThe tone is dramatic, serious, and heavy, matching the visual of a massive explosion and the characters' despair.\nThe words \"CRASHING DOWN\" are bolded for emphasis."
+  },
+  {
+    "id": "page-24_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1221.1026611328125,
+      "y": 2761.026123046875,
+      "width": 170.0172119140625,
+      "height": 144.162109375,
+      "confidence": 0.7877328395843506,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-004-x1221-y2761.jpg"
+    },
+    "ocr_text": "OH GOD.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Horrified, shocked, despairing",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Gruff, gritty young adult male voice with a Brooklyn accent",
+    "textWithCues": "[Breathless with horror] Oh god.",
+    "aiReasoning": "I have located the text \"OH GOD.\" in the bottom right panel of the comic page.\n1.  **Classification:** It is in a speech bubble with a tail pointing to a character. Type: `SPEECH`.\n2.  **Context:**\n    *   **Speaker:** The tail points to a Teenage Mutant Ninja Turtle wearing a bandana. Due to the red color scheme of the scene (and the character's typical red bandana), this is Raphael. The provided list only contains \"Narrator\", so I will use \"Raphael\".\n    *   **Side:** The Ninja Turtles are protagonists. Side: `HERO`.\n    *   **Importance:** Raphael is a main character. Importance: `MAJOR`.\n    *   **Voice Description:** Since the character is MAJOR, I don't strictly need to generate a generic description, but for completeness: He typically has a rough, Brooklyn-accented male voice.\n    *   **Emotion:** The scene depicts a catastrophic event (possibly the death of Master Splinter, given the shout \"MASTER!\"). The character's face is frozen in shock/horror.\n3.  **Performance Cues:**\n    *   The text is not bolded or jagged, unlike the sound effects. It represents a moment of pure shock and disbelief amidst the chaos.\n    *   The delivery should be breathless and horrified."
+  },
+  {
+    "id": "page-24_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 884.8217163085938,
+      "y": 2796.598388671875,
+      "width": 197.75860595703125,
+      "height": 153.57470703125,
+      "confidence": 0.5296590328216553,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-005-x884-y2796.jpg"
+    },
+    "ocr_text": "NO.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Shocked disbelief",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[breathless, quiet denial] No.",
+    "aiReasoning": "I see the text \"NO.\" in a standard rounded speech bubble.\nThe bubble's tail points to the Red Ranger character standing in the background, between the screaming Turtle on the left and the shocked Turtle on the right.\nThe scene depicts a catastrophic event (explosion, \"world crashing down\"), and the characters are reacting with horror.\nThe speaker is the Red Ranger (Jason Lee Scott), who is a HERO and a MAJOR character.\nHis posture suggests he is stopping in his tracks or reeling back. The emotion is pure shock and denial. Unlike the \"MASTER!\" shout which implies volume, \"NO.\" is a simple, possibly breathless refusal to accept what just happened.\n\n**Classification:**\n*   Type: SPEECH\n*   Speaker: Red Ranger (New character, not in provided list)\n*   Side: HERO\n*   Importance: MAJOR\n*   Emotion: Shocked disbelief"
+  },
+  {
+    "id": "page-24_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 806.8507690429688,
+      "y": 2725.109130859375,
+      "width": 197.33331298828125,
+      "height": 77.6171875,
+      "confidence": 0.5244803428649902,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-006-x806-y2725.jpg"
+    },
+    "ocr_text": "MASTER!",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Devastated screaming",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young male voice, heroic but currently filled with raw, gut-wrenching horror and desperation.",
+    "textWithCues": "[Screaming in pure horror] MASTER!",
+    "aiReasoning": "1.  **Locate Text:** \"MASTER!\" is in a jagged speech bubble in the bottom panel (x:806, y:2725).\n2.  **Trace Speaker:** The tail points to a figure in a Power Ranger suit standing to the left of Raphael (who is unmasked).\n3.  **Identify Character:**\n    *   The page is from a TMNT/Power Rangers crossover (likely the BOOM! Studios series).\n    *   The figures present are a screaming Turtle face (extreme left), a Ranger shouting \"MASTER!\", Raphael (center, unmasked), and another Ranger saying \"OH GOD.\" (right).\n    *   The term \"Master\" is used by the Turtles to refer to Splinter. The silhouette in the top panel appears to be Splinter (holding a staff, rat-like robes) being destroyed.\n    *   Therefore, the speaker is one of the Turtles morphed into a Ranger (likely Leonardo, as he is the leader and most devoted to Splinter).\n    *   However, the visual appearance is identical to a standard Power Ranger. The prompt's \"Unique Characters\" list includes \"Red Ranger\". The instructions say: \"If the speaker in this panel looks like one of these characters, reuse the exact name.\"\n    *   The figure looks exactly like the Red Ranger (helmeted). Even though it's likely Leonardo inside, visually it falls under the \"Red Ranger\" or generic Ranger archetype. Given the strict instruction to reuse names if they look alike, and the monochromatic red coloring making color identification impossible (Leo would be Blue), I will use the provided label \"Red Ranger\" or simply treat them as a \"Red Ranger\" visual match, but the voice direction will reflect the context of a student losing a teacher.\n4.  **Context & Emotion:**\n    *   The character is witnessing their father figure/master being obliterated.\n    *   The bubble is jagged/burst, indicating a loud scream.\n    *   Emotion is pure horror, shock, and devastation.\n5.  **Cues:**\n    *   Volume: Screaming.\n    *   Tone: Heartbroken, horrified."
+  },
+  {
+    "id": "page-24_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 747.958984375,
+      "y": 2277.05419921875,
+      "width": 719.4478759765625,
+      "height": 101.625,
+      "confidence": 0.4110669195652008,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-24/page-24-crop-007-x747-y2277.jpg"
+    },
+    "ocr_text": "TO BE BESIEGED ON ALL SIDES AND FEEL LIKE YOUR ENTIRE WORLD IS ABOUT TO...",
+    "type": "NARRATION",
+    "speaker": "Narrator",
+    "emotion": "Neutral",
+    "characterType": "MAJOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, resonant, and grave storytelling voice. Serious and dramatic tone.",
+    "textWithCues": "[Serious, building tension] TO BE BESIEGED ON ALL SIDES AND FEEL LIKE YOUR ENTIRE WORLD IS ABOUT TO...",
+    "aiReasoning": "I have located the text box containing \"TO BE BESIEGED ON ALL SIDES AND FEEL LIKE YOUR ENTIRE WORLD IS ABOUT TO...\".\n1.  **Classify:** The text is enclosed in a rectangular yellow box with a gradient, distinct from the speech bubbles used by the characters below. This is `NARRATION`.\n2.  **Context:**\n    *   **Speaker:** The text is part of a series of narration boxes describing the philosophical weight of the moment (\"loss of faith\"). The speaker is the \"Narrator\".\n    *   **Side:** The narration is sympathetic to the heroes' plight, describing their despair. I will classify as `NEUTRAL` generally for narrators, or aligned with `HERO` contextually. Let's stick to `NEUTRAL` as the standard for an omniscient narrator.\n    *   **Importance:** `MAJOR`. The narrator drives the emotional beat of the page.\n    *   **Voice Description:** N/A as it's a specific role, but generally: A deep, serious, dramatic storytelling voice. It needs to carry the weight of the \"loss of faith\" theme.\n    *   **Emotion:** Grave, foreboding, and tense. The text builds up to a climax (\"about to...\").\n3.  **Performance Cues:**\n    *   The text is in all caps with bold italicized emphasis on \"BESIEGED\" and \"ENTIRE WORLD\".\n    *   It ends with ellipses, indicating a pause or suspension before the next thought.\n    *   The tone should be heavy and dramatic."
+  }
+]

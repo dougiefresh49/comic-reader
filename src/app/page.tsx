@@ -1,8 +1,13 @@
 import Link from "next/link";
 import Image from "next/image";
-import manifest from "~/data/manifest";
+import { getManifest } from "~/server";
+import { pageImageUrl } from "~/lib/storage";
 
-export default function LibraryPage() {
+export const revalidate = 3600;
+
+export default async function LibraryPage() {
+  const manifest = await getManifest();
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
       <div className="container mx-auto px-4 py-8">
@@ -20,7 +25,7 @@ export default function LibraryPage() {
               // Use first page of first issue as cover
               const firstIssue = book.issues[0];
               const coverImage = firstIssue
-                ? `/comics/tmnt-mmpr-iii/${firstIssue.id}/pages/page-01.webp`
+                ? pageImageUrl(book.id, firstIssue.id, 1)
                 : null;
 
               return (

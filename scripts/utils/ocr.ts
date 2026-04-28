@@ -3,6 +3,7 @@ import {
   createPartFromBase64,
   createPartFromText,
 } from "@google/genai";
+import { GEMINI_MEDIUM } from "./models.js";
 import { join, dirname } from "path";
 import fs from "fs-extra";
 import { createOCRViewer, type OCRPrediction } from "./ocr-viewer.js";
@@ -92,7 +93,7 @@ async function runOCRGemini(
 
   try {
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: GEMINI_MEDIUM,
       contents: [imagePart, prompt],
     });
 

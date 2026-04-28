@@ -45,5 +45,23 @@ yarn-error.log*
 # idea files
 .idea
 
-/assets/*
+/assets/**/audio/*
+/assets/episodes/
+/assets/**/data/ocr-crops/*
+/assets/**/data/predictions/*
+/assets/**/pages-webp/*
 /video-test-files/*
+assets/**/checkpoint.json
+/assets/**/new-characters.json
+/assets/**/known-characters.json
+/assets/**/data/wiki-cache.txt
+/assets/**/data/reviewed-speakers.json
+supabase/.temp
+
+# local AI tooling
+.agents/
+.claude/worktrees/
+.cursor/mcp.json
+.gemini/
+.mcp.json
+skills-lock.json

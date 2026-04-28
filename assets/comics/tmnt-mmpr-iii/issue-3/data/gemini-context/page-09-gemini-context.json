@@ -1,0 +1,213 @@
+[
+  {
+    "id": "page-09_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 871,
+      "y": 403,
+      "width": 271,
+      "height": 163,
+      "confidence": 0.9242591261863708,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-001-x871-y403.jpg"
+    },
+    "ocr_text": "JOIN US AND I WILL GUIDE YOU WITHOUT JUDGMENT.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "persuasive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Persuasively] Join us and I will guide you without judgment."
+  },
+  {
+    "id": "page-09_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 227,
+      "y": 617,
+      "width": 308,
+      "height": 165,
+      "confidence": 0.9188586473464966,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-002-x227-y617.jpg"
+    },
+    "ocr_text": "PLEASE... DON'T MAKE ME THROW UP IN MY HELMET.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "sarcastic, disgusted",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Sarcastically, with mock disgust] Please... don't make me throw up in my helmet.",
+    "aiReasoning": "I see the text \"PLEASE... DON'T MAKE ME THROW UP IN MY HELMET.\" in a speech bubble.\nThe tail points to the Red Ranger (Jason).\nHe is a HERO, MAJOR importance.\nHe is responding to Shredder's grandstanding with sarcasm and disgust."
+  },
+  {
+    "id": "page-09_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 487,
+      "y": 221,
+      "width": 234,
+      "height": 165,
+      "confidence": 0.9176076650619507,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-003-x487-y221.jpg"
+    },
+    "ocr_text": "JASON, I'VE BEEN WHERE YOU ARE.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "manipulative",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": null,
+    "textWithCues": "[Manipulative tone] JASON, I'VE BEEN WHERE YOU ARE."
+  },
+  {
+    "id": "page-09_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 883,
+      "y": 661,
+      "width": 245,
+      "height": 188,
+      "confidence": 0.9147170186042786,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-004-x883-y661.jpg"
+    },
+    "ocr_text": "VERY WELL. STOCKMAN, WHENEVER YOU'RE READY...",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "calm, commanding",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Calmly, issuing a command] Very well. Stockman, whenever you're ready...",
+    "aiReasoning": "The text \"VERY WELL. STOCKMAN, WHENEVER YOU'RE READY...\" is in a speech bubble.\nThe tail points to the character in green armor with a helmet, identified from the context list as Green Ranger Shredder.\nShredder is a main villain, so Importance is MAJOR and Side is VILLAIN.\nHe has just been rejected by the Red Ranger and is now calmly ordering Baxter Stockman to initiate an attack (which results in the explosion in the next panel). His expression (though masked) and posture suggest a calm, authoritative, and slightly disappointed demeanor.\nI will add a cue for a calm, commanding tone."
+  },
+  {
+    "id": "page-09_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1166,
+      "y": 1701,
+      "width": 163,
+      "height": 100,
+      "confidence": 0.8967585563659668,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-005-x1166-y1701.jpg"
+    },
+    "ocr_text": "DAMN IT.",
+    "type": "SPEECH",
+    "speaker": "Female Soldier",
+    "emotion": "frustrated",
+    "characterType": "EXTRA",
+    "side": "HERO",
+    "voiceDescription": "Firm, authoritative adult female voice",
+    "textWithCues": "[Frustrated] Damn it."
+  },
+  {
+    "id": "page-09_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 673,
+      "y": 609,
+      "width": 224,
+      "height": 159,
+      "confidence": 0.8929685354232788,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-006-x673-y609.jpg"
+    },
+    "ocr_text": "SO MUCH PROMISE, SO LITTLE VISION.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "condescending",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Condescendingly] So much promise, so little vision.",
+    "aiReasoning": "I have located the text \"SO MUCH PROMISE, SO LITTLE VISION.\" in the second panel.\nThe speech bubble's tail points to the character wearing the green ranger armor combined with Shredder's helmet. This is Green Ranger Shredder.\nHe is a major villain.\nHis tone here is condescending and arrogant as he reacts to the Red Ranger's rejection of his offer.\nI will add a cue for a condescending tone."
+  },
+  {
+    "id": "page-09_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1419,
+      "y": 2404,
+      "width": 475,
+      "height": 203,
+      "confidence": 0.8848806023597717,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-007-x1419-y2404.jpg"
+    },
+    "ocr_text": "NOW, WOULD YOU LIKE TO CONTINUE FIGHTING ME OR DEPART TO SAVE A FEW INSIGNIFICANT LIVES?",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "arrogant, manipulative",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Arrogantly mocking] Now, would you like to continue fighting me, or depart to save a few insignificant lives?"
+  },
+  {
+    "id": "page-09_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 491,
+      "y": 378,
+      "width": 384,
+      "height": 167,
+      "confidence": 0.840749979019165,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-008-x491-y378.jpg"
+    },
+    "ocr_text": "FIGHTING TO FEEL THE POWER OF DESTRUCTION, BUT ASHAMED OF YOUR TRUE MOTIVES.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger Shredder",
+    "emotion": "taunting, analytical",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "N/A",
+    "textWithCues": "[Commanding, analytical] FIGHTING to feel the power of DESTRUCTION... but ASHAMED of your TRUE MOTIVES."
+  },
+  {
+    "id": "page-09_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 1417,
+      "y": 1975,
+      "width": 257,
+      "height": 166,
+      "confidence": 0.805456280708313,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-010-x1417-y1975.jpg"
+    },
+    "ocr_text": "EVERYONE DOWN! TAKE COVER!!!",
+    "type": "SPEECH",
+    "speaker": "Female Soldier",
+    "emotion": "urgent",
+    "characterType": "EXTRA",
+    "side": "NEUTRAL",
+    "voiceDescription": "Authoritative, urgent female voice, mid-30s, military commanding tone",
+    "textWithCues": "[Shouting urgently] EVERYONE DOWN! TAKE COVER!!!",
+    "aiReasoning": "The text \"EVERYONE DOWN! TAKE COVER!!!\" is in a standard speech bubble in the third panel.\nThe tail points to the blonde female character in military/tactical gear, who is commanding the other soldiers while debris falls around them. Based on the provided list, she is the \"Female Soldier\".\nShe is trying to protect her squad from the villain's attack, putting her on the `NEUTRAL` (or allied/good) side.\nShe is a generic or unnamed character, so her importance is `EXTRA`.\nThe text is in all caps with multiple exclamation marks, indicating shouting. The context of falling debris implies extreme urgency."
+  },
+  {
+    "id": "page-09_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 887,
+      "y": 2275,
+      "width": 118,
+      "height": 186,
+      "confidence": 0.7721789479255676,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-09/page-09-crop-011-x887-y2275.jpg"
+    },
+    "ocr_text": "NO.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "shocked, desperate",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Shocked, desperate] No.",
+    "aiReasoning": "The text \"NO.\" is located in the bottom panel, in a small speech bubble.\nThe tail points to the Red Ranger, who is looking over his shoulder towards the area where the explosion occurred in the previous panels.\nThe Red Ranger is a HERO and a MAJOR character.\nThe context is that an explosion just happened, putting soldiers in danger (as seen in the panel above). His reaction is one of shock and desperation as he realizes people are going to get hurt.\nThe bubble is simple, not jagged, so it's a quiet but intense expression of horror, not a scream."
+  }
+]

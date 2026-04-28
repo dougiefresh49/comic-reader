@@ -1,0 +1,11 @@
+{
+  "data": {
+    "eliza-default": "venice-sd35",
+    "most_uncensored": "lustify-v8",
+    "highest_quality": "qwen-image",
+    "default": "z-image-turbo",
+    "fastest": "z-image-turbo"
+  },
+  "object": "list",
+  "type": "image"
+}

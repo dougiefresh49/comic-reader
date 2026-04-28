@@ -1,0 +1,42 @@
+name: Version bump
+
+on:
+  pull_request:
+    types: [labeled]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    name: Bump package version
+    if: github.event.label.name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve bump type
+        id: resolve
+        run: bash scripts/resolve-bump.sh
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Bump version and push to PR branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BUMP_TYPE="${{ steps.resolve.outputs.bump_type }}"
+          NEW_VERSION=$(npm version "$BUMP_TYPE" --no-git-tag-version)
+          git add package.json
+          git commit -m "chore: bump version to ${NEW_VERSION}"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"

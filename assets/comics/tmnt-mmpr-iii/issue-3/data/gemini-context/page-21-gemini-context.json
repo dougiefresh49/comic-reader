@@ -1,0 +1,232 @@
+[
+  {
+    "id": "page-21_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 945,
+      "y": 1661,
+      "width": 369,
+      "height": 214,
+      "confidence": 0.8867502808570862,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-001-x945-y1661.jpg"
+    },
+    "ocr_text": "COMPLETE THE MODIFICATION IN TWELVE HOURS, OR BREATHING WILL BE THE LEAST OF YOUR CONCERNS.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "threatening",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": null,
+    "textWithCues": "[Threateningly] Complete the modification in twelve hours, or breathing will be the least of your concerns."
+  },
+  {
+    "id": "page-21_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1082,
+      "y": 177,
+      "width": 303,
+      "height": 154,
+      "confidence": 0.8507338762283325,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-002-x1082-y177.jpg"
+    },
+    "ocr_text": "WITHOUT THE FOOT CLAN, YOU ARE NOTHING.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "authoritative, arrogant, cold",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Coldly authoritative] Without the Foot Clan, you are nothing.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"WITHOUT THE FOOT CLAN, YOU ARE NOTHING.\" is inside a speech bubble in the top right panel. It is classified as `SPEECH`.\n2.  **Analyze Context:** The tail of the speech bubble points to the character in the spiky armor and helmet, who is Shredder. Shredder is a `MAJOR` character and a `VILLAIN`. In this scene, he is asserting dominance over a subordinate who is expressing fear. His emotion is cold, authoritative, and arrogant.\n3.  **Performance Cues:** The line should be delivered with a menacing, superior tone, emphasizing his power and the insignificance of others."
+  },
+  {
+    "id": "page-21_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1260,
+      "y": 295,
+      "width": 365,
+      "height": 200,
+      "confidence": 0.8284891843795776,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-003-x1260-y295.jpg"
+    },
+    "ocr_text": "THE LIVES OF EVERYONE IN MY SERVICE ARE MEANINGLESS AND INCONSEQUENTIAL.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "cold, commanding, dismissive",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Coldly, asserting his dominance] The lives of everyone in my service are meaningless and inconsequential.",
+    "aiReasoning": "I have located the text \"THE LIVES OF EVERYONE IN MY SERVICE ARE MEANINGLESS AND INCONSEQUENTIAL.\" in the top right panel.\nIt is in a standard speech bubble, so it is SPEECH.\nThe tail points to the imposing figure standing on the structure, looking out at space. The character in the previous panel addressed him as \"Master Shredder\". Therefore, the speaker is Shredder.\nShredder is a MAJOR character and a VILLAIN.\nThe text conveys a cruel, calculating, and grandiose attitude. He is dismissing the value of his followers in pursuit of his larger goals.\nThe emotion should be cold, authoritative, and slightly megalomaniacal."
+  },
+  {
+    "id": "page-21_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 772,
+      "y": 1527,
+      "width": 313,
+      "height": 157,
+      "confidence": 0.8026033043861389,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-004-x772-y1527.jpg"
+    },
+    "ocr_text": "YOU ASKED FOR POWER, AND I HAVE PROVIDED.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "authoritative",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, raspy, authoritative, and menacing Japanese male voice",
+    "textWithCues": "[Commanding] You asked for power, and I have provided."
+  },
+  {
+    "id": "page-21_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1466,
+      "y": 452,
+      "width": 340,
+      "height": 258,
+      "confidence": 0.7600148916244507,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-005-x1466-y452.jpg"
+    },
+    "ocr_text": "BUT I AM ON THE PRECIPICE OF ETERNITY, AND I WILL NOT LET YOUR FEAR STAND IN MY WAY.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "authoritative, grandiose",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": null,
+    "textWithCues": "[Authoritative, grandiose declaration] BUT I AM ON THE PRECIPICE OF ETERNITY, AND I WILL NOT LET YOUR FEAR STAND IN MY WAY.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top right panel. The tail points towards the armored figure standing on the structure. This is `SPEECH`.\n2.  **Analyze Context:** The speaker is Shredder, identifiable by his iconic helmet, cape, and armor, and the context of the conversation where the other character addresses him as \"Master Shredder\". He is a `MAJOR` `VILLAIN`. He is making a grand, arrogant declaration about his imminent power, dismissing the other character's mundane fears. The emotion is authoritative, grandiose, and utterly confident.\n3.  **Performance Cues:** The line is a dramatic proclamation. It needs to sound powerful and unwavering. A cue like `[Authoritative, grandiose]` or `[Booming declaration]` is appropriate to convey his sense of scale and ambition."
+  },
+  {
+    "id": "page-21_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 251,
+      "y": 2211,
+      "width": 311,
+      "height": 167,
+      "confidence": 0.7319945096969604,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-006-x251-y2211.jpg"
+    },
+    "ocr_text": "I SEE YOU FINALLY DECIDE TO COME OUT OF YOUR--",
+    "type": "SPEECH",
+    "speaker": "Baxter Stockman",
+    "emotion": "hurried, interrupted",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Nasally, anxious male voice, sniveling scientist archetype",
+    "textWithCues": "[Hurried, slightly breathless] I see you finally decide to come out of your--",
+    "aiReasoning": "The text \"I SEE YOU FINALLY DECIDE TO COME OUT OF YOUR--\" is in a speech bubble in the bottom-left panel.\nThe tail of the bubble points to the character in the white lab coat who is running away.\nBased on the top panel, this character is Baxter Stockman.\nHe is a known villain/henchman character in the TMNT franchise, making him a MINOR character for voice casting purposes.\nHe has just been thrown to the ground by Shredder and is now running away, looking back over his shoulder. The dashes at the end indicate he is interrupted mid-sentence.\nHis tone should be hurried, slightly breathless from running, and perhaps a bit defensive or anxious before getting cut off."
+  },
+  {
+    "id": "page-21_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 31,
+      "y": 2098,
+      "width": 312,
+      "height": 173,
+      "confidence": 0.6663039326667786,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-007-x31-y2098.jpg"
+    },
+    "ocr_text": "I CAN FEEL THEM MOVING AGAINST US, OROKU SAKI.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "ominous",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Ominously] I can feel them moving against us, Oroku Saki."
+  },
+  {
+    "id": "page-21_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1002,
+      "y": 2046,
+      "width": 312,
+      "height": 154,
+      "confidence": 0.5936179161071777,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-008-x1002-y2046.jpg"
+    },
+    "ocr_text": "WHAT HAS HAPPENED? THE MUTAGEN.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "surprised",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Surprised] What has happened? The mutagen.",
+    "aiReasoning": "The text is in a speech bubble.\nThe tail points to the left, indicating the speaker is the character from the previous panel who was just speaking to Oroku Saki (Shredder). This character has the visual hallmarks of Lord Zedd (metal bands, visor) but with green, mutated skin. He is reacting to Shredder stepping out of the shadows in his new, mutated form.\nSpeaker: Lord Zedd.\nImportance: Major Villain.\nEmotion: Surprised, confused, demanding an explanation.\nPerformance: He is taken aback by Shredder's transformation."
+  },
+  {
+    "id": "page-21_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 154,
+      "y": 56,
+      "width": 253,
+      "height": 154,
+      "confidence": 0.5240510702133179,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-009-x154-y56.jpg"
+    },
+    "ocr_text": "YOU'RE WORRIED ABOUT...THE AIR?",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "incredulous",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Incredulous, condescending tone] You're worried about... [pauses in disbelief] the air?",
+    "aiReasoning": "The text \"YOU'RE WORRIED ABOUT...THE AIR?\" is in a speech bubble in the top left panel. The tail points off-panel to the right. The character shown in the panel is Baxter Stockman, looking terrified and sweating. In the subsequent bubbles, Stockman addresses the speaker as \"MASTER SHREDDER\", confirming the speaker of this line is Shredder.\nShredder is a MAJOR VILLAIN. His tone here is clearly one of disbelief and condescension at Stockman's fear of the vacuum of space while they are on the \"precipice of eternity\".\nThe ellipsis suggests a pause, emphasizing his incredulity. The performance should reflect this arrogant disbelief."
+  },
+  {
+    "id": "page-21_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 183,
+      "y": 985,
+      "width": 369,
+      "height": 233,
+      "confidence": 0.3143790066242218,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-010-x183-y985.jpg"
+    },
+    "ocr_text": "IT'S JUST THAT THE IDEA OF MAGIC BEING THE ONLY THING BETWEEN ME AND THE VACUUM OF SPACE IS--",
+    "type": "SPEECH",
+    "speaker": "Baxter Stockman",
+    "emotion": "terrified",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Panicking, rambling] It's just that the idea of magic being the only thing between me and the vacuum of space is--"
+  },
+  {
+    "id": "page-21_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 1292,
+      "y": 2106,
+      "width": 221,
+      "height": 120,
+      "confidence": 0.3001438081264496,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-21/page-21-crop-011-x1292-y2106.jpg"
+    },
+    "ocr_text": "I WARNED YOU--",
+    "type": "SPEECH",
+    "speaker": "Baxter Stockman",
+    "emotion": "terrified",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Panicking, cutting himself off] I warned you--"
+  }
+]

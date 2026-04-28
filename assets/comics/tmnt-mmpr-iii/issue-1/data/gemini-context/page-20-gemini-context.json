@@ -1,0 +1,130 @@
+[
+  {
+    "id": "page-20_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1422.717529296875,
+      "y": 1461.0621337890625,
+      "width": 250.6741943359375,
+      "height": 155.574951171875,
+      "confidence": 0.9407153129577637,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-20/page-20-crop-001-x1422-y1461.jpg"
+    },
+    "ocr_text": "FINALLY, I CAN CRACK THAT SHELL IN TWO!",
+    "type": "SPEECH",
+    "speaker": "Armored Villain",
+    "emotion": "Triumphant and sadistic",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, booming, aggressive male voice, like a powerful brute gloating",
+    "textWithCues": "[Shouting with sadistic glee] FINALLY, I CAN CRACK THAT SHELL IN TWO!"
+  },
+  {
+    "id": "page-20_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 404.5697326660156,
+      "y": 58.750118255615234,
+      "width": 343.3778381347656,
+      "height": 185.28522109985352,
+      "confidence": 0.9283730387687683,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-20/page-20-crop-002-x404-y58.jpg"
+    },
+    "ocr_text": "DON'T MATTER. THEY CAN PUT ON ALL THE FANCY ARMOR THEY WANT!",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Stubborn and aggressive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Dismissive, gruff shout while running] Don't matter. They can put on all the fancy armor they want!"
+  },
+  {
+    "id": "page-20_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 352.1125183105469,
+      "y": 216.860107421875,
+      "width": 211.35195922851562,
+      "height": 127.41030883789062,
+      "confidence": 0.9241794943809509,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-20/page-20-crop-003-x352-y216.jpg"
+    },
+    "ocr_text": "NO, WAIT! YOU CAN'T--",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Panicked urgency",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting anxiously] NO, WAIT! YOU CAN'T--",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"NO, WAIT! YOU CAN'T--\" is in a speech bubble in the top left panel.\n2.  **Context:**\n    *   **Visuals:** The bubble has a tail pointing to the Green Ranger (from Power Rangers) in the background. He is reaching out with one hand as if to stop someone.\n    *   **Speaker:** The character is the Green Ranger. He is not in the \"Unique Characters\" list (which only contains Armored Villain and Raphael), so I will name him \"Green Ranger\".\n    *   **Side:** HERO.\n    *   **Importance:** MAJOR (He is a Power Ranger).\n    *   **Emotion:** He looks panicked and is trying to warn Raphael not to attack. The text is urgent.\n3.  **Performance Cues:**\n    *   The text is all caps with exclamation marks, implying volume.\n    *   The \"--\" at the end indicates he is cut off or the action is happening too fast.\n    *   Tone should be urgent, warning, and desperate."
+  },
+  {
+    "id": "page-20_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 988.8936767578125,
+      "y": 74.2496109008789,
+      "width": 280.2490234375,
+      "height": 237.45250701904297,
+      "confidence": 0.9188632965087891,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-20/page-20-crop-004-x988-y74.jpg"
+    },
+    "ocr_text": "THEY'RE STILL SLOW, STUPID AND--",
+    "type": "SPEECH",
+    "speaker": "Armored Villain",
+    "emotion": "Mocking and Aggressive",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice, aggressive and tough",
+    "textWithCues": "[Shouting mid-air, mocking] They're still slow, stupid and--",
+    "aiReasoning": "I identified the text \"THEY'RE STILL SLOW, STUPID AND--\" in the top right panel.\nThe speaker is the large, armored rhino character in the air. Based on the provided unique character list, this is the \"Armored Villain\".\nHe is attacking Raphael, so he is a VILLAIN.\nGiven the generic name \"Armored Villain\", I will classify him as MINOR to provide a voice description, as he appears to be a named character (Rocksteady) but is labeled generically.\nHis voice should be deep, brutish, and aggressive.\nThe text ends with \"--\", indicating he is cut off, likely by the impact in the subsequent panel. He is mocking the heroes while attacking."
+  },
+  {
+    "id": "page-20_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1105.873779296875,
+      "y": 1391.51416015625,
+      "width": 336.9420166015625,
+      "height": 190.120849609375,
+      "confidence": 0.9123642444610596,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-20/page-20-crop-005-x1105-y1391.jpg"
+    },
+    "ocr_text": "I'M BIGGER, BADDER AND BETTER THAN YOU'LL EVER BE NOW!",
+    "type": "SPEECH",
+    "speaker": "Armored Villain",
+    "emotion": "Arrogant and triumphant",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, booming, metallic, and raspy male voice; authoritative and menacing",
+    "textWithCues": "[Shouting with arrogant pride while attacking] I'M BIGGER, BADDER AND BETTER THAN YOU'LL EVER BE NOW!",
+    "aiReasoning": "The text is located in a speech bubble in the large middle panel where the villain is smashing Raphael into the ground.\n1.  **Locate & Classify:** The text is \"I'M BIGGER, BADDER AND BETTER THAN YOU'LL EVER BE NOW!\". It is inside a rounded speech bubble with a tail pointing to the large red armored character. Classification: `SPEECH`.\n2.  **Speaker:** The character is the large, red, muscular villain with silver armor pieces. The provided list identifies him as \"Armored Villain\". I will use this exact name.\n3.  **Side:** He is fighting Raphael (a Hero), so he is a `VILLAIN`.\n4.  **Importance:** He is the central antagonist in this scene, physically overpowering a main hero. This qualifies as `MAJOR` (or a very significant MINOR). I will classify as `MAJOR`.\n5.  **Voice Description:** Even though he is MAJOR, the name \"Armored Villain\" is generic. To ensure a good performance, I will describe the voice. He looks like a powerhouse character (Lord Zedd). The voice should be deep, booming, raspy, and authoritative.\n6.  **Emotion:** He is gloating about his superiority while physically dominating his opponent. The emotion is arrogant, triumphant, and aggressive.\n7.  **Performance Cues:** The text is in all caps. He is in the middle of a violent action (slamming Raph). He is listing his superior traits (\"Bigger, Badder, Better\"). This should be delivered with forceful arrogance, likely shouting over the noise of the crash."
+  },
+  {
+    "id": "page-20_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1554.8350830078125,
+      "y": 1131.5029296875,
+      "width": 293.742919921875,
+      "height": 169.073974609375,
+      "confidence": 0.7204737067222595,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-20/page-20-crop-006-x1554-y1131.jpg"
+    },
+    "ocr_text": "WHO YOU CALLIN' SLOW, YOU TURTLE TWERP!",
+    "type": "SPEECH",
+    "speaker": "Armored Villain",
+    "emotion": "Angry",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gruff, brutish male voice, aggressive and loud, like a street thug",
+    "textWithCues": "[Shouting angrily while punching] Who you callin' slow, you turtle twerp!",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"WHO YOU CALLIN' SLOW, YOU TURTLE TWERP!\" is in a speech bubble in the middle-right panel. The tail connects to the large armored rhinoceros character (Rocksteady). This is `SPEECH`.\n2.  **Analyze Context**:\n    *   **Speaker**: The character is the large figure in red/white/gold armor. The prompt provides a list of unique characters including \"Armored Villain\". This character fits that description perfectly. I will use \"Armored Villain\".\n    *   **Side**: `VILLAIN`. He is attacking Raphael (a hero).\n    *   **Importance**: He is a named secondary villain (Rocksteady), distinct from generic \"extras\". Based on the instructions, this fits `MINOR` (Named secondary characters).\n    *   **Voice Description**: He is a large brute. The voice should be deep, gruff, raspy, and sound like a tough street thug or henchman. High aggression.\n    *   **Emotion**: He is reacting to being called \"slow\" and \"stupid\" in the previous panel. He is furious and in the middle of a violent physical attack. The emotion is anger and aggression.\n3.  **Performance Cues**:\n    *   **Volume**: He is shouting. The text is all caps and he is mid-combat.\n    *   **Tone**: Offended, aggressive, exerting effort (punching).\n    *   **Text Processing**: \"Who you callin' slow, you turtle twerp!\"\n    *   **Cues**: `[Shouting angrily]`, `[Exerting effort]`."
+  }
+]

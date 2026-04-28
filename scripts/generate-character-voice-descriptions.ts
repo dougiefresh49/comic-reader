@@ -11,39 +11,65 @@ import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { GEMINI_MEDIUM } from "./utils/models.js";
 import { env } from "~/env.mjs";
 import type { Bubble } from "./utils/gemini-context.js";
+import { loadBookConfig } from "./utils/roster.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
-// Get issue number from command line argument or default to issue-1
-const ISSUE = process.argv[2] || "issue-1";
-const ISSUE_DIR = join(
-  PROJECT_ROOT,
-  "assets",
-  "comics",
-  "tmnt-mmpr-iii",
-  ISSUE,
-);
-const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
-const OUTPUT_FILE = join(ISSUE_DIR, "character-voice-descriptions.json");
+function parseArgs(): { book: string; issue: string; referenceIssue: string } {
+  const args = process.argv.slice(2);
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
+  let referenceIssue = issue;
 
-// Path to reference file (existing character voice descriptions)
-// Defaults to issue-1, but can be overridden via command line argument
-const REFERENCE_ISSUE = process.argv[3] || "issue-1";
-const REFERENCE_FILE = join(
-  PROJECT_ROOT,
-  "assets",
-  "comics",
-  "tmnt-mmpr-iii",
-  REFERENCE_ISSUE,
-  "character-voice-descriptions.json",
-);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (!arg) continue;
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const next = args[i + 1];
+      if (next) book = next.trim();
+    }
+    if (arg.startsWith("--issue=")) {
+      const issueNum = arg.split("=")[1]?.trim();
+      if (issueNum)
+        issue = issueNum.startsWith("issue-") ? issueNum : `issue-${issueNum}`;
+    }
+    if (arg === "--issue") {
+      const next = args[i + 1];
+      if (next) {
+        issue = next.startsWith("issue-") ? next : `issue-${next}`;
+      }
+    }
+    if (arg.startsWith("--reference-issue=")) {
+      const ref = arg.split("=")[1]?.trim();
+      if (ref) referenceIssue = ref.startsWith("issue-") ? ref : `issue-${ref}`;
+    }
+    if (arg === "--reference-issue") {
+      const next = args[i + 1];
+      if (next)
+        referenceIssue = next.startsWith("issue-") ? next : `issue-${next}`;
+    }
+  }
+
+  // default referenceIssue to issue if not overridden
+  if (!args.some((a) => a.startsWith("--reference-issue"))) {
+    referenceIssue = issue;
+  }
+
+  return { book, issue, referenceIssue };
+}
 
 type ContextCache = Record<string, Bubble[]>;
-type CharacterVoiceMap = Record<string, string>;
+export type CharacterVoiceEntry = { description: string; named: boolean };
+type CharacterVoiceMap = Record<string, CharacterVoiceEntry>;
+type LegacyOrNewEntry = string | CharacterVoiceEntry;
 
 /**
  * Collect all voice descriptions for each character
@@ -70,24 +96,32 @@ function collectCharacterVoiceDescriptions(
 }
 
 /**
- * Generate a single voice description for a character using Gemini
+ * Generate a consolidated voice description + named classification for a character using Gemini
  */
 async function generateCharacterVoiceDescription(
   gemini: GoogleGenAI,
   characterName: string,
   voiceDescriptions: string[],
-): Promise<string> {
+  bookTitle: string,
+  characterContextInstruction: string,
+): Promise<CharacterVoiceEntry> {
   const descriptionsList = voiceDescriptions
     .map((desc, idx) => `${idx + 1}. ${desc}`)
     .join("\n");
 
-  const prompt = `You are generating a voice description for the character "${characterName}" from the Teenage Mutant Ninja Turtles x Mighty Morphin Power Rangers crossover comic book.
+  const contextLine = characterContextInstruction
+    ? `\nFranchise context: ${characterContextInstruction}\n`
+    : "";
 
+  const prompt = `You are generating a voice description for the character "${characterName}" from ${bookTitle}.
+${contextLine}
 Below is a list of context-aware voice descriptions from different pages where this character appears:
 
 ${descriptionsList}
 
-Your task is to analyze all these voice descriptions and create a single, comprehensive voice description that captures the essence of this character's voice. This description will be used to generate a voice model via Eleven Labs.
+Your task is to:
+1. Create a single, comprehensive voice description that captures the essence of this character's voice for AI voice generation.
+2. Classify whether this character is "named" (has a specific proper name from the source franchise, e.g. Goldar, Baxter Stockman, Bulk, Lord Zedd) or "generic" (described only by role or appearance, e.g. "Female Soldier", "Unknown Voice", "Robo-Foot Soldier", "Winged Monster").
 
 Consider:
 - The consistent characteristics across all descriptions
@@ -95,13 +129,17 @@ Consider:
 - The tone, pitch, and style that best represents them
 - Any unique vocal qualities mentioned
 
-Return ONLY a single, concise voice description (2-3 sentences maximum) that can be used for voice generation. Do not include any explanatory text, just the voice description itself.`;
+Return ONLY a JSON object (no markdown, no extra text) with this exact structure:
+{
+  "description": "..voice description (2-3 sentences)..",
+  "named": true
+}`;
 
   try {
     const textPart = createPartFromText(prompt);
 
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: GEMINI_MEDIUM,
       contents: [textPart],
     });
 
@@ -110,16 +148,22 @@ Return ONLY a single, concise voice description (2-3 sentences maximum) that can
       throw new Error("No text response from Gemini");
     }
 
-    // Clean up the response - remove markdown code blocks if present
-    let cleanedText = text.trim();
-    if (cleanedText.includes("```")) {
-      const codeBlockMatch = cleanedText.match(/```[^\n]*\n([\s\S]*?)\n```/);
-      if (codeBlockMatch) {
-        cleanedText = codeBlockMatch[1]?.trim() ?? cleanedText;
-      }
+    let jsonText = text.trim();
+    const codeBlockMatch = jsonText.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1]?.trim() ?? jsonText;
     }
+    const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) jsonText = jsonMatch[0]!;
 
-    return cleanedText;
+    const parsed = JSON.parse(jsonText) as {
+      description?: string;
+      named?: boolean;
+    };
+    return {
+      description: parsed.description ?? text.trim(),
+      named: parsed.named ?? true,
+    };
   } catch (error) {
     console.error(
       `Error generating voice description for ${characterName}:`,
@@ -130,20 +174,29 @@ Return ONLY a single, concise voice description (2-3 sentences maximum) that can
 }
 
 /**
- * Load existing character voice descriptions from reference file
+ * Load existing character voice descriptions from reference file (handles legacy string format)
  */
-async function loadExistingDescriptions(): Promise<CharacterVoiceMap> {
+async function loadExistingDescriptions(
+  referenceFile: string,
+): Promise<CharacterVoiceMap> {
   try {
-    if (await fs.pathExists(REFERENCE_FILE)) {
-      const existing = await fs.readFile(REFERENCE_FILE, "utf-8");
-      const parsed = JSON.parse(existing) as CharacterVoiceMap;
+    if (await fs.pathExists(referenceFile)) {
+      const existing = await fs.readFile(referenceFile, "utf-8");
+      const raw = JSON.parse(existing) as Record<string, LegacyOrNewEntry>;
+      const normalized: CharacterVoiceMap = {};
+      for (const [name, value] of Object.entries(raw)) {
+        normalized[name] =
+          typeof value === "string"
+            ? { description: value, named: true }
+            : value;
+      }
       console.log(
-        `   ✓ Loaded ${Object.keys(parsed).length} existing character descriptions from ${REFERENCE_FILE}\n`,
+        `   ✓ Loaded ${Object.keys(normalized).length} existing character descriptions from ${referenceFile}\n`,
       );
-      return parsed;
+      return normalized;
     } else {
       console.log(
-        `   ℹ️  No reference file found at ${REFERENCE_FILE}, will generate all descriptions\n`,
+        `   ℹ️  No reference file found at ${referenceFile}, will generate all descriptions\n`,
       );
       return {};
     }
@@ -161,17 +214,38 @@ async function loadExistingDescriptions(): Promise<CharacterVoiceMap> {
  */
 async function main() {
   try {
+    const { book, issue, referenceIssue } = parseArgs();
+
+    const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+    const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
+    const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
+    const OUTPUT_FILE = join(ISSUE_DIR, "character-voice-descriptions.json");
+    const REFERENCE_FILE = join(
+      PROJECT_ROOT,
+      "assets",
+      "comics",
+      book,
+      referenceIssue,
+      "character-voice-descriptions.json",
+    );
+
+    const bookConfig = await loadBookConfig(BOOK_DIR);
+    const bookTitle =
+      bookConfig?.title ??
+      "Teenage Mutant Ninja Turtles x Mighty Morphin Power Rangers crossover comic book";
+    const characterContextInstruction = bookConfig?.characterContext ?? "";
+
     console.log("🎤 Starting character voice description generation...\n");
-    console.log(`📁 Processing issue: ${ISSUE}`);
-    if (REFERENCE_ISSUE !== ISSUE) {
-      console.log(`📚 Using reference from: ${REFERENCE_ISSUE}\n`);
+    console.log(`📁 Processing issue: ${issue}`);
+    if (referenceIssue !== issue) {
+      console.log(`📚 Using reference from: ${referenceIssue}\n`);
     } else {
       console.log();
     }
 
     // Load existing descriptions from reference file
     console.log("📖 Loading existing character voice descriptions...");
-    const existingDescriptions = await loadExistingDescriptions();
+    const existingDescriptions = await loadExistingDescriptions(REFERENCE_FILE);
 
     // Initialize Gemini with GEMINI_API_KEY_2
     const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY_2 });
@@ -249,9 +323,14 @@ async function main() {
               gemini,
               characterName,
               descriptions,
+              bookTitle,
+              characterContextInstruction,
             );
           voiceMap[characterName] = consolidatedDescription;
-          console.log(`      ✓ Generated voice description`);
+          const namedLabel = consolidatedDescription.named
+            ? "named"
+            : "generic";
+          console.log(`      ✓ Generated voice description (${namedLabel})`);
           processed++;
 
           // Wait 2 seconds between API calls to prevent rate limiting

@@ -1,43 +1,45 @@
-export const aliasMap = {
-  // Power Rangers
-  tommy: "Green Ranger",
-  "tommy oliver": "Green Ranger",
-  "green ranger": "Green Ranger",
+import { supabase } from "./lib/supabase.js";
 
-  jason: "Red Ranger",
-  "red ranger": "Red Ranger",
+let aliasCache: Map<string, string> | null = null;
 
-  kimberly: "Pink Ranger",
-  "pink ranger": "Pink Ranger",
+export async function initAliasMap(): Promise<void> {
+  const { data, error } = await supabase
+    .from("aliases")
+    .select("alias, canonical, scope, scope_id");
+  if (error) {
+    console.warn(
+      "alias-map: DB load failed, falling back to empty map:",
+      error.message,
+    );
+    aliasCache = new Map();
+    return;
+  }
+  aliasCache = new Map(
+    (data ?? []).map((row: { alias: string; canonical: string }) => [
+      row.alias.toLowerCase().trim(),
+      row.canonical,
+    ]),
+  );
+}
 
-  trini: "Yellow Ranger",
-  "yellow ranger": "Yellow Ranger",
+export function getCanonicalName(
+  name: string,
+  _context?: { bookId?: string; seriesId?: string },
+): string {
+  if (!aliasCache) {
+    throw new Error("initAliasMap() must be called before getCanonicalName()");
+  }
+  const lower = name.toLowerCase().trim();
+  // Scope resolution: book > series > global (simple lookup for now)
+  return aliasCache.get(lower) ?? name;
+}
 
-  zack: "Black Ranger",
-  "black ranger": "Black Ranger",
-
-  billy: "Blue Ranger",
-  "billy cranston": "Blue Ranger",
-  "master splinter": "Splinter",
-
-  // Note: "Blue Ranger" wasn't in your file, but Billy was.
-  // We will map Billy to Blue Ranger to keep the naming convention consistent.
-
-  // Support Characters
-  "ms. sterling": "Grace Sterling",
-  "grace sterling": "Grace Sterling",
-
-  // Groups (Map to the dominant speaker or a generic group voice if needed)
-  "jason and kimberly": "Red Ranger", // Default to Jason for now, or create a 'Group' entry
-  "michelangelo & red ranger": "Michelangelo", // Default to Mikey for shared lines
-  "yellow turtle ranger": "Michelangelo", // Default to Mikey for shared lines
-  scientist: "Dr. Boyd", // Default to Mikey for shared lines
-};
-
-// Helper to normalize names (trim, lowercase) for lookup
-export const getCanonicalName = (name: string) => {
-  const cleanName = name.toLowerCase().trim();
-  // Return the alias if it exists, otherwise return the original name (Title Cased)
-  // This preserves names like "Shredder" or "Leonardo" that aren't in the alias map.
-  return aliasMap[cleanName as keyof typeof aliasMap] || name;
-};
+// Keep the aliasMap export as a getter for backwards compat
+export const aliasMap: Record<string, string> = new Proxy(
+  {} as Record<string, string>,
+  {
+    get(_target, key: string) {
+      return aliasCache?.get(key.toLowerCase()) ?? undefined;
+    },
+  },
+);

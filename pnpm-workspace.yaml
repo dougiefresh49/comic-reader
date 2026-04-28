@@ -1,4 +1,8 @@
 onlyBuiltDependencies:
+  - bufferutil
+  - esbuild
+  - ffmpeg-static
+  - fluent-ffmpeg
   - sharp
   - unrs-resolver
   - youtube-dl-exec

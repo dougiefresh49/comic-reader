@@ -1,0 +1,175 @@
+[
+  {
+    "id": "page-22_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1135.168212890625,
+      "y": 1870.7535400390625,
+      "width": 282.231689453125,
+      "height": 223.7088623046875,
+      "confidence": 0.9481191039085388,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-001-x1135-y1870.jpg"
+    },
+    "ocr_text": "THIS WORKED OUT EVEN BETTER THAN EXPECTED.",
+    "type": "SPEECH",
+    "speaker": "Krang",
+    "emotion": "Smug satisfaction",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Smugly satisfied] THIS WORKED OUT EVEN BETTER THAN EXPECTED.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"THIS WORKED OUT EVEN BETTER THAN EXPECTED.\" is in the bottom right panel. It is in a standard speech bubble with a tail pointing to the character on the left side of the panel. Classification: `SPEECH`.\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to the character on the left, who is a brain inside the stomach of an android body. This is the character **Krang**.\n    *   **Side**: `VILLAIN`.\n    *   **Importance**: `MAJOR` (Krang is a primary antagonist in TMNT lore).\n    *   **Voice Description**: Since the character is `MAJOR`, a generic description isn't strictly required by the prompt rules (\"If MINOR or EXTRA...\"), but Krang is known for a raspy, burbly, arrogant alien voice.\n    *   **Emotion**: The text implies satisfaction with a plan coming to fruition. He is gloating to his ally, Shredder. The emotion is smug and pleased.\n3.  **Performance Cues**:\n    *   **Volume**: Normal speech bubble.\n    *   **Tone**: Smug, satisfied, gloating.\n    *   **Text Cues**: Add `[Smugly]` or `[Satisfied]` to indicate the pleasure in the success of the plan."
+  },
+  {
+    "id": "page-22_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 211.1142120361328,
+      "y": 1865.892333984375,
+      "width": 183.89137268066406,
+      "height": 98.41455078125,
+      "confidence": 0.9301174879074097,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-002-x211-y1865.jpg"
+    },
+    "ocr_text": "YES, MASTER.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Determined and obedient",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, disciplined, leader-like, American accent",
+    "textWithCues": "[Firmly acknowledging command] Yes, Master.",
+    "aiReasoning": "The user wants me to analyze the speech bubble containing the text \"YES, MASTER.\".\n\n1.  **Locate & Classify**:\n    *   The text is in the bottom-left panel.\n    *   It is in a standard speech bubble.\n    *   The tail of the bubble points to the Teenage Mutant Ninja Turtle wearing a blue mask. This is Leonardo.\n    *   **Type**: SPEECH.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The character is Leonardo. He is responding to the command given in the previous panel (\"Jason! Leonardo! Defensive positions.\") by Master Splinter. Since \"Leonardo\" is not in the provided unique characters list (only Krang is listed), I will create the new name \"Leonardo\".\n    *   **Side**: HERO.\n    *   **Importance**: MAJOR (He is one of the main protagonists).\n    *   **Voice Description**: Since he is a MAJOR character not in the provided list, I will provide a description suitable for Leonardo: \"Young adult male, disciplined, authoritative but youthful, American accent.\"\n    *   **Emotion**: He is entering a defensive stance, holding his swords ready. He looks focused and determined. The tone is obedient and ready for combat.\n\n3.  **Performance Cues**:\n    *   The text is a direct response to an order.\n    *   No shouting formatting (bold/jagged), just standard text.\n    *   Context implies a military-like acknowledgment.\n    *   **Cues**: `[Firmly and obediently]` or `[Focused]`.\n\n4.  **Drafting Output**:\n    *   Speaker: Leonardo\n    *   Text: \"Yes, Master.\"\n    *   Cues: \"[Firmly acknowledging command] Yes, Master.\""
+  },
+  {
+    "id": "page-22_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1463.0068359375,
+      "y": 1891.127685546875,
+      "width": 215.4102783203125,
+      "height": 98.311767578125,
+      "confidence": 0.9264237880706787,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-003-x1463-y1891.jpg"
+    },
+    "ocr_text": "I'M GLAD WE AGREE.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Sinister satisfaction",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, commanding, raspy, and menacing male voice. Authoritative and cold.",
+    "textWithCues": "[Coldly, with sinister satisfaction] I'm glad we agree.",
+    "aiReasoning": "I have located the text \"I'M GLAD WE AGREE.\" in the bottom right panel.\nThe speech bubble has a tail pointing to the character on the right, who is the Shredder.\nShredder is a major villain in the TMNT franchise. He is not listed in the provided \"Unique Characters\" list (which only had Krang and Leonardo), so I will use the name \"Shredder\".\nHis tone is likely cold, menacing, and satisfied, as he is conspiring with Krang."
+  },
+  {
+    "id": "page-22_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 562.9412841796875,
+      "y": 1914.9854736328125,
+      "width": 246.20770263671875,
+      "height": 159.4259033203125,
+      "confidence": 0.9161688685417175,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-004-x562-y1914.jpg"
+    },
+    "ocr_text": "NOT ONE. THIS IS WHY WE TRAIN, RIGHT?",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Determined and confident",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Heroic, confident young male voice with a strong American accent",
+    "textWithCues": "[Firmly] Not one. [Confident, rallying tone] This is why we train, right?",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"NOT ONE. THIS IS WHY WE TRAIN, RIGHT?\" is located in the bottom-left panel. It is enclosed in a speech bubble with a tail pointing to the character in the red suit (the Red Ranger). Therefore, the type is `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to the Red Ranger. Based on the previous panel's text (\"Jason! Leonardo!\"), this character is Jason, the Red Power Ranger. He is a distinct character from the provided list (Krang, Leonardo, Shredder). I will name him \"Red Ranger\".\n    *   **Side:** `HERO`. He is fighting alongside the Ninja Turtles against the villains.\n    *   **Importance:** `MAJOR`. He is one of the main protagonists (Power Rangers).\n    *   **Voice Description:** (Although primarily for Minor/Extra, I will provide context) Heroic, young adult male, American accent, confident leader tone.\n    *   **Emotion:** Determined, focused, exhibiting camaraderie. He is backing up Leonardo's statement (\"No one gets through\").\n\n3.  **Performance Cues:**\n    *   \"NOT ONE.\" is a firm agreement with Leonardo's previous statement (\"No one gets through.\"). It requires a resolute, determined tone.\n    *   \"THIS IS WHY WE TRAIN, RIGHT?\" is a rhetorical question meant to bolster confidence and affirm their readiness. It should be delivered with a slightly lighter, confident, perhaps breathless (from fighting) tone of camaraderie."
+  },
+  {
+    "id": "page-22_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1554.562744140625,
+      "y": 1986.360595703125,
+      "width": 274.4097900390625,
+      "height": 137.2431640625,
+      "confidence": 0.9095206260681152,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-005-x1554-y1986.jpg"
+    },
+    "ocr_text": "FOOT CLAN...DESTROY THEM.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Commanding",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, resonant, menacing, and authoritative male voice",
+    "textWithCues": "[Deep, authoritative voice] Foot Clan... [pauses] destroy them.",
+    "aiReasoning": "The user wants me to analyze a speech bubble in the bottom right panel of the comic page.\n**Text:** \"FOOT CLAN...DESTROY THEM.\"\n**Location:** Bottom right panel, right side.\n**Visual Context:** The bubble has a tail pointing to the character on the right in this panel. This character is wearing the iconic spiked armor, helmet, and purple cape of the Shredder.\n**Character Identification:** Based on the visual appearance and the provided list of unique characters, this is **Shredder**.\n**Role:** Shredder is the primary antagonist of the Teenage Mutant Ninja Turtles. He is a **MAJOR** character.\n**Side:** He is a **VILLAIN**.\n**Emotion/Delivery:** He is issuing a command to his minions. His stance is standing tall and firm. The dialogue follows an agreement with Krang. The tone should be authoritative, cold, and menacing.\n**Text Cues:** The ellipsis \"...\" indicates a dramatic pause between naming the unit (\"Foot Clan\") and giving the order (\"destroy them\").\n**Voice Description:** Even though he is a MAJOR character, a description helps. Deep, resonant, menacing male voice."
+  },
+  {
+    "id": "page-22_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 311.78253173828125,
+      "y": 1939.906005859375,
+      "width": 223.11224365234375,
+      "height": 137.5947265625,
+      "confidence": 0.9017531275749207,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-006-x311-y1939.jpg"
+    },
+    "ocr_text": "NO ONE GETS THROUGH.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Determined and focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Firmly, in a defensive stance] No one gets through.",
+    "aiReasoning": "The user wants me to analyze the text \"NO ONE GETS THROUGH.\"\n1.  **Locate**: This text is in the bottom-left panel.\n2.  **Classify**: It is inside a speech bubble with a tail. Type is `SPEECH`.\n3.  **Speaker**: The tail points to the Ninja Turtle with the blue mask. This is **Leonardo**. He is listed in the provided \"Unique Characters\" list.\n4.  **Side**: Leonardo is a protagonist. Side is `HERO`.\n5.  **Importance**: He is a main character. Importance is `MAJOR`.\n6.  **Context**: Leonardo is in a defensive fighting stance alongside Master Splinter and the Red Ranger. They are preparing to defend against an attack. He is responding to an order to take defensive positions.\n7.  **Emotion**: He looks focused, serious, and determined. His brow is furrowed (visible through the mask).\n8.  **Performance Cues**: The line is a declaration of intent. It should be spoken with authority, firmness, and grit. It's not necessarily a scream, but a strong projection of will."
+  },
+  {
+    "id": "page-22_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1616.469482421875,
+      "y": 1285.5345458984375,
+      "width": 246.066162109375,
+      "height": 131.072021484375,
+      "confidence": 0.7696943283081055,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-007-x1616-y1285.jpg"
+    },
+    "ocr_text": "STRENGTH AND FOCUS.",
+    "type": "SPEECH",
+    "speaker": "Master Splinter",
+    "emotion": "Serious and instructional",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Wise, elderly male voice, authoritative, calm but firm, Japanese accent",
+    "textWithCues": "[Firmly and instructively] Strength and focus.",
+    "aiReasoning": "The text is \"STRENGTH AND FOCUS.\" located in a speech bubble in the top right of the panel.\nThe bubble's tail connects to the previous bubble (\"JASON! LEONARDO! DEFENSIVE POSITIONS.\"), which originates from the anthropomorphic rat character in the red robe.\nThis character is Master Splinter. He is not in the provided list of unique characters (Krang, Leonardo, Shredder, Red Ranger), so I will create a new name for him.\nSplinter is a mentor figure and a hero. He is giving a command/advice during combat.\nHis expression is focused and serious.\nThe text is standard speech, not bold or jagged, so it is spoken with authority but not screamed. It serves as a combat instruction or mantra."
+  },
+  {
+    "id": "page-22_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1631.42724609375,
+      "y": 964.1411743164062,
+      "width": 259.89013671875,
+      "height": 336.41729736328125,
+      "confidence": 0.4646499752998352,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-22/page-22-crop-008-x1631-y964.jpg"
+    },
+    "ocr_text": "JASON! LEONARDO! DEFENSIVE POSITIONS.",
+    "type": "SPEECH",
+    "speaker": "Master Splinter",
+    "emotion": "Commanding and urgent",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting authoritatively] JASON! LEONARDO! DEFENSIVE POSITIONS.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"JASON! LEONARDO! DEFENSIVE POSITIONS.\" is inside a speech bubble in the top panel (x:1631, y:964).\n2.  **Speaker Identification**: The bubble has a tail pointing directly to the rat character on the right side of the panel. Based on the provided unique character list and visual appearance, this is **Master Splinter**.\n3.  **Context**:\n    *   **Side**: Hero (Mentor to the Turtles).\n    *   **Character Type**: MAJOR (He is a main character).\n    *   **Action**: Splinter is leaping into action alongside Leonardo and the Red Ranger. He is issuing tactical commands.\n    *   **Emotion**: Commanding, urgent, focused, authoritative.\n4.  **Performance Cues**: The text is in all caps with exclamation marks for the names (\"JASON!\", \"LEONARDO!\"). This indicates he is projecting his voice loudly to be heard in combat. The tone should be that of a stern martial arts master giving orders.\n5.  **Voice Description**: Since the character is MAJOR, a specific description isn't strictly required by the prompt instructions (\"If MINOR or EXTRA...\"), but for context, it would be an elderly, wise, gravelly male voice. I will omit the specific field or leave it generic since the prompt implies it's for non-major characters, but I'll focus on the `textWithCues`."
+  }
+]

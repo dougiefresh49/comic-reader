@@ -1,0 +1,44 @@
+[
+  {
+    "id": "page-17_b01",
+    "box_2d": {
+      "index": 1,
+      "x": 535,
+      "y": 1220,
+      "width": 351,
+      "height": 733,
+      "confidence": 0.4929175078868866,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-17/page-17-crop-002-x535-y1220.jpg"
+    },
+    "ocr_text": "SPEAK FOR YOURSELF, GOALIE MAN. HEY DONNIE! DID MIKEY HAPPEN TO COME ALONG?",
+    "type": "SPEECH",
+    "speaker": "Casey Jones",
+    "emotion": "cocky, casual mid-battle banter",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Cocky taunt] Speak for yourself, goalie man. [Calls out cheerfully] Hey Donnie! Did Mikey happen to come along?"
+  },
+  {
+    "id": "page-17_b02",
+    "box_2d": {
+      "index": 3,
+      "x": 813,
+      "y": 751,
+      "width": 650,
+      "height": 658,
+      "confidence": 0.3008396625518799,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-17/page-17-crop-004-x813-y751.jpg"
+    },
+    "ocr_text": "...BUT DIMENSION X IS A BIG PLACE, AND IT ONLY HAS SO MANY RANGERS TO PROTECT IT. NICE OF YOU TO BRING SOME MORE BAD GUYS WITH YOU. THE NEUTRINOS COULD USE A BREAK FROM CHASING DOWN WHAT'S LEFT OF KRANG'S ARMY.",
+    "type": "SPEECH",
+    "speaker": "Casey Jones",
+    "emotion": "confident",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Energetic] ...But Dimension X is a big place, and it only has so many Rangers to protect it. [Sarcastically] Nice of you to bring some more bad guys with you. The Neutrinos could use a break from chasing down what's left of Krang's army.",
+    "aiReasoning": "Text is in a speech bubble pointing to the pink Ranger-suited character.\nThis character wields a hockey stick and is referred to as \"Goalie Man\" by the blue character below. This identifies him as Casey Jones.\nHe is a HERO, a MAJOR character in the TMNT universe.\nThe text is standard dialogue, no special formatting for shouting. The tone is confident, slightly sarcastic about bringing more bad guys.\nI will add cues for a confident, slightly sarcastic tone mid-combat."
+  }
+]

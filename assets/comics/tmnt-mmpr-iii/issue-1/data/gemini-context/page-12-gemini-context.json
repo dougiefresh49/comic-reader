@@ -1,0 +1,254 @@
+[
+  {
+    "id": "page-12_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 376.3011474609375,
+      "y": 77.88815307617188,
+      "width": 325.780029296875,
+      "height": 221.41769409179688,
+      "confidence": 0.9552172422409058,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-001-x376-y77.jpg"
+    },
+    "ocr_text": "...BUT YOU STOPPED WARBUNNY AND PROTECTED THE TRAIN ADMIRABLY.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Wise, authoritative, and reassuring",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Deep, resonant voice, speaking calmly and reassuringly] ...But you stopped Warbunny and protected the train admirably."
+  },
+  {
+    "id": "page-12_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 515.732177734375,
+      "y": 398.9891357421875,
+      "width": 264.99603271484375,
+      "height": 137.2471923828125,
+      "confidence": 0.9420878291130066,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-002-x515-y398.jpg"
+    },
+    "ocr_text": "BUT IT'S NOT THAT SIMPLE, ZORDON.",
+    "type": "SPEECH",
+    "speaker": "Jason",
+    "emotion": "Serious, weary, concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Serious, weary tone] But it's not that simple, Zordon.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"BUT IT'S NOT THAT SIMPLE, ZORDON.\" is in a standard speech bubble in the top panel. The tail points to the Red Ranger, Jason.\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to the Red Ranger. In the subsequent panel, another character (Trini) says \"Jason's right,\" referring to the points made in this dialogue chain. Therefore, the speaker is Jason.\n    *   **Side**: Hero (Power Ranger).\n    *   **Importance**: Major.\n    *   **Emotion**: Jason is countering Zordon's praise with a harsh reality check. He sounds weary, serious, and stressed about the tactical situation. He is respectful but firm.\n3.  **Performance Cues**:\n    *   The tone should be serious and perhaps a bit tired/weary (\"exhausting\" is mentioned later).\n    *   He is interrupting or pivoting the conversation from a win to the larger problem.\n    *   No shouting or whispering indicated."
+  },
+  {
+    "id": "page-12_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1535.3179931640625,
+      "y": 358.30572509765625,
+      "width": 366.2403564453125,
+      "height": 225.89752197265625,
+      "confidence": 0.9373634457588196,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-003-x1535-y358.jpg"
+    },
+    "ocr_text": "OUR ENEMIES MAY HAVE BEEN SUCCESSFUL TODAY, YET YOU'VE WON MORE TIMES THAN YOU'VE LOST.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Wise, calm, and reassuring",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Deep, resonant, authoritative tone] Our enemies may have been successful today... yet you've won more times than you've lost.",
+    "aiReasoning": "I have located the text bubble containing \"OUR ENEMIES MAY HAVE BEEN SUCCESSFUL TODAY, YET YOU'VE WON MORE TIMES THAN YOU'VE LOST.\"\nThe speech bubble's tail points directly to the large blue floating head in the tube, which is Zordon.\nZordon is a major character, the mentor of the Power Rangers.\nHis expression is stoic and calm. The context is a debriefing after a battle where the heroes feel defeated. Zordon is offering wisdom and perspective to reassure them.\nHis voice is traditionally deep, resonant, and slow-paced.\nThere are no bold texts or jagged edges, indicating a normal but authoritative volume."
+  },
+  {
+    "id": "page-12_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 601.0820922851562,
+      "y": 524.8618774414062,
+      "width": 335.97747802734375,
+      "height": 161.00897216796875,
+      "confidence": 0.9062613844871521,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-004-x601-y524.jpg"
+    },
+    "ocr_text": "THE TURTLES HAVE DEALT WITH SHREDDER FOR YEARS.",
+    "type": "SPEECH",
+    "speaker": "Jason",
+    "emotion": "Serious and pragmatic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Confident, leadership quality, American male young adult voice",
+    "textWithCues": "[Seriously, stating a fact] The Turtles have dealt with Shredder for years.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"THE TURTLES HAVE DEALT WITH SHREDDER FOR YEARS.\" is in a standard speech bubble in the top panel. It is classified as `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Visuals**: The scene is in the Command Center. Zordon is in his tube. The Rangers and Turtles are gathered.\n    *   **Speaker Trace**: The speech bubble is part of a sequence. The preceding bubble (\"BUT IT'S NOT THAT SIMPLE, ZORDON.\") has a tail pointing clearly to the character in the red sleeveless karate gi. This is Jason (the Red Ranger). In the panel immediately following this dialogue, another character explicitly says, \"JASON'S RIGHT.\" This confirms the speaker is Jason.\n    *   **Character Identity**: Jason.\n    *   **Side**: `HERO`.\n    *   **Importance**: `MAJOR`.\n    *   **Context**: Zordon is praising them for a victory. Jason is countering that praise with a grim reality check. He is explaining that while the individual teams know their individual villains, the alliance between the villains is the real problem.\n    *   **Emotion**: Serious, pragmatic, concerned, perhaps a bit stressed/exhausted given the \"exhausting\" comment later.\n\n3.  **Performance Cues**:\n    *   **Tone**: Serious, factual, slightly argumentative but respectful. He is laying out a premise for his argument.\n    *   **Volume**: Normal speaking volume, but firm.\n    *   **Cues**: [Matter-of-factly] or [Seriously].\n\n4.  **Final Polish**:\n    *   Text: \"The Turtles have dealt with Shredder for years.\"\n    *   Cue: \"[Seriously, stating a fact] The Turtles have dealt with Shredder for years.\""
+  },
+  {
+    "id": "page-12_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 951.04150390625,
+      "y": 2135.350830078125,
+      "width": 234.6702880859375,
+      "height": 123.90380859375,
+      "confidence": 0.8550580739974976,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-005-x951-y2135.jpg"
+    },
+    "ocr_text": "MASTER SPLANTER IS CORRECT.",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Authoritative and wise",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Deep, resonant, booming voice] Master Splinter is correct.",
+    "aiReasoning": "1.  **Locate & Classify**: The target text \"MASTER SPLINTER IS CORRECT.\" (noted typo in prompt \"SPLANTER\") is located in the bottom right panel of the page. It is inside a speech bubble with a tail pointing to the large blue face in the tube.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The character is the giant blue head in a tube, which is **Zordon**. He is listed in the \"Unique Characters\" provided.\n    *   **Side**: Zordon is the mentor of the Power Rangers, so he is a `HERO`.\n    *   **Importance**: He is a central figure in the lore, so `MAJOR`.\n    *   **Voice Description**: Since the character is `MAJOR`, strictly speaking, a description isn't required by the prompt instructions (\"If MINOR or EXTRA...\"). However, Zordon's voice is iconic: deep, resonant, booming, and often has a slight reverb or electronic quality.\n    *   **Emotion**: Zordon looks calm, serious, and wise. He is validating Splinter's advice.\n\n3.  **Performance Cues**:\n    *   The delivery should be slow, authoritative, and wise.\n    *   Cues: `[Deep, resonant voice]` or `[Calmly and authoritatively]`.\n\n4.  **Text Correction**: The prompt has a typo (\"SPLANTER\"). The image clearly reads \"SPLINTER\". I will use the correct text from the image."
+  },
+  {
+    "id": "page-12_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 851.9229736328125,
+      "y": 1877.0609130859375,
+      "width": 284.1480712890625,
+      "height": 180.0321044921875,
+      "confidence": 0.7090721726417542,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-006-x851-y1877.jpg"
+    },
+    "ocr_text": "THEY GET MORE POWERFUL... WE STAY THE SAME.",
+    "type": "SPEECH",
+    "speaker": "Tommy",
+    "emotion": "grim realization",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, American accent, serious, weary and frustrated tone",
+    "textWithCues": "[Grimly] They get more powerful... [pause] we stay the same.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"THEY GET MORE POWERFUL... WE STAY THE SAME.\" is found in a speech bubble in the middle horizontal strip of the page. The bubble has a tail pointing to a character. Classification: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to the young male character on the left of the panel, standing next to Raphael (the Turtle with the red mask).\n    *   **Identity**:\n        *   The character has long dark hair tied in a bun/ponytail and is wearing a martial-arts style tunic.\n        *   In the *Power Rangers / TMNT* comic crossovers, this visual design is specific to **Tommy Oliver** (the Green Ranger). While Jason (Red Ranger) is mentioned in the dialogue above (\"Jason's right\"), the visual of the speaker does not match Jason (who typically has short hair). The speaker refers to \"We\" regarding the Rangers' struggles against Putties, confirming he is a Ranger.\n        *   The prompt's unique character list only includes \"Zordon\" and \"Jason\". Since this character is visually distinct and clearly a different person (Tommy), I will create the new name \"Tommy\".\n    *   **Side**: `HERO` (Power Ranger).\n    *   **Importance**: `MAJOR` (Main cast member).\n    *   **Voice Description**: Young adult male (teenager), American accent. He sounds weary, serious, and frustrated. He is the \"cool/tough\" one of the group, so the voice should have a bit of grit but is currently sounding disheartened.\n    *   **Emotion**: The character has furrowed brows and a serious expression. He is expressing frustration at the escalation of the enemy's power compared to their own stagnation.\n\n3.  **Performance Cues**:\n    *   The text has an ellipsis \"...\" indicating a pause for thought or emphasis.\n    *   The tone is one of grim realization or complaint.\n    *   Cue: `[Grimly]` or `[Frustrated]`.\n    *   Pause: `[pause]` at the ellipsis."
+  },
+  {
+    "id": "page-12_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 905.0231323242188,
+      "y": 2256.458251953125,
+      "width": 250.93084716796875,
+      "height": 289.25390625,
+      "confidence": 0.7076985239982605,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-007-x905-y2256.jpg"
+    },
+    "ocr_text": "WE HAVE DEALT WITH MANY FOES TOGETHER. BUT I PROMISE YOU...",
+    "type": "SPEECH",
+    "speaker": "Zordon",
+    "emotion": "Reassuring and Authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Deep, resonant, and wise voice] We have dealt with many foes together. [Pauses for emphasis] But I promise you...",
+    "aiReasoning": "I have located the text region at the bottom right of the page.\nThe text is inside a blue speech bubble originating from the large face in the tube.\nThe character is Zordon, the mentor of the Power Rangers. He is a major hero character.\nHis expression is calm, stoic, and serious.\nHe is responding to the team's concerns, offering reassurance and validating Splinter's advice.\nThe voice should be deep, resonant, wise, and authoritative.\nThe text ends with ellipses, suggesting a pause or a lead-in to a revelation, indicating a deliberate, slow pace."
+  },
+  {
+    "id": "page-12_b08",
+    "box_2d": {
+      "index": 11,
+      "x": 978.72412109375,
+      "y": 436.4077453613281,
+      "width": 577.3740234375,
+      "height": 267.5754089355469,
+      "confidence": 0.4922187924385071,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-012-x978-y436.jpg"
+    },
+    "ocr_text": "AND WE COULD PROBABLY HANDLE LORD ZEDD BY OURSELVES, BUT...WITH THE TWO OF THEM WORKING TOGETHER, THEY'RE PICKING US APART.",
+    "type": "SPEECH",
+    "speaker": "Jason",
+    "emotion": "Frustrated and concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "And we could probably handle Lord Zedd by ourselves, but... [pauses grimly] with the two of them working together, they're picking us apart.",
+    "aiReasoning": "I have located the text bubble containing \"AND WE COULD PROBABLY HANDLE LORD ZEDD BY OURSELVES, BUT...WITH THE TWO OF THEM WORKING TOGETHER, THEY'RE PICKING US APART.\"\n1.  **Type:** It is a speech bubble with a tail.\n2.  **Speaker:** The tail points to the Red Ranger. Based on the provided unique character list, the Red Ranger is **Jason**.\n3.  **Context:** The team is debriefing with Zordon. They are discussing the difficulty of fighting an alliance between Lord Zedd and another villain (presumably Shredder, mentioned in the adjacent bubble). The mood is serious and concerned about the overwhelming odds.\n4.  **Emotion:** Jason sounds frustrated and strategically concerned. He is admitting that while they are strong, the combination of enemies is too much.\n5.  **Cues:**\n    *   \"BUT...\" indicates a pause.\n    *   The tone should shift from hypothetical confidence (\"could probably handle\") to serious reality (\"picking us apart\")."
+  },
+  {
+    "id": "page-12_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 478.23712158203125,
+      "y": 1781.38134765625,
+      "width": 334.3309326171875,
+      "height": 173.1427001953125,
+      "confidence": 0.6510159373283386,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-009-x478-y1781.jpg"
+    },
+    "ocr_text": "NOW, SUDDENLY THEY'RE FASTER AND STRONGER AND CAN THROW FIREBALLS?",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Frustrated and incredulous",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Frustrated, gritting teeth] Now, suddenly they're faster and stronger and can throw fireballs?"
+  },
+  {
+    "id": "page-12_b10",
+    "box_2d": {
+      "index": 10,
+      "x": 585.751220703125,
+      "y": 2865.056396484375,
+      "width": 271.3868408203125,
+      "height": 123.099609375,
+      "confidence": 0.5836243033409119,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-011-x585-y2865.jpg"
+    },
+    "ocr_text": "ALL WILL BE REVEALED IN TIME.",
+    "type": "SPEECH",
+    "speaker": "Master Splinter",
+    "emotion": "Wise, calm, authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Calmly and wisely] All will be revealed in time.",
+    "aiReasoning": "The user wants to analyze the text \"ALL WILL BE REVEALED IN TIME.\" located in the bottom left panel.\n1.  **Locate**: The text is in a standard speech bubble with a tail pointing to the character on the left.\n2.  **Speaker**: The character is a large anthropomorphic rat in a red robe. This is Master Splinter from Teenage Mutant Ninja Turtles. He is distinct from the list provided (Zordon, Jason, Tommy, Raphael).\n3.  **Type**: SPEECH.\n4.  **Side**: HERO (Mentor to the Turtles).\n5.  **Importance**: MAJOR.\n6.  **Emotion**: He looks calm, serious, and wise. He is giving advice/counsel to the agitated Turtles (specifically Raphael from the previous panel).\n7.  **Performance Cues**: The line is a classic \"wise mentor\" trope. It should be spoken slowly, with weight and reassurance. No shouting or whispering.\n\nFinal check of the text: \"ALL WILL BE REVEALED IN TIME.\"\nContext: He just told them to be patient and focus on the mission. This is the closing statement of his advice.\nCue: `[calmly and wisely]` or `[reassuringly]`."
+  },
+  {
+    "id": "page-12_b11",
+    "box_2d": {
+      "index": 12,
+      "x": 984.6810302734375,
+      "y": 1398.57666015625,
+      "width": 284.4736328125,
+      "height": 165.955078125,
+      "confidence": 0.4866941571235657,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-013-x984-y1398.jpg"
+    },
+    "ocr_text": "I MEAN, EVEN WITH DOUBLE DUTY...IT'S EXHAUSTING.",
+    "type": "SPEECH",
+    "speaker": "Trini",
+    "emotion": "Exhausted and concerned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Wearily] I mean, even with double duty... [sighs] it's exhausting.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"I MEAN, EVEN WITH DOUBLE DUTY...IT'S EXHAUSTING.\" is located in a speech bubble in the middle panel. It is `SPEECH`.\n2.  **Context**:\n    *   **Speaker**: The bubble is connected (joined) to the previous bubble (\"JASON'S RIGHT...\"), which has a tail pointing to the female character in the yellow suit. This is the Yellow Power Ranger, Trini Kwan. She is not in the provided unique character list (Zordon, Jason, Tommy, Raphael, Master Splinter), so I will use her name, **Trini**.\n    *   **Side**: `HERO` (Power Ranger).\n    *   **Importance**: `MAJOR` (Main team member).\n    *   **Emotion**: She looks concerned and tired. Her hand is raised in a gesture of explanation/exasperation. The text content explicitly mentions exhaustion.\n3.  **Performance Cues**:\n    *   The text starts with \"I mean,\" which is a conversational filler, suggesting a natural, slightly weary tone.\n    *   \"...\" indicates a pause for thought or emphasis on the fatigue.\n    *   \"It's exhausting\" should be delivered with a downward inflection or a sigh to convey the physical and mental toll.\n    *   Context cues: She is supporting Jason's argument about the overwhelming number of enemies."
+  },
+  {
+    "id": "page-12_b12",
+    "box_2d": {
+      "index": 13,
+      "x": 518.8155517578125,
+      "y": 2685.14111328125,
+      "width": 350.99798583984375,
+      "height": 185.524658203125,
+      "confidence": 0.42511042952537537,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-12/page-12-crop-014-x518-y2685.jpg"
+    },
+    "ocr_text": "FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY.",
+    "type": "SPEECH",
+    "speaker": "Master Splinter",
+    "emotion": "Serious, wise, and authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Firmly and instructively] Focus on the enemy and continue to protect those in harm's way.",
+    "aiReasoning": "The text \"FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY.\" is located in a speech bubble in the bottom left panel.\nThe bubble has a tail pointing to the character Master Splinter (an anthropomorphic rat in a red robe).\nMaster Splinter is a \"MAJOR\" character and a \"HERO\".\nHe is addressing Raphael (implied by \"my son\" in the connected bubble and the context of the conversation).\nThe tone is instructive, wise, and firm. He is counseling patience and focus in the face of adversity.\nThere are no jagged edges to the bubble, so he is not shouting. The text is standard dialogue.\nCharacter expression: Serious, focused, stern but not angry."
+  }
+]

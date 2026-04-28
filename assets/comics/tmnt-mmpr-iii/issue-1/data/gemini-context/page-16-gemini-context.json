@@ -1,0 +1,255 @@
+[
+  {
+    "id": "page-16_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 929.3024291992188,
+      "y": 2341.484130859375,
+      "width": 247.56231689453125,
+      "height": 261.5517578125,
+      "confidence": 0.9466826319694519,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-001-x929-y2341.jpg"
+    },
+    "ocr_text": "...YOU WILL WATCH YOUR WORLD BURN.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Threatening",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, booming, terrifying male voice",
+    "textWithCues": "[Ominously] ...you will watch your world burn.",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   Target text: \"...YOU WILL WATCH YOUR WORLD BURN.\"\n    *   Location: Bottom right panel, speech bubble.\n    *   Type: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The character is Lord Zedd (identifiable by the exposed brain, metal mask, and red muscular suit). He is speaking to Shredder.\n    *   **Side:** `VILLAIN`.\n    *   **Importance:** `MAJOR`.\n    *   **Voice Description:** Lord Zedd has a deep, gravelly, booming, and terrifying voice. He speaks with authority and malice.\n    *   **Emotion:** Menacing, dark, threatening. He is delivering an ultimatum/threat to an ally.\n\n3.  **Performance Cues:**\n    *   **Context:** This is the second half of a sentence started in the previous bubble (\"...if you attempt to betray or double-cross me...\").\n    *   **Tone:** The delivery should be slow, deliberate, and dripping with malice.\n    *   **Cues:** Use `[Ominously]` or `[Darkly]` to convey the threat. Keep the ellipsis to indicate the pause from the previous thought.\n\n4.  **Final Polish:**\n    *   Speaker: Lord Zedd\n    *   Emotion: Threatening\n    *   Text: \"[Ominously] ...you will watch your world burn.\""
+  },
+  {
+    "id": "page-16_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 399.1971435546875,
+      "y": 1256.7618408203125,
+      "width": 305.49835205078125,
+      "height": 162.7161865234375,
+      "confidence": 0.9340834021568298,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-002-x399-y1256.jpg"
+    },
+    "ocr_text": "DO I NEED TO RECONSIDER OUR ALLIANCE ALREADY?",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Threatening, Suspicious",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, menacing voice] And yet you conspire to seize this world without me? [Lower, dangerous tone] Do I need to reconsider our alliance already?",
+    "aiReasoning": "1.  **Locate & Classify**: The target text \"DO I NEED TO RECONSIDER OUR ALLIANCE ALREADY?\" is located in a speech bubble in the first panel. The bubble actually contains two sentences: \"AND YET YOU CONSPIRE TO SEIZE THIS WORLD WITHOUT ME? DO I NEED TO RECONSIDER OUR ALLIANCE ALREADY?\". The bounding box provided covers this entire speech bubble. Classification is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The bubble's tail points to **Lord Zedd**, the large red muscular figure with the metal exoskeleton and \"Z\" staff. He is a named unique character in the list.\n    *   **Side**: Lord Zedd is a primary antagonist, so `VILLAIN`.\n    *   **Importance**: He is a main character in this story arc, so `MAJOR`.\n    *   **Voice Description**: Since he is `MAJOR`, a specific description isn't strictly required by the prompt instructions, but contextually: Deep, gravelly, menacing, metallic, authoritative (based on the original show's voice by Robert Axelrod).\n    *   **Emotion**: Zedd is suspicious and threatening. He believes his ally (Shredder) might be plotting against him or acting without his permission. The tone is dangerous and commanding.\n\n3.  **Performance Cues**:\n    *   The text provided in the prompt is the second sentence, but the speech bubble contains a preceding sentence (\"And yet you conspire to seize this world without me?\"). For a proper voice acting cue, the full bubble context is needed.\n    *   Tone: The delivery should be deep and intimidating. He is asserting dominance.\n    *   Cues: Start with a suspicious tone for the accusation, then drop pitch/tempo for the threat \"reconsider our alliance\"."
+  },
+  {
+    "id": "page-16_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1013.9005737304688,
+      "y": 106.0824966430664,
+      "width": 212.90631103515625,
+      "height": 123.9085464477539,
+      "confidence": 0.9276808500289917,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-003-x1013-y106.jpg"
+    },
+    "ocr_text": "NOT AT ALL, LORD ZEDD.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Calm, diplomatic, and reassuring",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Calmly reassuring] Not at all, Lord Zedd.",
+    "aiReasoning": "The text is \"NOT AT ALL, LORD ZEDD.\" located in the top right panel.\nThe bubble has a tail pointing to the character on the left of that panel, who is wearing the Shredder armor (silver helmet, purple cape visible in other panels, though here just the armor is seen).\nThe character being addressed is Lord Zedd (the red, muscular figure).\nThe speaker is Shredder.\n**Classifiction:**\n*   **Type:** SPEECH\n*   **Speaker:** Shredder (He is a main villain in the TMNT franchise and this crossover).\n*   **Character Type:** MAJOR (Explicitly listed as an example in the instructions).\n*   **Side:** VILLAIN.\n*   **Emotion/Tone:** Zedd has just threatened to end their alliance. Shredder is responding to de-escalate the situation. He is calm, collected, and reassuring, asserting that plans are moving forward. He is not afraid, but he is being diplomatic.\n*   **Cues:** He should sound smooth and unbothered.\n\n**Voice Description:** Since the character is MAJOR, the instructions say \"If MINOR or EXTRA, describe their voice\". I will omit the specific voice description field or leave it implied by the character name, but the JSON format usually expects the key. I won't generate a description for an AI generator as per the constraint, but the cues will guide the performance.\n\n**Text Rewrite:**\n\"[Calmly reassuring] Not at all, Lord Zedd.\""
+  },
+  {
+    "id": "page-16_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 785.731689453125,
+      "y": 2177.459228515625,
+      "width": 353.6766357421875,
+      "height": 185.31005859375,
+      "confidence": 0.9254345297813416,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-004-x785-y2177.jpg"
+    },
+    "ocr_text": "GOOD. BECAUSE IF YOU ATTEMPT TO BETRAY OR DOUBLE-CROSS ME...",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, booming, and terrifying male voice with an authoritative tone.",
+    "textWithCues": "[Deep, ominous tone] GOOD. [Pause] BECAUSE IF YOU ATTEMPT TO BETRAY OR DOUBLE-CROSS ME...",
+    "aiReasoning": "The text \"GOOD. BECAUSE IF YOU ATTEMPT TO BETRAY OR DOUBLE-CROSS ME...\" is located in a speech bubble in the bottom panel.\nThe bubble's tail points to the character on the right, who is Lord Zedd (identifiable by the exposed brain and metal mask).\nLord Zedd is a major villain.\nHe is responding to a statement of gratitude with a stern approval followed by a severe threat.\nHis voice is canonically deep, gravelly, and terrifying.\nThe emotion is menacing and authoritative. He is issuing a warning.\nThe text ends with an ellipsis \"...\", indicating a pause or a lead-in to the consequence in the next bubble."
+  },
+  {
+    "id": "page-16_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 375.3941345214844,
+      "y": 2154.3046875,
+      "width": 430.8526916503906,
+      "height": 188.669921875,
+      "confidence": 0.9148687124252319,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-005-x375-y2154.jpg"
+    },
+    "ocr_text": "OF COURSE. AND THE FOOT CLAN IS ETERNALLY GRATEFUL FOR YOUR... GENEROSITY.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Diplomatic, calculating, placating",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, metallic voice, smooth and respectful] Of course. And the Foot Clan is *eternally* grateful for your... [deliberate pause] generosity.",
+    "aiReasoning": "1.  **Text Identification**: The text is \"OF COURSE. AND THE FOOT CLAN IS ETERNALLY GRATEFUL FOR YOUR... GENEROSITY.\" located in a speech bubble in the bottom-left panel.\n2.  **Speaker Identification**: The tail of the speech bubble points to the character on the far left. This character is wearing Shredder's iconic armor (shoulder pads, purple cape, helmet). The previous panels establish a conversation between Lord Zedd and Shredder. Therefore, the speaker is **Shredder**.\n3.  **Classification**: `SPEECH`.\n4.  **Context**: Shredder is responding to Lord Zedd, who previously warned him not to be patronizing. Shredder is playing the role of the ally, smoothing things over.\n5.  **Character Type**: Shredder is a major villain (`MAJOR`).\n6.  **Side**: `VILLAIN`.\n7.  **Voice Description**: Deep, commanding, metallic/raspy (due to mask), authoritative but currently placating.\n8.  **Emotion/Tone**: Diplomatic, respectful (outwardly), calculating. The ellipsis \"...\" suggests a deliberate pause, perhaps weighing his words or swallowing his pride.\n9.  **Cues**:\n    *   \"OF COURSE.\" -> Calm acknowledgment.\n    *   \"ETERNALLY\" -> Emphasized.\n    *   \"...\" -> Pause before \"generosity\".\n    *   Overall tone is smooth and reassuring to Zedd."
+  },
+  {
+    "id": "page-16_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 199.18765258789062,
+      "y": 1138.374267578125,
+      "width": 336.8648986816406,
+      "height": 152.83154296875,
+      "confidence": 0.9079293608665466,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-006-x199-y1138.jpg"
+    },
+    "ocr_text": "AND YET YOU CONSPIRE TO SEIZE THIS WORLD WITHOUT ME?",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Suspicious and menacing",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Suspiciously and menacingly] And yet you conspire to seize this world without me?",
+    "aiReasoning": "I have located the text \"AND YET YOU CONSPIRE TO SEIZE THIS WORLD WITHOUT ME?\" on the page.\nIt is in a speech bubble in the first panel on the left.\nThe tail of the bubble points to the large red armored character, Lord Zedd.\nContext: Lord Zedd is a major villain. He is speaking to Shredder. Shredder has just boasted about turning runaways into warriors. Zedd is countering with an accusation of betrayal or independent action.\nThe tone is suspicious, menacing, and authoritative. He is questioning Shredder's loyalty.\nThe character type is MAJOR (Lord Zedd).\nSide is VILLAIN.\nSince the character is MAJOR, I do not strictly need a voice description for AI generation, but the voice is known to be deep, raspy, and booming.\nEmotion: Suspicious, accusatory.\n\nPerformance Cues:\nThe delivery should be low and threatening. He is catching Shredder in a potential lie or act of treason.\nCue: [Suspiciously and menacingly]\nText transformation: \"And yet you conspire to seize this world without me?\""
+  },
+  {
+    "id": "page-16_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1447.51513671875,
+      "y": 1470.98779296875,
+      "width": 423.6541748046875,
+      "height": 271.13427734375,
+      "confidence": 0.9039713144302368,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-007-x1447-y1470.jpg"
+    },
+    "ocr_text": "AND ALL THAT I ASK IN RETURN IS THAT ZORDON AND HIS RANGERS UNDERSTAND THE TRUE MEANING OF SUFFERING...BEFORE WE TAKE ALL THAT THEY ARE.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Sinister, sadistic, and commanding",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, menacing voice] And all that I ask in return is that Zordon and his Rangers understand the true meaning of **suffering**... [short dramatic pause] before we take all that they are."
+  },
+  {
+    "id": "page-16_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1202.236572265625,
+      "y": 918.0234375,
+      "width": 310.802734375,
+      "height": 273.889404296875,
+      "confidence": 0.89210444688797,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-008-x1202-y918.jpg"
+    },
+    "ocr_text": "DO NOT PATRONIZE ME, HUMAN.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Menacing, authoritative, and irritated",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, gravelly voice, snapping angrily] DO NOT PATRONIZE ME, HUMAN.",
+    "aiReasoning": "1.  **Identify the Target Text:** \"DO NOT PATRONIZE ME, HUMAN.\"\n2.  **Locate in Image:** Second panel, right side speech bubble.\n3.  **Trace Bubble Tail:** The tail extends to the right, pointing at the red, muscle-exposed character with the metal visor/grill.\n4.  **Identify Speaker:** This character is Lord Zedd (identified in the unique characters list). The dialogue context supports this: the other character (Shredder) just addressed him as \"Lord Zedd\" and is a human, whereas Zedd is an alien who would refer to Shredder as \"human\".\n5.  **Classify Type:** SPEECH.\n6.  **Analyze Context:**\n    *   **Speaker:** Lord Zedd.\n    *   **Side:** VILLAIN.\n    *   **Importance:** MAJOR.\n    *   **Emotion:** Zedd is irritated, authoritative, and menacing. He feels Shredder is making excuses or treating him like a fool.\n7.  **Performance Cues:**\n    *   Tone: Deep, gravelly, booming, threatening.\n    *   Delivery: Sharp command, emphasizing the word \"Human\" with disdain.\n    *   Cues to add: `[Menacingly, with a deep growl]` or similar."
+  },
+  {
+    "id": "page-16_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 1394.3712158203125,
+      "y": 1329.45166015625,
+      "width": 372.39453125,
+      "height": 144.6951904296875,
+      "confidence": 0.8920172452926636,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-009-x1394-y1329.jpg"
+    },
+    "ocr_text": "I'VE GIVEN YOU ALL YOU NEED TO SEIZE THIS WORLD AND MORE.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Authoritative, sinister, commanding",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, raspy, commanding voice] I'VE GIVEN YOU ALL YOU NEED TO SEIZE THIS WORLD AND MORE.",
+    "aiReasoning": "The text is in a speech bubble in the third panel.\nThe speaker is the large, armored figure standing over the kneeling figure. This is Lord Zedd, identifiable by his exposed muscle/silver tubing aesthetic established in the first panel.\nHe is a major villain.\nHis tone is commanding, deep, and authoritative, stating the terms of their alliance. He is emphasizing his generosity to ensure compliance."
+  },
+  {
+    "id": "page-16_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 296.9084777832031,
+      "y": 901.0626831054688,
+      "width": 383.7020568847656,
+      "height": 239.12298583984375,
+      "confidence": 0.7145856618881226,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-010-x296-y901.jpg"
+    },
+    "ocr_text": "I TURNED YOUR COLLECTION OF RUNAWAYS AND VAGRANTS INTO FEARSOME WARRIORS WITH JUST A TOUCH OF MAGIC.",
+    "type": "SPEECH",
+    "speaker": "Lord Zedd",
+    "emotion": "Arrogant and condescending",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Deep, booming, raspy voice, speaking down to him] I turned your collection of runaways and vagrants into fearsome warriors with just a touch of magic.",
+    "aiReasoning": "I have located the text bubble containing \"I TURNED YOUR COLLECTION OF RUNAWAYS AND VAGRANTS INTO FEARSOME WARRIORS WITH JUST A TOUCH OF MAGIC.\"\nThe tail of the speech bubble points to the large, red, muscular character with the silver 'Z' staff. This character is Lord Zedd.\nLord Zedd is a major villain.\nHis posture is imposing and he is looking down at Shredder.\nThe context is Zedd boasting about how he improved Shredder's foot soldiers using his magic, while simultaneously insulting the original quality of the soldiers (\"runaways and vagrants\").\nThe tone should be deep, raspy, authoritative, arrogant, and condescending."
+  },
+  {
+    "id": "page-16_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 979.4865112304688,
+      "y": 370.65643310546875,
+      "width": 209.55218505859375,
+      "height": 169.6461181640625,
+      "confidence": 0.5745947957038879,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-011-x979-y370.jpg"
+    },
+    "ocr_text": "I SI REQUIRED A MINUTE ADDI COMPLETE O ENDE.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Calm, calculating, and reassuring",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Calmly and diplomatically] I simply required a few last minute additions to complete our mutual endeavor.",
+    "aiReasoning": "I have located the text bubble containing \"I SIMPLY REQUIRED A FEW LAST MINUTE ADDITIONS TO COMPLETE OUR MUTUAL ENDEAVOR.\"\nIt is in the top right panel.\nThe speech bubbles in this panel are connected. The first bubble (\"NOT AT ALL, LORD ZEDD.\") has a tail pointing to the character on the left, who is Shredder (identifiable by the metal helmet/mask and purple clothing).\nThe target text is in the third bubble of this sequence, spoken by the same character.\nTherefore, the speaker is Shredder.\nShredder is a MAJOR VILLAIN.\nHe is responding to Lord Zedd's threat about reconsidering their alliance. Shredder is being diplomatic, calm, and reassuring to keep Zedd on side.\nHis voice is typically deep, raspy, and menacing, coming from behind a mask.\nEmotion: Calm, calculating, reassuring."
+  },
+  {
+    "id": "page-16_b12",
+    "box_2d": {
+      "index": 11,
+      "x": 1162.951171875,
+      "y": 211.64781188964844,
+      "width": 249.72119140625,
+      "height": 145.8399200439453,
+      "confidence": 0.5490439534187317,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-16/page-16-crop-012-x1162-y211.jpg"
+    },
+    "ocr_text": "EVERYTHING E DISCUSSED PROCEEDING AS PLANNED.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "Confident and reassuring",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, authoritative, raspy, and menacing male voice. Commanding and intelligent.",
+    "textWithCues": "[Calmly and authoritatively] Everything we discussed is proceeding as planned."
+  }
+]

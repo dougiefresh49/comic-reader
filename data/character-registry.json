@@ -1,0 +1,1907 @@
+{
+  "Alpha 5": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "alpha-5-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "G4FycwjZbrUlO5rnrTGm",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.933Z",
+          "voiceDescription": "A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality."
+        }
+      }
+    ]
+  },
+  "Armored Villain": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "armored-villain-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "P70H4nshzpgpGx0vAA3z",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, booming, gravelly male voice with a distinct metallic rasp. It sounds powerfully aggressive, brutish, and menacingly authoritative."
+        }
+      }
+    ]
+  },
+  "Bebop": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "bebop-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "FCFJMCa9ZFu4325AUU3w",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A rough, raspy, and gravelly male voice with a distinct street-punk attitude. It possesses a high-energy, often aggressive and smug tone, delivered with a thick New York accent."
+        }
+      }
+    ]
+  },
+  "Black Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "black-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "cuy9NDFuCyOdZU0vkcym",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A confident, cool, and youthful male voice with an American accent. The tone is steady and assured, reflecting his reliable and strong presence."
+        }
+      }
+    ]
+  },
+  "Blue Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "blue-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "eggrlJySU29RodqjhIkX",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": null
+        }
+      }
+    ]
+  },
+  "Dr. Boyd": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "dr-boyd-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Zhgd6Vgnj3TFlPqeH2Ke",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "An intelligent, articulate male voice with an American accent. It maintains a professional demeanor but carries an underlying tone of defensiveness and stress, reflecting a character under pressure."
+        }
+      }
+    ]
+  },
+  "Foot Elite": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "foot-elite-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Uo9kYf3kXKz03qyoPMpG",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, disciplined, and authoritative male voice that is calm yet menacing. It is articulate and resonant, conveying a fanatical conviction, with a slight muffled quality from a mask that does not hinder its clear projection."
+        }
+      }
+    ]
+  },
+  "Foot Soldier": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "foot-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "8EsHn25qWtDd2mWwmiYQ",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A fanatical, raspy male voice, gruff and often muffled by a mask, with an American accent. It conveys an intense, zealous aggression, characteristic of a disciplined ninja cultist or professional henchman, occasionally sounding breathless."
+        }
+      }
+    ]
+  },
+  "Grace Sterling": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "grace-sterling-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "CBRFW97Lj0x8Fbaic4x2",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A mature female voice, authoritative and commanding, conveying intelligence and unwavering confidence. She speaks with a clear American accent."
+        }
+      }
+    ]
+  },
+  "Green Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "green-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "fDCFh0Z04XCcSmBoHT4j",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge."
+        }
+      }
+    ]
+  },
+  "Leonardo": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "leonardo-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "1sca4ecJ4XyU7M176Ei0",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A clear, young adult male voice with an American accent. It is disciplined and authoritative, reflecting his leadership role with a generally serious and focused tone."
+        }
+      }
+    ]
+  },
+  "Lord Zedd": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "lord-zedd-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "xZHSfy1jtZKEX5ypvdGU",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, gravelly, booming, and terrifying male voice with a commanding and authoritative tone."
+        }
+      }
+    ]
+  },
+  "Pink Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "pink-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "E8CavmYRhEEZqRb2s4nt",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A youthful American female voice, energetic and distinctly sassy. It projects confidence and a heroic spirit, suitable for a dynamic and courageous character."
+        }
+      }
+    ]
+  },
+  "Red Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "red-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "R8tHGp6yBIKs45odIPD1",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation."
+        }
+      }
+    ]
+  },
+  "Rezar": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rezar-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "EYiikCfvEGJXIrjaniJV",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": null
+        }
+      }
+    ]
+  },
+  "Rita Repulsa": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rita-repulsa-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "fpszSg5AsrBuI5R9aidj",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A shrill, raspy female voice with a strong theatrical quality. It should convey a wicked, commanding, and sharp presence, embodying her villainous authority."
+        }
+      }
+    ]
+  },
+  "Rock Soldier": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rock-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Z0QRcWFZLNfSWpPpb0br",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, heavy, gravelly male voice, resonating with the sound of grinding stones. It possesses a rough, monstrous quality, projecting an authoritative and intimidating presence."
+        }
+      }
+    ]
+  },
+  "Rocksteady": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "rocksteady-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "FBptoKFxS8EhO4XO87xt",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, gravelly, brutish male voice, characterized by a rough, unintelligent street-thug accent. It projects a tough, aggressive persona, befitting a powerful yet dim-witted henchman."
+        }
+      }
+    ]
+  },
+  "Soldier": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "kaQG4rvOTzT2F2yIXtSN",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A commanding, professional male voice with a clear American accent, reflecting a strong military background. It is often urgent, capable of being loud when necessary, and carries an air of unwavering authority."
+        }
+      }
+    ]
+  },
+  "Warbunny": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "warbunny-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "Ur4iSnAWauOSA2qdwx6b",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A deep, booming, gravelly, and guttural male voice, monstrous and brutish. It projects an aggressively arrogant, theatrical barbarian warlord persona, capable of also sounding primitive and submissive."
+        }
+      }
+    ]
+  },
+  "Yellow Ranger": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "yellow-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "hBYwgU1d9wzr397yTscG",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "A young, energetic female voice with a clear American accent. She speaks with a lively and spirited tone, reflecting her youthful enthusiasm."
+        }
+      }
+    ]
+  },
+  "Zordon": {
+    "franchise": "Power Rangers",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "zordon-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated from voice description. No source media.",
+        "voice": {
+          "voiceId": "NvO7pjO09CWuF87LH2iA",
+          "voiceType": "voice_design",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:07.934Z",
+          "voiceDescription": "Zordon's voice is deep, booming, resonant, and authoritative, embodying a wise male presence. It possesses a slight ethereal quality, hinting at his bodiless form, and occasionally carries a subtle electronic echo."
+        }
+      }
+    ]
+  },
+  "Donatello": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "donatello-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Rob Paulsen",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Donatello voice Rob Paulsen",
+          "Donatello 2012 funny moments"
+        ],
+        "notes": "Rob Paulsen previously voiced Raphael in the 1987 series.",
+        "voice": {
+          "voiceId": "2sV2XnVqQ2RShkIOGFvZ",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:04:59.713Z",
+          "voiceDescription": "A teenage male voice with an intelligent, articulate American accent. It's confident and often sarcastic, carrying a relaxed yet inquisitive tone with a subtle tech-nerd inflection."
+        }
+      }
+    ]
+  },
+  "Karai": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "karai-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Kelly Hu",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Karai and Shredder",
+          "Kelly Hu Karai moments",
+          "Karai transformation 2012"
+        ],
+        "notes": "A reimagined version of the character as Shredder's adopted daughter and Splinter's biological daughter.",
+        "voice": {
+          "voiceId": "anwrO52UeU1FtcsB1tHj",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:07:11.791Z",
+          "voiceDescription": "A confident, disciplined, and intelligent female voice. It possesses a clear, articulate tone with a steady, controlled cadence, reflecting a sharp mind and formidable presence."
+        }
+      }
+    ]
+  },
+  "Master Splinter": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "master-splinter-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Hoon Lee",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Hoon Lee Master Splinter clips",
+          "TMNT 2012 Splinter vs Shredder"
+        ],
+        "notes": "Nickelodeon series; this version of Splinter is notably taller and more physically formidable.",
+        "voice": {
+          "voiceId": "6G3IoJHUBafcI3SyzELE",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:07:50.222Z",
+          "voiceDescription": "A wise, elderly male voice that is calm and authoritative, yet firm when necessary. It is delivered with a distinct Japanese accent."
+        }
+      }
+    ]
+  },
+  "Michelangelo": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "michelangelo-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Greg Cipes",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Michelangelo funny",
+          "Greg Cipes Michelangelo voice"
+        ],
+        "notes": "Nickelodeon CGI series; introduced the 'Booyakasha' catchphrase.",
+        "voice": {
+          "voiceId": "oFMuHQNZ0Bh0jz5SJXQy",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:08:41.327Z",
+          "voiceDescription": "A young, high-energy American male voice with a distinct surfer dude accent. The tone is typically playful and enthusiastic, ready for action or a good time."
+        }
+      }
+    ]
+  },
+  "Narrator": {
+    "franchise": "Unknown",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "narrator-cate-blanchett-lotr",
+        "mediaTitle": "The Lord of the Rings: The Fellowship of the Ring (2001)",
+        "year": 2001,
+        "voiceActor": "Cate Blanchett",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Cate Blanchett LOTR Fellowship narration",
+          "Lord of the Rings Fellowship prologue Galadriel"
+        ],
+        "notes": "Opening narration of Fellowship of the Ring. Warm, authoritative, cinematic.",
+        "voice": {
+          "voiceId": "l6mRFE6WsbFVDdbMTQyk",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:10:31.263Z",
+          "voiceDescription": "A deep, resonant, and wise male voice with a philosophical storytelling tone. It's serious, authoritative, and cinematic, delivering narration with both epic gravitas and professional clarity."
+        }
+      }
+    ]
+  },
+  "Raphael": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "raphael-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1990,
+        "voiceActor": "Josh Pais",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "TMNT 1990 Raphael clips",
+          "Josh Pais Raphael interview"
+        ],
+        "notes": "Only actor in the original film trilogy to both voice the character and perform in the physical suit.",
+        "voice": {
+          "voiceId": "RbsOf5RuEmcgV4XgAWDA",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:11:49.062Z",
+          "voiceDescription": "A gruff, gritty young male voice with a deep tone. It features a thick, street-smart Brooklyn/New York accent, embodying a tough and rebellious character."
+        }
+      }
+    ]
+  },
+  "Shredder": {
+    "franchise": "TMNT",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "shredder-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2012,
+        "voiceActor": "Kevin Michael Richardson",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2012 Shredder clips",
+          "Kevin Michael Richardson Shredder",
+          "Shredder vs Splinter 2012 final fight"
+        ],
+        "notes": "Nickelodeon CGI series; depicts Shredder as a primary antagonist throughout.",
+        "voice": {
+          "voiceId": "zyz29XaJBhGHDfyrCD7d",
+          "voiceType": "ivc",
+          "status": "ready",
+          "createdAt": "2026-04-26T02:12:58.822Z",
+          "voiceDescription": "A deep, authoritative, and menacing male voice. It possesses a raspy, metallic quality, conveying a cold, calculating intelligence."
+        }
+      }
+    ]
+  },
+  "Blue Robot Minion": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "blue-robot-minion-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Generic character — auto-routed to Voice Design.",
+        "voice": null
+      }
+    ]
+  },
+  "Robotic Foot Soldier": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "robotic-foot-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Generic character — auto-routed to Voice Design.",
+        "voice": null
+      }
+    ]
+  },
+  "Baxter Stockman": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "baxter-stockman-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1987,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Baxter Stockman 1987 clips",
+          "Baxter Stockman fly transformation 1987",
+          "Pat Fraley Baxter Stockman"
+        ],
+        "notes": "Original animated series; character transforms from human to a humanoid fly.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-teenage-mutant-ninja-turtles-out-of-the-shadows",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Out of the Shadows",
+        "year": 2016,
+        "voiceActor": "Tyler Perry",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Tyler Perry Baxter Stockman scenes",
+          "Baxter Stockman TMNT 2 movie clip",
+          "Tyler Perry TMNT 2016"
+        ],
+        "notes": "Live-action portrayal; works for Shredder to help open the Technodrome portal.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-rise-of-the-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Rise of the Teenage Mutant Ninja Turtles",
+        "year": 2018,
+        "voiceActor": "Ramone Hamilton",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Baxter Stockboy clips",
+          "Rise of the TMNT Baxter Stockman",
+          "Baxter Stockboy vlog"
+        ],
+        "notes": "Reimagined as a child prodigy named 'Baxter Stockboy' who uses technology for social media fame.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-batman-vs-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Batman vs. Teenage Mutant Ninja Turtles",
+        "year": 2019,
+        "voiceActor": "Keith Szarabajka",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Baxter Stockman Batman vs TMNT",
+          "Baxter Stockman Arkham Asylum clip",
+          "Keith Szarabajka Baxter Stockman"
+        ],
+        "notes": "Animated crossover movie; Stockman appears as a fly-mutant working with the Joker.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-teenage-mutant-ninja-turtles-mutant-mayhem",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Mutant Mayhem",
+        "year": 2023,
+        "voiceActor": "Giancarlo Esposito",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Baxter Stockman Mutant Mayhem",
+          "Giancarlo Esposito Baxter Stockman",
+          "Mutant Mayhem opening scene"
+        ],
+        "notes": "Theatrical film; depicted as the creator of the mutagen and father-figure to Superfly.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-teenage-mutant-ninja-turtles-mutants-in-manhattan",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Mutants in Manhattan",
+        "year": 2016,
+        "voiceActor": "Dave B. Mitchell",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Mutants in Manhattan Baxter Stockman boss",
+          "Baxter Stockman Dave B Mitchell",
+          "TMNT Mutants in Manhattan cutscenes"
+        ],
+        "notes": "Action game developed by PlatinumGames; features a fly-form boss fight.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-teenage-mutant-ninja-turtles-shredders-revenge",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
+        "year": 2022,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Shredder's Revenge Baxter Stockman boss fight",
+          "Baxter Stockman intro Shredder's Revenge",
+          "Pat Fraley Baxter Stockman 2022"
+        ],
+        "notes": "Retro-style beat 'em up; Pat Fraley reprises his role from the 1987 series.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-teenage-mutant-ninja-turtles-video-game",
+        "mediaTitle": "Teenage Mutant Ninja Turtles (Video Game)",
+        "year": 2003,
+        "voiceActor": "Sam Riegel",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT 2003 game Baxter Stockman boss",
+          "Baxter Stockman mouser boss fight",
+          "Sam Riegel Baxter Stockman game"
+        ],
+        "notes": "Based on the 2003 animated series; features Stockman in his robotic suit and controlling Mousers.",
+        "voice": null
+      },
+      {
+        "id": "baxter-stockman-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Bulk": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "bulk-mighty-morphin-power-rangers",
+        "mediaTitle": "Mighty Morphin Power Rangers",
+        "year": 1993,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull best moments",
+          "Mighty Morphin Power Rangers Bulk clips",
+          "Paul Schrier Bulk dialogue"
+        ],
+        "notes": "Original series appearance; Bulk is the iconic comic relief character.",
+        "voice": {
+          "voiceId": "",
+          "voiceType": "ivc",
+          "status": "needs_clips",
+          "createdAt": "2026-04-26T16:21:23.471Z"
+        }
+      },
+      {
+        "id": "bulk-mighty-morphin-power-rangers-the-movie",
+        "mediaTitle": "Mighty Morphin Power Rangers: The Movie",
+        "year": 1995,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Bulk and Skull MMPR Movie 1995",
+          "Paul Schrier Power Rangers movie scenes"
+        ],
+        "notes": "Feature film debut of the character.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-zeo",
+        "mediaTitle": "Power Rangers Zeo",
+        "year": 1996,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull Power Rangers Zeo",
+          "Bulk and Skull detective scenes"
+        ],
+        "notes": "Character continues his role as a detective trainee.",
+        "voice": null
+      },
+      {
+        "id": "bulk-turbo-a-power-rangers-movie",
+        "mediaTitle": "Turbo: A Power Rangers Movie",
+        "year": 1997,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Bulk and Skull Turbo Movie clips",
+          "Turbo A Power Rangers Movie Bulk scenes"
+        ],
+        "notes": "Theatrical movie bridging Zeo and Turbo.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-turbo",
+        "mediaTitle": "Power Rangers Turbo",
+        "year": 1997,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull turned into chimps",
+          "Bulk and Skull Turbo season clips"
+        ],
+        "notes": "Character is famously transformed into a chimpanzee for a portion of the season.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-in-space",
+        "mediaTitle": "Power Rangers In Space",
+        "year": 1998,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull Power Rangers In Space",
+          "Bulk and Skull save the world scene"
+        ],
+        "notes": "Features a significant character moment where Bulk leads citizens against an invasion.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-lost-galaxy",
+        "mediaTitle": "Power Rangers Lost Galaxy",
+        "year": 1999,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk Power Rangers Lost Galaxy scenes",
+          "Bulk and Professor Phenomenus clips"
+        ],
+        "notes": "Bulk travels to the Terra Venture space colony.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-wild-force",
+        "mediaTitle": "Power Rangers Wild Force",
+        "year": 2002,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull Forever Red cameo",
+          "Bulk and Skull Wild Force appearance"
+        ],
+        "notes": "Special cameo appearance in the episode 'Forever Red'.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-samurai",
+        "mediaTitle": "Power Rangers Samurai",
+        "year": 2011,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Spike Power Rangers Samurai",
+          "Paul Schrier Bulk return Samurai"
+        ],
+        "notes": "Return of the character as a mentor to Skull's son, Spike.",
+        "voice": null
+      },
+      {
+        "id": "bulk-power-rangers-battle-for-the-grid",
+        "mediaTitle": "Power Rangers: Battle for the Grid",
+        "year": 2019,
+        "voiceActor": "Paul Schrier",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Bulk Sentry Battle for the Grid voices",
+          "Bulk Sentry gameplay dialogue"
+        ],
+        "notes": "Voices the 'Bulk Sentry' character, a multiverse version of Bulk from the Boom! Studios comics (similar to the TMNT MMPR crossover source material).",
+        "voice": null
+      }
+    ]
+  },
+  "Cyborg Villain": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "cyborg-villain-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Director": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "director-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 2003,
+        "voiceActor": "David Zen Mansley",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "TMNT 2003 Agent Bishop clips",
+          "Director Bishop Earth Protection Force"
+        ],
+        "notes": "Original voice actor for the character's debut as the Director of the EPF.",
+        "voice": null
+      },
+      {
+        "id": "director-teenage-mutant-ninja-turtles-3-mutant-nightmare",
+        "mediaTitle": "Teenage Mutant Ninja Turtles 3: Mutant Nightmare",
+        "year": 2005,
+        "voiceActor": "David Zen Mansley",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT Mutant Nightmare Agent Bishop boss",
+          "Agent Bishop video game dialogue"
+        ],
+        "notes": "Voiced appearance as a major boss in the video game based on the 2003 series.",
+        "voice": null
+      },
+      {
+        "id": "director-turtles-forever",
+        "mediaTitle": "Turtles Forever",
+        "year": 2009,
+        "voiceActor": "David Zen Mansley",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Turtles Forever Agent Bishop",
+          "Agent Bishop command center scene"
+        ],
+        "notes": "Voiced appearance in the crossover movie where the character monitors multiversal anomalies.",
+        "voice": null
+      },
+      {
+        "id": "director-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Female Soldier": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "female-soldier-power-rangers-battle-for-the-grid",
+        "mediaTitle": "Power Rangers: Battle for the Grid",
+        "year": 2021,
+        "voiceActor": "Abby Trott",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "April O'Neil Power Rangers Battle for the Grid gameplay",
+          "April O'Neil Yellow Ranger moveset",
+          "TMNT MMPR crossover April O'Neil voice"
+        ],
+        "notes": "April O'Neil appears in her Yellow Ranger form directly based on the TMNT/MMPR crossover comic series (MMPR/TMNT II).",
+        "voice": null
+      },
+      {
+        "id": "female-soldier-tmnt-shredders-revenge",
+        "mediaTitle": "TMNT: Shredder's Revenge",
+        "year": 2022,
+        "voiceActor": "Yukie LaBarge",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT Shredder's Revenge Karai gameplay",
+          "Karai voiced dialogue Shredder's Revenge",
+          "TMNT Shredder's Revenge DLC characters"
+        ],
+        "notes": "Appears as Karai, the high-ranking female soldier/leader of the Foot Clan; she is a playable character and a boss.",
+        "voice": null
+      },
+      {
+        "id": "female-soldier-power-rangers-in-space",
+        "mediaTitle": "Power Rangers in Space",
+        "year": 1998,
+        "voiceActor": "Lalainia Lindbjerg",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Power Rangers in Space Shell Shocked episode",
+          "Venus de Milo TMNT Power Rangers crossover",
+          "TMNT Next Mutation Power Rangers crossover"
+        ],
+        "notes": "Features Venus de Milo in the official 'Shell Shocked' crossover episode between TMNT: The Next Mutation and Power Rangers.",
+        "voice": null
+      },
+      {
+        "id": "female-soldier-teenage-mutant-ninja-turtles-iii",
+        "mediaTitle": "Teenage Mutant Ninja Turtles III",
+        "year": 1993,
+        "voiceActor": "Vivian Wu",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "TMNT 3 Mitsu scenes",
+          "Teenage Mutant Ninja Turtles 1993 Mitsu",
+          "TMNT 3 rebellion leader"
+        ],
+        "notes": "Mitsu is the primary female soldier/rebel leader in the third live-action TMNT film.",
+        "voice": null
+      },
+      {
+        "id": "female-soldier-tmnt-mutant-melee",
+        "mediaTitle": "TMNT: Mutant Melee",
+        "year": 2005,
+        "voiceActor": "Grey DeLisle",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT Mutant Melee Female Foot Ninja gameplay",
+          "TMNT Mutant Melee all voiced lines",
+          "Grey DeLisle TMNT voice"
+        ],
+        "notes": "A playable 'Female Foot Ninja' (Soldier) character with unique voiced dialogue and combat grunts.",
+        "voice": null
+      },
+      {
+        "id": "female-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Ghost Tiger": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "ghost-tiger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Green Dimension X Ranger": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "green-dimension-x-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Green Ranger Shredder": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "green-ranger-shredder-power-rangers-battle-for-the-grid",
+        "mediaTitle": "Power Rangers: Battle for the Grid",
+        "year": 2021,
+        "voiceActor": "Bill Rogers",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Green Ranger Shredder Battle for the Grid dialogue",
+          "Shredder Power Rangers Battle for the Grid gameplay",
+          "Bill Rogers Shredder voice lines"
+        ],
+        "notes": "The character was added as part of the Season 4 DLC. He features unique intro and outro dialogue, as well as mid-fight quips specifically referencing his takeover of the Dragon Coin.",
+        "voice": null
+      },
+      {
+        "id": "green-ranger-shredder-power-rangers-legacy-wars",
+        "mediaTitle": "Power Rangers: Legacy Wars",
+        "year": 2021,
+        "voiceActor": "Bill Rogers",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Power Rangers Legacy Wars Shredder moveset",
+          "Legacy Wars Green Ranger Shredder trailer",
+          "Shredder TMNT Power Rangers crossover dialogue"
+        ],
+        "notes": "A mobile fighting game. Shredder was added as a legendary attacker. While dialogue is more limited than the console counterpart, he features voiced combat grunts and victory lines.",
+        "voice": null
+      },
+      {
+        "id": "green-ranger-shredder-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Kayla": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "kayla-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1987,
+        "voiceActor": "Tress MacNeille",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Kala Neutrino TMNT 1987",
+          "Neutrinos TMNT Dimension X clips"
+        ],
+        "notes": "Original appearance; character is spelled 'Kala' but phonetically identical to 'Kayla'. She is a core ally in the MMPR/TMNT crossover comics.",
+        "voice": null
+      },
+      {
+        "id": "kayla-tmnt-shredders-revenge",
+        "mediaTitle": "TMNT: Shredder's Revenge",
+        "year": 2022,
+        "voiceActor": "Cree Summer",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT Shredder's Revenge Neutrinos dialogue",
+          "Kala Shredder's Revenge Dimension Shellshock"
+        ],
+        "notes": "Appears as an NPC in the base game and provides voiced dialogue in the 'Dimension Shellshock' DLC.",
+        "voice": null
+      },
+      {
+        "id": "kayla-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Krang": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "krang-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1987,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "1987 Krang voice clips",
+          "Krang and Shredder funny moments",
+          "Pat Fraley Krang dialogue"
+        ],
+        "notes": "Original iconic voice actor; defined the character's personality.",
+        "voice": {
+          "voiceId": "",
+          "voiceType": "ivc",
+          "status": "needs_clips",
+          "createdAt": "2026-04-26T16:24:16.132Z"
+        }
+      },
+      {
+        "id": "krang-teenage-mutant-ninja-turtles-turtles-in-time",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Turtles in Time",
+        "year": 1991,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Turtles in Time Krang boss fight",
+          "TMNT Arcade Krang dialogue",
+          "SNES Turtles in Time Krang"
+        ],
+        "notes": "Features voiced taunts and dialogue during boss encounters in the Arcade and SNES versions.",
+        "voice": null
+      },
+      {
+        "id": "krang-turtles-forever",
+        "mediaTitle": "Turtles Forever",
+        "year": 2009,
+        "voiceActor": "Bradford Cameron",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Turtles Forever 1987 Krang",
+          "Krang meets 2003 Shredder",
+          "Turtles Forever Krang clips"
+        ],
+        "notes": "Crossover movie featuring the 1987 version of Krang.",
+        "voice": null
+      },
+      {
+        "id": "krang-teenage-mutant-ninja-turtles-out-of-the-shadows",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Out of the Shadows",
+        "year": 2016,
+        "voiceActor": "Brad Garrett",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Out of the Shadows Krang scene",
+          "Brad Garrett Krang voice",
+          "Krang vs Turtles final battle 2016"
+        ],
+        "notes": "First live-action cinematic appearance; CGI character with voiced dialogue.",
+        "voice": null
+      },
+      {
+        "id": "krang-tmnt-mutants-in-manhattan",
+        "mediaTitle": "TMNT: Mutants in Manhattan",
+        "year": 2016,
+        "voiceActor": "Steve Blum",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Mutants in Manhattan Krang boss",
+          "Steve Blum Krang voice",
+          "TMNT Mutants in Manhattan cutscenes"
+        ],
+        "notes": "A more serious, menacing interpretation of the character.",
+        "voice": null
+      },
+      {
+        "id": "krang-rise-of-the-teenage-mutant-ninja-turtles-the-movie",
+        "mediaTitle": "Rise of the Teenage Mutant Ninja Turtles: The Movie",
+        "year": 2022,
+        "voiceActor": "Jim Pirri",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Rise of the TMNT Krang Leader",
+          "Rise TMNT movie Krang dialogue",
+          "Krang Leader vs Leo"
+        ],
+        "notes": "Portrayed as 'Krang Leader', part of a hive-mind alien species.",
+        "voice": null
+      },
+      {
+        "id": "krang-teenage-mutant-ninja-turtles-shredders-revenge",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
+        "year": 2022,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Shredder's Revenge Krang boss",
+          "Pat Fraley Krang Shredder's Revenge",
+          "TMNT Shredder's Revenge ending"
+        ],
+        "notes": "Pat Fraley returns to voice the classic 1987 iteration of the character.",
+        "voice": null
+      },
+      {
+        "id": "krang-nickelodeon-all-star-brawl-2",
+        "mediaTitle": "Nickelodeon All-Star Brawl 2",
+        "year": 2023,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "NASB 2 Krang voice lines",
+          "Nickelodeon All-Star Brawl 2 Krang gameplay",
+          "Pat Fraley NASB 2"
+        ],
+        "notes": "A playable fighter using the 1987 design and voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Mutated Villain": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "mutated-villain-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Mysterious Enemy": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "mysterious-enemy-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Putty Foot Soldier": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "putty-foot-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Robo-Foot Soldier": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "robo-foot-soldier-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1987,
+        "voiceActor": "Peter Renaday",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "1987 TMNT Foot Soldier voice",
+          "TMNT Enter the Shredder robot foot soldiers",
+          "classic TMNT foot soldier dialogue"
+        ],
+        "notes": "This is the primary source where Foot Soldiers were established as robots to satisfy broadcast censors. In early episodes, they possess distinct, processed metallic dialogue before becoming silent minions in later seasons.",
+        "voice": null
+      },
+      {
+        "id": "robo-foot-soldier-teenage-mutant-ninja-turtles-shredders-revenge",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
+        "year": 2022,
+        "voiceActor": "Yuri Lowenthal",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT Shredder's Revenge robot foot soldier gameplay",
+          "Shredder's Revenge generic enemy voices",
+          "Shredder's Revenge voice cast"
+        ],
+        "notes": "The robotic Foot Soldiers in this game feature combat barks and shouts. While the cast is ensemble, Yuri Lowenthal provides many of the generic Foot Soldier vocalizations.",
+        "voice": null
+      },
+      {
+        "id": "robo-foot-soldier-teenage-mutant-ninja-turtles-mutants-in-manhattan",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Mutants in Manhattan",
+        "year": 2016,
+        "voiceActor": "Nolan North",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "TMNT Mutants in Manhattan robot foot soldiers",
+          "Mutants in Manhattan enemy dialogue"
+        ],
+        "notes": "Features robotic Foot Soldiers with electronic vocal effects and combat dialogue. Nolan North is credited for various Foot Soldier and background voices.",
+        "voice": null
+      },
+      {
+        "id": "robo-foot-soldier-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Skull": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "skull-mighty-morphin-power-rangers",
+        "mediaTitle": "Mighty Morphin Power Rangers",
+        "year": 1993,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull best moments",
+          "Mighty Morphin Power Rangers Skull compilation",
+          "Jason Narvy Power Rangers"
+        ],
+        "notes": "Original series appearance; secondary antagonist turned comic relief.",
+        "voice": null
+      },
+      {
+        "id": "skull-mighty-morphin-power-rangers-the-movie",
+        "mediaTitle": "Mighty Morphin Power Rangers: The Movie",
+        "year": 1995,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Bulk and Skull 1995 movie",
+          "Power Rangers Movie skydiving scene",
+          "Jason Narvy 1995 Movie"
+        ],
+        "notes": "First feature film appearance; set in an alternate continuity to the show.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-zeo",
+        "mediaTitle": "Power Rangers Zeo",
+        "year": 1996,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull junior police",
+          "Power Rangers Zeo Skull moments",
+          "Jason Narvy Power Rangers Zeo"
+        ],
+        "notes": "Follows the character's transition from student to Junior Police officer.",
+        "voice": null
+      },
+      {
+        "id": "skull-turbo-a-power-rangers-movie",
+        "mediaTitle": "Turbo: A Power Rangers Movie",
+        "year": 1997,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Turbo A Power Rangers Movie Bulk and Skull",
+          "Bulk and Skull turned into monkeys",
+          "Jason Narvy Turbo movie"
+        ],
+        "notes": "Skull is famously turned into a chimpanzee for much of this film but provides dialogue in his human form.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-turbo",
+        "mediaTitle": "Power Rangers Turbo",
+        "year": 1997,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Power Rangers Turbo Bulk and Skull monkey",
+          "Skull turned back to human Turbo",
+          "Jason Narvy Power Rangers Turbo"
+        ],
+        "notes": "Character is initially portrayed as a chimpanzee (voiced/grunted) before returning to human form.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-in-space",
+        "mediaTitle": "Power Rangers In Space",
+        "year": 1998,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Bulk and Skull I am a Power Ranger",
+          "Power Rangers In Space finale Bulk and Skull",
+          "Jason Narvy Power Rangers In Space"
+        ],
+        "notes": "Includes the iconic scene where Skull and Bulk lead the citizens of Angel Grove to defend the Rangers.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-lost-galaxy",
+        "mediaTitle": "Power Rangers Lost Galaxy",
+        "year": 1999,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Power Rangers Lost Galaxy Skull cameo",
+          "Bulk and Skull Lost Galaxy first episode",
+          "Jason Narvy Lost Galaxy"
+        ],
+        "notes": "Cameo appearance in the premiere episode 'Quasar Quest'.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-wild-force",
+        "mediaTitle": "Power Rangers Wild Force",
+        "year": 2002,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Power Rangers Forever Red Bulk and Skull",
+          "Bulk and Skull reunion Wild Force",
+          "Jason Narvy Forever Red"
+        ],
+        "notes": "Guest appearance in the 10th anniversary special episode 'Forever Red'.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-samurai",
+        "mediaTitle": "Power Rangers Samurai",
+        "year": 2012,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Power Rangers Samurai Skull return",
+          "Bulk and Skull reunion Samurai",
+          "Jason Narvy Power Rangers Samurai finale"
+        ],
+        "notes": "Guest appearance in the season finale to reunite with Bulk and his son, Spike.",
+        "voice": null
+      },
+      {
+        "id": "skull-power-rangers-battle-for-the-grid",
+        "mediaTitle": "Power Rangers: Battle for the Grid",
+        "year": 2019,
+        "voiceActor": "Jason Narvy",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Battle for the Grid Bulk and Skull gameplay",
+          "Jason Narvy Battle for the Grid voice lines",
+          "Power Rangers Battle for the Grid Bulk assistant"
+        ],
+        "notes": "Skull appears as part of Bulk's moveset and has voiced intro, outro, and assist dialogue.",
+        "voice": null
+      },
+      {
+        "id": "skull-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Squatt": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "squatt-mighty-morphin-power-rangers",
+        "mediaTitle": "Mighty Morphin Power Rangers",
+        "year": 1993,
+        "voiceActor": "Michael Sorich",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Squatt and Baboo funny moments",
+          "MMPR Squatt voice Michael Sorich"
+        ],
+        "notes": "Original series; character appeared in 146 episodes as a main antagonist minion.",
+        "voice": null
+      },
+      {
+        "id": "squatt-mighty-morphin-power-rangers-the-movie",
+        "mediaTitle": "Mighty Morphin Power Rangers: The Movie",
+        "year": 1995,
+        "voiceActor": "Michael Sorich",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Squatt and Baboo 1995 movie scenes",
+          "Ivan Ooze Rita and Zedd"
+        ],
+        "notes": "Theatrical film release; character design was slightly updated with higher-quality prosthetics.",
+        "voice": null
+      },
+      {
+        "id": "squatt-power-rangers-zeo",
+        "mediaTitle": "Power Rangers Zeo",
+        "year": 1996,
+        "voiceActor": "Michael Sorich",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Squatt and Baboo Power Rangers Zeo",
+          "Rita and Zedd flee Machine Empire"
+        ],
+        "notes": "Appeared in the early episodes of the season before the character was phased out of the live-action show.",
+        "voice": null
+      },
+      {
+        "id": "squatt-power-rangers-super-legends",
+        "mediaTitle": "Power Rangers: Super Legends",
+        "year": 2007,
+        "voiceActor": "Michael Sorich",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Power Rangers Super Legends Squatt boss",
+          "Super Legends Michael Sorich dialogue"
+        ],
+        "notes": "Michael Sorich reprised his role for this 15th-anniversary video game.",
+        "voice": null
+      },
+      {
+        "id": "squatt-power-rangers-battle-for-the-grid",
+        "mediaTitle": "Power Rangers: Battle for the Grid",
+        "year": 2019,
+        "voiceActor": "Michael Sorich",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Battle for the Grid Story Mode Squatt",
+          "Battle for the Grid Rita Repulsa cutscenes"
+        ],
+        "notes": "The character appears in the cinematic story mode with voiced dialogue during the interactions with Rita Repulsa.",
+        "voice": null
+      },
+      {
+        "id": "squatt-mighty-morphin-power-rangers-once-always",
+        "mediaTitle": "Mighty Morphin Power Rangers: Once & Always",
+        "year": 2023,
+        "voiceActor": "Michael Sorich",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Robo-Squatt and Robo-Baboo Once & Always",
+          "MMPR Once and Always 30th Anniversary"
+        ],
+        "notes": "Appears as a robotic recreation (Robo-Squatt); Michael Sorich returned once again to provide the voice.",
+        "voice": null
+      },
+      {
+        "id": "squatt-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Unknown Character": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "unknown-character-power-rangers-legacy-wars",
+        "mediaTitle": "Power Rangers: Legacy Wars",
+        "year": 2023,
+        "voiceActor": "Josh Peck",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Power Rangers Legacy Wars Unknown Ranger gameplay",
+          "Casey Jones Unknown Ranger TMNT MMPR",
+          "Legacy Wars Casey Jones moveset"
+        ],
+        "notes": "The character appears as 'Casey Jones (MMPR/TMNT)' utilizing the 'Unknown Ranger' (or Ranger X) suit from the 'Mighty Morphin Power Rangers/Teenage Mutant Ninja Turtles II' crossover comic series. The voice lines are performed by Josh Peck, who voiced Casey Jones in the 2012 TMNT animated series.",
+        "voice": null
+      },
+      {
+        "id": "unknown-character-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Unknown Hero": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "unknown-hero-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Unknown Voice": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "unknown-voice-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  },
+  "Villain Scientist": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "villain-scientist-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Teenage Mutant Ninja Turtles",
+        "year": 1987,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Baxter Stockman 1987",
+          "Baxter Stockman fly transformation"
+        ],
+        "notes": "Original animated version; depicted as a Caucasian scientist who eventually mutates into a fly.",
+        "voice": null
+      },
+      {
+        "id": "villain-scientist-teenage-mutant-ninja-turtles-out-of-the-shadows",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Out of the Shadows",
+        "year": 2016,
+        "voiceActor": "Tyler Perry",
+        "mediaType": "live_action",
+        "youtubeSearchTerms": [
+          "Tyler Perry Baxter Stockman",
+          "TMNT 2 Baxter Stockman scene"
+        ],
+        "notes": "Live-action portrayal where he assists Shredder and Krang.",
+        "voice": null
+      },
+      {
+        "id": "villain-scientist-rise-of-the-teenage-mutant-ninja-turtles",
+        "mediaTitle": "Rise of the Teenage Mutant Ninja Turtles",
+        "year": 2018,
+        "voiceActor": "Ramone Hamilton",
+        "mediaType": "animated_series",
+        "youtubeSearchTerms": [
+          "Baxter Stockboy Rise of the TMNT",
+          "Baxter Stockboy clips"
+        ],
+        "notes": "A reimagined version named Baxter Stockboy, a child prodigy/tech villain.",
+        "voice": null
+      },
+      {
+        "id": "villain-scientist-teenage-mutant-ninja-turtles-shredders-revenge",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Shredder's Revenge",
+        "year": 2022,
+        "voiceActor": "Pat Fraley",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Shredder's Revenge Baxter Stockman boss fight",
+          "Shredder's Revenge voice cast"
+        ],
+        "notes": "Reprises his 1987 role as a boss character in this retro-styled game.",
+        "voice": null
+      },
+      {
+        "id": "villain-scientist-teenage-mutant-ninja-turtles-mutant-mayhem",
+        "mediaTitle": "Teenage Mutant Ninja Turtles: Mutant Mayhem",
+        "year": 2023,
+        "voiceActor": "Giancarlo Esposito",
+        "mediaType": "movie",
+        "youtubeSearchTerms": [
+          "Baxter Stockman Mutant Mayhem",
+          "Giancarlo Esposito TMNT"
+        ],
+        "notes": "Depicted as the creator of the mutant species and Superfly's father figure.",
+        "voice": null
+      },
+      {
+        "id": "villain-scientist-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Villain Yellow Ranger": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "villain-yellow-ranger-power-rangers-legacy-wars",
+        "mediaTitle": "Power Rangers: Legacy Wars",
+        "year": 2022,
+        "voiceActor": "Zeno Robinson",
+        "mediaType": "video_game",
+        "youtubeSearchTerms": [
+          "Power Rangers Legacy Wars Casey Jones Ranger X",
+          "Casey Jones TMNT MMPR crossover gameplay",
+          "Legacy Wars Casey Jones voice lines"
+        ],
+        "notes": "Appears as a playable character using the 'Ranger X' suit, which is the villainous Yellow Ranger variant Casey Jones uses in the IDW/BOOM! Studios crossover comic series.",
+        "voice": null
+      },
+      {
+        "id": "villain-yellow-ranger-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "User selected auto-generated voice.",
+        "voice": null
+      }
+    ]
+  },
+  "Winged Monster": {
+    "franchise": "TMNT MMPR III",
+    "aliases": [],
+    "appearances": [
+      {
+        "id": "winged-monster-voice-design",
+        "mediaTitle": null,
+        "year": null,
+        "voiceActor": null,
+        "mediaType": "voice_design",
+        "youtubeSearchTerms": [],
+        "notes": "Auto-generated: no media appearances found.",
+        "voice": null
+      }
+    ]
+  }
+}

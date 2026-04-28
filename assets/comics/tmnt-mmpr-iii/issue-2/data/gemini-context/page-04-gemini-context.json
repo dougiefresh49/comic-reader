@@ -1,0 +1,271 @@
+[
+  {
+    "id": "page-04_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 994.6060791015625,
+      "y": 1732.8438720703125,
+      "width": 212.8084716796875,
+      "height": 156.7332763671875,
+      "confidence": 0.9441257119178772,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-001-x994-y1732.jpg"
+    },
+    "ocr_text": "I KNOW THIS WAS YOUR IDEA.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Resentful and accusing",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Gruff, angry young male voice with a thick New York accent",
+    "textWithCues": "[Accusingly, with seething anger] I KNOW THIS WAS YOUR IDEA.",
+    "aiReasoning": "I see the text \"I KNOW THIS WAS YOUR IDEA.\" in a standard rounded speech bubble.\nThe bubble is connected to a second bubble (\"YOU ALWAYS SCREW UP...\") which has a tail pointing to the character on the right, Raphael (identified by the red mask and sai on belt/general appearance).\nRaphael is pointing an accusing finger at Leonardo (blue mask).\nThe context is a heated argument where Raphael is blaming Leonardo for their father's death.\nImportance is MAJOR.\nEmotion is resentful, angry, and accusatory."
+  },
+  {
+    "id": "page-04_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 961.4186401367188,
+      "y": 1211.8941650390625,
+      "width": 216.37957763671875,
+      "height": 188.7608642578125,
+      "confidence": 0.9334936141967773,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-002-x961-y1211.jpg"
+    },
+    "ocr_text": "SPLINTER WOULDN'T HAVE--",
+    "type": "SPEECH",
+    "speaker": "Donatello",
+    "emotion": "Concerned and pleading",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Reasoning, suddenly cut off] Splinter wouldn't have--",
+    "aiReasoning": "1.  **Locate Text**: The speech bubble \"SPLINTER WOULDN'T HAVE--\" is in the middle panel, positioned towards the right side.\n2.  **Identify Speaker**:\n    *   The tail of the speech bubble points clearly to the Ninja Turtle with the **purple mask** (Donatello).\n    *   In the subsequent panel (bottom-left), Raphael (Red mask) is seen physically shoving Donatello (Purple mask) and yelling \"DON'T YOU SAY HIS NAME!\". This narrative sequence confirms Donatello is the one who mentioned Splinter, triggering Raphael's aggressive response.\n    *   Speaker Name: **Donatello**.\n3.  **Classify**:\n    *   **Type**: SPEECH.\n    *   **Character Type**: MAJOR (He is one of the Ninja Turtles).\n    *   **Side**: HERO.\n4.  **Analyze Context**:\n    *   **Situation**: Leonardo is in a rage (beating someone up in previous panels). Donatello attempts to intervene by invoking the moral authority of their deceased father figure, Splinter.\n    *   **Emotion**: Concerned, pleading, attempting to be the \"voice of reason.\"\n    *   **Interruption**: The text ends with a double dash \"--\", indicating he is cut off abruptly (by Raphael's shouting in the next panel).\n5.  **Determine Cues**:\n    *   Tone: Reasonable but urgent. He is trying to reach his brother's conscience.\n    *   Effect: The sentence is unfinished. The actor should stop sharply.\n    *   Cue text: `[Pleading, reasoning, suddenly cut off] Splinter wouldn't have--`"
+  },
+  {
+    "id": "page-04_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 184.80178833007812,
+      "y": 1233.935546875,
+      "width": 210.12652587890625,
+      "height": 112.4281005859375,
+      "confidence": 0.9295330047607422,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-003-x184-y1233.jpg"
+    },
+    "ocr_text": "LEO! LET HIM GO.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Urgent, alarmed, commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting urgently] LEO! LET HIM GO.",
+    "aiReasoning": "I have located the text \"LEO! LET HIM GO.\" in the third panel of the comic page.\nThe text is inside a speech bubble with a tail pointing to a character on the left side of the group.\nVisual identification: The speaker is a male character wearing a Red Power Ranger suit without the helmet. He has short dark hair. This character is distinct from the Turtles (Raphael, Donatello, etc.). He is a major character in this crossover (likely Jason, the Red Ranger).\nSpeaker Identification: The character is the Red Ranger. He is not Raphael (Turtle) or Donatello. I will name him \"Red Ranger\".\nClassifications:\n- Type: SPEECH\n- Side: HERO (Power Ranger)\n- Importance: MAJOR (Lead team member)\n- Emotion: Urgent, alarmed, commanding. His expression shows concern and he is shouting to stop an act of violence.\n- Voice Cues: The text is bold and capitalized with an exclamation mark, indicating shouting. The context is an emergency intervention.\n\nThe prompt text only includes the first bubble. I will process only that text."
+  },
+  {
+    "id": "page-04_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 96.29518127441406,
+      "y": 1345.8353271484375,
+      "width": 212.15296936035156,
+      "height": 172.5067138671875,
+      "confidence": 0.9267409443855286,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-004-x96-y1345.jpg"
+    },
+    "ocr_text": "HE ALREADY KNOWS WHAT HE DID.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Urgent, protective, and commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, strong American accent, commanding and heroic tone",
+    "textWithCues": "[Shouting urgently] He already knows what he did.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"HE ALREADY KNOWS WHAT HE DID.\" is located in a speech bubble in the middle panel. The tail of the speech bubble points to the character in the red suit (Red Ranger).\n    *   Type: `SPEECH`\n\n2.  **Analyze Context:**\n    *   **Speaker:** The character is wearing the Red Power Ranger suit without the helmet. He matches the \"Red Ranger\" from the unique characters list.\n    *   **Side:** Power Rangers are heroes. Side is `HERO`.\n    *   **Importance:** He is a main character (one of the Rangers). Importance is `MAJOR`.\n    *   **Voice Description:** Since he is a MAJOR character, a specific AI generation description is not strictly required by the instructions (\"If MINOR or EXTRA...\"), but generally, he has a young, commanding, heroic male voice.\n    *   **Emotion:** He is shouting at Leonardo to stop attacking Casey Jones. His face shows urgency and concern. He is acting as a peacemaker/leader.\n\n3.  **Performance Cues:**\n    *   **Volume:** The text is in bold (\"**HE ALREADY KNOWS WHAT HE DID.**\") and he is trying to stop a physical fight. He is definitely shouting or yelling.\n    *   **Tone:** Urgent, authoritative, pleading.\n    *   **Cue:** `[Shouting urgently]` or `[Yelling firmly]`. Let's go with `[Shouting urgently]`."
+  },
+  {
+    "id": "page-04_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1483.7467041015625,
+      "y": 1725.77294921875,
+      "width": 207.6072998046875,
+      "height": 116.926025390625,
+      "confidence": 0.9201620817184448,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-005-x1483-y1725.jpg"
+    },
+    "ocr_text": "BUT NOT THIS TIME.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Cold, resentful, and final",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Coldly and with finality] But not this time.",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   The text \"BUT NOT THIS TIME.\" is found in the middle-right panel of the page.\n    *   It is inside a standard speech bubble with a tail pointing to the character on the right (Raphael).\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The character has a red mask and is a turtle. This is Raphael. He is listed in the 'Unique Characters'.\n    *   **Side:** `HERO` (Teenage Mutant Ninja Turtle).\n    *   **Importance:** `MAJOR`.\n    *   **Context:** Raphael is confronting Leonardo. He just accused Leo (\"I know this was *your* idea\") and reminded him of his past mistakes (\"You always screw up, and he always forgave you\"). This line is the final verdict of the confrontation.\n    *   **Emotion:** Raphael's expression is stern and angry. He is pointing an accusing finger. The previous shouting matches have simmered down into a cold, hard resentment. He is drawing a line. The tone is unforgiving, final, and bitter.\n\n3.  **Performance Cues:**\n    *   The bubble is smooth, not jagged like the earlier ones where he was screaming. This suggests a drop in volume to a more intense, serious level.\n    *   The phrase implies a break in a pattern. It should be delivered with finality.\n    *   Cue suggestions: `[Coldly]`, `[Resolutely]`, `[With deep resentment]`.\n    *   I will use `[Coldly and with finality]` to capture the severing of their bond over this issue."
+  },
+  {
+    "id": "page-04_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1203.780029296875,
+      "y": 1752.2786865234375,
+      "width": 302.7515869140625,
+      "height": 190.19580078125,
+      "confidence": 0.9136890769004822,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-006-x1203-y1752.jpg"
+    },
+    "ocr_text": "YOU ALWAYS SCREW UP, AND HE ALWAYS FORGAVE YOU.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Bitter and accusatory",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Coldly, pointing a finger] You always screw up, [voice trembling with repressed grief] and he always forgave you.",
+    "aiReasoning": "I have located the text \"YOU ALWAYS SCREW UP, AND HE ALWAYS FORGAVE YOU.\" in the middle-right panel.\n1.  **Speaker Identification**:\n    *   The speech bubble is connected to \"I KNOW THIS WAS YOUR IDEA.\"\n    *   The tail of the speech bubble cluster points to the character on the left side of the panel.\n    *   The character on the left has his back to the viewer, is pointing a finger, and wears a **blue** mask (visible mask tails). This is **Leonardo**.\n    *   The character being spoken to is facing the viewer, wearing a **red** mask. This is **Raphael**.\n    *   Leonardo is not in the provided \"Unique Characters\" list, so I will create a new name for him.\n2.  **Context**:\n    *   Leonardo is grieving the death of Splinter (\"My father is dead because of you\").\n    *   He is lashing out at Raphael, blaming Raph's reckless plan (\"Your idea\") for the tragedy.\n    *   He is contrasting Raph's history of mistakes (\"Always screw up\") with Splinter's history of forgiveness, implying that this time the mistake is unforgivable because Splinter is gone.\n3.  **Performance Cues**:\n    *   **Tone**: Bitter, resentful, accusatory. It is a cold, cutting statement rather than a loud scream (text is not bold/jagged like the earlier shouts).\n    *   **Emotion**: Deep grief manifesting as anger.\n    *   **Cues**: Emphasize \"ALWAYS\" to highlight the pattern. A crack in the voice on \"forgave you\" or \"he\" to show the pain of the loss."
+  },
+  {
+    "id": "page-04_b07",
+    "box_2d": {
+      "index": 7,
+      "x": 1433.1529541015625,
+      "y": 78.7679443359375,
+      "width": 187.7388916015625,
+      "height": 104.3375244140625,
+      "confidence": 0.7228690385818481,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-008-x1433-y78.jpg"
+    },
+    "ocr_text": "I'M...I'M SORRY.",
+    "type": "SPEECH",
+    "speaker": "Tommy Oliver",
+    "emotion": "Remorseful, scared, sad",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young male voice, American accent. Currently sounding broken, shaky, quiet, and full of guilt.",
+    "textWithCues": "[Stammering, softly] I'm... I'm sorry.",
+    "aiReasoning": "I see the text \"I'M...I'M SORRY.\" in a standard speech bubble in the top right panel.\nThe speaker is the unmasked human character with black hair and a ponytail, wearing green and gold. Based on the comic context (MMPR/TMNT crossover) and the green outfit/ponytail, this is Tommy Oliver (the Green Ranger).\nHe is being confronted by Leonardo. The context suggests a plan went wrong (\"I know this was your idea\") resulting in a tragedy (\"My father is dead\").\nImportance is MAJOR.\nHe is expressing deep regret and fear/sadness. The text contains ellipses \"...\" indicating a stutter or hesitation. The font is not bolded or jagged, contrasting with Leonardo's shouting, implying a quieter, meeker tone."
+  },
+  {
+    "id": "page-04_b08",
+    "box_2d": {
+      "index": 8,
+      "x": 92.19036102294922,
+      "y": 69.04330444335938,
+      "width": 288.81629180908203,
+      "height": 159.60679626464844,
+      "confidence": 0.6687474846839905,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-009-x92-y69.jpg"
+    },
+    "ocr_text": "THEY SAID TO... STAY PUT! TO BE PATIENT!!!",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Furious, grief-stricken, shouting",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Shouting in a rage, shaking the listener] THEY SAID TO... [short pause] STAY PUT! TO BE PATIENT!!!",
+    "aiReasoning": "The text is located in the top-left panel.\nIt is a speech bubble containing the text \"THEY SAID TO... STAY PUT! TO BE PATIENT!!!\".\nThe tail of the bubble points to the character with the blue mask, which is Leonardo (identified in the provided list).\nLeonardo is a member of the Teenage Mutant Ninja Turtles, making him a HERO and a MAJOR character.\nHis expression is one of intense anger; his teeth are bared, eyebrows furrowed, and he is physically grabbing another character (Tommy Oliver).\nThe text contains bold words and exclamation points, indicating shouting. The ellipsis \"...\" suggests a momentary pause for breath or emphasis in his rage, rather than a stutter of fear.\nContext implies he is reprimanding Tommy for an action that led to a tragedy (Splinter's death, mentioned in the next panel)."
+  },
+  {
+    "id": "page-04_b09",
+    "box_2d": {
+      "index": 9,
+      "x": 1486.1478271484375,
+      "y": 322.5027160644531,
+      "width": 270.460205078125,
+      "height": 137.48123168945312,
+      "confidence": 0.6042051911354065,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-010-x1486-y322.jpg"
+    },
+    "ocr_text": "YOU THINK \"SORRY\" FIXES THAT?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Enraged and grieving",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Screaming with intense rage] YOU THINK \"SORRY\" FIXES THAT?",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   The text \"YOU THINK \"SORRY\" FIXES THAT?\" is found in the top-right panel (Panel 2).\n    *   It is in a speech bubble.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The bubble tail leads to the Ninja Turtle with the blue mask. Based on the provided unique character list, this is **Leonardo**.\n    *   **Side:** Hero.\n    *   **Importance:** Major.\n    *   **Situation:** Leonardo has pinned Tommy Oliver against a wall. Tommy has just apologized (\"I'm... I'm sorry\"). Leonardo is reacting with extreme anger and grief, blaming Tommy for his father's (Splinter's) death.\n    *   **Visuals:** Leonardo's face is close to Tommy's, his mouth is wide open in a yell/snarl, eyebrows furrowed deep in anger. The line preceding this is \"MY FATHER IS DEAD BECAUSE OF YOU.\" This context is pure rage and heartbreak.\n\n3.  **Performance Cues:**\n    *   **Volume:** The text is bold, the emotional context is screaming/yelling.\n    *   **Tone:** Furious, incredulous, hateful.\n    *   **Delivery:** He is mocking the inadequacy of the apology. \"SORRY\" is in quotation marks, implying he is spitting that word out with disdain.\n    *   **Cues:** `[Screaming in rage]`, emphasis on \"sorry\".\n\n4.  **Drafting Output:**\n    *   Speaker: Leonardo\n    *   Emotion: Enraged/Grieving\n    *   Text: \"[Screaming with intense rage] YOU THINK \"SORRY\" FIXES THAT?\""
+  },
+  {
+    "id": "page-04_b10",
+    "box_2d": {
+      "index": 10,
+      "x": 588.6776733398438,
+      "y": 2468.97265625,
+      "width": 167.323486328125,
+      "height": 122.739013671875,
+      "confidence": 0.553756058216095,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-011-x588-y2468.jpg"
+    },
+    "ocr_text": "I'M DONE.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Cold resignation and finality",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Walking away, voice low and firm with disappointment] I'm done.",
+    "aiReasoning": "I have located the text \"I'M DONE.\" in the final panel of the page.\nThe text is inside a speech bubble with a tail pointing to a turtle with a red bandana.\nBased on the character designs and the list of unique characters, the red bandana identifies this character as **Raphael**.\nHe is a main protagonist (`MAJOR`, `HERO`).\nIn the preceding panels, there is high tension. Leonardo (blue) is lashing out at Tommy Oliver. Then Raphael confronts Leonardo (or possibly Tommy, but the \"You always screw up, and he always forgave you\" line strongly implies Raph talking to Leo about Splinter).\nIn this final panel, Raphael turns his back on the group/Leonardo and walks away. His body language is slumped but firm, indicating he is giving up on the conversation or the person he was arguing with.\nThe emotion is one of cold resignation, exhaustion, and finality. He isn't screaming this line (the bubble isn't jagged), but it's a definitive statement ending the interaction.\n\nStructure:\n- Type: SPEECH\n- Speaker: Raphael\n- Character Type: MAJOR\n- Side: HERO\n- Emotion: Cold, resigned, angry.\n- Cue: Walking away, low tone, firm."
+  },
+  {
+    "id": "page-04_b11",
+    "box_2d": {
+      "index": 11,
+      "x": 165.69070434570312,
+      "y": 1689.78076171875,
+      "width": 336.2716979980469,
+      "height": 103.503173828125,
+      "confidence": 0.5168282389640808,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-012-x165-y1689.jpg"
+    },
+    "ocr_text": "DON'T YOU SAY HIS NAME!",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Enraged/Grief-stricken",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Screaming in sudden fury] DON'T YOU SAY HIS NAME!",
+    "aiReasoning": "1.  **Locate Text**: \"DON'T YOU SAY HIS NAME!\" is in the bottom-left panel. The speech bubble has a red outline, indicating intense anger or screaming.\n2.  **Identify Speaker**: The bubble's tail points off-panel to the right. In the immediate next panel to the right, Raphael (Turtle with the red mask) is shown pointing an accusing finger and continuing the thought process (\"I know this was your idea...\"). The interruption is in response to the Pink Ranger saying \"Splinter wouldn't have--\" in the panel above. Therefore, the speaker is Raphael.\n3.  **Classify Context**:\n    *   **Type**: SPEECH.\n    *   **Speaker**: Raphael (Matches unique character list).\n    *   **Side**: HERO.\n    *   **Importance**: MAJOR.\n    *   **Emotion**: Enraged, grief-stricken, aggressive. The red border and bold text signify shouting.\n4.  **Draft Performance Cues**: The character is screaming in a fit of rage to stop someone from speaking about his deceased father figure. The delivery should be loud, harsh, and cracking with emotion."
+  },
+  {
+    "id": "page-04_b12",
+    "box_2d": {
+      "index": 12,
+      "x": 546.9903564453125,
+      "y": 78.04395294189453,
+      "width": 372.9490966796875,
+      "height": 201.34725189208984,
+      "confidence": 0.4893740713596344,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-013-x546-y78.jpg"
+    },
+    "ocr_text": "YOU DON'T THINK I WANTED TO GO UP THERE AND SMASH THE PLACE TO PIECES EVERY SINGLE DAY?!",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  },
+  {
+    "id": "page-04_b13",
+    "box_2d": {
+      "index": 13,
+      "x": 358.4326477050781,
+      "y": 1781.459228515625,
+      "width": 208.37356567382812,
+      "height": 104.2874755859375,
+      "confidence": 0.4356726408004761,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-04/page-04-crop-014-x358-y1781.jpg"
+    },
+    "ocr_text": "DON'T YOU DARE!",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  }
+]

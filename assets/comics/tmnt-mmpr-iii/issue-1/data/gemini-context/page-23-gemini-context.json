@@ -1,0 +1,280 @@
+[
+  {
+    "id": "page-23_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 411.103271484375,
+      "y": 200.59698486328125,
+      "width": 229.5267333984375,
+      "height": 320.47064208984375,
+      "confidence": 0.9757905602455139,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-001-x411-y200.jpg"
+    },
+    "ocr_text": "UGH... DO I GOT A CHOICE?",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Pained and resigned",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Gruff, tough male voice with a Brooklyn accent, sounding injured and exhausted",
+    "textWithCues": "[groans in pain] Ugh... [strained breath] Do I got a choice?",
+    "aiReasoning": "The text \"UGH... DO I GOT A CHOICE?\" is located in the top-left panel.\nThe speech bubble tail points to the turtle being supported by Leonardo (who has the blue mask). The turtle being supported has a red mask, identifying him as Raphael. Leonardo just asked \"Raph, I need you to walk. Can you do that?\".\nRaphael is injured/exhausted.\nType: SPEECH.\nSpeaker: Raphael.\nSide: HERO.\nImportance: MAJOR.\nEmotion: Pain, exhaustion, resignation.\nCues: Needs to sound strained and in pain. The \"Ugh\" is a groan."
+  },
+  {
+    "id": "page-23_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 787.0519409179688,
+      "y": 125.0404052734375,
+      "width": 140.772216796875,
+      "height": 146.63681030273438,
+      "confidence": 0.9515942931175232,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-002-x787-y125.jpg"
+    },
+    "ocr_text": "NOPE.",
+    "type": "SPEECH",
+    "speaker": "Red Ranger",
+    "emotion": "Blunt, serious",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Matter-of-factly] Nope.",
+    "aiReasoning": "1.  **Locate & Classify:**\n    *   **Text:** \"NOPE.\"\n    *   **Type:** `SPEECH` (It is a dialogue bubble with a tail).\n    *   **Visual Context:** The bubble is in the first panel. The tail extends downwards and to the right, pointing directly at the character in the background wearing a Red Power Ranger suit.\n    *   **Narrative Context:** Leonardo (Blue Turtle) is supporting an injured Raphael (Red Turtle). Leo says, \"Raph, I need you to walk...\" Raph responds, \"Ugh... Do I got a choice?\" The character in the background answers the rhetorical question with a blunt \"Nope.\"\n\n2.  **Analyze Context:**\n    *   **Speaker:** The tail points to the **Red Ranger** (Jason Lee Scott). He is distinct from Raphael (who is being carried).\n    *   **Side:** `HERO` (Power Ranger).\n    *   **Importance:** `MAJOR` (Power Rangers are title characters in this crossover).\n    *   **Voice Description:** (Instruction says to provide for MINOR/EXTRA. Since this is a MAJOR character, I will omit detailed description, but imply the tone through cues. He sounds like a confident, young adult male leader).\n    *   **Emotion:** Serious, urgent, matter-of-fact. He is cutting short any complaints because they are in danger.\n\n3.  **Performance Cues:**\n    *   The text is a single word, followed by a period. No shouting (bolding) or whispering (dotted).\n    *   The tone is a direct, blunt answer to Raph's question \"Do I got a choice?\".\n    *   Cue: `[Matter-of-factly]` or `[Bluntly]`.\n\n4.  **Final Polish:**\n    *   Speaker Name: \"Red Ranger\" (New character, clearly different from Raphael).\n    *   Text Modification: \"[Matter-of-factly] Nope.\""
+  },
+  {
+    "id": "page-23_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 192.2466278076172,
+      "y": 76.59428405761719,
+      "width": 275.21031188964844,
+      "height": 276.3662872314453,
+      "confidence": 0.9244287014007568,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-003-x192-y76.jpg"
+    },
+    "ocr_text": "RAPH, I NEED YOU TO WALK. CAN YOU DO THAT?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Urgent concern",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Straining under weight, urgently] Raph, I need you to walk. Can you do that?",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"RAPH, I NEED YOU TO WALK. CAN YOU DO THAT?\" is in the top-left panel. The speech bubble has a tail pointing to the Ninja Turtle wearing a blue mask (Leonardo).\n    *   Type: `SPEECH`\n\n2.  **Analyze Context**:\n    *   **Speaker**: The character has a blue mask and katanas on his back. This is Leonardo. He is not in the provided \"Unique Characters\" list (which only has Raphael and Red Ranger), so I will define his name as \"Leonardo\".\n    *   **Side**: `HERO`.\n    *   **Importance**: `MAJOR` (He is one of the main Turtles).\n    *   **Action**: Leonardo is physically supporting an injured/exhausted Raphael (red mask). They are in the middle of a conflict or escape scenario.\n    *   **Emotion**: Urgent, concerned, focused, exerting physical effort.\n\n3.  **Performance Cues**:\n    *   **Tone**: Serious and leader-like. He is assessing his brother's condition while trying to evacuate.\n    *   **Physicality**: He is holding up a heavy mutant turtle, so his voice should sound slightly strained from the physical exertion.\n    *   **Pacing**: Quick/Urgent.\n\n4.  **Final Polish**:\n    *   Text: \"Raph, I need you to walk. Can you do that?\"\n    *   Cues: `[Straining under weight, urgently]`"
+  },
+  {
+    "id": "page-23_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1317.1982421875,
+      "y": 308.1844482421875,
+      "width": 210.1669921875,
+      "height": 133.52090454101562,
+      "confidence": 0.9221442341804504,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-004-x1317-y308.jpg"
+    },
+    "ocr_text": "I'M CHANGING THE PLAN.",
+    "type": "SPEECH",
+    "speaker": "Rock Soldier",
+    "emotion": "Commanding",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, heavy, gravelly male voice; sounds like grinding stones; authoritative and intimidating",
+    "textWithCues": "[Deep, gravelly voice, commanding] I'M CHANGING THE PLAN.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"I'M CHANGING THE PLAN.\" is found in the top-right panel. It is enclosed in a standard speech bubble with a tail pointing to a character.\n    *   **Type**: SPEECH.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The tail points to a large, grey, rock-skinned humanoid character in the foreground. This character is physically distinct from the \"Putties\" (the smoother grey minions) and the main heroes/villains listed (Raphael, Red Ranger, Leonardo). Visual recognition suggests this is a Rock Soldier (a common TMNT enemy type, possibly General Traag, but unnamed here). I will label him \"Rock Soldier\".\n    *   **Side**: He is leading minions (Putties) against the heroes and is allied with the villains (Shredder is visible in the background). Side: `VILLAIN`.\n    *   **Importance**: While he has a speaking line and seems to be in command of the squad, he is likely a \"Monster of the Week\" or an elite minion rather than a named main character in this specific snippet. I will classify him as `EXTRA` (or a specialized Extra) since he doesn't have a confirmed name in the prompt list.\n    *   **Voice Description**: Being made of rock/stone, his voice should sound deep, heavy, and gravelly. He is asserting authority over another villain who questions him (\"But we agreed--\"), so the tone is commanding and decisive.\n    *   **Emotion**: He is firm, decisive, and authoritative. He is overriding a previous agreement.\n\n3.  **Performance Cues**:\n    *   The text is declarative and bold.\n    *   He is interrupting or shutting down a subordinate.\n    *   Cue ideas: `[Deep, gravelly voice]`, `[Commanding]`, `[Authoritatively]`.\n    *   Draft: `[Deep, gravelly voice, commanding] I'M CHANGING THE PLAN.`"
+  },
+  {
+    "id": "page-23_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1518.4163818359375,
+      "y": 272.9409484863281,
+      "width": 202.6298828125,
+      "height": 118.47775268554688,
+      "confidence": 0.9215277433395386,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-005-x1518-y272.jpg"
+    },
+    "ocr_text": "WHAT? BUT WE AGREED--",
+    "type": "SPEECH",
+    "speaker": "Rock Soldier",
+    "emotion": "Shocked and protesting",
+    "characterType": "EXTRA",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, rough, monstrous male voice",
+    "textWithCues": "[Shocked, protesting loudly] WHAT? BUT WE AGREED--",
+    "aiReasoning": "I have located the text \"WHAT? BUT WE AGREED--\" in the top right panel.\nThe speech bubble tail points to one of the large, grey, rocky creatures in the foreground. Based on the provided unique character list, this is a \"Rock Soldier\".\nThese characters are villains/minions. They are reacting to a command from the balcony (\"I'm changing the plan\").\nThe emotion is shock and protest at the sudden change.\nThe character is a large, stone-like alien, so the voice should be deep, gravelly, and rough.\nThe importance is EXTRA (generic soldier)."
+  },
+  {
+    "id": "page-23_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 117.31198120117188,
+      "y": 1765.2913818359375,
+      "width": 280.6563415527344,
+      "height": 161.8463134765625,
+      "confidence": 0.9072754383087158,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-006-x117-y1765.jpg"
+    },
+    "ocr_text": "SPLINTER? BUT HOW...WHY ARE--",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Shock and confusion",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young male voice, American accent, heroic but currently breathless and bewildered",
+    "textWithCues": "[Gasping in surprise] Splinter? [Stammering] But how... why are--",
+    "aiReasoning": "I see the text \"SPLINTER? BUT HOW...WHY ARE--\" in a speech bubble.\nThe speaker is the Green Ranger (likely Tommy Oliver or a morphed Turtle, distinct from the Red Ranger/Raphael mentioned in the prompt).\nHe is looking up at Master Splinter in shock/surprise.\nImportance is MAJOR.\nSide is HERO.\nEmotion is shock/confusion."
+  },
+  {
+    "id": "page-23_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 174.29896545410156,
+      "y": 2171.349365234375,
+      "width": 215.3005828857422,
+      "height": 123.89697265625,
+      "confidence": 0.8829890489578247,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-007-x174-y2171.jpg"
+    },
+    "ocr_text": "KEEP GOING, MY SONS.",
+    "type": "SPEECH",
+    "speaker": "Splinter",
+    "emotion": "determined and protective",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Firmly and protectively] Keep going, my sons.",
+    "aiReasoning": "The user wants me to analyze the speech bubble containing \"KEEP GOING, MY SONS.\"\n1.  **Locate**: The text is in a speech bubble in the bottom panel, pointing to the large rat character in the foreground.\n2.  **Classify**: `SPEECH` type.\n3.  **Speaker**: The character is Master Splinter. He is not in the provided \"Unique Characters\" list (which includes Raphael, Red Ranger, Leonardo, etc.), but he is explicitly named \"SPLINTER?\" by the Green Ranger in the panel immediately preceding this one. Therefore, the name is \"Splinter\".\n4.  **Side**: He is the mentor to the protagonists (Turtles), so he is a `HERO`.\n5.  **Importance**: `MAJOR` (He is a central character in the TMNT franchise).\n6.  **Voice Description**: Since he is `MAJOR`, I do not strictly need to generate a description based on the prompt rules (\"If MINOR or EXTRA...\"), but generally, he has a wise, gravelly, elderly male voice. I will omit the specific field if strictly following \"If MINOR or EXTRA\", but providing it doesn't hurt. I will leave it out to strictly follow the conditional instruction.\n7.  **Emotion**: He is protective, determined, and serious. He is covering his sons' escape. The expression on his face is fierce and focused.\n8.  **Performance Cues**: The text is a command to his sons to ensure their safety. It should be delivered firmly and with authority, but also with the warmth of a parent protecting their children.\n    *   Text: \"KEEP GOING, MY SONS.\"\n    *   Cue: `[Firmly and protectively]`"
+  },
+  {
+    "id": "page-23_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 335.2126159667969,
+      "y": 1843.1871337890625,
+      "width": 310.0979309082031,
+      "height": 160.1856689453125,
+      "confidence": 0.8374460935592651,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-008-x335-y1843.jpg"
+    },
+    "ocr_text": "EXPLANATIONS LATER. RIGHT NOW...WE MUST GO.",
+    "type": "SPEECH",
+    "speaker": "Splinter",
+    "emotion": "Urgent and authoritative",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Interrupting, urgently] Explanations later. Right now... we must go.",
+    "aiReasoning": "The text \"EXPLANATIONS LATER. RIGHT NOW...WE MUST GO.\" appears in a standard speech bubble in the third panel (middle left).\nThe tail of the bubble points clearly to the rat-character, Master Splinter, who is helping the Green Ranger up.\nIdentity: \"Splinter\" is listed in the unique characters provided.\nClassification: SPEECH.\nSide: HERO (Splinter is the mentor to the Turtles).\nImportance: MAJOR (Main character).\nContext: The Green Ranger is confused and asking questions (\"Splinter? But how...\"). Splinter interrupts him because they are in immediate danger and need to escape. His expression is serious and urgent.\nPerformance Cues: He is cutting off a question to prioritize survival. The tone should be authoritative, urgent, and fatherly."
+  },
+  {
+    "id": "page-23_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 258.8614807128906,
+      "y": 2276.91357421875,
+      "width": 353.5389709472656,
+      "height": 169.727783203125,
+      "confidence": 0.8366968631744385,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-009-x258-y2276.jpg"
+    },
+    "ocr_text": "NO ONE WILL CATCH YOU. I PROM--",
+    "type": "SPEECH",
+    "speaker": "Splinter",
+    "emotion": "Protective, determined, interrupted",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Firmly and reassuringly] No one will catch you. I prom-- [cut off abruptly]",
+    "aiReasoning": "The text region contains the dialogue \"NO ONE WILL CATCH YOU. I PROM--\".\nThis is inside a speech bubble originating from the large figure of Splinter in the bottom foreground.\nSplinter is a MAJOR character and a HERO.\nHe is speaking to his \"sons\" (the Turtles) urging them to escape.\nHis expression is serious, determined, and protective.\nThe text ends with \"--\", indicating he is interrupted mid-sentence, likely by an attack or sudden event, preventing him from finishing the word \"promise\".\nSince he is a MAJOR character, I do not need to provide a generic voice description.\nThe delivery should be firm and reassuring, suddenly cut short."
+  },
+  {
+    "id": "page-23_b10",
+    "box_2d": {
+      "index": 15,
+      "x": 888.4970703125,
+      "y": 1054.265625,
+      "width": 511.439453125,
+      "height": 329.897216796875,
+      "confidence": 0.42176324129104614,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-016-x888-y1054.jpg"
+    },
+    "ocr_text": "ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. IS THAT GONNA WORK?",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Urgent and commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Youthful but authoritative male voice, American accent, leader tone",
+    "textWithCues": "[Speaking into communicator while running, breathless] ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. [Urgent query] IS THAT GONNA WORK?",
+    "aiReasoning": "I have located the text region. It corresponds to two connected speech bubbles in the middle right panel.\nThe text is: \"ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT. IS THAT GONNA WORK?\"\nThe tail of the speech bubble points directly to the Turtle with the blue mask. This character is Leonardo.\nLeonardo is a `MAJOR` character and a `HERO`.\nContext: The group is fleeing (\"Run!\", \"We must go\"). Leonardo is coordinating an escape plan via communicator with Alpha while running.\nEmotion: Urgent, commanding, focused, slightly breathless due to physical exertion (running).\n\nCues:\n- \"ALPHA!\" needs to sound like he is hailing someone on a radio/comms.\n- The instruction is fast and decisive.\n- The question at the end is urgent, checking for confirmation.\n- He is running, so breathlessness is appropriate."
+  },
+  {
+    "id": "page-23_b11",
+    "box_2d": {
+      "index": 10,
+      "x": 1353.6099853515625,
+      "y": 1103.8909912109375,
+      "width": 227.329833984375,
+      "height": 142.513671875,
+      "confidence": 0.7377080321311951,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-011-x1353-y1103.jpg"
+    },
+    "ocr_text": "NOT IF THEY CATCH US FIRST.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Urgent, pragmatic, focused",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Breathless from running, urgent tone] NOT IF THEY CATCH US FIRST.",
+    "aiReasoning": "1.  **Locate Text:** The text \"NOT IF THEY CATCH US FIRST.\" is in a speech bubble in the middle-right panel (Panel 4).\n2.  **Identify Speaker:** The tail of the speech bubble points clearly to the Turtle wearing a blue mask. This is Leonardo.\n3.  **Check Classification:** Leonardo is a main character in TMNT. He is listed in the unique characters provided (implied by the group, explicitly listed in instructions).\n    *   **Speaker:** Leonardo\n    *   **Side:** HERO\n    *   **Importance:** MAJOR\n4.  **Analyze Context:** The group is fleeing (\"Run! ... We must go\"). Someone (likely Donatello off-screen or the Red Ranger via comms/Alpha) suggests teleporting once clear. Michelangelo asks if it will work. Leonardo, running alongside them, adds the pragmatic, urgent condition that they have to survive the escape first.\n5.  **Determine Performance:** Leonardo is running, so he should sound slightly breathless or physically exerted. His tone is urgent and focused on the immediate threat, typical of his leadership role (keeping the team grounded in reality). The text is standard (no bold, no jagged edges), indicating normal volume but high tension."
+  },
+  {
+    "id": "page-23_b12",
+    "box_2d": {
+      "index": 11,
+      "x": 889.4028930664062,
+      "y": 1049.2132568359375,
+      "width": 341.57073974609375,
+      "height": 177.3519287109375,
+      "confidence": 0.6482774019241333,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-012-x889-y1049.jpg"
+    },
+    "ocr_text": "ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "Urgent, commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting urgently into communicator] ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT.",
+    "aiReasoning": "1.  **Locate:** The text \"ALPHA! ONCE WE'RE CLEAR OF THE ENERGY FIELD, TELEPORT US ALL OUT.\" is in a speech bubble in the middle-right panel.\n2.  **Classify:** It is `SPEECH`.\n3.  **Speaker:** The bubble tail points to the Teenage Mutant Ninja Turtle wearing a blue mask. This is Leonardo.\n4.  **Context:** Leonardo is leading the group (Michelangelo, Splinter) in a retreat/escape. He is communicating a plan to \"Alpha\" (presumably Alpha 5 via communicator).\n5.  **Character:** Leonardo is a `MAJOR` character. He is a `HERO`.\n6.  **Emotion:** He is running and shouting orders. The tone is urgent, authoritative, and decisive.\n7.  **Cues:** The text starts with an exclamation and is a command during an action scene. Cues like `[Shouting into comms]` or `[Urgently]` are appropriate."
+  },
+  {
+    "id": "page-23_b13",
+    "box_2d": {
+      "index": 12,
+      "x": 636.6181640625,
+      "y": 1684.300537109375,
+      "width": 112.89801025390625,
+      "height": 228.212890625,
+      "confidence": 0.6204028725624084,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-23/page-23-crop-013-x636-y1684.jpg"
+    },
+    "ocr_text": "RUN!",
+    "type": "SPEECH",
+    "speaker": "Splinter",
+    "emotion": "Urgent, commanding",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Commanding urgently] RUN!",
+    "aiReasoning": "I have identified the target text \"RUN!\" in the middle-left panel (Panel 3).\nThe text is inside a speech bubble.\nThe context of the panel shows the Green Ranger kneeling in confusion while Master Splinter supports him.\nThe dialogue flow is:\n1. Green Ranger: \"SPLINTER? BUT HOW... WHY ARE--\"\n2. Splinter: \"EXPLANATIONS LATER. RIGHT NOW... WE MUST GO.\"\n3. \"RUN!\"\n\nAnalyzing the visual cues for the speaker of \"RUN!\":\n- The bubble is positioned below the Green Ranger's text, but the tail points sharply to the right.\n- The Green Ranger is on the left; Splinter is on the right.\n- A right-pointing tail indicates the speaker is the character on the right (Splinter).\n- Logically, Splinter is the one urging them to escape (\"We must go\"), so \"RUN!\" reinforces his command. The Green Ranger is confused and disoriented, making him an unlikely speaker for a command.\n\nClassifications:\n- Type: SPEECH\n- Speaker: Splinter (Listed in unique characters).\n- Importance: MAJOR (Mentor/Main cast).\n- Side: HERO.\n- Emotion: Urgent, commanding, authoritative.\n- Cues: The text is an imperative command with an exclamation mark, following \"We must go\". It should be delivered with urgency and volume.\n\nInstructions check: \"If MINOR or EXTRA, describe their voice\". Splinter is MAJOR, so I will omit the specific voice description field or leave it strictly as a known character context. However, looking at the JSON structure, usually providing context helps. I will focus on the cues."
+  }
+]

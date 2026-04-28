@@ -1,0 +1,152 @@
+[
+  {
+    "id": "page-17_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1230.955078125,
+      "y": 1123.7529296875,
+      "width": 359.567138671875,
+      "height": 135.5386962890625,
+      "confidence": 0.9669459462165833,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-001-x1230-y1123.jpg"
+    },
+    "ocr_text": "\"AND WE BREAK WHATEVER WE FIND, RIGHT?\"",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "eager/conspiratorial",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Young adult male, American accent, heroic but sounding eager and conspiratorial",
+    "textWithCues": "[Eagerly, conspiring] And we **break** whatever we find, right?",
+    "aiReasoning": "The text \"AND WE BREAK WHATEVER WE FIND, RIGHT?\" is inside a rectangular caption box with a yellow border.\nContext Analysis:\n1.  **Dialogue Flow**: The scene is a conversation between two characters infiltrating a base.\n    -   Red Box (Top Left): \"You know, when you said you could teleport us...\" -> Identifies Raphael (Red Bandana).\n    -   Yellow/Gold Box (Top Middle): \"What can I say. Alpha loves presets.\" -> Identifies the Green Ranger (Gold Coin symbol).\n    -   Beige/Yellow Box (Top Right): \"Do we know what we're looking for in here?\" -> Same speaker style as the previous yellow box, minus the icon. Use of \"in here\" implies the speaker is physically present.\n    -   Red Box: \"Anything that looks expensive or complicated I guess.\" -> Raphael answering.\n    -   **Target Text (Yellow Box)**: \"AND WE BREAK WHATEVER WE FIND, RIGHT?\" -> Same speaker as the previous yellow box.\n    -   Red Box: \"Oh, absolutely.\" -> Raphael answering.\n2.  **Speaker Identification**: The only characters physically present in the scene (\"in here\") are Raphael and the Green Ranger (Tommy Oliver). The red boxes correspond to Raphael. The yellow/gold boxes correspond to the Green Ranger (matching his gold armor accents and the Dragonzord coin seen earlier).\n3.  **Personality/Tone**: The Green Ranger is confirming the \"rules of engagement\" with Raphael. Raphael is known for being rough and breaking things. Tommy (Green Ranger) sounds like he is getting into the spirit of the mission or verifying the plan with a bit of eagerness/mischief.\n4.  **Visuals**: The box is rectangular, which typically denotes narration, but here functions as dialogue (likely over comms or stylized internal/external speech). Given the interaction, I will classify it as `SPEECH`."
+  },
+  {
+    "id": "page-17_b02",
+    "box_2d": {
+      "index": 8,
+      "x": 952.068115234375,
+      "y": 117.0096435546875,
+      "width": 330.718505859375,
+      "height": 830.88427734375,
+      "confidence": 0.4922778606414795,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-009-x952-y117.jpg"
+    },
+    "ocr_text": "\"DO WE KNOW WHAT WE'RE LOOKING FOR IN HERE?\"",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Inquisitive",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Looking around, inquisitive] Do we know what we're looking for in here?",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"DO WE KNOW WHAT WE'RE LOOKING FOR IN HERE?\" is located in a vertical rectangular panel (the second panel from the left). It is inside a yellow/gold rectangular caption box with a Power Ranger coin icon in the corner. In this comic series (Mighty Morphin Power Rangers / Teenage Mutant Ninja Turtles), these colored boxes with icons represent character speech. The yellow/gold box with the Dragonzord coin corresponds to the Green Ranger (Tommy Oliver). Therefore, this is `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The text box has the Green Ranger's symbol. The Green Ranger is present in the scene (visible in the large bottom panel and partially in the panel to the right). The dialogue is an exchange with Raphael (red boxes).\n    *   **Side**: `HERO` (Power Ranger).\n    *   **Importance**: `MAJOR` (Main character).\n    *   **Emotion**: The Green Ranger has just arrived in a new, potentially dangerous location (\"the moon\"). He is pivoting from a joke about the teleportation to the mission at hand. He is asking Raphael what their objective is. The tone is practical, inquisitive, and slightly casual.\n\n3.  **Performance Cues**:\n    *   The character is looking around a dark room/facility.\n    *   He is asking a genuine question to his partner.\n    *   Tone should be conversational but focused.\n    *   Cue: `[Looking around, inquisitive]` or `[Curious]`.\n\n4.  **Drafting Output**:\n    *   Text: \"Do we know what we're looking for in here?\"\n    *   Add cues for the inquisitive nature of the line."
+  },
+  {
+    "id": "page-17_b03",
+    "box_2d": {
+      "index": 7,
+      "x": 524.5103149414062,
+      "y": 89.76380920410156,
+      "width": 391.65673828125,
+      "height": 831.9935150146484,
+      "confidence": 0.6572436094284058,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-008-x524-y89.jpg"
+    },
+    "ocr_text": "WHAT CAN I SAY. ALPHA LOVES PRESETS.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Casual and nonchalant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Modestly, shrugging off the praise] What can I say. Alpha loves presets.",
+    "aiReasoning": "I have located the text \"WHAT CAN I SAY. ALPHA LOVES PRESETS.\" in the top row, middle panel.\nThe text is inside a rectangular speech balloon with a yellow/gold border and a Dragon Coin insignia on the left.\nThe tail of the balloon points towards a character partially visible (green suit, gold armor pieces), who is clearly the Green Ranger.\nThe Green Ranger is a MAJOR character (Tommy Oliver) and a HERO.\nContext: Raphael (in the red box) just commented on the teleportation being surprisingly successful/safe. The Green Ranger is responding to explain that the robot Alpha 5 handled the technical details (\"presets\").\nThe tone is casual, modest, and conversational. He is deflecting the praise/surprise to his tech support.\nEmotion: Relaxed, nonchalant."
+  },
+  {
+    "id": "page-17_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1603.5343017578125,
+      "y": 2798.404052734375,
+      "width": 247.8077392578125,
+      "height": 158.2861328125,
+      "confidence": 0.9072483777999878,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-004-x1603-y2798.jpg"
+    },
+    "ocr_text": "\"I FIGURE WE CAN DO WHATEVER WE WANT...\"",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Smug and mischievous",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Rough, street-smart New York accent, deep and gritty male voice",
+    "textWithCues": "[Smug, nonchalant tone] I figure we can do whatever we want...",
+    "aiReasoning": "The text region is a red rectangular box containing the text: \"I FIGURE WE CAN DO WHATEVER WE WANT...\".\nVisually, this is a caption box, typically used for narration or internal monologue. However, contextually, it is part of a conversation.\nIn the previous panel, the Green Ranger asks (in a yellow box with a tail), \"AND WE BREAK WHATEVER WE FIND, RIGHT?\".\nA red box responds, \"OH, ABSOLUTELY.\"\nThe target text follows this red box, continuing the thought.\nThe color red is associated with Raphael (the Turtle with the red bandana seen in the bottom left panel).\nTherefore, the speaker is Raphael.\nSince Raphael is a main protagonist, he is a HERO and MAJOR character.\nHis tone is rebellious, tough, and nonchalant. He is justifying breaking things in the villain's lair.\nAlthough the text is in a box (usually `NARRATION`), it functions entirely as `SPEECH` dialogue. To provide the best voice acting instructions, I will classify it as `SPEECH` attributed to Raphael.\nThe text ends with ellipses \"...\", implying a pause or a sense of open-ended possibility/implication.\n\nSpeaker: Raphael (Teenage Mutant Ninja Turtle)\nTone: Smug, confident, mischievous."
+  },
+  {
+    "id": "page-17_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 885.0989379882812,
+      "y": 2174.936767578125,
+      "width": 325.28204345703125,
+      "height": 77.105224609375,
+      "confidence": 0.8631885647773743,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-005-x885-y2174.jpg"
+    },
+    "ocr_text": "\"OH, ABSOLUTELY.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Eager and satisfied",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Rough, street-smart New York accent, deep and gravelly.",
+    "textWithCues": "[Eagerly, with a smirk] Oh, absolutely.",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"OH, ABSOLUTELY.\" is in a red rectangular box located in an inset panel near the bottom center of the page.\n    *   The box color (red) matches Raphael's bandana and the previous speech boxes attributed to him (e.g., \"You know, when you said...\").\n    *   The contrasting boxes (yellow outline/white background) are associated with the Green Ranger (Tommy), as seen with the coin icon and the context of the questions.\n    *   Context: The Green Ranger (yellow box) asks, \"And we break whatever we find, right?\" The response \"Oh, absolutely.\" comes in a red box. This is Raphael answering.\n    *   Classification: `SPEECH`. Even though it lacks a tail, it is color-coded dialogue in a conversation.\n\n2.  **Analyze Context**:\n    *   **Speaker**: Raphael. The red color coding is specific to him in this comic (TMNT x Power Rangers). He is replying to the Green Ranger.\n    *   **Side**: `HERO`.\n    *   **Importance**: `MAJOR`.\n    *   **Voice Description**: N/A (Existing Major Character).\n    *   **Emotion**: Raphael is known for being the \"tough guy\" who enjoys fighting and breaking things. Answering a question about breaking machinery with \"absolutely\" implies eagerness, satisfaction, or a grim smirk. He is happy to have permission to destroy.\n\n3.  **Performance Cues**:\n    *   The text is bold and capitalized, standard for comics, but the phrase itself is an emphatic agreement.\n    *   There is no shouting indicated (no jagged bubble).\n    *   The tone should be eager or definitive. He likes the plan.\n\n    *   *Drafting cue*: [Eagerly, with a smirk] Oh, absolutely."
+  },
+  {
+    "id": "page-17_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 110.27452850341797,
+      "y": 97.37897491455078,
+      "width": 317.83020782470703,
+      "height": 293.06432342529297,
+      "confidence": 0.8495230078697205,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-006-x110-y97.jpg"
+    },
+    "ocr_text": "\"YOU KNOW, WHEN YOU SAID YOU COULD TELEPORT US TO THE MOON YOURSELF WITHOUT DYING, I THOUGHT YOU WERE LYING.\"",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Casual, admitting skepticism",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Gruff, Brooklyn accent, teenage male voice",
+    "textWithCues": "[Casual, admitting] You know, when you said you could teleport us to the moon yourself without dying, I thought you were lying.",
+    "aiReasoning": "The user wants me to analyze a specific text box in the provided comic page.\n1.  **Locate the text**: The text is \"YOU KNOW, WHEN YOU SAID YOU COULD TELEPORT US TO THE MOON YOURSELF WITHOUT DYING, I THOUGHT YOU WERE LYING.\" It is located in the top-left panel, inside a red rectangular caption box.\n2.  **Classify**: Although it is a rectangular box (often NARRATION), the text is enclosed in quotation marks and is part of a conversation between two characters. The color coding (Red) matches the character Raphael (who wears a red mask and is present in the scene). The answering box is Yellow with a Power Ranger coin symbol, matching the Green Ranger. This is \"Voice-Over Dialogue\". Functionally, it is **SPEECH**.\n3.  **Speaker**: The box is red. The character associated with red in this team-up is **Raphael** (Teenage Mutant Ninja Turtle). He is speaking to the Green Ranger.\n4.  **Character Type**: Raphael is a main character -> **MAJOR**.\n5.  **Side**: **HERO**.\n6.  **Emotion/Tone**: Raphael is admitting he doubted the Green Ranger's abilities. The tone is conversational, candid, and slightly dry/humorous. It's a moment of bonding/banter.\n7.  **Performance Cues**: No shouting or whispering. It's a normal volume conversation. The cue should reflect his admission of skepticism."
+  },
+  {
+    "id": "page-17_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1462.155517578125,
+      "y": 208.78472900390625,
+      "width": 359.2193603515625,
+      "height": 153.62948608398438,
+      "confidence": 0.823775589466095,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-17/page-17-crop-007-x1462-y208.jpg"
+    },
+    "ocr_text": "\"ANYTHING THAT LOOKS EXPENSIVE OR COMPLICATED I GUESS.\"",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "Nonchalant, pragmatic",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Casually, matter-of-factly] Anything that looks expensive or complicated I guess."
+  }
+]

@@ -13,7 +13,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { env } from "~/env.mjs";
-import { getCanonicalName } from "./alias-map.js";
+import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -206,12 +206,13 @@ async function main() {
 
     // Parse arguments
     const { issue, page } = parseArgs();
+    await initAliasMap();
 
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");
     const ISSUE_DIR = join(COMIC_DIR, issue);
     const CACHE_FILE = join(ISSUE_DIR, "bubbles.json");
-    const CASTLIST_FILE = join(COMIC_DIR, "castlist.json");
+    const CASTLIST_FILE = join(ISSUE_DIR, "castlist.json");
     const AUDIO_DIR = join(ISSUE_DIR, "audio");
     const TIMESTAMPS_FILE = join(ISSUE_DIR, "audio-timestamps.json");
 
@@ -422,10 +423,7 @@ async function main() {
 
     // Save timestamps
     console.log("💾 Saving timestamps...");
-    await fs.writeFile(
-      TIMESTAMPS_FILE,
-      JSON.stringify(timestamps, null, 2),
-    );
+    await fs.writeFile(TIMESTAMPS_FILE, JSON.stringify(timestamps, null, 2));
     console.log(`   ✓ Saved to ${TIMESTAMPS_FILE}\n`);
 
     // Summary
@@ -441,4 +439,3 @@ async function main() {
 }
 
 main();
-

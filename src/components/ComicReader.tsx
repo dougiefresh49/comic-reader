@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import type { Bubble, CharacterAlignment, AudioTimestamps } from "~/types";
+import { audioUrl } from "~/lib/storage";
 
 interface ComicReaderProps {
   pageImage: string;
@@ -53,8 +54,12 @@ export default function ComicReader({
     setHighlightedRange(null);
 
     // Load and play audio
-    const audioUrl = `/comics/${bookId}/${issueId}/audio/${currentBubble.id}.mp3`;
-    const audio = new Audio(audioUrl);
+    const src = audioUrl(
+      bookId,
+      issueId,
+      currentBubble.audioStoragePath ?? `${currentBubble.id}.mp3`,
+    );
+    const audio = new Audio(src);
     audioRef.current = audio;
 
     // Get timestamps for this bubble

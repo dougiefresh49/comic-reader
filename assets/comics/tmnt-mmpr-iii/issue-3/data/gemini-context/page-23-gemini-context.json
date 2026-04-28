@@ -1,0 +1,216 @@
+[
+  {
+    "id": "page-23_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 1305,
+      "y": 96,
+      "width": 240,
+      "height": 225,
+      "confidence": 0.9135901927947998,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-001-x1305-y96.jpg"
+    },
+    "ocr_text": "ZORDON DIDN'T SAY ANYTHING ABOUT ANY GHOST TIGERS.",
+    "type": "SPEECH",
+    "speaker": "Leonardo",
+    "emotion": "surprised",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Surprised] ZORDON DIDN'T SAY ANYTHING ABOUT ANY GHOST TIGERS."
+  },
+  {
+    "id": "page-23_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1218,
+      "y": 827,
+      "width": 293,
+      "height": 201,
+      "confidence": 0.8948442339897156,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-002-x1218-y827.jpg"
+    },
+    "ocr_text": "THIS IS NO PLACE FOR YOU. YOU ARE NOT WELCOME HERE.",
+    "type": "SPEECH",
+    "speaker": "Ghost Tiger",
+    "emotion": "stern, commanding",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Ethereal, powerful, deep and resonant male voice, sounding ancient and commanding like a supernatural guardian.",
+    "textWithCues": "[Stern and commanding] THIS IS NO PLACE FOR YOU. YOU ARE NOT WELCOME HERE."
+  },
+  {
+    "id": "page-23_b03",
+    "box_2d": {
+      "index": 13,
+      "x": 270,
+      "y": 2731,
+      "width": 527,
+      "height": 246,
+      "confidence": 0.34067416191101074,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-014-x270-y2731.jpg"
+    },
+    "ocr_text": "UNWORTHY. YOUR HEARTS ARE BLACK WITH SORROW AND DISTRUST. THERE IS ONLY ONE WHO--",
+    "type": "SPEECH",
+    "speaker": "Ghost Tiger",
+    "emotion": "solemn, judgmental",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, ethereal, resonant mystical male voice",
+    "textWithCues": "[Sternly, passing judgement] Unworthy. Your hearts are black with sorrow and distrust. There is only one who-- [interrupted abruptly]",
+    "aiReasoning": "The target text is from a cluster of speech bubbles in the bottom-left panel. The tail of the main bubble clearly points to the glowing white tiger, previously addressed as \"Ghost Tiger\".\nThis is SPEECH. The speaker is the Ghost Tiger, a mystical entity judging the heroes, so his side is NEUTRAL. He acts as a gatekeeper or test, making him a MINOR character in the grand scheme but central to this scene.\nHis expression is stern and animalistic but intelligent. The tone of the words is solemn and judgmental. His voice should sound ethereal, powerful, and deep.\nThe text ends with a double dash, indicating he is interrupted by the lightning strike in the adjacent panel.\nI will add cues for a solemn, authoritative delivery and an abrupt stop at the end."
+  },
+  {
+    "id": "page-23_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 1582,
+      "y": 1838,
+      "width": 284,
+      "height": 152,
+      "confidence": 0.8738879561424255,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-004-x1582-y1838.jpg"
+    },
+    "ocr_text": "YOU CAME ALL THIS WAY JUST TO DISCOVER...",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "condescending",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Condescendingly] You came all this way just to discover...",
+    "aiReasoning": "The text \"YOU CAME ALL THIS WAY JUST TO DISCOVER...\" is located in a speech bubble in the bottom right panel. The tail of the bubble points down to the dark, armored figure in the foreground. Based on the character design (dark armor, helmet, typical of the franchise crossover villain), this is Shredder. The character is a major villain. The tone of the dialogue is condescending and menacing, mocking the heroes for their \"unworthy\" status and their wasted effort. I will add a cue for a condescending, villainous tone. The ellipsis at the end indicates a trailing off or a dramatic pause."
+  },
+  {
+    "id": "page-23_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1036,
+      "y": 760,
+      "width": 228,
+      "height": 136,
+      "confidence": 0.8661555051803589,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-005-x1036-y760.jpg"
+    },
+    "ocr_text": "TOMMY OLIVER. LEONARDO.",
+    "type": "SPEECH",
+    "speaker": "Ghost Tiger",
+    "emotion": "authoritative",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, echoing, ethereal, powerful voice",
+    "textWithCues": "[Commanding] Tommy Oliver. Leonardo.",
+    "aiReasoning": "The text \"TOMMY OLIVER. LEONARDO.\" is located in a speech bubble in the top panel. The tail of the bubble points to the large, glowing white tiger. Based on the unique character list and context, this is the \"Ghost Tiger\". It is acting as a gatekeeper or guardian, addressing the heroes. I will classify it as a MINOR character with a NEUTRAL alignment for now, as it's testing them rather than outright attacking maliciously. The voice should be deep, resonant, and perhaps slightly ethereal. The emotion is authoritative and commanding."
+  },
+  {
+    "id": "page-23_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 414,
+      "y": 2605,
+      "width": 325,
+      "height": 158,
+      "confidence": 0.8465518951416016,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-006-x414-y2605.jpg"
+    },
+    "ocr_text": "I KNOW WHAT YOU SEEK, BUT YOU ARE BOTH... UNWORTHY.",
+    "type": "SPEECH",
+    "speaker": "Ghost Tiger",
+    "emotion": "judgmental",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Deep, ethereal, resonant mystical creature voice",
+    "textWithCues": "[Authoritative, echoing] I know what you seek, but you are both... [dramatic pause] unworthy.",
+    "aiReasoning": "The text is \"I KNOW WHAT YOU SEEK, BUT YOU ARE BOTH... UNWORTHY.\" located in the bottom left panel.\nIt is a speech bubble pointing to the large white tiger entity.\nThe speaker is the Ghost Tiger.\nIt is acting as a mystical guardian judging the heroes, so it's a Neutral or Minor character.\nThe emotion is serious and judgmental.\nThe voice should be ethereal, deep, and resonant.\nThere is a dramatic pause before \"UNWORTHY\"."
+  },
+  {
+    "id": "page-23_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 494,
+      "y": 78,
+      "width": 175,
+      "height": 150,
+      "confidence": 0.7486773133277893,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-007-x494-y78.jpg"
+    },
+    "ocr_text": "HMM. GHOST TIGER.",
+    "type": "SPEECH",
+    "speaker": "Tommy Oliver",
+    "emotion": "thoughtful",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "N/A",
+    "textWithCues": "[Thoughtful] Hmm. Ghost tiger."
+  },
+  {
+    "id": "page-23_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1436,
+      "y": 1719,
+      "width": 398,
+      "height": 120,
+      "confidence": 0.7133693099021912,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-008-x1436-y1719.jpg"
+    },
+    "ocr_text": "UNWORTHY. HOW SAD.",
+    "type": "SPEECH",
+    "speaker": "Shredder",
+    "emotion": "mocking",
+    "characterType": "MAJOR",
+    "side": "VILLAIN",
+    "textWithCues": "[Mockingly] Unworthy. How sad.",
+    "aiReasoning": "The text \"UNWORTHY. HOW SAD.\" is in a speech bubble in the bottom right panel.\nThe tail of the bubble points downwards to a shadowed figure in the foreground. This figure has a distinctive helmet with spikes/prongs, characteristic of Shredder, who is listed among the unique characters.\nThe context is Shredder gloating over Tommy and Leonardo being deemed unworthy by the Ghost Tiger.\nTherefore, the speaker is Shredder, a major villain character. His emotion is mocking or sarcastic.\nI will add performance cues to reflect this arrogant, mocking tone."
+  },
+  {
+    "id": "page-23_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 824,
+      "y": 1208,
+      "width": 308,
+      "height": 239,
+      "confidence": 0.7081799507141113,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-009-x824-y1208.jpg"
+    },
+    "ocr_text": "UM...ZORDON OF ELTAR SENT US, GREAT TALKING TIGER, SIR. VERY SMOOTH.",
+    "type": "SPEECH",
+    "speaker": "Tommy Oliver",
+    "emotion": "awkward, hesitant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Hesitantly] Um... Zordon of Eltar sent us, great talking tiger, sir. \n(Leonardo) [Sarcastically] Very smooth.",
+    "aiReasoning": "I see two speech bubbles in the target region that have been grouped together into one text string by the system.\nThe first bubble, \"UM...ZORDON OF ELTAR SENT US, GREAT TALKING TIGER, SIR.\", has a tail pointing to the human in the Green Ranger suit, Tommy Oliver. He is a HERO, MAJOR character. He looks unsure and his dialogue is hesitant and overly polite, so the emotion is awkward/hesitant.\nThe second bubble, \"VERY SMOOTH.\", has a tail pointing to the blue Ninja Turtle, Leonardo. He is also a HERO, MAJOR character. His dialogue is clearly a sarcastic response to Tommy's awkward intro.\nSince I must output one JSON for the provided grouped text block, I will set the main metadata (speaker, etc.) to the primary speaker (Tommy Oliver) and format the `textWithCues` to indicate the two separate lines and their respective tones."
+  },
+  {
+    "id": "page-23_b10",
+    "box_2d": {
+      "index": 9,
+      "x": 267,
+      "y": 2740,
+      "width": 323,
+      "height": 180,
+      "confidence": 0.6803492307662964,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-23/page-23-crop-010-x267-y2740.jpg"
+    },
+    "ocr_text": "YOUR HEARTS ARE BLACK WITH SORROW AND DISTRUST.",
+    "type": "SPEECH",
+    "speaker": "Ghost Tiger",
+    "emotion": "solemn",
+    "characterType": "MINOR",
+    "side": "NEUTRAL",
+    "voiceDescription": "Mystical, resonant, ethereal beast voice, solemn and authoritative",
+    "textWithCues": "[Solemnly, with a mystical resonance] Your hearts are black with sorrow and distrust.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"YOUR HEARTS ARE BLACK WITH SORROW AND DISTRUST.\" is in the bottom left panel inside a speech bubble. The tail points to the glowing white tiger. Classification: `SPEECH`.\n2.  **Analyze Context:** The speaker is the mystical tiger introduced earlier in the page. Based on the character list, this is the \"Ghost Tiger\". It is acting as a guardian or judge, making it a `NEUTRAL` party (not a main hero or villain, but an obstacle/entity they must deal with). As a specific entity with dialogue, its importance is `MINOR`.\n3.  **Performance Cues:** The Ghost Tiger is passing judgment on Tommy and Leonardo. Its tone should be solemn, mystical, and authoritative. The text isn't emphasized with bolding or special bubbles, but the nature of the character suggests a resonant, otherworldly voice."
+  }
+]

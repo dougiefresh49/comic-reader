@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { pageImageUrl } from "~/lib/storage";
 
 interface PageSheetProps {
   bookId: string;
@@ -61,7 +62,6 @@ export function PageSheet({
 
         <div className="flex gap-3 overflow-x-auto pt-1 pb-2">
           {pages.map((page) => {
-            const padded = String(page).padStart(2, "0");
             const href = `/book/${bookId}/${issueId}/${page}`;
             const isActive = page === currentPage;
 
@@ -77,7 +77,7 @@ export function PageSheet({
                 onClick={onClose}
               >
                 <Image
-                  src={`/comics/${bookId}/${issueId}/pages/page-${padded}.webp`}
+                  src={pageImageUrl(bookId, issueId, page)}
                   alt={`Page ${page}`}
                   fill
                   sizes="128px"

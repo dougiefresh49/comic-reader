@@ -16,6 +16,8 @@ export interface Bubble {
   speaker: string | null;
   emotion: string;
   textWithCues?: string;
+  aiReasoning?: string;
+  audioStoragePath?: string;
   ignored?: boolean;
   style?: {
     left: string;
@@ -35,4 +37,3 @@ export interface AudioTimestamps {
   alignment: CharacterAlignment | null;
   normalized_alignment: CharacterAlignment | null;
 }
-

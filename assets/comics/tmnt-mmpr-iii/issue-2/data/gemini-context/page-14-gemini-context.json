@@ -1,0 +1,168 @@
+[
+  {
+    "id": "page-14_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 571.7413330078125,
+      "y": 2070.9384765625,
+      "width": 278.21429443359375,
+      "height": 200.17529296875,
+      "confidence": 0.6799352765083313,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-001-x571-y2070.jpg"
+    },
+    "ocr_text": "YOU MAY LOOK LIKE RANGERS, BUT YOU DON'T FIGHT LIKE THEM.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Assertive/Taunting",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Heroic, confident, athletic young male voice",
+    "textWithCues": "[Assertively, mid-fight] You may look like Rangers, but you don't fight like them.",
+    "aiReasoning": "**Step 1: Locate & Classify**\nThe target text is \"YOU MAY LOOK LIKE RANGERS, BUT YOU DON'T FIGHT LIKE THEM.\" located in the bottom-left panel.\nIt is enclosed in a standard smooth speech bubble.\nClassification: `SPEECH`.\n\n**Step 2: Analyze Context**\n*   **Visuals:** The panel shows the Green Ranger (in mid-air, delivering a strike) and a large, mutated turtle-like figure (on the ground, reacting to the hit).\n*   **Bubble Tail:** The tail of the speech bubble originates from the top-left of the bubble and points upwards towards the Green Ranger's head.\n*   **Speaker Identity:** The Green Ranger (Tommy Oliver).\n*   **Narrative Context:** The Rangers (Black, Yellow, Green) are fighting mutated versions of the Teenage Mutant Ninja Turtles who appear to be wearing Ranger-inspired armor/tech. The dialogue across the page consists of the Rangers taunting these enemies (e.g., \"In case it wasn't clear what I hit you with,\" \"Made you look\").\n*   **Meaning:** The Green Ranger is mocking his opponent. The enemy might be wearing Ranger-like armor (Shredder's tech), but lacks the skill or \"fight\" of a true Ranger.\n*   **Side:** HERO.\n*   **Importance:** MAJOR.\n\n**Step 3: Performance Cues**\n*   **Action:** The Green Ranger is physically exerting himself (jumping/punching), having just yelled \"SHEEYAH!\".\n*   **Tone:** Confident, critical, and authoritative. He is differentiating the heroes from the imposters/monsters.\n*   **Delivery:** Projected clearly over the sounds of combat, slightly out of breath perhaps, but mostly steady and cool."
+  },
+  {
+    "id": "page-14_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1024.13720703125,
+      "y": 1730.1185302734375,
+      "width": 283.9429931640625,
+      "height": 156.9580078125,
+      "confidence": 0.6438081860542297,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-002-x1024-y1730.jpg"
+    },
+    "ocr_text": "IN CASE IT WASN'T CLEAR WHAT I HIT YOU WITH.",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "cocky",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Cheekily, explaining the obvious] In case it wasn't clear what I hit you with."
+  },
+  {
+    "id": "page-14_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 214.9586181640625,
+      "y": 1398.0113525390625,
+      "width": 264.40679931640625,
+      "height": 157.8553466796875,
+      "confidence": 0.6297899484634399,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-003-x214-y1398.jpg"
+    },
+    "ocr_text": "POWER AXE!",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "Shouting, commanding, high energy",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Shouting forcefully while striking] POWER AXE!",
+    "aiReasoning": "I have identified the target text region as a speech bubble containing the text \"POWER AXE!\".\n1.  **Locate & Classify:** The text is in a speech bubble with a tail pointing to the character in the black and white suit (Black Ranger). Therefore, it is `SPEECH`.\n2.  **Analyze Context:**\n    *   **Speaker:** The character is wearing the Black Ranger costume (Mastodon helmet). The user provided list includes \"Black Ranger\", so I will use that name.\n    *   **Side:** The Power Rangers are heroes (`HERO`).\n    *   **Importance:** The Black Ranger is a core member of the main cast (`MAJOR`).\n    *   **Emotion:** The character is executing a special attack, shouting the name of his weapon to summon/energize it. The font is large, bold, and colored, indicating high volume and intensity. The body language is dynamic and forceful.\n3.  **Performance Cues:**\n    *   **Volume:** The stylized, bold text indicates shouting.\n    *   **Tone:** Energetic, commanding, action-oriented.\n    *   **Cue:** `[Shouting intensely]` or `[Calling out attack]`.\n\nFinal Plan:\n- Speaker: Black Ranger\n- Type: SPEECH\n- Side: HERO\n- Emotion: Shouting, Commanding\n- Text: \"[Shouting forcefully] POWER AXE!\""
+  },
+  {
+    "id": "page-14_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 971.8480834960938,
+      "y": 1938.16015625,
+      "width": 232.70611572265625,
+      "height": 108.0257568359375,
+      "confidence": 0.6202788949012756,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-004-x971-y1938.jpg"
+    },
+    "ocr_text": "SLOWPOKE, HUH?",
+    "type": "SPEECH",
+    "speaker": "Yellow Turtle Ranger",
+    "emotion": "taunting",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Arrogant, sneering, aggressive male voice",
+    "textWithCues": "[Mockingly] Slowpoke, huh?",
+    "aiReasoning": "I have analyzed the provided comic page region.\n\n**1. Locate & Classify:**\n*   **Text:** \"SLOWPOKE, HUH?\"\n*   **Location:** Bottom right panel, left speech bubble.\n*   **Type:** `SPEECH` (Standard bubble with tail).\n\n**2. Context & Speaker Identification:**\n*   **Visual Analysis:** The panel shows two characters facing off.\n    *   Left: A character in a Yellow Ranger suit but with a bulky turtle shell and dagger weapons (resembling a Sai). The bubble tail points clearly to this character.\n    *   Right: The Black Ranger (holding the Power Axe). The other bubble (\"JUST TRYING TO GET YOU OUT OF YOUR SHELL.\") points to him.\n*   **Narrative Context:**\n    *   In the top panels, the Green Ranger says, \"You may look like Rangers, but you don't fight like them,\" and text refers to Shredder making these enemies \"bigger and meaner.\" This indicates the Turtle-Ranger hybrids are villains/imposters created by Shredder.\n    *   In Panel 1, the real Michelangelo (Mikey) refers to himself as a \"sitting duck\" while being attacked by one of these dopplegangers.\n    *   Therefore, the Yellow Turtle-Ranger in the target panel is an enemy (Villain).\n    *   The dialogue \"Slowpoke, huh?\" is a taunt directed at the Black Ranger, likely mocking his speed or the weight of his axe.\n    *   The Black Ranger retorts with a pun about cracking his shell.\n*   **Speaker Name:** Since this is an enemy doppleganger and not one of the provided unique characters (Green Ranger, Black Ranger), I will label him \"Yellow Turtle Ranger\".\n*   **Side:** `VILLAIN`.\n*   **Importance:** `MINOR` (An enemy minion/monster, distinct from the main cast heroes).\n*   **Voice Description:** Since he is a villain mocking a hero, the voice should be arrogant, sneering, and aggressive.\n*   **Emotion:** Taunting / Mocking.\n\n**3. Performance Cues:**\n*   **Tone:** The text is a short, punchy taunt.\n*   **Cue:** `[Mockingly]` or `[Tauntingly]`."
+  },
+  {
+    "id": "page-14_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 1222.40185546875,
+      "y": 1952.9439697265625,
+      "width": 276.8424072265625,
+      "height": 164.3607177734375,
+      "confidence": 0.5981778502464294,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-005-x1222-y1952.jpg"
+    },
+    "ocr_text": "JUST TRYING TO GET YOU OUT OF YOUR SHELL.",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "Playful and witty",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Confident, cool, youthful male voice, American accent",
+    "textWithCues": "[Cheekily making a pun] Just trying to get you out of your shell.",
+    "aiReasoning": "The text is located in the bottom right panel of the page.\nThe text reads: \"JUST TRYING TO GET YOU OUT OF YOUR SHELL.\"\nThe speech bubble has a tail pointing to the character in the black suit with a mastodon-style helmet. This is the **Black Ranger**.\nThe Black Ranger is a **MAJOR** character and a **HERO**.\nIn the context of the page, the Black Ranger has just struck a turtle-like enemy (Mikey) with his Power Axe in a previous panel. He is now standing alongside the Yellow Ranger (who appears to have a turtle shell mutation in this crossover).\nThe line is a pun/quip referring to the turtle enemy's shell. It is a moment of lighthearted banter during combat.\nThe tone should be confident, playful, and witty."
+  },
+  {
+    "id": "page-14_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 1632.6031494140625,
+      "y": 682.6509399414062,
+      "width": 214.0521240234375,
+      "height": 105.33123779296875,
+      "confidence": 0.53031986951828,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-006-x1632-y682.jpg"
+    },
+    "ocr_text": "MADE YOU LOOK.",
+    "type": "SPEECH",
+    "speaker": "Green Ranger",
+    "emotion": "Taunting",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "Energetic, confident teenage male voice. Playful and heroic.",
+    "textWithCues": "[Playfully taunting] Made you look."
+  },
+  {
+    "id": "page-14_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 616.820556640625,
+      "y": 455.2206115722656,
+      "width": 221.67034912109375,
+      "height": 146.18209838867188,
+      "confidence": 0.4940149188041687,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-007-x616-y455.jpg"
+    },
+    "ocr_text": "URGH!",
+    "type": "SPEECH",
+    "speaker": null,
+    "emotion": "neutral"
+  },
+  {
+    "id": "page-14_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 1632.806396484375,
+      "y": 473.55096435546875,
+      "width": 192.9659423828125,
+      "height": 131.514404296875,
+      "confidence": 0.4234600067138672,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-14/page-14-crop-008-x1632-y473.jpg"
+    },
+    "ocr_text": "HRGH!",
+    "type": "SPEECH",
+    "speaker": "Black Ranger",
+    "emotion": "Exertion",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[grunts with effort] HRGH!",
+    "aiReasoning": "1.  **Locate & Classify**: The text \"HRGH!\" is located in a speech bubble in the top right corner of the first panel (approx x:1632, y:473). It is classified as `SPEECH`.\n2.  **Analyze Context**:\n    *   **Speaker**: The tail of the speech bubble points to the character on the far right of the panel. This character is wearing the Black Ranger uniform (black helmet with mastodon design). The provided unique character list includes \"Black Ranger\". I will use that name.\n    *   **Side**: `HERO`.\n    *   **Importance**: `MAJOR` (He is one of the main Power Rangers).\n    *   **Action/Emotion**: The Black Ranger appears to be in the middle of a physical altercation, likely striking or being struck. The text \"HRGH!\" is a vocalization of physical effort or impact. Given the action lines, he seems to be exerting force.\n3.  **Performance Cues**:\n    *   The text is a sound of exertion.\n    *   I will add a cue like `[grunts with effort]`.\n    *   It is a short, sharp exhalation."
+  }
+]

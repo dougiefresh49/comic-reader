@@ -1,0 +1,46 @@
+[
+  {
+    "id": "page-19_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 340.6769714355469,
+      "y": 2462.2177734375,
+      "width": 251.53970336914062,
+      "height": 197.015380859375,
+      "confidence": 0.4729480445384979,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-001-x340-y2462.jpg"
+    },
+    "ocr_text": "I AIN'T FELT THIS GOOD SINCE OUR FIRST MUTATION.",
+    "type": "SPEECH",
+    "speaker": "Rocksteady",
+    "emotion": "Exhilarated and powerful",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Deep, gravelly, brutish male voice with a street-tough accent",
+    "textWithCues": "[Deep, gravelly voice, sounding exhilarated] I ain't felt this good since our first mutation.",
+    "aiReasoning": "1.  **Locate & Classify:** The text \"I AIN'T FELT THIS GOOD SINCE OUR FIRST MUTATION.\" is in a speech bubble located in the lower-left quadrant of the image. The tail points to the large, green-armored rhinoceros character. Classification: `SPEECH`.\n\n2.  **Analyze Context:**\n    *   **Speaker:** The character is Rocksteady (the mutant rhino), currently transformed into a Power Ranger version (Green Ranger armor style). He is a well-known named character.\n    *   **Side:** `VILLAIN`. He is an enemy of the Turtles and Rangers.\n    *   **Importance:** `MINOR` (as per instructions: \"Named secondary characters\"). While iconic, he is a henchman compared to the main villains like Shredder or Rita Repulsa.\n    *   **Voice Description:** Rocksteady typically has a deep, gravelly, dim-witted but tough voice, often with a street/thug accent.\n    *   **Emotion:** He is reacting to a transformation (\"Shadow Grid Activate\"). He states he hasn't felt this \"good\" since his origin. He looks powerful and ready to fight. The emotion is exhilaration, confidence, and satisfaction.\n\n3.  **Performance Cues:**\n    *   The text is in a standard bubble, suggesting normal volume (not screaming like the \"RRRAAARGH!\" SFX nearby), but the content implies high energy and satisfaction.\n    *   He is reminiscing about his \"first mutation\", implying a sense of dark nostalgia mixed with the current rush of power.\n    *   Cue: `[Deep, gravelly voice, sounding exhilarated and powerful]`.\n\n4.  **Final JSON Construction:**\n    *   Type: SPEECH\n    *   Speaker: Rocksteady\n    *   Side: VILLAIN\n    *   CharacterType: MINOR\n    *   VoiceDesc: Deep, gravelly, brutish male voice with a street-tough accent.\n    *   Text: \"[Deep, gravelly voice, sounding exhilarated] I ain't felt this good since our first mutation.\""
+  },
+  {
+    "id": "page-19_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 549.8131713867188,
+      "y": 2281.632080078125,
+      "width": 293.924560546875,
+      "height": 218.312255859375,
+      "confidence": 0.4570445418357849,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/data/ocr-crops/page-19/page-19-crop-002-x549-y2281.jpg"
+    },
+    "ocr_text": "OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.",
+    "type": "SPEECH",
+    "speaker": "Bebop",
+    "emotion": "Strained intensity",
+    "characterType": "MINOR",
+    "side": "VILLAIN",
+    "voiceDescription": "Rough, street-punk male voice, aggressive and gravelly",
+    "textWithCues": "[Strained, gritting teeth] Oh, that feels like a hot pepper dipped in battery acid.",
+    "aiReasoning": "The user wants me to analyze the speech bubble containing \"OH, THAT FEELS LIKE A HOT PEPPER DIPPED IN BATTERY ACID.\".\n\n1.  **Locate & Classify**:\n    *   The text is in a speech bubble at the bottom right of the main panel.\n    *   Classification: `SPEECH`.\n\n2.  **Analyze Context**:\n    *   **Speaker**: The tail of the bubble clearly points to the Warthog character in the red and gold armor. This character is **Bebop**. (Note: The user provided \"Rocksteady\" in the unique characters list, who is the Rhino on the left. Since the Warthog is clearly a different character and iconic partner, I will identify him as \"Bebop\").\n    *   **Side**: `VILLAIN`. Bebop is a henchman of Shredder/Rita Repulsa.\n    *   **Importance**: `MINOR`. The definitions categorize \"Named secondary characters\" as MINOR (like Bulk & Skull). Bebop fits this role as a named henchman.\n    *   **Voice Description**: Bebop typically has a rough, street-punk voice, often associated with an African American Vernacular English (AAVE) accent or just a gruff, high-energy thug voice. In this context, he is powered up, so it should sound intense.\n    *   **Emotion**: The character is experiencing an intense physical transformation. The metaphor \"hot pepper dipped in battery acid\" suggests a burning, stinging sensation that is powerful and painful. His posture is crouched and tense.\n\n3.  **Performance Cues**:\n    *   The text describes a visceral burning sensation.\n    *   The character is likely straining against the surge of energy.\n    *   There is no shouting (bold) or whispering indicated by the font, but the context implies high intensity.\n    *   I will add a cue indicating the strained, gritty delivery."
+  }
+]

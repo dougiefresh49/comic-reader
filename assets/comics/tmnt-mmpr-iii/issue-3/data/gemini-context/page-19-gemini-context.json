@@ -1,0 +1,212 @@
+[
+  {
+    "id": "page-19_b01",
+    "box_2d": {
+      "index": 0,
+      "x": 240,
+      "y": 647,
+      "width": 298,
+      "height": 192,
+      "confidence": 0.8927270770072937,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-001-x240-y647.jpg"
+    },
+    "ocr_text": "I CAN'T BELIEVE IT. THE VILLAGE. THE TEMPLE. IT'S ALL GONE.",
+    "type": "SPEECH",
+    "speaker": "Kimberly Ann Hart",
+    "emotion": "shocked, disbelief",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[In disbelief] I can't believe it. The village. The temple. It's all gone.",
+    "aiReasoning": "1.  **Locate & Classify:** The text is in a speech bubble in the top left panel. It's clearly `SPEECH`.\n2.  **Analyze Context:** The tail of the speech bubble points to the circular inset panel featuring the Pink Ranger. Given the context of Mighty Morphin Power Rangers, this is Kimberly Ann Hart. She is a `MAJOR` character and a `HERO`. She is looking at the ruins of a temple/village, so her emotion is shock and disbelief.\n3.  **Performance Cues:** The text expresses shock at seeing destruction. A performance cue like `[In disbelief]` is appropriate to convey the emotional weight of seeing a familiar place destroyed."
+  },
+  {
+    "id": "page-19_b02",
+    "box_2d": {
+      "index": 1,
+      "x": 1070,
+      "y": 1655,
+      "width": 242,
+      "height": 146,
+      "confidence": 0.8757734298706055,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-002-x1070-y1655.jpg"
+    },
+    "ocr_text": "BILLY, I DON'T LIKE THIS...",
+    "type": "SPEECH",
+    "speaker": "Kimberly Ann Hart",
+    "emotion": "nervous",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Nervously] Billy, I-I don't like this..."
+  },
+  {
+    "id": "page-19_b03",
+    "box_2d": {
+      "index": 2,
+      "x": 1095,
+      "y": 1897,
+      "width": 182,
+      "height": 124,
+      "confidence": 0.8668407797813416,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-003-x1095-y1897.jpg"
+    },
+    "ocr_text": "YO, GOOD GUYS...",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "alert",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[Alert] Yo, good guys...",
+    "aiReasoning": "I have located the text \"YO, GOOD GUYS...\". It is a speech bubble.\nThe tail points to the Teenage Mutant Ninja Turtle with the red bandana, which is Raphael.\nRaphael is a HERO and a MAJOR character.\nHis expression is serious and alert, looking off-panel as he senses something coming. He is interrupting the others to give a warning.\nThe performance should reflect this alert warning tone."
+  },
+  {
+    "id": "page-19_b04",
+    "box_2d": {
+      "index": 3,
+      "x": 301,
+      "y": 1924,
+      "width": 241,
+      "height": 151,
+      "confidence": 0.8580342531204224,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-004-x301-y1924.jpg"
+    },
+    "ocr_text": "...YOU GETTING ANYTHING?",
+    "type": "SPEECH",
+    "speaker": "Kimberly Ann Hart",
+    "emotion": "questioning",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Hesitant] ...you getting anything?"
+  },
+  {
+    "id": "page-19_b05",
+    "box_2d": {
+      "index": 4,
+      "x": 612,
+      "y": 1009,
+      "width": 225,
+      "height": 165,
+      "confidence": 0.8579426407814026,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-005-x612-y1009.jpg"
+    },
+    "ocr_text": "LOOKS LIKE WE MISSED A HECK OF A BATTLE.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "observant",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[Gruffly] Looks like we missed a heck of a battle."
+  },
+  {
+    "id": "page-19_b06",
+    "box_2d": {
+      "index": 5,
+      "x": 345,
+      "y": 821,
+      "width": 322,
+      "height": 201,
+      "confidence": 0.8534258604049683,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-006-x345-y821.jpg"
+    },
+    "ocr_text": "EVERYTHING WAS IN A LOT BETTER SHAPE THE LAST TIME WE WERE HERE.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "dry",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": "",
+    "textWithCues": "[dryly] Everything was in a lot better shape the last time we were here.",
+    "aiReasoning": "The target text is \"EVERYTHING WAS IN A LOT BETTER SHAPE THE LAST TIME WE WERE HERE.\".\nThis text is inside a speech bubble. The tail of the bubble is connected to the circular inset panel showing Raphael (red mask).\nTherefore, the speaker is Raphael. He is a MAJOR character and a HERO.\nRaphael's expression is slightly frowning or cynical. He is making a typical dry or sarcastic observation about the ruined state of the temple they are looking at.\nA suitable performance cue would be \"[dryly]\" or \"[sarcastically]\"."
+  },
+  {
+    "id": "page-19_b07",
+    "box_2d": {
+      "index": 6,
+      "x": 1103,
+      "y": 2023,
+      "width": 262,
+      "height": 174,
+      "confidence": 0.8120557069778442,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-007-x1103-y2023.jpg"
+    },
+    "ocr_text": "FEEL THAT RUMBLING? SOMETHING'S COMING.",
+    "type": "SPEECH",
+    "speaker": "Raphael",
+    "emotion": "alert",
+    "side": "HERO",
+    "textWithCues": "[Alert] Feel that rumbling? Something's coming.",
+    "aiReasoning": "I see the text \"FEEL THAT RUMBLING? SOMETHING'S COMING.\" It is in a speech bubble in the bottom right panel.\nThe tail of the bubble points to Raphael, the Teenage Mutant Ninja Turtle with the red mask.\nRaphael is a HERO and a MAJOR character.\nHis expression is alert and serious, warning the others about an impending threat.\nThe performance should reflect this tension and alertness."
+  },
+  {
+    "id": "page-19_b08",
+    "box_2d": {
+      "index": 7,
+      "x": 983,
+      "y": 1555,
+      "width": 232,
+      "height": 109,
+      "confidence": 0.7977328896522522,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-008-x983-y1555.jpg"
+    },
+    "ocr_text": "OR A NIGHTMARE.",
+    "type": "SPEECH",
+    "speaker": "Kimberly Ann Hart",
+    "emotion": "worried",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "voiceDescription": null,
+    "textWithCues": "[serious, worried] Or a nightmare."
+  },
+  {
+    "id": "page-19_b09",
+    "box_2d": {
+      "index": 8,
+      "x": 744,
+      "y": 1324,
+      "width": 492,
+      "height": 189,
+      "confidence": 0.6038630604743958,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-009-x744-y1324.jpg"
+    },
+    "ocr_text": "THIS PLACE DOES FEEL TOTALLY FAMILIAR. LIKE OUT OF A TOTALLY AWESOME DREAM.",
+    "type": "SPEECH",
+    "speaker": "Michelangelo",
+    "emotion": "thoughtful, experiencing deja vu",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Thoughtfully, looking around] This place does feel totally familiar. [Slightly more upbeat] Like out of a totally awesome dream.",
+    "aiReasoning": "The text region contains two separate speech bubbles that have been combined in the prompt: \"THIS PLACE DOES FEEL TOTALLY FAMILIAR.\" and \"LIKE OUT OF A TOTALLY AWESOME DREAM.\"\nThe first bubble's tail points to Michelangelo (orange-masked turtle).\nThe second bubble's tail points to Kimberly Ann Hart (Pink Ranger).\nSince the text is provided as a single block and I must assign a single speaker for the JSON output, I will attribute it to the character who initiates the dialogue block, Michelangelo.\nMichelangelo is a major hero character. He is looking around thoughtfully, feeling a sense of deja vu.\nI will format the performance cues to flow naturally as a single continuous thought, matching the combined text provided."
+  },
+  {
+    "id": "page-19_b10",
+    "box_2d": {
+      "index": 10,
+      "x": 249,
+      "y": 2542,
+      "width": 189,
+      "height": 162,
+      "confidence": 0.5290271043777466,
+      "class": "speech bubble",
+      "cropPath": "/Users/dougiefresh49/projects/comic-reader/assets/comics/tmnt-mmpr-iii/issue-3/data/ocr-crops/page-19/page-19-crop-011-x249-y2542.jpg"
+    },
+    "ocr_text": "THIS MIGHT TAKE--",
+    "type": "SPEECH",
+    "speaker": "Billy Cranston",
+    "emotion": "focused, interrupted",
+    "characterType": "MAJOR",
+    "side": "HERO",
+    "textWithCues": "[Focused, abruptly interrupted] THIS MIGHT TAKE--",
+    "aiReasoning": "I located the text \"THIS MIGHT TAKE--\" in the bottom left panel. It's a speech bubble connected to the Blue Ranger, who is Billy Cranston.\nBilly is a MAJOR character and a HERO.\nHe is looking at a device and analyzing it, so he sounds focused, but the sentence is cut off with \"--\", indicating he is interrupted by the rumbling mentioned in the next panel.\nI will add a cue for an abrupt interruption."
+  }
+]

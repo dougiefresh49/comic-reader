@@ -54,7 +54,12 @@ type BubblesCache = Record<string, Bubble[]>;
 /**
  * Parse command-line arguments
  */
-function parseArgs(): { issue: string; overwrite?: boolean; dryRun?: boolean } {
+function parseArgs(): {
+  book: string;
+  issue: string;
+  overwrite?: boolean;
+  dryRun?: boolean;
+} {
   const args = process.argv.slice(2);
 
   // Check for help flag
@@ -77,7 +82,8 @@ Examples:
     process.exit(0);
   }
 
-  let issue = "issue-1";
+  let book = process.env.COMIC_BOOK ?? "tmnt-mmpr-iii";
+  let issue = process.env.COMIC_ISSUE ?? "issue-1";
   let overwrite = false;
   let dryRun = false;
 
@@ -85,6 +91,13 @@ Examples:
     const arg = args[i];
     if (!arg) continue;
 
+    if (arg.startsWith("--book=")) {
+      book = arg.split("=")[1]?.trim() ?? book;
+    }
+    if (arg === "--book") {
+      const nextArg = args[i + 1];
+      if (nextArg) book = nextArg.trim();
+    }
     if (arg.startsWith("--issue=")) {
       const issueNum = arg.split("=")[1]?.trim();
       if (issueNum) {
@@ -106,7 +119,7 @@ Examples:
     }
   }
 
-  return { issue, overwrite, dryRun };
+  return { book, issue, overwrite, dryRun };
 }
 
 /**
@@ -156,15 +169,9 @@ function calculateStyle(
  */
 async function main() {
   try {
-    const { issue, overwrite, dryRun } = parseArgs();
+    const { book, issue, overwrite, dryRun } = parseArgs();
 
-    const ISSUE_DIR = join(
-      PROJECT_ROOT,
-      "assets",
-      "comics",
-      "tmnt-mmpr-iii",
-      issue,
-    );
+    const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
     const BUBBLES_FILE = join(ISSUE_DIR, "bubbles.json");
     const PAGES_FILE = join(ISSUE_DIR, "pages.json");
 
@@ -267,4 +274,3 @@ async function main() {
 }
 
 main();
-
