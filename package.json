@@ -1,6 +1,6 @@
 {
   "name": "comic-reader",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "type": "module",
   "scripts": {
@@ -45,7 +45,8 @@
     "motion-comic": "tsx --env-file=.env scripts/motion-comic.ts",
     "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts",
     "migrate-to-db": "tsx --env-file=.env scripts/migrate-to-db.ts",
-    "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts"
+    "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",
+    "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",

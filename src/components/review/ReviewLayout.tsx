@@ -245,6 +245,56 @@ export function ReviewLayout({
   );
 
   const totalPendingCount = pendingCount + Object.keys(pageOrder).length;
+  const [applyState, setApplyState] = useState<
+    "idle" | "applying" | "success" | "error"
+  >("idle");
+  const [applyMessage, setApplyMessage] = useState<string | null>(null);
+
+  const handleApplyToDb = useCallback(async () => {
+    const secret = process.env.NEXT_PUBLIC_APPLY_FIXES_SECRET;
+    if (!secret) {
+      setApplyState("error");
+      setApplyMessage("NEXT_PUBLIC_APPLY_FIXES_SECRET not set in client env.");
+      return;
+    }
+    const json = buildFixesJson(bookId, issueId, edits, pageOrder, allBubbles);
+    if (!json.fixes.length) return;
+    setApplyState("applying");
+    setApplyMessage(null);
+    try {
+      const res = await fetch("/api/apply-fixes", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-apply-fixes-secret": secret,
+        },
+        body: JSON.stringify(json),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
+      }
+      const result = (await res.json()) as {
+        applied: number;
+        skipped: string[];
+        needsAudio: number;
+      };
+      setApplyState("success");
+      const parts = [`Applied ${result.applied} fix(es)`];
+      if (result.needsAudio > 0) parts.push(`${result.needsAudio} need audio`);
+      if (result.skipped.length > 0)
+        parts.push(`${result.skipped.length} skipped`);
+      setApplyMessage(parts.join(" · "));
+      clearAll();
+      setTimeout(() => {
+        setApplyState("idle");
+        setApplyMessage(null);
+      }, 5000);
+    } catch (e) {
+      setApplyState("error");
+      setApplyMessage((e as Error).message);
+    }
+  }, [bookId, issueId, edits, pageOrder, allBubbles, clearAll]);
 
   const handleExport = useCallback(() => {
     const json = buildFixesJson(bookId, issueId, edits, pageOrder, allBubbles);
@@ -291,6 +341,27 @@ export function ReviewLayout({
         </span>
 
         <div className="flex items-center gap-2">
+          {applyMessage && (
+            <span
+              className={`text-xs ${
+                applyState === "error" ? "text-red-400" : "text-emerald-400"
+              }`}
+            >
+              {applyMessage}
+            </span>
+          )}
+          <button
+            onClick={handleApplyToDb}
+            disabled={totalPendingCount === 0 || applyState === "applying"}
+            className="flex items-center gap-1.5 rounded bg-emerald-700 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {applyState === "applying" ? "Applying…" : "Apply to DB"}
+            {totalPendingCount > 0 && applyState !== "applying" && (
+              <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px]">
+                {totalPendingCount}
+              </span>
+            )}
+          </button>
           <button
             onClick={handleExport}
             disabled={totalPendingCount === 0}
@@ -372,6 +443,9 @@ export function ReviewLayout({
             redoSet={redoSet}
             selectedId={selectedId}
             speakerRef={speakerInputRef}
+            bookId={bookId}
+            issueId={issueId}
+            pageNumber={currentPage}
             onSelect={setSelectedId}
             onAdvance={handleAdvance}
             onSetPageOrder={handleSetPageOrder}

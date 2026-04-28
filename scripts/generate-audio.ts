@@ -224,8 +224,16 @@ function getVoiceSettingsFromEmotion(emotion: string): {
   };
 }
 
+// Sentinel value written into castlist when a character's casting task was
+// explicitly skipped from the casting browser UI. Bubbles spoken by these
+// characters are skipped during audio generation rather than falling back
+// to Narrator.
+const SKIPPED_VOICE = "__SKIPPED__";
+
 /**
- * Get voice ID for a character name
+ * Get voice ID for a character name.
+ * Returns voiceId === SKIPPED_VOICE when the character was explicitly skipped
+ * from casting — caller should skip the bubble entirely.
  */
 function getVoiceId(
   characterName: string | null,
@@ -243,7 +251,7 @@ function getVoiceId(
   // Normalize using alias map
   const normalizedName = getCanonicalName(characterName);
 
-  // Direct lookup
+  // Direct lookup (may return __SKIPPED__ sentinel)
   if (castList[normalizedName]) {
     return {
       voiceId: castList[normalizedName]!,
@@ -488,6 +496,15 @@ async function main() {
           bubble.speaker,
           castList,
         );
+
+        // Speaker explicitly skipped via casting UI → don't generate audio
+        if (voiceId === SKIPPED_VOICE) {
+          console.log(
+            `   [skip] ${bubble.id} - ${bubble.speaker} (casting skipped)`,
+          );
+          skipped++;
+          continue;
+        }
 
         // Track no matches (when we had to use Narrator but speaker was not null)
         if (
