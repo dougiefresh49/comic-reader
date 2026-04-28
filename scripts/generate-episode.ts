@@ -26,6 +26,14 @@ import {
   type BubbleInput,
   type ShotPlan,
 } from "./utils/shot-planner.js";
+import {
+  directPagePanels,
+  type AudioTimestamp as PanelAudioTimestamp,
+  type BubbleManifestEntry,
+  type DirectedPanel,
+  type PanelDirection,
+} from "./utils/panel-director.js";
+import { supabase as supabaseAdmin } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,7 +41,12 @@ const PROJECT_ROOT = join(__dirname, "..");
 
 // ─── Step registry ────────────────────────────────────────────────────────────
 
-const STEPS = ["setup-series", "lock-characters", "plan-shots"] as const;
+const STEPS = [
+  "setup-series",
+  "lock-characters",
+  "direct-panels",
+  "plan-shots",
+] as const;
 type Step = (typeof STEPS)[number];
 
 // ─── Checkpoint helpers ───────────────────────────────────────────────────────
@@ -548,6 +561,200 @@ async function lockCharacters(
   }
 }
 
+// ─── Step: direct-panels (motion-comic-plus default) ─────────────────────────
+
+async function directPanels(
+  book: string,
+  issue: string,
+  force: boolean,
+): Promise<void> {
+  const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+  const BUBBLES_PATH = join(ISSUE_DIR, "bubbles.json");
+  const TIMESTAMPS_PATH = join(ISSUE_DIR, "audio-timestamps.json");
+  const PAGES_DIR = join(ISSUE_DIR, "pages-webp");
+  const GEMINI_CONTEXT_DIR = join(ISSUE_DIR, "data", "gemini-context");
+
+  const EPISODE_DIR = join(PROJECT_ROOT, "assets", "episodes", book, issue);
+  const PANEL_JSON_PATH = join(EPISODE_DIR, "panel-direction.json");
+
+  if (!force && (await fs.pathExists(PANEL_JSON_PATH))) {
+    console.log(
+      `   ⏭  panel-direction.json already exists at ${PANEL_JSON_PATH} — re-run with --force to regenerate.`,
+    );
+    return;
+  }
+
+  for (const p of [BUBBLES_PATH, TIMESTAMPS_PATH, PAGES_DIR]) {
+    if (!(await fs.pathExists(p))) {
+      console.error(`❌ Missing ${p}`);
+      process.exit(1);
+    }
+  }
+
+  const bubblesByPage = (await fs.readJson(BUBBLES_PATH)) as Record<
+    string,
+    BubbleManifestEntry[]
+  >;
+  const audioTimestamps = (await fs.readJson(TIMESTAMPS_PATH)) as Record<
+    string,
+    PanelAudioTimestamp
+  >;
+
+  const pageFiles = (await fs.readdir(PAGES_DIR))
+    .filter((f) => /^page-\d+\.webp$/i.test(f))
+    .sort();
+
+  const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+
+  console.log(
+    `\n   🎬 Directing ${pageFiles.length} page(s) with ${GEMINI_MEDIUM}...\n`,
+  );
+
+  const pages: Awaited<ReturnType<typeof directPagePanels>>[] = [];
+  let prevSummary: string | null = null;
+  let analyzed = 0;
+  let skipped = 0;
+
+  for (const filename of pageFiles) {
+    const m = /^page-(\d+)\.webp$/i.exec(filename);
+    if (!m) continue;
+    const pageNumber = parseInt(m[1]!, 10);
+    const pagePadded = String(pageNumber).padStart(2, "0");
+    const pageKey = `page-${pagePadded}.jpg`;
+    process.stdout.write(
+      `   [${(analyzed + skipped + 1).toString().padStart(3, " ")}/${pageFiles.length}] page-${pagePadded}... `,
+    );
+
+    try {
+      const buffer = await fs.readFile(join(PAGES_DIR, filename));
+      const manifest = (bubblesByPage[pageKey] ?? []) as BubbleManifestEntry[];
+
+      // Pull cached aiReasoning for this page if it exists
+      const ctxPath = join(
+        GEMINI_CONTEXT_DIR,
+        `page-${pagePadded}-gemini-context.json`,
+      );
+      let cachedReasoning: Array<Record<string, unknown>> = [];
+      if (await fs.pathExists(ctxPath)) {
+        cachedReasoning = (await fs.readJson(ctxPath)) as Array<
+          Record<string, unknown>
+        >;
+      }
+
+      const result = await directPagePanels({
+        gemini,
+        geminiModel: GEMINI_MEDIUM,
+        pageNumber,
+        pageImageBuffer: buffer,
+        bubbleManifest: manifest,
+        cachedReasoning: cachedReasoning as Parameters<
+          typeof directPagePanels
+        >[0]["cachedReasoning"],
+        audioTimestamps,
+        previousPageSummary: prevSummary,
+        isFirstPage: analyzed === 0 && skipped === 0,
+      });
+      pages.push(result);
+      prevSummary = result.settingSummary || prevSummary;
+      analyzed++;
+      console.log(
+        `✓ ${result.panels.length} panel(s)${result.isNewScene ? " · new scene" : ""}`,
+      );
+    } catch (err) {
+      skipped++;
+      console.log(`⚠ ${err instanceof Error ? err.message : String(err)}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  if (pages.length === 0) {
+    console.error("\n❌ No pages directed successfully — aborting.");
+    process.exit(1);
+  }
+
+  const direction: PanelDirection = {
+    bookId: book,
+    issueId: issue,
+    generatedAt: new Date().toISOString(),
+    pages,
+  };
+
+  await fs.ensureDir(EPISODE_DIR);
+  await fs.writeJson(PANEL_JSON_PATH, direction, { spaces: 2 });
+  console.log(`\n   💾 Wrote ${PANEL_JSON_PATH}`);
+
+  // ── Persist to DB ─────────────────────────────────────────────────────────
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url || !key) {
+    console.log(
+      "   ⚠ Supabase env vars not set — skipping DB sync. JSON file is the only artifact.",
+    );
+    return;
+  }
+
+  console.log("   📦 Syncing panels to DB...");
+  let panelsInserted = 0;
+  let bubblesAssigned = 0;
+
+  for (const page of pages) {
+    for (const panel of page.panels) {
+      const { data: row, error } = await supabaseAdmin
+        .from("panels")
+        .upsert(
+          {
+            book_id: book,
+            issue_id: issue,
+            page_number: panel.pageNumber,
+            panel_id: panel.panelId,
+            sort_order: panel.sortOrder,
+            bounding_box: panel.boundingBox,
+            cinematic_description: panel.cinematicDescription,
+            effect_tags: panel.effectTags,
+            audio_tags: panel.audioTags,
+            primary_speaker: panel.primarySpeaker,
+            estimated_duration_seconds: panel.estimatedDurationSeconds,
+            is_new_scene: panel.isNewScene,
+            source: "gemini",
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "book_id,issue_id,panel_id" },
+        )
+        .select("id")
+        .single();
+
+      if (error) {
+        console.warn(`     ⚠ panel ${panel.panelId}: ${error.message}`);
+        continue;
+      }
+      const panelUuid = (row as { id?: string })?.id;
+      if (!panelUuid) continue;
+      panelsInserted++;
+
+      // Assign bubbles to this panel via legacy_id
+      if (panel.bubbleIds.length > 0) {
+        const { error: bErr } = await supabaseAdmin
+          .from("bubbles")
+          .update({ panel_id: panelUuid })
+          .eq("book_id", book)
+          .eq("issue_id", issue)
+          .in("legacy_id", panel.bubbleIds);
+        if (bErr) {
+          console.warn(
+            `     ⚠ bubble assignment ${panel.panelId}: ${bErr.message}`,
+          );
+        } else {
+          bubblesAssigned += panel.bubbleIds.length;
+        }
+      }
+    }
+  }
+
+  console.log(
+    `   ✓ ${panelsInserted} panel(s) upserted, ${bubblesAssigned} bubble(s) reassigned\n`,
+  );
+}
+
 // ─── Step: plan-shots ─────────────────────────────────────────────────────────
 
 async function planShots(
@@ -725,6 +932,7 @@ async function main(): Promise<void> {
   const stepHandlers: Record<Step, () => Promise<void>> = {
     "setup-series": () => setupSeries(book, issue, force),
     "lock-characters": () => lockCharacters(book, issue, force),
+    "direct-panels": () => directPanels(book, issue, force),
     "plan-shots": () => planShots(book, issue, force),
   };
 

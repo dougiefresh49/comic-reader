@@ -46,7 +46,9 @@
     "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts",
     "migrate-to-db": "tsx --env-file=.env scripts/migrate-to-db.ts",
     "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",
-    "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts"
+    "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts",
+    "train-panel-detection": "tsx --env-file=.env scripts/train-panel-detection.ts",
+    "backfill-page-context": "tsx --env-file=.env scripts/backfill-page-context.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",
