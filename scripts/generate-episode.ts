@@ -37,7 +37,13 @@ import {
   detectIssuePanels,
   type DetectedPagePanels,
 } from "./utils/roboflow-panels.js";
+import {
+  cropPageToPanel,
+  describeSinglePanel,
+  type PanelBubbleSummary,
+} from "./utils/panel-describer.js";
 import { supabase as supabaseAdmin } from "./lib/supabase.js";
+import pLimit from "p-limit";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -751,6 +757,78 @@ async function detectPanels(
   console.log(
     `   ✓ ${bubblesAssigned} bubble(s) assigned${bubblesUnassigned > 0 ? `, ${bubblesUnassigned} unassigned` : ""}\n`,
   );
+
+  // 6. Full-page fallback for pages that have bubbles but Roboflow detected
+  //    no panels. These are typically splash pages — the whole page IS one
+  //    panel. Synthesize a single-panel row with source='heuristic-fullpage'
+  //    and pin every unassigned bubble on the page to it.
+  console.log("   🩹 Full-page fallback for pages with no detected panels...");
+  const pagesWithNoDetections = new Set(
+    detected.filter((d) => d.panels.length === 0).map((d) => d.pageNumber),
+  );
+  let fullPagePanelsCreated = 0;
+  let fullPageBubblesAssigned = 0;
+  for (const pageKey of Object.keys(bubblesByPage)) {
+    const m = /^page-?0*(\d+)/.exec(pageKey);
+    if (!m) continue;
+    const pageNumber = parseInt(m[1]!, 10);
+    // Only synthesize for pages where we explicitly got back 0 panels —
+    // pages absent from the detected[] list never reached Roboflow (e.g.
+    // network error) and we don't want to silently fabricate for those.
+    if (!pagesWithNoDetections.has(pageNumber)) continue;
+
+    const pageBubbles = bubblesByPage[pageKey] ?? [];
+    if (pageBubbles.length === 0) continue; // no bubbles, no panel needed
+
+    const padded = String(pageNumber).padStart(2, "0");
+    const { data: ins, error: iErr } = await supabaseAdmin
+      .from("panels")
+      .upsert(
+        {
+          book_id: book,
+          issue_id: issue,
+          page_number: pageNumber,
+          panel_id: `p${padded}-01`,
+          sort_order: 0,
+          bounding_box: { x: 0, y: 0, w: 1, h: 1 },
+          effect_tags: [],
+          audio_tags: {
+            ambience: [],
+            sfx: [],
+            music_mood: "transition_neutral",
+          },
+          source: "heuristic-fullpage",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "book_id,issue_id,panel_id" },
+      )
+      .select("id")
+      .single();
+    if (iErr) {
+      console.warn(`   ⚠ full-page panel page-${padded}: ${iErr.message}`);
+      continue;
+    }
+    const panelUuid = (ins as { id?: string } | null)?.id;
+    if (!panelUuid) continue;
+    fullPagePanelsCreated++;
+
+    const { error: bErr } = await supabaseAdmin
+      .from("bubbles")
+      .update({ panel_id: panelUuid })
+      .eq("book_id", book)
+      .eq("issue_id", issue)
+      .eq("page_number", pageNumber)
+      .is("panel_id", null);
+    if (!bErr) fullPageBubblesAssigned += pageBubbles.length;
+    console.log(
+      `   ✓ page-${padded} → 1 full-page panel (${pageBubbles.length} bubble(s))`,
+    );
+  }
+  if (fullPagePanelsCreated > 0) {
+    console.log(
+      `   ✓ ${fullPagePanelsCreated} full-page panel(s) created, ${fullPageBubblesAssigned} bubble(s) assigned\n`,
+    );
+  }
 }
 
 // ─── Step: describe-panels (Gemini, populates descriptions + tags) ───────────
@@ -760,12 +838,14 @@ async function describePanels(
   issue: string,
   force: boolean,
 ): Promise<void> {
-  // Read panels for this issue from DB, then call Gemini per-panel for
-  // cinematicDescription + effect/audio tags.
+  const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+  const PAGES_DIR = join(ISSUE_DIR, "pages-webp");
+
+  // 1. Read panels + their bubbles from DB
   const { data: panelRows, error: pErr } = await supabaseAdmin
     .from("panels")
     .select(
-      "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene",
+      "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, source",
     )
     .eq("book_id", book)
     .eq("issue_id", issue)
@@ -782,7 +862,8 @@ async function describePanels(
     sort_order: number;
     bounding_box: { x: number; y: number; w: number; h: number };
     cinematic_description: string | null;
-    effect_tags: string[];
+    effect_tags: string[] | null;
+    source: string;
   }>;
 
   if (panels.length === 0) {
@@ -811,23 +892,127 @@ async function describePanels(
   console.log(
     `\n   🎬 Describing ${todo.length} panel(s) of ${panels.length} via ${GEMINI_MEDIUM}...`,
   );
-  console.log(
-    "   (per-panel Gemini calls; tags clamped to enum; soft-fail per panel)\n",
+
+  // 2. Pull all bubbles for this issue once, group by panel_id
+  const { data: bubbleRows } = await supabaseAdmin
+    .from("bubbles")
+    .select(
+      "legacy_id, panel_id, type, speaker, emotion, ocr_text, text_with_cues",
+    )
+    .eq("book_id", book)
+    .eq("issue_id", issue)
+    .not("panel_id", "is", null)
+    .order("sort_order");
+  const bubblesByPanel = new Map<string, PanelBubbleSummary[]>();
+  for (const b of (bubbleRows ?? []) as Array<{
+    legacy_id: string | null;
+    panel_id: string;
+    type: string;
+    speaker: string | null;
+    emotion: string | null;
+    ocr_text: string | null;
+    text_with_cues: string | null;
+  }>) {
+    const list = bubblesByPanel.get(b.panel_id) ?? [];
+    list.push({
+      legacyId: b.legacy_id,
+      type: b.type,
+      speaker: b.speaker,
+      emotion: b.emotion,
+      text: b.text_with_cues ?? b.ocr_text ?? "",
+    });
+    bubblesByPanel.set(b.panel_id, list);
+  }
+
+  // 3. Cache page WebP buffers — many panels share a page
+  const pageBufferCache = new Map<number, Buffer>();
+  const getPageBuffer = async (pageNumber: number): Promise<Buffer> => {
+    let buf = pageBufferCache.get(pageNumber);
+    if (!buf) {
+      const padded = String(pageNumber).padStart(2, "0");
+      buf = await fs.readFile(join(PAGES_DIR, `page-${padded}.webp`));
+      pageBufferCache.set(pageNumber, buf);
+    }
+    return buf;
+  };
+
+  const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  const limit = pLimit(2); // throttle Gemini concurrency
+  let described = 0;
+  let failed = 0;
+
+  await Promise.all(
+    todo.map((panel) =>
+      limit(async () => {
+        // Throttle: ~400ms between starts so we stay friendly to Flash quota
+        await new Promise((r) => setTimeout(r, 400));
+        try {
+          const pageBuffer = await getPageBuffer(panel.page_number);
+          const panelCrop = await cropPageToPanel(
+            pageBuffer,
+            panel.bounding_box,
+          );
+          const bubbles = bubblesByPanel.get(panel.id) ?? [];
+          const isFullPagePanel = panel.source === "heuristic-fullpage";
+
+          const result = await describeSinglePanel({
+            gemini,
+            geminiModel: GEMINI_MEDIUM,
+            panelCropJpeg: panelCrop,
+            bubbles,
+            isFullPagePanel,
+          });
+
+          const primarySpeaker =
+            bubbles.length > 0 ? mostCommonSpeaker(bubbles) : null;
+
+          const { error: uErr } = await supabaseAdmin
+            .from("panels")
+            .update({
+              cinematic_description: result.cinematicDescription,
+              effect_tags: result.effectTags,
+              audio_tags: result.audioTags,
+              primary_speaker: primarySpeaker,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", panel.id);
+          if (uErr) {
+            failed++;
+            console.warn(`   ⚠ ${panel.panel_id}: ${uErr.message}`);
+            return;
+          }
+          described++;
+          console.log(
+            `   ✓ ${panel.panel_id} → ${result.effectTags.length} fx, ${result.audioTags.sfx.length} sfx, mood=${result.audioTags.music_mood}`,
+          );
+        } catch (e) {
+          failed++;
+          console.warn(`   ⚠ ${panel.panel_id}: ${(e as Error).message}`);
+        }
+      }),
+    ),
   );
 
-  // For now: use the existing directPagePanels module per page. We treat the
-  // already-detected Roboflow rects as the source of truth and overlay
-  // Gemini's tags + descriptions onto them. A cleaner per-panel Gemini call
-  // (one per detected rect, sending only the cropped panel) is the next
-  // optimization — it would let us drop the per-page overhead entirely.
-  //
-  // TODO: scripts/utils/panel-describer.ts — accepts a single panel + crop
-  // image, returns cinematicDescription + effectTags + audioTags. Call N
-  // times per page in parallel within a concurrency limit.
-
   console.log(
-    "   ⚠ describe-panels currently a TODO — Roboflow rects are in DB; tags will populate manually until the per-panel Gemini call is built.",
+    `\n   ✓ ${described} panel(s) described${failed > 0 ? `, ${failed} failed` : ""}\n`,
   );
+}
+
+function mostCommonSpeaker(bubbles: PanelBubbleSummary[]): string | null {
+  const counts = new Map<string, number>();
+  for (const b of bubbles) {
+    if (!b.speaker) continue;
+    counts.set(b.speaker, (counts.get(b.speaker) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let max = 0;
+  for (const [name, n] of counts) {
+    if (n > max) {
+      max = n;
+      best = name;
+    }
+  }
+  return best;
 }
 
 // ─── Step: direct-panels (motion-comic-plus, legacy single-pass) ─────────────

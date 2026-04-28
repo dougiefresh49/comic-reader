@@ -11,6 +11,7 @@
  *
  * Usage:
  *   pnpm train-panel-detection -- --book tmnt-mmpr-iii --issue 1
+ *   pnpm train-panel-detection -- --book tmnt-mmpr-iii --issue 1 --page 4   # only page-04.*
  *   pnpm train-panel-detection -- --book tmnt-mmpr-iii            # all issues
  *   pnpm train-panel-detection -- --all                            # every book
  *   pnpm train-panel-detection -- --concurrency 3 --delay-ms 1500  # throttle
@@ -54,6 +55,8 @@ async function bufferForRoboflowWorkflow(imageBuffer: Buffer): Promise<Buffer> {
 interface Args {
   book?: string;
   issue?: string;
+  /** 1-based page index matching `page-NN.*` filenames (e.g. 4 → page-04.webp). */
+  page?: number;
   all: boolean;
   concurrency: number;
   delayMs: number;
@@ -68,6 +71,7 @@ function parseArgs(): Args {
   let concurrency = 2;
   let delayMs = 1000;
   let dryRun = false;
+  let page: number | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -78,6 +82,15 @@ function parseArgs(): Args {
       case "--issue":
         issue = argv[++i];
         if (issue && !issue.startsWith("issue-")) issue = `issue-${issue}`;
+        break;
+      case "--page":
+        page = parseInt(argv[++i] ?? "", 10);
+        if (!Number.isFinite(page) || page < 1 || !Number.isInteger(page)) {
+          console.error(
+            "--page must be a positive integer (e.g. 4 for page-04.webp)",
+          );
+          process.exit(1);
+        }
         break;
       case "--all":
         all = true;
@@ -94,7 +107,7 @@ function parseArgs(): Args {
       case "--help":
       case "-h":
         console.log(
-          "Usage: pnpm train-panel-detection -- [--book <name>] [--issue <n>] [--all] [--concurrency 2] [--delay-ms 1000] [--dry-run]",
+          "Usage: pnpm train-panel-detection -- [--book <name>] [--issue <n>] [--page <pageNum>] [--all] [--concurrency 2] [--delay-ms 1000] [--dry-run]",
         );
         process.exit(0);
     }
@@ -104,13 +117,27 @@ function parseArgs(): Args {
     console.error("Provide either --book <name> or --all");
     process.exit(1);
   }
-  return { book, issue, all, concurrency, delayMs, dryRun };
+  return { book, issue, page, all, concurrency, delayMs, dryRun };
 }
 
 interface LocalIssue {
   bookId: string;
   issueId: string;
   pagePaths: string[];
+}
+
+function filterIssuesToPageNumber(
+  issues: LocalIssue[],
+  pageNum: number,
+): LocalIssue[] {
+  return issues
+    .map((iss) => ({
+      ...iss,
+      pagePaths: iss.pagePaths.filter(
+        (p) => pageNumberFromFilename(path.basename(p)) === pageNum,
+      ),
+    }))
+    .filter((iss) => iss.pagePaths.length > 0);
 }
 
 function pageAssetFolderLabel(pagePaths: string[]): string {
@@ -260,7 +287,7 @@ async function sendToRoboflow(imageBuffer: Buffer): Promise<InferResult> {
 }
 
 async function main() {
-  const { book, issue, all, concurrency, delayMs, dryRun } = parseArgs();
+  const { book, issue, page, all, concurrency, delayMs, dryRun } = parseArgs();
 
   let issues: LocalIssue[] = [];
   if (all) {
@@ -272,6 +299,19 @@ async function main() {
   if (issues.length === 0) {
     console.log("No matching issues found.");
     process.exit(0);
+  }
+
+  if (page !== undefined) {
+    issues = filterIssuesToPageNumber(issues, page);
+    if (issues.length === 0) {
+      console.error(
+        `No file matching page-${String(page).padStart(2, "0")}.* for the selected book/issue (--page ${page}).`,
+      );
+      process.exit(1);
+    }
+    console.log(
+      `Filter: single page (--page ${page} → page-${String(page).padStart(2, "0")}.*)`,
+    );
   }
 
   const totalPages = issues.reduce((acc, i) => acc + i.pagePaths.length, 0);
