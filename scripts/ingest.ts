@@ -72,6 +72,7 @@ Options:
   --from-step=ID               Force restart from a specific step ID
   --dry-run                    Preview what would run without executing
   --auto                       Skip interactive prompts (prune-only for review-new-characters)
+                               With STORAGE_MODE=supabase, review-new-characters uses --db (browser pause)
   --help, -h                   Show this help message
 
 Pipeline steps:
@@ -171,7 +172,7 @@ async function runPnpmScript(
   book: string,
   issue: string,
   extraArgs: string[] = [],
-): Promise<void> {
+): Promise<number> {
   return new Promise((resolve, reject) => {
     const env = {
       ...process.env,
@@ -190,11 +191,7 @@ async function runPnpmScript(
     );
 
     child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`Script "${scriptName}" exited with code ${code}`));
-      }
+      resolve(code ?? 1);
     });
 
     child.on("error", (err) => {
@@ -332,8 +329,34 @@ async function main() {
             `   ⚠️  No script named "${step.id}" in package.json — skipping`,
           );
         } else {
-          const extraArgs = auto ? ["--auto"] : [];
-          await runPnpmScript(step.id, book, issue, extraArgs);
+          const extraArgs: string[] = [];
+          if (auto) extraArgs.push("--auto");
+          if (
+            step.id === "review-new-characters" &&
+            process.env.STORAGE_MODE === "supabase"
+          ) {
+            extraArgs.push("--db");
+          }
+          const exitCode = await runPnpmScript(step.id, book, issue, extraArgs);
+
+          if (
+            step.id === "review-new-characters" &&
+            exitCode === 2
+          ) {
+            console.log(
+              `\n⏸️  Pipeline paused at review-new-characters — complete the browser review, then re-run ingest.`,
+            );
+            checkpoint.currentStep = null;
+            checkpoint.failedStep = null;
+            await writeCheckpoint(checkpoint);
+            process.exit(0);
+          }
+
+          if (exitCode !== 0) {
+            throw new Error(
+              `Script "${step.id}" exited with code ${exitCode}`,
+            );
+          }
         }
       }
 

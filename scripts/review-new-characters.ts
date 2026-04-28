@@ -7,6 +7,7 @@ import * as readline from "readline";
 import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
 import type { CharacterVoiceEntry } from "./generate-character-voice-descriptions.js";
 import { supabase } from "./lib/supabase.js";
+import { analyzeNewCharacterQueue } from "./utils/new-character-queue.js";
 
 async function upsertAliasInDb(alias: string, canonical: string) {
   if (
@@ -42,11 +43,12 @@ type NewCharsMap = Record<string, CharacterVoiceEntry>;
 type BubbleEntry = { type?: string; speaker?: string };
 type Annotation = { type: "renamed" | "merged"; from: string };
 
-function parseArgs(): { book: string; issue: string; auto: boolean } {
+function parseArgs(): { book: string; issue: string; auto: boolean; db: boolean } {
   const args = process.argv.slice(2);
   let book = process.env.COMIC_BOOK ?? "";
   let issue = process.env.COMIC_ISSUE ?? "";
   let auto = false;
+  let db = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -65,6 +67,7 @@ function parseArgs(): { book: string; issue: string; auto: boolean } {
       if (next) issue = next.startsWith("issue-") ? next : `issue-${next}`;
     }
     if (arg === "--auto") auto = true;
+    if (arg === "--db") db = true;
   }
 
   if (!book) {
@@ -76,15 +79,70 @@ function parseArgs(): { book: string; issue: string; auto: boolean } {
     process.exit(1);
   }
 
-  return { book, issue, auto };
+  return { book, issue, auto, db };
 }
 
 function applyAlias(name: string, aliasMap: Record<string, string>): string {
   return aliasMap[name.toLowerCase().trim()] ?? name;
 }
 
+async function runReviewNewCharactersDbMode(
+  book: string,
+  issue: string,
+): Promise<void> {
+  const SEP = "─".repeat(62);
+  const adminUrl = `/admin/${book}/${issue}/review/new-characters`;
+
+  const { pendingCount } = await analyzeNewCharacterQueue(supabase, book, issue, {
+    projectRoot: PROJECT_ROOT,
+  });
+
+  if (pendingCount > 0) {
+    const { error } = await supabase
+      .from("issues")
+      .update({
+        pipeline_step: "review-new-characters",
+        pipeline_paused: true,
+        pipeline_paused_at: "review-new-characters",
+        pipeline_paused_url: adminUrl,
+      })
+      .eq("book_id", book)
+      .eq("id", issue);
+
+    if (error) {
+      console.warn(`  ⚠ issues pipeline pause update: ${error.message}`);
+    }
+
+    console.log(`\n${SEP}`);
+    console.log("── Review new characters ──────────────────────────────");
+    console.log(`  ${pendingCount} character(s) awaiting review.`);
+    console.log(`  Open: ${adminUrl}`);
+    console.log(`  Re-run after completing review to continue.`);
+    console.log(`${SEP}\n`);
+    process.exit(2);
+  }
+
+  await supabase
+    .from("issues")
+    .update({
+      pipeline_paused: false,
+      pipeline_paused_at: null,
+      pipeline_paused_url: null,
+    })
+    .eq("book_id", book)
+    .eq("id", issue)
+    .eq("pipeline_paused_at", "review-new-characters");
+
+  console.log(`\n✅ No new characters awaiting review — continuing pipeline.\n`);
+}
+
 async function main() {
-  const { book, issue, auto } = parseArgs();
+  const { book, issue, auto, db } = parseArgs();
+
+  if (db) {
+    await runReviewNewCharactersDbMode(book, issue);
+    process.exit(0);
+  }
 
   const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
   const BUBBLES_PATH = join(ISSUE_DIR, "bubbles.json");
