@@ -443,6 +443,8 @@ export function ReviewLayout({
             redoSet={redoSet}
             selectedId={selectedId}
             speakerRef={speakerInputRef}
+            bookId={bookId}
+            issueId={issueId}
             onSelect={setSelectedId}
             onAdvance={handleAdvance}
             onSetPageOrder={handleSetPageOrder}

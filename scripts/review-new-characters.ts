@@ -6,6 +6,32 @@ import { fileURLToPath } from "url";
 import * as readline from "readline";
 import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
 import type { CharacterVoiceEntry } from "./generate-character-voice-descriptions.js";
+import { supabase } from "./lib/supabase.js";
+
+async function upsertAliasInDb(alias: string, canonical: string) {
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.SUPABASE_SECRET_KEY
+  ) {
+    return;
+  }
+  try {
+    const { error } = await supabase.from("aliases").upsert(
+      {
+        alias: alias.toLowerCase().trim(),
+        canonical,
+        scope: "global",
+        scope_id: null,
+      },
+      { onConflict: "alias,scope,scope_id" },
+    );
+    if (error) {
+      console.warn(`  ⚠ DB alias upsert: ${error.message}`);
+    }
+  } catch (e) {
+    console.warn(`  ⚠ DB alias upsert: ${(e as Error).message}`);
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -246,6 +272,8 @@ async function main() {
           // Write alias immediately so it survives a crash
           aliasMap[currentName.toLowerCase().trim()] = targetName;
           await fs.writeJson(ALIAS_MAP_PATH, aliasMap, { spaces: 2 });
+          // Also push to DB so live app picks it up immediately
+          await upsertAliasInDb(currentName, targetName);
 
           if (knownChars[targetName]) {
             delete newChars[currentName];

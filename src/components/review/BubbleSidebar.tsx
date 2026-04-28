@@ -19,6 +19,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { LocalBubble, EditChanges } from "~/hooks/useReviewEdits";
+import { regenerateCues } from "~/server/actions/review/regenerate-cues";
+import { regenerateAudio } from "~/server/actions/review/regenerate-audio";
 
 interface BubbleSidebarProps {
   bubble: LocalBubble | null;
@@ -27,6 +29,8 @@ interface BubbleSidebarProps {
   redoSet: Set<string>;
   selectedId: string | null;
   speakerRef: React.RefObject<HTMLInputElement | null>;
+  bookId: string;
+  issueId: string;
   onSelect: (id: string) => void;
   onAdvance: () => void;
   onSetPageOrder: (ids: string[]) => void;
@@ -91,6 +95,8 @@ function BubbleDetail({
   characters,
   isRedo,
   speakerRef,
+  bookId,
+  issueId,
   onAdvance,
   onChange,
   onMarkRedo,
@@ -100,12 +106,19 @@ function BubbleDetail({
   characters: string[];
   isRedo: boolean;
   speakerRef: React.RefObject<HTMLInputElement | null>;
+  bookId: string;
+  issueId: string;
   onAdvance: () => void;
   onChange: (changes: EditChanges) => void;
   onMarkRedo: () => void;
   onDelete: () => void;
 }) {
   const [aiExpanded, setAiExpanded] = useState(false);
+  const [regenState, setRegenState] = useState<{
+    cues: "idle" | "running" | "error";
+    audio: "idle" | "running" | "error";
+    msg: string | null;
+  }>({ cues: "idle", audio: "idle", msg: null });
   const pct = styleToPctValues(bubble.style);
   const readingIndex =
     bubble.box_2d.index !== undefined ? bubble.box_2d.index + 1 : "?";
@@ -265,22 +278,88 @@ function BubbleDetail({
         </div>
       </div>
 
-      {/* Phase B buttons — grayed out */}
+      {/* Phase B regeneration */}
       <div className="flex flex-col gap-1 pt-1">
         <button
           disabled
           className="cursor-not-allowed rounded border border-neutral-800 px-2 py-1 text-xs text-neutral-600"
-          title="Available in Phase B"
+          title="Re-run Gemini context — not yet implemented (needs Vision crop pipeline)"
         >
           ↻ Re-run Gemini Context
         </button>
         <button
-          disabled
-          className="cursor-not-allowed rounded border border-neutral-800 px-2 py-1 text-xs text-neutral-600"
-          title="Available in Phase B"
+          disabled={regenState.cues === "running"}
+          onClick={async () => {
+            const text = bubble.textWithCues ?? bubble.ocr_text ?? "";
+            if (!text.trim()) return;
+            setRegenState({ cues: "running", audio: "idle", msg: null });
+            const res = await regenerateCues({
+              bookId,
+              issueId,
+              bubbleId: bubble.id,
+              text,
+            });
+            if (res.ok && res.textWithCues) {
+              onChange({ textWithCues: res.textWithCues });
+              setRegenState({
+                cues: "idle",
+                audio: "idle",
+                msg: "Cues updated.",
+              });
+            } else {
+              setRegenState({
+                cues: "error",
+                audio: "idle",
+                msg: res.error ?? "regen failed",
+              });
+            }
+          }}
+          className="rounded border border-cyan-700 bg-cyan-900/20 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-900/40 disabled:opacity-40"
         >
-          🔊 Re-generate Audio
+          {regenState.cues === "running"
+            ? "Regenerating cues…"
+            : "✎ Re-generate Cues"}
         </button>
+        <button
+          disabled={regenState.audio === "running"}
+          onClick={async () => {
+            setRegenState({ cues: "idle", audio: "running", msg: null });
+            const res = await regenerateAudio({
+              bookId,
+              issueId,
+              bubbleId: bubble.id,
+            });
+            if (res.ok) {
+              setRegenState({
+                cues: "idle",
+                audio: "idle",
+                msg: "Audio regenerated.",
+              });
+            } else {
+              setRegenState({
+                cues: "idle",
+                audio: "error",
+                msg: res.error ?? "regen failed",
+              });
+            }
+          }}
+          className="rounded border border-emerald-700 bg-emerald-900/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/40 disabled:opacity-40"
+        >
+          {regenState.audio === "running"
+            ? "Regenerating audio…"
+            : "🔊 Re-generate Audio"}
+        </button>
+        {regenState.msg && (
+          <p
+            className={`text-[10px] ${
+              regenState.cues === "error" || regenState.audio === "error"
+                ? "text-red-400"
+                : "text-emerald-400"
+            }`}
+          >
+            {regenState.msg}
+          </p>
+        )}
       </div>
 
       {/* Delete */}
@@ -374,6 +453,8 @@ export function BubbleSidebar({
   redoSet,
   selectedId,
   speakerRef,
+  bookId,
+  issueId,
   onSelect,
   onAdvance,
   onSetPageOrder,
@@ -422,6 +503,8 @@ export function BubbleSidebar({
             characters={characters}
             isRedo={redoSet.has(bubble.id)}
             speakerRef={speakerRef}
+            bookId={bookId}
+            issueId={issueId}
             onAdvance={onAdvance}
             onChange={(changes) => onChange(bubble.id, changes)}
             onMarkRedo={() => onMarkRedo(bubble.id)}
