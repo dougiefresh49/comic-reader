@@ -68,3 +68,23 @@ NEXT_PUBLIC_BASE_URL=
 ```
 
 See `.env` for full variable list including optional pipeline flags.
+
+## Text to image models that do not charge credits in the venice.ai ui
+
+| Model         | details       | is private? |
+| ------------- | ------------- | ----------- |
+| Z-Image Turbo | Uncensored    | Yes         |
+| HiDream       | Retiring Soon | Yes         |
+| Venice SD35   | --            | Yes         |
+| Lustify SDXL  | Uncensored    | Yes         |
+| Lustify v8    | Uncensored    | Yes         |
+| Qwen Image    | --            | Yes         |
+| Anime (WAI)   | Uncensored    | Yes         |
+| Chroma        | Uncensored    | Yes         |
+
+## Image editing models that do not charge credits in the venice.ai ui
+
+| Model                  | is private? |
+| ---------------------- | ----------- |
+| Qwen Edit 2511         | Yes         |
+| FireRed Image Edit 1.1 | Yes         |

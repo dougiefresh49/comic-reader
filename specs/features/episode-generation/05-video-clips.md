@@ -1,6 +1,14 @@
 # Phase 4 — Video Clip Generation
 
-## Status: `pending`
+> **⚠ Superseded.** The cinematic-video direction was abandoned for cost
+> reasons (~$95–$380/issue against a $5 API ceiling). The new default
+> render path is **Motion Comic Plus** —
+> see [`../motion-comic-plus/00-overview.md`](../motion-comic-plus/00-overview.md).
+> This spec is retained for the optional **Hero Shot Cinematic** mode,
+> where individual shots can be tagged `--hero` to opt into Venice
+> image+video gen.
+
+## Status: `superseded` (default), `pending` (hero-shot opt-in only)
 ## Prerequisites: Phase 3 complete (all panels approved in review-state.json)
 ## Cost: ~$15–50/issue (~$0.50–2.00 per clip × 20–30 shots)
 

@@ -18,7 +18,25 @@ in `scripts/generate-episode.ts` and `scripts/utils/venice-client.ts`:
 The script is implementation-ready for a full run. Verification still
 needs to happen against a fresh book.
 
-## Phase 2 — Shot Planning — ✅ Done (smoke test pending)
+## ⚠ Direction shift (2026-04-28)
+
+Smoke-test of Phase 2 produced 190 shots / $9.50 image + $95–$380 video
+cost vs a $5 hard API ceiling. The cinematic-video plan is incompatible
+with the budget AND the actual product goal (kid-first reading
+experience that preserves the book medium).
+
+New default direction: **Motion Comic Plus**. See
+[`../motion-comic-plus/00-overview.md`](../motion-comic-plus/00-overview.md).
+The old Phase 3/4 specs are marked superseded but kept for the optional
+"Hero Shot Cinematic" opt-in mode.
+
+`shot-planner.ts` and the `plan-shots` step are kept as the feeder for
+hero-shot cinematics. The new default `direct-panels` step (spec'd in
+motion-comic-plus/01-panel-direction.md) replaces it for everyday use.
+
+---
+
+## Phase 2 — Shot Planning — ✅ Done (now optional path for hero shots only)
 
 Implementation:
 - `scripts/utils/shot-planner.ts` — Gemini Vision per-page panel analysis,
