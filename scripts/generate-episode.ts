@@ -33,6 +33,10 @@ import {
   type DirectedPanel,
   type PanelDirection,
 } from "./utils/panel-director.js";
+import {
+  detectIssuePanels,
+  type DetectedPagePanels,
+} from "./utils/roboflow-panels.js";
 import { supabase as supabaseAdmin } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -44,7 +48,8 @@ const PROJECT_ROOT = join(__dirname, "..");
 const STEPS = [
   "setup-series",
   "lock-characters",
-  "direct-panels",
+  "detect-panels",
+  "describe-panels",
   "plan-shots",
 ] as const;
 type Step = (typeof STEPS)[number];
@@ -561,7 +566,271 @@ async function lockCharacters(
   }
 }
 
-// ─── Step: direct-panels (motion-comic-plus default) ─────────────────────────
+// ─── Step: detect-panels (Roboflow) ──────────────────────────────────────────
+
+async function detectPanels(
+  book: string,
+  issue: string,
+  force: boolean,
+): Promise<void> {
+  // 1. List page numbers we have WebPs for
+  const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+  const PAGES_DIR = join(ISSUE_DIR, "pages-webp");
+  const BUBBLES_PATH = join(ISSUE_DIR, "bubbles.json");
+  if (!(await fs.pathExists(PAGES_DIR))) {
+    console.error(`❌ Missing ${PAGES_DIR}`);
+    process.exit(1);
+  }
+  const pageFiles = (await fs.readdir(PAGES_DIR))
+    .filter((f) => /^page-\d+\.webp$/i.test(f))
+    .sort();
+  const pageNumbers = pageFiles
+    .map((f) => parseInt(/^page-(\d+)\.webp$/i.exec(f)?.[1] ?? "0", 10))
+    .filter((n) => n > 0);
+
+  // 2. Skip if panels already populated for this issue and not forcing
+  if (!force) {
+    const { count } = await supabaseAdmin
+      .from("panels")
+      .select("id", { count: "exact", head: true })
+      .eq("book_id", book)
+      .eq("issue_id", issue);
+    if (count && count > 0) {
+      console.log(
+        `   ⏭  ${count} panel(s) already exist for ${book}/${issue} — re-run with --force to redetect.`,
+      );
+      return;
+    }
+  }
+
+  // 3. Build a public URL resolver (Supabase CDN) so Roboflow can fetch pages
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    console.error("❌ NEXT_PUBLIC_SUPABASE_URL not set");
+    process.exit(1);
+  }
+  const pageUrl = (n: number) => {
+    const padded = String(n).padStart(2, "0");
+    return `${supabaseUrl}/storage/v1/object/public/comic-pages/${book}/${issue}/page-${padded}.webp`;
+  };
+
+  console.log(
+    `\n   🔎 Detecting panels on ${pageNumbers.length} page(s) via Roboflow...\n`,
+  );
+
+  const detected = await detectIssuePanels({
+    bookId: book,
+    issueId: issue,
+    pageNumbers,
+    pageUrl,
+    concurrency: 2,
+    delayMs: 750,
+  });
+
+  let totalPanels = 0;
+  for (const d of detected) {
+    console.log(
+      `   ✓ page-${String(d.pageNumber).padStart(2, "0")} → ${d.panels.length} panel(s)`,
+    );
+    totalPanels += d.panels.length;
+  }
+  console.log(`   ${detected.length} page(s), ${totalPanels} panel(s) total\n`);
+
+  // 4. If forcing, clear existing panels for this issue (cascade nulls bubble FKs).
+  if (force) {
+    const { error: dErr } = await supabaseAdmin
+      .from("panels")
+      .delete()
+      .eq("book_id", book)
+      .eq("issue_id", issue);
+    if (dErr) {
+      console.warn(`   ⚠ delete existing panels: ${dErr.message}`);
+    }
+  }
+
+  // 5. Upsert panels rows. panelId is "p<page>-<NN>" sequential.
+  console.log("   📦 Writing panels to DB and assigning bubbles...");
+  let bubblesAssigned = 0;
+  let bubblesUnassigned = 0;
+
+  // Load bubbles.json once for spatial assignment
+  const bubblesByPage = (await fs.readJson(BUBBLES_PATH)) as Record<
+    string,
+    Array<{
+      id: string;
+      style?: { left: string; top: string; width: string; height: string };
+    }>
+  >;
+
+  for (const page of detected) {
+    const padded = String(page.pageNumber).padStart(2, "0");
+    const pageKey = `page-${padded}.jpg`;
+    const pageBubbles = bubblesByPage[pageKey] ?? [];
+
+    // Insert panels for this page
+    const panelRows = page.panels.map((p, idx) => ({
+      book_id: book,
+      issue_id: issue,
+      page_number: page.pageNumber,
+      panel_id: `p${padded}-${String(idx + 1).padStart(2, "0")}`,
+      sort_order: idx,
+      bounding_box: { x: p.x, y: p.y, w: p.w, h: p.h },
+      effect_tags: [] as string[],
+      audio_tags: { ambience: [], sfx: [], music_mood: "transition_neutral" },
+      source: "roboflow",
+      updated_at: new Date().toISOString(),
+    }));
+    if (panelRows.length === 0) continue;
+
+    const { data: inserted, error: iErr } = await supabaseAdmin
+      .from("panels")
+      .upsert(panelRows, { onConflict: "book_id,issue_id,panel_id" })
+      .select("id, panel_id, bounding_box, sort_order");
+    if (iErr) {
+      console.warn(`   ⚠ panels upsert page-${padded}: ${iErr.message}`);
+      continue;
+    }
+    const insertedRows = (inserted ?? []) as Array<{
+      id: string;
+      panel_id: string;
+      bounding_box: { x: number; y: number; w: number; h: number };
+      sort_order: number;
+    }>;
+
+    // Map bubbles to panels by center-in-rect (smallest matching panel wins)
+    for (const bubble of pageBubbles) {
+      if (!bubble.style) continue;
+      const cx =
+        (parseFloat(bubble.style.left) + parseFloat(bubble.style.width) / 2) /
+        100;
+      const cy =
+        (parseFloat(bubble.style.top) + parseFloat(bubble.style.height) / 2) /
+        100;
+
+      const matches = insertedRows.filter((r) => {
+        const b = r.bounding_box;
+        return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
+      });
+      let chosen = matches.sort(
+        (a, b) =>
+          a.bounding_box.w * a.bounding_box.h -
+          b.bounding_box.w * b.bounding_box.h,
+      )[0];
+
+      // Fallback: if no panel contains the center, pick the closest by center
+      if (!chosen) {
+        let bestDist = Infinity;
+        for (const r of insertedRows) {
+          const px = r.bounding_box.x + r.bounding_box.w / 2;
+          const py = r.bounding_box.y + r.bounding_box.h / 2;
+          const d = Math.hypot(px - cx, py - cy);
+          if (d < bestDist) {
+            bestDist = d;
+            chosen = r;
+          }
+        }
+      }
+      if (!chosen) {
+        bubblesUnassigned++;
+        continue;
+      }
+      const { error: uErr } = await supabaseAdmin
+        .from("bubbles")
+        .update({ panel_id: chosen.id })
+        .eq("book_id", book)
+        .eq("issue_id", issue)
+        .eq("legacy_id", bubble.id);
+      if (uErr) {
+        bubblesUnassigned++;
+      } else {
+        bubblesAssigned++;
+      }
+    }
+  }
+
+  console.log(
+    `   ✓ ${bubblesAssigned} bubble(s) assigned${bubblesUnassigned > 0 ? `, ${bubblesUnassigned} unassigned` : ""}\n`,
+  );
+}
+
+// ─── Step: describe-panels (Gemini, populates descriptions + tags) ───────────
+
+async function describePanels(
+  book: string,
+  issue: string,
+  force: boolean,
+): Promise<void> {
+  // Read panels for this issue from DB, then call Gemini per-panel for
+  // cinematicDescription + effect/audio tags.
+  const { data: panelRows, error: pErr } = await supabaseAdmin
+    .from("panels")
+    .select(
+      "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene",
+    )
+    .eq("book_id", book)
+    .eq("issue_id", issue)
+    .order("page_number")
+    .order("sort_order");
+  if (pErr) {
+    console.error(`❌ panels read: ${pErr.message}`);
+    process.exit(1);
+  }
+  const panels = (panelRows ?? []) as Array<{
+    id: string;
+    panel_id: string;
+    page_number: number;
+    sort_order: number;
+    bounding_box: { x: number; y: number; w: number; h: number };
+    cinematic_description: string | null;
+    effect_tags: string[];
+  }>;
+
+  if (panels.length === 0) {
+    console.error(
+      "❌ No panels in DB for this issue. Run --only-step detect-panels first.",
+    );
+    process.exit(1);
+  }
+
+  const todo = force
+    ? panels
+    : panels.filter(
+        (p) =>
+          !p.cinematic_description ||
+          !p.effect_tags ||
+          p.effect_tags.length === 0,
+      );
+
+  if (todo.length === 0) {
+    console.log(
+      `   ⏭  All ${panels.length} panel(s) already described. --force to redo.`,
+    );
+    return;
+  }
+
+  console.log(
+    `\n   🎬 Describing ${todo.length} panel(s) of ${panels.length} via ${GEMINI_MEDIUM}...`,
+  );
+  console.log(
+    "   (per-panel Gemini calls; tags clamped to enum; soft-fail per panel)\n",
+  );
+
+  // For now: use the existing directPagePanels module per page. We treat the
+  // already-detected Roboflow rects as the source of truth and overlay
+  // Gemini's tags + descriptions onto them. A cleaner per-panel Gemini call
+  // (one per detected rect, sending only the cropped panel) is the next
+  // optimization — it would let us drop the per-page overhead entirely.
+  //
+  // TODO: scripts/utils/panel-describer.ts — accepts a single panel + crop
+  // image, returns cinematicDescription + effectTags + audioTags. Call N
+  // times per page in parallel within a concurrency limit.
+
+  console.log(
+    "   ⚠ describe-panels currently a TODO — Roboflow rects are in DB; tags will populate manually until the per-panel Gemini call is built.",
+  );
+}
+
+// ─── Step: direct-panels (motion-comic-plus, legacy single-pass) ─────────────
 
 async function directPanels(
   book: string,
@@ -932,7 +1201,8 @@ async function main(): Promise<void> {
   const stepHandlers: Record<Step, () => Promise<void>> = {
     "setup-series": () => setupSeries(book, issue, force),
     "lock-characters": () => lockCharacters(book, issue, force),
-    "direct-panels": () => directPanels(book, issue, force),
+    "detect-panels": () => detectPanels(book, issue, force),
+    "describe-panels": () => describePanels(book, issue, force),
     "plan-shots": () => planShots(book, issue, force),
   };
 
