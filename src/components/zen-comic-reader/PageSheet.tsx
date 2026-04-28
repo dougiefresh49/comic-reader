@@ -62,7 +62,6 @@ export function PageSheet({
 
         <div className="flex gap-3 overflow-x-auto pt-1 pb-2">
           {pages.map((page) => {
-            const padded = String(page).padStart(2, "0");
             const href = `/book/${bookId}/${issueId}/${page}`;
             const isActive = page === currentPage;
 

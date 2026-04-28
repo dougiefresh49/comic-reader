@@ -157,7 +157,7 @@ export async function getIssueData(
   const allBubbles: Record<string, Bubble[]> = {};
   for (const row of (bubbleRows ?? []) as BubbleRow[]) {
     const key = `page-${String(row.page_number).padStart(2, "0")}.jpg`;
-    if (!allBubbles[key]) allBubbles[key] = [];
+    allBubbles[key] ??= [];
     allBubbles[key].push(rowToBubble(row));
   }
 
@@ -169,7 +169,9 @@ export async function getIssueData(
 
   let characters: string[] = [];
   if (!castError && castRows?.length) {
-    characters = castRows.map((r) => r.character).sort();
+    characters = (castRows as { character: string }[])
+      .map((r) => r.character)
+      .sort();
   } else {
     if (castError) console.error("getIssueData castlist:", castError);
     const seen = new Set<string>();
