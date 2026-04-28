@@ -18,6 +18,7 @@ import {
   loadCastSelections,
 } from "./utils/registry.js";
 import type { AppearanceEntry, MediaType } from "./types/registry.js";
+import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -38,6 +39,7 @@ function parseArgs(): {
   franchise?: string;
   book?: string;
   issue?: string;
+  db: boolean;
 } {
   const args = process.argv.slice(2);
 
@@ -46,6 +48,11 @@ function parseArgs(): {
 Usage:
   pnpm find-voice-sources -- --character "Raphael" --franchise "TMNT"
   pnpm find-voice-sources -- --book <name> --issue <n>
+  pnpm find-voice-sources -- --book <name> --issue <n> --db   # populate
+                                                                # casting_tasks
+                                                                # for the
+                                                                # browser UI
+                                                                # and pause
 `);
     process.exit(0);
   }
@@ -54,6 +61,7 @@ Usage:
   let franchise: string | undefined;
   let book: string | undefined;
   let issue: string | undefined;
+  let db = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -73,10 +81,11 @@ Usage:
       const v = args[i + 1]?.trim();
       if (v) issue = v.startsWith("issue-") ? v : `issue-${v}`;
     }
+    if (arg === "--db") db = true;
   }
 
   if (character) {
-    return { mode: "character", character, franchise };
+    return { mode: "character", character, franchise, db };
   }
 
   book = book ?? process.env.COMIC_BOOK;
@@ -86,7 +95,7 @@ Usage:
     const normalizedIssue = issue.startsWith("issue-")
       ? issue
       : `issue-${issue}`;
-    return { mode: "book", book, issue: normalizedIssue };
+    return { mode: "book", book, issue: normalizedIssue, db };
   }
 
   console.error(
@@ -252,7 +261,11 @@ function isNamed(entry: NewCharEntry): boolean {
   return entry.named !== false;
 }
 
-async function runBookMode(book: string, issue: string): Promise<void> {
+async function runBookMode(
+  book: string,
+  issue: string,
+  db = false,
+): Promise<void> {
   const issueDir = join(PROJECT_ROOT, "assets", "comics", book, issue);
   const newCharsPath = join(issueDir, "new-characters.json");
   const knownCharsPath = join(issueDir, "known-characters.json");
@@ -388,6 +401,161 @@ async function runBookMode(book: string, issue: string): Promise<void> {
     }
 
     await saveRegistry(registry);
+  }
+
+  // ── DB mode: write character_appearances + casting_tasks for the browser ──
+  if (db) {
+    console.log(
+      "\n─────────────────────────────────────────────────────────────",
+    );
+    console.log("Writing to DB for casting browser UI...\n");
+
+    // Pause issue first so the dashboard reflects state immediately
+    await supabase
+      .from("issues")
+      .update({
+        pipeline_step: "find-voice-sources",
+        pipeline_paused: true,
+        pipeline_paused_at: "find-voice-sources",
+        pipeline_paused_url: `/admin/characters/casting?book=${book}&issue=${issue}`,
+      })
+      .eq("book_id", book)
+      .eq("id", issue);
+
+    let charsUpserted = 0;
+    let appsUpserted = 0;
+    let tasksUpserted = 0;
+
+    for (const character of allNewCharNames) {
+      const entry = registry[character];
+      if (!entry) continue;
+
+      // 1. characters table — id is the canonical character name
+      const { error: cErr } = await supabase.from("characters").upsert(
+        {
+          id: character,
+          franchise: entry.franchise,
+          aliases: entry.aliases ?? [],
+        },
+        { onConflict: "id" },
+      );
+      if (cErr) {
+        console.warn(`   ⚠ characters upsert ${character}: ${cErr.message}`);
+        continue;
+      }
+      charsUpserted++;
+
+      // 2. character_appearances — one row per Gemini-suggested appearance
+      for (const app of entry.appearances) {
+        const { error: aErr } = await supabase
+          .from("character_appearances")
+          .upsert(
+            {
+              id: app.id,
+              character_id: character,
+              media_title: app.mediaTitle,
+              year: app.year,
+              voice_actor: app.voiceActor,
+              media_type: app.mediaType,
+              youtube_search_terms: app.youtubeSearchTerms,
+              notes: app.notes,
+              voice_id: app.voice?.voiceId ?? null,
+              voice_type: app.voice?.voiceType ?? null,
+              voice_status: app.voice?.status ?? null,
+              voice_description: app.voice?.voiceDescription ?? null,
+              voice_created_at: app.voice?.createdAt ?? null,
+              voice_model_status:
+                app.voice?.status === "ready" ? "ready" : "pending",
+            },
+            { onConflict: "id" },
+          );
+        if (aErr) {
+          console.warn(`   ⚠ appearance ${app.id}: ${aErr.message}`);
+        } else {
+          appsUpserted++;
+        }
+      }
+
+      // 3. casting_tasks — one row per character that doesn't already have a
+      //    voice in castlist for this issue. Idempotent: if the row exists
+      //    and is already complete/skipped, leave it alone.
+      const { data: existingCast } = await supabase
+        .from("castlist")
+        .select("voice_id")
+        .eq("book_id", book)
+        .eq("issue_id", issue)
+        .eq("character", character)
+        .maybeSingle();
+      const existingCastVoice = (existingCast as { voice_id?: string } | null)
+        ?.voice_id;
+      if (existingCastVoice && existingCastVoice !== "__SKIPPED__") {
+        // Already cast for this issue — no task needed
+        continue;
+      }
+      const { data: existingTask } = await supabase
+        .from("casting_tasks")
+        .select("id, status")
+        .eq("book_id", book)
+        .eq("issue_id", issue)
+        .eq("character_id", character)
+        .maybeSingle();
+      const existing = existingTask as { id: string; status: string } | null;
+      if (existing && existing.status !== "pending") {
+        // already complete/in_progress/skipped — leave alone
+        continue;
+      }
+      if (!existing) {
+        const { error: tErr } = await supabase.from("casting_tasks").insert({
+          book_id: book,
+          issue_id: issue,
+          character_id: character,
+          status: "pending",
+        });
+        if (tErr) {
+          console.warn(`   ⚠ casting_task ${character}: ${tErr.message}`);
+        } else {
+          tasksUpserted++;
+        }
+      }
+    }
+
+    console.log(
+      `   ✓ ${charsUpserted} character(s), ${appsUpserted} appearance(s), ${tasksUpserted} casting task(s)\n`,
+    );
+
+    // Check whether anything is actually pending — if everything's already
+    // cast (e.g. re-running the script after browser completion) advance.
+    const { count: pendingCount } = await supabase
+      .from("casting_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("book_id", book)
+      .eq("issue_id", issue)
+      .eq("status", "pending");
+
+    if (pendingCount && pendingCount > 0) {
+      console.log(`── Casting paused ─────────────────────────────────────`);
+      console.log(`  ${pendingCount} character(s) awaiting casting.`);
+      console.log(
+        `  Open: /admin/characters/casting?book=${book}&issue=${issue}`,
+      );
+      console.log(`  Run again after completing casting to continue.`);
+      console.log(`──────────────────────────────────────────────────────`);
+      // Exit 2 = clean pause signal for ingest.ts
+      process.exit(2);
+    }
+
+    // No pending tasks → clear pause flag and let pipeline continue
+    await supabase
+      .from("issues")
+      .update({
+        pipeline_paused: false,
+        pipeline_paused_at: null,
+        pipeline_paused_url: null,
+      })
+      .eq("book_id", book)
+      .eq("id", issue);
+    console.log("✓ All characters already cast — continuing pipeline\n");
+    return;
   }
 
   // Save voice-sourcing-suggestions.json for reference (all new chars)
@@ -606,7 +774,7 @@ async function main() {
   if (args.mode === "character") {
     await runCharacterMode(args.character!, args.franchise ?? args.character!);
   } else {
-    await runBookMode(args.book!, args.issue!);
+    await runBookMode(args.book!, args.issue!, args.db);
   }
 }
 

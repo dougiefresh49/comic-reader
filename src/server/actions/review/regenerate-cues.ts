@@ -5,24 +5,36 @@ import { revalidatePath } from "next/cache";
 import { GEMINI_FAST } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
-const PROMPT = `You format dialogue text for ElevenLabs v3 TTS. Add ElevenLabs audio cues using the following rules:
+function buildPrompt(text: string, userFeedback?: string): string {
+  const feedbackBlock = userFeedback?.trim()
+    ? `\n\nReviewer feedback (apply this to the cue choices):\n"${userFeedback.trim()}"\n`
+    : "";
+
+  return `You format dialogue text for ElevenLabs v3 TTS. Add ElevenLabs audio cues using the following rules:
 
 1. Wrap onomatopoeia and shouts with capitalization for emphasis: "BOOM!", "AAAARGH!"
-2. Use [whisper], [shouting], [emphasis], [laughs], [sigh] inline tags ONLY if the emotion is clearly stated (e.g. screaming, whispering)
+2. Use [whisper], [shouting], [emphasis], [laughs], [sigh], [urgent], [determined] inline tags when warranted by the emotion
 3. Convert "..." to " — " for natural pauses
 4. Preserve the original meaning EXACTLY — do not add new words or change the meaning
-5. Output ONLY the formatted text, no explanation, no quotes, no surrounding markdown
+5. Output ONLY the formatted text, no explanation, no quotes, no surrounding markdown${feedbackBlock}
 
 Input:
-{TEXT}
+${text}
 
 Formatted text:`;
+}
 
 interface Args {
   bookId: string;
   issueId: string;
   bubbleId: string;
   text: string;
+  /**
+   * Optional free-form guidance from the human reviewer about *why* the
+   * previous cues didn't work. e.g. "voice should sound urgent, not mellow"
+   * — Gemini uses this to drive the new formatting choice.
+   */
+  userFeedback?: string;
 }
 
 export async function regenerateCues(args: Args) {
@@ -37,8 +49,11 @@ export async function regenerateCues(args: Args) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const result = await ai.models.generateContent({
       model: GEMINI_FAST,
-      contents: PROMPT.replace("{TEXT}", args.text),
-      config: { temperature: 0 },
+      contents: buildPrompt(args.text, args.userFeedback),
+      // When the user supplies feedback, allow a touch of variability so we
+      // don't return the same output verbatim. Without feedback, stay
+      // deterministic.
+      config: { temperature: args.userFeedback?.trim() ? 0.3 : 0 },
     });
     const formatted = result.text?.trim() ?? "";
     if (!formatted) return { ok: false, error: "Empty Gemini response" };

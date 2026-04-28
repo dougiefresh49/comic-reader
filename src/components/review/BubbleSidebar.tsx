@@ -163,6 +163,19 @@ function BubbleDetail({
     context: "idle" | "running" | "error";
     msg: string | null;
   }>({ cues: "idle", audio: "idle", context: "idle", msg: null });
+  const [userFeedback, setUserFeedback] = useState("");
+
+  // Reset feedback whenever a different bubble is selected so notes from
+  // bubble A don't leak into bubble B's regen.
+  useEffect(() => {
+    setUserFeedback("");
+    setRegenState({
+      cues: "idle",
+      audio: "idle",
+      context: "idle",
+      msg: null,
+    });
+  }, [bubble.id]);
   const pct = styleToPctValues(bubble.style);
   const readingIndex =
     bubble.box_2d.index !== undefined ? bubble.box_2d.index + 1 : "?";
@@ -323,7 +336,19 @@ function BubbleDetail({
       </div>
 
       {/* Phase B regeneration */}
-      <div className="flex flex-col gap-1 pt-1">
+      <div className="flex flex-col gap-2 pt-1">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-neutral-400">
+            Feedback for Gemini (optional)
+          </span>
+          <textarea
+            value={userFeedback}
+            onChange={(e) => setUserFeedback(e.target.value)}
+            placeholder='e.g. "should sound urgent, not mellow" or "this is Master Splinter, not the narrator"'
+            rows={2}
+            className="w-full resize-y rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-xs text-neutral-200 placeholder:text-neutral-600 focus:border-purple-500 focus:outline-none"
+          />
+        </label>
         <button
           disabled={regenState.context === "running" || !bubble.style}
           onClick={async () => {
@@ -339,6 +364,7 @@ function BubbleDetail({
                 issueId,
                 bubbleId: bubble.id,
                 cropBase64,
+                userFeedback: userFeedback.trim() || undefined,
               });
               if (res.ok) {
                 onChange({
@@ -387,11 +413,13 @@ function BubbleDetail({
             const text = bubble.textWithCues ?? bubble.ocr_text ?? "";
             if (!text.trim()) return;
             setRegenState((s) => ({ ...s, cues: "running", msg: null }));
+            const feedback = userFeedback.trim() || undefined;
             const res = await regenerateCues({
               bookId,
               issueId,
               bubbleId: bubble.id,
               text,
+              userFeedback: feedback,
             });
             if (res.ok && res.textWithCues) {
               onChange({ textWithCues: res.textWithCues });

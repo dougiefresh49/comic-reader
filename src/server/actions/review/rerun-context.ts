@@ -20,6 +20,12 @@ interface Args {
    * already-loaded page image via canvas. Includes data: prefix or not.
    */
   cropBase64: string;
+  /**
+   * Optional free-form guidance from the human reviewer about what was
+   * wrong with the previous output. e.g. "this is Master Splinter, not
+   * the narrator". Helps Gemini avoid repeating the same mistake.
+   */
+  userFeedback?: string;
 }
 
 interface Result {
@@ -62,6 +68,7 @@ function buildPrompt(args: {
   pageNumber: number;
   uniqueCharacters: string[];
   pageBubbles: BubbleRow[];
+  userFeedback?: string;
 }): string {
   const known =
     args.uniqueCharacters.length > 0
@@ -73,6 +80,9 @@ function buildPrompt(args: {
         `  #${b.sort_order + 1} [${b.type}] ${b.speaker ?? "?"}: ${b.ocr_text?.slice(0, 80) ?? "(no text)"}`,
     )
     .join("\n");
+  const feedbackBlock = args.userFeedback?.trim()
+    ? `\n\nReviewer feedback (the previous attempt was wrong; correct it accordingly):\n"${args.userFeedback.trim()}"\n`
+    : "";
 
   return `You are analyzing a single speech bubble inside a comic page. Two images are provided:
 1. The full page (for layout / who else is in the panel)
@@ -86,7 +96,7 @@ ${pageContext}
 The bubble in question:
 - Page: ${args.pageNumber}
 - Current speaker: ${args.targetSpeaker ?? "(unknown)"}
-- Current text: ${args.targetText || "(no OCR yet)"}
+- Current text: ${args.targetText || "(no OCR yet)"}${feedbackBlock}
 
 Re-analyze who is speaking and what emotion they're conveying. Use scratchpad reasoning, then output strict JSON.
 
@@ -179,6 +189,7 @@ export async function rerunContext(args: Args): Promise<Result> {
         pageNumber: t.page_number,
         uniqueCharacters,
         pageBubbles: neighbors,
+        userFeedback: args.userFeedback,
       }),
     );
 
