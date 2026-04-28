@@ -13,7 +13,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { env } from "~/env.mjs";
-import { getCanonicalName } from "./alias-map.js";
+import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -206,6 +206,7 @@ async function main() {
 
     // Parse arguments
     const { issue, page } = parseArgs();
+    await initAliasMap();
 
     // Set up paths
     const COMIC_DIR = join(PROJECT_ROOT, "assets", "comics", "tmnt-mmpr-iii");

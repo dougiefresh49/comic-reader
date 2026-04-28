@@ -1,29 +1,70 @@
-# Create T3 App
+# Comic Reader
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Personal "Audible + Kindle for comics" app. Kids learning to read get an interactive comic viewer where tapping a speech bubble plays the character's voice and highlights words in sync (karaoke-style). Family use only — not for sale.
 
-## What's next? How do I make an app with this?
+Currently live with TMNT × MMPR issues. Powered by a pipeline that goes from raw comic scans to a fully voiced, interactive reading experience.
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+## Tech Stack
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+- **Frontend**: Next.js 15 App Router, React 19, Tailwind CSS
+- **Database**: Supabase (PostgreSQL + Storage)
+- **Bubble detection**: Roboflow
+- **OCR + Context**: Google Gemini
+- **Voice**: ElevenLabs (PVC for main characters, Voice Design for minor)
+- **Image processing**: sharp (JPEG → WebP)
+- **Deployed**: Vercel
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Drizzle](https://orm.drizzle.team)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+## Pipeline
 
-## Learn More
+Each book+issue is processed by `pnpm ingest -- --book <name> --issue <n>`:
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+| Step | What it does |
+|------|-------------|
+| 1 | validate-inputs — check assets dir + pages exist |
+| 2 | generate-pages-metadata — extract page dimensions |
+| 3 | convert-pages-to-webp — JPEG → WebP |
+| 4 | get-context — Roboflow detection + Gemini OCR + speaker/emotion |
+| 5 | sort-bubbles-gemini — AI reading order sort |
+| 6 | add-bubble-styles — % coordinates for responsive overlay |
+| 7 | generate-character-voice-descriptions — Gemini voice descriptions |
+| 8 | clean-voice-descriptions — normalize names via alias map |
+| 9 | find-voice-sources — Gemini researches voice media appearances |
+| 10 | generate-voice-models — ElevenLabs creates voice models |
+| 11 | generate-audio — ElevenLabs TTS for every bubble |
+| 12 | copy-to-public — upload WebP + audio to Supabase Storage; upsert data to DB |
+| 13 | generate-manifest — update issues table counts + flags |
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+## Key Commands
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+```bash
+# Add a new comic
+pnpm scrape-pages -- --url <url> --book <name> --issue <n>
+pnpm ingest -- --book <name> --issue <n>
 
-## How do I deploy this?
+# Apply review corrections and sync to DB
+pnpm apply-fixes
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+# Migrate existing local data to Supabase
+pnpm migrate-to-db -- --book <name> --issue <n>
+
+# Dev server
+pnpm dev
+
+# Type check
+pnpm typecheck
+```
+
+## Environment Variables
+
+```
+GEMINI_API_KEY=
+ELEVENLABS_API_KEY=
+ROBOFLOW_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
+REVALIDATE_SECRET=
+NEXT_PUBLIC_BASE_URL=
+```
+
+See `.env` for full variable list including optional pipeline flags.

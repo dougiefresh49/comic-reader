@@ -43,7 +43,7 @@ Backlog and status tracker for planned features. Update status here when work st
 
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
-| Data hosting migration (Supabase DB + Storage) | `pending` | [data-hosting/README.md](data-hosting/README.md) | 5-phase plan: Storage (WebP/MP3), DB schema, frontend refactor, pipeline upload, browser apply-fixes. Prerequisite for Review UI Phase B. |
+| Data hosting migration (Supabase DB + Storage) | `done` | [data-hosting/README.md](data-hosting/README.md) | Phases A–D complete: 5 Storage buckets, DB schema (14 tables), frontend reads from Supabase CDN, pipeline writes to Supabase. Unblocks Review UI Phase B. |
 | Auth (Clerk or Supabase) | `pending` | — | Noted as known need, not yet specced |
 
 ## Episode Generation

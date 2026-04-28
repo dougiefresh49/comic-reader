@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Bubble, AudioTimestamps } from "~/types";
+import { audioUrl } from "~/lib/storage";
 import { buildWordTimings } from "~/components/zen-comic-reader/text-utils";
 import { useWordHighlight } from "./useWordHighlight";
 
@@ -42,7 +43,11 @@ export function useAudioPlayback({
       stopAll();
 
       const audio = new Audio(
-        `/comics/${bookId}/${issueId}/audio/${bubble.id}.mp3`,
+        audioUrl(
+          bookId,
+          issueId,
+          bubble.audioStoragePath ?? `${bubble.id}.mp3`,
+        ),
       );
       audioRef.current = audio;
       setIsPlaying(true);

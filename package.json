@@ -43,7 +43,9 @@
     "ocr-flagged-bubbles": "tsx --env-file=.env scripts/ocr-flagged-bubbles.ts",
     "orch-fixes": "tsx --env-file=.env scripts/orch-fixes.ts",
     "motion-comic": "tsx --env-file=.env scripts/motion-comic.ts",
-    "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts"
+    "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts",
+    "migrate-to-db": "tsx --env-file=.env scripts/migrate-to-db.ts",
+    "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",
@@ -52,6 +54,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@elevenlabs/elevenlabs-js": "^2.25.1",
     "@google/genai": "^1.30.0",
+    "@supabase/supabase-js": "^2.105.0",
     "@t3-oss/env-nextjs": "^0.12.0",
     "fs-extra": "^11.3.2",
     "glob": "^13.0.0",
@@ -79,6 +82,7 @@
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
+    "supabase": "^2.95.5",
     "tailwindcss": "^4.0.15",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
@@ -88,5 +92,5 @@
   "ct3aMetadata": {
     "initVersion": "7.40.0"
   },
-  "packageManager": "pnpm@10.7.1"
+  "packageManager": "pnpm@10.33.2"
 }

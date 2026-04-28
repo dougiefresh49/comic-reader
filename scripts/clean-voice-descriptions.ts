@@ -1,5 +1,5 @@
 import fs from "fs-extra";
-import { getCanonicalName } from "./alias-map.js";
+import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -50,6 +50,7 @@ function normalizeEntry(value: LegacyOrNewEntry): CharacterVoiceEntry {
 
 async function main() {
   const { book, issue } = parseArgs();
+  await initAliasMap();
   const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
   const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
   const INPUT_PATH = join(ISSUE_DIR, "character-voice-descriptions.json");

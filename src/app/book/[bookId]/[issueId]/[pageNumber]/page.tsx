@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
-import manifest from "~/data/manifest";
+import { getManifest, getPageData } from "~/server";
 import ZenComicReader from "~/components/ZenComicReader";
-import { getPageData } from "~/server";
+import { pageImageUrl } from "~/lib/storage";
+
+export const revalidate = 86400;
 
 interface BookPageProps {
   params: Promise<{
@@ -13,6 +15,8 @@ interface BookPageProps {
 
 export default async function BookPage({ params }: BookPageProps) {
   const { bookId, issueId, pageNumber } = await params;
+
+  const manifest = await getManifest();
 
   // Find the book
   const book = manifest.books.find((b) => b.id === bookId);
@@ -31,9 +35,7 @@ export default async function BookPage({ params }: BookPageProps) {
     notFound();
   }
 
-  // Format page number with leading zero (e.g., "01", "02")
-  const formattedPageNum = String(pageNum).padStart(2, "0");
-  const pageImage = `/comics/${bookId}/${issueId}/pages/page-${formattedPageNum}.webp`;
+  const pageImage = pageImageUrl(bookId, issueId, pageNum);
 
   // Fetch bubble data and timestamps
   const { bubbles, timestamps } = await getPageData(

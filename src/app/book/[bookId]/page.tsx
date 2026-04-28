@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import manifest from "~/data/manifest";
+import { getManifest } from "~/server";
+import { pageImageUrl } from "~/lib/storage";
+
+export const revalidate = 3600;
 
 interface BookDetailProps {
   params: Promise<{
@@ -12,6 +15,8 @@ interface BookDetailProps {
 export default async function BookDetailPage({ params }: BookDetailProps) {
   const { bookId } = await params;
 
+  const manifest = await getManifest();
+
   // Find the book
   const book = manifest.books.find((b) => b.id === bookId);
   if (!book) {
@@ -20,9 +25,7 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
 
   // Get cover image (first page of first issue)
   const firstIssue = book.issues[0];
-  const coverImage = firstIssue
-    ? `/comics/${bookId}/${firstIssue.id}/pages/page-01.webp`
-    : null;
+  const coverImage = firstIssue ? pageImageUrl(bookId, firstIssue.id, 1) : null;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
@@ -71,21 +74,17 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {book.issues.map((issue) => {
-                const issueCoverImage = `/comics/${bookId}/${issue.id}/pages/page-01.webp`;
+                const issueCoverImage = pageImageUrl(bookId, issue.id, 1);
                 const isAvailable = issue.hasWebP;
 
                 return (
                   <Link
                     key={issue.id}
-                    href={
-                      isAvailable
-                        ? `/book/${bookId}/${issue.id}/1`
-                        : "#"
-                    }
+                    href={isAvailable ? `/book/${bookId}/${issue.id}/1` : "#"}
                     className={`group flex flex-col transition-transform ${
                       isAvailable
-                        ? "hover:scale-105 cursor-pointer"
-                        : "opacity-50 cursor-not-allowed"
+                        ? "cursor-pointer hover:scale-105"
+                        : "cursor-not-allowed opacity-50"
                     }`}
                   >
                     <div className="relative mb-2 aspect-[2/3] w-full overflow-hidden rounded-lg bg-gray-800 shadow-lg">
@@ -122,4 +121,3 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
     </main>
   );
 }
-

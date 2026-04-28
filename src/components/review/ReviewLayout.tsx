@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import type { Bubble } from "~/types";
-import type { IssueManifest } from "~/data/manifest";
+import type { IssueManifest } from "~/types/manifest";
+import { pageImageUrl } from "~/lib/storage";
 import {
   useReviewEdits,
   mergeEdits,
@@ -34,10 +35,6 @@ function nextTempId() {
 
 function pageKey(pageNum: number) {
   return `page-${String(pageNum).padStart(2, "0")}.jpg`;
-}
-
-function pageImageUrl(bookId: string, issueId: string, pageNum: number) {
-  return `/comics/${bookId}/${issueId}/pages/page-${String(pageNum).padStart(2, "0")}.webp`;
 }
 
 export function ReviewLayout({

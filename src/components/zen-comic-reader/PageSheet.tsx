@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { pageImageUrl } from "~/lib/storage";
 
 interface PageSheetProps {
   bookId: string;
@@ -77,7 +78,7 @@ export function PageSheet({
                 onClick={onClose}
               >
                 <Image
-                  src={`/comics/${bookId}/${issueId}/pages/page-${padded}.webp`}
+                  src={pageImageUrl(bookId, issueId, page)}
                   alt={`Page ${page}`}
                   fill
                   sizes="128px"

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { pageImageUrl } from "~/lib/storage";
 import BottomSheet from "./BottomSheet";
 
 interface PageSelectorSheetProps {
@@ -26,7 +27,6 @@ export function PageSelectorSheet({
       <div className="h-full overflow-x-auto">
         <div className="flex items-start gap-3 px-4 py-3">
           {Array.from({ length: pageCount }, (_, i) => i + 1).map((page) => {
-            const formatted = String(page).padStart(2, "0");
             const isActive = page === currentPage;
             return (
               <div
@@ -43,7 +43,7 @@ export function PageSelectorSheet({
                   onClick={onClose}
                 >
                   <Image
-                    src={`/comics/${bookId}/${issueId}/pages/page-${formatted}.webp`}
+                    src={pageImageUrl(bookId, issueId, page)}
                     alt={`Page ${page}`}
                     fill
                     sizes="80px"

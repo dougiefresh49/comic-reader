@@ -2,3 +2,6 @@ onlyBuiltDependencies:
   - sharp
   - unrs-resolver
   - youtube-dl-exec
+  - fluent-ffmpeg
+  - ffmpeg-static
+  - supabase

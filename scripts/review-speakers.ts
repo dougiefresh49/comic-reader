@@ -6,7 +6,7 @@ import { fileURLToPath } from "url";
 import * as readline from "readline";
 import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
 import { loadRoster, getRosterAliasMap } from "./utils/roster.js";
-import { getCanonicalName } from "./alias-map.js";
+import { getCanonicalName, initAliasMap } from "./alias-map.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -161,6 +161,7 @@ async function pickFromList(
 
 async function main() {
   const { book, issue, auto } = parseArgs();
+  await initAliasMap();
 
   const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
   const ISSUE_DIR = join(BOOK_DIR, issue);

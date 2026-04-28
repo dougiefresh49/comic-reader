@@ -18,6 +18,7 @@ import pLimit from "p-limit";
 import { env } from "~/env.mjs";
 import { runOCR } from "./utils/ocr.js";
 import { detectTextRegions } from "./utils/roboflow.js";
+import { GEMINI_HIGH } from "./utils/models.js";
 import { analyzeContext, type Bubble } from "./utils/gemini-context.js";
 import {
   loadBookConfig,
@@ -238,6 +239,47 @@ async function main() {
     // Save cache
     await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
     console.log(`\n✓ Saved cache to ${CACHE_FILE}`);
+
+    // Upsert per-page Gemini context to page_context table (best-effort, non-blocking)
+    if (
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SECRET_KEY
+    ) {
+      try {
+        const { supabase } = await import("./lib/supabase.js");
+        const contextFiles = await fs
+          .readdir(GEMINI_CONTEXT_DIR)
+          .catch(() => [] as string[]);
+        const jsonFiles = contextFiles.filter((f) => f.endsWith(".json"));
+        for (const file of jsonFiles) {
+          const pageNumMatch = file.match(/page-?0*(\d+)/i);
+          if (!pageNumMatch) continue;
+          const pageNumber = parseInt(pageNumMatch[1]!, 10);
+          const rawResponse = await fs
+            .readJson(join(GEMINI_CONTEXT_DIR, file))
+            .catch(() => null);
+          if (!rawResponse) continue;
+          await supabase
+            .from("page_context")
+            .upsert(
+              {
+                book_id: book,
+                issue_id: issue,
+                page_number: pageNumber,
+                gemini_model: GEMINI_HIGH,
+                raw_response: rawResponse,
+                updated_at: new Date(),
+              },
+              { onConflict: "book_id,issue_id,page_number" },
+            );
+        }
+        console.log(`✓ Upserted ${jsonFiles.length} page_context rows`);
+      } catch (err) {
+        console.warn(
+          `⚠️  page_context upsert failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
 
     console.log(`\n📊 Summary:`);
     if (pageNum !== null) {
