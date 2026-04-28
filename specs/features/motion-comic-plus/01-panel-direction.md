@@ -1,8 +1,25 @@
 # Panel Direction
 
-## Status: `pending`
-## Goal: One Gemini Vision call per page returns everything the renderer needs to build a motion comic
-## Cost: ~$0.10 per issue (24 GEMINI_MEDIUM calls)
+## Status: `partial` — `detect-panels` shipped (Roboflow); `describe-panels` is a stub
+## Goal: Two-step pipeline — Roboflow detects panel rects, Gemini describes each panel + tags effects/audio
+## Cost: ~$0.10 per issue (Gemini MEDIUM only; Roboflow on a flat-rate plan)
+
+> ## ⚠ Direction shift 2026-04-29
+>
+> Original design used Gemini Vision to BOTH detect panel rectangles
+> AND describe them. Smoke-test on TMNT × MMPR III page 3: Gemini found
+> 1 panel; Roboflow found 6 (the actual count).
+>
+> Pipeline split:
+>
+> | Step | Tool | What it writes |
+> |---|---|---|
+> | `detect-panels` | Roboflow `find-comic-panel-v1` | `panels.bounding_box` + `bubbles.panel_id` (spatial overlap assignment) |
+> | `describe-panels` | Gemini per-panel | `panels.cinematic_description` + `effect_tags` + `audio_tags` |
+>
+> Issue 1 results: 26 pages, 97 panels, 216/222 (97.3%) bubbles
+> auto-assigned. 6 unassigned bubbles on page 4 (Roboflow training gap
+> — fixable by feeding more training data).
 
 ---
 
