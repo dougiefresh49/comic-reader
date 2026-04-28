@@ -3,10 +3,39 @@
 Started: 2026-04-28 (late night)
 Branch: `feat/data-migration-2`
 
-## Status: complete (all 9 tasks)
+## Status: complete (all tasks + follow-ups from your morning notes)
 
-All 9 tasks from the overnight plan finished. Six commits on this
-branch. Ready for review + merge.
+All 9 original tasks plus 3 follow-ups (hybrid re-run, speakers
+auto-populate, casting simplification) are done. Branch ready for
+review + merge.
+
+### Follow-ups from your morning feedback
+
+**Hybrid Re-run Gemini Context** — done
+- Browser canvas-extracts the bubble crop (~10–30 KB JPEG, 4% margin)
+  from the already-loaded `<img>` via `crossOrigin="anonymous"`
+- Server fetches the full page WebP from `comic-pages` bucket
+  server-side (no Vercel body-size concern)
+- Both go to GEMINI_HIGH inline along with neighbor-bubble OCR / castlist
+- Public bucket already returns `Access-Control-Allow-Origin: *`,
+  no Supabase config required
+
+**Speakers UI auto-populate** — done
+- `getSpeakerReviews` now derives the queue live from `bubbles`,
+  joins persisted `speaker_reviews` rows, auto-marks names matched
+  by alias-map / characters / castlist
+- Actions take `(bookId, issueId, originalName)` and upsert on demand —
+  the table is no longer required to be pre-populated by a script
+- Browser is fully self-sufficient
+
+**Casting UI simplified** — done
+- Each card lists Gemini suggestions with YouTube search-term chips
+  that open the live `youtube.com/results?search_query=...` in a new tab
+- Single voice-ID paste input + "Save voice ID" button per card
+- "Skip and add later" button writes `castlist.voice_id = '__SKIPPED__'`
+- `scripts/generate-audio.ts` now skips bubbles whose speaker has the
+  skip sentinel in castlist (instead of falling back to Narrator)
+- ElevenLabs Voice Library link for quick access from the page
 
 ---
 

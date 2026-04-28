@@ -52,7 +52,7 @@ function isUuid(id: string) {
 
 function stripDataPrefix(s: string): { mime: string; data: string } {
   const m = /^data:([^;]+);base64,(.+)$/.exec(s);
-  if (m && m[1] && m[2]) return { mime: m[1], data: m[2] };
+  if (m?.[1] && m?.[2]) return { mime: m[1], data: m[2] };
   return { mime: "image/jpeg", data: s };
 }
 
@@ -190,11 +190,11 @@ export async function rerunContext(args: Args): Promise<Result> {
     if (!text) return { ok: false, error: "Empty Gemini response" };
 
     let aiReasoning: string | null = null;
-    const scratch = text.match(/<scratchpad>([\s\S]*?)<\/scratchpad>/i);
+    const scratch = /<scratchpad>([\s\S]*?)<\/scratchpad>/i.exec(text);
     if (scratch) aiReasoning = scratch[1]?.trim() ?? null;
 
     let jsonText = text;
-    const fence = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
+    const fence = /```json\s*([\s\S]*?)\s*```/.exec(jsonText);
     if (fence) jsonText = fence[1] ?? jsonText;
     const braceStart = jsonText.indexOf("{");
     const braceEnd = jsonText.lastIndexOf("}");
@@ -214,7 +214,7 @@ export async function rerunContext(args: Args): Promise<Result> {
 
     // 6. Persist to DB (also marks needs_audio if speaker / type changed)
     const patch: Record<string, unknown> = {};
-    if (parsed.speaker !== undefined) patch.speaker = parsed.speaker || null;
+    if (parsed.speaker !== undefined) patch.speaker = parsed.speaker ?? null;
     if (parsed.emotion !== undefined) patch.emotion = parsed.emotion;
     if (parsed.type !== undefined) patch.type = parsed.type;
     if (aiReasoning !== null) patch.ai_reasoning = aiReasoning;

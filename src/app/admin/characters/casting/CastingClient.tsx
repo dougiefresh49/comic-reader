@@ -2,11 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { CastingAppearance, CastingTask } from "~/server/admin/casting";
-import {
-  markCastingComplete,
-  selectAppearance,
-  skipCastingTask,
-} from "./actions";
+import { markChosenSource, saveVoiceId, skipAndAddLater } from "./actions";
 
 interface Props {
   initialTasks: CastingTask[];
@@ -17,21 +13,62 @@ export function CastingClient({ initialTasks }: Props) {
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
-  const handleSelect = (task: CastingTask, appearance: CastingAppearance) => {
+  const handleSaveVoiceId = (
+    task: CastingTask,
+    voiceId: string,
+    chosenAppearanceId: string | null,
+  ) => {
     startTransition(async () => {
-      const res = await selectAppearance(appearance.id, task.characterId);
+      const res = await saveVoiceId({
+        taskId: task.id,
+        characterId: task.characterId,
+        bookId: task.bookId,
+        issueId: task.issueId,
+        voiceId,
+        appearanceId: chosenAppearanceId ?? undefined,
+      });
       if (!res.ok) {
         setMsg(`Error: ${res.error}`);
         return;
       }
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setMsg(`✓ ${task.characterName} voice saved.`);
+    });
+  };
+
+  const handleSkip = (task: CastingTask) => {
+    if (
+      !window.confirm(
+        `Skip casting for ${task.characterName}? Their bubbles will not have audio generated until you come back and add a voice ID.`,
+      )
+    )
+      return;
+    startTransition(async () => {
+      const res = await skipAndAddLater({
+        taskId: task.id,
+        characterId: task.characterId,
+        bookId: task.bookId,
+        issueId: task.issueId,
+      });
+      if (!res.ok) {
+        setMsg(`Error: ${res.error}`);
+        return;
+      }
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setMsg(`${task.characterName} skipped — bubbles will be silent.`);
+    });
+  };
+
+  const handleMarkSource = (task: CastingTask, appearanceId: string) => {
+    startTransition(async () => {
+      await markChosenSource({ appearanceId });
       setTasks((prev) =>
         prev.map((t) =>
           t.id === task.id
             ? {
                 ...t,
-                status: "in_progress",
                 appearances: t.appearances.map((a) =>
-                  a.id === appearance.id
+                  a.id === appearanceId
                     ? { ...a, voiceModelStatus: "processing" }
                     : a,
                 ),
@@ -39,48 +76,6 @@ export function CastingClient({ initialTasks }: Props) {
             : t,
         ),
       );
-      setMsg(
-        `Selected source for ${task.characterName}. Clip download + voice model creation will run in the next pipeline run (or via worker).`,
-      );
-    });
-  };
-
-  const handleManualComplete = (
-    task: CastingTask,
-    appearance: CastingAppearance,
-  ) => {
-    const voiceId = window.prompt(
-      `Voice model already created for ${task.characterName}? Enter the ElevenLabs voice ID:`,
-      appearance.voiceId ?? "",
-    );
-    if (!voiceId) return;
-    startTransition(async () => {
-      const res = await markCastingComplete(
-        task.id,
-        task.characterId,
-        voiceId.trim(),
-        appearance.id,
-        task.bookId,
-        task.issueId,
-      );
-      if (!res.ok) {
-        setMsg(`Error: ${res.error}`);
-        return;
-      }
-      setTasks((prev) => prev.filter((t) => t.id !== task.id));
-      setMsg(`✓ ${task.characterName} marked complete.`);
-    });
-  };
-
-  const handleSkip = (task: CastingTask) => {
-    if (!window.confirm(`Skip casting for ${task.characterName}?`)) return;
-    startTransition(async () => {
-      const res = await skipCastingTask(task.id);
-      if (!res.ok) {
-        setMsg(`Error: ${res.error}`);
-        return;
-      }
-      setTasks((prev) => prev.filter((t) => t.id !== task.id));
     });
   };
 
@@ -92,6 +87,22 @@ export function CastingClient({ initialTasks }: Props) {
         </div>
       )}
 
+      <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
+        <strong className="text-neutral-300">How this works:</strong> Click a
+        suggestion&apos;s search links to find clips on YouTube. Download and
+        splice them locally, then create an{" "}
+        <a
+          href="https://elevenlabs.io/app/voice-library"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-cyan-300"
+        >
+          ElevenLabs IVC voice
+        </a>{" "}
+        and paste the voice ID below. Or hit &ldquo;Skip and add later&rdquo; to
+        leave this character&apos;s bubbles silent for now.
+      </div>
+
       <div className="text-sm text-neutral-400">
         {tasks.length} character{tasks.length === 1 ? "" : "s"} need
         {tasks.length === 1 ? "s" : ""} casting
@@ -101,32 +112,47 @@ export function CastingClient({ initialTasks }: Props) {
         <CharacterCard
           key={task.id}
           task={task}
-          onSelect={handleSelect}
-          onComplete={handleManualComplete}
-          onSkip={handleSkip}
           disabled={pending}
+          onSaveVoiceId={handleSaveVoiceId}
+          onSkip={handleSkip}
+          onMarkSource={handleMarkSource}
         />
       ))}
     </div>
   );
 }
 
+function youtubeSearchUrl(query: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+}
+
 function CharacterCard({
   task,
-  onSelect,
-  onComplete,
-  onSkip,
   disabled,
+  onSaveVoiceId,
+  onSkip,
+  onMarkSource,
 }: {
   task: CastingTask;
-  onSelect: (t: CastingTask, a: CastingAppearance) => void;
-  onComplete: (t: CastingTask, a: CastingAppearance) => void;
-  onSkip: (t: CastingTask) => void;
   disabled: boolean;
+  onSaveVoiceId: (
+    task: CastingTask,
+    voiceId: string,
+    chosenAppearanceId: string | null,
+  ) => void;
+  onSkip: (task: CastingTask) => void;
+  onMarkSource: (task: CastingTask, appearanceId: string) => void;
 }) {
-  const inProgress = task.appearances.find(
-    (a) => a.voiceModelStatus === "processing",
+  const [voiceIdInput, setVoiceIdInput] = useState("");
+  const [chosenAppearanceId, setChosenAppearanceId] = useState<string | null>(
+    task.appearances.find((a) => a.voiceModelStatus === "processing")?.id ??
+      null,
   );
+
+  const submit = () => {
+    if (!voiceIdInput.trim()) return;
+    onSaveVoiceId(task, voiceIdInput.trim(), chosenAppearanceId);
+  };
 
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
@@ -142,65 +168,90 @@ function CharacterCard({
         <button
           onClick={() => onSkip(task)}
           disabled={disabled}
-          className="text-xs text-neutral-500 hover:text-neutral-300"
+          className="rounded border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 hover:border-yellow-600 hover:text-yellow-400 disabled:opacity-40"
         >
-          Skip
+          Skip and add later
         </button>
       </div>
-
-      {inProgress && (
-        <div className="mb-3 rounded bg-yellow-900/30 px-3 py-2 text-xs text-yellow-200">
-          Selected: {inProgress.mediaTitle ?? "—"} · status:{" "}
-          {inProgress.voiceModelStatus}
-          {inProgress.voiceId ? ` · voice_id: ${inProgress.voiceId}` : ""}
-        </div>
-      )}
 
       {task.appearances.length === 0 ? (
         <p className="text-sm text-neutral-500">
           No Gemini suggestions yet — run{" "}
           <code className="rounded bg-neutral-800 px-1 text-xs">
             find-voice-sources --db
-          </code>
-          .
+          </code>{" "}
+          locally.
         </p>
       ) : (
         <div className="space-y-2">
           {task.appearances.map((app, i) => (
-            <AppearanceRow
+            <SuggestionRow
               key={app.id}
               appearance={app}
               isFirst={i === 0}
-              onSelect={() => onSelect(task, app)}
-              onComplete={() => onComplete(task, app)}
+              isChosen={chosenAppearanceId === app.id}
               disabled={disabled}
+              onChoose={() => {
+                setChosenAppearanceId(app.id);
+                onMarkSource(task, app.id);
+              }}
             />
           ))}
         </div>
       )}
+
+      {/* Voice ID paste */}
+      <div className="mt-4 flex flex-col gap-2 border-t border-neutral-800 pt-4">
+        <label className="text-xs text-neutral-400">
+          ElevenLabs voice ID (paste once you&apos;ve created the IVC)
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={voiceIdInput}
+            onChange={(e) => setVoiceIdInput(e.target.value)}
+            placeholder="abc123def456…"
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            className="flex-1 rounded border border-neutral-700 bg-neutral-950 px-3 py-2 font-mono text-sm text-neutral-200"
+          />
+          <button
+            onClick={submit}
+            disabled={disabled || !voiceIdInput.trim()}
+            className="rounded bg-emerald-700 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
+          >
+            Save voice ID
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function AppearanceRow({
+function SuggestionRow({
   appearance,
   isFirst,
-  onSelect,
-  onComplete,
+  isChosen,
   disabled,
+  onChoose,
 }: {
   appearance: CastingAppearance;
   isFirst: boolean;
-  onSelect: () => void;
-  onComplete: () => void;
+  isChosen: boolean;
   disabled: boolean;
+  onChoose: () => void;
 }) {
-  const isReady = appearance.voiceModelStatus === "ready";
-  const isProcessing = appearance.voiceModelStatus === "processing";
+  const searchTerms = appearance.youtubeSearchTerms ?? [];
+
   return (
-    <div className="rounded border border-neutral-700 bg-neutral-950 p-3">
+    <div
+      className={`rounded border p-3 transition-colors ${
+        isChosen
+          ? "border-cyan-600 bg-cyan-900/10"
+          : "border-neutral-700 bg-neutral-950"
+      }`}
+    >
       <div className="mb-2 flex items-start justify-between">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2 text-sm font-medium text-neutral-100">
             {isFirst && <span className="text-yellow-400">★</span>}
             {appearance.mediaTitle ?? "—"}
@@ -214,48 +265,39 @@ function AppearanceRow({
             {appearance.voiceActor && `Voice: ${appearance.voiceActor}`}
             {appearance.mediaType && ` · ${appearance.mediaType}`}
           </div>
-          {appearance.youtubeSearchTerms?.length ? (
-            <div className="mt-1 text-xs text-neutral-500">
-              Search: {appearance.youtubeSearchTerms.join(", ")}
-            </div>
-          ) : null}
           {appearance.notes && (
-            <div className="mt-1 text-xs text-neutral-500 italic">
+            <p className="mt-1 text-xs text-neutral-500 italic">
               {appearance.notes}
+            </p>
+          )}
+          {searchTerms.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {searchTerms.map((term) => (
+                <a
+                  key={term}
+                  href={youtubeSearchUrl(term)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded bg-red-900/30 px-2 py-0.5 text-[11px] text-red-200 hover:bg-red-900/50"
+                  title={`Search YouTube for "${term}"`}
+                >
+                  ▶ {term}
+                </a>
+              ))}
             </div>
           )}
         </div>
-        <span
-          className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${
-            isReady
-              ? "bg-emerald-700/40 text-emerald-200"
-              : isProcessing
-                ? "bg-yellow-700/40 text-yellow-200"
-                : "bg-neutral-800 text-neutral-400"
-          }`}
-        >
-          {appearance.voiceModelStatus}
-        </span>
       </div>
 
-      <div className="flex gap-2">
-        {!isReady && !isProcessing && (
-          <button
-            onClick={onSelect}
-            disabled={disabled}
-            className="rounded bg-cyan-700 px-3 py-1 text-xs font-medium text-white hover:bg-cyan-600 disabled:opacity-40"
-          >
-            Use this source
-          </button>
-        )}
-        <button
-          onClick={onComplete}
-          disabled={disabled}
-          className="rounded bg-neutral-700 px-3 py-1 text-xs font-medium text-white hover:bg-neutral-600 disabled:opacity-40"
-        >
-          Mark complete (manual voice ID)
-        </button>
-      </div>
+      <button
+        onClick={onChoose}
+        disabled={disabled || isChosen}
+        className={`text-xs ${
+          isChosen ? "text-cyan-400" : "text-neutral-500 hover:text-neutral-200"
+        }`}
+      >
+        {isChosen ? "✓ Selected" : "Mark as my source"}
+      </button>
     </div>
   );
 }
