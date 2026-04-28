@@ -19,8 +19,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { LocalBubble, EditChanges } from "~/hooks/useReviewEdits";
+import { pageImageUrl } from "~/lib/storage";
 import { regenerateCues } from "~/server/actions/review/regenerate-cues";
 import { regenerateAudio } from "~/server/actions/review/regenerate-audio";
+import { rerunContext } from "~/server/actions/review/rerun-context";
 
 interface BubbleSidebarProps {
   bubble: LocalBubble | null;
@@ -31,12 +33,51 @@ interface BubbleSidebarProps {
   speakerRef: React.RefObject<HTMLInputElement | null>;
   bookId: string;
   issueId: string;
+  pageNumber: number;
   onSelect: (id: string) => void;
   onAdvance: () => void;
   onSetPageOrder: (ids: string[]) => void;
   onChange: (id: string, changes: EditChanges) => void;
   onMarkRedo: (id: string) => void;
   onDelete: (id: string) => void;
+}
+
+// Loads the page image with crossOrigin=anonymous and crops the bubble's
+// bounding box (with a small margin) to a base64 JPEG. Used to feed Gemini
+// the bubble close-up alongside the page-level context fetched server-side.
+async function extractBubbleCrop(
+  pageUrl: string,
+  bubbleStyle: { left: string; top: string; width: string; height: string },
+): Promise<string> {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("Failed to load page image"));
+    img.src = pageUrl;
+  });
+  const x = parseFloat(bubbleStyle.left) / 100;
+  const y = parseFloat(bubbleStyle.top) / 100;
+  const w = parseFloat(bubbleStyle.width) / 100;
+  const h = parseFloat(bubbleStyle.height) / 100;
+  const px = x * img.naturalWidth;
+  const py = y * img.naturalHeight;
+  const pw = w * img.naturalWidth;
+  const ph = h * img.naturalHeight;
+  // 4% margin so the tail/surrounding panel art is included
+  const mx = pw * 0.04;
+  const my = ph * 0.04;
+  const cx = Math.max(0, Math.floor(px - mx));
+  const cy = Math.max(0, Math.floor(py - my));
+  const cw = Math.min(img.naturalWidth - cx, Math.ceil(pw + mx * 2));
+  const ch = Math.min(img.naturalHeight - cy, Math.ceil(ph + my * 2));
+  const canvas = document.createElement("canvas");
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2d context unavailable");
+  ctx.drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+  return canvas.toDataURL("image/jpeg", 0.85);
 }
 
 const COMMON_EMOTIONS = [
@@ -97,6 +138,7 @@ function BubbleDetail({
   speakerRef,
   bookId,
   issueId,
+  pageNumber,
   onAdvance,
   onChange,
   onMarkRedo,
@@ -108,6 +150,7 @@ function BubbleDetail({
   speakerRef: React.RefObject<HTMLInputElement | null>;
   bookId: string;
   issueId: string;
+  pageNumber: number;
   onAdvance: () => void;
   onChange: (changes: EditChanges) => void;
   onMarkRedo: () => void;
@@ -117,8 +160,9 @@ function BubbleDetail({
   const [regenState, setRegenState] = useState<{
     cues: "idle" | "running" | "error";
     audio: "idle" | "running" | "error";
+    context: "idle" | "running" | "error";
     msg: string | null;
-  }>({ cues: "idle", audio: "idle", msg: null });
+  }>({ cues: "idle", audio: "idle", context: "idle", msg: null });
   const pct = styleToPctValues(bubble.style);
   const readingIndex =
     bubble.box_2d.index !== undefined ? bubble.box_2d.index + 1 : "?";
@@ -281,18 +325,68 @@ function BubbleDetail({
       {/* Phase B regeneration */}
       <div className="flex flex-col gap-1 pt-1">
         <button
-          disabled
-          className="cursor-not-allowed rounded border border-neutral-800 px-2 py-1 text-xs text-neutral-600"
-          title="Re-run Gemini context — not yet implemented (needs Vision crop pipeline)"
+          disabled={regenState.context === "running" || !bubble.style}
+          onClick={async () => {
+            if (!bubble.style) return;
+            setRegenState((s) => ({ ...s, context: "running", msg: null }));
+            try {
+              const cropBase64 = await extractBubbleCrop(
+                pageImageUrl(bookId, issueId, pageNumber),
+                bubble.style,
+              );
+              const res = await rerunContext({
+                bookId,
+                issueId,
+                bubbleId: bubble.id,
+                cropBase64,
+              });
+              if (res.ok) {
+                onChange({
+                  speaker: res.speaker ?? null,
+                  emotion: res.emotion ?? "",
+                  type:
+                    (res.type as
+                      | "SPEECH"
+                      | "NARRATION"
+                      | "CAPTION"
+                      | "SFX"
+                      | "BACKGROUND"
+                      | undefined) ?? bubble.type,
+                });
+                setRegenState({
+                  cues: "idle",
+                  audio: "idle",
+                  context: "idle",
+                  msg: "Context refreshed.",
+                });
+              } else {
+                setRegenState((s) => ({
+                  ...s,
+                  context: "error",
+                  msg: res.error ?? "rerun failed",
+                }));
+              }
+            } catch (e) {
+              setRegenState((s) => ({
+                ...s,
+                context: "error",
+                msg: (e as Error).message,
+              }));
+            }
+          }}
+          className="rounded border border-purple-700 bg-purple-900/20 px-2 py-1 text-xs text-purple-300 hover:bg-purple-900/40 disabled:opacity-40"
+          title="Send the bubble crop + page to Gemini for a fresh speaker / emotion / type read"
         >
-          ↻ Re-run Gemini Context
+          {regenState.context === "running"
+            ? "Re-running…"
+            : "↻ Re-run Gemini Context"}
         </button>
         <button
           disabled={regenState.cues === "running"}
           onClick={async () => {
             const text = bubble.textWithCues ?? bubble.ocr_text ?? "";
             if (!text.trim()) return;
-            setRegenState({ cues: "running", audio: "idle", msg: null });
+            setRegenState((s) => ({ ...s, cues: "running", msg: null }));
             const res = await regenerateCues({
               bookId,
               issueId,
@@ -301,17 +395,17 @@ function BubbleDetail({
             });
             if (res.ok && res.textWithCues) {
               onChange({ textWithCues: res.textWithCues });
-              setRegenState({
+              setRegenState((s) => ({
+                ...s,
                 cues: "idle",
-                audio: "idle",
                 msg: "Cues updated.",
-              });
+              }));
             } else {
-              setRegenState({
+              setRegenState((s) => ({
+                ...s,
                 cues: "error",
-                audio: "idle",
                 msg: res.error ?? "regen failed",
-              });
+              }));
             }
           }}
           className="rounded border border-cyan-700 bg-cyan-900/20 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-900/40 disabled:opacity-40"
@@ -323,24 +417,24 @@ function BubbleDetail({
         <button
           disabled={regenState.audio === "running"}
           onClick={async () => {
-            setRegenState({ cues: "idle", audio: "running", msg: null });
+            setRegenState((s) => ({ ...s, audio: "running", msg: null }));
             const res = await regenerateAudio({
               bookId,
               issueId,
               bubbleId: bubble.id,
             });
             if (res.ok) {
-              setRegenState({
-                cues: "idle",
+              setRegenState((s) => ({
+                ...s,
                 audio: "idle",
                 msg: "Audio regenerated.",
-              });
+              }));
             } else {
-              setRegenState({
-                cues: "idle",
+              setRegenState((s) => ({
+                ...s,
                 audio: "error",
                 msg: res.error ?? "regen failed",
-              });
+              }));
             }
           }}
           className="rounded border border-emerald-700 bg-emerald-900/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/40 disabled:opacity-40"
@@ -352,7 +446,9 @@ function BubbleDetail({
         {regenState.msg && (
           <p
             className={`text-[10px] ${
-              regenState.cues === "error" || regenState.audio === "error"
+              regenState.cues === "error" ||
+              regenState.audio === "error" ||
+              regenState.context === "error"
                 ? "text-red-400"
                 : "text-emerald-400"
             }`}
@@ -455,6 +551,7 @@ export function BubbleSidebar({
   speakerRef,
   bookId,
   issueId,
+  pageNumber,
   onSelect,
   onAdvance,
   onSetPageOrder,
@@ -505,6 +602,7 @@ export function BubbleSidebar({
             speakerRef={speakerRef}
             bookId={bookId}
             issueId={issueId}
+            pageNumber={pageNumber}
             onAdvance={onAdvance}
             onChange={(changes) => onChange(bubble.id, changes)}
             onMarkRedo={() => onMarkRedo(bubble.id)}

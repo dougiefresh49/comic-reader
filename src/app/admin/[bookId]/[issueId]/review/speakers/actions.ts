@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 interface ResolveArgs {
-  reviewId: string;
+  bookId: string;
+  issueId: string;
+  originalName: string;
   resolvedName: string;
   status: "accepted" | "renamed" | "skipped";
   saveAsAlias?: boolean;
@@ -12,41 +14,42 @@ interface ResolveArgs {
 }
 
 export async function resolveSpeakerReview(args: ResolveArgs) {
-  const { error } = await supabaseAdmin
-    .from("speaker_reviews")
-    .update({
+  const { error } = await supabaseAdmin.from("speaker_reviews").upsert(
+    {
+      book_id: args.bookId,
+      issue_id: args.issueId,
+      original_name: args.originalName,
       resolved_name: args.resolvedName,
       status: args.status,
       save_as_alias: args.saveAsAlias ?? false,
       alias_scope: args.aliasScope ?? null,
       reviewed_at: new Date().toISOString(),
-    })
-    .eq("id", args.reviewId);
+    },
+    { onConflict: "book_id,issue_id,original_name" },
+  );
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 
 interface UnresolveArgs {
-  reviewId: string;
+  bookId: string;
+  issueId: string;
+  originalName: string;
 }
 
 export async function unresolveSpeakerReview(args: UnresolveArgs) {
   const { error } = await supabaseAdmin
     .from("speaker_reviews")
-    .update({
-      resolved_name: null,
-      status: "pending",
-      save_as_alias: false,
-      alias_scope: null,
-      reviewed_at: null,
-    })
-    .eq("id", args.reviewId);
+    .delete()
+    .eq("book_id", args.bookId)
+    .eq("issue_id", args.issueId)
+    .eq("original_name", args.originalName);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
 
 export async function completeSpeakerReview(bookId: string, issueId: string) {
-  // 1. Pull all reviewed rows for this issue
+  // 1. Pull all reviewed rows for this issue (excluding pending)
   const { data: reviews, error: rErr } = await supabaseAdmin
     .from("speaker_reviews")
     .select(
@@ -67,7 +70,6 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
   };
   const reviewRows = (reviews ?? []) as Review[];
 
-  // 2. For each rename, update bubbles where speaker = original_name → resolved_name
   let bubblesUpdated = 0;
   let aliasesAdded = 0;
   for (const r of reviewRows) {
@@ -101,7 +103,7 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
     }
   }
 
-  // 3. Clear the issue's pause flag if it was paused on review-speakers
+  // Clear the issue's pause flag if it was paused on review-speakers
   await supabaseAdmin
     .from("issues")
     .update({
@@ -113,7 +115,6 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
     .eq("id", issueId)
     .eq("pipeline_paused_at", "review-speakers");
 
-  // 4. Invalidate caches
   revalidatePath(`/book/${bookId}/${issueId}`, "page");
   revalidatePath(`/book/${bookId}/${issueId}/review`, "page");
   revalidatePath(`/admin/${bookId}/${issueId}/review/speakers`, "page");

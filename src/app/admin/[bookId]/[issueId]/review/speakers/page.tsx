@@ -38,11 +38,9 @@ export default async function ReviewSpeakersPage({ params }: Params) {
         </p>
         {reviews.length === 0 ? (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">
-            No speaker reviews queued for this issue. Run{" "}
-            <code className="rounded bg-neutral-800 px-1.5 py-0.5">
-              pnpm review-speakers -- --book {bookId} --issue {issueId} --db
-            </code>{" "}
-            to populate the review queue.
+            No speakers found in this issue&apos;s bubbles yet. Once the
+            pipeline finishes step 4 (<code>get-context</code>), speakers will
+            appear here for review.
           </div>
         ) : (
           <SpeakersReviewClient

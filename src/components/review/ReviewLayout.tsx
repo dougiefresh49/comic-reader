@@ -445,6 +445,7 @@ export function ReviewLayout({
             speakerRef={speakerInputRef}
             bookId={bookId}
             issueId={issueId}
+            pageNumber={currentPage}
             onSelect={setSelectedId}
             onAdvance={handleAdvance}
             onSetPageOrder={handleSetPageOrder}

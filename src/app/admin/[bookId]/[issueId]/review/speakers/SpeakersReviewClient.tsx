@@ -45,9 +45,11 @@ export function SpeakersReviewClient({
   const reviewedCount = totalNonAuto - queue.length;
   const allResolved = queue.length === 0;
 
-  const updateLocal = (id: string, patch: Partial<SpeakerReview>) => {
+  const updateLocal = (originalName: string, patch: Partial<SpeakerReview>) => {
     setReviews((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+      prev.map((r) =>
+        r.originalName === originalName ? { ...r, ...patch } : r,
+      ),
     );
   };
 
@@ -57,7 +59,7 @@ export function SpeakersReviewClient({
     status: "accepted" | "renamed" | "skipped",
     opts: { saveAsAlias?: boolean; aliasScope?: "global" | "book" } = {},
   ) => {
-    updateLocal(review.id, {
+    updateLocal(review.originalName, {
       resolvedName,
       status,
       saveAsAlias: opts.saveAsAlias ?? false,
@@ -65,15 +67,16 @@ export function SpeakersReviewClient({
     });
     startTransition(async () => {
       const res = await resolveSpeakerReview({
-        reviewId: review.id,
+        bookId,
+        issueId,
+        originalName: review.originalName,
         resolvedName,
         status,
         saveAsAlias: opts.saveAsAlias,
         aliasScope: opts.aliasScope,
       });
       if (!res.ok) {
-        // revert on error
-        updateLocal(review.id, {
+        updateLocal(review.originalName, {
           resolvedName: null,
           status: "pending",
           saveAsAlias: false,
@@ -85,14 +88,18 @@ export function SpeakersReviewClient({
   };
 
   const handleUndo = (review: SpeakerReview) => {
-    updateLocal(review.id, {
+    updateLocal(review.originalName, {
       resolvedName: null,
       status: "pending",
       saveAsAlias: false,
       aliasScope: null,
     });
     startTransition(async () => {
-      await unresolveSpeakerReview({ reviewId: review.id });
+      await unresolveSpeakerReview({
+        bookId,
+        issueId,
+        originalName: review.originalName,
+      });
     });
   };
 
@@ -149,7 +156,7 @@ export function SpeakersReviewClient({
           <div className="mt-3 flex flex-wrap gap-2">
             {autoAccepted.map((r) => (
               <span
-                key={r.id}
+                key={r.originalName}
                 className="rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300"
               >
                 {r.resolvedName ?? r.originalName}
@@ -167,7 +174,7 @@ export function SpeakersReviewClient({
           </h2>
           {queue.map((r) => (
             <ReviewCard
-              key={r.id}
+              key={r.originalName}
               review={r}
               knownCharacters={knownCharacters}
               onResolve={handleResolve}
@@ -185,7 +192,7 @@ export function SpeakersReviewClient({
           <div className="mt-3 space-y-2">
             {resolved.map((r) => (
               <div
-                key={r.id}
+                key={r.originalName}
                 className="flex items-center justify-between rounded bg-neutral-800/50 px-3 py-2 text-sm"
               >
                 <div>
