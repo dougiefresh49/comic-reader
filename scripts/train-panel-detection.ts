@@ -6,7 +6,8 @@
  * persist results — Roboflow captures the inference internally for you
  * to label/correct in their dashboard.
  *
- * Workflow: https://detect.roboflow.com/infer/workflows/fresh-space/find-comic-panel-v1
+ * Workflow URL: ROBOFLOW_PANEL_WORKFLOW_URL in .env (see src/env.mjs), defaulting to
+ *   https://serverless.roboflow.com/fresh-space/workflows/find-comic-panel-v1
  *
  * Usage:
  *   pnpm train-panel-detection -- --book tmnt-mmpr-iii --issue 1
@@ -14,22 +15,41 @@
  *   pnpm train-panel-detection -- --all                            # every book
  *   pnpm train-panel-detection -- --concurrency 3 --delay-ms 1500  # throttle
  *
- * Pages are read from the public Supabase comic-pages bucket so we don't
- * have to ship local files; Roboflow fetches the URL.
+ * Pages are read from assets/comics/<book>/issue-<n>/pages-webp when present
+ * (preferred), otherwise from pages/ (JPEG/WebP/PNG). Images are resized and
+ * sent as WebP base64 to Roboflow.
  */
 
+import { env } from "~/env.mjs";
 import fs from "fs-extra";
 import path from "path";
 import pLimit from "p-limit";
+import sharp from "sharp";
 import { fileURLToPath } from "url";
-import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.join(__dirname, "..");
+const ASSETS_COMICS = path.join(PROJECT_ROOT, "assets", "comics");
 
-const ROBOFLOW_WORKFLOW_URL =
-  "https://detect.roboflow.com/infer/workflows/fresh-space/find-comic-panel-v1";
+/** Matches Roboflow workflow snippet `inputs.confidence` (tunable via env if we add it later). */
+const PANEL_WORKFLOW_CONFIDENCE = 0.4;
+
+/** Downscale huge comic scans so the hosted workflow stays under payload/runtime limits. */
+const MAX_IMAGE_EDGE_PX = 2048;
+
+async function bufferForRoboflowWorkflow(imageBuffer: Buffer): Promise<Buffer> {
+  return sharp(imageBuffer)
+    .rotate()
+    .resize({
+      width: MAX_IMAGE_EDGE_PX,
+      height: MAX_IMAGE_EDGE_PX,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 90 })
+    .toBuffer();
+}
 
 interface Args {
   book?: string;
@@ -87,51 +107,110 @@ function parseArgs(): Args {
   return { book, issue, all, concurrency, delayMs, dryRun };
 }
 
+interface LocalIssue {
+  bookId: string;
+  issueId: string;
+  pagePaths: string[];
+}
+
+function pageAssetFolderLabel(pagePaths: string[]): string {
+  const first = pagePaths[0];
+  if (!first) return "pages";
+  return path.basename(path.dirname(first));
+}
+
+function pageNumberFromFilename(filename: string): number {
+  const m = filename.match(/^page-(\d+)\./i);
+  return m?.[1] ? parseInt(m[1], 10) : 0;
+}
+
+const PAGE_IMAGE_RE = /^page-\d+\.(jpe?g|webp|png)$/i;
+const PAGE_WEBP_RE = /^page-\d+\.webp$/i;
+
+async function listSortedPagePaths(pagesDir: string): Promise<string[]> {
+  if (!(await fs.pathExists(pagesDir))) return [];
+  const names = await fs.readdir(pagesDir);
+  const files = names
+    .filter((n) => PAGE_IMAGE_RE.test(n))
+    .sort((a, b) => pageNumberFromFilename(a) - pageNumberFromFilename(b));
+  return files.map((n) => path.join(pagesDir, n));
+}
+
+async function listSortedWebpPagePaths(
+  pagesWebpDir: string,
+): Promise<string[]> {
+  if (!(await fs.pathExists(pagesWebpDir))) return [];
+  const names = await fs.readdir(pagesWebpDir);
+  const files = names
+    .filter((n) => PAGE_WEBP_RE.test(n))
+    .sort((a, b) => pageNumberFromFilename(a) - pageNumberFromFilename(b));
+  return files.map((n) => path.join(pagesWebpDir, n));
+}
+
+/** Prefer pipeline WebPs in pages-webp/; fall back to raw pages/ when missing. */
+async function resolveIssuePagePaths(
+  bookDir: string,
+  issueId: string,
+): Promise<string[]> {
+  const webpPaths = await listSortedWebpPagePaths(
+    path.join(bookDir, issueId, "pages-webp"),
+  );
+  if (webpPaths.length > 0) return webpPaths;
+  return listSortedPagePaths(path.join(bookDir, issueId, "pages"));
+}
+
 async function listIssuesForBook(
   bookId: string,
-  filterIssueId?: string,
-): Promise<Array<{ bookId: string; issueId: string; pageCount: number }>> {
-  let query = supabase
-    .from("issues")
-    .select("id, book_id, page_count")
-    .eq("book_id", bookId);
-  if (filterIssueId) query = query.eq("id", filterIssueId);
-  const { data, error } = await query;
-  if (error) {
-    console.error("Failed to list issues:", error.message);
+  filterIssueFolder?: string,
+): Promise<LocalIssue[]> {
+  const bookDir = path.join(ASSETS_COMICS, bookId);
+  if (!(await fs.pathExists(bookDir))) {
+    console.error(`Book directory not found: ${bookDir}`);
     return [];
   }
-  return (
-    (data ?? []) as Array<{ id: string; book_id: string; page_count: number }>
-  ).map((r) => ({ bookId: r.book_id, issueId: r.id, pageCount: r.page_count }));
+  const entries = await fs.readdir(bookDir);
+  const issueDirs: string[] = [];
+  for (const name of entries) {
+    if (!name.startsWith("issue-")) continue;
+    if (filterIssueFolder && name !== filterIssueFolder) continue;
+    const full = path.join(bookDir, name);
+    if ((await fs.stat(full)).isDirectory()) issueDirs.push(name);
+  }
+  issueDirs.sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+  );
+  const out: LocalIssue[] = [];
+  for (const issueId of issueDirs) {
+    const pagePaths = await resolveIssuePagePaths(bookDir, issueId);
+    if (pagePaths.length === 0) continue;
+    out.push({ bookId, issueId, pagePaths });
+  }
+  return out;
 }
 
-async function listAllIssues(): Promise<
-  Array<{ bookId: string; issueId: string; pageCount: number }>
-> {
-  const { data, error } = await supabase
-    .from("issues")
-    .select("id, book_id, page_count")
-    .order("book_id")
-    .order("number");
-  if (error) {
-    console.error("Failed to list issues:", error.message);
+async function listAllIssues(): Promise<LocalIssue[]> {
+  if (!(await fs.pathExists(ASSETS_COMICS))) {
+    console.error(`Comics assets directory not found: ${ASSETS_COMICS}`);
     return [];
   }
-  return (
-    (data ?? []) as Array<{ id: string; book_id: string; page_count: number }>
-  ).map((r) => ({ bookId: r.book_id, issueId: r.id, pageCount: r.page_count }));
-}
-
-function pageImageUrl(
-  bookId: string,
-  issueId: string,
-  pageNum: number,
-): string {
-  const padded = String(pageNum).padStart(2, "0");
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!base) throw new Error("NEXT_PUBLIC_SUPABASE_URL not set");
-  return `${base}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${padded}.webp`;
+  const bookNames = (await fs.readdir(ASSETS_COMICS)).filter(
+    (n) => !n.startsWith("."),
+  );
+  const out: LocalIssue[] = [];
+  for (const bookId of bookNames) {
+    const bookPath = path.join(ASSETS_COMICS, bookId);
+    if (!(await fs.stat(bookPath)).isDirectory()) continue;
+    out.push(...(await listIssuesForBook(bookId)));
+  }
+  out.sort((a, b) => {
+    const byBook = a.bookId.localeCompare(b.bookId);
+    if (byBook !== 0) return byBook;
+    return a.issueId.localeCompare(b.issueId, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+  return out;
 }
 
 interface InferResult {
@@ -141,18 +220,22 @@ interface InferResult {
   error?: string;
 }
 
-async function sendToRoboflow(imageUrl: string): Promise<InferResult> {
-  const apiKey = process.env.ROBOFLOW_API_KEY;
-  if (!apiKey) {
-    return { ok: false, status: 0, error: "ROBOFLOW_API_KEY not set" };
-  }
+async function sendToRoboflow(imageBuffer: Buffer): Promise<InferResult> {
   try {
-    const res = await fetch(ROBOFLOW_WORKFLOW_URL, {
+    const normalized = await bufferForRoboflowWorkflow(imageBuffer);
+    const base64Image = normalized.toString("base64");
+    const res = await fetch(env.ROBOFLOW_PANEL_WORKFLOW_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        api_key: apiKey,
-        inputs: { image: { type: "url", value: imageUrl } },
+        api_key: env.ROBOFLOW_API_KEY,
+        inputs: {
+          image: {
+            type: "base64",
+            value: base64Image,
+          },
+          confidence: PANEL_WORKFLOW_CONFIDENCE,
+        },
       }),
     });
     if (!res.ok) {
@@ -179,8 +262,7 @@ async function sendToRoboflow(imageUrl: string): Promise<InferResult> {
 async function main() {
   const { book, issue, all, concurrency, delayMs, dryRun } = parseArgs();
 
-  let issues: Array<{ bookId: string; issueId: string; pageCount: number }> =
-    [];
+  let issues: LocalIssue[] = [];
   if (all) {
     issues = await listAllIssues();
   } else if (book) {
@@ -192,13 +274,19 @@ async function main() {
     process.exit(0);
   }
 
-  const totalPages = issues.reduce((acc, i) => acc + i.pageCount, 0);
+  const totalPages = issues.reduce((acc, i) => acc + i.pagePaths.length, 0);
   console.log(
-    `Found ${issues.length} issue(s), ~${totalPages} pages total. concurrency=${concurrency} delay=${delayMs}ms`,
+    `Found ${issues.length} issue(s), ${totalPages} pages total. concurrency=${concurrency} delay=${delayMs}ms`,
+  );
+  console.log(
+    `Roboflow workflow: ${env.ROBOFLOW_PANEL_WORKFLOW_URL} (confidence=${PANEL_WORKFLOW_CONFIDENCE}; images max ${MAX_IMAGE_EDGE_PX}px edge)`,
   );
   if (dryRun) {
     for (const i of issues) {
-      console.log(`  ${i.bookId}/${i.issueId} → ${i.pageCount} pages`);
+      const src = pageAssetFolderLabel(i.pagePaths);
+      console.log(
+        `  ${i.bookId}/${i.issueId} → ${i.pagePaths.length} pages (${src})`,
+      );
     }
     return;
   }
@@ -209,29 +297,29 @@ async function main() {
   let processed = 0;
 
   for (const iss of issues) {
-    console.log(`\n📚 ${iss.bookId} / ${iss.issueId}`);
+    console.log(
+      `\n📚 ${iss.bookId} / ${iss.issueId} (${pageAssetFolderLabel(iss.pagePaths)})`,
+    );
     await Promise.all(
-      Array.from({ length: iss.pageCount }, (_, idx) => idx + 1).map(
-        (pageNum) =>
-          limit(async () => {
-            const url = pageImageUrl(iss.bookId, iss.issueId, pageNum);
-            await new Promise((r) => setTimeout(r, delayMs));
-            const r = await sendToRoboflow(url);
-            processed++;
-            if (r.ok) {
-              success++;
-              const n =
-                r.detections !== undefined ? `${r.detections} panels` : "ok";
-              console.log(
-                `  ✓ [${processed}/${totalPages}] page-${String(pageNum).padStart(2, "0")} → ${n}`,
-              );
-            } else {
-              failed++;
-              console.log(
-                `  ✗ [${processed}/${totalPages}] page-${String(pageNum).padStart(2, "0")} → ${r.status} ${r.error?.slice(0, 80) ?? "error"}`,
-              );
-            }
-          }),
+      iss.pagePaths.map((pagePath) =>
+        limit(async () => {
+          const pageLabel = path.basename(pagePath);
+          await new Promise((r) => setTimeout(r, delayMs));
+          const imageBuffer = await fs.readFile(pagePath);
+          const r = await sendToRoboflow(imageBuffer);
+          processed++;
+          if (r.ok) {
+            success++;
+            const n =
+              r.detections !== undefined ? `${r.detections} panels` : "ok";
+            console.log(`  ✓ [${processed}/${totalPages}] ${pageLabel} → ${n}`);
+          } else {
+            failed++;
+            console.log(
+              `  ✗ [${processed}/${totalPages}] ${pageLabel} → ${r.status} ${r.error?.slice(0, 80) ?? "error"}`,
+            );
+          }
+        }),
       ),
     );
   }

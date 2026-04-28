@@ -13,6 +13,13 @@ export const env = createEnv({
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     ROBOFLOW_API_KEY: z.string(),
     ROBOFLOW_WORKFLOW_URL: z.string(),
+    /** Panel-detection workflow (serverless); override if Roboflow changes the deploy URL. */
+    ROBOFLOW_PANEL_WORKFLOW_URL: z
+      .string()
+      .url()
+      .default(
+        "https://serverless.roboflow.com/fresh-space/workflows/find-comic-panel-v1",
+      ),
     GEMINI_API_KEY: z.string(),
     GEMINI_API_KEY_2: z.string(),
     ELEVENLABS_API_KEY: z.string(),
@@ -37,6 +44,7 @@ export const env = createEnv({
     LOG_LEVEL: process.env.LOG_LEVEL,
     ROBOFLOW_API_KEY: process.env.ROBOFLOW_API_KEY,
     ROBOFLOW_WORKFLOW_URL: process.env.ROBOFLOW_WORKFLOW_URL,
+    ROBOFLOW_PANEL_WORKFLOW_URL: process.env.ROBOFLOW_PANEL_WORKFLOW_URL,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_API_KEY_2: process.env.GEMINI_API_KEY_2,
     ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
