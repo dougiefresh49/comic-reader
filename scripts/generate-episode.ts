@@ -18,6 +18,14 @@ import {
 } from "./utils/models.js";
 import { generateImage, getBalance } from "./utils/venice-client.js";
 import { loadRegistry, saveRegistry, hasReadyVoice } from "./utils/registry.js";
+import {
+  analyzePage,
+  buildShots,
+  printShotTable,
+  type AudioTimestamp,
+  type BubbleInput,
+  type ShotPlan,
+} from "./utils/shot-planner.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,7 +33,7 @@ const PROJECT_ROOT = join(__dirname, "..");
 
 // ─── Step registry ────────────────────────────────────────────────────────────
 
-const STEPS = ["setup-series", "lock-characters"] as const;
+const STEPS = ["setup-series", "lock-characters", "plan-shots"] as const;
 type Step = (typeof STEPS)[number];
 
 // ─── Checkpoint helpers ───────────────────────────────────────────────────────
@@ -540,6 +548,170 @@ async function lockCharacters(
   }
 }
 
+// ─── Step: plan-shots ─────────────────────────────────────────────────────────
+
+async function planShots(
+  book: string,
+  issue: string,
+  force: boolean,
+): Promise<void> {
+  const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
+  const BUBBLES_PATH = join(ISSUE_DIR, "bubbles.json");
+  const TIMESTAMPS_PATH = join(ISSUE_DIR, "audio-timestamps.json");
+  const PAGES_DIR = join(ISSUE_DIR, "pages-webp");
+
+  const EPISODE_DIR = join(PROJECT_ROOT, "assets", "episodes", book, issue);
+  const SHOT_PLAN_PATH = join(EPISODE_DIR, "shot-plan.json");
+
+  if (!force && (await fs.pathExists(SHOT_PLAN_PATH))) {
+    console.log(
+      `   ⏭  shot-plan.json already exists at ${SHOT_PLAN_PATH} — re-run with --force to regenerate.\n   Edit the file by hand if you want adjustments before phases 3–4.`,
+    );
+    return;
+  }
+
+  if (!(await fs.pathExists(BUBBLES_PATH))) {
+    console.error(`❌ Missing ${BUBBLES_PATH}`);
+    console.error("   Run the comic ingest pipeline first.");
+    process.exit(1);
+  }
+  if (!(await fs.pathExists(TIMESTAMPS_PATH))) {
+    console.error(`❌ Missing ${TIMESTAMPS_PATH}`);
+    console.error(
+      "   Audio durations are required to estimate shot lengths. Run generate-audio first.",
+    );
+    process.exit(1);
+  }
+  if (!(await fs.pathExists(PAGES_DIR))) {
+    console.error(`❌ Missing ${PAGES_DIR}`);
+    process.exit(1);
+  }
+
+  const bubblesByPage = (await fs.readJson(BUBBLES_PATH)) as Record<
+    string,
+    BubbleInput[]
+  >;
+  const audioTimestamps = (await fs.readJson(TIMESTAMPS_PATH)) as Record<
+    string,
+    AudioTimestamp
+  >;
+
+  const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+
+  // ── Per-page Gemini Vision pass ──────────────────────────────────────────
+  // Iterate page WebPs in order, hand each to analyzePage. Soft-fail per
+  // page so a single Gemini hiccup doesn't drop the whole plan.
+  const pageFiles = (await fs.readdir(PAGES_DIR))
+    .filter((f) => /^page-\d+\.webp$/i.test(f))
+    .sort();
+
+  if (pageFiles.length === 0) {
+    console.error(`❌ No page WebPs found in ${PAGES_DIR}`);
+    process.exit(1);
+  }
+
+  console.log(
+    `   📄 Analyzing ${pageFiles.length} page(s) with ${GEMINI_MEDIUM}...\n`,
+  );
+
+  const pageAnalyses = new Map<
+    number,
+    Awaited<ReturnType<typeof analyzePage>>
+  >();
+  let analyzed = 0;
+  let skipped = 0;
+  for (const filename of pageFiles) {
+    const m = /^page-(\d+)\.webp$/i.exec(filename);
+    if (!m) continue;
+    const pageNumber = parseInt(m[1]!, 10);
+    process.stdout.write(
+      `   [${(analyzed + skipped + 1).toString().padStart(3, " ")}/${pageFiles.length}] page-${String(pageNumber).padStart(2, "0")}... `,
+    );
+    try {
+      const buffer = await fs.readFile(join(PAGES_DIR, filename));
+      const analysis = await analyzePage(
+        gemini,
+        buffer,
+        pageNumber,
+        analyzed === 0 && skipped === 0,
+        GEMINI_MEDIUM,
+      );
+      pageAnalyses.set(pageNumber, analysis);
+      analyzed++;
+      console.log(
+        `✓ ${analysis.panelCount} panel(s)${analysis.newSceneFromPreviousPage ? " · new scene" : ""}`,
+      );
+    } catch (err) {
+      skipped++;
+      console.log(`⚠ ${err instanceof Error ? err.message : String(err)}`);
+    }
+    // Light throttle so we don't burn through Flash tier in a burst
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
+  if (pageAnalyses.size === 0) {
+    console.error("❌ No pages analyzed successfully — aborting");
+    process.exit(1);
+  }
+  if (skipped > 0) {
+    console.log(
+      `   ⚠ ${skipped} page(s) skipped — shot plan will omit them. Inspect logs and re-run --force when fixed.`,
+    );
+  }
+
+  // ── Build shots ──────────────────────────────────────────────────────────
+  const shots = buildShots({
+    bookId: book,
+    issueId: issue,
+    bubblesByPage,
+    audioTimestamps,
+    pageAnalyses,
+  });
+
+  const totalDur = shots.reduce(
+    (acc, s) => acc + s.estimatedDurationSeconds,
+    0,
+  );
+  const plan: ShotPlan = {
+    bookId: book,
+    issueId: issue,
+    generatedAt: new Date().toISOString(),
+    totalShots: shots.length,
+    estimatedDurationSeconds: Math.round(totalDur * 10) / 10,
+    shots,
+  };
+
+  await fs.ensureDir(EPISODE_DIR);
+  await fs.writeJson(SHOT_PLAN_PATH, plan, { spaces: 2 });
+  console.log(`\n   💾 Wrote ${SHOT_PLAN_PATH}`);
+
+  // ── Review gate ──────────────────────────────────────────────────────────
+  printShotTable(plan);
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const answer = await new Promise<string>((resolve) =>
+    rl.question("\nProceed with this plan? [Y/n] ", resolve),
+  );
+  rl.close();
+
+  if (answer.trim().toLowerCase() === "n") {
+    console.log(
+      `\n   Pausing. Edit ${SHOT_PLAN_PATH} and re-run --only-step plan-shots --force when ready.`,
+    );
+    process.exit(2);
+  }
+
+  // If the user edited the file before answering, re-read from disk so the
+  // checkpoint reflects what they actually approved.
+  const finalPlan = (await fs.readJson(SHOT_PLAN_PATH)) as ShotPlan;
+  console.log(
+    `\n   ✓ Approved ${finalPlan.totalShots} shot(s) for production.\n`,
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -553,6 +725,7 @@ async function main(): Promise<void> {
   const stepHandlers: Record<Step, () => Promise<void>> = {
     "setup-series": () => setupSeries(book, issue, force),
     "lock-characters": () => lockCharacters(book, issue, force),
+    "plan-shots": () => planShots(book, issue, force),
   };
 
   if (onlyStep) {

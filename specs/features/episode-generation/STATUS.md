@@ -18,21 +18,29 @@ in `scripts/generate-episode.ts` and `scripts/utils/venice-client.ts`:
 The script is implementation-ready for a full run. Verification still
 needs to happen against a fresh book.
 
-## Phase 2 — Shot Planning — 🟡 Pending implementation
+## Phase 2 — Shot Planning — ✅ Done (smoke test pending)
 
-Spec (`03-shot-planning.md`) is complete and detailed. Implementation has
-not started. **Last free review gate before Venice spending begins.**
+Implementation:
+- `scripts/utils/shot-planner.ts` — Gemini Vision per-page panel analysis,
+  bubble→panel spatial mapping (% center inside region bounds, smallest
+  region wins ties), shot grouping rules, review-table printer
+- `plan-shots` step added to `scripts/generate-episode.ts` step registry
+- Output: `assets/episodes/<book>/<issue>/shot-plan.json`
+- Cost: ~$0.05–0.10/issue (~24 GEMINI_MEDIUM calls)
 
-Required:
-- `scripts/utils/shot-planner.ts` — Gemini Vision per-page panel analysis
-- Output: `shot-plan.json` per issue with structured shot descriptors
-- Manual review/edit step on the JSON before Phase 3 starts
-- Cost: ~$0.10–0.30/issue (Gemini Vision only)
+**Reddit-driven design hardening** (Seedance/Venice content filters):
+- Gemini Vision prompt explicitly forbids character names and IP proper
+  nouns in panel descriptions; mandates cinematic vocabulary
+  ("depth of field", "low-angle", "rim lighting", "tracking shot")
+- `sceneDescription` is built purely from cinematic terms — safe to send
+  directly to Venice
+- IP names stay in `characters[]` array (sourced from bubbles' `speaker`
+  field) and only feed into Phase 3's character-reference image lookup
+- This makes Phase 3/4 prompts filter-safe by construction
 
-Open questions for implementation:
-- Bubble-to-panel mapping is the trickiest part — Gemini detects panels,
-  we already have bubbles with positions; how to associate them deterministically?
-- Shot grouping rules clear in spec but require real test data to validate
+**Smoke test next step:** run against TMNT × MMPR III issue 1
+(`pnpm generate-episode -- --book tmnt-mmpr-iii --issue 1 --only-step plan-shots`)
+to validate panel-mapping accuracy and review the generated `sceneDescription` strings before Phase 3.
 
 ## Phase 3 — Storyboard — 🟢 Ready to code
 
