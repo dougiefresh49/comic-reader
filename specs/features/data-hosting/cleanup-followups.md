@@ -84,7 +84,40 @@ Small, do when you next touch storage.
 Living at the repo root. It's served its purpose; could move to
 `specs/notes/2026-04-overnight.md` or be deleted once the PR merges.
 
-## 6. `scripts/apply-fixes.ts` `STORAGE_MODE=local` branch
+## 6. Gemini key fallback for rate-limited HIGH model
+
+GEMINI_HIGH (`gemini-3.1-pro-preview`) has a hard 250 calls per 24-hour
+window. We have two keys provisioned (`GEMINI_API_KEY`,
+`GEMINI_API_KEY_2`) but no fallback logic.
+
+Currently:
+- `rerun-context.ts` is on MEDIUM after dropping from HIGH (single-bubble
+  vision with full context doesn't need Pro)
+- The pipeline `get-context` step still uses HIGH for fresh
+  page-level speaker assignment — this is the legitimate Pro use case
+  (~24 pages × 1 call = 24/day per issue, well within the 250 limit
+  with room for retries)
+
+If a future feature pushes HIGH usage past the 250/day threshold, add a
+small `geminiClientWithFallback()` that catches `429`/`RESOURCE_EXHAUSTED`
+on the primary key and retries on the secondary. Pattern:
+
+```ts
+async function geminiCall(...args): Promise<Response> {
+  for (const key of [GEMINI_API_KEY, GEMINI_API_KEY_2]) {
+    try {
+      return await new GoogleGenAI({ apiKey: key }).models.generateContent(...args);
+    } catch (e) {
+      if (!isRateLimitError(e)) throw e;
+    }
+  }
+  throw new Error("Both Gemini keys exhausted");
+}
+```
+
+Skip until needed.
+
+## 7. `scripts/apply-fixes.ts` `STORAGE_MODE=local` branch
 
 The script supports `STORAGE_MODE=local|supabase|both`, but post Phase D
 the canonical mode is `supabase`. The `local` and `both` branches are

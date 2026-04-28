@@ -60,10 +60,24 @@ Specs in `specs/features/episode-generation/`. Two output modes: motion comic (f
 | Assembly | `pending` | [06-assembly.md](episode-generation/06-assembly.md) | FFmpeg concat + ElevenLabs audio mix + optional Venice music. |
 | Review System | `pending` | [review-system.md](episode-generation/review-system.md) | Human-gated review at each phase. Static HTML galleries + terminal prompts. No AI at review time. |
 
+## Motion Comic Plus
+
+New default render path for episodes. Replaces the old cinematic-video
+direction (kept as opt-in "Hero Shot Cinematic"). See
+[motion-comic-plus/00-overview.md](motion-comic-plus/00-overview.md).
+
+| Feature | Status | Spec | Notes |
+|---------|--------|------|-------|
+| Panel Direction (Gemini panel rects + effect/audio tags) | `pending` | [motion-comic-plus/01-panel-direction.md](motion-comic-plus/01-panel-direction.md) | Replaces `plan-shots` as default. Uses cached gemini-context. |
+| Panel Reader UI (Kindle-style) | `pending` | [motion-comic-plus/02-panel-reader-ui.md](motion-comic-plus/02-panel-reader-ui.md) | Double-tap enter, swipe between panels |
+| Effect Library | `pending` | [motion-comic-plus/03-effect-library.md](motion-comic-plus/03-effect-library.md) | ~20 reusable CSS/canvas/SVG effects |
+| Audio Layer | `pending` | [motion-comic-plus/04-audio-layer.md](motion-comic-plus/04-audio-layer.md) | Music + SFX, Freesound→ElevenLabs fallback, cached |
+| MP4 Export | `pending` | [motion-comic-plus/05-mp4-export.md](motion-comic-plus/05-mp4-export.md) | Headless Chromium screen-record (sketch only) |
+| Onomatopoeia bubble re-detection | `pending` | — | User task: re-add to Roboflow now that hand-tweak + multi-class detection are mature |
+
 ## Future / Ideas
 
 | Idea | Notes |
 |------|-------|
-| Sound effects for onomatopoeia | BOOM, CRASH etc. trigger actual SFX clips |
 | Roboflow model retraining | Model has improved since initial setup — may reduce need for manual bounds corrections |
 | Episode web player | `/episode/[bookId]/[issueId]` route in Next.js app — after assembly pipeline ships |

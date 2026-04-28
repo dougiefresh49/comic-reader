@@ -1,6 +1,14 @@
 # Phase 3 — Storyboard (Image Generation)
 
-## Status: `pending`
+> **⚠ Superseded.** The cinematic-video direction was abandoned for cost
+> reasons (~$95–$380/issue against a $5 API ceiling). The new default
+> render path is **Motion Comic Plus** —
+> see [`../motion-comic-plus/00-overview.md`](../motion-comic-plus/00-overview.md).
+> This spec is retained for the optional **Hero Shot Cinematic** mode,
+> where individual shots can be tagged `--hero` to opt into Venice
+> image+video gen.
+
+## Status: `superseded` (default), `pending` (hero-shot opt-in only)
 ## Prerequisites: Phase 2 complete (shot-plan.json approved), Phase 1 complete (series.json, character references)
 ## Cost: ~$5–15/issue (~$0.05–0.50 per image × 20–30 shots)
 

@@ -18,21 +18,47 @@ in `scripts/generate-episode.ts` and `scripts/utils/venice-client.ts`:
 The script is implementation-ready for a full run. Verification still
 needs to happen against a fresh book.
 
-## Phase 2 — Shot Planning — 🟡 Pending implementation
+## ⚠ Direction shift (2026-04-28)
 
-Spec (`03-shot-planning.md`) is complete and detailed. Implementation has
-not started. **Last free review gate before Venice spending begins.**
+Smoke-test of Phase 2 produced 190 shots / $9.50 image + $95–$380 video
+cost vs a $5 hard API ceiling. The cinematic-video plan is incompatible
+with the budget AND the actual product goal (kid-first reading
+experience that preserves the book medium).
 
-Required:
-- `scripts/utils/shot-planner.ts` — Gemini Vision per-page panel analysis
-- Output: `shot-plan.json` per issue with structured shot descriptors
-- Manual review/edit step on the JSON before Phase 3 starts
-- Cost: ~$0.10–0.30/issue (Gemini Vision only)
+New default direction: **Motion Comic Plus**. See
+[`../motion-comic-plus/00-overview.md`](../motion-comic-plus/00-overview.md).
+The old Phase 3/4 specs are marked superseded but kept for the optional
+"Hero Shot Cinematic" opt-in mode.
 
-Open questions for implementation:
-- Bubble-to-panel mapping is the trickiest part — Gemini detects panels,
-  we already have bubbles with positions; how to associate them deterministically?
-- Shot grouping rules clear in spec but require real test data to validate
+`shot-planner.ts` and the `plan-shots` step are kept as the feeder for
+hero-shot cinematics. The new default `direct-panels` step (spec'd in
+motion-comic-plus/01-panel-direction.md) replaces it for everyday use.
+
+---
+
+## Phase 2 — Shot Planning — ✅ Done (now optional path for hero shots only)
+
+Implementation:
+- `scripts/utils/shot-planner.ts` — Gemini Vision per-page panel analysis,
+  bubble→panel spatial mapping (% center inside region bounds, smallest
+  region wins ties), shot grouping rules, review-table printer
+- `plan-shots` step added to `scripts/generate-episode.ts` step registry
+- Output: `assets/episodes/<book>/<issue>/shot-plan.json`
+- Cost: ~$0.05–0.10/issue (~24 GEMINI_MEDIUM calls)
+
+**Reddit-driven design hardening** (Seedance/Venice content filters):
+- Gemini Vision prompt explicitly forbids character names and IP proper
+  nouns in panel descriptions; mandates cinematic vocabulary
+  ("depth of field", "low-angle", "rim lighting", "tracking shot")
+- `sceneDescription` is built purely from cinematic terms — safe to send
+  directly to Venice
+- IP names stay in `characters[]` array (sourced from bubbles' `speaker`
+  field) and only feed into Phase 3's character-reference image lookup
+- This makes Phase 3/4 prompts filter-safe by construction
+
+**Smoke test next step:** run against TMNT × MMPR III issue 1
+(`pnpm generate-episode -- --book tmnt-mmpr-iii --issue 1 --only-step plan-shots`)
+to validate panel-mapping accuracy and review the generated `sceneDescription` strings before Phase 3.
 
 ## Phase 3 — Storyboard — 🟢 Ready to code
 

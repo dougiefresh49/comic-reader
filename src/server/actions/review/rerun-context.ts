@@ -6,7 +6,7 @@ import {
   createPartFromText,
 } from "@google/genai";
 import { revalidatePath } from "next/cache";
-import { GEMINI_HIGH } from "~/lib/models";
+import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 const PAGES_BUCKET = "comic-pages";
@@ -193,8 +193,11 @@ export async function rerunContext(args: Args): Promise<Result> {
       }),
     );
 
+    // Single-bubble vision with full neighbor context fits comfortably in
+    // MEDIUM (Flash) — no need to spend Pro budget here. Switch to HIGH
+    // only if quality drops below acceptable.
     const response = await ai.models.generateContent({
-      model: GEMINI_HIGH,
+      model: GEMINI_MEDIUM,
       contents: [pagePart, cropPart, textPart],
     });
     const text = response.text?.trim();

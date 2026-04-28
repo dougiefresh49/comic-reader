@@ -1,8 +1,8 @@
 # Phase 2 — Shot Planning
 
-## Status: `pending`
+## Status: `done` (implementation lives in `scripts/utils/shot-planner.ts` + `plan-shots` step in `scripts/generate-episode.ts`)
 ## Prerequisites: Phase 1 complete (series.json exists)
-## Cost: ~$0.10–0.30/issue (Gemini Vision per page)
+## Cost: ~$0.05–0.10/issue (Gemini MEDIUM Vision per page; ~24 calls/issue)
 
 ---
 
@@ -55,7 +55,7 @@ pnpm generate-episode -- --book tmnt-mmpr-iii --issue 1 --only-step plan-shots
       "type": "dialogue",
       "characters": ["Raphael", "Leonardo"],
       "primarySpeaker": "Raphael",
-      "sceneDescription": "Raphael confronts Leonardo on a rooftop, gesturing aggressively. Night city backdrop.",
+      "sceneDescription": "low-angle medium shot — rain-slicked rooftop in a neon-lit metropolis at night — two anthropomorphic turtles (one red mask, one blue mask) confront each other, the red-masked one gesturing aggressively — tense",
       "dialogue": [
         { "speaker": "Raphael", "text": "I told you this was a trap!", "audioFile": "page-01-bubble-003.mp3" },
         { "speaker": "Leonardo", "text": "Stay focused. We finish this together.", "audioFile": "page-01-bubble-004.mp3" }
@@ -107,33 +107,31 @@ These rules run on the sorted bubbles from `bubbles.json`:
 
 For each page image:
 
-1. Send page image + that page's bubbles (from `bubbles.json`) to Gemini Vision (`GEMINI_MEDIUM`):
+1. Send only the page image to Gemini Vision (`GEMINI_MEDIUM`). Bubbles are NOT passed to Gemini — character identity comes from the bubbles' existing `speaker` field, which is already DB-canonical. Asking Gemini to identify characters re-introduces error and wastes tokens.
 
-```
-You are analyzing a comic book page for video production.
+2. Gemini's job is to describe **panels** in **cinematic language** that's pre-hardened against Venice / Seedance content filters. Per Reddit r/generativeAI commentary, the filter rejects:
+   - Real human faces (suggests AI-generated portraits or abstract descriptions instead)
+   - IP/copyrighted character names ("Spider-Man", "Splinter") and proper nouns from real-world IP
+   - Combinations of recognizable visual features tied to known IP
 
-Here is the page image and the structured dialogue data for this page:
-<bubbles_json>
+The prompt explicitly forbids character names in panel descriptions and encourages cinematic vocabulary ("depth of field", "low-angle", "rim lighting", "tracking shot") which acts as a compositional shield.
 
-For this page, identify:
-1. How many distinct visual panels are on this page (1–6 typically)?
-2. For each panel, describe: location/setting, which characters appear, the action/mood.
-3. Are there any mid-page scene changes (location shift, time jump)?
-4. Suggest where natural scene/shot breaks should be.
+Returns:
 
-Return JSON:
+```json
 {
   "panelCount": number,
   "panels": [
     {
       "region": "top-third | top-half | bottom-half | bottom-third | full-page | left-half | right-half",
-      "setting": "string description of location",
-      "characters": ["character names visible"],
-      "action": "string description of what's happening",
-      "mood": "string"
+      "setting": "...",
+      "action": "...",
+      "mood": "...",
+      "cameraStyle": "..."
     }
   ],
-  "sceneBreakAfterPanel": number | null
+  "sceneBreakAfterPanel": number | null,
+  "newSceneFromPreviousPage": boolean
 }
 ```
 
@@ -146,10 +144,12 @@ Cross-reference each bubble's `style` coordinates with the panel regions returne
 ### Step C — Apply grouping rules
 
 Apply the shot grouping rules from above to produce the final shot list. For each shot:
-- Build `sceneDescription` from the Gemini panel description
-- Collect `audioFiles` from the bubble IDs (audio file naming: `<bubble.id>.mp3`)
-- Calculate `estimatedDurationSeconds` from `audio-timestamps.json` (sum of bubble durations + 0.3s padding between lines)
-- Assign `type` based on characters present and bubble types
+- `sceneDescription` is built from the panel as: `"{cameraStyle} — {setting} — {action} — {mood}"`. This is the prompt that goes to Venice in Phase 3, already cinematic and IP-name-free.
+- `characters[]` is the unique set of `speaker` values from the bubbles assigned to this shot's panel. This is the structured data Phase 3 uses to look up `visualDescription` from the character registry — IP names live here, never in `sceneDescription`.
+- `audioFiles` collected from the bubble IDs (`<bubble.id>.mp3`)
+- `estimatedDurationSeconds` calculated from `audio-timestamps.json` (sum of bubble durations + 0.3s padding between lines)
+- `type` assigned based on characters present and bubble types (NARRATION/CAPTION → `narration`; 0 chars → `establishing`; 3+ chars → `action`; 1–2 chars → `dialogue`)
+- `newSceneFromPreviousPage=true` from page A inserts an `establishing` shot at the top of page A before any dialogue shots
 
 ### Step D — Write shot-plan.json
 

@@ -18,21 +18,21 @@ Currently live with TMNT × MMPR issues. Powered by a pipeline that goes from ra
 
 Each book+issue is processed by `pnpm ingest -- --book <name> --issue <n>`:
 
-| Step | What it does |
-|------|-------------|
-| 1 | validate-inputs — check assets dir + pages exist |
-| 2 | generate-pages-metadata — extract page dimensions |
-| 3 | convert-pages-to-webp — JPEG → WebP |
-| 4 | get-context — Roboflow detection + Gemini OCR + speaker/emotion |
-| 5 | sort-bubbles-gemini — AI reading order sort |
-| 6 | add-bubble-styles — % coordinates for responsive overlay |
-| 7 | generate-character-voice-descriptions — Gemini voice descriptions |
-| 8 | clean-voice-descriptions — normalize names via alias map |
-| 9 | find-voice-sources — Gemini researches voice media appearances |
-| 10 | generate-voice-models — ElevenLabs creates voice models |
-| 11 | generate-audio — ElevenLabs TTS for every bubble |
-| 12 | copy-to-public — upload WebP + audio to Supabase Storage; upsert data to DB |
-| 13 | generate-manifest — update issues table counts + flags |
+| Step | What it does                                                                |
+| ---- | --------------------------------------------------------------------------- |
+| 1    | validate-inputs — check assets dir + pages exist                            |
+| 2    | generate-pages-metadata — extract page dimensions                           |
+| 3    | convert-pages-to-webp — JPEG → WebP                                         |
+| 4    | get-context — Roboflow detection + Gemini OCR + speaker/emotion             |
+| 5    | sort-bubbles-gemini — AI reading order sort                                 |
+| 6    | add-bubble-styles — % coordinates for responsive overlay                    |
+| 7    | generate-character-voice-descriptions — Gemini voice descriptions           |
+| 8    | clean-voice-descriptions — normalize names via alias map                    |
+| 9    | find-voice-sources — Gemini researches voice media appearances              |
+| 10   | generate-voice-models — ElevenLabs creates voice models                     |
+| 11   | generate-audio — ElevenLabs TTS for every bubble                            |
+| 12   | copy-to-public — upload WebP + audio to Supabase Storage; upsert data to DB |
+| 13   | generate-manifest — update issues table counts + flags                      |
 
 ## Key Commands
 
@@ -68,3 +68,23 @@ NEXT_PUBLIC_BASE_URL=
 ```
 
 See `.env` for full variable list including optional pipeline flags.
+
+## Text to image models that do not charge credits in the venice.ai ui
+
+| Model         | details       | is private? |
+| ------------- | ------------- | ----------- |
+| Z-Image Turbo | Uncensored    | Yes         |
+| HiDream       | Retiring Soon | Yes         |
+| Venice SD35   | --            | Yes         |
+| Lustify SDXL  | Uncensored    | Yes         |
+| Lustify v8    | Uncensored    | Yes         |
+| Qwen Image    | --            | Yes         |
+| Anime (WAI)   | Uncensored    | Yes         |
+| Chroma        | Uncensored    | Yes         |
+
+## Image editing models that do not charge credits in the venice.ai ui
+
+| Model                  | is private? |
+| ---------------------- | ----------- |
+| Qwen Edit 2511         | Yes         |
+| FireRed Image Edit 1.1 | Yes         |
