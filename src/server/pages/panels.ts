@@ -1,42 +1,13 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
-
-export interface PanelBoundingBox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface PanelAudioTags {
-  ambience: string[];
-  sfx: string[];
-  music_mood: string;
-}
-
-export interface PageDirectedPanel {
-  id: string; // panels.id (UUID)
-  panelId: string; // stable within issue, e.g. "p03-01"
-  pageNumber: number;
-  sortOrder: number;
-  boundingBox: PanelBoundingBox;
-  cinematicDescription: string | null;
-  effectTags: string[];
-  audioTags: PanelAudioTags;
-  primarySpeaker: string | null;
-  estimatedDurationSeconds: number | null;
-  isNewScene: boolean;
-  source: "gemini" | "roboflow" | "manual";
-  /** UUIDs of bubbles assigned to this panel via bubbles.panel_id FK */
-  bubbleIds: string[];
-}
+import type { PageDirectedPanel, PanelAudioTags } from "~/types/panels";
 
 interface PanelRow {
   id: string;
   panel_id: string;
   page_number: number;
   sort_order: number;
-  bounding_box: PanelBoundingBox;
+  bounding_box: PageDirectedPanel["boundingBox"];
   cinematic_description: string | null;
   effect_tags: string[];
   audio_tags: PanelAudioTags | null;
