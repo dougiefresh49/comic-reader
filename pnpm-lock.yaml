@@ -26,6 +26,9 @@ importers:
       '@google/genai':
         specifier: ^1.30.0
         version: 1.30.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@3.25.76))(bufferutil@4.1.0)
+      '@paper-design/shaders-react':
+        specifier: ^0.0.76
+        version: 0.0.76(@types/react@19.2.5)(react@19.2.0)
       '@supabase/supabase-js':
         specifier: ^2.105.0
         version: 2.105.0(bufferutil@4.1.0)
@@ -949,6 +952,18 @@ packages:
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+
+  '@paper-design/shaders-react@0.0.76':
+    resolution: {integrity: sha512-uPJWrYRf6cJdO2H+fuXlahaqz0QjYglNAyUTaRfIInpzCa/d6guxBIK003soAZQFuQ035yg9FhtfFzKNWm+a5A==}
+    peerDependencies:
+      '@types/react': ^18 || ^19
+      react: ^18 || ^19
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
+  '@paper-design/shaders@0.0.76':
+    resolution: {integrity: sha512-AcNDY4J66YQHUfQYFInkCP7M9VOje0od7wLpOR7LtCmc532opJy6ll+h1W9zBovz8tt9U7OADUmJ/qKEXyOX/A==}
 
   '@pinojs/redact@0.4.0':
     resolution: {integrity: sha512-k2ENnmBugE/rzQfEcdWHcCY+/FM3VLzH9cYEsbdsoqrvzAKRhUZeRNhAZvB8OitQJ1TBed3yqWtdjzS6wJKBwg==}
@@ -4847,6 +4862,15 @@ snapshots:
   '@nolyfill/is-core-module@1.0.39': {}
 
   '@opentelemetry/api@1.9.0': {}
+
+  '@paper-design/shaders-react@0.0.76(@types/react@19.2.5)(react@19.2.0)':
+    dependencies:
+      '@paper-design/shaders': 0.0.76
+      react: 19.2.0
+    optionalDependencies:
+      '@types/react': 19.2.5
+
+  '@paper-design/shaders@0.0.76': {}
 
   '@pinojs/redact@0.4.0': {}
 
