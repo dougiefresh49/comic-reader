@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Particles, { initParticlesEngine } from "@tsparticles/react";
+import { useEffect, useRef, useState } from "react";
+import { initParticlesEngine } from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import { loadEmittersPlugin } from "@tsparticles/plugin-emitters";
-import type { ISourceOptions } from "@tsparticles/engine";
+import { tsParticles } from "@tsparticles/engine";
+import type { Container, ISourceOptions } from "@tsparticles/engine";
 
 let initialized = false;
 let initPromise: Promise<void> | null = null;
@@ -33,15 +34,51 @@ interface Props {
 }
 
 /**
- * Shared particle wrapper. Lazy-loads the slim engine bundle once on
- * first render and keeps it cached. Each instance positions a canvas
- * over the panel's bbox.
+ * Imperative tsParticles wrapper.
+ *
+ * The official `@tsparticles/react` <Particles> includes the entire
+ * props object in its useEffect deps, so any parent re-render destroys
+ * and recreates the container. With a 60Hz progress signal driving the
+ * preview gallery (and the panel reader), that means particles never
+ * accumulate. We side-step the React wrapper and call `tsParticles.load`
+ * directly inside a stable useEffect keyed only on `id` and `options`.
+ *
+ * The bbox styles live on the outer div and re-render at React's
+ * normal cadence — that's cheap.
  */
 export function ParticleEffect({ id, bbox, options, blendMode }: Props) {
   const [ready, setReady] = useState(initialized);
+  const containerRef = useRef<Container | null>(null);
+  const targetRef = useRef<HTMLDivElement | null>(null);
+
+  // First-mount: ensure the engine is loaded.
   useEffect(() => {
     if (!initialized) void ensureInit().then(() => setReady(true));
   }, []);
+
+  // Mount the tsParticles container once when ready, with stable deps.
+  // We deliberately omit `bbox` and `blendMode` — they're CSS-only and
+  // don't affect the canvas. `options` is module-level and stable.
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    let local: Container | null = null;
+    void tsParticles
+      .load({ id, element: targetRef.current ?? undefined, options })
+      .then((c) => {
+        if (cancelled) {
+          c?.destroy();
+          return;
+        }
+        local = c ?? null;
+        containerRef.current = local;
+      });
+    return () => {
+      cancelled = true;
+      local?.destroy();
+      containerRef.current = null;
+    };
+  }, [ready, id, options]);
 
   if (!ready) return null;
   return (
@@ -58,7 +95,7 @@ export function ParticleEffect({ id, bbox, options, blendMode }: Props) {
         mixBlendMode: blendMode,
       }}
     >
-      <Particles id={id} options={options} className="h-full w-full" />
+      <div ref={targetRef} id={id} className="h-full w-full" />
     </div>
   );
 }

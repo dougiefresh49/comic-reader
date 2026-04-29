@@ -29,8 +29,12 @@ const baseOptions: ISourceOptions = {
   background: { color: { value: "transparent" } },
   detectRetina: true,
   fpsLimit: 60,
-  pauseOnBlur: true,
-  pauseOnOutsideViewport: true,
+  // Don't pause when the canvas isn't fully in viewport — preview cards
+  // and reader panels are often partly clipped, and we want them
+  // animating regardless. The active-panel-only mount in
+  // PanelEffectsOverlay already handles the perf budget.
+  pauseOnBlur: false,
+  pauseOnOutsideViewport: false,
 };
 
 // ─── Smoke ─────────────────────────────────────────────────────────────────
@@ -38,26 +42,35 @@ const baseOptions: ISourceOptions = {
 const smokeDriftOptions: ISourceOptions = {
   ...baseOptions,
   particles: {
-    number: { value: 18, density: { enable: true } },
     color: { value: ["#9ca3af", "#6b7280", "#4b5563"] },
     opacity: {
-      value: { min: 0.2, max: 0.45 },
-      animation: { enable: true, speed: 0.4, sync: false, startValue: "min" },
+      value: { min: 0.0, max: 0.4 },
+      animation: {
+        enable: true,
+        speed: 0.5,
+        startValue: "max",
+        destroy: "min",
+        sync: false,
+      },
     },
-    size: { value: { min: 30, max: 70 } },
+    size: {
+      value: { min: 16, max: 36 },
+      animation: { enable: true, speed: 4, startValue: "min", sync: false },
+    },
     move: {
       enable: true,
       direction: "top",
-      speed: { min: 0.3, max: 0.9 },
-      outModes: { default: "destroy", top: "destroy" },
-      drift: { min: -0.4, max: 0.4 },
+      speed: { min: 1.5, max: 3.0 },
+      outModes: { default: "destroy" },
+      drift: { min: -0.6, max: 0.6 },
     },
     shape: { type: "circle" },
+    life: { duration: { value: { min: 4, max: 7 }, sync: false } },
   },
   emitters: {
     position: { x: 50, y: 100 },
-    rate: { delay: 0.3, quantity: 1 },
-    size: { width: 80, height: 0 },
+    rate: { delay: 0.4, quantity: 1 },
+    size: { width: 100, height: 0 },
   },
 };
 
@@ -75,30 +88,35 @@ export function SmokeDrift({ bbox, active, reducedMotion }: EffectProps) {
 const smokeBillowOptions: ISourceOptions = {
   ...baseOptions,
   particles: {
-    number: { value: 12 },
     color: { value: ["#e5e7eb", "#9ca3af", "#6b7280"] },
     opacity: {
-      value: { min: 0.0, max: 0.55 },
-      animation: { enable: true, speed: 0.6, startValue: "min", count: 1 },
+      value: { min: 0.0, max: 0.6 },
+      animation: {
+        enable: true,
+        speed: 0.5,
+        startValue: "max",
+        destroy: "min",
+        sync: false,
+      },
     },
     size: {
-      value: { min: 60, max: 130 },
-      animation: { enable: true, speed: 8, startValue: "min", count: 1 },
+      value: { min: 30, max: 70 },
+      animation: { enable: true, speed: 12, startValue: "min", sync: false },
     },
     move: {
       enable: true,
       direction: "top",
-      speed: { min: 0.4, max: 1.2 },
+      speed: { min: 1.5, max: 3.0 },
       outModes: { default: "destroy" },
-      drift: { min: -0.3, max: 0.3 },
+      drift: { min: -0.5, max: 0.5 },
     },
     shape: { type: "circle" },
-    life: { duration: { value: 5 }, count: 1 },
+    life: { duration: { value: { min: 4, max: 6 }, sync: false } },
   },
   emitters: {
-    position: { x: 50, y: 90 },
-    rate: { delay: 0.5, quantity: 2 },
-    size: { width: 60, height: 0 },
+    position: { x: 50, y: 95 },
+    rate: { delay: 0.4, quantity: 2 },
+    size: { width: 80, height: 0 },
   },
 };
 
@@ -121,23 +139,26 @@ export function SmokeBillow({ bbox, active, reducedMotion }: EffectProps) {
 // additive (screen) blend so overlapping particles brighten into a hot
 // core. Sizes shrink as particles age via size animation; opacity fades
 // to zero on death so we don't see hard edges popping out.
+// Fire: many small flecks emitted from a narrow base, tapering as they
+// rise. Each fleck shrinks AND fades out via animations so the top of
+// the flame fades into nothing. `mix-blend-mode: screen` on the canvas
+// makes overlapping flecks brighten toward the hot yellow core.
 const fireFlickerOptions: ISourceOptions = {
   ...baseOptions,
   particles: {
-    number: { value: 0 }, // emitters drive population
     color: { value: ["#fde68a", "#fbbf24", "#f97316", "#dc2626"] },
     opacity: {
       value: { min: 0, max: 0.85 },
       animation: {
         enable: true,
-        speed: 2.5,
+        speed: 1.5,
         startValue: "max",
         destroy: "min",
         sync: false,
       },
     },
     size: {
-      value: { min: 2, max: 7 },
+      value: { min: 3, max: 9 },
       animation: {
         enable: true,
         speed: 6,
@@ -149,23 +170,17 @@ const fireFlickerOptions: ISourceOptions = {
     move: {
       enable: true,
       direction: "top",
-      speed: { min: 1.5, max: 3.5 },
+      speed: { min: 2.5, max: 5 },
       outModes: { default: "destroy" },
-      gravity: { enable: true, acceleration: -8 }, // accelerate upward
-      drift: { min: -0.6, max: 0.6 },
+      drift: { min: -0.4, max: 0.4 },
     },
     shape: { type: "circle" },
-    life: { duration: { value: { min: 0.4, max: 0.9 }, sync: false } },
-    shadow: {
-      enable: true,
-      blur: 6,
-      color: { value: "#fbbf24" },
-    },
+    life: { duration: { value: { min: 1.2, max: 1.8 }, sync: false } },
   },
   emitters: {
-    position: { x: 50, y: 100 },
-    rate: { delay: 0.02, quantity: 3 },
-    size: { width: 18, height: 0 },
+    position: { x: 50, y: 96 },
+    rate: { delay: 0.03, quantity: 3 },
+    size: { width: 12, height: 0 },
   },
 };
 
@@ -175,7 +190,6 @@ export function FireFlicker({ bbox, active, reducedMotion }: EffectProps) {
     <ParticleEffect
       id={`fire-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
-      blendMode={reducedMotion ? undefined : "screen"}
       options={
         reducedMotion ? makeStill(fireFlickerOptions) : fireFlickerOptions
       }
