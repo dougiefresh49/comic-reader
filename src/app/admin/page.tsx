@@ -147,6 +147,12 @@ function ActionButtons({
       >
         Review
       </Link>
+      <Link
+        href={`/admin/${issue.bookId}/${issue.issueId}/review/panels`}
+        className="rounded bg-fuchsia-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-fuchsia-600"
+      >
+        Panels
+      </Link>
     </div>
   );
 }
