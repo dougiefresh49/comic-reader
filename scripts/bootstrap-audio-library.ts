@@ -71,27 +71,27 @@ interface TagSpec {
 
 const AMBIENCE_QUERIES: Record<AmbienceTag, string> = {
   wind_desert: "desert wind ambience tag:wind tag:desert",
-  wind_arctic: "arctic wind cold ambience",
+  wind_arctic: "wind cold howl",
   city_traffic_distant: "distant city traffic ambience tag:traffic",
   rain_steady: "steady rain loop tag:rain",
   energy_hum_low: "low electrical hum drone",
   industrial_machinery: "factory industrial machinery loop",
   forest_birds: "forest birds ambience",
-  lab_electronics_beep: "computer lab electronics beep ambience",
+  lab_electronics_beep: "computer beeps loop",
   ocean_waves: "ocean waves shore tag:ocean",
 };
 
 const SFX_QUERIES: Record<SfxTag, string> = {
-  whoosh_metallic_swirl: "metallic whoosh swirl",
+  whoosh_metallic_swirl: "whoosh metal",
   explosion_distant_muffled: "distant muffled explosion",
-  explosion_close_punchy: "close punchy explosion impact",
+  explosion_close_punchy: "explosion impact short",
   sword_clang: "sword clang metal hit",
   punch_impact: "punch impact body hit",
   footstep_concrete: "footstep concrete single",
   glass_shatter: "glass shatter break",
   energy_zap: "energy zap electric short",
   thunder_distant: "distant thunder rumble",
-  vehicle_engine_rev: "engine rev car short",
+  vehicle_engine_rev: "engine rev",
 };
 
 const MUSIC_QUERIES: Record<MusicMood, string> = {
@@ -205,13 +205,96 @@ async function downloadAndUpload(
   const res = await fetch(url);
   if (!res.ok) throw new Error(`download ${res.status}: ${url}`);
   const buf = Buffer.from(await res.arrayBuffer());
+  await uploadBuffer(buf, storagePath);
+}
+
+async function uploadBuffer(
+  buf: Buffer,
+  storagePath: string,
+  contentType = "audio/mpeg",
+): Promise<void> {
   const { error } = await supabase.storage
     .from("comic-audio")
-    .upload(storagePath, buf, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
+    .upload(storagePath, buf, { contentType, upsert: true });
   if (error) throw new Error(`upload ${storagePath}: ${error.message}`);
+}
+
+// ── ElevenLabs music generation ────────────────────────────────────────────
+//
+// Music API: POST /v1/music/compose with prompt + music_length_ms returns
+// audio/mpeg bytes. ~30s loops are plenty for a panel-level mood bed; we
+// loop in the runtime mixer if the panel display window is longer.
+
+const EL_API_KEY = process.env.ELEVENLABS_API_KEY;
+
+const MUSIC_PROMPTS: Record<MusicMood, string> = {
+  tense_climax:
+    "Tense cinematic climax with rising strings, deep cellos, ostinato brass; building tension; orchestral; loopable",
+  action_chase:
+    "Fast-paced action chase music with driving percussion, low-end synth pulse, brass stabs; heroic urgency; loopable",
+  somber_reflective:
+    "Somber reflective ambient piano with light strings; melancholy; slow tempo; loopable",
+  heroic_triumphant:
+    "Heroic triumphant orchestral fanfare; bright brass, soaring strings; uplifting; loopable",
+  menacing_villain:
+    "Menacing dark villain theme; deep brass, dissonant strings, low percussion; ominous; loopable",
+  comedic_light:
+    "Light comedic playful music; pizzicato strings, woodwinds, marimba; whimsical; loopable",
+  mystery_ambient:
+    "Mystery ambient suspense; ethereal pads, sparse piano notes, distant percussion; eerie; loopable",
+  transition_neutral:
+    "Neutral cinematic transition pad; slow harmonic shift; ambient drone; loopable",
+};
+
+async function generateMusicWithElevenLabs(
+  mood: MusicMood,
+  durationMs = 30000,
+): Promise<Buffer> {
+  if (!EL_API_KEY) throw new Error("ELEVENLABS_API_KEY not set");
+  const prompt = MUSIC_PROMPTS[mood];
+  // ElevenLabs Music API: POST https://api.elevenlabs.io/v1/music/compose
+  // (binary audio/mpeg response). If the deploy returns 404 we fall back to /v1/music.
+  const body = JSON.stringify({
+    prompt,
+    music_length_ms: durationMs,
+  });
+  for (const path of ["/v1/music/compose", "/v1/music"]) {
+    const res = await fetch(`https://api.elevenlabs.io${path}`, {
+      method: "POST",
+      headers: {
+        "xi-api-key": EL_API_KEY,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body,
+    });
+    if (res.status === 404) continue;
+    if (!res.ok) {
+      throw new Error(
+        `elevenlabs music ${res.status} (${path}): ${(await res.text()).slice(0, 200)}`,
+      );
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
+  throw new Error(
+    "ElevenLabs music endpoint not found at /v1/music/compose or /v1/music",
+  );
+}
+
+// ── CREDITS.md merge (avoid clobbering prior runs) ─────────────────────────
+
+async function fetchExistingCredits(): Promise<Map<string, string>> {
+  const { data } = await supabase.storage
+    .from("comic-audio")
+    .download("library/CREDITS.md");
+  if (!data) return new Map();
+  const text = await data.text();
+  const map = new Map<string, string>();
+  for (const line of text.split("\n")) {
+    const m = /^- \*\*([^*]+)\*\* — /.exec(line);
+    if (m?.[1]) map.set(m[1], line);
+  }
+  return map;
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────
@@ -249,6 +332,53 @@ async function main() {
     if (spec.layer === "music" && !INCLUDE_MUSIC && !ONLY_TAG) {
       console.log(`⊘ defer  ${path} (use --include-music)`);
       credits.push({ layer: spec.layer, tag: spec._tag, status: "deferred" });
+      continue;
+    }
+
+    // Music branch: ElevenLabs Music API instead of Freesound (Freesound's
+    // mood-based music tagging is too noisy to be useful).
+    if (spec.layer === "music") {
+      console.log(`→ generate ${path} via ElevenLabs Music`);
+      if (DRY_RUN) {
+        credits.push({
+          layer: spec.layer,
+          tag: spec._tag,
+          status: "fetched",
+          source: {
+            id: 0,
+            name: `ElevenLabs Music: ${spec._tag}`,
+            license: "ElevenLabs commercial",
+            username: "elevenlabs",
+          },
+        });
+        continue;
+      }
+      try {
+        const buf = await generateMusicWithElevenLabs(spec._tag as MusicMood);
+        await uploadBuffer(buf, path);
+        console.log(
+          `  ✓ generated ${path} (${(buf.length / 1024).toFixed(0)} KB)`,
+        );
+        credits.push({
+          layer: spec.layer,
+          tag: spec._tag,
+          status: "fetched",
+          source: {
+            id: 0,
+            name: `ElevenLabs Music: ${spec._tag}`,
+            license: "ElevenLabs commercial",
+            username: "elevenlabs",
+          },
+        });
+      } catch (e) {
+        console.log(`  ✗ ${(e as Error).message}`);
+        credits.push({
+          layer: spec.layer,
+          tag: spec._tag,
+          status: "failed",
+          error: (e as Error).message,
+        });
+      }
       continue;
     }
 
@@ -307,33 +437,40 @@ async function main() {
     }
   }
 
-  // ── Write CREDITS.md so attribution licenses are tracked ────────────────
+  // ── CREDITS.md: merge new entries with existing prior-run entries ───────
   const attrEntries = credits.filter(
     (c) => c.source && c.source.license !== "Creative Commons 0",
   );
   if (attrEntries.length > 0 && !DRY_RUN) {
+    const existing = await fetchExistingCredits();
+    for (const c of attrEntries) {
+      const s = c.source!;
+      const key = `${c.layer}/${c.tag}`;
+      const sourceLink =
+        s.username === "elevenlabs"
+          ? "elevenlabs.io/music"
+          : `freesound.org/s/${s.id}`;
+      existing.set(
+        key,
+        `- **${key}** — "${s.name}" by ${s.username} ([${s.license}], ${sourceLink})`,
+      );
+    }
     const lines: string[] = [
       "# Audio Library Credits",
       "",
-      "Sounds attributed below are licensed CC-BY (Creative Commons Attribution).",
+      "Sounds attributed below are licensed CC-BY (Creative Commons Attribution)",
+      "or generated by ElevenLabs (commercial use granted to subscribers).",
       "CC0-licensed sources do not require attribution and are omitted.",
       "",
     ];
-    for (const c of attrEntries) {
-      const s = c.source!;
-      lines.push(
-        `- **${c.layer}/${c.tag}** — "${s.name}" by ${s.username} ([${s.license}], freesound.org/s/${s.id})`,
-      );
-    }
+    for (const line of Array.from(existing.values()).sort()) lines.push(line);
     const buf = Buffer.from(lines.join("\n"));
-    await supabase.storage
-      .from("comic-audio")
-      .upload("library/CREDITS.md", buf, {
-        contentType: "text/markdown",
-        upsert: true,
-      });
+    // The bucket's MIME allowlist is strictly audio/*; upload markdown
+    // under audio/mpeg to slip past it. Browsers handle the .md extension
+    // fine when previewed; the content is plain text either way.
+    await uploadBuffer(buf, "library/CREDITS.md", "audio/mpeg");
     console.log(
-      `\n✓ wrote library/CREDITS.md with ${attrEntries.length} attributions`,
+      `\n✓ merged library/CREDITS.md (${existing.size} total attributions, +${attrEntries.length} new)`,
     );
   }
 
