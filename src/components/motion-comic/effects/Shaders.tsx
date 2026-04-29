@@ -1,6 +1,6 @@
 "use client";
 
-import { ShaderMount } from "@paper-design/shaders-react";
+import { ShaderMount, SmokeRing } from "@paper-design/shaders-react";
 import type { EffectProps } from "./types";
 
 /**
@@ -243,5 +243,72 @@ export function SmokeBillowShader({
         speed={reducedMotion ? 0 : 1}
       />
     </ShaderShell>
+  );
+}
+
+// ─── Energy portals ────────────────────────────────────────────────────────
+//
+// Concentric crackling rings, hue-locked per variant. Built on Paper's
+// SmokeRing shader — the radial structure + noise iterations gives us
+// the "portal swirl" look without writing a custom shader. Transparent
+// colorBack so the panel art shows through the gaps.
+
+interface PortalProps {
+  bbox: EffectProps["bbox"];
+  active: boolean;
+  reducedMotion: boolean;
+  /** Highlight color (the bright outer ring). */
+  colors: string[];
+}
+
+function EnergyPortal({ bbox, active, reducedMotion, colors }: PortalProps) {
+  return (
+    <ShaderShell bbox={bbox} active={active} blendMode="screen">
+      <SmokeRing
+        style={{ width: "100%", height: "100%" }}
+        colorBack="#00000000"
+        colors={colors}
+        noiseScale={2.5}
+        noiseIterations={6}
+        radius={0.3}
+        thickness={0.55}
+        innerShape={0.9}
+        scale={1}
+        speed={reducedMotion ? 0 : 1}
+      />
+    </ShaderShell>
+  );
+}
+
+export function EnergyPortalBlueShader(p: EffectProps) {
+  return (
+    <EnergyPortal
+      bbox={p.bbox}
+      active={p.active}
+      reducedMotion={p.reducedMotion}
+      colors={["#aef0ff", "#00d4ff", "#0066ff"]}
+    />
+  );
+}
+
+export function EnergyPortalRedShader(p: EffectProps) {
+  return (
+    <EnergyPortal
+      bbox={p.bbox}
+      active={p.active}
+      reducedMotion={p.reducedMotion}
+      colors={["#ffd0c4", "#ff5544", "#cc1122"]}
+    />
+  );
+}
+
+export function EnergyPortalGreenShader(p: EffectProps) {
+  return (
+    <EnergyPortal
+      bbox={p.bbox}
+      active={p.active}
+      reducedMotion={p.reducedMotion}
+      colors={["#d0ffd8", "#44ff77", "#118833"]}
+    />
   );
 }

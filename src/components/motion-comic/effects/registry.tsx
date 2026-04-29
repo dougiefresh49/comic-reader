@@ -10,6 +10,9 @@ import {
 } from "./Particles";
 import { RimLightingGlow } from "./RimLightingGlow";
 import {
+  EnergyPortalBlueShader,
+  EnergyPortalGreenShader,
+  EnergyPortalRedShader,
   FireFlickerShader,
   SmokeBillowShader,
   SmokeDriftShader,
@@ -36,6 +39,9 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   smoke_drift: SmokeDriftShader,
   smoke_billow: SmokeBillowShader,
   fire_flicker: FireFlickerShader,
+  energy_portal_blue: EnergyPortalBlueShader,
+  energy_portal_red: EnergyPortalRedShader,
+  energy_portal_green: EnergyPortalGreenShader,
   embers_rising: EmbersRising,
   rain_falling: RainFalling,
   snow_falling: SnowFalling,
