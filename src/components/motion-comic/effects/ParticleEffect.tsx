@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Particles, { initParticlesEngine } from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
+import { loadEmittersPlugin } from "@tsparticles/plugin-emitters";
 import type { ISourceOptions } from "@tsparticles/engine";
 
 let initialized = false;
@@ -12,6 +13,9 @@ function ensureInit(): Promise<void> {
   if (initialized) return Promise.resolve();
   initPromise ??= initParticlesEngine(async (engine) => {
     await loadSlim(engine);
+    // Slim doesn't include the emitters plugin; every effect uses
+    // emitters to spawn particles continuously, so load it explicitly.
+    await loadEmittersPlugin(engine);
   }).then(() => {
     initialized = true;
   });
