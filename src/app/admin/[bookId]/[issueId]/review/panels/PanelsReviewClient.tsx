@@ -78,9 +78,21 @@ function nextPanelId(
 interface Props {
   data: PanelReviewData;
   tagEnums: TagEnums;
+  /** keyed by `${layer}:${base}` → variant slugs */
+  variantsByTag?: Record<string, string[]>;
 }
 
-export function PanelsReviewClient({ data, tagEnums }: Props) {
+function parseTagString(s: string): { base: string; variant: string | null } {
+  const at = s.indexOf("@");
+  if (at < 0) return { base: s, variant: null };
+  return { base: s.slice(0, at), variant: s.slice(at + 1) || null };
+}
+
+export function PanelsReviewClient({
+  data,
+  tagEnums,
+  variantsByTag = {},
+}: Props) {
   const [pageIdx, setPageIdx] = useState(0);
   const [panels, setPanels] = useState<WorkingPanel[]>(() =>
     data.pages.flatMap((p) => p.panels),
@@ -578,6 +590,7 @@ export function PanelsReviewClient({ data, tagEnums }: Props) {
               color={panelColorById.get(p.id) ?? UNASSIGNED_COLOR}
               selected={p.id === selectedPanelId}
               tagEnums={tagEnums}
+              variantsByTag={variantsByTag}
               bubbleCount={pageBubbles.filter((b) => b.panelId === p.id).length}
               onSelect={() => setSelectedPanelId(p.id)}
               onChange={(patch) => updatePanel(p.id, patch)}
@@ -632,6 +645,7 @@ function PanelCard({
   selected,
   bubbleCount,
   tagEnums,
+  variantsByTag,
   onSelect,
   onChange,
   onDelete,
@@ -641,12 +655,22 @@ function PanelCard({
   selected: boolean;
   bubbleCount: number;
   tagEnums: TagEnums;
+  variantsByTag: Record<string, string[]>;
   onSelect: () => void;
   onChange: (patch: Partial<WorkingPanel>) => void;
   onDelete: () => void;
 }) {
   function toggleTag(list: string[], tag: string): string[] {
     return list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag];
+  }
+  function setBaseVariant(
+    list: string[],
+    base: string,
+    variant: string | null,
+  ): string[] {
+    const next = list.filter((s) => parseTagString(s).base !== base);
+    next.push(variant ? `${base}@${variant}` : base);
+    return next;
   }
   function updateAudio(patch: Partial<AudioTags>) {
     onChange({ audioTags: { ...panel.audioTags, ...patch } });
@@ -703,20 +727,34 @@ function PanelCard({
           onChange({ effectTags: toggleTag(panel.effectTags, tag) })
         }
       />
-      <TagChips
+      <AudioTagChips
         label="Ambience"
+        layer="ambience"
         all={tagEnums.ambience}
         selected={panel.audioTags.ambience}
+        variantsByTag={variantsByTag}
         onToggle={(tag) =>
           updateAudio({ ambience: toggleTag(panel.audioTags.ambience, tag) })
         }
+        onPickVariant={(base, variant) =>
+          updateAudio({
+            ambience: setBaseVariant(panel.audioTags.ambience, base, variant),
+          })
+        }
       />
-      <TagChips
+      <AudioTagChips
         label="SFX"
+        layer="sfx"
         all={tagEnums.sfx}
         selected={panel.audioTags.sfx}
+        variantsByTag={variantsByTag}
         onToggle={(tag) =>
           updateAudio({ sfx: toggleTag(panel.audioTags.sfx, tag) })
+        }
+        onPickVariant={(base, variant) =>
+          updateAudio({
+            sfx: setBaseVariant(panel.audioTags.sfx, base, variant),
+          })
         }
       />
       <label className="mt-2 block text-xs text-neutral-400">
@@ -726,11 +764,19 @@ function PanelCard({
           onChange={(e) => updateAudio({ music_mood: e.target.value })}
           className="ml-2 rounded bg-neutral-800 px-1 py-0.5 text-xs"
         >
-          {tagEnums.music.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
+          {tagEnums.music.flatMap((m) => {
+            const variants = variantsByTag[`music:${m}`] ?? [];
+            return [
+              <option key={m} value={m}>
+                {m}
+              </option>,
+              ...variants.map((v) => (
+                <option key={`${m}@${v}`} value={`${m}@${v}`}>
+                  {m} @{v}
+                </option>
+              )),
+            ];
+          })}
         </select>
       </label>
       <label className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
@@ -778,6 +824,119 @@ function TagChips({
             >
               {tag}
             </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Variant-aware tag chips for audio layers (ambience / sfx).
+ *
+ * Each chip represents a base tag. A tag is "on" if any string in
+ * `selected[]` parses to that base. Clicking a chip toggles the bare
+ * tag (or removes all variants of that base). When the chip is on AND
+ * variants exist, an inline ▾ button reveals a variant menu.
+ */
+function AudioTagChips({
+  label,
+  layer,
+  all,
+  selected,
+  variantsByTag,
+  onToggle,
+  onPickVariant,
+}: {
+  label: string;
+  layer: "ambience" | "sfx";
+  all: string[];
+  selected: string[];
+  variantsByTag: Record<string, string[]>;
+  onToggle: (tag: string) => void;
+  onPickVariant: (base: string, variant: string | null) => void;
+}) {
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  return (
+    <div className="mt-2">
+      <div className="mb-1 text-xs text-neutral-400">{label}</div>
+      <div className="flex flex-wrap gap-1">
+        {all.map((base) => {
+          const selectedString = selected.find(
+            (s) => parseTagString(s).base === base,
+          );
+          const on = Boolean(selectedString);
+          const currentVariant = selectedString
+            ? parseTagString(selectedString).variant
+            : null;
+          const variants = variantsByTag[`${layer}:${base}`] ?? [];
+          return (
+            <span key={base} className="relative inline-flex items-stretch">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggle(base);
+                }}
+                className={`rounded-l px-1.5 py-0.5 text-[10px] ${
+                  on
+                    ? "bg-cyan-700 text-white"
+                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                } ${variants.length === 0 ? "rounded-r" : ""}`}
+              >
+                {base}
+                {currentVariant ? (
+                  <span className="ml-1 text-cyan-200">@{currentVariant}</span>
+                ) : null}
+              </button>
+              {variants.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenu(openMenu === base ? null : base);
+                  }}
+                  className={`rounded-r border-l border-neutral-900 px-1 text-[10px] ${
+                    on
+                      ? "bg-cyan-700 text-white hover:bg-cyan-600"
+                      : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                  }`}
+                  aria-label={`Variants for ${base}`}
+                >
+                  ▾
+                </button>
+              )}
+              {openMenu === base && (
+                <div
+                  className="absolute top-full left-0 z-10 mt-0.5 flex flex-col rounded border border-neutral-700 bg-neutral-900 p-1 shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onPickVariant(base, null);
+                      setOpenMenu(null);
+                    }}
+                    className={`rounded px-2 py-0.5 text-left text-[10px] ${currentVariant === null && on ? "bg-cyan-700 text-white" : "text-neutral-300 hover:bg-neutral-800"}`}
+                  >
+                    default
+                  </button>
+                  {variants.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        onPickVariant(base, v);
+                        setOpenMenu(null);
+                      }}
+                      className={`rounded px-2 py-0.5 text-left text-[10px] ${currentVariant === v ? "bg-cyan-700 text-white" : "text-neutral-300 hover:bg-neutral-800"}`}
+                    >
+                      @{v}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </span>
           );
         })}
       </div>
