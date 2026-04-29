@@ -11,6 +11,10 @@ interface UseAudioPlaybackOptions {
   issueId: string;
   timestamps: Record<string, AudioTimestamps>;
   onBubbleEnded?: (bubble: Bubble) => void;
+  /** 0..1 — applied as audio.volume on every bubble playback. */
+  volume?: number;
+  /** HTMLMediaElement.playbackRate; pitch-preserved up to ~1.5x in Safari. */
+  playbackRate?: number;
 }
 
 export function useAudioPlayback({
@@ -18,6 +22,8 @@ export function useAudioPlayback({
   issueId,
   timestamps,
   onBubbleEnded,
+  volume = 1,
+  playbackRate = 1,
 }: UseAudioPlaybackOptions) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -49,6 +55,8 @@ export function useAudioPlayback({
           bubble.audioStoragePath ?? `${bubble.id}.mp3`,
         ),
       );
+      audio.volume = Math.max(0, Math.min(1, volume));
+      audio.playbackRate = playbackRate;
       audioRef.current = audio;
       setIsPlaying(true);
 
@@ -70,8 +78,25 @@ export function useAudioPlayback({
         setIsPlaying(false);
       });
     },
-    [bookId, issueId, timestamps, startHighlight, stopAll, stopHighlight],
+    [
+      bookId,
+      issueId,
+      timestamps,
+      startHighlight,
+      stopAll,
+      stopHighlight,
+      volume,
+      playbackRate,
+    ],
   );
+
+  // Live-update an in-flight audio element when volume/rate change mid-playback.
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = Math.max(0, Math.min(1, volume));
+      audioRef.current.playbackRate = playbackRate;
+    }
+  }, [volume, playbackRate]);
 
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
