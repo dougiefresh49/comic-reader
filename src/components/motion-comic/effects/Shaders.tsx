@@ -128,6 +128,36 @@ void main() {
   // Soft alpha cutoff with extra fade near the tip.
   float alpha = flame * (1.0 - smoothstep(0.85, 1.0, h));
 
+  // Rising embers: a sparse hash-based dot field that drifts upward.
+  // Each "cell" of the field gets a random seed; only the brightest
+  // ~3% draw a spark, so we get scattered bright points rather than a
+  // dense grid. Sparks fade in above the flame and fade out near the
+  // canvas top, mimicking ash carried by the heat.
+  vec2 sp = vec2(uv.x * 28.0, (uv.y * 16.0) - t * 1.8);
+  vec2 sparkCell = floor(sp);
+  vec2 sparkLocal = fract(sp);
+  float sparkSeed = hash(sparkCell);
+  // Jitter spark center within the cell so they don't form a grid.
+  vec2 jitter = vec2(hash(sparkCell + vec2(1.7, 0.0)), hash(sparkCell + vec2(0.0, 3.4))) - 0.5;
+  float sparkDist = length(sparkLocal - (vec2(0.5) + jitter * 0.4));
+  // Top ~12% of cells emit a spark — gives visible scatter without
+  // turning the field into a wall of sparks.
+  float sparkMask = smoothstep(0.88, 1.0, sparkSeed);
+  // Slightly larger glowing dot with a soft halo.
+  float sparkCore = 1.0 - smoothstep(0.0, 0.10, sparkDist);
+  float sparkHalo = (1.0 - smoothstep(0.0, 0.30, sparkDist)) * 0.3;
+  float sparkBrightness = (sparkCore + sparkHalo) * sparkMask;
+  // Sparks live ABOVE the flame: ramp up where flame fades, ramp down at top.
+  float sparkHeightMask = smoothstep(0.20, 0.45, h) * smoothstep(1.0, 0.55, h);
+  // Twinkle: each spark has a per-cell time offset so they pulse in/out.
+  float twinkle = 0.55 + 0.45 * sin(t * 3.5 + sparkSeed * 6.28);
+  sparkBrightness *= sparkHeightMask * twinkle;
+
+  // Compose sparks: bright orange-yellow point, additive over flame.
+  vec3 sparkColor = vec3(1.0, 0.7, 0.25);
+  col = col + sparkColor * sparkBrightness;
+  alpha = max(alpha, sparkBrightness);
+
   fragColor = vec4(col * alpha, alpha);
 }
 `;
