@@ -2,6 +2,7 @@ import "~/styles/globals.css";
 
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
+import { ServiceWorkerRegistrar } from "~/components/ServiceWorkerRegistrar";
 
 export const metadata: Metadata = {
   title: "Comic Reader",
@@ -19,7 +20,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geist.variable}`}>
-      <body>{children}</body>
+      <body>
+        <ServiceWorkerRegistrar />
+        {children}
+      </body>
     </html>
   );
 }
