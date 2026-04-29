@@ -16,9 +16,9 @@ import { SpeechBox } from "./zen-comic-reader/SpeechBox";
 import { PageSheet } from "./zen-comic-reader/PageSheet";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
+import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
+import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import {
-  PanelDimOverlay,
-  PanelViewFrame,
   PanelViewHud,
   usePrefersReducedMotion,
 } from "./zen-comic-reader/PanelView";
@@ -382,6 +382,11 @@ export default function ZenComicReader({
               {panelViewMode && activePanel ? (
                 <PanelDimOverlay bbox={activePanel.boundingBox} />
               ) : null}
+              <PanelEffectsOverlay
+                panel={activePanel}
+                active={panelViewMode}
+                reducedMotion={reducedMotion}
+              />
               {displayBubbles.map((bubble) => {
                 if (!bubble.style) return null;
                 const isSelected = selectedBubbleId === bubble.id;
