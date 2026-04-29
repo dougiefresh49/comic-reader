@@ -29,13 +29,16 @@ import { SpeedLinesDiagonal, SpeedLinesHorizontal } from "./SpeedLines";
 import type { EffectProps } from "./types";
 
 /**
- * Effect tag → React component. Tags not present here are silently
- * dropped at render time (see PanelEffectsOverlay). When a new tag is
- * added to EFFECT_TAGS, register the component here.
+ * Effect tag → React component, runtime registry.
  *
- * v1 ships the CSS-only and SVG-overlay effects. Particle-based
- * (smoke/fire/rain/snow/embers/leaves) and canvas energy portals are
- * deferred to v2; the unmapped tags simply render nothing for now.
+ * Camera transforms (push_in_*, pan_*, shake_*, pull_back) are
+ * deliberately ABSENT from this map — they're applied by
+ * PanelViewFrame via a CSS keyframe class on the page-layer wrapper,
+ * not as overlays. Including them here would render the cyan
+ * preview-only marker boxes on top of the page in the live reader.
+ *
+ * Use EFFECTS_PREVIEW (below) for the /admin/effects-preview gallery
+ * which needs visible demos for every tag.
  */
 export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   rim_lighting_glow: RimLightingGlow,
@@ -54,6 +57,19 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   rain_falling: RainFalling,
   snow_falling: SnowFalling,
   leaves_drifting: LeavesDrifting,
+};
+
+export function getEffect(tag: string): ComponentType<EffectProps> | undefined {
+  return EFFECTS[tag];
+}
+
+/**
+ * Preview-only registry. Adds camera-effect demo components on top of
+ * the runtime EFFECTS so the gallery has something to show for those
+ * tags too.
+ */
+export const EFFECTS_PREVIEW: Record<string, ComponentType<EffectProps>> = {
+  ...EFFECTS,
   camera_push_in_slow: CameraPushInSlowDemo,
   camera_push_in_fast: CameraPushInFastDemo,
   camera_pull_back: CameraPullBackDemo,
@@ -62,6 +78,8 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   panel_shake_hard: PanelShakeHardDemo,
 };
 
-export function getEffect(tag: string): ComponentType<EffectProps> | undefined {
-  return EFFECTS[tag];
+export function getPreviewEffect(
+  tag: string,
+): ComponentType<EffectProps> | undefined {
+  return EFFECTS_PREVIEW[tag];
 }

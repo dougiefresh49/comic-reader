@@ -367,7 +367,7 @@ export default function ZenComicReader({
         >
           <div
             {...doubleTapProps}
-            className="relative flex max-h-full max-w-full flex-col items-center justify-center"
+            className="relative flex h-full w-full flex-col items-center justify-center"
             style={{
               transform: panelViewMode
                 ? undefined
