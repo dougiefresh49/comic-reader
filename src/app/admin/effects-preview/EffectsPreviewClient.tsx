@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getEffect } from "~/components/motion-comic/effects/registry";
+import { getPreviewEffect } from "~/components/motion-comic/effects/registry";
 
 const SAMPLE_BBOX = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
 const SAMPLE_BG =
@@ -43,7 +43,7 @@ export function EffectsPreviewClient({ tags }: { tags: string[] }) {
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {tags.map((tag) => {
-          const Effect = getEffect(tag);
+          const Effect = getPreviewEffect(tag);
           const implemented = Boolean(Effect);
           const isActive = activeTag === tag;
           return (
