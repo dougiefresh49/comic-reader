@@ -18,6 +18,7 @@ import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
 import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
+import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
 import {
   PanelViewHud,
   usePrefersReducedMotion,
@@ -386,6 +387,12 @@ export default function ZenComicReader({
                 panel={activePanel}
                 active={panelViewMode}
                 reducedMotion={reducedMotion}
+              />
+              <PanelAudioLayer
+                panel={activePanel}
+                active={panelViewMode && panelAutoPlay}
+                muted={!panelAutoPlay}
+                newScene={activePanel?.isNewScene ?? false}
               />
               {displayBubbles.map((bubble) => {
                 if (!bubble.style) return null;

@@ -24,6 +24,8 @@ export const env = createEnv({
     GEMINI_API_KEY_2: z.string(),
     ELEVENLABS_API_KEY: z.string(),
     VENICE_API_KEY: z.string(),
+    FREESOUND_API_KEY: z.string().optional(),
+    FREESOUND_CLIENT_ID: z.string().optional(),
   },
 
   /**
@@ -49,6 +51,8 @@ export const env = createEnv({
     GEMINI_API_KEY_2: process.env.GEMINI_API_KEY_2,
     ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
     VENICE_API_KEY: process.env.VENICE_API_KEY,
+    FREESOUND_API_KEY: process.env.FREESOUND_API_KEY,
+    FREESOUND_CLIENT_ID: process.env.FREESOUND_CLIENT_ID,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**

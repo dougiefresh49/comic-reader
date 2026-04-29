@@ -1,6 +1,6 @@
 {
   "name": "comic-reader",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": false,
   "type": "module",
   "scripts": {
@@ -48,7 +48,8 @@
     "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",
     "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts",
     "train-panel-detection": "tsx --env-file=.env scripts/train-panel-detection.ts",
-    "backfill-page-context": "tsx --env-file=.env scripts/backfill-page-context.ts"
+    "backfill-page-context": "tsx --env-file=.env scripts/backfill-page-context.ts",
+    "bootstrap-audio-library": "tsx --env-file=.env scripts/bootstrap-audio-library.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",
