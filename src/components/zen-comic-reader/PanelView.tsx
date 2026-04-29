@@ -130,16 +130,79 @@ export function PanelViewFrame({
     };
   }, [panelViewMode, activePanel, containerSize, reducedMotion]);
 
+  // Camera-effect class derived from the active panel's effectTags. Runs
+  // forwards-once so the panel settles into a stable pose by the end of
+  // its display window. Re-keyed on panel.id so the animation restarts
+  // every time we navigate to a new panel.
+  const cameraEffectClass =
+    !panelViewMode || reducedMotion || !activePanel
+      ? ""
+      : cameraEffectClassFromTags(activePanel.effectTags);
+
   return (
     <div
       ref={viewportRef}
       className="relative mx-auto aspect-[2/3] max-h-[calc(100vh-140px)] w-full max-w-[min(100%,calc((100vh-140px)*0.667))] overflow-hidden select-none"
     >
       <div className="relative h-full w-full" style={transformStyle}>
-        {children}
+        <div
+          key={activePanel?.id ?? "no-panel"}
+          className={`relative h-full w-full ${cameraEffectClass}`}
+          style={{ transformOrigin: "center center" }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Map active panel effect tags to a camera-effect className. Tags
+ * compose: a panel can both push-in AND shake. Tailwind's
+ * `animate-[name_dur_easing_count_fill]` arbitrary-value syntax
+ * references keyframes defined in globals.css.
+ *
+ * Multiple animations on a single element merge into one
+ * `animation` shorthand list, which works here because each
+ * keyframe sets a single transform-prop slice (scale OR translate)
+ * — the browser composes them via the `animation-composition` default
+ * (`replace`) and we get the last-set value. For simple single-
+ * effect panels (the common case) this is fine.
+ *
+ * If a panel mixes scale + shake we'd want a layered structure, but
+ * since panel-direction usually picks one camera tag per panel
+ * (Gemini ranks them) we accept the simpler model for v1.
+ */
+function cameraEffectClassFromTags(tags: string[]): string {
+  const classes: string[] = [];
+  // Pick the first matching scale/pan tag; pick the first matching shake.
+  for (const tag of tags) {
+    switch (tag) {
+      case "camera_push_in_slow":
+        classes.push("animate-[cameraPushInSlow_6s_ease-out_forwards]");
+        break;
+      case "camera_push_in_fast":
+        classes.push("animate-[cameraPushInFast_0.6s_ease-out_forwards]");
+        break;
+      case "camera_pull_back":
+        classes.push("animate-[cameraPullBack_5s_ease-out_forwards]");
+        break;
+      case "camera_pan_horizontal":
+        classes.push(
+          "animate-[cameraPanHorizontal_8s_ease-in-out_infinite_alternate]",
+        );
+        break;
+      case "panel_shake_subtle":
+        classes.push("animate-[panelShakeSubtle_0.4s_steps(8)_1]");
+        break;
+      case "panel_shake_hard":
+        classes.push("animate-[panelShakeHard_0.6s_steps(12)_1]");
+        break;
+    }
+    if (classes.length > 0) break; // only one camera tag per panel
+  }
+  return classes.join(" ");
 }
 
 interface PanelViewHudProps {

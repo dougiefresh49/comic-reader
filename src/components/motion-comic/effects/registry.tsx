@@ -1,8 +1,30 @@
 "use client";
 import type { ComponentType } from "react";
+import {
+  CameraPanHorizontalDemo,
+  CameraPullBackDemo,
+  CameraPushInFastDemo,
+  CameraPushInSlowDemo,
+  PanelShakeHardDemo,
+  PanelShakeSubtleDemo,
+} from "./CameraEffects";
 import { ImpactLinesRadial } from "./ImpactLinesRadial";
 import { LensFlareCool, LensFlareWarm } from "./LensFlare";
+import {
+  EmbersRising,
+  LeavesDrifting,
+  RainFalling,
+  SnowFalling,
+} from "./Particles";
 import { RimLightingGlow } from "./RimLightingGlow";
+import {
+  EnergyPortalBlueShader,
+  EnergyPortalGreenShader,
+  EnergyPortalRedShader,
+  FireFlickerShader,
+  SmokeBillowShader,
+  SmokeDriftShader,
+} from "./Shaders";
 import { SpeedLinesDiagonal, SpeedLinesHorizontal } from "./SpeedLines";
 import type { EffectProps } from "./types";
 
@@ -22,6 +44,22 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   speed_lines_horizontal: SpeedLinesHorizontal,
   speed_lines_diagonal: SpeedLinesDiagonal,
   impact_lines_radial: ImpactLinesRadial,
+  smoke_drift: SmokeDriftShader,
+  smoke_billow: SmokeBillowShader,
+  fire_flicker: FireFlickerShader,
+  energy_portal_blue: EnergyPortalBlueShader,
+  energy_portal_red: EnergyPortalRedShader,
+  energy_portal_green: EnergyPortalGreenShader,
+  embers_rising: EmbersRising,
+  rain_falling: RainFalling,
+  snow_falling: SnowFalling,
+  leaves_drifting: LeavesDrifting,
+  camera_push_in_slow: CameraPushInSlowDemo,
+  camera_push_in_fast: CameraPushInFastDemo,
+  camera_pull_back: CameraPullBackDemo,
+  camera_pan_horizontal: CameraPanHorizontalDemo,
+  panel_shake_subtle: PanelShakeSubtleDemo,
+  panel_shake_hard: PanelShakeHardDemo,
 };
 
 export function getEffect(tag: string): ComponentType<EffectProps> | undefined {

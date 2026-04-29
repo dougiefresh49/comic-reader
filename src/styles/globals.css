@@ -59,3 +59,111 @@
     opacity: 1;
   }
 }
+
+/* Camera-effect transforms applied on top of PanelViewFrame's zoom.
+   Each runs forwards-once so the panel settles into a fixed pose by
+   the end. transform-origin: center ensures scale doesn't shift the
+   focal point. */
+
+@keyframes cameraPushInSlow {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes cameraPushInFast {
+  0% {
+    transform: scale(1);
+  }
+  50%,
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+@keyframes cameraPullBack {
+  from {
+    transform: scale(1.04);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes cameraPanHorizontal {
+  0%,
+  100% {
+    transform: translateX(-2%);
+  }
+  50% {
+    transform: translateX(2%);
+  }
+}
+
+@keyframes panelShakeSubtle {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  10% {
+    transform: translate(2px, -2px);
+  }
+  25% {
+    transform: translate(-2px, 1px);
+  }
+  40% {
+    transform: translate(3px, 2px);
+  }
+  55% {
+    transform: translate(-1px, -3px);
+  }
+  70% {
+    transform: translate(2px, 0);
+  }
+  85% {
+    transform: translate(-2px, 2px);
+  }
+}
+
+@keyframes panelShakeHard {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  8% {
+    transform: translate(8px, -10px);
+  }
+  16% {
+    transform: translate(-12px, 6px);
+  }
+  24% {
+    transform: translate(10px, 8px);
+  }
+  32% {
+    transform: translate(-8px, -10px);
+  }
+  40% {
+    transform: translate(12px, 4px);
+  }
+  48% {
+    transform: translate(-10px, 10px);
+  }
+  56% {
+    transform: translate(8px, -6px);
+  }
+  64% {
+    transform: translate(-6px, -8px);
+  }
+  72% {
+    transform: translate(4px, 6px);
+  }
+  80% {
+    transform: translate(-4px, 2px);
+  }
+  90% {
+    transform: translate(2px, -1px);
+  }
+}
