@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { initParticlesEngine } from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import { loadEmittersPlugin } from "@tsparticles/plugin-emitters";
+import { loadTiltUpdater } from "@tsparticles/updater-tilt";
+import { loadWobbleUpdater } from "@tsparticles/updater-wobble";
 import { tsParticles } from "@tsparticles/engine";
 import type { Container, ISourceOptions } from "@tsparticles/engine";
 
@@ -17,6 +19,9 @@ function ensureInit(): Promise<void> {
     // Slim doesn't include the emitters plugin; every effect uses
     // emitters to spawn particles continuously, so load it explicitly.
     await loadEmittersPlugin(engine);
+    // Wobble + tilt drive the falling-leaves sway and rotation.
+    await loadWobbleUpdater(engine);
+    await loadTiltUpdater(engine);
   }).then(() => {
     initialized = true;
   });

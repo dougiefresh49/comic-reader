@@ -65,6 +65,8 @@
     "@tsparticles/plugin-emitters": "^3.9.1",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",
+    "@tsparticles/updater-tilt": "^3.9.1",
+    "@tsparticles/updater-wobble": "^3.9.1",
     "@use-gesture/react": "^10.3.1",
     "fs-extra": "^11.3.2",
     "glob": "^13.0.0",

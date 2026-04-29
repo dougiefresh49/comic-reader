@@ -304,24 +304,58 @@ export function SnowFalling({ bbox, active, reducedMotion }: EffectProps) {
   );
 }
 
+// Leaf shape — simple SVG so we don't depend on bundled assets. Two
+// data URIs (one warm autumn leaf, one cool fall leaf) get rotated
+// randomly for variety.
+const LEAF_SVG_AUTUMN =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#d97706" d="M12 2c-3 4-7 5-7 11s3 9 7 9 7-3 7-9-4-7-7-11z" stroke="#7c2d12" stroke-width="0.6"/><path d="M12 4c0 6 0 12 0 18" stroke="#7c2d12" stroke-width="0.5" fill="none"/></svg>',
+  );
+const LEAF_SVG_RUST =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#b45309" d="M12 2c-3 4-7 5-7 11s3 9 7 9 7-3 7-9-4-7-7-11z" stroke="#78350f" stroke-width="0.6"/><path d="M12 4c0 6 0 12 0 18" stroke="#78350f" stroke-width="0.5" fill="none"/></svg>',
+  );
+
 const leavesDriftingOptions: ISourceOptions = {
   ...baseOptions,
   particles: {
-    number: { value: 12 },
-    color: { value: ["#ca8a04", "#a16207", "#92400e", "#dc2626"] },
-    opacity: { value: { min: 0.55, max: 0.9 } },
-    size: { value: { min: 4, max: 8 } },
-    shape: { type: "polygon", options: { polygon: { sides: 5 } } },
+    number: { value: 18 },
+    opacity: { value: { min: 0.7, max: 1 } },
+    size: { value: { min: 8, max: 16 } },
+    // Image leaves with a couple of color variants. tsparticles picks
+    // randomly per particle. Keeps file size negligible (inline SVG).
+    shape: {
+      type: "image",
+      options: {
+        image: [
+          { src: LEAF_SVG_AUTUMN, width: 24, height: 24 },
+          { src: LEAF_SVG_RUST, width: 24, height: 24 },
+        ],
+      },
+    },
     move: {
       enable: true,
       direction: "bottom",
-      speed: { min: 0.5, max: 1.4 },
-      drift: { min: -1.5, max: 1.5 },
+      speed: { min: 0.6, max: 1.6 },
       outModes: { default: "out" },
+    },
+    // Wobble lives at the particle level (not move) — sin-wave lateral
+    // sway that simulates leaves fluttering as they fall.
+    wobble: {
+      enable: true,
+      distance: 14,
+      speed: { min: 4, max: 8 },
     },
     rotate: {
       value: { min: 0, max: 360 },
-      animation: { enable: true, speed: 8, sync: false },
+      animation: { enable: true, speed: 6, sync: false },
+    },
+    tilt: {
+      enable: true,
+      direction: "random",
+      animation: { enable: true, speed: 8 },
     },
   },
 };
