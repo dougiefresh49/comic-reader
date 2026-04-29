@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { getPanelReviewData } from "~/server/admin/panel-review";
 import {
+  getAudioLibraryListing,
+  variantsByTag,
+} from "~/server/admin/audio-library";
+import {
   AMBIENCE_TAGS,
   EFFECT_TAGS,
   MUSIC_MOODS,
@@ -16,7 +20,11 @@ interface Params {
 
 export default async function ReviewPanelsPage({ params }: Params) {
   const { bookId, issueId } = await params;
-  const data = await getPanelReviewData(bookId, issueId);
+  const [data, audioListing] = await Promise.all([
+    getPanelReviewData(bookId, issueId),
+    getAudioLibraryListing(),
+  ]);
+  const variants = variantsByTag(audioListing);
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100">
@@ -50,6 +58,7 @@ export default async function ReviewPanelsPage({ params }: Params) {
               sfx: [...SFX_TAGS],
               music: [...MUSIC_MOODS],
             }}
+            variantsByTag={variants}
           />
         )}
       </div>
