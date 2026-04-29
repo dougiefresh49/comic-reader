@@ -117,30 +117,55 @@ export function SmokeBillow({ bbox, active, reducedMotion }: EffectProps) {
 
 // ─── Fire / embers ─────────────────────────────────────────────────────────
 
+// Fire = many small flecks rising fast from a narrow base, layered with
+// additive (screen) blend so overlapping particles brighten into a hot
+// core. Sizes shrink as particles age via size animation; opacity fades
+// to zero on death so we don't see hard edges popping out.
 const fireFlickerOptions: ISourceOptions = {
   ...baseOptions,
   particles: {
-    number: { value: 30 },
-    color: { value: ["#fbbf24", "#f97316", "#ef4444", "#fde68a"] },
+    number: { value: 0 }, // emitters drive population
+    color: { value: ["#fde68a", "#fbbf24", "#f97316", "#dc2626"] },
     opacity: {
-      value: { min: 0.4, max: 0.95 },
-      animation: { enable: true, speed: 4, startValue: "max", count: 1 },
+      value: { min: 0, max: 0.85 },
+      animation: {
+        enable: true,
+        speed: 2.5,
+        startValue: "max",
+        destroy: "min",
+        sync: false,
+      },
     },
-    size: { value: { min: 8, max: 22 } },
+    size: {
+      value: { min: 2, max: 7 },
+      animation: {
+        enable: true,
+        speed: 6,
+        startValue: "max",
+        destroy: "min",
+        sync: false,
+      },
+    },
     move: {
       enable: true,
       direction: "top",
-      speed: { min: 1.0, max: 2.4 },
+      speed: { min: 1.5, max: 3.5 },
       outModes: { default: "destroy" },
-      drift: { min: -0.5, max: 0.5 },
+      gravity: { enable: true, acceleration: -8 }, // accelerate upward
+      drift: { min: -0.6, max: 0.6 },
     },
     shape: { type: "circle" },
-    life: { duration: { value: { min: 0.5, max: 1.2 } } },
+    life: { duration: { value: { min: 0.4, max: 0.9 }, sync: false } },
+    shadow: {
+      enable: true,
+      blur: 6,
+      color: { value: "#fbbf24" },
+    },
   },
   emitters: {
-    position: { x: 50, y: 95 },
-    rate: { delay: 0.05, quantity: 2 },
-    size: { width: 40, height: 0 },
+    position: { x: 50, y: 100 },
+    rate: { delay: 0.02, quantity: 3 },
+    size: { width: 18, height: 0 },
   },
 };
 
@@ -150,6 +175,7 @@ export function FireFlicker({ bbox, active, reducedMotion }: EffectProps) {
     <ParticleEffect
       id={`fire-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      blendMode={reducedMotion ? undefined : "screen"}
       options={
         reducedMotion ? makeStill(fireFlickerOptions) : fireFlickerOptions
       }

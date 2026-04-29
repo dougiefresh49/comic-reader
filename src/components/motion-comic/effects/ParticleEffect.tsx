@@ -24,6 +24,8 @@ interface Props {
   /** 0..1 fraction of the page; effect renders inside this rect. */
   bbox: { x: number; y: number; w: number; h: number };
   options: ISourceOptions;
+  /** Optional CSS mix-blend-mode for hot/glow effects (e.g. "screen" for fire). */
+  blendMode?: "screen" | "lighten" | "plus-lighter";
 }
 
 /**
@@ -31,7 +33,7 @@ interface Props {
  * first render and keeps it cached. Each instance positions a canvas
  * over the panel's bbox.
  */
-export function ParticleEffect({ id, bbox, options }: Props) {
+export function ParticleEffect({ id, bbox, options, blendMode }: Props) {
   const [ready, setReady] = useState(initialized);
   useEffect(() => {
     if (!initialized) void ensureInit().then(() => setReady(true));
@@ -49,6 +51,7 @@ export function ParticleEffect({ id, bbox, options }: Props) {
         height: `${bbox.h * 100}%`,
         // Constrain the canvas to the bbox so particles don't spill out.
         overflow: "hidden",
+        mixBlendMode: blendMode,
       }}
     >
       <Particles id={id} options={options} className="h-full w-full" />
