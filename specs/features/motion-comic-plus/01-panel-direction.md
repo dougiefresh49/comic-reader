@@ -1,8 +1,25 @@
 # Panel Direction
 
-## Status: `pending`
-## Goal: One Gemini Vision call per page returns everything the renderer needs to build a motion comic
-## Cost: ~$0.10 per issue (24 GEMINI_MEDIUM calls)
+## Status: `partial` — `detect-panels` shipped (Roboflow); `describe-panels` is a stub
+## Goal: Two-step pipeline — Roboflow detects panel rects, Gemini describes each panel + tags effects/audio
+## Cost: ~$0.10 per issue (Gemini MEDIUM only; Roboflow on a flat-rate plan)
+
+> ## ⚠ Direction shift 2026-04-29
+>
+> Original design used Gemini Vision to BOTH detect panel rectangles
+> AND describe them. Smoke-test on TMNT × MMPR III page 3: Gemini found
+> 1 panel; Roboflow found 6 (the actual count).
+>
+> Pipeline split:
+>
+> | Step | Tool | What it writes |
+> |---|---|---|
+> | `detect-panels` | Roboflow `find-comic-panel-v1` | `panels.bounding_box` + `bubbles.panel_id` (spatial overlap assignment) |
+> | `describe-panels` | Gemini per-panel | `panels.cinematic_description` + `effect_tags` + `audio_tags` |
+>
+> Issue 1 results: 26 pages, 97 panels, 216/222 (97.3%) bubbles
+> auto-assigned. 6 unassigned bubbles on page 4 (Roboflow training gap
+> — fixable by feeding more training data).
 
 ---
 
@@ -18,6 +35,77 @@ The current `plan-shots` Gemini call sends **only** the page WebP. That's wastef
 2. The bubble manifest for the page: `[{ id, type, speaker, emotion, textWithCues, style }, ...]`
 3. The previous page's `setting` summary (one sentence) — for scene continuity
 4. The cached `aiReasoning` joined into a single context block
+
+---
+
+## DB schema
+
+The browser reader needs panels at runtime, so they live in the DB with the `panel-direction.json` file kept as a debug artifact only.
+
+### New table `panels`
+
+```sql
+CREATE TABLE panels (
+  id                          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  book_id                     text NOT NULL,
+  issue_id                    text NOT NULL,
+  page_number                 int  NOT NULL,
+  panel_id                    text NOT NULL,           -- "p03-01" stable within issue
+  sort_order                  int  NOT NULL,           -- panel order within page
+  bounding_box                jsonb NOT NULL,          -- {x, y, w, h} as 0..1
+  cinematic_description       text,
+  effect_tags                 text[] NOT NULL DEFAULT '{}',
+  audio_tags                  jsonb NOT NULL DEFAULT '{}',
+  primary_speaker             text,
+  estimated_duration_seconds  real,
+  is_new_scene                boolean NOT NULL DEFAULT false,
+  source                      text NOT NULL DEFAULT 'gemini',  -- 'gemini' | 'roboflow' | 'manual'
+  created_at                  timestamptz NOT NULL DEFAULT now(),
+  updated_at                  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (book_id, issue_id, panel_id),
+  FOREIGN KEY (book_id, issue_id) REFERENCES issues(book_id, id)
+);
+
+CREATE INDEX panels_page_idx ON panels(book_id, issue_id, page_number, sort_order);
+```
+
+Note: the denormalized `bubble_ids text[]` from the JSON output isn't stored on `panels`. Instead, each bubble gets a foreign key pointing at its panel — see below.
+
+### Bubble ↔ panel relationship
+
+Use a foreign key on `bubbles`, not a junction table. A bubble belongs to **one** panel; a panel has **many** bubbles. (1-to-N normalization.)
+
+```sql
+ALTER TABLE bubbles
+  ADD COLUMN panel_id uuid REFERENCES panels(id) ON DELETE SET NULL;
+
+CREATE INDEX bubbles_panel_idx ON bubbles(panel_id);
+```
+
+Why a FK and not the array on panels:
+- The "drag a bubble to a different panel" UI mutates bubbles.panel_id with a single UPDATE — no array splice / re-write.
+- Joining bubbles → panel is trivial (`SELECT b.*, p.* FROM bubbles b JOIN panels p ON b.panel_id = p.id`).
+- `ON DELETE SET NULL` so deleting a panel doesn't cascade-delete bubbles; they just become "unassigned" and the manual review UI can reassign them.
+
+If `bubbles.panel_id` is NULL, that's the "needs assignment" state — the renderer skips effects for unassigned bubbles, and the panel-review UI surfaces them prominently.
+
+### Reads from the live app
+
+```ts
+// src/server/pages/queries.ts
+export async function getPanelsForPage(bookId, issueId, pageNumber) {
+  const { data } = await supabase
+    .from("panels")
+    .select("*, bubbles(id, legacy_id, sort_order)")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("page_number", pageNumber)
+    .order("sort_order");
+  return data;
+}
+```
+
+The Supabase client foreign-key embedding does the join for free.
 
 ---
 
@@ -170,6 +258,61 @@ Output lands at `assets/episodes/<book>/<issue>/panel-direction.json`.
 ### Backfill `page_context` table while we're at it
 
 Small standalone script: `scripts/backfill-page-context.ts` that walks every issue's `data/gemini-context/page-NN-gemini-context.json` and upserts to `page_context`. Restores the DB integrity that the original ingest skipped. **One-time chore.**
+
+---
+
+## Manual panel review (browser)
+
+The Gemini panel detection won't be perfect — bounding boxes will sometimes overlap, miss, or assign a bubble to the wrong panel (especially when a speech tail crosses a panel edge). The review UI needs a panel-editing mode alongside the existing bubble-editing mode.
+
+### Mode toggle in the review sidebar
+
+```
+┌─────────────────────────────┐
+│ Review: TMNT × MMPR III #1  │
+│ Page 3 of 24                │
+│                             │
+│ [ Bubbles ]  [ Panels ]    │   ← toggle, persists per-session
+│                             │
+│ ...mode-specific UI...      │
+└─────────────────────────────┘
+```
+
+Bubble mode is what ships today. Panel mode shows:
+
+- A panels list (sortable, reorderable per page) with per-panel cards showing: bbox preview, cinematic description, effect tags, audio tags, count of assigned bubbles
+- The full-page image is overlaid with **panel rectangles** (semi-transparent fills, distinct color per panel) instead of bubble overlays
+- Drag a panel edge to resize the bbox; drag inside to reposition; double-click to enter "edit panel" form
+- Bubbles still render but as small dots colored by their assigned panel, so you can spot bubbles whose dot color disagrees with the surrounding panel
+- Click a bubble dot to either reassign to the active panel (one click) or pop a "move to panel ▾" picker
+
+### Operations
+
+| Action | Effect | Storage |
+|---|---|---|
+| Resize / reposition panel rect | Update `panels.bounding_box` for that panel | DB write on save (or on Apply to DB) |
+| Reassign a bubble to another panel | Update `bubbles.panel_id` for that bubble | DB write on save |
+| Edit cinematic description / effect tags / audio tags | Form fields on the panel card | DB write |
+| Add a panel | "+ Panel" button → drag a new rect → fill form | INSERT into panels with `source = 'manual'` |
+| Delete a panel | Trash icon on card → confirms → soft delete | DELETE; bubbles' panel_id → NULL via FK |
+| Reorder panels | Drag handle on cards | Update `sort_order` |
+
+The "Apply to DB" pattern from the bubble review extends naturally — IndexedDB-backed local edit buffer, batched POST to a server action. New endpoint: `/api/admin/apply-panel-fixes`.
+
+### Why we want this even if Gemini is good
+
+1. Bubbles that spill across panel borders need explicit assignment
+2. Splash pages and full-page art are ambiguous — a human picks "treat as one big panel" vs "split into N visual beats"
+3. Effect / audio tags will sometimes need overrides ("this isn't really a portal scene")
+4. Building this once gives us the hand-tweak escape hatch for everything in the schema, including effect / audio drift over time
+
+### Roboflow fallback for panel detection
+
+If Gemini's panel detection turns out poor on real pages, swap in the Roboflow workflow at `https://detect.roboflow.com/infer/workflows/fresh-space/find-comic-panel-v1`. The workflow returns rectangle bounding boxes; we map those to the same `panels` table (with `source = 'roboflow'`).
+
+The `source` column lets the reviewer's UI flag where a panel came from. Mixed-source pages (some panels from Roboflow, some from manual edits, some from Gemini) are fine — they're all just rows.
+
+A standalone `scripts/train-panel-detection.ts` exists to feed page WebPs to the workflow for training data accumulation. Once Roboflow's confidence is high enough, we'd add a `direct-panels --source roboflow` switch to use it instead of Gemini.
 
 ---
 

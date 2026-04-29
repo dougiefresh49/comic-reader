@@ -25,11 +25,14 @@ function clampOffset(v: number) {
 interface UsePinchZoomOptions {
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
+  /** When true, pinch/swipe handlers are inert (e.g. panel view handles gestures). */
+  disabled?: boolean;
 }
 
 export function usePinchZoom({
   onSwipeLeft,
   onSwipeRight,
+  disabled = false,
 }: UsePinchZoomOptions = {}) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -58,65 +61,88 @@ export function usePinchZoom({
     setOffset({ x: 0, y: 0 });
   }, []);
 
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    const pointers = pointerMapRef.current;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-
-    if (pointers.size === 1 && scaleRef.current === 1) {
-      swipeStartRef.current = e.clientX;
+  useEffect(() => {
+    if (disabled) {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
     }
+  }, [disabled]);
 
-    if (pointers.size === 2) {
-      const [first, second] = Array.from(pointers.values()) as [
-        { x: number; y: number },
-        { x: number; y: number },
-      ];
-      pinchRef.current = {
-        distance: distanceBetween(first, second),
-        scale: scaleRef.current,
-      };
-    }
-  }, []);
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (disabled) return;
+      const pointers = pointerMapRef.current;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const pointers = pointerMapRef.current;
-    const prev = pointers.get(e.pointerId);
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1 && scaleRef.current === 1) {
+        swipeStartRef.current = e.clientX;
+      }
 
-    if (pointers.size === 2 && pinchRef.current) {
-      const [first, second] = Array.from(pointers.values()) as [
-        { x: number; y: number },
-        { x: number; y: number },
-      ];
-      const ratio =
-        distanceBetween(first, second) / (pinchRef.current.distance || 1);
-      const nextScale = clampScale(pinchRef.current.scale * ratio);
-      setScale(nextScale);
-      return;
-    }
+      if (pointers.size === 2) {
+        const [first, second] = Array.from(pointers.values()) as [
+          { x: number; y: number },
+          { x: number; y: number },
+        ];
+        pinchRef.current = {
+          distance: distanceBetween(first, second),
+          scale: scaleRef.current,
+        };
+      }
+    },
+    [disabled],
+  );
 
-    if (pointers.size === 1 && scaleRef.current > 1 && prev) {
-      setOffset((cur) => ({
-        x: clampOffset(cur.x + e.clientX - prev.x),
-        y: clampOffset(cur.y + e.clientY - prev.y),
-      }));
-    }
-  }, []);
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (disabled) return;
+      const pointers = pointerMapRef.current;
+      const prev = pointers.get(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    const pointers = pointerMapRef.current;
-    const wasPinch = pointers.size === 2;
-    pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinchRef.current = null;
+      if (pointers.size === 2 && pinchRef.current) {
+        const [first, second] = Array.from(pointers.values()) as [
+          { x: number; y: number },
+          { x: number; y: number },
+        ];
+        const ratio =
+          distanceBetween(first, second) / (pinchRef.current.distance || 1);
+        const nextScale = clampScale(pinchRef.current.scale * ratio);
+        setScale(nextScale);
+        return;
+      }
 
-    if (!wasPinch && scaleRef.current === 1 && swipeStartRef.current !== null) {
-      const delta = e.clientX - swipeStartRef.current;
-      if (delta > MIN_SWIPE_DISTANCE) onSwipeRightRef.current?.();
-      if (delta < -MIN_SWIPE_DISTANCE) onSwipeLeftRef.current?.();
-    }
-    swipeStartRef.current = null;
-  }, []);
+      if (pointers.size === 1 && scaleRef.current > 1 && prev) {
+        setOffset((cur) => ({
+          x: clampOffset(cur.x + e.clientX - prev.x),
+          y: clampOffset(cur.y + e.clientY - prev.y),
+        }));
+      }
+    },
+    [disabled],
+  );
+
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (disabled) return;
+      const pointers = pointerMapRef.current;
+      const wasPinch = pointers.size === 2;
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinchRef.current = null;
+
+      if (
+        !wasPinch &&
+        scaleRef.current === 1 &&
+        swipeStartRef.current !== null
+      ) {
+        const delta = e.clientX - swipeStartRef.current;
+        if (delta > MIN_SWIPE_DISTANCE) onSwipeRightRef.current?.();
+        if (delta < -MIN_SWIPE_DISTANCE) onSwipeLeftRef.current?.();
+      }
+      swipeStartRef.current = null;
+    },
+    [disabled],
+  );
 
   return {
     scale,

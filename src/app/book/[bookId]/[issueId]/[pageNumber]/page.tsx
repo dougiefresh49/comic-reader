@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getManifest, getPageData } from "~/server";
 import ZenComicReader from "~/components/ZenComicReader";
 import { pageImageUrl } from "~/lib/storage";
+import { getPanelsForPage } from "~/server/pages/panels";
 
 export const revalidate = 86400;
 
@@ -54,6 +55,8 @@ export default async function BookPage({ params }: BookPageProps) {
     ? `/book/${bookId}/${issueId}/${nextPage}`
     : null;
 
+  const panels = await getPanelsForPage(bookId, issueId, pageNum);
+
   return (
     <main className="min-h-screen bg-black">
       <ZenComicReader
@@ -66,6 +69,7 @@ export default async function BookPage({ params }: BookPageProps) {
         pageCount={issue.pageCount}
         prevPageLink={prevPageLink}
         nextPageLink={nextPageLink}
+        panels={panels}
       />
     </main>
   );

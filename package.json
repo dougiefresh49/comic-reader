@@ -1,6 +1,6 @@
 {
   "name": "comic-reader",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": false,
   "type": "module",
   "scripts": {
@@ -46,7 +46,9 @@
     "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts",
     "migrate-to-db": "tsx --env-file=.env scripts/migrate-to-db.ts",
     "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",
-    "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts"
+    "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts",
+    "train-panel-detection": "tsx --env-file=.env scripts/train-panel-detection.ts",
+    "backfill-page-context": "tsx --env-file=.env scripts/backfill-page-context.ts"
   },
   "dependencies": {
     "@browserbasehq/stagehand": "^3.2.1",
@@ -57,6 +59,7 @@
     "@google/genai": "^1.30.0",
     "@supabase/supabase-js": "^2.105.0",
     "@t3-oss/env-nextjs": "^0.12.0",
+    "@use-gesture/react": "^10.3.1",
     "fs-extra": "^11.3.2",
     "glob": "^13.0.0",
     "next": "15.2.6",
