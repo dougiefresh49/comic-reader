@@ -2,6 +2,15 @@
 import type { ComponentType } from "react";
 import { ImpactLinesRadial } from "./ImpactLinesRadial";
 import { LensFlareCool, LensFlareWarm } from "./LensFlare";
+import {
+  EmbersRising,
+  FireFlicker,
+  LeavesDrifting,
+  RainFalling,
+  SmokeBillow,
+  SmokeDrift,
+  SnowFalling,
+} from "./Particles";
 import { RimLightingGlow } from "./RimLightingGlow";
 import { SpeedLinesDiagonal, SpeedLinesHorizontal } from "./SpeedLines";
 import type { EffectProps } from "./types";
@@ -22,6 +31,13 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   speed_lines_horizontal: SpeedLinesHorizontal,
   speed_lines_diagonal: SpeedLinesDiagonal,
   impact_lines_radial: ImpactLinesRadial,
+  smoke_drift: SmokeDrift,
+  smoke_billow: SmokeBillow,
+  fire_flicker: FireFlicker,
+  embers_rising: EmbersRising,
+  rain_falling: RainFalling,
+  snow_falling: SnowFalling,
+  leaves_drifting: LeavesDrifting,
 };
 
 export function getEffect(tag: string): ComponentType<EffectProps> | undefined {
