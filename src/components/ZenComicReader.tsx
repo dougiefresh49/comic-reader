@@ -149,7 +149,15 @@ export default function ZenComicReader({
   const doubleTapBinder = useDoubleTap(handleDoubleTap);
   const doubleTapProps = doubleTapBinder();
 
-  const { autoPlayEnabled, toggleAutoPlay } = useSettings();
+  const {
+    autoPlayEnabled,
+    toggleAutoPlay,
+    volumes,
+    setLayerVolume,
+    resetVolumes,
+    playbackRate,
+    setPlaybackRate,
+  } = useSettings();
   const { navigatePrev, navigateNext } = usePageNavigation({
     prevPageLink,
     nextPageLink,
@@ -241,6 +249,8 @@ export default function ZenComicReader({
     issueId,
     timestamps,
     onBubbleEnded: handleBubbleEnded,
+    volume: volumes.dialogue,
+    playbackRate,
   });
 
   const playBubble = useCallback(
@@ -393,6 +403,11 @@ export default function ZenComicReader({
                 active={panelViewMode && panelAutoPlay}
                 muted={!panelAutoPlay}
                 newScene={activePanel?.isNewScene ?? false}
+                volume={{
+                  ambience: volumes.ambience,
+                  sfx: volumes.sfx,
+                  music: volumes.music,
+                }}
               />
               {displayBubbles.map((bubble) => {
                 if (!bubble.style) return null;
@@ -490,6 +505,11 @@ export default function ZenComicReader({
         hasPrev={!!prevPageLink}
         onNext={navigateNext}
         onPrev={navigatePrev}
+        volumes={volumes}
+        onSetLayerVolume={setLayerVolume}
+        onResetVolumes={resetVolumes}
+        playbackRate={playbackRate}
+        onSetPlaybackRate={setPlaybackRate}
       />
 
       {!panelViewMode && scale > 1 && (
