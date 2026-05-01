@@ -17,7 +17,6 @@ import { SpeechBox } from "./zen-comic-reader/SpeechBox";
 import { PageSheet } from "./zen-comic-reader/PageSheet";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
-import { ForegroundPlate } from "./zen-comic-reader/ForegroundPlate";
 import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
@@ -113,6 +112,11 @@ export default function ZenComicReader({
     setPanelAutoPlay((p) => !p);
   }, []);
 
+  // Forward refs so usePanelNavigation can call into page nav even
+  // though usePageNavigation is declared below it.
+  const navigateNextRef = useRef<(() => void) | null>(null);
+  const navigatePrevRef = useRef<(() => void) | null>(null);
+
   const {
     panelIndex,
     setPanelIndex,
@@ -125,6 +129,8 @@ export default function ZenComicReader({
     enabled: panelViewMode && panels.length > 0,
     onExit: exitPanelView,
     onTogglePanelAutoPlay: togglePanelAutoPlay,
+    onPastEnd: () => navigateNextRef.current?.(),
+    onBeforeStart: () => navigatePrevRef.current?.(),
   });
 
   const activePanel = panels[panelIndex] ?? null;
@@ -184,6 +190,8 @@ export default function ZenComicReader({
     prevPageLink,
     nextPageLink,
   });
+  navigateNextRef.current = navigateNext;
+  navigatePrevRef.current = navigatePrev;
   const {
     scale,
     offset,
@@ -420,7 +428,6 @@ export default function ZenComicReader({
                 active={panelViewMode}
                 reducedMotion={reducedMotion}
               />
-              <ForegroundPlate pageImage={pageImage} panels={panels} />
               <PanelAudioLayer
                 panel={activePanel}
                 active={panelViewMode && panelAutoPlay}

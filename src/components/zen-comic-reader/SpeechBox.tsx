@@ -38,10 +38,13 @@ export function SpeechBox({
       targetRect.right <= containerRect.right;
 
     if (!isVisible) {
+      // The caption container is overflow-y-auto only; an `inline: "center"`
+      // here would walk up the DOM and scroll the page horizontally,
+      // clipping the caption mid-word. Stick to vertical scroll-to-line.
       target.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
-        inline: "center",
+        inline: "nearest",
       });
     }
   }, [activeWordIndex]);
