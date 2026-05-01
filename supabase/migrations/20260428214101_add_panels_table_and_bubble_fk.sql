@@ -1,0 +1,4 @@
+-- Applied directly to production before migrations were tracked in git.
+-- Stub file so Supabase branch previews can match the remote version.
+--
+-- Original: created panels table, added bubbles.panel_id FK to panels.

@@ -1,0 +1,5 @@
+-- Applied directly to production before migrations were tracked in git.
+-- Stub file so Supabase branch previews can match the remote version.
+--
+-- Original: granted anon SELECT on public tables + created RLS
+-- "public read" policies for reader-facing tables.

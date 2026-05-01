@@ -1,0 +1,6 @@
+-- Applied directly to production before migrations were tracked in git.
+-- Stub file so Supabase branch previews can match the remote version.
+--
+-- Original: created initial schema (series, books, issues, pages,
+-- bubbles, audio_timestamps, castlist, characters, character_appearances,
+-- aliases, speaker_reviews, page_context, pipeline_runs, casting_tasks).
