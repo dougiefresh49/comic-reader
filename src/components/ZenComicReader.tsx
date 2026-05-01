@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
+import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { useSettings } from "~/hooks/useSettings";
 import { useAudioPlayback } from "~/hooks/useAudioPlayback";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
@@ -48,8 +49,9 @@ export default function ZenComicReader({
   nextPageLink,
   pageNumber,
   pageCount,
-  panels = [],
+  panels: rawPanels = [],
 }: ZenComicReaderProps) {
+  const panels = useMemo(() => sortPanelsForReading(rawPanels), [rawPanels]);
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
   const [isPageSheetOpen, setIsPageSheetOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -59,6 +61,18 @@ export default function ZenComicReader({
   const reducedMotion = usePrefersReducedMotion();
   const focusBeforePanelRef = useRef<Element | null>(null);
   const panelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const {
+    autoPlayEnabled,
+    toggleAutoPlay,
+    volumes,
+    setLayerVolume,
+    resetVolumes,
+    playbackRate,
+    setPlaybackRate,
+    panelViewPreferred,
+    setPanelViewPreferred,
+  } = useSettings();
 
   const clearPanelTimer = useCallback(() => {
     if (panelTimerRef.current !== null) {
@@ -86,12 +100,13 @@ export default function ZenComicReader({
     clearPanelTimer();
     setPanelViewMode(false);
     setPanelAutoPlay(false);
+    setPanelViewPreferred(false);
     const el = focusBeforePanelRef.current;
     focusBeforePanelRef.current = null;
     if (el instanceof HTMLElement) {
       queueMicrotask(() => el.focus());
     }
-  }, [clearPanelTimer]);
+  }, [clearPanelTimer, setPanelViewPreferred]);
 
   const togglePanelAutoPlay = useCallback(() => {
     setPanelAutoPlay((p) => !p);
@@ -139,7 +154,8 @@ export default function ZenComicReader({
     focusBeforePanelRef.current = document.activeElement;
     setPanelIndex(0);
     setPanelViewMode(true);
-  }, [panels.length, setPanelIndex]);
+    setPanelViewPreferred(true);
+  }, [panels.length, setPanelIndex, setPanelViewPreferred]);
 
   const handleDoubleTap = useCallback(() => {
     if (panelViewMode) exitPanelView();
@@ -149,15 +165,20 @@ export default function ZenComicReader({
   const doubleTapBinder = useDoubleTap(handleDoubleTap);
   const doubleTapProps = doubleTapBinder();
 
-  const {
-    autoPlayEnabled,
-    toggleAutoPlay,
-    volumes,
-    setLayerVolume,
-    resetVolumes,
-    playbackRate,
-    setPlaybackRate,
-  } = useSettings();
+  // If the user was reading panel-by-panel on the previous page, drop
+  // straight back into panel view on this one. Auto-play is *not*
+  // resumed: browsers block silent autoplay without a fresh user gesture.
+  useEffect(() => {
+    if (panelViewPreferred && panels.length > 0 && !panelViewMode) {
+      focusBeforePanelRef.current = document.activeElement;
+      setPanelIndex(0);
+      setPanelViewMode(true);
+    }
+    // Intentionally only on mount per page route — subsequent toggles
+    // are tracked by the explicit enter/exit callbacks below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { navigatePrev, navigateNext } = usePageNavigation({
     prevPageLink,
     nextPageLink,

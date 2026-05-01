@@ -4,6 +4,8 @@ Backlog and status tracker for planned features. Update status here when work st
 
 **Statuses:** `pending` · `in-progress` · `done` · `blocked`
 
+> **Looking for the big picture?** See [`specs/roadmap/00-overview.md`](../roadmap/00-overview.md) — north-star, end-state diagrams, and phased plan that ties all the work below together.
+
 ---
 
 ## Reader
@@ -75,9 +77,21 @@ direction (kept as opt-in "Hero Shot Cinematic"). See
 | MP4 Export | `pending` | [motion-comic-plus/05-mp4-export.md](motion-comic-plus/05-mp4-export.md) | Headless Chromium screen-record (sketch only) |
 | Onomatopoeia bubble re-detection | `pending` | — | User task: re-add to Roboflow now that hand-tweak + multi-class detection are mature |
 
+## From 2026-04-30 testing-session feedback
+
+| Feature | Status | Spec | Notes |
+|---------|--------|------|-------|
+| Persist panel-view across page nav | `done` | — | `panelViewPreferred` in `useSettings`; reader auto-enters panel view on next page if last toggle was on. Audio not auto-resumed (browser autoplay policy). |
+| Runtime panel reading-order sort | `done` | — | `src/lib/panel-reading-order.ts` row-band heuristic. `source === "manual"` panels keep their persisted order. |
+| Music scenes (group panels by mood run) | `pending` | [music-scenes.md](music-scenes.md) | Fixes per-panel music restart. New `music_scenes` table + ingest consolidation step. |
+| SAM3 segmentation → particle layering | `pending` | [segmentation-layering.md](segmentation-layering.md) | Foreground mask layer so particles render between bg and characters/bubbles. Side-benefit: face crops drop into the lookahead pipeline for free. |
+| Reader chrome redesign (Kindle-inspired) | `pending` | [reader-chrome-redesign.md](reader-chrome-redesign.md) | Auto-hiding top bar, slimmer bottom bar, reorganized settings. UI work — needs sign-off. |
+
 ## Future / Ideas
 
 | Idea | Notes |
 |------|-------|
 | Roboflow model retraining | Model has improved since initial setup — may reduce need for manual bounds corrections |
 | Episode web player | `/episode/[bookId]/[issueId]` route in Next.js app — after assembly pipeline ships |
+| Spring-curve panel transitions | Borrow Kindle's smoothness via CSS / Framer Motion. Small change in `PanelView.transforms.ts`. |
+| Action-line position hint in effect tags | Cheap fix for effects placed in wrong corner; precursor to action-line bbox detection. See `segmentation-layering.md` §"Action lines". |

@@ -132,6 +132,21 @@ pnpm typecheck
 
 ---
 
+## Roadmap
+
+The end-state vision and phased plan tying every workstream together
+lives in **[specs/roadmap/00-overview.md](specs/roadmap/00-overview.md)**.
+Open this first if you want context on where things are going. Sub-docs:
+
+| File | What it covers |
+|---|---|
+| [00-overview.md](specs/roadmap/00-overview.md) | North-star, current state, end-state diagram, phased plan |
+| [01-data-model.md](specs/roadmap/01-data-model.md) | Canonical DB schema (existing + planned) |
+| [02-ingest-pipeline.md](specs/roadmap/02-ingest-pipeline.md) | End-state ingest with new steps (wiki, segmentation, lookahead, music scenes) |
+| [03-reader-experience.md](specs/roadmap/03-reader-experience.md) | Layered render, transitions, chrome, captions |
+| [04-voice-rotation.md](specs/roadmap/04-voice-rotation.md) | IVC archive/restore + fidelity test recipe |
+| [05-admin-tooling.md](specs/roadmap/05-admin-tooling.md) | Admin UI gaps and additions per workstream |
+
 ## Phase Plan Index
 
 Improvements are broken into phases. Run each in a new Claude session with `/clear` between phases.

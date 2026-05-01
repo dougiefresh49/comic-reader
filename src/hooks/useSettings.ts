@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 const AUTOPLAY_KEY = "zen-reader-autoplay";
 const VOLUMES_KEY = "zen-reader-volumes";
 const PLAYBACK_RATE_KEY = "zen-reader-playback-rate";
+const PANEL_VIEW_PREFERRED_KEY = "zen-reader-panel-view-preferred";
 
 export interface LayerVolumes {
   dialogue: number;
@@ -47,6 +48,12 @@ export function useSettings() {
 
   const [volumes, setVolumes] = useState<LayerVolumes>(readVolumes);
 
+  const [panelViewPreferred, setPanelViewPreferred] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const stored = window.localStorage.getItem(PANEL_VIEW_PREFERRED_KEY);
+    return stored === "true";
+  });
+
   const [playbackRate, setPlaybackRate] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_PLAYBACK_RATE;
     const stored = window.localStorage.getItem(PLAYBACK_RATE_KEY);
@@ -66,6 +73,13 @@ export function useSettings() {
   useEffect(() => {
     window.localStorage.setItem(PLAYBACK_RATE_KEY, String(playbackRate));
   }, [playbackRate]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      PANEL_VIEW_PREFERRED_KEY,
+      String(panelViewPreferred),
+    );
+  }, [panelViewPreferred]);
 
   const toggleAutoPlay = useCallback(() => {
     setAutoPlayEnabled((prev) => !prev);
@@ -91,5 +105,7 @@ export function useSettings() {
     resetVolumes,
     playbackRate,
     setPlaybackRate,
+    panelViewPreferred,
+    setPanelViewPreferred,
   };
 }

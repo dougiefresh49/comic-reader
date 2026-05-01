@@ -20,6 +20,16 @@ export const env = createEnv({
       .default(
         "https://serverless.roboflow.com/fresh-space/workflows/find-comic-panel-v1",
       ),
+    /** Combined panel + bubble + full-page SAM3 segmentation workflow.
+     *  v2 (per-panel SAM3) is currently broken upstream (dynamic_crop block bug
+     *  reported 2026-05-01); v3 runs SAM3 once on the full page and we map
+     *  polygons to panel-local coords ourselves in extract-foreground-masks. */
+    ROBOFLOW_SAM3_WORKFLOW_URL: z
+      .string()
+      .url()
+      .default(
+        "https://serverless.roboflow.com/infer/workflows/fresh-space/comic-page-analyzer-v3-full-page-sam3",
+      ),
     GEMINI_API_KEY: z.string(),
     GEMINI_API_KEY_2: z.string(),
     ELEVENLABS_API_KEY: z.string(),
@@ -47,6 +57,7 @@ export const env = createEnv({
     ROBOFLOW_API_KEY: process.env.ROBOFLOW_API_KEY,
     ROBOFLOW_WORKFLOW_URL: process.env.ROBOFLOW_WORKFLOW_URL,
     ROBOFLOW_PANEL_WORKFLOW_URL: process.env.ROBOFLOW_PANEL_WORKFLOW_URL,
+    ROBOFLOW_SAM3_WORKFLOW_URL: process.env.ROBOFLOW_SAM3_WORKFLOW_URL,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_API_KEY_2: process.env.GEMINI_API_KEY_2,
     ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
