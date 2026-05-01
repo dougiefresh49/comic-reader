@@ -1,6 +1,24 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DraggableAttributes,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { PageDirectedPanel, PanelAudioTags } from "~/types/panels";
 
 type AudioTags = PanelAudioTags;
@@ -293,6 +311,7 @@ export function PanelsReviewClient({
             edit.primarySpeaker = p.primarySpeaker;
           if (orig?.isNewScene !== p.isNewScene) edit.isNewScene = p.isNewScene;
           if (orig?.sortOrder !== p.sortOrder) edit.sortOrder = p.sortOrder;
+          if (orig?.source !== p.source) edit.source = p.source;
           return edit;
         });
 
@@ -348,6 +367,41 @@ export function PanelsReviewClient({
     } finally {
       setSaving(false);
     }
+  }
+
+  // ─── Drag-to-reorder panels ────────────────────────────────────────────
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ids = pagePanels.map((p) => p.id);
+    const oldIndex = ids.indexOf(String(active.id));
+    const newIndex = ids.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(ids, oldIndex, newIndex);
+    setPanels((curr) => {
+      const updated = [...curr];
+      reordered.forEach((id, i) => {
+        const idx = updated.findIndex((p) => p.id === id);
+        const existing = updated[idx];
+        if (idx !== -1 && existing) {
+          updated[idx] = {
+            ...existing,
+            sortOrder: i,
+            source: "manual",
+            dirty: true,
+          };
+        }
+      });
+      return updated;
+    });
   }
 
   const dirtyCount =
@@ -584,20 +638,33 @@ export function PanelsReviewClient({
               one, then drag the corners to size it.
             </div>
           )}
-          {pagePanels.map((p) => (
-            <PanelCard
-              key={p.id}
-              panel={p}
-              color={panelColorById.get(p.id) ?? UNASSIGNED_COLOR}
-              selected={p.id === selectedPanelId}
-              tagEnums={tagEnums}
-              variantsByTag={variantsByTag}
-              bubbleCount={pageBubbles.filter((b) => b.panelId === p.id).length}
-              onSelect={() => setSelectedPanelId(p.id)}
-              onChange={(patch) => updatePanel(p.id, patch)}
-              onDelete={() => deletePanel(p.id)}
-            />
-          ))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={pagePanels.map((p) => p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {pagePanels.map((p) => (
+                <SortablePanelCard
+                  key={p.id}
+                  panel={p}
+                  color={panelColorById.get(p.id) ?? UNASSIGNED_COLOR}
+                  selected={p.id === selectedPanelId}
+                  tagEnums={tagEnums}
+                  variantsByTag={variantsByTag}
+                  bubbleCount={
+                    pageBubbles.filter((b) => b.panelId === p.id).length
+                  }
+                  onSelect={() => setSelectedPanelId(p.id)}
+                  onChange={(patch) => updatePanel(p.id, patch)}
+                  onDelete={() => deletePanel(p.id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
       </div>
     </div>
@@ -640,6 +707,48 @@ function Handle({
   );
 }
 
+interface PanelCardProps {
+  panel: WorkingPanel;
+  color: string;
+  selected: boolean;
+  bubbleCount: number;
+  tagEnums: TagEnums;
+  variantsByTag: Record<string, string[]>;
+  onSelect: () => void;
+  onChange: (patch: Partial<WorkingPanel>) => void;
+  onDelete: () => void;
+}
+
+function SortablePanelCard(props: PanelCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: props.panel.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? "opacity-50 shadow-lg shadow-black/50" : ""}
+    >
+      <PanelCard
+        {...props}
+        dragAttributes={attributes}
+        dragListeners={listeners}
+      />
+    </div>
+  );
+}
+
 function PanelCard({
   panel,
   color,
@@ -650,16 +759,11 @@ function PanelCard({
   onSelect,
   onChange,
   onDelete,
-}: {
-  panel: WorkingPanel;
-  color: string;
-  selected: boolean;
-  bubbleCount: number;
-  tagEnums: TagEnums;
-  variantsByTag: Record<string, string[]>;
-  onSelect: () => void;
-  onChange: (patch: Partial<WorkingPanel>) => void;
-  onDelete: () => void;
+  dragAttributes,
+  dragListeners,
+}: PanelCardProps & {
+  dragAttributes?: DraggableAttributes;
+  dragListeners?: ReturnType<typeof useSortable>["listeners"];
 }) {
   function toggleTag(list: string[], tag: string): string[] {
     return list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag];
@@ -684,6 +788,17 @@ function PanelCard({
     >
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {dragAttributes && dragListeners && (
+            <button
+              className="flex shrink-0 cursor-grab items-center text-neutral-600 hover:text-neutral-400 active:cursor-grabbing"
+              {...dragAttributes}
+              {...dragListeners}
+              tabIndex={-1}
+              aria-label="Drag to reorder"
+            >
+              ⠿
+            </button>
+          )}
           <span
             className="inline-block h-3 w-3 rounded"
             style={{ backgroundColor: color }}
