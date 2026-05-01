@@ -16,12 +16,20 @@ export default async function AdminDashboardPage() {
               Pipeline status across all books and issues.
             </p>
           </div>
-          <Link
-            href="/admin/new-issue"
-            className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
-          >
-            + New Issue
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/voices"
+              className="rounded bg-neutral-700 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-600"
+            >
+              Voices
+            </Link>
+            <Link
+              href="/admin/new-issue"
+              className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+            >
+              + New Issue
+            </Link>
+          </div>
         </header>
 
         <section className="mb-6">
