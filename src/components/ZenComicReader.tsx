@@ -112,6 +112,11 @@ export default function ZenComicReader({
     setPanelAutoPlay((p) => !p);
   }, []);
 
+  // Forward refs so usePanelNavigation can call into page nav even
+  // though usePageNavigation is declared below it.
+  const navigateNextRef = useRef<(() => void) | null>(null);
+  const navigatePrevRef = useRef<(() => void) | null>(null);
+
   const {
     panelIndex,
     setPanelIndex,
@@ -124,6 +129,8 @@ export default function ZenComicReader({
     enabled: panelViewMode && panels.length > 0,
     onExit: exitPanelView,
     onTogglePanelAutoPlay: togglePanelAutoPlay,
+    onPastEnd: () => navigateNextRef.current?.(),
+    onBeforeStart: () => navigatePrevRef.current?.(),
   });
 
   const activePanel = panels[panelIndex] ?? null;
@@ -183,6 +190,8 @@ export default function ZenComicReader({
     prevPageLink,
     nextPageLink,
   });
+  navigateNextRef.current = navigateNext;
+  navigatePrevRef.current = navigatePrev;
   const {
     scale,
     offset,

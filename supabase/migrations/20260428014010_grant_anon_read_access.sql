@@ -1,0 +1,26 @@
+grant select on public.series to anon;
+grant select on public.books to anon;
+grant select on public.issues to anon;
+grant select on public.pages to anon;
+grant select on public.bubbles to anon;
+grant select on public.audio_timestamps to anon;
+grant select on public.castlist to anon;
+grant select on public.characters to anon;
+grant select on public.character_appearances to anon;
+grant select on public.aliases to anon;
+grant select on public.speaker_reviews to anon;
+grant select on public.page_context to anon;
+grant select on public.pipeline_runs to anon;
+grant select on public.casting_tasks to anon;
+
+create policy "public read" on series for select using (true);
+create policy "public read" on books for select using (true);
+create policy "public read" on issues for select using (true);
+create policy "public read" on pages for select using (true);
+create policy "public read" on bubbles for select using (true);
+create policy "public read" on audio_timestamps for select using (true);
+create policy "public read" on castlist for select using (true);
+create policy "public read" on characters for select using (true);
+create policy "public read" on character_appearances for select using (true);
+create policy "public read" on aliases for select using (true);
+create policy "public read" on speaker_reviews for select using (true);

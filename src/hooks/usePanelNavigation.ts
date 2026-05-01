@@ -12,6 +12,10 @@ export interface UsePanelNavigationOptions {
   enabled: boolean;
   onExit: () => void;
   onTogglePanelAutoPlay?: () => void;
+  /** Called when the user advances past the last panel — wire to next-page nav. */
+  onPastEnd?: () => void;
+  /** Called when the user advances before the first panel — wire to prev-page nav. */
+  onBeforeStart?: () => void;
 }
 
 export interface UsePanelNavigationResult {
@@ -28,6 +32,8 @@ export function usePanelNavigation({
   enabled,
   onExit,
   onTogglePanelAutoPlay,
+  onPastEnd,
+  onBeforeStart,
 }: UsePanelNavigationOptions): UsePanelNavigationResult {
   const [panelIndex, setPanelIndex] = useState(0);
   const panelContainerRef = useRef<HTMLDivElement | null>(null);
@@ -38,12 +44,28 @@ export function usePanelNavigation({
   );
 
   const goNext = useCallback(() => {
-    setPanelIndex((i) => clampIndex(i + 1));
-  }, [clampIndex]);
+    let crossedEnd = false;
+    setPanelIndex((i) => {
+      if (i >= panelCount - 1) {
+        crossedEnd = true;
+        return i;
+      }
+      return clampIndex(i + 1);
+    });
+    if (crossedEnd) onPastEnd?.();
+  }, [clampIndex, panelCount, onPastEnd]);
 
   const goPrev = useCallback(() => {
-    setPanelIndex((i) => clampIndex(i - 1));
-  }, [clampIndex]);
+    let crossedStart = false;
+    setPanelIndex((i) => {
+      if (i <= 0) {
+        crossedStart = true;
+        return i;
+      }
+      return clampIndex(i - 1);
+    });
+    if (crossedStart) onBeforeStart?.();
+  }, [clampIndex, onBeforeStart]);
 
   useEffect(() => {
     setPanelIndex((i) => clampIndex(i));

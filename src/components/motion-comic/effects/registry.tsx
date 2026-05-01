@@ -46,9 +46,10 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   lens_flare_cool: LensFlareCool,
   speed_lines_horizontal: SpeedLinesHorizontal,
   speed_lines_diagonal: SpeedLinesDiagonal,
-  impact_lines_radial: ImpactLinesRadial,
-  smoke_drift: SmokeDriftShader,
-  smoke_billow: SmokeBillowShader,
+  // 2026-05-01: smoke + center-spiral radial removed from runtime per
+  // testing feedback ("particles look ridiculous" / "smoke stuff" / "the
+  // center spiral thing looked terrible"). Components stay in the
+  // codebase so /admin/effects-preview keeps rendering them.
   fire_flicker: FireFlickerShader,
   energy_portal_blue: EnergyPortalBlueShader,
   energy_portal_red: EnergyPortalRedShader,
@@ -70,6 +71,11 @@ export function getEffect(tag: string): ComponentType<EffectProps> | undefined {
  */
 export const EFFECTS_PREVIEW: Record<string, ComponentType<EffectProps>> = {
   ...EFFECTS,
+  // Disabled-in-runtime effects still rendered in the admin gallery so
+  // they can be eyeballed when deciding whether to flip them back on.
+  smoke_drift: SmokeDriftShader,
+  smoke_billow: SmokeBillowShader,
+  impact_lines_radial: ImpactLinesRadial,
   camera_push_in_slow: CameraPushInSlowDemo,
   camera_push_in_fast: CameraPushInFastDemo,
   camera_pull_back: CameraPullBackDemo,

@@ -178,6 +178,7 @@ export function PanelsReviewClient({
       isNewScene: false,
       source: "manual",
       bubbleIds: [],
+      foregroundPolygons: null,
       dirty: true,
     };
     setPanels((curr) => [...curr, fresh]);
