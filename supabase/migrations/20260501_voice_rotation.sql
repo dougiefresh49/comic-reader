@@ -92,3 +92,10 @@ create policy voices_public_read on voices
 drop policy if exists voice_archives_public_read on voice_archives;
 create policy voice_archives_public_read on voice_archives
   for select using (true);
+
+-- Supabase doesn't auto-grant CRUD on tables with RLS — service_role
+-- needs explicit privileges to write from the pipeline scripts.
+grant select, insert, update, delete on public.voices to service_role;
+grant select, insert, update, delete on public.voice_archives to service_role;
+grant select on public.voices to anon;
+grant select on public.voice_archives to anon;
