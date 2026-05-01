@@ -1,6 +1,10 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
-import type { PageDirectedPanel, PanelAudioTags } from "~/types/panels";
+import type {
+  PageDirectedPanel,
+  PanelAudioTags,
+  PanelForegroundPolygons,
+} from "~/types/panels";
 
 interface PanelRow {
   id: string;
@@ -15,8 +19,12 @@ interface PanelRow {
   estimated_duration_seconds: number | null;
   is_new_scene: boolean;
   source: string;
+  foreground_polygons: PanelForegroundPolygons | null;
   bubbles: Array<{ id: string; sort_order: number }> | null;
 }
+
+const PANEL_SELECT =
+  "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, bubbles(id, sort_order)";
 
 function rowToPanel(row: PanelRow): PageDirectedPanel {
   const bubbles = (row.bubbles ?? [])
@@ -43,6 +51,7 @@ function rowToPanel(row: PanelRow): PageDirectedPanel {
         ? row.source
         : "gemini",
     bubbleIds: bubbles.map((b) => b.id),
+    foregroundPolygons: row.foreground_polygons,
   };
 }
 
@@ -57,9 +66,7 @@ export async function getPanelsForPage(
 ): Promise<PageDirectedPanel[]> {
   const { data, error } = await supabase
     .from("panels")
-    .select(
-      "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, bubbles(id, sort_order)",
-    )
+    .select(PANEL_SELECT)
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber)
@@ -80,9 +87,7 @@ export async function getPanelsForIssue(
 ): Promise<PageDirectedPanel[]> {
   const { data, error } = await supabase
     .from("panels")
-    .select(
-      "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, bubbles(id, sort_order)",
-    )
+    .select(PANEL_SELECT)
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .order("page_number")

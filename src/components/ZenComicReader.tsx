@@ -17,6 +17,7 @@ import { SpeechBox } from "./zen-comic-reader/SpeechBox";
 import { PageSheet } from "./zen-comic-reader/PageSheet";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
+import { ForegroundPlate } from "./zen-comic-reader/ForegroundPlate";
 import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
@@ -419,6 +420,7 @@ export default function ZenComicReader({
                 active={panelViewMode}
                 reducedMotion={reducedMotion}
               />
+              <ForegroundPlate pageImage={pageImage} panels={panels} />
               <PanelAudioLayer
                 panel={activePanel}
                 active={panelViewMode && panelAutoPlay}

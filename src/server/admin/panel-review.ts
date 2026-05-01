@@ -1,6 +1,10 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import type { PageDirectedPanel, PanelBoundingBox } from "~/types/panels";
+import type {
+  PageDirectedPanel,
+  PanelBoundingBox,
+  PanelForegroundPolygons,
+} from "~/types/panels";
 import type { AudioTags } from "~/lib/panel-tags";
 
 export interface PanelReviewBubble {
@@ -47,6 +51,7 @@ interface PanelRow {
   estimated_duration_seconds: number | null;
   is_new_scene: boolean;
   source: string;
+  foreground_polygons: PanelForegroundPolygons | null;
 }
 
 interface BubbleRow {
@@ -87,7 +92,7 @@ export async function getPanelReviewData(
       supabaseAdmin
         .from("panels")
         .select(
-          "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source",
+          "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons",
         )
         .eq("book_id", bookId)
         .eq("issue_id", issueId)
@@ -161,6 +166,7 @@ export async function getPanelReviewData(
           ? row.source
           : "gemini",
       bubbleIds: [],
+      foregroundPolygons: row.foreground_polygons ?? null,
     });
   }
 
