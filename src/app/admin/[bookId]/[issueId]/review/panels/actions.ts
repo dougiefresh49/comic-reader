@@ -16,6 +16,7 @@ export interface PanelEdit {
   primarySpeaker?: string | null;
   isNewScene?: boolean;
   sortOrder?: number;
+  source?: string;
 }
 
 export interface PanelInsert {
@@ -122,6 +123,7 @@ export async function applyPanelFixes(
       update.primary_speaker = edit.primarySpeaker;
     if (edit.isNewScene !== undefined) update.is_new_scene = edit.isNewScene;
     if (edit.sortOrder !== undefined) update.sort_order = edit.sortOrder;
+    if (edit.source !== undefined) update.source = edit.source;
     const { error } = await supabaseAdmin
       .from("panels")
       .update(update)

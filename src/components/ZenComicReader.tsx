@@ -259,7 +259,7 @@ export default function ZenComicReader({
               )
             : 1200;
         panelTimerRef.current = setTimeout(() => {
-          if (pi < plist.length - 1) goNextPanelRef.current();
+          goNextPanelRef.current();
         }, dwellMs);
         return;
       }
@@ -318,9 +318,7 @@ export default function ZenComicReader({
           ? Math.max(600, panel.estimatedDurationSeconds * 1000)
           : 2000;
       panelTimerRef.current = setTimeout(() => {
-        if (panelIndexRef.current < panelsRef.current.length - 1) {
-          goNextPanelRef.current();
-        }
+        goNextPanelRef.current();
       }, ms);
       return () => clearPanelTimer();
     }
