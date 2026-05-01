@@ -78,7 +78,7 @@ const response = await fetch(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      api_key: "5erSDAGsNG97NOG0f127",
+      api_key: "",
       inputs: {
         image: { type: "url", value: "IMAGE_URL" },
       },
@@ -89,3 +89,6 @@ const response = await fetch(
 const result = await response.json();
 console.log(result);
 ```
+
+New Roboflow workflow:
+`comic-page-analyzer-1777506243433`
