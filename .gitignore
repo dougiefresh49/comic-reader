@@ -56,6 +56,9 @@ assets/**/checkpoint.json
 /assets/**/known-characters.json
 /assets/**/data/wiki-cache.txt
 /assets/**/data/reviewed-speakers.json
+
+# scratch outputs from local scripts (e.g. test-ivc-fidelity)
+/tmp/
 supabase/.temp
 
 # local AI tooling

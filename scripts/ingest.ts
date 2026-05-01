@@ -34,6 +34,8 @@ const PIPELINE_STEPS: PipelineStep[] = [
   { id: "validate-inputs" },
   { id: "generate-pages-metadata" },
   { id: "convert-pages-to-webp" },
+  { id: "roboflow-page-analyze" },
+  { id: "extract-foreground-masks" },
   { id: "get-context" },
   { id: "review-speakers" },
   { id: "sort-bubbles-gemini" },
@@ -339,10 +341,7 @@ async function main() {
           }
           const exitCode = await runPnpmScript(step.id, book, issue, extraArgs);
 
-          if (
-            step.id === "review-new-characters" &&
-            exitCode === 2
-          ) {
+          if (step.id === "review-new-characters" && exitCode === 2) {
             console.log(
               `\n⏸️  Pipeline paused at review-new-characters — complete the browser review, then re-run ingest.`,
             );
@@ -353,9 +352,7 @@ async function main() {
           }
 
           if (exitCode !== 0) {
-            throw new Error(
-              `Script "${step.id}" exited with code ${exitCode}`,
-            );
+            throw new Error(`Script "${step.id}" exited with code ${exitCode}`);
           }
         }
       }

@@ -87,11 +87,60 @@ Downstream steps fall back to current "no wiki context" behavior.
 **Purpose**: Single Roboflow workflow call returning panel bboxes,
 bubble bboxes, and SAM3 segmentation polygons.
 
-**Endpoint**: `https://serverless.roboflow.com/fresh-space/workflows/comic-page-analyzer-1777506243433`
+**Endpoint** (production for ingest):
+`https://serverless.roboflow.com/infer/workflows/fresh-space/comic-page-analyzer-v3-full-page-sam3`
 
-**Status**: workflow exists, currently runs SAM3 per-page. Needs
-update to **per-panel segmentation** for cleaner masks (Roboflow rep
-suggested this; SAM3 is more accurate when given a tight crop).
+**Workflow ID**: `NyslOhzdmti28rpDD10M`
+**Slug**: `comic-page-analyzer-v3-full-page-sam3`
+
+**Status**: Built 2026-05-01 after v2 hit a Roboflow bug. v3 runs
+SAM3 once on the full page (rather than per panel). Validated end-to-end
+on `tmnt-mmpr-iii/issue-1` (26/26 pages, ~6s each, sidecars at
+`assets/comics/.../data/sam3/page-NN.json`).
+
+**Why v3 instead of v2**: We initially built a per-panel-SAM3 workflow
+(`comic-page-analyzer-v2-per-panel-sam3`, ID `bIENpbdiWqay9ZTCrL1y`)
+because Roboflow's rep recommended per-panel for tighter masks. It
+worked on a smoke test of two pages but failed on 12 of 26 pages with
+a runtime error from the `dynamic_crop@v1` block: *"Step panel_crops
+did not produce required outputs. Expected: {'predictions', 'crops'}.
+Got: {'crops'}."* Reproducible in isolation (just panel_model →
+dynamic_crop, no SAM3) — purely a dynamic_crop block bug. Bug filed
+to Roboflow via `meta_feedback_send` 2026-05-01. When fixed, the env
+var `ROBOFLOW_SAM3_WORKFLOW_URL` can be flipped back to v2 with no
+code changes needed in the parser (see notes below).
+
+**Tradeoff**: full-page SAM3 produces slightly looser masks than
+per-panel would, per the Roboflow rep. In practice the masks have
+been good enough for the layered-render use case. Polygon coords come
+back in page-space; `extract-foreground-masks` (step 4.2) handles the
+panel-local conversion using the panel bboxes from the same response.
+
+The earlier full-page workflow `comic-page-analyzer-1777506243433`
+remains untouched as a separate prod-safe artifact and is *not* the
+endpoint we wire ingest to.
+
+**Pipeline shape inside the v3 workflow** (current):
+
+```
+input image
+  ├─→ panel_model (find-comic-panel-v1/1 @ 0.4)
+  ├─→ bubble_model (find-speech-bubbles-fmu3y/4 @ 0.3)
+  └─→ sam3@v3 (full page)
+       classes: comic character | person | face | head | speech bubble
+       confidence: 0.4
+       output_format: polygons
+```
+
+**Pipeline shape v2 would have used (currently broken upstream)**:
+
+```
+input image
+  ├─→ panel_model
+  ├─→ bubble_model
+  └─→ dynamic_crop ← BUG: doesn't always emit `predictions` output
+        └─→ sam3@v3 per crop
+```
 
 **Per-panel segmentation flow**:
 
@@ -115,24 +164,59 @@ flowchart LR
     Bn --> Out
 ```
 
-This is a Roboflow workflow change, not application code — done in
-their console. Once configured, the response shape becomes:
+**v3 response shape** (actual, ingested into `data/sam3/page-NN.json`):
 
 ```jsonc
 {
-  "panels": [
-    {
-      "panel_id": "p01-01",
-      "bbox": { "x": 0.0, "y": 0.0, "w": 1.0, "h": 0.3 },
-      "bubbles": [{ "bbox": [...], "confidence": 0.97 }],
-      "segmentation": [
-        { "class": "character", "polygon": [[…]], "confidence": 0.96 },
-        { "class": "bubble",    "polygon": [[…]], "confidence": 0.99 }
+  "outputs": [{
+    "panel_predictions": {
+      "image": { "width": 1988, "height": 3057 },
+      "predictions": [
+        { "x", "y", "width", "height", "confidence",
+          "class": "comic panel", "detection_id" }
+      ]
+    },
+    "bubble_predictions": { /* same shape, class: "speech bubble" */ },
+    "segmentation_predictions": {
+      "image": { "width": 1988, "height": 3057 },
+      "predictions": [
+        {
+          "class": "comic character" | "person" | "face" | "head" | "speech bubble",
+          "confidence": 0.96,
+          "points": [{ "x": 1489, "y": 2692 }, …],   // page-space pixels
+          "detection_id", "parent_id"
+        }
       ]
     }
-  ]
+  }]
 }
 ```
+
+After our parser strips visualizations and flattens, the persisted
+sidecar is:
+
+```jsonc
+{
+  "image": { "width": 1988, "height": 3057 },
+  "panel_predictions":        [/* BoxPrediction[] */],
+  "bubble_predictions":       [/* BoxPrediction[] */],
+  "segmentation_predictions": [/* SegmentationPrediction[] */]
+}
+```
+
+**Coordinate detail**: All SAM3 polygon coords are in **page-space
+pixels** (the full-page input space). Step 4.2 normalizes to
+panel-local 0..1 by assigning each polygon to a panel via centroid-in-bbox
+and then subtracting the panel bbox origin / dividing by panel dimensions.
+
+**Class assignment in step 4.2**:
+- `comic character | person | face | head` → `foreground_polygons.characters` bucket
+- `speech bubble` → `foreground_polygons.bubbles` bucket
+
+The runtime renders the page WebP twice with complementary clip-paths
+using these polygons (see `03-reader-experience.md`). Bubbles get a
+separate exclusion zone so particle effects don't render over the
+text.
 
 ### 4.1 `reading-order-canonicalize` (NEW)
 
@@ -161,11 +245,17 @@ shape the runtime layering expects.
 ```
 
 **Algorithm**:
-1. Filter `segmentation_predictions` to character/face/head/person
-   and bubble classes.
-2. Merge overlapping same-class polygons (union).
-3. Convert to panel-local 0..1 coordinates.
-4. Simplify via Ramer–Douglas–Peucker to ~30 vertices per shape so
+1. For each panel index *i*, take
+   `panel_segmentation_predictions[i].predictions` (page-space
+   coords from `dynamic_crop`) and the matching panel bbox from
+   `panel_predictions.predictions[i]`.
+2. Filter polygons to character/face/head/person classes (foreground)
+   and bubble classes (separate set; runtime treats them as a different
+   exclusion zone for particles).
+3. Merge overlapping same-class polygons (union).
+4. Convert to panel-local 0..1: `(point.x - panel.bbox.x) / panel.bbox.w`,
+   same for y/h.
+5. Simplify via Ramer–Douglas–Peucker to ~30 vertices per shape so
    the persisted clip-path string stays small.
 
 Detail: [features/segmentation-layering.md](../features/segmentation-layering.md).
