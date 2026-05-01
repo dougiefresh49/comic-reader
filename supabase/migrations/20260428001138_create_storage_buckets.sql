@@ -1,4 +1,8 @@
--- Applied directly to production before migrations were tracked in git.
--- Stub file so Supabase branch previews can match the remote version.
---
--- Original: created storage buckets for comic assets.
+insert into storage.buckets (id, name, public)
+values
+  ('comic-pages', 'comic-pages', true),
+  ('comic-audio', 'comic-audio', true),
+  ('comic-pages-raw', 'comic-pages-raw', false),
+  ('comic-ocr-crops', 'comic-ocr-crops', false),
+  ('comic-voice-clips', 'comic-voice-clips', false)
+on conflict (id) do nothing;

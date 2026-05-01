@@ -1,4 +1,14 @@
--- Applied directly to production before migrations were tracked in git.
--- Stub file so Supabase branch previews can match the remote version.
---
--- Original: granted service_role CRUD on all public tables with RLS.
+grant select, insert, update, delete on public.series to service_role;
+grant select, insert, update, delete on public.books to service_role;
+grant select, insert, update, delete on public.issues to service_role;
+grant select, insert, update, delete on public.pages to service_role;
+grant select, insert, update, delete on public.bubbles to service_role;
+grant select, insert, update, delete on public.audio_timestamps to service_role;
+grant select, insert, update, delete on public.castlist to service_role;
+grant select, insert, update, delete on public.characters to service_role;
+grant select, insert, update, delete on public.character_appearances to service_role;
+grant select, insert, update, delete on public.aliases to service_role;
+grant select, insert, update, delete on public.speaker_reviews to service_role;
+grant select, insert, update, delete on public.page_context to service_role;
+grant select, insert, update, delete on public.pipeline_runs to service_role;
+grant select, insert, update, delete on public.casting_tasks to service_role;
