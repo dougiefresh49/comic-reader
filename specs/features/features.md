@@ -4,6 +4,8 @@ Backlog and status tracker for planned features. Update status here when work st
 
 **Statuses:** `pending` · `in-progress` · `done` · `blocked`
 
+> **Looking for the big picture?** See [`specs/roadmap/00-overview.md`](../roadmap/00-overview.md) — north-star, end-state diagrams, and phased plan that ties all the work below together.
+
 ---
 
 ## Reader
