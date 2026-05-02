@@ -19,7 +19,12 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { PageDirectedPanel, PanelAudioTags } from "~/types/panels";
+import type {
+  EffectAnchor,
+  EffectPositions,
+  PageDirectedPanel,
+  PanelAudioTags,
+} from "~/types/panels";
 
 type AudioTags = PanelAudioTags;
 import type {
@@ -304,6 +309,11 @@ export function PanelsReviewClient({
             JSON.stringify(p.effectTags)
           )
             edit.effectTags = p.effectTags;
+          if (
+            JSON.stringify(orig?.effectPositions ?? null) !==
+            JSON.stringify(p.effectPositions ?? null)
+          )
+            edit.effectPositions = p.effectPositions ?? null;
           if (
             JSON.stringify(orig?.audioTags ?? {}) !==
             JSON.stringify(p.audioTags)
@@ -841,9 +851,21 @@ function PanelCard({
         label="Effect tags"
         all={tagEnums.effect}
         selected={panel.effectTags}
-        onToggle={(tag) =>
-          onChange({ effectTags: toggleTag(panel.effectTags, tag) })
-        }
+        onToggle={(tag) => {
+          const next = toggleTag(panel.effectTags, tag);
+          const patch: Partial<WorkingPanel> = { effectTags: next };
+          if (!next.includes(tag) && panel.effectPositions?.[tag]) {
+            const ep = { ...panel.effectPositions };
+            delete ep[tag];
+            patch.effectPositions = Object.keys(ep).length > 0 ? ep : null;
+          }
+          onChange(patch);
+        }}
+      />
+      <EffectPositionPicker
+        effectTags={panel.effectTags}
+        effectPositions={panel.effectPositions}
+        onChange={(ep) => onChange({ effectPositions: ep })}
       />
       <AudioTagChips
         label="Ambience"
@@ -905,6 +927,84 @@ function PanelCard({
         />
         New scene (music transition)
       </label>
+    </div>
+  );
+}
+
+const CAMERA_PREFIXES = ["camera_", "panel_shake"];
+
+const ANCHOR_GRID: Array<{ value: EffectAnchor; label: string }> = [
+  { value: "top-left", label: "TL" },
+  { value: "top-center", label: "TC" },
+  { value: "top-right", label: "TR" },
+  { value: "left-center", label: "ML" },
+  { value: "center", label: "C" },
+  { value: "right-center", label: "MR" },
+  { value: "bottom-left", label: "BL" },
+  { value: "bottom-center", label: "BC" },
+  { value: "bottom-right", label: "BR" },
+];
+
+function EffectPositionPicker({
+  effectTags,
+  effectPositions,
+  onChange,
+}: {
+  effectTags: string[];
+  effectPositions: EffectPositions | null;
+  onChange: (ep: EffectPositions | null) => void;
+}) {
+  const positionable = effectTags.filter(
+    (t) => !CAMERA_PREFIXES.some((p) => t.startsWith(p)),
+  );
+  if (positionable.length === 0) return null;
+
+  function setAnchor(tag: string, anchor: EffectAnchor | null) {
+    const current = { ...(effectPositions ?? {}) };
+    if (anchor === null) {
+      delete current[tag];
+    } else {
+      current[tag] = { anchor };
+    }
+    onChange(Object.keys(current).length > 0 ? current : null);
+  }
+
+  return (
+    <div className="mt-2">
+      <div className="mb-1 text-xs text-neutral-400">Effect positions</div>
+      <div className="flex flex-col gap-2">
+        {positionable.map((tag) => {
+          const pos = effectPositions?.[tag];
+          const activeAnchor = pos?.anchor ?? null;
+          return (
+            <div key={tag} className="flex items-start gap-2">
+              <span className="mt-0.5 min-w-0 shrink text-[10px] leading-tight break-all text-neutral-500">
+                {tag.replace(/_/g, " ")}
+              </span>
+              <div className="grid shrink-0 grid-cols-3 gap-px">
+                {ANCHOR_GRID.map((a) => (
+                  <button
+                    key={a.value}
+                    type="button"
+                    title={a.value}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAnchor(tag, activeAnchor === a.value ? null : a.value);
+                    }}
+                    className={`h-4 w-5 text-[8px] leading-none ${
+                      activeAnchor === a.value
+                        ? "bg-cyan-700 text-white"
+                        : "bg-neutral-800 text-neutral-500 hover:bg-neutral-700"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

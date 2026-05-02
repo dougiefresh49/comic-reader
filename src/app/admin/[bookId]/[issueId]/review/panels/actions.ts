@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import type { PanelBoundingBox, PanelAudioTags } from "~/types/panels";
+import type {
+  EffectPositions,
+  PanelBoundingBox,
+  PanelAudioTags,
+} from "~/types/panels";
 
 type AudioTags = PanelAudioTags;
 
@@ -12,6 +16,7 @@ export interface PanelEdit {
   boundingBox?: PanelBoundingBox;
   cinematicDescription?: string | null;
   effectTags?: string[];
+  effectPositions?: EffectPositions | null;
   audioTags?: AudioTags;
   primarySpeaker?: string | null;
   isNewScene?: boolean;
@@ -118,6 +123,8 @@ export async function applyPanelFixes(
     if (edit.cinematicDescription !== undefined)
       update.cinematic_description = edit.cinematicDescription;
     if (edit.effectTags !== undefined) update.effect_tags = edit.effectTags;
+    if (edit.effectPositions !== undefined)
+      update.effect_positions = edit.effectPositions;
     if (edit.audioTags !== undefined) update.audio_tags = edit.audioTags;
     if (edit.primarySpeaker !== undefined)
       update.primary_speaker = edit.primarySpeaker;
