@@ -12,10 +12,13 @@ import { usePinchZoom } from "~/hooks/usePinchZoom";
 import { usePageNavigation } from "~/hooks/usePageNavigation";
 import { usePanelNavigation } from "~/hooks/usePanelNavigation";
 import { useDoubleTap } from "~/hooks/useDoubleTap";
+import { useChromeAutoHide } from "~/hooks/useChromeAutoHide";
+import { TopBar } from "./zen-comic-reader/TopBar";
 import { ControlBar } from "./zen-comic-reader/ControlBar";
 import { SpeechBox } from "./zen-comic-reader/SpeechBox";
 import { PageSheet } from "./zen-comic-reader/PageSheet";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
+import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
 import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
@@ -35,7 +38,6 @@ interface ZenComicReaderProps {
   nextPageLink?: string | null;
   pageNumber: number;
   pageCount: number;
-  /** Directed panels for this page only (Supabase). Empty → panel view hidden. */
   panels?: PageDirectedPanel[];
 }
 
@@ -55,12 +57,21 @@ export default function ZenComicReader({
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
   const [isPageSheetOpen, setIsPageSheetOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
   const [panelViewMode, setPanelViewMode] = useState(false);
   const [panelAutoPlay, setPanelAutoPlay] = useState(false);
 
   const reducedMotion = usePrefersReducedMotion();
   const focusBeforePanelRef = useRef<Element | null>(null);
   const panelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const anySheetOpen = isPageSheetOpen || isSettingsOpen || isViewSheetOpen;
+  const { chromeVisible, showChrome, toggleChrome, lockChrome } =
+    useChromeAutoHide();
+
+  useEffect(() => {
+    lockChrome(anySheetOpen);
+  }, [anySheetOpen, lockChrome]);
 
   const {
     autoPlayEnabled,
@@ -112,8 +123,6 @@ export default function ZenComicReader({
     setPanelAutoPlay((p) => !p);
   }, []);
 
-  // Forward refs so usePanelNavigation can call into page nav even
-  // though usePageNavigation is declared below it.
   const navigateNextRef = useRef<(() => void) | null>(null);
   const navigatePrevRef = useRef<(() => void) | null>(null);
 
@@ -164,25 +173,24 @@ export default function ZenComicReader({
     setPanelViewPreferred(true);
   }, [panels.length, setPanelIndex, setPanelViewPreferred]);
 
-  const handleDoubleTap = useCallback(() => {
+  const handleTogglePanelView = useCallback(() => {
     if (panelViewMode) exitPanelView();
     else enterPanelView();
   }, [panelViewMode, exitPanelView, enterPanelView]);
 
-  const doubleTapBinder = useDoubleTap(handleDoubleTap);
+  const handleDoubleTap = useCallback(() => {
+    handleTogglePanelView();
+  }, [handleTogglePanelView]);
+
+  const doubleTapBinder = useDoubleTap(handleDoubleTap, toggleChrome);
   const doubleTapProps = doubleTapBinder();
 
-  // If the user was reading panel-by-panel on the previous page, drop
-  // straight back into panel view on this one. Auto-play is *not*
-  // resumed: browsers block silent autoplay without a fresh user gesture.
   useEffect(() => {
     if (panelViewPreferred && panels.length > 0 && !panelViewMode) {
       focusBeforePanelRef.current = document.activeElement;
       setPanelIndex(0);
       setPanelViewMode(true);
     }
-    // Intentionally only on mount per page route — subsequent toggles
-    // are tracked by the explicit enter/exit callbacks below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -386,6 +394,13 @@ export default function ZenComicReader({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black">
+      <TopBar
+        visible={chromeVisible}
+        onOpenPages={() => setIsPageSheetOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenViewSheet={() => setIsViewSheetOpen(true)}
+      />
+
       <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
         <div
           ref={panelContainerRef}
@@ -469,23 +484,8 @@ export default function ZenComicReader({
         </div>
       </div>
 
-      <ControlBar
-        onOpenPages={() => setIsPageSheetOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      >
+      <ControlBar pageNumber={pageNumber} pageCount={pageCount}>
         <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
-          {!panelViewMode && panels.length > 0 ? (
-            <div className="flex shrink-0 justify-end">
-              <button
-                type="button"
-                onClick={enterPanelView}
-                className="rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium text-neutral-200 hover:bg-white/15"
-              >
-                Panel View
-              </button>
-            </div>
-          ) : null}
-
           {panelViewMode && panels.length > 0 ? (
             <PanelViewHud
               panelIndex={panelIndex}
@@ -530,15 +530,19 @@ export default function ZenComicReader({
         onClose={() => setIsSettingsOpen(false)}
         autoPlayEnabled={autoPlayEnabled}
         onToggleAutoPlay={toggleAutoPlay}
-        hasNext={!!nextPageLink}
-        hasPrev={!!prevPageLink}
-        onNext={navigateNext}
-        onPrev={navigatePrev}
         volumes={volumes}
         onSetLayerVolume={setLayerVolume}
         onResetVolumes={resetVolumes}
         playbackRate={playbackRate}
         onSetPlaybackRate={setPlaybackRate}
+      />
+
+      <ViewSheet
+        isOpen={isViewSheetOpen}
+        onClose={() => setIsViewSheetOpen(false)}
+        panelViewMode={panelViewMode}
+        onTogglePanelView={handleTogglePanelView}
+        hasPanels={panels.length > 0}
       />
 
       {!panelViewMode && scale > 1 && (
@@ -548,7 +552,7 @@ export default function ZenComicReader({
             resetView();
             stopAll();
           }}
-          className="absolute top-4 right-4 z-50 rounded-full bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-200 shadow-lg backdrop-blur hover:bg-neutral-800"
+          className="absolute top-16 right-4 z-50 rounded-full bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-200 shadow-lg backdrop-blur hover:bg-neutral-800"
         >
           Reset View
         </button>

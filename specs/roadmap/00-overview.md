@@ -24,14 +24,15 @@ continuously beneath it all.
 | Voice cloning (ElevenLabs IVC) | live | 30-slot Creator cap; one-off characters burn slots. |
 | Audio gen + karaoke timestamps | live | mp3 + word alignment, layered playback. |
 | Reader (zen + panel-by-panel) | live | Panel-view mode persists across pages (just shipped). |
+| Spring panel transitions | live | rAF spring physics (stiffness=170, damping=26). Shipped in PR #20. |
 | Particle effects on panels | live | Render *on top of* the page — occludes characters/bubbles. |
-| Music scenes | absent | Music restarts every panel. |
+| Music scenes | live | `music_scenes` table + `consolidate-music-scenes` backfill. Runtime uses `scene_id` for continuity. Shipped in PR #20. |
 | Foreground / background separation | absent | SAM3 segmentation works in Roboflow workflow; not consumed yet. |
 | Wiki context fetch at ingest | absent | |
 | Character lookahead (face cluster + identify) | absent | |
-| Voice rotation (IVC archive/restore) | absent | |
+| Voice rotation (IVC archive/restore) | live | Pipeline wiring (checkout step 8.5, archive step 12.5). Fidelity test still open. Shipped in PR #20. |
 | Admin: bubble↔panel reassign | live | `PanelsReviewClient.tsx`. |
-| Admin: panel reorder | absent | Read-only `sort_order` today. |
+| Admin: panel reorder | live | Drag-to-reorder via `@dnd-kit/sortable`. Sets `source = "manual"`. Shipped in PR #19. |
 
 ## North star — what "done enough" looks like
 

@@ -11,10 +11,6 @@ interface SettingsSheetProps {
   onClose: () => void;
   autoPlayEnabled: boolean;
   onToggleAutoPlay: () => void;
-  onNext?: () => void;
-  onPrev?: () => void;
-  hasNext: boolean;
-  hasPrev: boolean;
   volumes: LayerVolumes;
   onSetLayerVolume: (layer: keyof LayerVolumes, value: number) => void;
   onResetVolumes: () => void;
@@ -38,10 +34,6 @@ export function SettingsSheet({
   onClose,
   autoPlayEnabled,
   onToggleAutoPlay,
-  onNext,
-  onPrev,
-  hasNext,
-  hasPrev,
   volumes,
   onSetLayerVolume,
   onResetVolumes,
@@ -85,106 +77,84 @@ export function SettingsSheet({
           </button>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <button
-            onClick={onToggleAutoPlay}
-            className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-colors ${
-              autoPlayEnabled
-                ? "border-cyan-500/60 bg-cyan-500/10 text-white"
-                : "border-white/10 bg-white/5 text-neutral-100"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div>
-                <div className="text-sm font-semibold">Auto Play</div>
-                <div className="text-xs text-neutral-400">
-                  Toggle continuous reading
-                </div>
-              </div>
-            </div>
-            <div
-              className={`h-5 w-10 rounded-full p-0.5 transition-colors ${
-                autoPlayEnabled ? "bg-cyan-500" : "bg-neutral-700"
-              }`}
-            >
-              <div
-                className={`h-4 w-4 rounded-full bg-white transition-transform ${
-                  autoPlayEnabled ? "translate-x-5" : "translate-x-0"
-                }`}
+        <div className="flex flex-col gap-4">
+          {/* ── Audio Section ── */}
+          <section>
+            <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+              Audio
+            </h3>
+            <div className="flex flex-col gap-3">
+              <PlaybackRateRow
+                value={playbackRate}
+                onChange={onSetPlaybackRate}
+              />
+              <VolumeSection
+                volumes={volumes}
+                onChange={onSetLayerVolume}
+                onReset={onResetVolumes}
               />
             </div>
-          </button>
+          </section>
 
-          <PlaybackRateRow value={playbackRate} onChange={onSetPlaybackRate} />
-
-          <VolumeSection
-            volumes={volumes}
-            onChange={onSetLayerVolume}
-            onReset={onResetVolumes}
-          />
-
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-            <div className="text-sm font-semibold text-neutral-100">
-              Page Controls
+          {/* ── Reading Section ── */}
+          <section>
+            <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+              Reading
+            </h3>
+            <div className="flex flex-col gap-3">
+              <ToggleRow
+                label="Auto-advance"
+                hint="Play bubbles continuously"
+                enabled={autoPlayEnabled}
+                onToggle={onToggleAutoPlay}
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onPrev}
-                disabled={!hasPrev}
-                className={`rounded-full p-3 transition-colors ${
-                  hasPrev
-                    ? "bg-neutral-800 text-white hover:bg-neutral-700"
-                    : "cursor-not-allowed bg-neutral-900 text-neutral-600"
-                }`}
-                aria-label="Previous page"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m15 18-6-6 6-6" />
-                </svg>
-              </button>
-              <button
-                onClick={onNext}
-                disabled={!hasNext}
-                className={`rounded-full p-3 transition-colors ${
-                  hasNext
-                    ? "bg-neutral-800 text-white hover:bg-neutral-700"
-                    : "cursor-not-allowed bg-neutral-900 text-neutral-600"
-                }`}
-                aria-label="Next page"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-              </button>
-            </div>
-          </div>
+          </section>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Subcomponents ───────────────────────────────────────────────────────────
+function ToggleRow({
+  label,
+  hint,
+  enabled,
+  onToggle,
+}: {
+  label: string;
+  hint: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition-colors ${
+        enabled
+          ? "border-cyan-500/60 bg-cyan-500/10 text-white"
+          : "border-white/10 bg-white/5 text-neutral-100"
+      }`}
+    >
+      <div>
+        <div className="text-sm font-semibold">{label}</div>
+        <div className="text-xs text-neutral-400">{hint}</div>
+      </div>
+      <div
+        className={`h-5 w-10 rounded-full p-0.5 transition-colors ${
+          enabled ? "bg-cyan-500" : "bg-neutral-700"
+        }`}
+      >
+        <div
+          className={`h-4 w-4 rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </div>
+    </button>
+  );
+}
 
 function PlaybackRateRow({
   value,
@@ -202,7 +172,7 @@ function PlaybackRateRow({
             Reading speed
           </div>
           <div className="text-xs text-neutral-400">
-            Speeds up dialogue audio. {value.toFixed(2)}×
+            Speeds up dialogue audio. {value.toFixed(2)}x
           </div>
         </div>
       </div>
@@ -228,7 +198,7 @@ function PlaybackRateRow({
                 : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
             }`}
           >
-            {p}×
+            {p}x
           </button>
         ))}
       </div>

@@ -83,7 +83,7 @@ direction (kept as opt-in "Hero Shot Cinematic"). See
 |---------|--------|------|-------|
 | Persist panel-view across page nav | `done` | — | `panelViewPreferred` in `useSettings`; reader auto-enters panel view on next page if last toggle was on. Audio not auto-resumed (browser autoplay policy). |
 | Runtime panel reading-order sort | `done` | — | `src/lib/panel-reading-order.ts` row-band heuristic. `source === "manual"` panels keep their persisted order. |
-| Music scenes (group panels by mood run) | `pending` | [music-scenes.md](music-scenes.md) | Fixes per-panel music restart. New `music_scenes` table + ingest consolidation step. |
+| Music scenes (group panels by mood run) | `done` | [music-scenes.md](music-scenes.md) | `music_scenes` table, `consolidate-music-scenes` script, runtime `scene_id` continuity. PR #20. |
 | SAM3 segmentation → particle layering | `pending` | [segmentation-layering.md](segmentation-layering.md) | Foreground mask layer so particles render between bg and characters/bubbles. Side-benefit: face crops drop into the lookahead pipeline for free. |
 | Reader chrome redesign (Kindle-inspired) | `pending` | [reader-chrome-redesign.md](reader-chrome-redesign.md) | Auto-hiding top bar, slimmer bottom bar, reorganized settings. UI work — needs sign-off. |
 
@@ -93,5 +93,5 @@ direction (kept as opt-in "Hero Shot Cinematic"). See
 |------|-------|
 | Roboflow model retraining | Model has improved since initial setup — may reduce need for manual bounds corrections |
 | Episode web player | `/episode/[bookId]/[issueId]` route in Next.js app — after assembly pipeline ships |
-| Spring-curve panel transitions | Borrow Kindle's smoothness via CSS / Framer Motion. Small change in `PanelView.transforms.ts`. |
+| ~~Spring-curve panel transitions~~ | **Done** — rAF spring physics in `PanelView.transforms.ts`. PR #20. |
 | Action-line position hint in effect tags | Cheap fix for effects placed in wrong corner; precursor to action-line bbox detection. See `segmentation-layering.md` §"Action lines". |
