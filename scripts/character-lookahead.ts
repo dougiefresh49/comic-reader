@@ -424,69 +424,6 @@ async function main() {
 
   console.log(`   ${insertedCount} panel_character_detections rows inserted`);
 
-  // ── Assign bubbles by geometry ─────────────────────────────────────────
-  console.log("\n📍 Assigning bubbles by face proximity...\n");
-
-  const { data: bubbles } = await supabase
-    .from("bubbles")
-    .select("id, page_number, style, panel_id")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId);
-
-  let assignedCount = 0;
-
-  for (const bubble of bubbles ?? []) {
-    if (!bubble.panel_id || !bubble.style) continue;
-
-    const { data: detections } = await supabase
-      .from("panel_character_detections")
-      .select("character_id, face_bbox")
-      .eq("panel_id", bubble.panel_id as string);
-
-    if (!detections || detections.length === 0) continue;
-
-    const bubbleStyle = bubble.style as {
-      left?: string;
-      top?: string;
-      width?: string;
-      height?: string;
-    };
-    const bubbleLeft = parseFloat(bubbleStyle.left ?? "50") / 100;
-    const bubbleTop = parseFloat(bubbleStyle.top ?? "0") / 100;
-    const bubbleW = parseFloat(bubbleStyle.width ?? "10") / 100;
-    const bubbleCx = bubbleLeft + bubbleW / 2;
-    const bubbleTailY = bubbleTop;
-
-    let closestCharId: string | null = null;
-    let closestDist = Infinity;
-
-    for (const det of detections) {
-      const fb = det.face_bbox as {
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-      };
-      const faceCx = fb.x + fb.w / 2;
-      const faceCy = fb.y + fb.h / 2;
-      const dist = Math.hypot(faceCx - bubbleCx, faceCy - bubbleTailY);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestCharId = det.character_id as string;
-      }
-    }
-
-    if (closestCharId) {
-      const { error } = await supabase
-        .from("bubbles")
-        .update({ character_id: closestCharId })
-        .eq("id", bubble.id as string);
-      if (!error) assignedCount++;
-    }
-  }
-
-  console.log(`   ${assignedCount} bubbles assigned character_id by proximity`);
-
   // ── Save results cache ─────────────────────────────────────────────────
   await fs.writeJSON(
     CACHE_PATH,
@@ -499,14 +436,13 @@ async function main() {
         confidence: c.confidence,
       })),
       insertedDetections: insertedCount,
-      assignedBubbles: assignedCount,
     },
     { spaces: 2 },
   );
 
   console.log(`\n✅ Character lookahead complete for ${book}/${issue}`);
   console.log(
-    `   ${clusters.length} characters identified, ${insertedCount} detections, ${assignedCount} bubbles assigned\n`,
+    `   ${clusters.length} characters identified, ${insertedCount} detections persisted\n`,
   );
 }
 
