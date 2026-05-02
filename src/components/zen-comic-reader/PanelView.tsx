@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { PageDirectedPanel } from "~/types/panels";
 import {
-  PANEL_VIEW_EASING,
-  PANEL_VIEW_TRANSITION_MS,
+  type PanelTransformResult,
+  type SpringState,
+  createSpringState,
   panelTransform,
+  stepSpring,
 } from "./PanelView.transforms";
 
 export function usePrefersReducedMotion(): boolean {
@@ -87,7 +95,10 @@ export function PanelViewFrame({
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const transformRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 1, h: 1 });
+  const springRef = useRef<SpringState | null>(null);
+  const rafRef = useRef<number>(0);
 
   useLayoutEffect(() => {
     const el = viewportRef.current;
@@ -102,33 +113,60 @@ export function PanelViewFrame({
 
   const activePanel = panels[panelIndex];
 
-  const transformStyle = useMemo(() => {
+  const getTarget = useCallback((): PanelTransformResult => {
     if (
       !panelViewMode ||
       !activePanel ||
       containerSize.w <= 0 ||
       containerSize.h <= 0
     ) {
-      return {
-        transform: "translate(0px, 0px) scale(1)",
-        transition: reducedMotion
-          ? undefined
-          : `transform ${PANEL_VIEW_TRANSITION_MS}ms ${PANEL_VIEW_EASING}`,
-      };
+      return { tx: 0, ty: 0, scale: 1 };
     }
-    const { scale, tx, ty } = panelTransform(
+    return panelTransform(
       activePanel.boundingBox,
       containerSize,
       containerSize,
     );
-    return {
-      transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-      transition: reducedMotion
-        ? undefined
-        : `transform ${PANEL_VIEW_TRANSITION_MS}ms ${PANEL_VIEW_EASING}`,
-      transformOrigin: "0 0" as const,
+  }, [panelViewMode, activePanel, containerSize]);
+
+  const applyTransform = useCallback((t: PanelTransformResult) => {
+    const el = transformRef.current;
+    if (!el) return;
+    el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.scale})`;
+    el.style.transformOrigin = "0 0";
+  }, []);
+
+  useEffect(() => {
+    const target = getTarget();
+
+    if (reducedMotion) {
+      applyTransform(target);
+      springRef.current = createSpringState(target);
+      return;
+    }
+
+    if (!springRef.current) {
+      springRef.current = createSpringState(target);
+      applyTransform(target);
+      return;
+    }
+
+    // Keep position, reset velocity toward new target
+    springRef.current.vTx = 0;
+    springRef.current.vTy = 0;
+    springRef.current.vScale = 0;
+
+    cancelAnimationFrame(rafRef.current);
+    const animate = () => {
+      if (!springRef.current) return;
+      const { state, atRest } = stepSpring(springRef.current, target);
+      springRef.current = state;
+      applyTransform(state);
+      if (!atRest) rafRef.current = requestAnimationFrame(animate);
     };
-  }, [panelViewMode, activePanel, containerSize, reducedMotion]);
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [getTarget, reducedMotion, applyTransform]);
 
   // Camera-effect class derived from the active panel's effectTags. Runs
   // forwards-once so the panel settles into a stable pose by the end of
@@ -144,7 +182,7 @@ export function PanelViewFrame({
       ref={viewportRef}
       className="relative mx-auto aspect-[2/3] max-h-[calc(100vh-140px)] w-full max-w-[min(100%,calc((100vh-140px)*0.667))] overflow-hidden select-none"
     >
-      <div className="relative h-full w-full" style={transformStyle}>
+      <div ref={transformRef} className="relative h-full w-full">
         <div
           key={activePanel?.id ?? "no-panel"}
           className={`relative h-full w-full ${cameraEffectClass}`}

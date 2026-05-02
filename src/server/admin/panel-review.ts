@@ -52,6 +52,7 @@ interface PanelRow {
   is_new_scene: boolean;
   source: string;
   foreground_polygons: PanelForegroundPolygons | null;
+  scene_id: string | null;
 }
 
 interface BubbleRow {
@@ -92,7 +93,7 @@ export async function getPanelReviewData(
       supabaseAdmin
         .from("panels")
         .select(
-          "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons",
+          "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, scene_id",
         )
         .eq("book_id", bookId)
         .eq("issue_id", issueId)
@@ -167,6 +168,7 @@ export async function getPanelReviewData(
           : "gemini",
       bubbleIds: [],
       foregroundPolygons: row.foreground_polygons ?? null,
+      sceneId: row.scene_id ?? null,
     });
   }
 

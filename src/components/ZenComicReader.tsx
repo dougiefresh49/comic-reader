@@ -431,6 +431,7 @@ export default function ZenComicReader({
                 active={panelViewMode && panelAutoPlay}
                 muted={!panelAutoPlay}
                 newScene={activePanel?.isNewScene ?? false}
+                sceneId={activePanel?.sceneId ?? null}
                 volume={{
                   ambience: volumes.ambience,
                   sfx: volumes.sfx,

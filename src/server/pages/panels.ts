@@ -20,11 +20,12 @@ interface PanelRow {
   is_new_scene: boolean;
   source: string;
   foreground_polygons: PanelForegroundPolygons | null;
+  scene_id: string | null;
   bubbles: Array<{ id: string; sort_order: number }> | null;
 }
 
 const PANEL_SELECT =
-  "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, bubbles(id, sort_order)";
+  "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, scene_id, bubbles(id, sort_order)";
 
 function rowToPanel(row: PanelRow): PageDirectedPanel {
   const bubbles = (row.bubbles ?? [])
@@ -52,6 +53,7 @@ function rowToPanel(row: PanelRow): PageDirectedPanel {
         : "gemini",
     bubbleIds: bubbles.map((b) => b.id),
     foregroundPolygons: row.foreground_polygons,
+    sceneId: row.scene_id,
   };
 }
 
