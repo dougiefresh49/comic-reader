@@ -4,10 +4,69 @@ export const PANEL_VIEW_TRANSITION_MS = 380;
 export const PANEL_VIEW_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 export const PANEL_VIEW_MARGIN = 0.05;
 
+const SPRING_STIFFNESS = 170;
+const SPRING_DAMPING = 26;
+const SPRING_MASS = 1;
+const SPRING_REST_THRESHOLD = 0.01;
+const SPRING_DT = 1 / 60;
+
 export interface PanelTransformResult {
   scale: number;
   tx: number;
   ty: number;
+}
+
+export interface SpringState {
+  tx: number;
+  ty: number;
+  scale: number;
+  vTx: number;
+  vTy: number;
+  vScale: number;
+}
+
+export function createSpringState(t: PanelTransformResult): SpringState {
+  return { tx: t.tx, ty: t.ty, scale: t.scale, vTx: 0, vTy: 0, vScale: 0 };
+}
+
+function springStep(current: number, target: number, velocity: number) {
+  const force = -SPRING_STIFFNESS * (current - target);
+  const drag = -SPRING_DAMPING * velocity;
+  const accel = (force + drag) / SPRING_MASS;
+  const newVelocity = velocity + accel * SPRING_DT;
+  const newCurrent = current + newVelocity * SPRING_DT;
+  return { value: newCurrent, velocity: newVelocity };
+}
+
+function isAtRest(current: number, target: number, velocity: number): boolean {
+  return (
+    Math.abs(current - target) < SPRING_REST_THRESHOLD &&
+    Math.abs(velocity) < SPRING_REST_THRESHOLD
+  );
+}
+
+export function stepSpring(
+  state: SpringState,
+  target: PanelTransformResult,
+): { state: SpringState; atRest: boolean } {
+  const tx = springStep(state.tx, target.tx, state.vTx);
+  const ty = springStep(state.ty, target.ty, state.vTy);
+  const sc = springStep(state.scale, target.scale, state.vScale);
+  const atRest =
+    isAtRest(tx.value, target.tx, tx.velocity) &&
+    isAtRest(ty.value, target.ty, ty.velocity) &&
+    isAtRest(sc.value, target.scale, sc.velocity);
+  return {
+    state: {
+      tx: atRest ? target.tx : tx.value,
+      ty: atRest ? target.ty : ty.value,
+      scale: atRest ? target.scale : sc.value,
+      vTx: atRest ? 0 : tx.velocity,
+      vTy: atRest ? 0 : ty.velocity,
+      vScale: atRest ? 0 : sc.velocity,
+    },
+    atRest,
+  };
 }
 
 /**

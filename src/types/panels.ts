@@ -48,4 +48,6 @@ export interface PageDirectedPanel {
   bubbleIds: string[];
   /** Null until extract-foreground-masks + backfill have run for this panel. */
   foregroundPolygons: PanelForegroundPolygons | null;
+  /** Null until consolidate-music-scenes has run. */
+  sceneId: string | null;
 }

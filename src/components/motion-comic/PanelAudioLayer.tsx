@@ -14,6 +14,8 @@ interface Props {
   volume?: { ambience?: number; sfx?: number; music?: number };
   /** True when the panel transitions to a new scene — triggers music crossfade. */
   newScene?: boolean;
+  /** Stable scene ID from music_scenes table — when set, overrides tag-based continuity. */
+  sceneId?: string | null;
 }
 
 const DEFAULT_VOLUME = { ambience: 0.25, sfx: 0.5, music: 0.2 };
@@ -34,11 +36,13 @@ export function PanelAudioLayer({
   muted = false,
   volume = DEFAULT_VOLUME,
   newScene = false,
+  sceneId = null,
 }: Props) {
   const ambienceRef = useRef<HTMLAudioElement | null>(null);
   const sfxRef = useRef<HTMLAudioElement | null>(null);
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const lastMusicTagRef = useRef<string | null>(null);
+  const lastSceneIdRef = useRef<string | null>(null);
 
   // Build URLs from current panel tags. Empty arrays → null.
   const ambienceTag = panel?.audioTags.ambience[0] ?? null;
@@ -92,12 +96,15 @@ export function PanelAudioLayer({
       return;
     }
 
-    const same = lastMusicTagRef.current === musicTag;
+    const sameScene = sceneId != null && lastSceneIdRef.current === sceneId;
+    const sameMood = lastMusicTagRef.current === musicTag;
+    const continuePlaying = sameScene || (sameMood && !newScene);
     const url = audioLibraryUrl("music", musicTag);
 
-    if (same && !newScene) {
-      // Continue playing the current bed
+    if (continuePlaying) {
       if (el.paused) el.play().catch(() => undefined);
+      lastSceneIdRef.current = sceneId;
+      lastMusicTagRef.current = musicTag;
       return;
     }
 
@@ -117,6 +124,7 @@ export function PanelAudioLayer({
         el.volume = 0;
         el.play().catch(() => undefined);
         lastMusicTagRef.current = musicTag;
+        lastSceneIdRef.current = sceneId;
 
         let j = 0;
         const fadeIn = setInterval(() => {
@@ -129,7 +137,7 @@ export function PanelAudioLayer({
     return () => {
       clearInterval(fadeOut);
     };
-  }, [musicTag, active, muted, newScene, volume.music]);
+  }, [musicTag, active, muted, newScene, sceneId, volume.music]);
 
   return (
     <>

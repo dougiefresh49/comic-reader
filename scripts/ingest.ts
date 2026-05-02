@@ -50,8 +50,11 @@ const PIPELINE_STEPS: PipelineStep[] = [
     pauseMessage:
       "Voice sources saved to data/source-material.json.\nDownload clips for characters marked 'needs_clips', then press Enter to generate voice models.",
   },
+  { id: "voice-rotation-checkout" },
   { id: "generate-audio" },
   { id: "copy-to-public" },
+  { id: "consolidate-music-scenes" },
+  { id: "voice-rotation-archive" },
   { id: "generate-manifest" },
 ];
 
