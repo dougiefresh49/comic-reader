@@ -74,12 +74,18 @@ const smokeDriftOptions: ISourceOptions = {
   },
 };
 
-export function SmokeDrift({ bbox, active, reducedMotion }: EffectProps) {
+export function SmokeDrift({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`smoke-drift-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={reducedMotion ? makeStill(smokeDriftOptions) : smokeDriftOptions}
     />
   );
@@ -120,12 +126,18 @@ const smokeBillowOptions: ISourceOptions = {
   },
 };
 
-export function SmokeBillow({ bbox, active, reducedMotion }: EffectProps) {
+export function SmokeBillow({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`smoke-billow-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={
         reducedMotion ? makeStill(smokeBillowOptions) : smokeBillowOptions
       }
@@ -184,12 +196,18 @@ const fireFlickerOptions: ISourceOptions = {
   },
 };
 
-export function FireFlicker({ bbox, active, reducedMotion }: EffectProps) {
+export function FireFlicker({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`fire-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={
         reducedMotion ? makeStill(fireFlickerOptions) : fireFlickerOptions
       }
@@ -224,12 +242,18 @@ const embersRisingOptions: ISourceOptions = {
   },
 };
 
-export function EmbersRising({ bbox, active, reducedMotion }: EffectProps) {
+export function EmbersRising({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`embers-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={
         reducedMotion ? makeStill(embersRisingOptions) : embersRisingOptions
       }
@@ -260,12 +284,18 @@ const rainFallingOptions: ISourceOptions = {
   },
 };
 
-export function RainFalling({ bbox, active, reducedMotion }: EffectProps) {
+export function RainFalling({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`rain-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={
         reducedMotion ? makeStill(rainFallingOptions) : rainFallingOptions
       }
@@ -291,12 +321,18 @@ const snowFallingOptions: ISourceOptions = {
   },
 };
 
-export function SnowFalling({ bbox, active, reducedMotion }: EffectProps) {
+export function SnowFalling({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`snow-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={
         reducedMotion ? makeStill(snowFallingOptions) : snowFallingOptions
       }
@@ -360,12 +396,18 @@ const leavesDriftingOptions: ISourceOptions = {
   },
 };
 
-export function LeavesDrifting({ bbox, active, reducedMotion }: EffectProps) {
+export function LeavesDrifting({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   if (!active) return null;
   return (
     <ParticleEffect
       id={`leaves-${Math.round(bbox.x * 1000)}-${Math.round(bbox.y * 1000)}`}
       bbox={bbox}
+      position={position}
       options={
         reducedMotion ? makeStill(leavesDriftingOptions) : leavesDriftingOptions
       }

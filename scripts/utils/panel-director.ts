@@ -51,6 +51,36 @@ export interface BoundingBox {
   h: number;
 }
 
+export type EffectAnchor =
+  | "center"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "top-center"
+  | "bottom-center"
+  | "left-center"
+  | "right-center";
+
+const VALID_ANCHORS = new Set<string>([
+  "center",
+  "top-left",
+  "top-right",
+  "bottom-left",
+  "bottom-right",
+  "top-center",
+  "bottom-center",
+  "left-center",
+  "right-center",
+]);
+
+export interface EffectPosition {
+  anchor?: EffectAnchor;
+  bbox?: [number, number, number, number];
+}
+
+export type EffectPositions = Record<string, EffectPosition>;
+
 export interface DirectedPanel {
   panelId: string;
   pageNumber: number;
@@ -58,6 +88,7 @@ export interface DirectedPanel {
   boundingBox: BoundingBox;
   cinematicDescription: string;
   effectTags: EffectTag[];
+  effectPositions: EffectPositions | null;
   audioTags: AudioTags;
   bubbleIds: string[]; // legacy_id values from bubbles
   primarySpeaker: string | null;
@@ -123,6 +154,7 @@ interface GeminiPanelsResponse {
     boundingBox?: BoundingBox;
     cinematicDescription?: string;
     effectTags?: string[];
+    effectPositions?: Record<string, { anchor?: string; bbox?: number[] }>;
     audioTags?: {
       ambience?: string[];
       sfx?: string[];
@@ -195,6 +227,11 @@ Strict rules:
 2. Every bubble in the manifest must be assigned to exactly one panel via bubbleIds. The bubble id must come from the manifest above.
 3. effectTags must be 1–4 entries from this enum:
 ${JSON.stringify([...EFFECT_TAGS])}
+3b. effectPositions is an OPTIONAL object keyed by effect tag name. For each non-camera effect tag, describe WHERE in the panel the effect should originate. Two formats:
+   - { "anchor": "<position>" } where position is one of: center, top-left, top-right, bottom-left, bottom-right, top-center, bottom-center, left-center, right-center
+   - { "bbox": [x, y, w, h] } where values are 0..1 fractions of the panel (for effects that should cover a specific sub-region)
+   Omit camera effects (camera_push_in_*, camera_pull_back, camera_pan_*) from effectPositions — they apply to the whole panel.
+   Example: "effectPositions": { "impact_lines_radial": { "anchor": "center" }, "embers_rising": { "anchor": "bottom-center" } }
 4. audioTags.ambience must be 0–2 entries from:
 ${JSON.stringify([...AMBIENCE_TAGS])}
 5. audioTags.sfx must be 0–3 entries from:
@@ -218,7 +255,8 @@ Respond with strict JSON, no markdown fences:
       "panelId": "p${String(args.pageNumber).padStart(2, "0")}-01",
       "boundingBox": { "x": 0, "y": 0, "w": 1, "h": 0.5 },
       "cinematicDescription": "...",
-      "effectTags": ["camera_push_in_slow"],
+      "effectTags": ["camera_push_in_slow", "embers_rising"],
+      "effectPositions": { "embers_rising": { "anchor": "bottom-center" } },
       "audioTags": { "ambience": [], "sfx": [], "music_mood": "transition_neutral" },
       "bubbleIds": ["page-${String(args.pageNumber).padStart(2, "0")}_b01"],
       "primarySpeaker": "Narrator",
@@ -271,6 +309,31 @@ function clampArrayToEnum<T extends readonly string[]>(
     }
   }
   return out;
+}
+
+function sanitizeEffectPositions(
+  raw: Record<string, { anchor?: string; bbox?: number[] }> | undefined,
+  validTags: EffectTag[],
+): EffectPositions | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: EffectPositions = {};
+  for (const tag of validTags) {
+    const entry = raw[tag];
+    if (!entry || typeof entry !== "object") continue;
+    const pos: EffectPosition = {};
+    if (typeof entry.anchor === "string" && VALID_ANCHORS.has(entry.anchor)) {
+      pos.anchor = entry.anchor as EffectAnchor;
+    }
+    if (
+      Array.isArray(entry.bbox) &&
+      entry.bbox.length === 4 &&
+      entry.bbox.every((v) => typeof v === "number" && v >= 0 && v <= 1)
+    ) {
+      pos.bbox = entry.bbox as [number, number, number, number];
+    }
+    if (pos.anchor || pos.bbox) out[tag] = pos;
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 function bubbleDurationSeconds(ts: AudioTimestamp | undefined): number {
@@ -354,6 +417,10 @@ export async function directPagePanels(args: {
       boundingBox,
       cinematicDescription: (p.cinematicDescription ?? "").trim(),
       effectTags: clampArrayToEnum(p.effectTags, EFFECT_TAGS, 4),
+      effectPositions: sanitizeEffectPositions(
+        p.effectPositions,
+        clampArrayToEnum(p.effectTags, EFFECT_TAGS, 4),
+      ),
       audioTags: {
         ambience: clampArrayToEnum(p.audioTags?.ambience, AMBIENCE_TAGS, 2),
         sfx: clampArrayToEnum(p.audioTags?.sfx, SFX_TAGS, 3),
@@ -421,6 +488,7 @@ export async function directPagePanels(args: {
       boundingBox: { x: 0, y: 0, w: 1, h: 1 },
       cinematicDescription: "wide establishing shot — page-level scene",
       effectTags: ["camera_push_in_slow"],
+      effectPositions: null,
       audioTags: {
         ambience: [],
         sfx: [],

@@ -19,7 +19,7 @@ continuously beneath it all.
 |---|---|---|
 | Bubble detection (Roboflow) | live | Per-page bbox detection. |
 | Panel detection (Roboflow + Gemini) | live | Roboflow returns panel rects; Gemini orders + tags them. |
-| Per-panel direction (effect + audio tags) | live | `panels` table populated for tmnt-mmpr-iii issues. |
+| Per-panel direction (effect + audio tags) | live | `panels` table populated for tmnt-mmpr-iii issues. Effect placement hints (`effect_positions` jsonb) shipped in PR #25. |
 | Speaker ID per bubble (Gemini) | live | Per-page guess; mangles on non-main characters. |
 | Voice cloning (ElevenLabs IVC) | live | 30-slot Creator cap; one-off characters burn slots. |
 | Audio gen + karaoke timestamps | live | mp3 + word alignment, layered playback. |

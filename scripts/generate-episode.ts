@@ -1165,6 +1165,7 @@ async function directPanels(
             bounding_box: panel.boundingBox,
             cinematic_description: panel.cinematicDescription,
             effect_tags: panel.effectTags,
+            effect_positions: panel.effectPositions ?? null,
             audio_tags: panel.audioTags,
             primary_speaker: panel.primarySpeaker,
             estimated_duration_seconds: panel.estimatedDurationSeconds,

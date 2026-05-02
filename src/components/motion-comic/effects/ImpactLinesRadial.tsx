@@ -1,5 +1,6 @@
 "use client";
 import type { EffectProps } from "./types";
+import { resolveEffectRect } from "./types";
 
 const RAYS = Array.from({ length: 18 }, (_, i) => i);
 
@@ -8,10 +9,10 @@ export function ImpactLinesRadial({
   active,
   progress,
   reducedMotion,
+  position,
 }: EffectProps) {
   if (!active) return null;
-  const { x, y, w, h } = bbox;
-  // Fade out over the second half of the panel display window.
+  const rect = resolveEffectRect(bbox, position);
   const fade = reducedMotion
     ? 1
     : Math.max(0, 1 - Math.max(0, progress - 0.4) / 0.6);
@@ -20,10 +21,7 @@ export function ImpactLinesRadial({
       aria-hidden
       className="pointer-events-none absolute"
       style={{
-        left: `${x * 100}%`,
-        top: `${y * 100}%`,
-        width: `${w * 100}%`,
-        height: `${h * 100}%`,
+        ...rect,
         opacity: fade,
         mixBlendMode: "screen",
       }}

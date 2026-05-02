@@ -1,27 +1,24 @@
 "use client";
 import type { EffectProps } from "./types";
+import { resolveEffectRect } from "./types";
 
 interface Props extends EffectProps {
   palette: "warm" | "cool";
 }
 
-function Flare({ bbox, active, reducedMotion, palette }: Props) {
+function Flare({ bbox, active, reducedMotion, palette, position }: Props) {
   if (!active) return null;
-  const { x, y, w, h } = bbox;
+  const rect = resolveEffectRect(bbox, position);
   const colors =
     palette === "warm"
       ? ["rgba(255, 220, 150, 0.55)", "rgba(255, 160, 80, 0.25)"]
       : ["rgba(180, 220, 255, 0.55)", "rgba(120, 180, 255, 0.25)"];
-  // Two stacked radial gradients drift slowly across the panel.
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute overflow-hidden"
       style={{
-        left: `${x * 100}%`,
-        top: `${y * 100}%`,
-        width: `${w * 100}%`,
-        height: `${h * 100}%`,
+        ...rect,
         mixBlendMode: "screen",
       }}
     >

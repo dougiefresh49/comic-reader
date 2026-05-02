@@ -27,6 +27,26 @@ export type PanelLocalPolygon = Array<{ x: number; y: number }>;
  *
  * Polygon coordinates are panel-local 0..1 (fraction of panel bbox).
  */
+export type EffectAnchor =
+  | "center"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "top-center"
+  | "bottom-center"
+  | "left-center"
+  | "right-center";
+
+export interface EffectPosition {
+  anchor?: EffectAnchor;
+  /** Sub-region within the panel bbox, 0..1 fractions of panel. */
+  bbox?: [number, number, number, number];
+}
+
+/** Position hints for effect tags, keyed by tag name. */
+export type EffectPositions = Record<string, EffectPosition>;
+
 export interface PanelForegroundPolygons {
   characters: PanelLocalPolygon[];
   bubbles: PanelLocalPolygon[];
@@ -46,6 +66,8 @@ export interface PageDirectedPanel {
   isNewScene: boolean;
   source: "gemini" | "roboflow" | "manual";
   bubbleIds: string[];
+  /** Per-effect placement hints from Gemini panel-director. */
+  effectPositions: EffectPositions | null;
   /** Null until extract-foreground-masks + backfill have run for this panel. */
   foregroundPolygons: PanelForegroundPolygons | null;
   /** Null until consolidate-music-scenes has run. */

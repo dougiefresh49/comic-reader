@@ -2,6 +2,7 @@
 
 import { ShaderMount, SmokeRing } from "@paper-design/shaders-react";
 import type { EffectProps } from "./types";
+import { resolveEffectRect } from "./types";
 
 /**
  * WebGL-shader-based replacements for the smoke + fire particle
@@ -21,19 +22,24 @@ interface ShaderShellProps {
   active: boolean;
   children: React.ReactNode;
   blendMode?: React.CSSProperties["mixBlendMode"];
+  position?: EffectProps["position"];
 }
 
-function ShaderShell({ bbox, active, children, blendMode }: ShaderShellProps) {
+function ShaderShell({
+  bbox,
+  active,
+  children,
+  blendMode,
+  position,
+}: ShaderShellProps) {
   if (!active) return null;
+  const rect = resolveEffectRect(bbox, position);
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute"
       style={{
-        left: `${bbox.x * 100}%`,
-        top: `${bbox.y * 100}%`,
-        width: `${bbox.w * 100}%`,
-        height: `${bbox.h * 100}%`,
+        ...rect,
         overflow: "hidden",
         mixBlendMode: blendMode,
       }}
@@ -166,9 +172,10 @@ export function FireFlickerShader({
   bbox,
   active,
   reducedMotion,
+  position,
 }: EffectProps) {
   return (
-    <ShaderShell bbox={bbox} active={active}>
+    <ShaderShell bbox={bbox} active={active} position={position}>
       <ShaderMount
         style={{ width: "100%", height: "100%" }}
         fragmentShader={fireFragmentShader}
@@ -246,9 +253,14 @@ const smokeBillowShaderSource = smokeFragmentShader({
   contrast: 1.9,
 });
 
-export function SmokeDriftShader({ bbox, active, reducedMotion }: EffectProps) {
+export function SmokeDriftShader({
+  bbox,
+  active,
+  reducedMotion,
+  position,
+}: EffectProps) {
   return (
-    <ShaderShell bbox={bbox} active={active}>
+    <ShaderShell bbox={bbox} active={active} position={position}>
       <ShaderMount
         style={{ width: "100%", height: "100%" }}
         fragmentShader={smokeDriftShaderSource}
@@ -263,9 +275,10 @@ export function SmokeBillowShader({
   bbox,
   active,
   reducedMotion,
+  position,
 }: EffectProps) {
   return (
-    <ShaderShell bbox={bbox} active={active}>
+    <ShaderShell bbox={bbox} active={active} position={position}>
       <ShaderMount
         style={{ width: "100%", height: "100%" }}
         fragmentShader={smokeBillowShaderSource}
@@ -287,13 +300,24 @@ interface PortalProps {
   bbox: EffectProps["bbox"];
   active: boolean;
   reducedMotion: boolean;
-  /** Highlight color (the bright outer ring). */
   colors: string[];
+  position?: EffectProps["position"];
 }
 
-function EnergyPortal({ bbox, active, reducedMotion, colors }: PortalProps) {
+function EnergyPortal({
+  bbox,
+  active,
+  reducedMotion,
+  colors,
+  position,
+}: PortalProps) {
   return (
-    <ShaderShell bbox={bbox} active={active} blendMode="screen">
+    <ShaderShell
+      bbox={bbox}
+      active={active}
+      blendMode="screen"
+      position={position}
+    >
       <SmokeRing
         style={{ width: "100%", height: "100%" }}
         colorBack="#00000000"
@@ -316,6 +340,7 @@ export function EnergyPortalBlueShader(p: EffectProps) {
       bbox={p.bbox}
       active={p.active}
       reducedMotion={p.reducedMotion}
+      position={p.position}
       colors={["#aef0ff", "#00d4ff", "#0066ff"]}
     />
   );
@@ -327,6 +352,7 @@ export function EnergyPortalRedShader(p: EffectProps) {
       bbox={p.bbox}
       active={p.active}
       reducedMotion={p.reducedMotion}
+      position={p.position}
       colors={["#ffd0c4", "#ff5544", "#cc1122"]}
     />
   );
@@ -338,6 +364,7 @@ export function EnergyPortalGreenShader(p: EffectProps) {
       bbox={p.bbox}
       active={p.active}
       reducedMotion={p.reducedMotion}
+      position={p.position}
       colors={["#d0ffd8", "#44ff77", "#118833"]}
     />
   );

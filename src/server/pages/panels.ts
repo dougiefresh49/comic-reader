@@ -1,6 +1,7 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
 import type {
+  EffectPositions,
   PageDirectedPanel,
   PanelAudioTags,
   PanelForegroundPolygons,
@@ -14,6 +15,7 @@ interface PanelRow {
   bounding_box: PageDirectedPanel["boundingBox"];
   cinematic_description: string | null;
   effect_tags: string[];
+  effect_positions: EffectPositions | null;
   audio_tags: PanelAudioTags | null;
   primary_speaker: string | null;
   estimated_duration_seconds: number | null;
@@ -25,7 +27,7 @@ interface PanelRow {
 }
 
 const PANEL_SELECT =
-  "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, scene_id, bubbles(id, sort_order)";
+  "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, effect_positions, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, scene_id, bubbles(id, sort_order)";
 
 function rowToPanel(row: PanelRow): PageDirectedPanel {
   const bubbles = (row.bubbles ?? [])
@@ -39,6 +41,7 @@ function rowToPanel(row: PanelRow): PageDirectedPanel {
     boundingBox: row.bounding_box,
     cinematicDescription: row.cinematic_description,
     effectTags: row.effect_tags ?? [],
+    effectPositions: row.effect_positions ?? null,
     audioTags: row.audio_tags ?? {
       ambience: [],
       sfx: [],

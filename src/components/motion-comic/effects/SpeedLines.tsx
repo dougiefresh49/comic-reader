@@ -1,5 +1,6 @@
 "use client";
 import type { EffectProps } from "./types";
+import { resolveEffectRect } from "./types";
 
 interface Props extends EffectProps {
   variant: "horizontal" | "diagonal";
@@ -7,19 +8,16 @@ interface Props extends EffectProps {
 
 const LINES = Array.from({ length: 14 }, (_, i) => i);
 
-function Lines({ bbox, active, reducedMotion, variant }: Props) {
+function Lines({ bbox, active, reducedMotion, variant, position }: Props) {
   if (!active) return null;
-  const { x, y, w, h } = bbox;
+  const rect = resolveEffectRect(bbox, position);
   const rotate = variant === "diagonal" ? -25 : 0;
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute overflow-hidden"
       style={{
-        left: `${x * 100}%`,
-        top: `${y * 100}%`,
-        width: `${w * 100}%`,
-        height: `${h * 100}%`,
+        ...rect,
         transform: `rotate(${rotate}deg)`,
         transformOrigin: "50% 50%",
         mixBlendMode: "screen",
