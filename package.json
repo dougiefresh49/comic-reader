@@ -21,6 +21,7 @@
     "get-context": "tsx --env-file=.env scripts/get-context.ts",
     "roboflow-page-analyze": "tsx --env-file=.env scripts/roboflow-page-analyze.ts",
     "extract-foreground-masks": "tsx --env-file=.env scripts/extract-foreground-masks.ts",
+    "character-lookahead": "tsx --env-file=.env scripts/character-lookahead.ts",
     "test-ivc-fidelity": "tsx --env-file=.env scripts/test-ivc-fidelity.ts",
     "voice-rotation": "tsx --env-file=.env scripts/voice-rotation.ts",
     "voice-rotation-checkout": "tsx --env-file=.env scripts/voice-rotation-checkout.ts",
