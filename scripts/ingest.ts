@@ -36,6 +36,7 @@ const PIPELINE_STEPS: PipelineStep[] = [
   { id: "convert-pages-to-webp" },
   { id: "roboflow-page-analyze" },
   { id: "extract-foreground-masks" },
+  { id: "character-lookahead" },
   { id: "get-context" },
   { id: "review-speakers" },
   { id: "sort-bubbles-gemini" },
