@@ -84,8 +84,8 @@ direction (kept as opt-in "Hero Shot Cinematic"). See
 | Persist panel-view across page nav | `done` | — | `panelViewPreferred` in `useSettings`; reader auto-enters panel view on next page if last toggle was on. Audio not auto-resumed (browser autoplay policy). |
 | Runtime panel reading-order sort | `done` | — | `src/lib/panel-reading-order.ts` row-band heuristic. `source === "manual"` panels keep their persisted order. |
 | Music scenes (group panels by mood run) | `done` | [music-scenes.md](music-scenes.md) | `music_scenes` table, `consolidate-music-scenes` script, runtime `scene_id` continuity. PR #20. |
-| SAM3 segmentation → particle layering | `pending` | [segmentation-layering.md](segmentation-layering.md) | Foreground mask layer so particles render between bg and characters/bubbles. Side-benefit: face crops drop into the lookahead pipeline for free. |
-| Reader chrome redesign (Kindle-inspired) | `pending` | [reader-chrome-redesign.md](reader-chrome-redesign.md) | Auto-hiding top bar, slimmer bottom bar, reorganized settings. UI work — needs sign-off. |
+| SAM3 segmentation → particle layering | `done` | [segmentation-layering.md](segmentation-layering.md) | SVG clip-path layering (bg → effects → fg). `LayeredPanel.tsx`. Falls back when `foregroundPolygons` is null. PR #23. |
+| Reader chrome redesign (Kindle-inspired) | `done` | [reader-chrome-redesign.md](reader-chrome-redesign.md) | Auto-hiding top bar, slim bottom bar, view sheet, single-tap chrome toggle. PR #21. |
 
 ## Future / Ideas
 
