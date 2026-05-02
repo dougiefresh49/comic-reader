@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Pipeline step: character-lookahead
+ * Pipeline step: character-lookahead (v2 — incremental Gemini matching)
  *
  * Identifies every character in an issue by:
- *   1. Extracting face crops from SAM3 segmentation data
- *   2. Embedding each crop with CLIP (Roboflow workflow)
- *   3. Clustering embeddings with DBSCAN
- *   4. Identifying each cluster via Gemini
- *   5. Persisting to panel_character_detections + bubbles.character_id
+ *   1. Extracting face crops from SAM3 segmentation data page-by-page
+ *   2. Matching each face against existing clusters via Gemini Flash
+ *   3. Growing clusters incrementally — no batch CLIP or DBSCAN needed
+ *   4. Persisting to panel_character_detections + bubbles.character_id
  *
  * Runs after extract-foreground-masks, before get-context.
  */
@@ -18,11 +17,13 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
 import { supabase } from "./lib/supabase.js";
-import { extractFaceCrops } from "./utils/face-extraction.js";
-import { embedFaceCrops } from "./utils/clip-embeddings.js";
-import { dbscan, distanceStats } from "./utils/clustering.js";
-import { identifyClusters } from "./utils/character-identifier.js";
-import { loadBookConfig, loadRoster } from "./utils/roster.js";
+import { extractFaceCropsForPage } from "./utils/face-extraction.js";
+import {
+  identifySingleFace,
+  type CharacterCluster,
+} from "./utils/face-matcher.js";
+import { loadRoster } from "./utils/roster.js";
+import { glob } from "glob";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -165,6 +166,36 @@ async function ensureCharacterExists(characterName: string): Promise<string> {
   return id;
 }
 
+function buildKnownCharacterList(
+  roster: Record<string, { canonicalName: string; aliases: string[] }>,
+  wikiAppearances: string | null,
+): string[] {
+  const names = new Set<string>();
+  for (const entry of Object.values(roster)) {
+    names.add(entry.canonicalName);
+  }
+  if (wikiAppearances) {
+    try {
+      const parsed = JSON.parse(wikiAppearances) as Array<{
+        name: string;
+        qualifier?: string;
+      }>;
+      for (const a of parsed) {
+        if (a.name) names.add(a.name);
+      }
+    } catch {
+      // wiki_appearances might be plain text
+      if (typeof wikiAppearances === "string") {
+        for (const line of wikiAppearances.split("\n")) {
+          const trimmed = line.replace(/^[-*•]\s*/, "").trim();
+          if (trimmed) names.add(trimmed);
+        }
+      }
+    }
+  }
+  return [...names].sort();
+}
+
 async function main() {
   const { book, issue, overwrite } = parseArgs();
   const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
@@ -196,78 +227,6 @@ async function main() {
 
   await fs.ensureDir(LOOKAHEAD_DIR);
 
-  console.log(`\n🔍 Character lookahead for ${book}/${issue}\n`);
-
-  // ── Step 1: Extract face crops ─────────────────────────────────────────
-  console.log("📸 Step 1: Extracting face crops from SAM3 data...\n");
-  const crops = await extractFaceCrops(SAM3_DIR, WEBP_DIR);
-  console.log(`\n   ${crops.length} face crops extracted\n`);
-
-  if (crops.length === 0) {
-    console.log("   No face crops found — skipping lookahead.\n");
-    await fs.writeJSON(
-      CACHE_PATH,
-      { clusters: [], identifications: [], cropCount: 0 },
-      { spaces: 2 },
-    );
-    return;
-  }
-
-  // ── Step 2: CLIP embeddings ────────────────────────────────────────────
-  console.log("🧠 Step 2: Generating CLIP embeddings...\n");
-  const apiKey = process.env.ROBOFLOW_API_KEY;
-  if (!apiKey) {
-    console.error("❌ ROBOFLOW_API_KEY is required for CLIP embeddings");
-    process.exit(1);
-  }
-
-  const embeddings = await embedFaceCrops(
-    crops.map((c) => c.imageBuffer),
-    apiKey,
-    { concurrency: 3, delayMs: 200 },
-  );
-
-  const validCount = embeddings.filter((e) => e.length > 0).length;
-  console.log(`\n   ${validCount}/${crops.length} embeddings generated\n`);
-
-  // ── Step 3: Cluster ────────────────────────────────────────────────────
-  console.log("🔗 Step 3: Clustering face embeddings (DBSCAN)...\n");
-
-  const validIndices: number[] = [];
-  const validEmbeddings: number[][] = [];
-  for (let i = 0; i < embeddings.length; i++) {
-    if (embeddings[i]!.length > 0) {
-      validIndices.push(i);
-      validEmbeddings.push(embeddings[i]!);
-    }
-  }
-
-  const stats = distanceStats(validEmbeddings);
-  console.log(
-    `   Distance stats: min=${stats.min.toFixed(4)} p10=${stats.p10.toFixed(4)} p25=${stats.p25.toFixed(4)} median=${stats.median.toFixed(4)} p75=${stats.p75.toFixed(4)} p90=${stats.p90.toFixed(4)} max=${stats.max.toFixed(4)}`,
-  );
-
-  const eps = stats.p10 > 0 ? stats.p10 * 0.85 : 0.08;
-  console.log(`   Using eps=${eps.toFixed(4)} (85% of p10)\n`);
-
-  const { clusters: rawClusters, noise } = dbscan(validEmbeddings, eps, 2);
-
-  const clusters = rawClusters.map((c) => ({
-    ...c,
-    memberIndices: c.memberIndices.map((i) => validIndices[i]!),
-  }));
-
-  console.log(`   ${clusters.length} clusters, ${noise.length} noise points\n`);
-  for (const c of clusters) {
-    const pages = new Set(c.memberIndices.map((i) => crops[i]!.pageNumber));
-    console.log(
-      `   cluster ${c.id}: ${c.memberIndices.length} faces across pages [${[...pages].sort((a, b) => a - b).join(", ")}]`,
-    );
-  }
-
-  // ── Step 4: Identify clusters ──────────────────────────────────────────
-  console.log("\n🎭 Step 4: Identifying characters via Gemini...\n");
-
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     console.error("❌ GEMINI_API_KEY is required");
@@ -275,23 +234,105 @@ async function main() {
   }
   const gemini = new GoogleGenAI({ apiKey: geminiKey });
 
-  const bookConfig = await loadBookConfig(BOOK_DIR);
   const roster = await loadRoster(BOOK_DIR);
-
   const dbInfo = await getIssueDbIds(book, issue);
   const wikiAppearances = dbInfo?.wikiAppearances ?? null;
+  const knownCharacters = buildKnownCharacterList(roster, wikiAppearances);
 
-  const identifications = await identifyClusters(gemini, clusters, crops, {
-    bookTitle: bookConfig?.title ?? book,
-    characterContext:
-      bookConfig?.characterContext ??
-      "Identify characters by their proper canonical names.",
-    roster,
-    wikiAppearances,
-  });
+  console.log(`\n🔍 Character lookahead for ${book}/${issue}\n`);
+  if (knownCharacters.length > 0) {
+    console.log(`   Known characters: ${knownCharacters.join(", ")}\n`);
+  }
 
-  // ── Step 5: Persist to DB ──────────────────────────────────────────────
-  console.log("\n💾 Step 5: Persisting results...\n");
+  // ── Incremental page-by-page scan ──────────────────────────────────────
+  const sidecars = await glob("page-*.json", { cwd: SAM3_DIR });
+  sidecars.sort();
+
+  const clusters: CharacterCluster[] = [];
+  let nextClusterId = 0;
+  let totalCrops = 0;
+  const allAssignments: Array<{
+    pageNumber: number;
+    panelIndex: number;
+    clusterId: number;
+    bboxPanelLocal: { x: number; y: number; w: number; h: number };
+  }> = [];
+
+  for (const filename of sidecars) {
+    const pageNum = parseInt(
+      filename.replace("page-", "").replace(".json", ""),
+      10,
+    );
+    const padded = String(pageNum).padStart(2, "0");
+
+    const crops = await extractFaceCropsForPage(SAM3_DIR, WEBP_DIR, pageNum);
+    if (crops.length === 0) continue;
+
+    totalCrops += crops.length;
+    console.log(`   page-${padded}: ${crops.length} faces`);
+
+    // Identify all faces on this page concurrently
+    const identifications = await Promise.all(
+      crops.map((face) => identifySingleFace(gemini, face, knownCharacters)),
+    );
+
+    for (let i = 0; i < crops.length; i++) {
+      const face = crops[i]!;
+      const { characterName, confidence } = identifications[i]!;
+
+      // Merge into existing cluster by name, or create a new one
+      const existing = characterName
+        ? clusters.find(
+            (c) =>
+              c.characterName?.toLowerCase() === characterName.toLowerCase(),
+          )
+        : null;
+
+      if (existing) {
+        existing.memberCount++;
+        if (confidence > existing.confidence) {
+          existing.confidence = confidence;
+          existing.exemplar = face;
+        }
+        allAssignments.push({
+          pageNumber: face.pageNumber,
+          panelIndex: face.panelIndex,
+          clusterId: existing.id,
+          bboxPanelLocal: face.bboxPanelLocal,
+        });
+      } else {
+        const id = nextClusterId++;
+        clusters.push({
+          id,
+          characterName,
+          confidence,
+          exemplar: face,
+          memberCount: 1,
+        });
+        allAssignments.push({
+          pageNumber: face.pageNumber,
+          panelIndex: face.panelIndex,
+          clusterId: id,
+          bboxPanelLocal: face.bboxPanelLocal,
+        });
+        console.log(
+          `     → new cluster ${id}: ${characterName ?? "unknown"} (${(confidence * 100).toFixed(0)}%)`,
+        );
+      }
+    }
+  }
+
+  console.log(
+    `\n📊 Summary: ${totalCrops} faces → ${clusters.length} clusters\n`,
+  );
+  for (const c of clusters) {
+    console.log(
+      `   cluster ${c.id}: ${c.characterName ?? "unknown"} — ${c.memberCount} faces (${(c.confidence * 100).toFixed(0)}%)`,
+    );
+  }
+
+  // ── Persist to DB ──────────────────────────────────────────────────────
+  console.log("\n💾 Persisting results...\n");
 
   if (!dbInfo) {
     console.warn(
@@ -300,12 +341,13 @@ async function main() {
     await fs.writeJSON(
       CACHE_PATH,
       {
-        cropCount: crops.length,
+        cropCount: totalCrops,
         clusters: clusters.map((c) => ({
           id: c.id,
-          memberCount: c.memberIndices.length,
+          characterName: c.characterName,
+          memberCount: c.memberCount,
+          confidence: c.confidence,
         })),
-        identifications,
       },
       { spaces: 2 },
     );
@@ -317,11 +359,6 @@ async function main() {
   const panelsByPage = await getPanelsByPage(bookId, issueId);
 
   if (overwrite) {
-    await supabase
-      .from("panel_character_detections")
-      .delete()
-      .eq("panel_id", issueId);
-
     const allPanelIds: string[] = [];
     for (const panels of panelsByPage.values()) {
       for (const p of panels) allPanelIds.push(p.id);
@@ -336,57 +373,59 @@ async function main() {
 
   let insertedCount = 0;
 
-  for (const identification of identifications) {
-    const cluster = clusters.find((c) => c.id === identification.clusterId);
-    if (!cluster) continue;
+  // Build character_id cache so we don't call ensureCharacterExists repeatedly
+  const charIdCache = new Map<number, string>();
+  for (const cluster of clusters) {
+    if (!cluster.characterName) continue;
+    const charId = await ensureCharacterExists(cluster.characterName);
+    charIdCache.set(cluster.id, charId);
+  }
 
-    const characterId = await ensureCharacterExists(
-      identification.characterName,
-    );
+  const detectionRows: Array<{
+    character_id: string;
+    panel_id: string;
+    face_bbox: object;
+    cluster_id: number;
+    identification_confidence: number;
+  }> = [];
 
-    const rows: Array<{
-      character_id: string;
-      panel_id: string;
-      face_bbox: object;
-      cluster_id: number;
-      identification_confidence: number;
-    }> = [];
+  for (const assignment of allAssignments) {
+    const charId = charIdCache.get(assignment.clusterId);
+    if (!charId) continue;
 
-    for (const cropIdx of cluster.memberIndices) {
-      const crop = crops[cropIdx]!;
-      const pagePanels = panelsByPage.get(crop.pageNumber);
-      if (!pagePanels) continue;
+    const pagePanels = panelsByPage.get(assignment.pageNumber);
+    if (!pagePanels) continue;
 
-      const panel = pagePanels[crop.panelIndex];
-      if (!panel) continue;
+    const panel = pagePanels[assignment.panelIndex];
+    if (!panel) continue;
 
-      rows.push({
-        character_id: characterId,
-        panel_id: panel.id,
-        face_bbox: crop.bboxPanelLocal,
-        cluster_id: cluster.id,
-        identification_confidence: identification.confidence,
-      });
-    }
+    const cluster = clusters.find((c) => c.id === assignment.clusterId);
+    detectionRows.push({
+      character_id: charId,
+      panel_id: panel.id,
+      face_bbox: assignment.bboxPanelLocal,
+      cluster_id: assignment.clusterId,
+      identification_confidence: cluster?.confidence ?? 0,
+    });
+  }
 
-    if (rows.length > 0) {
-      const { error } = await supabase
-        .from("panel_character_detections")
-        .insert(rows);
-      if (error) {
-        console.warn(
-          `   ⚠ Failed to insert detections for ${identification.characterName}: ${error.message}`,
-        );
-      } else {
-        insertedCount += rows.length;
-      }
+  // Batch insert in chunks of 100
+  for (let i = 0; i < detectionRows.length; i += 100) {
+    const chunk = detectionRows.slice(i, i + 100);
+    const { error } = await supabase
+      .from("panel_character_detections")
+      .insert(chunk);
+    if (error) {
+      console.warn(`   ⚠ Insert batch failed: ${error.message}`);
+    } else {
+      insertedCount += chunk.length;
     }
   }
 
   console.log(`   ${insertedCount} panel_character_detections rows inserted`);
 
-  // ── Step 6: Assign bubbles by geometry ─────────────────────────────────
-  console.log("\n📍 Step 6: Assigning bubbles by face proximity...\n");
+  // ── Assign bubbles by geometry ─────────────────────────────────────────
+  console.log("\n📍 Assigning bubbles by face proximity...\n");
 
   const { data: bubbles } = await supabase
     .from("bubbles")
@@ -452,15 +491,13 @@ async function main() {
   await fs.writeJSON(
     CACHE_PATH,
     {
-      cropCount: crops.length,
-      embeddingCount: validCount,
-      clusterCount: clusters.length,
-      noiseCount: noise.length,
+      cropCount: totalCrops,
       clusters: clusters.map((c) => ({
         id: c.id,
-        memberCount: c.memberIndices.length,
+        characterName: c.characterName,
+        memberCount: c.memberCount,
+        confidence: c.confidence,
       })),
-      identifications,
       insertedDetections: insertedCount,
       assignedBubbles: assignedCount,
     },
