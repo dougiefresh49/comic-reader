@@ -27,6 +27,7 @@ Each book+issue goes through these steps in order. Run via `pnpm ingest -- --boo
 | 1 | validate-inputs | Check assets dir + pages exist |
 | 2 | generate-pages-metadata | Extract page dimensions → `pages.json` |
 | 3 | convert-pages-to-webp | JPEG pages → WebP → `pages-webp/` |
+| 3.5 | fetch-wiki-context | MediaWiki API → `issues.wiki_summary` + `issues.wiki_appearances` |
 | 4 | get-context | Roboflow bounding boxes + Gemini OCR + speaker/emotion context → `bubbles.json` |
 | 5 | sort-bubbles-gemini | AI reorders bubbles for correct reading order |
 | 6 | add-bubble-styles | Calculate % coordinates for responsive positioning |
@@ -182,7 +183,8 @@ When implementing a feature: read its spec file, implement only what's in that s
 
 ## Known Issues / Technical Debt
 
-- `src/components/ZenComicReader.tsx` refactored to 223 lines (Phase 5 complete) — logic lives in `src/hooks/`
+- `src/components/ZenComicReader.tsx` refactored (Phase 5 complete) — logic lives in `src/hooks/`
+- Layered panel rendering uses SVG clip-paths with SAM3 foreground polygons — effects render between bg and fg
 - `public/` folder image storage won't scale on Vercel (Phase 2 `STORAGE_MODE=s3` flag exists but isn't wired up)
 - Some one-off scripts in `scripts/` are patches for gaps in the pipeline (backfill-context, repair-cues, regenerate-timestamps) — these become less necessary once Phase 2 pipeline runs cleanly end-to-end
 - Roboflow model may benefit from re-training (has improved since initial setup)

@@ -13,7 +13,7 @@ sit above those effects, dialogue is voiced in the right character
 voice with karaoke-synced highlighting, and a soundtrack flows
 continuously beneath it all.
 
-## Where we are today (2026-05-01)
+## Where we are today (2026-05-02)
 
 | Capability | State | Notes |
 |---|---|---|
@@ -27,8 +27,8 @@ continuously beneath it all.
 | Spring panel transitions | live | rAF spring physics (stiffness=170, damping=26). Shipped in PR #20. |
 | Particle effects on panels | live | Render *on top of* the page — occludes characters/bubbles. |
 | Music scenes | live | `music_scenes` table + `consolidate-music-scenes` backfill. Runtime uses `scene_id` for continuity. Shipped in PR #20. |
-| Foreground / background separation | absent | SAM3 segmentation works in Roboflow workflow; not consumed yet. |
-| Wiki context fetch at ingest | absent | |
+| Foreground / background separation | live | SVG clip-path layering: bg → effects → fg. Uses SAM3 polygons from `panels.foreground_polygons`. Shipped in PR #23. |
+| Wiki context fetch at ingest | live | `fetch-wiki-context` script uses MediaWiki API for Summary + Appearances. Stores in `issues.wiki_summary` / `wiki_appearances`. Shipped in PR #22. |
 | Character lookahead (face cluster + identify) | absent | |
 | Voice rotation (IVC archive/restore) | live | Pipeline wiring (checkout step 8.5, archive step 12.5). Fidelity test still open. Shipped in PR #20. |
 | Admin: bubble↔panel reassign | live | `PanelsReviewClient.tsx`. |

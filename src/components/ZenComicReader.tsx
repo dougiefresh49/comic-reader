@@ -21,6 +21,7 @@ import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
 import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
+import { LayeredPanel } from "./zen-comic-reader/LayeredPanel";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
 import {
@@ -426,21 +427,38 @@ export default function ZenComicReader({
               panelIndex={panelIndex}
               reducedMotion={reducedMotion}
             >
-              <Image
-                src={pageImage}
-                alt="Comic page"
-                fill
-                className="object-contain"
-                priority
-              />
+              {panelViewMode && activePanel?.foregroundPolygons ? (
+                <LayeredPanel
+                  pageImage={pageImage}
+                  bbox={activePanel.boundingBox}
+                  polygons={activePanel.foregroundPolygons}
+                  effectsSlot={
+                    <PanelEffectsOverlay
+                      panel={activePanel}
+                      active={panelViewMode}
+                      reducedMotion={reducedMotion}
+                    />
+                  }
+                />
+              ) : (
+                <>
+                  <Image
+                    src={pageImage}
+                    alt="Comic page"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                  <PanelEffectsOverlay
+                    panel={activePanel}
+                    active={panelViewMode}
+                    reducedMotion={reducedMotion}
+                  />
+                </>
+              )}
               {panelViewMode && activePanel ? (
                 <PanelDimOverlay bbox={activePanel.boundingBox} />
               ) : null}
-              <PanelEffectsOverlay
-                panel={activePanel}
-                active={panelViewMode}
-                reducedMotion={reducedMotion}
-              />
               <PanelAudioLayer
                 panel={activePanel}
                 active={panelViewMode && panelAutoPlay}
