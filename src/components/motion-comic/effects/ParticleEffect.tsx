@@ -8,6 +8,7 @@ import { loadTiltUpdater } from "@tsparticles/updater-tilt";
 import { loadWobbleUpdater } from "@tsparticles/updater-wobble";
 import { tsParticles } from "@tsparticles/engine";
 import type { Container, ISourceOptions } from "@tsparticles/engine";
+import { resolveEffectRect } from "./types";
 
 let initialized = false;
 let initPromise: Promise<void> | null = null;
@@ -36,6 +37,8 @@ interface Props {
   options: ISourceOptions;
   /** Optional CSS mix-blend-mode for hot/glow effects (e.g. "screen" for fire). */
   blendMode?: "screen" | "lighten" | "plus-lighter";
+  /** Gemini position hint — narrows the effect to a sub-region of the panel. */
+  position?: { anchor?: string; bbox?: [number, number, number, number] };
 }
 
 /**
@@ -51,7 +54,13 @@ interface Props {
  * The bbox styles live on the outer div and re-render at React's
  * normal cadence — that's cheap.
  */
-export function ParticleEffect({ id, bbox, options, blendMode }: Props) {
+export function ParticleEffect({
+  id,
+  bbox,
+  options,
+  blendMode,
+  position,
+}: Props) {
   const [ready, setReady] = useState(initialized);
   const containerRef = useRef<Container | null>(null);
   const targetRef = useRef<HTMLDivElement | null>(null);
@@ -86,16 +95,13 @@ export function ParticleEffect({ id, bbox, options, blendMode }: Props) {
   }, [ready, id, options]);
 
   if (!ready) return null;
+  const rect = resolveEffectRect(bbox, position);
   return (
     <div
       aria-hidden
       className="pointer-events-none absolute"
       style={{
-        left: `${bbox.x * 100}%`,
-        top: `${bbox.y * 100}%`,
-        width: `${bbox.w * 100}%`,
-        height: `${bbox.h * 100}%`,
-        // Constrain the canvas to the bbox so particles don't spill out.
+        ...rect,
         overflow: "hidden",
         mixBlendMode: blendMode,
       }}

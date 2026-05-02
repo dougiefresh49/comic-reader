@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import type {
+  EffectPositions,
   PageDirectedPanel,
   PanelBoundingBox,
   PanelForegroundPolygons,
@@ -46,6 +47,7 @@ interface PanelRow {
   bounding_box: PanelBoundingBox;
   cinematic_description: string | null;
   effect_tags: string[] | null;
+  effect_positions: EffectPositions | null;
   audio_tags: AudioTags | null;
   primary_speaker: string | null;
   estimated_duration_seconds: number | null;
@@ -93,7 +95,7 @@ export async function getPanelReviewData(
       supabaseAdmin
         .from("panels")
         .select(
-          "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, scene_id",
+          "id, panel_id, page_number, sort_order, bounding_box, cinematic_description, effect_tags, effect_positions, audio_tags, primary_speaker, estimated_duration_seconds, is_new_scene, source, foreground_polygons, scene_id",
         )
         .eq("book_id", bookId)
         .eq("issue_id", issueId)
@@ -154,6 +156,7 @@ export async function getPanelReviewData(
       boundingBox: row.bounding_box,
       cinematicDescription: row.cinematic_description,
       effectTags: row.effect_tags ?? [],
+      effectPositions: row.effect_positions ?? null,
       audioTags: row.audio_tags ?? {
         ambience: [],
         sfx: [],

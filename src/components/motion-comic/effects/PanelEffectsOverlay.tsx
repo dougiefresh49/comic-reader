@@ -62,6 +62,7 @@ export function PanelEffectsOverlay({
           active,
           progress,
           reducedMotion,
+          position: panel.effectPositions?.[tag] ?? undefined,
         };
         return <Comp key={`${tag}-${i}`} {...props} />;
       })}

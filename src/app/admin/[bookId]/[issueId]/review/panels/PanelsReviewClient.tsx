@@ -190,6 +190,7 @@ export function PanelsReviewClient({
       boundingBox: { x: 0.1, y: 0.1, w: 0.3, h: 0.3 },
       cinematicDescription: null,
       effectTags: [],
+      effectPositions: null,
       audioTags: { ambience: [], sfx: [], music_mood: "transition_neutral" },
       primarySpeaker: null,
       estimatedDurationSeconds: null,
