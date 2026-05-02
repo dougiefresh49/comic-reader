@@ -17,6 +17,7 @@
     "audio-downloader": "node scripts/audio-downloader.js",
     "video-download": "node scripts/video-download.js",
     "download-comic-images": "python3 scripts/download_comic_images.py",
+    "fetch-wiki-context": "tsx --env-file=.env scripts/fetch-wiki-context.ts",
     "get-context": "tsx --env-file=.env scripts/get-context.ts",
     "roboflow-page-analyze": "tsx --env-file=.env scripts/roboflow-page-analyze.ts",
     "extract-foreground-masks": "tsx --env-file=.env scripts/extract-foreground-masks.ts",
