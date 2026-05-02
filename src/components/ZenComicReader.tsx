@@ -62,7 +62,7 @@ export default function ZenComicReader({
   const [panelViewMode, setPanelViewMode] = useState(false);
   const [panelAutoPlay, setPanelAutoPlay] = useState(false);
 
-  const reducedMotion = usePrefersReducedMotion();
+  const systemReducedMotion = usePrefersReducedMotion();
   const focusBeforePanelRef = useRef<Element | null>(null);
   const panelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -84,7 +84,12 @@ export default function ZenComicReader({
     setPlaybackRate,
     panelViewPreferred,
     setPanelViewPreferred,
+    motionIntensity,
+    setMotionIntensity,
   } = useSettings();
+
+  const effectsOff = systemReducedMotion || motionIntensity !== "full";
+  const cameraOff = systemReducedMotion || motionIntensity === "off";
 
   const clearPanelTimer = useCallback(() => {
     if (panelTimerRef.current !== null) {
@@ -425,7 +430,7 @@ export default function ZenComicReader({
               panelViewMode={panelViewMode}
               panels={panels}
               panelIndex={panelIndex}
-              reducedMotion={reducedMotion}
+              reducedMotion={cameraOff}
             >
               {panelViewMode && activePanel?.foregroundPolygons ? (
                 <LayeredPanel
@@ -436,7 +441,7 @@ export default function ZenComicReader({
                     <PanelEffectsOverlay
                       panel={activePanel}
                       active={panelViewMode}
-                      reducedMotion={reducedMotion}
+                      reducedMotion={effectsOff}
                     />
                   }
                 />
@@ -452,7 +457,7 @@ export default function ZenComicReader({
                   <PanelEffectsOverlay
                     panel={activePanel}
                     active={panelViewMode}
-                    reducedMotion={reducedMotion}
+                    reducedMotion={effectsOff}
                   />
                 </>
               )}
@@ -561,6 +566,8 @@ export default function ZenComicReader({
         panelViewMode={panelViewMode}
         onTogglePanelView={handleTogglePanelView}
         hasPanels={panels.length > 0}
+        motionIntensity={motionIntensity}
+        onSetMotionIntensity={setMotionIntensity}
       />
 
       {!panelViewMode && scale > 1 && (
