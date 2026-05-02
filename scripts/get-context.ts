@@ -27,6 +27,7 @@ import {
   formatRosterForPrompt,
   addCharacterToRoster,
 } from "./utils/roster.js";
+import { supabase } from "./lib/supabase.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
@@ -159,6 +160,44 @@ async function main() {
     }
     const additionalContext = contextParts.join("\n\n");
 
+    // Load per-page character detections from lookahead (if available)
+    const lookaheadByPage = new Map<number, string[]>();
+    {
+      const { data: panels } = await supabase
+        .from("panels")
+        .select("id, page_number")
+        .eq("book_id", book)
+        .eq("issue_id", issue);
+
+      if (panels && panels.length > 0) {
+        const panelPageMap = new Map<string, number>();
+        const panelIds: string[] = [];
+        for (const p of panels) {
+          panelPageMap.set(p.id as string, p.page_number as number);
+          panelIds.push(p.id as string);
+        }
+
+        const { data: detections } = await supabase
+          .from("panel_character_detections")
+          .select("character_id, panel_id")
+          .in("panel_id", panelIds);
+
+        if (detections && detections.length > 0) {
+          for (const det of detections) {
+            const pg = panelPageMap.get(det.panel_id as string);
+            if (!pg) continue;
+            if (!lookaheadByPage.has(pg)) lookaheadByPage.set(pg, []);
+            const name = (det.character_id as string).replace(/-/g, " ");
+            const list = lookaheadByPage.get(pg)!;
+            if (!list.includes(name)) list.push(name);
+          }
+          console.log(
+            `🔍 Lookahead: character detections loaded for ${lookaheadByPage.size} pages\n`,
+          );
+        }
+      }
+    }
+
     // Ensure data directories exist
     await fs.ensureDir(dirname(CACHE_FILE));
     await fs.ensureDir(PREDICTIONS_DIR);
@@ -190,6 +229,14 @@ async function main() {
             return { pageName, bubbles: cache[pageName] };
           }
 
+          const pageNumMatch = pageName.match(/page-(\d+)/);
+          const pgNum = pageNumMatch ? parseInt(pageNumMatch[1]!, 10) : 0;
+          const pageChars = lookaheadByPage.get(pgNum);
+          let pageContext = additionalContext;
+          if (pageChars && pageChars.length > 0) {
+            pageContext += `\n\n**Characters detected on this page (from face recognition):** ${pageChars.join(", ")}.\nUse these names when assigning speakers — prefer these over inventing new character names.`;
+          }
+
           const bubbles = await processPage(
             pagePath,
             gemini,
@@ -198,7 +245,7 @@ async function main() {
               ocrCropsDir: OCR_CROPS_DIR,
               geminiContextDir: GEMINI_CONTEXT_DIR,
             },
-            { useSpatialDedup, skipGemini, additionalContext },
+            { useSpatialDedup, skipGemini, additionalContext: pageContext },
           );
           return { pageName, bubbles };
         }),
@@ -259,19 +306,17 @@ async function main() {
             .readJson(join(GEMINI_CONTEXT_DIR, file))
             .catch(() => null);
           if (!rawResponse) continue;
-          await supabase
-            .from("page_context")
-            .upsert(
-              {
-                book_id: book,
-                issue_id: issue,
-                page_number: pageNumber,
-                gemini_model: GEMINI_HIGH,
-                raw_response: rawResponse,
-                updated_at: new Date(),
-              },
-              { onConflict: "book_id,issue_id,page_number" },
-            );
+          await supabase.from("page_context").upsert(
+            {
+              book_id: book,
+              issue_id: issue,
+              page_number: pageNumber,
+              gemini_model: GEMINI_HIGH,
+              raw_response: rawResponse,
+              updated_at: new Date(),
+            },
+            { onConflict: "book_id,issue_id,page_number" },
+          );
         }
         console.log(`✓ Upserted ${jsonFiles.length} page_context rows`);
       } catch (err) {
