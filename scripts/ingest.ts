@@ -338,16 +338,21 @@ async function main() {
           const extraArgs: string[] = [];
           if (auto) extraArgs.push("--auto");
           if (
-            step.id === "review-new-characters" &&
+            (step.id === "review-new-characters" ||
+              step.id === "review-speakers") &&
             process.env.STORAGE_MODE === "supabase"
           ) {
             extraArgs.push("--db");
           }
           const exitCode = await runPnpmScript(step.id, book, issue, extraArgs);
 
-          if (step.id === "review-new-characters" && exitCode === 2) {
+          if (
+            (step.id === "review-new-characters" ||
+              step.id === "review-speakers") &&
+            exitCode === 2
+          ) {
             console.log(
-              `\n⏸️  Pipeline paused at review-new-characters — complete the browser review, then re-run ingest.`,
+              `\n⏸️  Pipeline paused at ${step.id} — complete the browser review, then re-run ingest.`,
             );
             checkpoint.currentStep = null;
             checkpoint.failedStep = null;
