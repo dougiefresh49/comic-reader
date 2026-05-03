@@ -8,6 +8,8 @@ The pipeline transforms raw comic book page images into a fully-voiced, interact
 pnpm ingest -- --book <book-id> --issue <issue-number>
 ```
 
+Data is stored in Supabase (DB + Storage). The pipeline writes to Supabase; the web app reads from it.
+
 ---
 
 ## Full Pipeline Flow
@@ -18,6 +20,7 @@ flowchart TD
 
     subgraph PRE["Pre-flight"]
         P1[scrape-pages\nDownload page images via Stagehand]
+        P2[upload-source-pages\nUpload to comic-pages-raw bucket]
     end
 
     PRE --> STAGE1
@@ -29,209 +32,154 @@ flowchart TD
         S1A --> S1B --> S1C
     end
 
-    STAGE1 --> STAGE2
+    STAGE1 --> STAGE1B
 
-    subgraph STAGE2["Stage 2 — Bubble Analysis"]
-        S2A[get-context\nRoboflow detection + Gemini OCR + speaker/emotion]
-        S2B[sort-bubbles-gemini\nAI reading order]
-        S2C[add-bubble-styles\n% coordinate positioning]
-        S2A --> S2B --> S2C
+    subgraph STAGE1B["Stage 1.5 — Vision Analysis"]
+        S1D[roboflow-page-analyze\nPanels + bubbles + SAM3 masks]
+        S1E[extract-foreground-masks\nForeground polygons for layering]
+        S1F[character-lookahead\nFace detection + Gemini identification]
+        S1D --> S1E --> S1F
+    end
+
+    STAGE1B --> STAGE2
+
+    subgraph STAGE2["Stage 2 — Context & Bubbles"]
+        S2A[get-context\nGemini OCR + speaker/emotion\n+ character lookahead hints]
+        S2B["review-speakers ⏸\nBrowser review if unknown speakers"]
+        S2C[sort-bubbles-gemini\nAI reading order]
+        S2D[add-bubble-styles\n% coordinate positioning]
+        S2A --> S2B --> S2C --> S2D
     end
 
     STAGE2 --> STAGE3
 
     subgraph STAGE3["Stage 3 — Voice Setup"]
-        S3A[generate-character-voice-descriptions\nGemini consolidates voice descriptions]
-        S3B[clean-voice-descriptions\nNormalize names via alias-map]
-        S3C[find-voice-sources\nGemini researches media appearances\nUser picks preferred voice]
-        S3D{All characters\nhave voice clips?}
-        S3E[⏸ PAUSE\nDownload clips for 'needs_clips' characters]
-        S3F[generate-voice-models\nElevenLabs creates voice models]
-        S3A --> S3B --> S3C --> S3D
-        S3D -- No --> S3E --> S3F
-        S3D -- Yes/skip --> S3F
+        S3A[generate-character-voice-descriptions\nGemini voice profiles]
+        S3B[clean-voice-descriptions\nAlias normalization]
+        S3C[review-new-characters\nBrowser review for aliases]
+        S3D[find-voice-sources\nGemini media research]
+        S3E["casting UI ⏸\nBrowser: pick source, paste voice ID,\nor use Voice Design"]
+        S3F[voice-rotation-checkout\nRestore archived IVCs]
+        S3A --> S3B --> S3C --> S3D --> S3E --> S3F
     end
 
     STAGE3 --> STAGE4
 
     subgraph STAGE4["Stage 4 — Audio Generation"]
-        S4A[generate-audio\nElevenLabs TTS for every bubble\n+ word-level timestamps]
+        S4A[generate-audio\nElevenLabs TTS per bubble\n+ word-level timestamps]
     end
 
     STAGE4 --> STAGE5
 
     subgraph STAGE5["Stage 5 — Publishing"]
-        S5A[copy-to-public\nStage WebP + audio + JSON]
-        S5B[generate-manifest\nFinal manifest.json + manifest.ts]
-        S5A --> S5B
+        S5A[copy-to-public\nSync to Supabase Storage]
+        S5B[consolidate-music-scenes\nGroup panels by mood run]
+        S5C[voice-rotation-archive\nArchive unused IVCs]
+        S5D[generate-manifest\nFinal manifest]
+        S5A --> S5B --> S5C --> S5D
     end
 
     STAGE5 --> END([Comic ready in web app ✓])
 
+    style S2B fill:#f59e0b,color:#000
     style S3E fill:#f59e0b,color:#000
     style PRE fill:#1e3a5f,color:#fff
 ```
 
 ---
 
-## Step-by-Step Reference
+## Pipeline Steps (Ordered)
 
-### Pre-flight: Image Ingestion
-
-| Script | Command | Description |
-|--------|---------|-------------|
-| `scrape-pages` | `pnpm scrape-pages -- --url <url> --book <id> --issue <n>` | Uses Stagehand (AI browser automation) to navigate to a comic URL and extract all page image URLs. Downloads sequentially as `page-01.jpg`, `page-02.jpg`, etc. |
-
-> Stagehand uses `GEMINI_MEDIUM` to identify comic page images vs. thumbnails/UI chrome.
+| # | Step ID | What it does |
+|---|---------|-------------|
+| 1 | `validate-inputs` | Check assets dir + pages exist |
+| 2 | `generate-pages-metadata` | Extract page dimensions → DB |
+| 3 | `convert-pages-to-webp` | JPEG → WebP → Supabase Storage |
+| 4 | `roboflow-page-analyze` | Panels + bubbles + SAM3 segmentation via Roboflow workflow |
+| 5 | `extract-foreground-masks` | Foreground polygons from SAM3 for layered rendering |
+| 6 | `character-lookahead` | Face extraction + Gemini Flash identification per face → per-page character lists |
+| 7 | `get-context` | Gemini OCR + speaker/emotion context (uses lookahead hints) |
+| 8 | `review-speakers` | Browser pause if unknown speakers need review (`/admin/.../review/speakers`) |
+| 9 | `sort-bubbles-gemini` | AI reorders bubbles for correct reading order |
+| 10 | `add-bubble-styles` | Calculate % coordinates for responsive positioning |
+| 11 | `generate-character-voice-descriptions` | Gemini consolidates voice descriptions per character |
+| 12 | `clean-voice-descriptions` | Normalize names via alias-map |
+| 13 | `review-new-characters` | Browser pause for alias assignment (`/admin/.../review/new-characters`) |
+| 14 | `find-voice-sources` | Gemini researches media appearances; creates casting tasks |
+| 15 | `generate-voice-models` | ElevenLabs IVC/Voice Design from sourced clips |
+| 16 | `voice-rotation-checkout` | Restore archived voices for this issue's cast |
+| 17 | `generate-audio` | ElevenLabs TTS per bubble + word alignment timestamps |
+| 18 | `copy-to-public` | Sync WebP + audio to Supabase Storage |
+| 19 | `consolidate-music-scenes` | Group panels into mood-consistent music scenes |
+| 20 | `voice-rotation-archive` | Archive IVCs no longer needed (free ElevenLabs slots) |
+| 21 | `generate-manifest` | Final manifest for the web app |
 
 ---
 
-### Stage 1 — Image Processing
+## Browser Review Pauses
+
+When running with `STORAGE_MODE=supabase`, certain steps pause the pipeline (exit code 2) and open a browser review:
+
+| Step | Browser URL | Purpose |
+|------|-------------|---------|
+| `review-speakers` | `/admin/{book}/{issue}/review/speakers` | Accept/rename/alias unknown speaker names |
+| `review-new-characters` | `/admin/{book}/{issue}/review/new-characters` | Alias new characters to existing or keep as new |
+| `find-voice-sources` | `/admin/characters/casting?book={book}&issue={issue}` | Source voice clips, paste voice IDs, or use Voice Design |
+
+After completing the browser review, re-run `pnpm ingest` — it resumes from where it paused.
+
+---
+
+## Character Lookahead Flow
 
 ```mermaid
 flowchart LR
-    A["assets/.../pages/\npage-01.jpg ... page-N.jpg"] -->|validate-inputs| B{Pages exist?}
-    B -- Yes --> C[generate-pages-metadata]
-    C -->|pages.json| D[convert-pages-to-webp]
-    D -->|pages-webp/\n*.webp| E[Stage 2]
+    A[Page WebP] -->|SAM3 sidecar| B[Extract face/head crops]
+    B -->|Per face| C[Gemini Flash\nidentify character]
+    C -->|Name-based merge| D[Clusters per page]
+    D -->|panel_character_detections| E[DB]
+    E -->|get-context reads| F[Per-page character hints\nin Gemini prompt]
 ```
 
-| Step | Script | Input | Output | Notes |
-|------|--------|-------|--------|-------|
-| 1 | `validate-inputs` | `assets/.../pages/` | — | Fails fast if pages dir is missing or empty |
-| 2 | `generate-pages-metadata` | Page JPEGs | `data/pages.json` | Width/height per page for responsive layout |
-| 3 | `convert-pages-to-webp` | Page JPEGs | `pages-webp/*.webp` | Resize to 1200px wide, WebP for web performance |
+The character lookahead runs BEFORE `get-context` and provides per-page character lists. This dramatically improves speaker identification accuracy — Gemini knows who's on the page before analyzing dialogue.
 
 ---
 
-### Stage 2 — Bubble Analysis
+## Voice Clip Splitting (Manual)
 
-```mermaid
-flowchart LR
-    A[Page images] -->|Roboflow API| B[Bounding boxes\nper bubble]
-    B -->|Crop + Gemini OCR\nGEMINI_MEDIUM| C[Text per bubble]
-    A --> C
-    C -->|Gemini context\nGEMINI_HIGH| D["bubbles.json\nspeaker, emotion,\ntype, text"]
-    D -->|sort-bubbles-gemini\nGEMINI_MEDIUM| E[Reading order]
-    E -->|add-bubble-styles| F["bubbles.json\n+ style coordinates\n(% based)"]
+When sourcing voice clips for casting, use the split tool to isolate a single character from mixed audio:
+
+```bash
+pnpm split-voice -- --input clip.mp4 --character "Raphael" --book tmnt-mmpr-iii
 ```
 
-| Step | Script | Model | Input | Output |
-|------|--------|-------|-------|--------|
-| 4 | `get-context` | `GEMINI_HIGH` (context), `GEMINI_MEDIUM` (OCR) | Page images + Roboflow | `data/bubbles.json` |
-| 5 | `sort-bubbles-gemini` | `GEMINI_MEDIUM` | `bubbles.json` + page images | `bubbles.json` (reordered) |
-| 6 | `add-bubble-styles` | — | `bubbles.json` + `pages.json` | `bubbles.json` + `style` objects |
+Pipeline: source separation (remove music/SFX) → speaker diarization (who speaks when) → Gemini speaker ID → ffmpeg extraction. Outputs a clean WAV for ElevenLabs IVC upload.
 
-**Bubble types detected:**
-- `SPEECH` → identify speaker + emotion
-- `NARRATION` / `CAPTION` → force speaker = "Narrator", emotion = "Neutral"
-- `SFX` → skip (no audio generated)
-
----
-
-### Stage 3 — Voice Setup
-
-```mermaid
-flowchart TD
-    REG[("data/character-registry.json\nglobal — persists across all issues + books")]
-
-    A["bubbles.json"] -->|generate-character-voice-descriptions\nGEMINI_MEDIUM| B["character-voice-descriptions.json"]
-    B -->|clean-voice-descriptions\nalias-map normalization| C["Canonical character list"]
-    C --> D{In registry\nwith voice ID?}
-    REG -->|lookup| D
-    D -- Yes --> I["castlist.json\ncharacter → voice ID"]
-    D -- No --> E["find-voice-sources\nGEMINI_HIGH\nresearch + user picks"]
-    E -->|saves appearances + choice| REG
-    E --> F{Status}
-    F -->|needs_clips| G[User downloads clips\npnpm audio-downloader]
-    F -->|skip| H[Auto-generated voice\nElevenLabs Voice Design]
-    G --> J["generate-voice-models\nElevenLabs IVC"]
-    H --> J
-    J -->|saves voice ID| REG
-    J --> I
-```
-
-| Step | Script | Model | What happens |
-|------|--------|-------|-------------|
-| 7 | `generate-character-voice-descriptions` | `GEMINI_MEDIUM` | Aggregates all voice description mentions per character into one consolidated profile. Skips characters already in the global character registry. |
-| 8 | `clean-voice-descriptions` | — | Normalizes character names using `alias-map.ts` (handles "Raph" → "Raphael" etc.). Cross-references registry — known characters are pre-populated. |
-| 9 | `find-voice-sources` | `GEMINI_MEDIUM` | **Checks `data/character-registry.json` first.** Characters with an existing voice ID skip this step entirely. For new characters only: researches media appearances, caches results to registry, interactive terminal menu to pick preferred voice. |
-| 10 | `generate-voice-models` | — | **Checks registry for existing voice IDs** — skips creation if already present. For new characters: creates ElevenLabs **IVC** (Instant Voice Clone) from sourced audio clips, or Voice Design for auto-generated minor characters. Writes voice ID back to registry and `castlist.json`. |
-
-**Voice model type:** ElevenLabs **IVC (Instant Voice Clone)** — works with a few minutes of sourced audio clips. PVC (Professional Voice Clone) requires 30+ minutes of single-speaker audio and is not used here.
-
-**Human pause point:** After step 9, the pipeline pauses. For any character with `status: "needs_clips"`, the user runs `pnpm audio-downloader` with the YouTube URL to download and stage the audio clips before continuing.
-
-**Character registry:** `data/character-registry.json` is a global file at the project root (not per-issue). It persists media appearance research and voice IDs across all issues and books. Re-processing the same series skips voice setup for known characters entirely.
-
----
-
-### Stage 4 — Audio Generation
-
-```mermaid
-flowchart LR
-    A["bubbles.json\n(all bubble text)"] --> C[generate-audio]
-    B["castlist.json\ncharacter → voice ID"] --> C
-    C -->|ElevenLabs TTS\nper bubble| D["audio/\nbubble-001.mp3\nbubble-002.mp3\n..."]
-    C -->|word alignment data| E["audio-timestamps.json\nword-level timings\nfor karaoke highlight"]
-```
-
-| Step | Script | Input | Output | Notes |
-|------|--------|-------|--------|-------|
-| 11 | `generate-audio` | `bubbles.json` + `castlist.json` | `audio/*.mp3` + `audio-timestamps.json` | Calls ElevenLabs TTS API once per bubble. Word-level timestamps enable karaoke highlighting in the reader. |
-
----
-
-### Stage 5 — Publishing
-
-| Step | Script | Input | Output |
-|------|--------|-------|--------|
-| 12 | `copy-to-public` | `pages-webp/`, `audio/`, `bubbles.json` | `public/comics/<book>/<issue>/` |
-| 13 | `generate-manifest` | `assets/` directory tree | `public/comics/manifest.json` + `src/data/manifest.ts` |
-
----
-
-## Data Files Reference
-
-```
-assets/comics/<book>/issue-<n>/
-  pages/                          ← Source JPEGs (never in public/)
-  pages-webp/                     ← Converted WebP (intermediate)
-  audio/                          ← Generated MP3 files
-  data/
-    pages.json                    ← Page dimensions (Stage 1 output)
-    bubbles.json                  ← The core data file — everything about every bubble
-    character-voice-descriptions.json  ← Consolidated per-character voice profiles
-    voice-sourcing-suggestions.json    ← Gemini's media appearance research
-    source-material.json          ← Character → chosen voice source + status
-    castlist.json                 ← Character → ElevenLabs voice ID (final)
-    audio-timestamps.json         ← Word-level timing for karaoke highlight
-    gemini-context/               ← Per-page Gemini analysis cache (speeds up reruns)
-  checkpoint.json                 ← Pipeline progress (auto-managed, gitignored)
-```
+Requires: `pip install audio-separator[cpu] pyannote.audio` + `HF_TOKEN` env var.
 
 ---
 
 ## Checkpoint / Resume
 
-The pipeline writes a `checkpoint.json` after each step completes. If a run is interrupted (API error, rate limit, crash), re-running the same command automatically resumes from the last successful step.
+The pipeline writes a `checkpoint.json` after each step completes. If a run is interrupted, re-running the same command automatically resumes from the last successful step.
 
 ```bash
 # Normal run (auto-resumes if checkpoint exists)
-pnpm ingest -- --book tmnt-mmpr --issue 4
+pnpm ingest -- --book tmnt-mmpr-iii --issue 3
 
 # Force restart from a specific step
-pnpm ingest -- --book tmnt-mmpr --issue 4 --from-step generate-audio
+pnpm ingest -- --book tmnt-mmpr-iii --issue 3 --from-step generate-audio
 
 # Preview what would run without executing
-pnpm ingest -- --book tmnt-mmpr --issue 4 --dry-run
+pnpm ingest -- --book tmnt-mmpr-iii --issue 3 --dry-run
+
+# Skip interactive prompts (auto mode for terminal reviews)
+pnpm ingest -- --book tmnt-mmpr-iii --issue 3 --auto
 ```
 
 ---
 
 ## Manual / Maintenance Scripts
-
-These run outside the main pipeline to fix issues discovered during review.
 
 | Script | When to use |
 |--------|------------|
@@ -239,16 +187,44 @@ These run outside the main pipeline to fix issues discovered during review.
 | `pnpm backfill-context` | Add missing `aiReasoning` fields to an existing `bubbles.json` |
 | `pnpm regenerate-timestamps` | Re-fetch word timing data without re-generating audio |
 | `pnpm apply-fixes` | Apply speaker/emotion corrections exported from the web review UI |
-| `pnpm sort-bubbles` | Re-sort bubbles by position (simple Y then X, no AI) |
+| `pnpm split-voice` | Isolate character voice from mixed audio for IVC training |
+| `pnpm manage-registry` | Inspect/edit the global character registry |
 
 ---
 
 ## Gemini Model Tiers
 
-All model strings are centralized in `scripts/utils/models.ts`. Never hardcode inline.
+All model strings are centralized in `src/lib/models.ts` (re-exported via `scripts/utils/models.ts`). Never hardcode inline.
 
 | Export | Model | Used in |
 |--------|-------|---------|
 | `GEMINI_HIGH` | `gemini-3.1-pro-preview` | `get-context` (context analysis), `find-voice-sources` (research) |
-| `GEMINI_MEDIUM` | `gemini-3-flash-preview` | `get-context` (OCR), `sort-bubbles-gemini`, `generate-character-voice-descriptions`, `scrape-pages` |
-| `GEMINI_FAST` | `gemini-3.1-flash-lite-preview` | `repair-cues` (simple rule-based fixes) |
+| `GEMINI_MEDIUM` | `gemini-3-flash-preview` | OCR, `sort-bubbles-gemini`, `character-lookahead`, `scrape-pages`, `split-voice` (speaker ID) |
+| `GEMINI_FAST` | `gemini-3.1-flash-lite-preview` | `repair-cues`, `regenerate-cues` (simple rule-based fixes) |
+
+---
+
+## Data Storage
+
+| System | What's stored |
+|--------|--------------|
+| **Supabase DB** | Bubbles, panels, pages, issues, castlist, characters, aliases, music scenes, audio timestamps, casting tasks, speaker reviews |
+| **Supabase Storage** | Page WebPs (`comic-pages`), audio MP3s (`comic-audio`), raw source pages (`comic-pages-raw`), voice clips (`comic-voice-clips`), audio library (SFX/ambience/music) |
+| **Local `assets/`** | Source JPEGs, intermediate data files, SAM3 sidecars, checkpoint state |
+
+---
+
+## Admin Dashboard
+
+The admin dashboard at `/admin` shows:
+- All issues with pipeline status (Ready / Processing / Paused)
+- Links to review UIs when pipeline is paused
+- Quick access to panels review, bubble review, and reader
+
+Additional admin pages:
+- `/admin/new-issue` — drag-and-drop page upload
+- `/admin/voices` — voice model management and rotation
+- `/admin/characters/casting` — voice sourcing workflow
+- `/admin/{book}/{issue}/review/speakers` — speaker name review
+- `/admin/{book}/{issue}/review/new-characters` — character alias assignment
+- `/admin/{book}/{issue}/review/panels` — panel bounds, bubble assignment, effect tags
