@@ -44,6 +44,7 @@ Each book+issue goes through these steps in order. Run via `pnpm ingest -- --boo
 - `backfill-context` — add missing aiReasoning fields to existing bubbles.json
 - `regenerate-timestamps` — re-fetch timestamps without re-generating audio
 - `apply-fixes` — apply corrections from the web review interface
+- `split-voice` — isolate character voice from mixed audio (source separation + diarization + Gemini ID)
 
 ---
 
