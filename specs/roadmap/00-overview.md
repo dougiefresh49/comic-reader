@@ -29,7 +29,7 @@ continuously beneath it all.
 | Music scenes | live | `music_scenes` table + `consolidate-music-scenes` backfill. Runtime uses `scene_id` for continuity. Shipped in PR #20. |
 | Foreground / background separation | live | SVG clip-path layering: bg → effects → fg. Uses SAM3 polygons from `panels.foreground_polygons`. Shipped in PR #23. |
 | Wiki context fetch at ingest | live | `fetch-wiki-context` script uses MediaWiki API for Summary + Appearances. Stores in `issues.wiki_summary` / `wiki_appearances`. Shipped in PR #22. |
-| Character lookahead (face cluster + identify) | absent | |
+| Character lookahead (face cluster + identify) | live | Gemini Flash per-face identification → name-based clustering. Feeds per-page character lists into get-context. PR #28. |
 | Voice rotation (IVC archive/restore) | live | Pipeline wiring (checkout step 8.5, archive step 12.5). Fidelity test still open. Shipped in PR #20. |
 | Admin: bubble↔panel reassign | live | `PanelsReviewClient.tsx`. |
 | Admin: panel reorder | live | Drag-to-reorder via `@dnd-kit/sortable`. Sets `source = "manual"`. Shipped in PR #19. |

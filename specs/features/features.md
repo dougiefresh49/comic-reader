@@ -48,33 +48,31 @@ Backlog and status tracker for planned features. Update status here when work st
 | Data hosting migration (Supabase DB + Storage) | `done` | [data-hosting/README.md](data-hosting/README.md) | Phases A–D complete: 5 Storage buckets, DB schema (14 tables), frontend reads from Supabase CDN, pipeline writes to Supabase. Unblocks Review UI Phase B. |
 | Auth (Clerk or Supabase) | `pending` | — | Noted as known need, not yet specced |
 
-## Episode Generation
+## Episode Generation — PAUSED
 
-Specs in `specs/features/episode-generation/`. Two output modes: motion comic (free, Ken Burns + existing audio) and full cinematic (Venice.ai image + video generation). See [00-overview.md](episode-generation/00-overview.md) for architecture, cost estimates, and CLI interface.
+> **Status: Paused as of 2026-05-02.** Does not fit the core goal (make reading fun) and generation costs (Venice image/video) were too high. Motion Comic MVP is done and usable; the cinematic pipeline beyond that is shelved indefinitely.
 
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
 | Motion Comic MVP | `done` | [01-motion-comic-mvp.md](episode-generation/01-motion-comic-mvp.md) | `pnpm motion-comic` — Ken Burns + ElevenLabs audio + FFmpeg. No Venice. |
 | Character Setup | `done` | [02-character-setup.md](episode-generation/02-character-setup.md) | `visualDescription` registry field + seedream reference images + series.json aesthetic lock |
-| Shot Planning | `pending` | [03-shot-planning.md](episode-generation/03-shot-planning.md) | Gemini Vision per page → shot-plan.json. Last free gate before Venice spend. |
-| Storyboard | `pending` | [04-storyboard.md](episode-generation/04-storyboard.md) | Venice image generation per shot (seedream + flux-2-max-edit). ~$5–15/issue. |
-| Video Clips | `pending` | [05-video-clips.md](episode-generation/05-video-clips.md) | Venice video queue per panel (kling-3.0 for faces, seedance-2.0 for atmosphere). ~$15–50/issue. |
-| Assembly | `pending` | [06-assembly.md](episode-generation/06-assembly.md) | FFmpeg concat + ElevenLabs audio mix + optional Venice music. |
-| Review System | `pending` | [review-system.md](episode-generation/review-system.md) | Human-gated review at each phase. Static HTML galleries + terminal prompts. No AI at review time. |
+| Shot Planning | `paused` | [03-shot-planning.md](episode-generation/03-shot-planning.md) | Paused — too expensive, out of scope. |
+| Storyboard | `paused` | [04-storyboard.md](episode-generation/04-storyboard.md) | Paused — too expensive, out of scope. |
+| Video Clips | `paused` | [05-video-clips.md](episode-generation/05-video-clips.md) | Paused — too expensive, out of scope. |
+| Assembly | `paused` | [06-assembly.md](episode-generation/06-assembly.md) | Paused — too expensive, out of scope. |
+| Review System | `paused` | [review-system.md](episode-generation/review-system.md) | Paused — too expensive, out of scope. |
 
-## Motion Comic Plus
+## Motion Comic Plus — PAUSED
 
-New default render path for episodes. Replaces the old cinematic-video
-direction (kept as opt-in "Hero Shot Cinematic"). See
-[motion-comic-plus/00-overview.md](motion-comic-plus/00-overview.md).
+> **Status: Paused as of 2026-05-02.** Episode generation workstream is shelved (too expensive, out of scope for core reading experience).
 
 | Feature | Status | Spec | Notes |
 |---------|--------|------|-------|
-| Panel Direction (Gemini panel rects + effect/audio tags) | `pending` | [motion-comic-plus/01-panel-direction.md](motion-comic-plus/01-panel-direction.md) | Replaces `plan-shots` as default. Uses cached gemini-context. |
-| Panel Reader UI (Kindle-style) | `pending` | [motion-comic-plus/02-panel-reader-ui.md](motion-comic-plus/02-panel-reader-ui.md) | Double-tap enter, swipe between panels |
-| Effect Library | `pending` | [motion-comic-plus/03-effect-library.md](motion-comic-plus/03-effect-library.md) | ~20 reusable CSS/canvas/SVG effects |
-| Audio Layer | `pending` | [motion-comic-plus/04-audio-layer.md](motion-comic-plus/04-audio-layer.md) | Music + SFX, Freesound→ElevenLabs fallback, cached |
-| MP4 Export | `pending` | [motion-comic-plus/05-mp4-export.md](motion-comic-plus/05-mp4-export.md) | Headless Chromium screen-record (sketch only) |
+| Panel Direction (Gemini panel rects + effect/audio tags) | `paused` | [motion-comic-plus/01-panel-direction.md](motion-comic-plus/01-panel-direction.md) | Paused with episode generation. |
+| Panel Reader UI (Kindle-style) | `paused` | [motion-comic-plus/02-panel-reader-ui.md](motion-comic-plus/02-panel-reader-ui.md) | Paused with episode generation. |
+| Effect Library | `paused` | [motion-comic-plus/03-effect-library.md](motion-comic-plus/03-effect-library.md) | Paused with episode generation. |
+| Audio Layer | `paused` | [motion-comic-plus/04-audio-layer.md](motion-comic-plus/04-audio-layer.md) | Paused with episode generation. |
+| MP4 Export | `paused` | [motion-comic-plus/05-mp4-export.md](motion-comic-plus/05-mp4-export.md) | Paused with episode generation. |
 | Onomatopoeia bubble re-detection | `pending` | — | User task: re-add to Roboflow now that hand-tweak + multi-class detection are mature |
 
 ## From 2026-04-30 testing-session feedback
