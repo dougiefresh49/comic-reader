@@ -7,6 +7,7 @@ import * as readline from "readline";
 import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
 import { loadRoster, getRosterAliasMap } from "./utils/roster.js";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
+import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -20,11 +21,17 @@ type BubbleEntry = {
 type BubblesData = Record<string, BubbleEntry[]>;
 type ReviewedSpeakers = Record<string, string>;
 
-function parseArgs(): { book: string; issue: string; auto: boolean } {
+function parseArgs(): {
+  book: string;
+  issue: string;
+  auto: boolean;
+  db: boolean;
+} {
   const args = process.argv.slice(2);
   let book = process.env.COMIC_BOOK ?? "";
   let issue = process.env.COMIC_ISSUE ?? "";
   let auto = false;
+  let db = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -46,6 +53,7 @@ function parseArgs(): { book: string; issue: string; auto: boolean } {
       }
     }
     if (arg === "--auto") auto = true;
+    if (arg === "--db") db = true;
   }
 
   if (!book) {
@@ -57,7 +65,7 @@ function parseArgs(): { book: string; issue: string; auto: boolean } {
     process.exit(1);
   }
 
-  return { book, issue, auto };
+  return { book, issue, auto, db };
 }
 
 function pageNumFromKey(key: string): number {
@@ -159,8 +167,120 @@ async function pickFromList(
   }
 }
 
+async function runDbMode(book: string, issue: string): Promise<void> {
+  const SEP = "─".repeat(62);
+  const adminUrl = `/admin/${book}/${issue}/review/speakers`;
+
+  // Query unique SPEECH speakers from bubbles
+  const { data: bubbleRows } = await supabase
+    .from("bubbles")
+    .select("speaker")
+    .eq("book_id", book)
+    .eq("issue_id", issue)
+    .eq("type", "SPEECH")
+    .not("speaker", "is", null);
+
+  const uniqueSpeakers = new Set<string>();
+  for (const row of bubbleRows ?? []) {
+    if (row.speaker) uniqueSpeakers.add(row.speaker as string);
+  }
+
+  if (uniqueSpeakers.size === 0) {
+    console.log("\n✅ No speakers found in bubbles — nothing to review.\n");
+    return;
+  }
+
+  // Check which speakers already have resolved reviews
+  const { data: reviewRows } = await supabase
+    .from("speaker_reviews")
+    .select("original_name, status")
+    .eq("book_id", book)
+    .eq("issue_id", issue);
+
+  const resolvedNames = new Set<string>();
+  for (const r of reviewRows ?? []) {
+    if ((r.status as string) !== "pending") {
+      resolvedNames.add(r.original_name as string);
+    }
+  }
+
+  // Check for auto-known speakers via aliases + castlist
+  const [{ data: aliasRows }, { data: castRows }] = await Promise.all([
+    supabase
+      .from("aliases")
+      .select("alias, canonical")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${book})`),
+    supabase
+      .from("castlist")
+      .select("character")
+      .eq("book_id", book)
+      .eq("issue_id", issue),
+  ]);
+
+  const aliasMap = new Map<string, string>();
+  for (const r of (aliasRows ?? []) as Array<{
+    alias: string;
+    canonical: string;
+  }>) {
+    aliasMap.set(r.alias.toLowerCase().trim(), r.canonical);
+  }
+  const castedCharacters = new Set<string>();
+  for (const r of (castRows ?? []) as Array<{ character: string }>) {
+    castedCharacters.add(r.character);
+  }
+
+  let pendingCount = 0;
+  for (const name of uniqueSpeakers) {
+    if (resolvedNames.has(name)) continue;
+    const aliased = aliasMap.get(name.toLowerCase().trim());
+    const canonical = aliased ?? name;
+    if (castedCharacters.has(canonical)) continue;
+    pendingCount++;
+  }
+
+  if (pendingCount > 0) {
+    await supabase
+      .from("issues")
+      .update({
+        pipeline_step: "review-speakers",
+        pipeline_paused: true,
+        pipeline_paused_at: "review-speakers",
+        pipeline_paused_url: adminUrl,
+      })
+      .eq("book_id", book)
+      .eq("id", issue);
+
+    console.log(`\n${SEP}`);
+    console.log("── Review speakers ──────────────────────────────────────");
+    console.log(`  ${pendingCount} speaker(s) awaiting review.`);
+    console.log(`  Open: ${adminUrl}`);
+    console.log(`  Re-run after completing review to continue.`);
+    console.log(`${SEP}\n`);
+    process.exit(2);
+  }
+
+  await supabase
+    .from("issues")
+    .update({
+      pipeline_paused: false,
+      pipeline_paused_at: null,
+      pipeline_paused_url: null,
+    })
+    .eq("book_id", book)
+    .eq("id", issue)
+    .eq("pipeline_paused_at", "review-speakers");
+
+  console.log(`\n✅ No speakers awaiting review — continuing pipeline.\n`);
+}
+
 async function main() {
-  const { book, issue, auto } = parseArgs();
+  const { book, issue, auto, db } = parseArgs();
+
+  if (db) {
+    await runDbMode(book, issue);
+    return;
+  }
+
   await initAliasMap();
 
   const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
