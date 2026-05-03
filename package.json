@@ -47,6 +47,7 @@
     "review-speakers": "tsx --env-file=.env scripts/review-speakers.ts",
     "review-new-characters": "tsx --env-file=.env scripts/review-new-characters.ts",
     "find-voice-sources": "tsx --env-file=.env scripts/find-voice-sources.ts",
+    "split-voice": "tsx --env-file=.env scripts/split-voice-clip.ts",
     "manage-registry": "tsx --env-file=.env scripts/manage-registry.ts",
     "ingest": "tsx --env-file=.env scripts/ingest.ts",
     "scrape-pages": "tsx --env-file=.env scripts/scrape-pages.ts",
