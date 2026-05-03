@@ -57,8 +57,8 @@ flowchart TD
         S3A[generate-character-voice-descriptions\nGemini voice profiles]
         S3B[clean-voice-descriptions\nAlias normalization]
         S3C[review-new-characters\nBrowser review for aliases]
-        S3D[find-voice-sources\nGemini media research]
-        S3E["casting UI ⏸\nBrowser: pick source, paste voice ID,\nor use Voice Design"]
+        S3D[find-voice-sources\nCreate casting tasks]
+        S3E["casting UI ⏸\nBrowser: triage + on-demand research,\npick source, paste voice ID,\nor use Voice Design"]
         S3F[voice-rotation-checkout\nRestore archived IVCs]
         S3A --> S3B --> S3C --> S3D --> S3E --> S3F
     end
@@ -105,7 +105,7 @@ flowchart TD
 | 11 | `generate-character-voice-descriptions` | Gemini consolidates voice descriptions per character |
 | 12 | `clean-voice-descriptions` | Normalize names via alias-map |
 | 13 | `review-new-characters` | Browser pause for alias assignment (`/admin/.../review/new-characters`) |
-| 14 | `find-voice-sources` | Gemini researches media appearances; creates casting tasks |
+| 14 | `find-voice-sources` | Creates casting tasks; pauses for browser-based on-demand Gemini research |
 | 15 | `generate-voice-models` | ElevenLabs IVC/Voice Design from sourced clips |
 | 16 | `voice-rotation-checkout` | Restore archived voices for this issue's cast |
 | 17 | `generate-audio` | ElevenLabs TTS per bubble + word alignment timestamps |
@@ -124,7 +124,7 @@ When running with `STORAGE_MODE=supabase`, certain steps pause the pipeline (exi
 |------|-------------|---------|
 | `review-speakers` | `/admin/{book}/{issue}/review/speakers` | Accept/rename/alias unknown speaker names |
 | `review-new-characters` | `/admin/{book}/{issue}/review/new-characters` | Alias new characters to existing or keep as new |
-| `find-voice-sources` | `/admin/characters/casting?book={book}&issue={issue}` | Source voice clips, paste voice IDs, or use Voice Design |
+| `find-voice-sources` | `/admin/characters/casting?book={book}&issue={issue}` | Triage characters (with wiki voice hints), trigger on-demand Gemini research, source clips / Voice Design / paste voice IDs |
 
 After completing the browser review, re-run `pnpm ingest` — it resumes from where it paused.
 
