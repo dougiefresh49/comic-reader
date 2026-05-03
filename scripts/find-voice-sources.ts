@@ -403,7 +403,8 @@ async function runBookMode(
     await saveRegistry(registry);
   }
 
-  // ── DB mode: write character_appearances + casting_tasks for the browser ──
+  // ── DB mode: write characters + casting_tasks for the browser ──
+  // Research is now on-demand in the browser UI — we just create the tasks here.
   if (db) {
     console.log(
       "\n─────────────────────────────────────────────────────────────",
@@ -423,7 +424,6 @@ async function runBookMode(
       .eq("id", issue);
 
     let charsUpserted = 0;
-    let appsUpserted = 0;
     let tasksUpserted = 0;
 
     for (const character of allNewCharNames) {
@@ -445,35 +445,28 @@ async function runBookMode(
       }
       charsUpserted++;
 
-      // 2. character_appearances — one row per Gemini-suggested appearance
+      // 2. Write any cached appearances from registry (from previous runs)
       for (const app of entry.appearances) {
-        const { error: aErr } = await supabase
-          .from("character_appearances")
-          .upsert(
-            {
-              id: app.id,
-              character_id: character,
-              media_title: app.mediaTitle,
-              year: app.year,
-              voice_actor: app.voiceActor,
-              media_type: app.mediaType,
-              youtube_search_terms: app.youtubeSearchTerms,
-              notes: app.notes,
-              voice_id: app.voice?.voiceId ?? null,
-              voice_type: app.voice?.voiceType ?? null,
-              voice_status: app.voice?.status ?? null,
-              voice_description: app.voice?.voiceDescription ?? null,
-              voice_created_at: app.voice?.createdAt ?? null,
-              voice_model_status:
-                app.voice?.status === "ready" ? "ready" : "pending",
-            },
-            { onConflict: "id" },
-          );
-        if (aErr) {
-          console.warn(`   ⚠ appearance ${app.id}: ${aErr.message}`);
-        } else {
-          appsUpserted++;
-        }
+        await supabase.from("character_appearances").upsert(
+          {
+            id: app.id,
+            character_id: character,
+            media_title: app.mediaTitle,
+            year: app.year,
+            voice_actor: app.voiceActor,
+            media_type: app.mediaType,
+            youtube_search_terms: app.youtubeSearchTerms,
+            notes: app.notes,
+            voice_id: app.voice?.voiceId ?? null,
+            voice_type: app.voice?.voiceType ?? null,
+            voice_status: app.voice?.status ?? null,
+            voice_description: app.voice?.voiceDescription ?? null,
+            voice_created_at: app.voice?.createdAt ?? null,
+            voice_model_status:
+              app.voice?.status === "ready" ? "ready" : "pending",
+          },
+          { onConflict: "id" },
+        );
       }
 
       // 3. casting_tasks — one row per character that doesn't already have a
@@ -489,7 +482,6 @@ async function runBookMode(
       const existingCastVoice = (existingCast as { voice_id?: string } | null)
         ?.voice_id;
       if (existingCastVoice && existingCastVoice !== "__SKIPPED__") {
-        // Already cast for this issue — no task needed
         continue;
       }
       const { data: existingTask } = await supabase
@@ -501,7 +493,6 @@ async function runBookMode(
         .maybeSingle();
       const existing = existingTask as { id: string; status: string } | null;
       if (existing && existing.status !== "pending") {
-        // already complete/in_progress/skipped — leave alone
         continue;
       }
       if (!existing) {
@@ -520,7 +511,10 @@ async function runBookMode(
     }
 
     console.log(
-      `   ✓ ${charsUpserted} character(s), ${appsUpserted} appearance(s), ${tasksUpserted} casting task(s)\n`,
+      `   ✓ ${charsUpserted} character(s), ${tasksUpserted} casting task(s)\n`,
+    );
+    console.log(
+      `   Research is on-demand — open the casting UI to select which characters to research.\n`,
     );
 
     // Check whether anything is actually pending — if everything's already
@@ -540,7 +534,6 @@ async function runBookMode(
       );
       console.log(`  Run again after completing casting to continue.`);
       console.log(`──────────────────────────────────────────────────────`);
-      // Exit 2 = clean pause signal for ingest.ts
       process.exit(2);
     }
 

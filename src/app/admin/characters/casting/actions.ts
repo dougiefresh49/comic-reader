@@ -1,6 +1,8 @@
 "use server";
 
+import { GoogleGenAI, createPartFromText } from "@google/genai";
 import { revalidatePath } from "next/cache";
+import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 const SKIPPED_VOICE = "__SKIPPED__";
@@ -287,4 +289,141 @@ export async function createVoiceDesign(
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+}
+
+interface MediaAppearance {
+  mediaTitle: string;
+  year: number;
+  voiceActor: string;
+  mediaType: string;
+  youtubeSearchTerms: string[];
+  notes: string;
+}
+
+interface ResearchCharacterArgs {
+  characterId: string;
+  franchise?: string;
+}
+
+/**
+ * On-demand Gemini research for a single character.
+ * Looks up voice actors and media appearances, writes results to
+ * character_appearances table.
+ */
+export async function researchCharacter(
+  args: ResearchCharacterArgs,
+): Promise<ActionResult & { appearances?: MediaAppearance[] }> {
+  if (!process.env.GEMINI_API_KEY) {
+    return { ok: false, error: "GEMINI_API_KEY not configured" };
+  }
+
+  const franchise = args.franchise ?? "unknown franchise";
+  const prompt = `What animated series, movies, video games, or live-action productions has the character "${args.characterId}" from "${franchise}" appeared in with voiced dialogue?
+
+For each appearance, return:
+- mediaTitle: name of the show/movie/game
+- year: release year
+- voiceActor: name of voice actor
+- mediaType: "animated_series" | "movie" | "video_game" | "live_action"
+- youtubeSearchTerms: 2-3 good search queries to find clips on YouTube
+- notes: any relevant context (e.g., "original voice actor", "reboot", "cameo only")
+
+Return as a JSON array only, with no markdown formatting or extra text.`;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: GEMINI_MEDIUM,
+      contents: [createPartFromText(prompt)],
+    });
+
+    const text = response.text?.trim();
+    if (!text) return { ok: false, error: "Empty Gemini response" };
+
+    let jsonText = text;
+    const codeBlock = /```(?:json)?\n?([\s\S]*?)\n?```/.exec(jsonText);
+    if (codeBlock?.[1]) jsonText = codeBlock[1].trim();
+
+    let appearances: MediaAppearance[];
+    try {
+      appearances = JSON.parse(jsonText) as MediaAppearance[];
+    } catch {
+      return { ok: false, error: "Failed to parse Gemini response as JSON" };
+    }
+
+    // Write to character_appearances
+    for (const app of appearances) {
+      const id = `${args.characterId}-${app.mediaTitle}-${app.year}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .slice(0, 80);
+
+      await supabaseAdmin.from("character_appearances").upsert(
+        {
+          id,
+          character_id: args.characterId,
+          media_title: app.mediaTitle,
+          year: app.year,
+          voice_actor: app.voiceActor,
+          media_type: app.mediaType,
+          youtube_search_terms: app.youtubeSearchTerms,
+          notes: app.notes,
+          voice_model_status: "pending",
+        },
+        { onConflict: "id" },
+      );
+    }
+
+    revalidatePath("/admin/characters/casting", "page");
+    return { ok: true, appearances };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+interface BulkVoiceDesignArgs {
+  tasks: Array<{
+    taskId: string;
+    characterId: string;
+    bookId: string;
+    issueId: string;
+    voiceDescription: string;
+  }>;
+}
+
+/**
+ * Batch Voice Design for multiple characters at once.
+ * Used for minor/generic characters that don't need manual sourcing.
+ */
+export async function bulkVoiceDesign(args: BulkVoiceDesignArgs): Promise<
+  ActionResult & {
+    results?: Array<{
+      characterId: string;
+      ok: boolean;
+      voiceId?: string;
+      error?: string;
+    }>;
+  }
+> {
+  const results: Array<{
+    characterId: string;
+    ok: boolean;
+    voiceId?: string;
+    error?: string;
+  }> = [];
+
+  for (const task of args.tasks) {
+    const res = await createVoiceDesign(task);
+    results.push({
+      characterId: task.characterId,
+      ok: res.ok,
+      voiceId: res.ok ? (res as { voiceId?: string }).voiceId : undefined,
+      error: !res.ok ? (res as { error: string }).error : undefined,
+    });
+  }
+
+  revalidatePath("/admin/characters/casting", "page");
+  revalidatePath("/admin", "page");
+  return { ok: true, results };
 }

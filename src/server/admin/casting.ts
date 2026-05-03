@@ -30,6 +30,15 @@ export interface CastingTask {
   franchise: string | null;
   status: "pending" | "in_progress" | "complete" | "skipped";
   appearances: CastingAppearance[];
+  /** Whether Gemini research has been triggered for this character */
+  researched: boolean;
+  /** Wiki-sourced voice actor hint (free, no API call) */
+  wikiVoiceHint: string | null;
+}
+
+export interface WikiAppearanceEntry {
+  name: string;
+  qualifier?: string;
 }
 
 interface TaskRow {
@@ -121,6 +130,9 @@ export async function getCastingTasks(
     byChar.set(a.character_id, list);
   }
 
+  // Fetch wiki voice hints from the issue
+  const wikiHints = await getWikiVoiceHints(bookId, issueId);
+
   return tasks.map((t) => ({
     id: t.id,
     bookId: t.book_id,
@@ -130,5 +142,59 @@ export async function getCastingTasks(
     franchise: t.characters?.franchise ?? null,
     status: t.status as CastingTask["status"],
     appearances: byChar.get(t.character_id) ?? [],
+    researched: (byChar.get(t.character_id)?.length ?? 0) > 0,
+    wikiVoiceHint: wikiHints.get(t.character_id) ?? null,
   }));
+}
+
+function parseVoiceActorFromQualifier(qualifier: string): string | null {
+  const patterns = [
+    /voiced?\s+by\s+(.+)/i,
+    /voice(?:\s*actor)?:\s*(.+)/i,
+    /\((.+?)\)\s*$/,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(qualifier);
+    if (m?.[1]) return m[1].trim();
+  }
+  const skipPattern = /^(first|last|only|brief|cameo|mentioned)/i;
+  if (
+    qualifier.length > 2 &&
+    qualifier.length < 60 &&
+    !skipPattern.exec(qualifier)
+  ) {
+    return qualifier;
+  }
+  return null;
+}
+
+async function getWikiVoiceHints(
+  bookId?: string,
+  issueId?: string,
+): Promise<Map<string, string>> {
+  const hints = new Map<string, string>();
+  if (!bookId || !issueId) return hints;
+
+  const { data } = await supabaseAdmin
+    .from("issues")
+    .select("wiki_appearances")
+    .eq("book_id", bookId)
+    .eq("id", issueId)
+    .maybeSingle();
+
+  const appearances = (
+    data as { wiki_appearances?: WikiAppearanceEntry[] | null }
+  )?.wiki_appearances;
+  if (!Array.isArray(appearances)) return hints;
+
+  for (const entry of appearances) {
+    if (!entry.qualifier) continue;
+    const actor = parseVoiceActorFromQualifier(entry.qualifier);
+    if (actor) {
+      const normalizedName = entry.name.trim();
+      hints.set(normalizedName, actor);
+    }
+  }
+
+  return hints;
 }
