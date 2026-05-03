@@ -24,7 +24,7 @@ Backlog and status tracker for planned features. Update status here when work st
 |---------|--------|------|-------|
 | Review UI — Phase A (annotation) | `done` | [review-ui-phase-a.md](review-ui-phase-a.md) | Desktop sidebar editor — edit bubbles, adjust bounds, add/delete, export fixes.json |
 | Review UI — Keyboard, Speaker UX & Sort | `done` | [review-ui-keyboard-and-sort.md](review-ui-keyboard-and-sort.md) | `a` to add, Tab bubble nav, speaker auto-focus, form tab order, drag-to-reorder, character list caching fix |
-| Review UI — Phase B (live regen) | `blocked` | [review-ui-phase-b.md](review-ui-phase-b.md) | In-browser re-run Gemini / re-generate audio. Needs storage migration first. |
+| Review UI — Phase B (live regen) | `done` | [review-ui-phase-b.md](review-ui-phase-b.md) | Server actions in `src/server/actions/review/`. Re-run context (Gemini), regenerate cues, regenerate audio — all wired to BubbleSidebar buttons. Reads/writes Supabase Storage. |
 
 ## Pipeline & Ingestion
 
@@ -38,8 +38,9 @@ Backlog and status tracker for planned features. Update status here when work st
 | Interactive alias review | `pending` | [interactive-alias-review.md](interactive-alias-review.md) | Step 8.5 — per-character guided menu [1] New / [2] Alias to existing list. Prunes stale characters against bubbles.json first. Needs UX update from free-text to guided menu. |
 | Review speakers (terminal) | `done` | [review-speakers.md](review-speakers.md) | Step 4.5 post-get-context — review/correct all speaker names in bubbles.json before any processing. [1] Accept / [2] Edit / [3] Choose from confirmed+registry list. Auto-accepts known registry characters. Fixes names at the source so alias-map stays clean. |
 | Review speakers (browser UI) | `done` | [review-speakers-browser.md](review-speakers-browser.md) | Browser version of step 4.5. Pipeline pauses (exit 2), user reviews in `/admin/.../review/speakers`. Inline alias creation replaces step 8.5 for common case. PR #29. |
-| Source page upload + admin dashboard | `pending` | [upload-and-pipeline-trigger.md](upload-and-pipeline-trigger.md) | `upload-source-pages` script + `/admin/new-issue` drag-and-drop page. Moves raw JPEGs to `comic-pages-raw` bucket. `/admin` dashboard shows pipeline status per issue. Requires Phase A+B. |
-| Casting browser UI | `pending` | [casting-browser.md](casting-browser.md) | Browser flow for steps 9–10: Gemini suggestions as cards, yt-dlp clip download server-side, ElevenLabs PVC/Voice Design creation with status polling. Replaces terminal `find-voice-sources` + `generate-voice-models` human pause. Requires Phase A+B + `casting_tasks` table. |
+| Source page upload + admin dashboard | `done` | [upload-and-pipeline-trigger.md](upload-and-pipeline-trigger.md) | `/admin/new-issue` drag-and-drop upload to `comic-pages-raw` bucket. `/admin` dashboard shows pipeline status per issue with pause/resume links. |
+| Casting browser UI | `done` | [casting-browser.md](casting-browser.md) | `/admin/characters/casting` — Gemini suggestion cards, YouTube search links, Voice Design flow, paste voice ID, Complete Casting to unpause pipeline. |
+| Voice clip splitting | `pending` | [audio-splitting.md](audio-splitting.md) | `pnpm split-voice` — isolate target character voice from mixed audio using source separation + diarization + Gemini speaker ID. |
 
 ## Infrastructure
 

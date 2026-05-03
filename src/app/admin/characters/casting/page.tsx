@@ -42,7 +42,11 @@ export default async function CastingPage({ searchParams }: SearchParams) {
             to populate.
           </div>
         ) : (
-          <CastingClient initialTasks={tasks} />
+          <CastingClient
+            initialTasks={tasks}
+            bookId={sp.book}
+            issueId={sp.issue}
+          />
         )}
       </div>
     </main>
