@@ -123,10 +123,12 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
       });
 
       if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => ({ error: "Request failed" }));
+        const err = (await res
+          .json()
+          .catch(() => ({ error: "Request failed" }))) as { error: string };
         setDownload((d) => ({
           ...d,
-          error: (err as { error: string }).error,
+          error: err.error,
           done: true,
         }));
         setDownloading(false);

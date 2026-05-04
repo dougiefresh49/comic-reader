@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
           },
           verbose: 0,
           disablePino: true,
-          logger: () => {},
+          logger: () => undefined,
         });
 
         await stagehand.init();
@@ -264,7 +264,7 @@ export async function POST(req: NextRequest) {
 
 function extFromUrl(url: string): string {
   const clean = url.split("?")[0] ?? url;
-  const match = clean.match(/\.(jpe?g|png|webp|gif)$/i);
+  const match = /\.(jpe?g|png|webp|gif)$/i.exec(clean);
   return match ? match[1]!.toLowerCase().replace("jpeg", "jpg") : "jpg";
 }
 
