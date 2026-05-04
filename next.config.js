@@ -6,6 +6,7 @@ import "./src/env.mjs";
 
 /** @type {import("next").NextConfig} */
 const config = {
+  serverExternalPackages: ["@browserbasehq/stagehand"],
   images: {
     // Comic pages are already WebP and served from Supabase Storage's CDN.
     // unoptimized: true bypasses Vercel's image optimizer entirely so we
