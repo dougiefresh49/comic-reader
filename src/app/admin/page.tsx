@@ -24,10 +24,22 @@ export default async function AdminDashboardPage() {
               Voices
             </Link>
             <Link
+              href="/admin/add-book"
+              className="rounded bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-600"
+            >
+              + Add Book
+            </Link>
+            <Link
+              href="/admin/add-issue"
+              className="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+            >
+              + Add Issue
+            </Link>
+            <Link
               href="/admin/new-issue"
               className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
             >
-              + New Issue
+              + Upload Pages
             </Link>
           </div>
         </header>

@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import type { CastingAppearance, CastingTask } from "~/server/admin/casting";
 import {
+  bulkVoiceDesign,
   completeCasting,
   createVoiceDesign,
   markChosenSource,
+  researchCharacter,
   saveVoiceId,
   skipAndAddLater,
 } from "./actions";
@@ -21,6 +23,125 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [researchingIds, setResearchingIds] = useState<Set<string>>(new Set());
+
+  const unresearched = tasks.filter((t) => !t.researched);
+  const researched = tasks.filter((t) => t.researched);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelected(new Set(unresearched.map((t) => t.characterId)));
+  };
+
+  const selectNone = () => setSelected(new Set());
+
+  const handleResearchSelected = () => {
+    const toResearch = unresearched.filter((t) => selected.has(t.characterId));
+    if (toResearch.length === 0) return;
+
+    const ids = new Set(toResearch.map((t) => t.characterId));
+    setResearchingIds(ids);
+
+    startTransition(async () => {
+      for (const task of toResearch) {
+        const res = await researchCharacter({
+          characterId: task.characterId,
+          franchise: task.franchise ?? undefined,
+        });
+        if (res.ok && res.appearances) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.characterId === task.characterId
+                ? {
+                    ...t,
+                    researched: true,
+                    appearances: (res.appearances ?? []).map((a) => ({
+                      id: `${task.characterId}-${a.mediaTitle}-${a.year}`
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, "-")
+                        .replace(/-+/g, "-")
+                        .slice(0, 80),
+                      mediaTitle: a.mediaTitle,
+                      year: a.year,
+                      voiceActor: a.voiceActor,
+                      mediaType: a.mediaType,
+                      youtubeSearchTerms: a.youtubeSearchTerms,
+                      notes: a.notes,
+                      voiceId: null,
+                      voiceType: null,
+                      voiceStatus: null,
+                      voiceDescription: null,
+                      clipStoragePath: null,
+                      clipSourceUrl: null,
+                      clipDurationSecs: null,
+                      voiceModelStatus: "pending",
+                      voiceModelError: null,
+                      voiceModelStartedAt: null,
+                    })),
+                  }
+                : t,
+            ),
+          );
+        }
+        setResearchingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(task.characterId);
+          return next;
+        });
+      }
+      setSelected(new Set());
+      setMsg(
+        `Researched ${toResearch.length} character${toResearch.length === 1 ? "" : "s"}.`,
+      );
+    });
+  };
+
+  const handleBulkVoiceDesign = () => {
+    const toDesign = unresearched.filter((t) => selected.has(t.characterId));
+    if (toDesign.length === 0) return;
+    if (
+      !window.confirm(
+        `Generate Voice Design for ${toDesign.length} character(s)? This uses ElevenLabs credits.`,
+      )
+    )
+      return;
+
+    startTransition(async () => {
+      const res = await bulkVoiceDesign({
+        tasks: toDesign.map((t) => ({
+          taskId: t.id,
+          characterId: t.characterId,
+          bookId: t.bookId,
+          issueId: t.issueId,
+          voiceDescription: `A distinctive character voice for ${t.characterName} from ${t.franchise ?? "comics"}.`,
+        })),
+      });
+      if (res.ok && res.results) {
+        const doneIds = new Set(
+          res.results.filter((r) => r.ok).map((r) => r.characterId),
+        );
+        setTasks((prev) => prev.filter((t) => !doneIds.has(t.characterId)));
+        const failed = res.results.filter((r) => !r.ok);
+        if (failed.length > 0) {
+          setMsg(
+            `Designed ${doneIds.size} voice(s). ${failed.length} failed: ${failed.map((f) => f.characterId).join(", ")}`,
+          );
+        } else {
+          setMsg(`Designed ${doneIds.size} voice(s) via Voice Design.`);
+        }
+      }
+      setSelected(new Set());
+    });
+  };
 
   const handleSaveVoiceId = (
     task: CastingTask,
@@ -41,7 +162,7 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
         return;
       }
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
-      setMsg(`✓ ${task.characterName} voice saved.`);
+      setMsg(`${task.characterName} voice saved.`);
     });
   };
 
@@ -102,7 +223,7 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
         return;
       }
       setTasks((prev) => prev.filter((t) => t.id !== task.id));
-      setMsg(`✓ ${task.characterName} voice designed (${res.voiceId}).`);
+      setMsg(`${task.characterName} voice designed (${res.voiceId}).`);
     });
   };
 
@@ -115,50 +236,117 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
         return;
       }
       setCompleted(true);
-      setMsg("✓ Casting complete — pipeline unpaused.");
+      setMsg("Casting complete — pipeline unpaused.");
     });
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {msg && (
         <div className="rounded border border-cyan-700 bg-cyan-900/20 px-4 py-2 text-sm text-cyan-200">
           {msg}
         </div>
       )}
 
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
-        <strong className="text-neutral-300">How this works:</strong> Click a
-        suggestion&apos;s search links to find clips on YouTube. Download and
-        splice them locally, then create an{" "}
-        <a
-          href="https://elevenlabs.io/app/voice-library"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="underline hover:text-cyan-300"
-        >
-          ElevenLabs IVC voice
-        </a>{" "}
-        and paste the voice ID below. Or hit &ldquo;Skip and add later&rdquo; to
-        leave this character&apos;s bubbles silent for now.
-      </div>
+      {/* ── Phase 1: Triage — select characters to research ── */}
+      {unresearched.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-neutral-200">
+              Select Characters to Research
+            </h2>
+            <div className="flex gap-2 text-xs">
+              <button
+                onClick={selectAll}
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                Select all
+              </button>
+              <span className="text-neutral-700">|</span>
+              <button
+                onClick={selectNone}
+                className="text-neutral-400 hover:text-neutral-200"
+              >
+                None
+              </button>
+            </div>
+          </div>
 
-      <div className="text-sm text-neutral-400">
-        {tasks.length} character{tasks.length === 1 ? "" : "s"} need
-        {tasks.length === 1 ? "s" : ""} casting
-      </div>
+          <div className="mb-3 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
+            Check characters you want Gemini to research (voice actors, media
+            appearances, YouTube clips). Unchecked characters can go straight to
+            Voice Design or Skip.
+          </div>
 
-      {tasks.map((task) => (
-        <CharacterCard
-          key={task.id}
-          task={task}
-          disabled={pending}
-          onSaveVoiceId={handleSaveVoiceId}
-          onSkip={handleSkip}
-          onMarkSource={handleMarkSource}
-          onVoiceDesign={handleVoiceDesign}
-        />
-      ))}
+          <div className="space-y-1">
+            {unresearched.map((task) => (
+              <TriageRow
+                key={task.id}
+                task={task}
+                checked={selected.has(task.characterId)}
+                researching={researchingIds.has(task.characterId)}
+                onToggle={() => toggleSelect(task.characterId)}
+                onSkip={() => handleSkip(task)}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={handleResearchSelected}
+              disabled={pending || selected.size === 0}
+              className="rounded bg-cyan-700 px-5 py-2 text-sm font-semibold text-white hover:bg-cyan-600 disabled:opacity-40"
+            >
+              Research Selected ({selected.size})
+            </button>
+            <button
+              onClick={handleBulkVoiceDesign}
+              disabled={pending || selected.size === 0}
+              className="rounded border border-purple-700 px-5 py-2 text-sm font-semibold text-purple-300 hover:bg-purple-900/20 disabled:opacity-40"
+            >
+              Voice Design Selected ({selected.size})
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── Phase 2: Cast — researched characters with full cards ── */}
+      {researched.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-lg font-medium text-neutral-200">
+            Cast Voices
+          </h2>
+
+          <div className="mb-3 rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
+            <strong className="text-neutral-300">How this works:</strong> Click
+            search links to find clips on YouTube. Download and splice locally,
+            then create an{" "}
+            <a
+              href="https://elevenlabs.io/app/voice-library"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-cyan-300"
+            >
+              ElevenLabs IVC voice
+            </a>{" "}
+            and paste the voice ID. Or use Voice Design for a generated voice.
+          </div>
+
+          <div className="space-y-4">
+            {researched.map((task) => (
+              <CharacterCard
+                key={task.id}
+                task={task}
+                disabled={pending}
+                onSaveVoiceId={handleSaveVoiceId}
+                onSkip={handleSkip}
+                onMarkSource={handleMarkSource}
+                onVoiceDesign={handleVoiceDesign}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {tasks.length === 0 && !completed && bookId && issueId && (
         <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 p-6 text-center">
@@ -194,6 +382,64 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TriageRow({
+  task,
+  checked,
+  researching,
+  onToggle,
+  onSkip,
+}: {
+  task: CastingTask;
+  checked: boolean;
+  researching: boolean;
+  onToggle: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-3 rounded px-3 py-2.5 transition-colors ${
+        checked
+          ? "border border-cyan-800 bg-cyan-900/10"
+          : "border border-neutral-800 bg-neutral-900"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        disabled={researching}
+        className="h-4 w-4 accent-cyan-600"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-neutral-100">
+            {task.characterName}
+          </span>
+          {researching && (
+            <span className="animate-pulse text-xs text-cyan-400">
+              researching...
+            </span>
+          )}
+        </div>
+        {task.wikiVoiceHint && (
+          <p className="mt-0.5 text-xs text-amber-400/80">
+            Wiki: voiced by {task.wikiVoiceHint}
+          </p>
+        )}
+        {task.franchise && !task.wikiVoiceHint && (
+          <p className="mt-0.5 text-xs text-neutral-500">{task.franchise}</p>
+        )}
+      </div>
+      <button
+        onClick={onSkip}
+        className="text-xs text-neutral-500 hover:text-yellow-400"
+      >
+        Skip
+      </button>
     </div>
   );
 }

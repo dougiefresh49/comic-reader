@@ -39,8 +39,10 @@ Backlog and status tracker for planned features. Update status here when work st
 | Review speakers (terminal) | `done` | [review-speakers.md](review-speakers.md) | Step 4.5 post-get-context — review/correct all speaker names in bubbles.json before any processing. [1] Accept / [2] Edit / [3] Choose from confirmed+registry list. Auto-accepts known registry characters. Fixes names at the source so alias-map stays clean. |
 | Review speakers (browser UI) | `done` | [review-speakers-browser.md](review-speakers-browser.md) | Browser version of step 4.5. Pipeline pauses (exit 2), user reviews in `/admin/.../review/speakers`. Inline alias creation replaces step 8.5 for common case. PR #29. |
 | Source page upload + admin dashboard | `done` | [upload-and-pipeline-trigger.md](upload-and-pipeline-trigger.md) | `/admin/new-issue` drag-and-drop upload to `comic-pages-raw` bucket. `/admin` dashboard shows pipeline status per issue with pause/resume links. |
-| Casting browser UI | `done` | [casting-browser.md](casting-browser.md) | `/admin/characters/casting` — Gemini suggestion cards, YouTube search links, Voice Design flow, paste voice ID, Complete Casting to unpause pipeline. |
+| Casting browser UI | `done` | [casting-browser.md](casting-browser.md) | `/admin/characters/casting` — two-phase triage UI with wiki voice hints, on-demand Gemini research per character, Voice Design flow, paste voice ID, Complete Casting to unpause pipeline. |
 | Voice clip splitting | `done` | [audio-splitting.md](audio-splitting.md) | `pnpm split-voice` — isolate target character voice from mixed audio using source separation + diarization + Gemini speaker ID. PR #31. |
+| Book parts (multi-part series) | `done` | [book-parts.md](book-parts.md) | `book_parts` table for multi-part series (e.g., TMNT x MMPR Part I/II/III). Nullable `part_id` on issues. New columns on `books` for wiki/publisher/franchises. |
+| Smart add flow | `in-progress` | [smart-add-flow.md](smart-add-flow.md) | AI-assisted book/issue discovery. Gemini + Google Search grounding finds wiki pages and reading sources. Two flows: "Add Book" (search + create) and "Add Issue" (auto-detect next + lookup source). Requires Book Parts migration. |
 
 ## Infrastructure
 
