@@ -12,10 +12,12 @@ export default async function AddIssuePage({
   const { book: bookId } = await searchParams;
 
   if (!bookId) {
-    const { data: books } = await supabaseAdmin
+    const { data: books } = (await supabaseAdmin
       .from("books")
       .select("id, name")
-      .order("name", { ascending: true });
+      .order("name", { ascending: true })) as {
+      data: { id: string; name: string }[] | null;
+    };
 
     return (
       <main className="min-h-screen bg-neutral-950 px-6 py-8 text-neutral-100">

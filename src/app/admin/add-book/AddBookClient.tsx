@@ -26,7 +26,6 @@ export function AddBookClient() {
   const [result, setResult] = useState<BookSearchResult | null>(null);
   const [slug, setSlug] = useState("");
   const [creating, setCreating] = useState(false);
-  const [created, setCreated] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +60,6 @@ export function AddBookClient() {
       parts: result.parts ?? undefined,
     });
     if (res.ok) {
-      setCreated(true);
       router.push(`/admin/add-issue?book=${encodeURIComponent(slug.trim())}`);
     } else {
       setError(res.error);

@@ -22,29 +22,40 @@ interface BookInfo {
 }
 
 export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
-  const { data: book, error: bookErr } = await supabaseAdmin
+  const { data: book, error: bookErr } = (await supabaseAdmin
     .from("books")
     .select("id, name, total_issues, wiki_host, wiki_title_template")
     .eq("id", bookId)
-    .single();
+    .single()) as {
+    data: {
+      id: string;
+      name: string;
+      total_issues: number | null;
+      wiki_host: string | null;
+      wiki_title_template: string | null;
+    } | null;
+    error: { message: string } | null;
+  };
 
   if (bookErr || !book) {
     return { ok: false, error: bookErr?.message ?? "Book not found" };
   }
 
-  const { data: parts } = await supabaseAdmin
+  const { data: parts } = (await supabaseAdmin
     .from("book_parts")
     .select("id, number, name, slug")
     .eq("book_id", bookId)
-    .order("number", { ascending: true });
+    .order("number", { ascending: true })) as {
+    data: { id: string; number: number; name: string; slug: string }[] | null;
+  };
 
-  const { data: maxIssue } = await supabaseAdmin
+  const { data: maxIssue } = (await supabaseAdmin
     .from("issues")
     .select("number")
     .eq("book_id", bookId)
     .order("number", { ascending: false })
     .limit(1)
-    .single();
+    .single()) as { data: { number: number } | null };
 
   return {
     ok: true,
@@ -81,14 +92,21 @@ export async function lookupNextIssue(
     query = query.eq("part_id", partId);
   }
 
-  const { data: maxIssue } = await query.single();
+  const { data: maxIssue } = (await query.single()) as {
+    data: { number: number } | null;
+  };
   const nextNumber = (maxIssue?.number ?? 0) + 1;
 
-  const { data: book } = await supabaseAdmin
+  const { data: book } = (await supabaseAdmin
     .from("books")
     .select("wiki_host, wiki_title_template")
     .eq("id", bookId)
-    .single();
+    .single()) as {
+    data: {
+      wiki_host: string | null;
+      wiki_title_template: string | null;
+    } | null;
+  };
 
   let suggestedWikiUrl: string | null = null;
   if (book?.wiki_host && book?.wiki_title_template) {
@@ -163,7 +181,7 @@ interface CreateIssueArgs {
 export async function createIssue(
   args: CreateIssueArgs,
 ): Promise<Result<{ id: string }>> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = (await supabaseAdmin
     .from("issues")
     .insert({
       book_id: args.bookId,
@@ -173,10 +191,13 @@ export async function createIssue(
       source_url: args.sourceUrl,
     })
     .select("id")
-    .single();
+    .single()) as {
+    data: { id: string } | null;
+    error: { message: string } | null;
+  };
 
-  if (error) {
-    return { ok: false, error: error.message };
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Insert failed" };
   }
 
   return { ok: true, data: { id: data.id } };
