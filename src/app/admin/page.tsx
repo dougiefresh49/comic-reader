@@ -5,6 +5,7 @@ import {
   type AdminIssueRow,
   type AdminBookInfo,
 } from "~/server/admin/queries";
+import { TriggerIngestButton } from "./TriggerIngestButton";
 
 export const dynamic = "force-dynamic";
 
@@ -237,7 +238,9 @@ function ActionButtons({
     issueId: string;
     pipelinePaused: boolean;
     pipelinePausedUrl: string | null;
+    pipelineStep: string | null;
     hasWebP: boolean;
+    pageCount: number;
   };
 }) {
   if (issue.pipelinePaused && issue.pipelinePausedUrl) {
@@ -250,8 +253,15 @@ function ActionButtons({
       </Link>
     );
   }
+
+  const canTrigger =
+    issue.pageCount > 0 &&
+    (issue.pipelineStep === "pages-downloaded" ||
+      issue.pipelineStep?.startsWith("failed:"));
+
   return (
     <div className="flex gap-2">
+      {canTrigger && <TriggerIngestButton issueId={issue.issueId} />}
       {issue.hasWebP && (
         <Link
           href={`/book/${issue.bookId}/${issue.issueId}/1`}

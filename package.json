@@ -50,6 +50,7 @@
     "split-voice": "tsx --env-file=.env scripts/split-voice-clip.ts",
     "manage-registry": "tsx --env-file=.env scripts/manage-registry.ts",
     "ingest": "tsx --env-file=.env scripts/ingest.ts",
+    "worker": "tsx --env-file=.env scripts/ingest-worker.ts",
     "scrape-pages": "tsx --env-file=.env scripts/scrape-pages.ts",
     "apply-fixes": "tsx --env-file=.env scripts/apply-fixes.ts",
     "ocr-flagged-bubbles": "tsx --env-file=.env scripts/ocr-flagged-bubbles.ts",
