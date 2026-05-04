@@ -181,11 +181,14 @@ interface CreateIssueArgs {
 export async function createIssue(
   args: CreateIssueArgs,
 ): Promise<Result<{ id: string }>> {
+  const issueId = `issue-${args.issueNumber}`;
   const { data, error } = (await supabaseAdmin
     .from("issues")
     .insert({
+      id: issueId,
       book_id: args.bookId,
       number: args.issueNumber,
+      name: `Issue ${args.issueNumber}`,
       part_id: args.partId ?? null,
       wiki_url: args.wikiUrl,
       source_url: args.sourceUrl,
