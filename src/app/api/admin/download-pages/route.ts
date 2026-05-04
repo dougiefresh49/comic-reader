@@ -1,6 +1,5 @@
 import "server-only";
 import { type NextRequest } from "next/server";
-import { Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { GEMINI_MEDIUM } from "~/lib/models";
@@ -55,6 +54,7 @@ export async function POST(req: NextRequest) {
           message: "Launching browser via Browserbase...",
         });
 
+        const { Stagehand } = await import("@browserbasehq/stagehand");
         const stagehand = new Stagehand({
           env: "BROWSERBASE",
           apiKey: bbApiKey,
