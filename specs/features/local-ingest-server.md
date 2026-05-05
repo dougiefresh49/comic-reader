@@ -238,24 +238,23 @@ At ~3 events per step = ~345-375 events per run. **Hobby tier (50K free) support
 
 ### Hooks for human review
 
-Each human review step uses `defineHook()`:
+Each human review step uses `createHook()` with deterministic tokens:
 
 ```ts
-const clusterReviewHook = defineHook<{ approved: boolean }>();
-
-// ... after character-lookahead steps complete ...
-
-const token = `${bookId}/${issueId}/cluster-review`;
-await clusterReviewHook.create({ token });
-
-// Workflow suspends here — zero compute cost
-const reviewResult = await clusterReviewHook;
-// Resumes when browser UI calls hook.resume(token, { approved: true })
+using hook = createHook<{ approved: boolean }>({
+  token: `ingest:${bookId}/${issueId}/cluster-review`,
+});
+await hook; // Workflow suspends here — zero compute cost
 ```
 
-The browser review UI's "Complete Review" action calls:
+The browser review UI's "Complete Review" action calls the resume API:
 ```ts
-await hook.resume(token, { approved: true });
+// POST /api/admin/resume-hook
+await fetch("/api/admin/resume-hook", {
+  method: "POST",
+  body: JSON.stringify({ bookId, issueId, step: "cluster-review" }),
+});
+// Server calls: resumeHook(token, { approved: true })
 ```
 
 ### Step retry

@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 
-export function TriggerIngestButton({ issueId }: { issueId: string }) {
+export function TriggerIngestButton({
+  bookId,
+  issueId,
+}: {
+  bookId: string;
+  issueId: string;
+}) {
   const [loading, setLoading] = useState(false);
   const [triggered, setTriggered] = useState(false);
 
@@ -11,7 +17,7 @@ export function TriggerIngestButton({ issueId }: { issueId: string }) {
     const res = await fetch("/api/admin/trigger-ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ issueId }),
+      body: JSON.stringify({ bookId, issueId }),
     });
     if (res.ok) {
       setTriggered(true);

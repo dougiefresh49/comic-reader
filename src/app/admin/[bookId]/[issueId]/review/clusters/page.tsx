@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ApproveClusterButton } from "./ApproveClusterButton";
 
 export const dynamic = "force-dynamic";
 
@@ -24,25 +25,28 @@ export default async function ReviewClustersPage({ params }: Params) {
           </span>
         </div>
 
-        <h1 className="mb-2 text-2xl font-semibold">Review character clusters</h1>
+        <h1 className="mb-2 text-2xl font-semibold">
+          Review character clusters
+        </h1>
         <p className="mb-8 text-sm text-neutral-400">
           Confirm, rename, merge, or split face clusters after character
-          lookahead. This UI is not wired yet — the workflow hook and gallery
-          writes will land with the cloud ingest workstream.
+          lookahead. This UI will show cluster grids once the
+          character-lookahead step is implemented.
         </p>
 
         <div className="rounded-lg border border-dashed border-neutral-700 bg-neutral-900/40 p-8 text-center text-sm text-neutral-500">
           Cluster grid and actions will appear here.
         </div>
 
-        <p className="mt-6 text-sm">
+        <div className="mt-8 flex items-center justify-between">
           <Link
             href={`/admin/${bookId}/${issueId}/review/pipeline`}
-            className="text-cyan-400 hover:text-cyan-300"
+            className="text-sm text-cyan-400 hover:text-cyan-300"
           >
             ← Back to pipeline review
           </Link>
-        </p>
+          <ApproveClusterButton bookId={bookId} issueId={issueId} />
+        </div>
       </div>
     </main>
   );

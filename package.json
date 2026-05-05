@@ -83,6 +83,7 @@
     "@tsparticles/updater-tilt": "^3.9.1",
     "@tsparticles/updater-wobble": "^3.9.1",
     "@use-gesture/react": "^10.3.1",
+    "@workflow/next": "^4.0.5",
     "fs-extra": "^11.3.2",
     "glob": "^13.0.0",
     "next": "15.2.6",
@@ -91,6 +92,7 @@
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
+    "workflow": "^4.2.4",
     "youtube-dl-exec": "^3.0.26",
     "zod": "^3.25.76"
   },

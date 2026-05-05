@@ -33,6 +33,7 @@ export default async function ReviewPage({
     : Math.max(1, Math.min(rawPage, issue.pageCount));
 
   const { allBubbles, characters } = await getIssueData(bookId, issueId);
+  const mode = typeof sp.mode === "string" ? sp.mode : undefined;
 
   return (
     <ReviewLayout
@@ -42,6 +43,7 @@ export default async function ReviewPage({
       allBubbles={allBubbles}
       characters={characters}
       initialPage={initialPage}
+      mode={mode}
     />
   );
 }

@@ -261,7 +261,9 @@ function ActionButtons({
 
   return (
     <div className="flex gap-2">
-      {canTrigger && <TriggerIngestButton issueId={issue.issueId} />}
+      {canTrigger && (
+        <TriggerIngestButton bookId={issue.bookId} issueId={issue.issueId} />
+      )}
       {issue.hasWebP && (
         <Link
           href={`/book/${issue.bookId}/${issue.issueId}/1`}

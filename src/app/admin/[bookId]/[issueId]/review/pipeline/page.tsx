@@ -77,12 +77,15 @@ export default async function PipelineReviewPage({ params }: Params) {
                 Pages are ready but the pipeline hasn&apos;t been queued (or
                 failed and can restart).
               </span>
-              <TriggerIngestButton issueId={issue.issueId} />
+              <TriggerIngestButton
+                bookId={issue.bookId}
+                issueId={issue.issueId}
+              />
             </div>
           )}
         </div>
 
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="mb-3 text-sm font-medium tracking-wide text-neutral-500 uppercase">
           Review &amp; tools
         </h2>
         <ul className="space-y-2 text-sm">
