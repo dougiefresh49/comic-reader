@@ -70,10 +70,10 @@ function pauseUrl(bookId: string, issueId: string, step: string): string {
     return `${BASE_URL}/admin/${bookId}/${issueId}/review/speakers`;
   }
   if (step === "review-new-characters") {
-    return `${BASE_URL}/admin/${bookId}/${issueId}/review/characters`;
+    return `${BASE_URL}/admin/${bookId}/${issueId}/review/new-characters`;
   }
   if (step === "generate-voice-models") {
-    return `${BASE_URL}/admin/${bookId}/${issueId}/review/voices`;
+    return `${BASE_URL}/admin/voices`;
   }
   return `${BASE_URL}/admin`;
 }
