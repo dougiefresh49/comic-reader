@@ -59,7 +59,8 @@ export async function consolidateMusicScenes(bookId: string, issueId: string) {
     const raw = p.audio_tags?.music_mood ?? "transition_neutral";
     const mood = raw.replace(/_[a-z]$/, "").replace(/_\d+$/, "");
 
-    if (current && mood === current.mood && !p.is_new_scene) {
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
+    if (current && current.mood === mood && !p.is_new_scene) {
       current.panels.push(p);
     } else {
       if (current) runs.push(current);

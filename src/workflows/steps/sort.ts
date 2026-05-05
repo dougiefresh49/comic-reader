@@ -45,14 +45,14 @@ interface GeminiSortResponse {
 
 function extractJsonObject(text: string): string {
   let jsonText = text.trim();
-  const jsonMatch = jsonText.match(/```json\s*([\s\S]*?)\s*```/);
+  const jsonMatch = /```json\s*([\s\S]*?)\s*```/.exec(jsonText);
   if (jsonMatch?.[1]) {
     jsonText = jsonMatch[1].trim();
   } else {
-    const codeMatch = jsonText.match(/```\s*([\s\S]*?)\s*```/);
+    const codeMatch = /```\s*([\s\S]*?)\s*```/.exec(jsonText);
     if (codeMatch?.[1]) jsonText = codeMatch[1].trim();
   }
-  const objectMatch = jsonText.match(/\{[\s\S]*\}/);
+  const objectMatch = /\{[\s\S]*\}/.exec(jsonText);
   return objectMatch?.[0] ?? jsonText;
 }
 

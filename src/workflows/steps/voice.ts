@@ -209,8 +209,7 @@ export async function cleanVoiceDescriptions(bookId: string, issueId: string) {
       };
       const slugSpeaker = slugifyCharacterId(row.speaker);
       const targetsLoser =
-        (row.character_id && loserIds.has(row.character_id)) ||
-        loserIds.has(slugSpeaker);
+        loserIds.has(row.character_id ?? "") || loserIds.has(slugSpeaker);
 
       if (!targetsLoser) continue;
 

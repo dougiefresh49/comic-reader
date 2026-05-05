@@ -466,7 +466,7 @@ Output JSON only (no markdown fences):
         .replace(/^```json\s*/i, "")
         .replace(/```\s*$/, "")
         .trim();
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      const jsonMatch = /\{[\s\S]*\}/.exec(cleaned);
       if (!jsonMatch) continue;
 
       const parsed = JSON.parse(jsonMatch[0]) as {
@@ -669,7 +669,7 @@ export async function getContextPage(
     if (bubble.ocr_text) continue;
 
     const box = bubble.box_2d;
-    if (!box || !box.width || !box.height) continue;
+    if (!box?.width || !box.height) continue;
 
     let ocrText = "";
     try {
@@ -742,7 +742,7 @@ Output JSON only (no markdown):
       });
 
       const responseText = contextResponse.text?.trim() ?? "";
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const jsonMatch = /\{[\s\S]*\}/.exec(responseText);
       if (!jsonMatch) continue;
 
       const parsed = JSON.parse(jsonMatch[0]) as {
