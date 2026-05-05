@@ -3,6 +3,7 @@
  * for Docker builds.
  */
 import "./src/env.mjs";
+import { withWorkflow } from "workflow/next";
 
 /** @type {import("next").NextConfig} */
 const config = {
@@ -24,4 +25,4 @@ const config = {
   },
 };
 
-export default config;
+export default withWorkflow(config);

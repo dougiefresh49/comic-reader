@@ -1,10 +1,13 @@
 import "server-only";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
+import sharp from "sharp";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { GEMINI_MEDIUM } from "~/lib/models";
 
 const RAW_BUCKET = "comic-pages-raw";
+const WEBP_BUCKET = "comic-pages";
+const WEBP_QUALITY = 82;
 
 interface ProgressEvent {
   type: "status" | "page" | "done" | "error";
@@ -163,17 +166,27 @@ export async function POST(req: NextRequest) {
 
         send({
           type: "status",
-          message: `Uploading ${collectedUrls.length} pages to storage...`,
+          message: `Uploading ${collectedUrls.length} pages (raw + WebP) to storage...`,
           total: collectedUrls.length,
         });
 
         let uploaded = 0;
+        const pagesMetadata: Array<{
+          pageNumber: number;
+          width: number;
+          height: number;
+          filename: string;
+        }> = [];
+
         for (let i = 0; i < collectedUrls.length; i++) {
           const imgUrl = collectedUrls[i]!;
           const num = String(i + 1).padStart(2, "0");
+          const pageNumber = i + 1;
           const ext = extFromUrl(imgUrl);
-          const filename = `page-${num}.${ext}`;
-          const storagePath = `${body.bookId}/${body.issueId}/source/${filename}`;
+          const rawFilename = `page-${num}.${ext}`;
+          const webpFilename = `page-${num}.webp`;
+          const rawPath = `${body.bookId}/${body.issueId}/source/${rawFilename}`;
+          const webpPath = `${body.bookId}/${body.issueId}/pages/${webpFilename}`;
 
           try {
             const imgResponse = await fetch(imgUrl);
@@ -181,7 +194,7 @@ export async function POST(req: NextRequest) {
               send({
                 type: "page",
                 message: `Failed to download page ${num}: HTTP ${imgResponse.status}`,
-                current: i + 1,
+                current: pageNumber,
                 total: collectedUrls.length,
               });
               continue;
@@ -192,38 +205,79 @@ export async function POST(req: NextRequest) {
               imgResponse.headers.get("content-type") ??
               `image/${ext === "jpg" ? "jpeg" : ext}`;
 
-            const { error: uploadErr } = await supabaseAdmin.storage
-              .from(RAW_BUCKET)
-              .upload(storagePath, buffer, {
-                contentType,
-                upsert: true,
-              });
+            const [webpBuffer, metadata] = await Promise.all([
+              sharp(buffer).webp({ quality: WEBP_QUALITY }).toBuffer(),
+              sharp(buffer).metadata(),
+            ]);
 
-            if (uploadErr) {
+            const width = metadata.width ?? 0;
+            const height = metadata.height ?? 0;
+
+            const [rawResult, webpResult] = await Promise.all([
+              supabaseAdmin.storage
+                .from(RAW_BUCKET)
+                .upload(rawPath, buffer, { contentType, upsert: true }),
+              supabaseAdmin.storage
+                .from(WEBP_BUCKET)
+                .upload(webpPath, webpBuffer, {
+                  contentType: "image/webp",
+                  upsert: true,
+                }),
+            ]);
+
+            if (rawResult.error) {
               send({
                 type: "page",
-                message: `Upload failed for page ${num}: ${uploadErr.message}`,
-                current: i + 1,
+                message: `Raw upload failed for page ${num}: ${rawResult.error.message}`,
+                current: pageNumber,
                 total: collectedUrls.length,
               });
               continue;
             }
 
+            if (webpResult.error) {
+              send({
+                type: "page",
+                message: `WebP upload failed for page ${num}: ${webpResult.error.message} (raw OK)`,
+                current: pageNumber,
+                total: collectedUrls.length,
+              });
+            }
+
+            pagesMetadata.push({
+              pageNumber,
+              width,
+              height,
+              filename: webpFilename,
+            });
+
             uploaded++;
             send({
               type: "page",
-              message: `Uploaded page ${num}`,
-              current: i + 1,
+              message: `Uploaded page ${num} (${width}×${height})`,
+              current: pageNumber,
               total: collectedUrls.length,
             });
           } catch (err) {
             send({
               type: "page",
               message: `Error on page ${num}: ${err instanceof Error ? err.message : "unknown"}`,
-              current: i + 1,
+              current: pageNumber,
               total: collectedUrls.length,
             });
           }
+        }
+
+        // Upload pages metadata as JSON to the WebP bucket
+        if (pagesMetadata.length > 0) {
+          const metadataPath = `${body.bookId}/${body.issueId}/pages.json`;
+          await supabaseAdmin.storage
+            .from(WEBP_BUCKET)
+            .upload(
+              metadataPath,
+              Buffer.from(JSON.stringify(pagesMetadata, null, 2)),
+              { contentType: "application/json", upsert: true },
+            );
         }
 
         // Update issue page_count and pipeline_step
@@ -231,6 +285,7 @@ export async function POST(req: NextRequest) {
           .from("issues")
           .update({
             page_count: uploaded,
+            has_webp: true,
             pipeline_step: "pages-downloaded",
             source_pages_path: `${body.bookId}/${body.issueId}/source/`,
           })

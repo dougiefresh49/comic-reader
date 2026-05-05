@@ -25,6 +25,7 @@ interface ReviewLayoutProps {
   allBubbles: Record<string, Bubble[]>;
   characters: string[];
   initialPage: number;
+  mode?: string;
 }
 
 let newBubbleCounter = 0;
@@ -44,6 +45,7 @@ export function ReviewLayout({
   allBubbles,
   characters,
   initialPage,
+  mode,
 }: ReviewLayoutProps) {
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -341,6 +343,9 @@ export function ReviewLayout({
         </span>
 
         <div className="flex items-center gap-2">
+          {mode === "pipeline" && (
+            <PipelineApproveButton bookId={bookId} issueId={issueId} />
+          )}
           {applyMessage && (
             <span
               className={`text-xs ${
@@ -522,5 +527,43 @@ export function ReviewLayout({
         </div>
       )}
     </div>
+  );
+}
+
+function PipelineApproveButton({
+  bookId,
+  issueId,
+}: {
+  bookId: string;
+  issueId: string;
+}) {
+  const [state, setState] = useState<"idle" | "loading" | "done">("idle");
+
+  async function handleApprove() {
+    setState("loading");
+    const res = await fetch("/api/admin/resume-hook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookId, issueId, step: "page-review" }),
+    });
+    setState(res.ok ? "done" : "idle");
+  }
+
+  if (state === "done") {
+    return (
+      <span className="rounded bg-emerald-700/30 px-3 py-1 text-xs font-medium text-emerald-300">
+        Pipeline Resumed
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={handleApprove}
+      disabled={state === "loading"}
+      className="rounded bg-amber-700 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+    >
+      {state === "loading" ? "Resuming..." : "Approve & Continue Pipeline"}
+    </button>
   );
 }
