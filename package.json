@@ -36,6 +36,7 @@
     "generate-audio": "tsx --env-file=.env scripts/generate-audio.ts",
     "sort-bubbles": "tsx --env-file=.env scripts/sort-bubbles.ts",
     "sort-bubbles-gemini": "tsx --env-file=.env scripts/sort-bubbles-gemini.ts",
+    "sort-page-elements": "tsx --env-file=.env scripts/sort-page-elements.ts",
     "convert-pages-to-webp": "tsx --env-file=.env scripts/convert-pages-to-webp.ts",
     "copy-to-public": "tsx --env-file=.env scripts/copy-to-public.ts",
     "generate-manifest": "tsx --env-file=.env scripts/generate-manifest.ts",
