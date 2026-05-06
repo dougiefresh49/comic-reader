@@ -9,6 +9,7 @@ const PANEL_VIEW_PREFERRED_KEY = "zen-reader-panel-view-preferred";
 const MOTION_INTENSITY_KEY = "zen-reader-motion-intensity";
 const MUTE_ALL_KEY = "zen-reader-mute-all";
 const VOICES_ONLY_KEY = "zen-reader-voices-only";
+const AUTO_ADVANCE_PAGE_KEY = "zen-reader-auto-advance-page";
 
 export type MotionIntensity = "off" | "reduced" | "full";
 
@@ -69,6 +70,11 @@ export function useSettings() {
     },
   );
 
+  const [autoAdvancePage, setAutoAdvancePage] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(AUTO_ADVANCE_PAGE_KEY) === "true";
+  });
+
   const [muteAll, setMuteAll] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(MUTE_ALL_KEY) === "true";
@@ -104,6 +110,10 @@ export function useSettings() {
   }, [motionIntensity]);
 
   useEffect(() => {
+    window.localStorage.setItem(AUTO_ADVANCE_PAGE_KEY, String(autoAdvancePage));
+  }, [autoAdvancePage]);
+
+  useEffect(() => {
     window.localStorage.setItem(MUTE_ALL_KEY, String(muteAll));
   }, [muteAll]);
 
@@ -120,6 +130,10 @@ export function useSettings() {
 
   const toggleAutoPlay = useCallback(() => {
     setAutoPlayEnabled((prev) => !prev);
+  }, []);
+
+  const toggleAutoAdvancePage = useCallback(() => {
+    setAutoAdvancePage((prev) => !prev);
   }, []);
 
   const toggleMuteAll = useCallback(() => {
@@ -154,6 +168,8 @@ export function useSettings() {
   return {
     autoPlayEnabled,
     toggleAutoPlay,
+    autoAdvancePage,
+    toggleAutoAdvancePage,
     volumes,
     effectiveVolumes,
     setLayerVolume,

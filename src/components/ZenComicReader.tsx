@@ -85,6 +85,8 @@ export default function ZenComicReader({
   const {
     autoPlayEnabled,
     toggleAutoPlay,
+    autoAdvancePage,
+    toggleAutoAdvancePage,
     volumes,
     effectiveVolumes,
     setLayerVolume,
@@ -322,10 +324,15 @@ export default function ZenComicReader({
     playBubbleRef.current = playBubble;
   }, [playBubble]);
 
+  const autoAdvancePageCb = useCallback(() => {
+    if (autoAdvancePage) navigateNextRef.current?.();
+  }, [autoAdvancePage]);
+
   const { scheduleNext, cancelPending } = useAutoPlay(
     visibleBubbles,
     autoPlayEnabled,
     playBubble,
+    autoAdvancePageCb,
   );
 
   scheduleNextRef.current = scheduleNext;
@@ -574,8 +581,12 @@ export default function ZenComicReader({
         volumes={volumes}
         onSetLayerVolume={setLayerVolume}
         onResetVolumes={resetVolumes}
+        autoAdvancePage={autoAdvancePage}
+        onToggleAutoAdvancePage={toggleAutoAdvancePage}
         playbackRate={playbackRate}
         onSetPlaybackRate={setPlaybackRate}
+        motionIntensity={motionIntensity}
+        onSetMotionIntensity={setMotionIntensity}
       />
 
       <ViewSheet

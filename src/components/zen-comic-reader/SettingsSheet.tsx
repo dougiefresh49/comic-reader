@@ -4,6 +4,7 @@ import {
   PLAYBACK_RATE_MAX,
   PLAYBACK_RATE_MIN,
   type LayerVolumes,
+  type MotionIntensity,
 } from "~/hooks/useSettings";
 
 interface SettingsSheetProps {
@@ -18,8 +19,12 @@ interface SettingsSheetProps {
   volumes: LayerVolumes;
   onSetLayerVolume: (layer: keyof LayerVolumes, value: number) => void;
   onResetVolumes: () => void;
+  autoAdvancePage: boolean;
+  onToggleAutoAdvancePage: () => void;
   playbackRate: number;
   onSetPlaybackRate: (rate: number) => void;
+  motionIntensity: MotionIntensity;
+  onSetMotionIntensity: (m: MotionIntensity) => void;
 }
 
 const VOLUME_LAYERS: Array<{
@@ -45,8 +50,12 @@ export function SettingsSheet({
   volumes,
   onSetLayerVolume,
   onResetVolumes,
+  autoAdvancePage,
+  onToggleAutoAdvancePage,
   playbackRate,
   onSetPlaybackRate,
+  motionIntensity,
+  onSetMotionIntensity,
 }: SettingsSheetProps) {
   if (!isOpen) return null;
 
@@ -128,6 +137,41 @@ export function SettingsSheet({
                 hint="Play bubbles continuously"
                 enabled={autoPlayEnabled}
                 onToggle={onToggleAutoPlay}
+              />
+              <ToggleRow
+                label="Auto-turn pages"
+                hint="Advance to next page when all bubbles finish"
+                enabled={autoAdvancePage}
+                onToggle={onToggleAutoAdvancePage}
+              />
+            </div>
+          </section>
+
+          {/* ── Visual Section ── */}
+          <section>
+            <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+              Visual effects
+            </h3>
+            <div className="flex flex-col gap-3">
+              <ToggleRow
+                label="Camera motion"
+                hint="Panel zoom, push-in, and shake effects"
+                enabled={motionIntensity !== "off"}
+                onToggle={() =>
+                  onSetMotionIntensity(
+                    motionIntensity === "off" ? "full" : "off",
+                  )
+                }
+              />
+              <ToggleRow
+                label="Particle effects"
+                hint="Sparkles, dust, rain, and other overlays"
+                enabled={motionIntensity === "full"}
+                onToggle={() =>
+                  onSetMotionIntensity(
+                    motionIntensity === "full" ? "reduced" : "full",
+                  )
+                }
               />
             </div>
           </section>
