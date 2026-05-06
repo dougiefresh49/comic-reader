@@ -244,5 +244,11 @@
     "aliases": [],
     "firstSeenIssue": "issue-3",
     "firstSeenPage": 23
+  },
+  "Green Ranger": {
+    "canonicalName": "Green Ranger",
+    "aliases": [],
+    "firstSeenIssue": "issue-1",
+    "firstSeenPage": 5
   }
 }

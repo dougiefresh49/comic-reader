@@ -11,6 +11,10 @@ interface SettingsSheetProps {
   onClose: () => void;
   autoPlayEnabled: boolean;
   onToggleAutoPlay: () => void;
+  muteAll: boolean;
+  onToggleMuteAll: () => void;
+  voicesOnly: boolean;
+  onToggleVoicesOnly: () => void;
   volumes: LayerVolumes;
   onSetLayerVolume: (layer: keyof LayerVolumes, value: number) => void;
   onResetVolumes: () => void;
@@ -34,6 +38,10 @@ export function SettingsSheet({
   onClose,
   autoPlayEnabled,
   onToggleAutoPlay,
+  muteAll,
+  onToggleMuteAll,
+  voicesOnly,
+  onToggleVoicesOnly,
   volumes,
   onSetLayerVolume,
   onResetVolumes,
@@ -84,6 +92,18 @@ export function SettingsSheet({
               Audio
             </h3>
             <div className="flex flex-col gap-3">
+              <ToggleRow
+                label="Mute all"
+                hint="Silence everything"
+                enabled={muteAll}
+                onToggle={onToggleMuteAll}
+              />
+              <ToggleRow
+                label="Voices only"
+                hint="Dialogue only — no music, SFX, or ambience"
+                enabled={voicesOnly}
+                onToggle={onToggleVoicesOnly}
+              />
               <PlaybackRateRow
                 value={playbackRate}
                 onChange={onSetPlaybackRate}
@@ -92,6 +112,7 @@ export function SettingsSheet({
                 volumes={volumes}
                 onChange={onSetLayerVolume}
                 onReset={onResetVolumes}
+                disabled={muteAll || voicesOnly}
               />
             </div>
           </section>
@@ -210,18 +231,24 @@ function VolumeSection({
   volumes,
   onChange,
   onReset,
+  disabled = false,
 }: {
   volumes: LayerVolumes;
   onChange: (k: keyof LayerVolumes, v: number) => void;
   onReset: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+    <div
+      className={`rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition-opacity ${disabled ? "pointer-events-none opacity-40" : ""}`}
+    >
       <div className="mb-2 flex items-center justify-between">
         <div>
           <div className="text-sm font-semibold text-neutral-100">Volume</div>
           <div className="text-xs text-neutral-400">
-            Per-layer mix. Drag to 0 to mute.
+            {disabled
+              ? "Overridden by quick toggle above"
+              : "Per-layer mix. Drag to 0 to mute."}
           </div>
         </div>
         <button
