@@ -31,9 +31,18 @@ const DEFAULT_PANEL_DURATION_S = 4;
 export function EpisodeRenderClient({ panels, pageImages }: Props) {
   const [panelIndex, setPanelIndex] = useState(0);
   const finishedRef = useRef(false);
+  const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
   const activePanel = panels[panelIndex];
   const currentPage = activePanel?.pageNumber ?? 1;
   const pageImage = pageImages[currentPage] ?? "";
+
+  useEffect(() => {
+    if (!pageImage) return;
+    const img = new window.Image();
+    img.onload = () =>
+      setPageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = pageImage;
+  }, [pageImage]);
 
   // Derive a flat "panels" list scoped to the current page so
   // PanelViewFrame can compute the right zoom transform.
@@ -74,6 +83,7 @@ export function EpisodeRenderClient({ panels, pageImages }: Props) {
           panels={panelsOnPage}
           panelIndex={localIndex >= 0 ? localIndex : 0}
           reducedMotion={false}
+          pageSize={pageNaturalSize}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

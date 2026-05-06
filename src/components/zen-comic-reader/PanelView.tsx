@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -13,6 +14,7 @@ import {
   type SpringState,
   createSpringState,
   panelTransform,
+  renderedImageRect,
   stepSpring,
 } from "./PanelView.transforms";
 
@@ -81,6 +83,7 @@ interface PanelViewFrameProps {
   panels: PageDirectedPanel[];
   panelIndex: number;
   reducedMotion: boolean;
+  pageSize: { w: number; h: number };
   children: React.ReactNode;
 }
 
@@ -92,6 +95,7 @@ export function PanelViewFrame({
   panels,
   panelIndex,
   reducedMotion,
+  pageSize,
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -113,6 +117,11 @@ export function PanelViewFrame({
 
   const activePanel = panels[panelIndex];
 
+  const imageRect = useMemo(
+    () => renderedImageRect(containerSize, pageSize),
+    [containerSize, pageSize],
+  );
+
   const getTarget = useCallback((): PanelTransformResult => {
     if (
       !panelViewMode ||
@@ -122,12 +131,8 @@ export function PanelViewFrame({
     ) {
       return { tx: 0, ty: 0, scale: 1 };
     }
-    return panelTransform(
-      activePanel.boundingBox,
-      containerSize,
-      containerSize,
-    );
-  }, [panelViewMode, activePanel, containerSize]);
+    return panelTransform(activePanel.boundingBox, containerSize, imageRect);
+  }, [panelViewMode, activePanel, containerSize, imageRect]);
 
   const applyTransform = useCallback((t: PanelTransformResult) => {
     const el = transformRef.current;

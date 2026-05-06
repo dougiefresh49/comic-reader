@@ -61,6 +61,14 @@ export default function ZenComicReader({
   const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
   const [panelViewMode, setPanelViewMode] = useState(false);
   const [panelAutoPlay, setPanelAutoPlay] = useState(false);
+  const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.onload = () =>
+      setPageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+    img.src = pageImage;
+  }, [pageImage]);
 
   const systemReducedMotion = usePrefersReducedMotion();
   const focusBeforePanelRef = useRef<Element | null>(null);
@@ -77,9 +85,16 @@ export default function ZenComicReader({
   const {
     autoPlayEnabled,
     toggleAutoPlay,
+    autoAdvancePage,
+    toggleAutoAdvancePage,
     volumes,
+    effectiveVolumes,
     setLayerVolume,
     resetVolumes,
+    muteAll,
+    toggleMuteAll,
+    voicesOnly,
+    toggleVoicesOnly,
     playbackRate,
     setPlaybackRate,
     panelViewPreferred,
@@ -293,7 +308,7 @@ export default function ZenComicReader({
     issueId,
     timestamps,
     onBubbleEnded: handleBubbleEnded,
-    volume: volumes.dialogue,
+    volume: effectiveVolumes.dialogue,
     playbackRate,
   });
 
@@ -309,10 +324,15 @@ export default function ZenComicReader({
     playBubbleRef.current = playBubble;
   }, [playBubble]);
 
+  const autoAdvancePageCb = useCallback(() => {
+    if (autoAdvancePage) navigateNextRef.current?.();
+  }, [autoAdvancePage]);
+
   const { scheduleNext, cancelPending } = useAutoPlay(
     visibleBubbles,
     autoPlayEnabled,
     playBubble,
+    autoAdvancePageCb,
   );
 
   scheduleNextRef.current = scheduleNext;
@@ -431,6 +451,7 @@ export default function ZenComicReader({
               panels={panels}
               panelIndex={panelIndex}
               reducedMotion={cameraOff}
+              pageSize={pageNaturalSize}
             >
               {panelViewMode && activePanel?.foregroundPolygons ? (
                 <LayeredPanel
@@ -471,9 +492,9 @@ export default function ZenComicReader({
                 newScene={activePanel?.isNewScene ?? false}
                 sceneId={activePanel?.sceneId ?? null}
                 volume={{
-                  ambience: volumes.ambience,
-                  sfx: volumes.sfx,
-                  music: volumes.music,
+                  ambience: effectiveVolumes.ambience,
+                  sfx: effectiveVolumes.sfx,
+                  music: effectiveVolumes.music,
                 }}
               />
               {displayBubbles.map((bubble) => {
@@ -553,11 +574,19 @@ export default function ZenComicReader({
         onClose={() => setIsSettingsOpen(false)}
         autoPlayEnabled={autoPlayEnabled}
         onToggleAutoPlay={toggleAutoPlay}
+        muteAll={muteAll}
+        onToggleMuteAll={toggleMuteAll}
+        voicesOnly={voicesOnly}
+        onToggleVoicesOnly={toggleVoicesOnly}
         volumes={volumes}
         onSetLayerVolume={setLayerVolume}
         onResetVolumes={resetVolumes}
+        autoAdvancePage={autoAdvancePage}
+        onToggleAutoAdvancePage={toggleAutoAdvancePage}
         playbackRate={playbackRate}
         onSetPlaybackRate={setPlaybackRate}
+        motionIntensity={motionIntensity}
+        onSetMotionIntensity={setMotionIntensity}
       />
 
       <ViewSheet

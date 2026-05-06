@@ -285,6 +285,12 @@ function ActionButtons({
         Panels
       </Link>
       <Link
+        href={`/admin/${issue.bookId}/${issue.issueId}/review/scenes`}
+        className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600"
+      >
+        Scenes
+      </Link>
+      <Link
         href={`/admin/${issue.bookId}/${issue.issueId}/review/pipeline`}
         className="rounded bg-slate-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-500"
       >
