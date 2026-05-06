@@ -31,11 +31,32 @@ const VOLUME_LAYERS: Array<{
   key: keyof LayerVolumes;
   label: string;
   hint: string;
+  icon: React.ReactNode;
 }> = [
-  { key: "dialogue", label: "Dialogue", hint: "Character voices" },
-  { key: "music", label: "Music", hint: "Mood bed under the scene" },
-  { key: "sfx", label: "Sound FX", hint: "Whooshes, impacts, zaps" },
-  { key: "ambience", label: "Ambience", hint: "Wind, rain, machinery" },
+  {
+    key: "dialogue",
+    label: "Dialogue",
+    hint: "Character voices",
+    icon: <IconSpeechBubble />,
+  },
+  {
+    key: "music",
+    label: "Music",
+    hint: "Mood bed under the scene",
+    icon: <IconMusicNote />,
+  },
+  {
+    key: "sfx",
+    label: "Sound FX",
+    hint: "Whooshes, impacts, zaps",
+    icon: <IconZap />,
+  },
+  {
+    key: "ambience",
+    label: "Ambience",
+    hint: "Wind, rain, machinery",
+    icon: <IconWind />,
+  },
 ];
 
 export function SettingsSheet({
@@ -335,8 +356,11 @@ function VolumeSection({
                 {muted ? "MUTE" : "ON"}
               </button>
               <div className="flex-1">
-                <div className="flex items-baseline justify-between text-xs">
-                  <span className="text-neutral-200">{layer.label}</span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-neutral-200">
+                    <span className="text-neutral-500">{layer.icon}</span>
+                    {layer.label}
+                  </span>
                   <span className="text-neutral-500">
                     {Math.round(v * 100)}%
                   </span>
@@ -427,6 +451,54 @@ function IconSparkles() {
       <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
       <path d="M20 3v4" />
       <path d="M22 5h-4" />
+    </svg>
+  );
+}
+
+const svgSmall = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 14,
+  height: 14,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+function IconSpeechBubble() {
+  return (
+    <svg {...svgSmall}>
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+    </svg>
+  );
+}
+
+function IconMusicNote() {
+  return (
+    <svg {...svgSmall}>
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  );
+}
+
+function IconZap() {
+  return (
+    <svg {...svgSmall}>
+      <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+    </svg>
+  );
+}
+
+function IconWind() {
+  return (
+    <svg {...svgSmall}>
+      <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+      <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+      <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
     </svg>
   );
 }
