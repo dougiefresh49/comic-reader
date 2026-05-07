@@ -21,7 +21,14 @@ import { extractFaceCropsForPage } from "./utils/face-extraction.js";
 import {
   identifySingleFace,
   type CharacterCluster,
+  type ExemplarReference,
 } from "./utils/face-matcher.js";
+import {
+  findSimilarExemplars,
+  downloadExemplarImage,
+  storeExemplar,
+  seedFromExistingClusters,
+} from "./utils/exemplar-store.js";
 import { loadRoster } from "./utils/roster.js";
 import { glob } from "glob";
 
@@ -29,11 +36,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..");
 
-function parseArgs(): { book: string; issue: string; overwrite: boolean } {
+function parseArgs(): {
+  book: string;
+  issue: string;
+  overwrite: boolean;
+  seed: boolean;
+  noExemplars: boolean;
+} {
   const argv = process.argv.slice(2);
   let book = process.env.COMIC_BOOK ?? "";
   let issue = process.env.COMIC_ISSUE ?? "";
   let overwrite = false;
+  let seed = false;
+  let noExemplars = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a) continue;
@@ -46,12 +61,14 @@ function parseArgs(): { book: string; issue: string; overwrite: boolean } {
       const v = argv[i + 1]?.trim() ?? "";
       issue = v.startsWith("issue-") ? v : `issue-${v}`;
     } else if (a === "--overwrite") overwrite = true;
+    else if (a === "--seed") seed = true;
+    else if (a === "--no-exemplars") noExemplars = true;
   }
   if (!book || !issue) {
     console.error("❌ --book and --issue are required");
     process.exit(1);
   }
-  return { book, issue, overwrite };
+  return { book, issue, overwrite, seed, noExemplars };
 }
 
 async function getIssueDbIds(
@@ -196,14 +213,113 @@ function buildKnownCharacterList(
   return [...names].sort();
 }
 
+async function getExemplarsForFace(
+  face: { jpegBuffer: Buffer },
+  bookId: string,
+): Promise<ExemplarReference[]> {
+  const matches = await findSimilarExemplars(face.jpegBuffer, [bookId], 3);
+  if (matches.length === 0) return [];
+
+  const refs: ExemplarReference[] = [];
+  for (const match of matches) {
+    const imgBuf = await downloadExemplarImage(match.cropPath);
+    if (!imgBuf) continue;
+    refs.push({
+      characterName: match.characterId.replace(/-/g, " "),
+      jpegBase64: imgBuf.toString("base64"),
+      confidence: match.confidence,
+    });
+  }
+  return refs;
+}
+
 async function main() {
-  const { book, issue, overwrite } = parseArgs();
+  const { book, issue, overwrite, seed, noExemplars } = parseArgs();
   const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
   const ISSUE_DIR = join(BOOK_DIR, issue);
   const SAM3_DIR = join(ISSUE_DIR, "data", "sam3");
   const WEBP_DIR = join(ISSUE_DIR, "pages-webp");
   const LOOKAHEAD_DIR = join(ISSUE_DIR, "data", "character-lookahead");
   const CACHE_PATH = join(LOOKAHEAD_DIR, "results.json");
+
+  const dbInfo = await getIssueDbIds(book, issue);
+
+  // ── Seed mode: import existing clusters into exemplar store ────────────
+  if (seed) {
+    if (!dbInfo) {
+      console.error("❌ Cannot seed — issue not found in DB");
+      process.exit(1);
+    }
+    if (!(await fs.pathExists(CACHE_PATH))) {
+      console.error(
+        "❌ No results.json found — run character-lookahead first before seeding",
+      );
+      process.exit(1);
+    }
+
+    console.log(`\n🌱 Seeding exemplar store from ${book}/${issue}...\n`);
+
+    const sidecars = await glob("page-*.json", { cwd: SAM3_DIR });
+    sidecars.sort();
+    const clusters: CharacterCluster[] = [];
+    let nextClusterId = 0;
+
+    for (const filename of sidecars) {
+      const pageNum = parseInt(
+        filename.replace("page-", "").replace(".json", ""),
+        10,
+      );
+      const crops = await extractFaceCropsForPage(SAM3_DIR, WEBP_DIR, pageNum);
+      if (crops.length === 0) continue;
+
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (!geminiKey) {
+        console.error("❌ GEMINI_API_KEY is required");
+        process.exit(1);
+      }
+      const gemini = new GoogleGenAI({ apiKey: geminiKey });
+      const roster = await loadRoster(BOOK_DIR);
+      const knownCharacters = buildKnownCharacterList(
+        roster,
+        dbInfo.wikiAppearances,
+      );
+
+      const identifications = await Promise.all(
+        crops.map((face) => identifySingleFace(gemini, face, knownCharacters)),
+      );
+
+      for (let i = 0; i < crops.length; i++) {
+        const face = crops[i]!;
+        const { characterName, confidence } = identifications[i]!;
+        const existing = characterName
+          ? clusters.find(
+              (c) =>
+                c.characterName?.toLowerCase() === characterName.toLowerCase(),
+            )
+          : null;
+
+        if (existing) {
+          existing.memberCount++;
+          if (confidence > existing.confidence) {
+            existing.confidence = confidence;
+            existing.exemplar = face;
+          }
+        } else {
+          clusters.push({
+            id: nextClusterId++,
+            characterName,
+            confidence,
+            exemplar: face,
+            memberCount: 1,
+          });
+        }
+      }
+    }
+
+    await seedFromExistingClusters(clusters, dbInfo.bookId, issue);
+    console.log("\n✅ Seed complete\n");
+    return;
+  }
 
   if (!overwrite && (await fs.pathExists(CACHE_PATH))) {
     console.log(
@@ -235,14 +351,17 @@ async function main() {
   const gemini = new GoogleGenAI({ apiKey: geminiKey });
 
   const roster = await loadRoster(BOOK_DIR);
-  const dbInfo = await getIssueDbIds(book, issue);
   const wikiAppearances = dbInfo?.wikiAppearances ?? null;
   const knownCharacters = buildKnownCharacterList(roster, wikiAppearances);
+  const useExemplars = !noExemplars && !!dbInfo;
 
   console.log(`\n🔍 Character lookahead for ${book}/${issue}\n`);
   if (knownCharacters.length > 0) {
-    console.log(`   Known characters: ${knownCharacters.join(", ")}\n`);
+    console.log(`   Known characters: ${knownCharacters.join(", ")}`);
   }
+  console.log(
+    `   Exemplar matching: ${useExemplars ? "enabled" : "disabled"}\n`,
+  );
 
   // ── Incremental page-by-page scan ──────────────────────────────────────
   const sidecars = await glob("page-*.json", { cwd: SAM3_DIR });
@@ -271,9 +390,15 @@ async function main() {
     totalCrops += crops.length;
     console.log(`   page-${padded}: ${crops.length} faces`);
 
-    // Identify all faces on this page concurrently
+    // Retrieve exemplars and identify all faces on this page
     const identifications = await Promise.all(
-      crops.map((face) => identifySingleFace(gemini, face, knownCharacters)),
+      crops.map(async (face) => {
+        let exemplars: ExemplarReference[] | undefined;
+        if (useExemplars) {
+          exemplars = await getExemplarsForFace(face, dbInfo!.bookId);
+        }
+        return identifySingleFace(gemini, face, knownCharacters, exemplars);
+      }),
     );
 
     for (let i = 0; i < crops.length; i++) {
@@ -329,6 +454,36 @@ async function main() {
     console.log(
       `   cluster ${c.id}: ${c.characterName ?? "unknown"} — ${c.memberCount} faces (${(c.confidence * 100).toFixed(0)}%)`,
     );
+  }
+
+  // ── Store high-confidence exemplars ────────────────────────────────────
+  if (useExemplars) {
+    console.log("\n🧬 Storing face exemplars...\n");
+    let stored = 0;
+    for (const cluster of clusters) {
+      if (!cluster.characterName || cluster.confidence < 0.7) continue;
+      const charId = cluster.characterName.toLowerCase().replace(/\s+/g, "-");
+      try {
+        await storeExemplar({
+          jpegBuffer: cluster.exemplar.jpegBuffer,
+          characterId: charId,
+          bookId: dbInfo!.bookId,
+          sourceIssue: issue,
+          pageNumber: cluster.exemplar.pageNumber,
+          confidence: cluster.confidence,
+          isConfirmed: cluster.confidence >= 0.9,
+        });
+        stored++;
+        console.log(
+          `   ✓ ${cluster.characterName} (${(cluster.confidence * 100).toFixed(0)}%)`,
+        );
+      } catch (err) {
+        console.warn(
+          `   ⚠ Failed to store ${cluster.characterName}: ${err instanceof Error ? err.message : err}`,
+        );
+      }
+    }
+    console.log(`   ${stored} exemplars stored`);
   }
 
   // ── Persist to DB ──────────────────────────────────────────────────────

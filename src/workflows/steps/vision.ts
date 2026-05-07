@@ -1,8 +1,3 @@
-import {
-  GoogleGenAI,
-  createPartFromBase64,
-  createPartFromText,
-} from "@google/genai";
 import sharp from "sharp";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import type { PageMeta, BoundingBoxJson } from "./shared";
@@ -310,12 +305,19 @@ export async function characterLookaheadPage(
   const { createStepClient } = await import("../step-utils");
   const supabase = await createStepClient();
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-  const gemini = new GoogleGenAI({ apiKey });
+  const { getGeminiClient, getFallbackGeminiClient } = await import(
+    "~/lib/gemini-client"
+  );
+  const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
+  const { identifyFace, resolveCharacterId, buildKnownCharacterList } =
+    await import("~/lib/character-identification");
+  const { findSimilarExemplars, downloadExemplarImage, storeExemplar } =
+    await import("~/lib/exemplar-store");
 
+  const gemini = getGeminiClient();
   const padded = String(pageNumber).padStart(2, "0");
 
+  // 1. Load segmentation predictions from DB
   const { data: segRow } = await supabase
     .from("page_segmentation")
     .select("image_width, image_height, predictions")
@@ -335,16 +337,15 @@ export async function characterLookaheadPage(
     points: Array<{ x: number; y: number }>;
   }>;
 
-  const FACE_CLASSES = new Set(["face", "head"]);
-  const facePreds = predictions.filter(
-    (p) => FACE_CLASSES.has(p.class) && p.points.length >= 3,
+  const hasFaces = predictions.some(
+    (p) => (p.class === "face" || p.class === "head") && p.points.length >= 3,
   );
-
-  if (facePreds.length === 0) {
+  if (!hasFaces) {
     console.log(`[lookahead] page-${padded}: no faces detected — skip`);
     return;
   }
 
+  // 2. Download page image from Storage
   const storagePath = `${bookId}/${issueId}/pages/page-${padded}.webp`;
   const { data: imageBlob } = await supabase.storage
     .from("comic-pages")
@@ -361,6 +362,7 @@ export async function characterLookaheadPage(
   const imgH = meta.height ?? 0;
   if (imgW === 0 || imgH === 0) return;
 
+  // 3. Load panels from DB
   const { data: panels } = await supabase
     .from("panels")
     .select("id, bounding_box, sort_order")
@@ -371,7 +373,7 @@ export async function characterLookaheadPage(
 
   if (!panels || panels.length === 0) return;
 
-  const panelsPx = panels.map((p) => {
+  const panelRects = panels.map((p) => {
     const bb = p.bounding_box as BoundingBoxJson;
     return {
       id: p.id as string,
@@ -382,128 +384,129 @@ export async function characterLookaheadPage(
     };
   });
 
-  const { data: chars } = await supabase
-    .from("characters")
-    .select("id, aliases")
-    .eq("book_id", bookId);
+  // 4. Extract face crops with deduplication
+  const faceCrops = await extractFaceCropsFromBuffer(
+    imgBuf,
+    predictions,
+    panelRects,
+  );
 
-  const knownNames: string[] = [];
-  for (const c of chars ?? []) {
-    const id = c.id as string;
-    knownNames.push(id.replace(/-/g, " "));
-    const aliases = c.aliases as string[] | null;
-    if (aliases) knownNames.push(...aliases);
+  if (faceCrops.length === 0) {
+    console.log(`[lookahead] page-${padded}: no valid face crops — skip`);
+    return;
   }
 
+  // 5. Build known character list
+  const knownCharacters = await buildKnownCharacterList(supabase, bookId);
+
+  // 6. Identify each face with exemplar context
   const detectionRows: Array<{
-    character_id: string;
+    character_id: string | null;
+    suggested_name?: string;
     panel_id: string;
     face_bbox: object;
     identification_confidence: number;
   }> = [];
 
-  for (const facePred of facePreds) {
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    for (const pt of facePred.points) {
-      if (pt.x < minX) minX = pt.x;
-      if (pt.y < minY) minY = pt.y;
-      if (pt.x > maxX) maxX = pt.x;
-      if (pt.y > maxY) maxY = pt.y;
-    }
-
-    const faceW = maxX - minX;
-    const faceH = maxY - minY;
-    if (faceW < 30 || faceH < 30) continue;
-
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-    const panel = panelsPx.find(
-      (p) => cx >= p.x && cx <= p.x + p.w && cy >= p.y && cy <= p.y + p.h,
-    );
-    if (!panel) continue;
-
-    const pad = 0.2;
-    const cropX = Math.max(0, Math.round(minX - faceW * pad));
-    const cropY = Math.max(0, Math.round(minY - faceH * pad));
-    const cropW = Math.min(imgW - cropX, Math.round(faceW * (1 + 2 * pad)));
-    const cropH = Math.min(imgH - cropY, Math.round(faceH * (1 + 2 * pad)));
-
-    let faceBuf: Buffer;
+  for (const face of faceCrops) {
+    // Retrieve similar exemplars from pgvector
+    let exemplarRefs: Array<{
+      characterName: string;
+      jpegBase64: string;
+      confidence: number;
+    }> = [];
     try {
-      faceBuf = await sharp(imgBuf)
-        .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
-        .toBuffer();
-    } catch {
-      continue;
-    }
-
-    const identifyPrompt = `You are identifying a comic book character from a face crop.
-${knownNames.length > 0 ? `Known characters: ${knownNames.join(", ")}` : "No character list available."}
-
-Based on visual features (skin color, mask, helmet, hair, costume, species), identify who this character is.
-Only provide a name if you are genuinely confident.
-
-Output JSON only (no markdown fences):
-{"character_name": "Name" or null, "confidence": 0.0-1.0}`;
-
-    try {
-      const imagePart = createPartFromBase64(
-        faceBuf.toString("base64"),
-        "image/webp",
+      const matches = await findSimilarExemplars(
+        supabase,
+        face.jpegBuffer.toString("base64"),
+        [bookId],
+        3,
       );
-      const textPart = createPartFromText(identifyPrompt);
+      const refs = await Promise.all(
+        matches.map(async (m) => {
+          const img = await downloadExemplarImage(supabase, m.cropPath);
+          if (!img) return null;
+          return {
+            characterName: m.characterId,
+            jpegBase64: img.toString("base64"),
+            confidence: m.confidence,
+          };
+        }),
+      );
+      exemplarRefs = refs.filter((r): r is NonNullable<typeof r> => r !== null);
+    } catch {
+      // Exemplar lookup failed — proceed without
+    }
 
-      const response = await gemini.models.generateContent({
-        model: GEMINI_MEDIUM,
-        contents: [imagePart, textPart],
+    // Identify with exemplar context + key failover
+    let result;
+    try {
+      result = await identifyFace(
+        gemini,
+        face.jpegBuffer.toString("base64"),
+        "image/jpeg",
+        knownCharacters,
+        exemplarRefs,
+      );
+    } catch (err: unknown) {
+      const status =
+        err && typeof err === "object" && "status" in err
+          ? (err as { status: number }).status
+          : 0;
+      if (status === 429) {
+        const fallback = getFallbackGeminiClient();
+        if (fallback) {
+          try {
+            result = await identifyFace(
+              fallback,
+              face.jpegBuffer.toString("base64"),
+              "image/jpeg",
+              knownCharacters,
+              exemplarRefs,
+            );
+          } catch {
+            continue;
+          }
+        } else {
+          continue;
+        }
+      } else {
+        continue;
+      }
+    }
+
+    if (result.characterName && result.confidence >= 0.6) {
+      const charId = await resolveCharacterId(supabase, result.characterName);
+
+      detectionRows.push({
+        character_id: charId,
+        suggested_name: charId ? undefined : result.characterName,
+        panel_id: face.panelId,
+        face_bbox: face.bboxPanelLocal,
+        identification_confidence: result.confidence,
       });
 
-      const text = response.text?.trim() ?? "";
-      const cleaned = text
-        .replace(/^```json\s*/i, "")
-        .replace(/```\s*$/, "")
-        .trim();
-      const jsonMatch = /\{[\s\S]*\}/.exec(cleaned);
-      if (!jsonMatch) continue;
-
-      const parsed = JSON.parse(jsonMatch[0]) as {
-        character_name: string | null;
-        confidence: number;
-      };
-
-      if (parsed.character_name && parsed.confidence >= 0.6) {
-        const charId = parsed.character_name
-          .toLowerCase()
-          .trim()
-          .replace(/\s+/g, "-");
-
-        await supabase
-          .from("characters")
-          .upsert(
-            { id: charId, aliases: [parsed.character_name] },
-            { onConflict: "id", ignoreDuplicates: true },
-          );
-
-        detectionRows.push({
-          character_id: charId,
-          panel_id: panel.id,
-          face_bbox: {
-            x: (minX - panel.x) / panel.w,
-            y: (minY - panel.y) / panel.h,
-            w: faceW / panel.w,
-            h: faceH / panel.h,
-          },
-          identification_confidence: parsed.confidence,
-        });
+      // Store face as exemplar (confirmed if resolved + high confidence)
+      if (result.confidence >= 0.7) {
+        try {
+          await storeExemplar(supabase, {
+            jpegBuffer: face.jpegBuffer,
+            characterId: charId,
+            suggestedName: charId ? undefined : result.characterName,
+            bookId,
+            sourceIssue: issueId,
+            pageNumber,
+            confidence: result.confidence,
+            isConfirmed: charId !== null && result.confidence >= 0.9,
+          });
+        } catch {
+          // Non-fatal — exemplar storage failure shouldn't stop identification
+        }
       }
-    } catch {
-      // Gemini call failed for this face — skip
     }
 
-    await new Promise((r) => setTimeout(r, 1000));
+    // Rate limit delay between faces
+    await new Promise((r) => setTimeout(r, 800));
   }
 
   if (detectionRows.length > 0) {
@@ -518,7 +521,7 @@ Output JSON only (no markdown fences):
   }
 
   console.log(
-    `[lookahead] ${bookId}/${issueId}: page-${padded} → ${facePreds.length} faces, ${detectionRows.length} identified`,
+    `[lookahead] ${bookId}/${issueId}: page-${padded} → ${faceCrops.length} faces, ${detectionRows.length} identified`,
   );
 }
 
@@ -540,11 +543,30 @@ export async function getContextPage(
     );
   }
 
-  const { GoogleGenAI: GenAI } = await import("@google/genai");
-  const gemini = new GenAI({ apiKey: geminiKey });
+  const { getGeminiClient: getGemini } = await import("~/lib/gemini-client");
+  const gemini = getGemini();
   const { GEMINI_HIGH } = await import("~/lib/models");
 
   const padded = String(pageNumber).padStart(2, "0");
+
+  // Load book context for richer prompts
+  let bookContext: string | undefined;
+  const { data: bookRow } = await supabase
+    .from("books")
+    .select("name, franchises")
+    .eq("id", bookId)
+    .single();
+  if (bookRow) {
+    const parts: string[] = [];
+    const bookName = bookRow.name as string;
+    const franchises = bookRow.franchises as string[] | null;
+    if (bookName) parts.push(`Book: ${bookName}`);
+    if (franchises?.length) parts.push(`Franchises: ${franchises.join(", ")}`);
+    parts.push(
+      "Use your knowledge of comics and pop culture to identify characters by their proper canonical names where possible.",
+    );
+    bookContext = parts.join("\n");
+  }
 
   const storagePath = `${bookId}/${issueId}/pages/page-${padded}.webp`;
   const { data: imageBlob } = await supabase.storage
@@ -704,31 +726,17 @@ export async function getContextPage(
 
     if (!ocrText) continue;
 
-    const charListStr =
-      pageCharNames.length > 0
-        ? `Characters detected on this page: ${pageCharNames.join(", ")}`
-        : "";
-    const speakerListStr =
-      uniqueSpeakers.length > 0
-        ? `Characters already identified: ${uniqueSpeakers.join(", ")}`
-        : "";
+    const allCharacters = [...pageCharNames, ...uniqueSpeakers].filter(
+      (name, i, arr) => arr.indexOf(name) === i,
+    );
 
-    const contextPrompt = `I am providing a full comic book page.
-**Goal:** Analyze the specific text region to determine how it should be voice-acted.
-${charListStr}
-${speakerListStr}
-
-**Target Region:**
-* **Text:** "${ocrText}"
-* **Location:** x:${box.x}, y:${box.y} (width:${box.width}, height:${box.height})
-
-**Instructions:**
-1. Classify as: SPEECH, NARRATION, CAPTION, SFX, or BACKGROUND
-2. If SPEECH, identify the speaker by tracing the bubble tail
-3. Determine emotion and character type
-
-Output JSON only (no markdown):
-{"type":"SPEECH","speaker":"Name","emotion":"neutral","characterType":"MAJOR","side":"HERO","voiceDescription":"brief voice description","textWithCues":"text with <cue> tags for emphasis"}`;
+    const { buildContextPrompt } = await import("~/lib/gemini-prompts");
+    const contextPrompt = buildContextPrompt(
+      ocrText,
+      box,
+      allCharacters,
+      bookContext,
+    );
 
     try {
       const { createPartFromBase64: cpb64, createPartFromText: cpt } =
@@ -742,6 +750,13 @@ Output JSON only (no markdown):
       });
 
       const responseText = contextResponse.text?.trim() ?? "";
+
+      // Extract scratchpad reasoning if present
+      const scratchpadMatch = /<scratchpad>([\s\S]*?)<\/scratchpad>/.exec(
+        responseText,
+      );
+      const aiReasoning = scratchpadMatch?.[1]?.trim() ?? null;
+
       const jsonMatch = /\{[\s\S]*\}/.exec(responseText);
       if (!jsonMatch) continue;
 
@@ -769,6 +784,7 @@ Output JSON only (no markdown):
         .from("bubbles")
         .update({
           ocr_text: ocrText,
+          text: parsed.textWithCues ?? ocrText,
           type: bubbleType,
           speaker,
           emotion: parsed.emotion ?? "neutral",
@@ -776,6 +792,7 @@ Output JSON only (no markdown):
           side: parsed.side ?? null,
           voice_description: parsed.voiceDescription ?? null,
           text_with_cues: parsed.textWithCues ?? ocrText,
+          ai_reasoning: aiReasoning,
           ignored: bubbleType === "SFX" || bubbleType === "BACKGROUND",
         })
         .eq("id", bubble.id);
