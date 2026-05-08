@@ -27,6 +27,24 @@ export async function storeExemplar(
   supabase: SupabaseClient,
   params: StoreExemplarParams,
 ): Promise<string> {
+  let query = supabase
+    .from("character_face_exemplars")
+    .select("id")
+    .eq("book_id", params.bookId)
+    .eq("source_issue", params.sourceIssue)
+    .eq("page_number", params.pageNumber);
+
+  if (params.characterId) {
+    query = query.eq("character_id", params.characterId);
+  } else if (params.suggestedName) {
+    query = query.eq("suggested_name", params.suggestedName);
+  }
+
+  const { data: existing } = await query.limit(1);
+  if (existing?.[0]) {
+    return existing[0].id as string;
+  }
+
   const id = crypto.randomUUID();
   const folderName = params.characterId ?? "_unresolved";
   const storagePath = `${params.bookId}/${params.sourceIssue}/${folderName}/${id}.jpg`;

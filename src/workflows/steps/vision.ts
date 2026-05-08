@@ -528,13 +528,38 @@ export async function characterLookaheadPage(
   }
 
   if (detectionRows.length > 0) {
-    const { error } = await supabase
+    const panelIdsInBatch = [...new Set(detectionRows.map((r) => r.panel_id))];
+    const { data: existingDets } = await supabase
       .from("panel_character_detections")
-      .insert(detectionRows);
-    if (error) {
-      console.warn(
-        `[lookahead] page-${padded}: insert failed: ${error.message}`,
-      );
+      .select("character_id, suggested_name, panel_id")
+      .in("panel_id", panelIdsInBatch);
+
+    const existingKeys = new Set(
+      (existingDets ?? []).map(
+        (d: {
+          character_id: string | null;
+          suggested_name: string | null;
+          panel_id: string;
+        }) => `${d.character_id ?? d.suggested_name}::${d.panel_id}`,
+      ),
+    );
+
+    const newRows = detectionRows.filter(
+      (r) =>
+        !existingKeys.has(
+          `${r.character_id ?? r.suggested_name}::${r.panel_id}`,
+        ),
+    );
+
+    if (newRows.length > 0) {
+      const { error } = await supabase
+        .from("panel_character_detections")
+        .insert(newRows);
+      if (error) {
+        console.warn(
+          `[lookahead] page-${padded}: insert failed: ${error.message}`,
+        );
+      }
     }
   }
 
