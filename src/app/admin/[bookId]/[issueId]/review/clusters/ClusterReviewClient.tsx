@@ -20,6 +20,7 @@ export interface ClusterFace {
   pageNumber: number;
   panelId: string;
   faceBbox: { x: number; y: number; w: number; h: number };
+  pageImageUrl: string;
 }
 
 export interface CharacterCluster {
@@ -29,6 +30,9 @@ export interface CharacterCluster {
   label: string;
   faces: ClusterFace[];
   isResolved: boolean;
+  detectionCount: number;
+  allDetectionIds: string[];
+  pageNumbers: number[];
 }
 
 interface Props {
@@ -51,10 +55,12 @@ export function ClusterReviewClient({
     text: string;
     type: "error" | "success";
   } | null>(null);
+  const [previewFace, setPreviewFace] = useState<ClusterFace | null>(null);
 
   const stats = useMemo(() => {
-    const total = clusters.reduce((s, c) => s + c.faces.length, 0);
-    const unresolved = clusters
+    const totalCrops = clusters.reduce((s, c) => s + c.faces.length, 0);
+    const totalDetections = clusters.reduce((s, c) => s + c.detectionCount, 0);
+    const unresolvedCrops = clusters
       .filter((c) => !c.isResolved)
       .reduce((s, c) => s + c.faces.length, 0);
     const confirmed = clusters.reduce(
@@ -63,9 +69,10 @@ export function ClusterReviewClient({
     );
     const allHandled = clusters.every((c) => c.isResolved);
     return {
-      total,
-      resolved: total - unresolved,
-      unresolved,
+      totalCrops,
+      totalDetections,
+      resolvedCrops: totalCrops - unresolvedCrops,
+      unresolvedCrops,
       confirmed,
       allHandled,
     };
@@ -109,9 +116,9 @@ export function ClusterReviewClient({
   function handleConfirm(cluster: CharacterCluster) {
     startTransition(async () => {
       setMsg(null);
-      const detectionIds = cluster.faces
-        .map((f) => f.detectionId)
-        .filter((id) => !id.startsWith("exemplar-only:"));
+      const detectionIds = cluster.allDetectionIds.filter(
+        (id) => !id.startsWith("exemplar-only:"),
+      );
       const exemplarIds = cluster.faces
         .map((f) => f.exemplarId)
         .filter(Boolean) as string[];
@@ -164,6 +171,10 @@ export function ClusterReviewClient({
                   faces: c.faces.filter(
                     (f) => !faces.some((s) => s.detectionId === f.detectionId),
                   ),
+                  detectionCount: c.detectionCount - detectionIds.length,
+                  allDetectionIds: c.allDetectionIds.filter(
+                    (id) => !detectionIds.includes(id),
+                  ),
                 }
               : c,
           )
@@ -211,19 +222,27 @@ export function ClusterReviewClient({
                 (f) =>
                   !facesToMove.some((m) => m.detectionId === f.detectionId),
               ),
+              detectionCount: c.detectionCount - detectionIds.length,
+              allDetectionIds: c.allDetectionIds.filter(
+                (id) => !detectionIds.includes(id),
+              ),
             };
           }
           return c;
         });
 
-        const targetKey = targetCharacterId;
         const existingTarget = next.find(
           (c) => c.characterId === targetCharacterId,
         );
         if (existingTarget) {
           next = next.map((c) =>
             c.key === existingTarget.key
-              ? { ...c, faces: [...c.faces, ...facesToMove] }
+              ? {
+                  ...c,
+                  faces: [...c.faces, ...facesToMove],
+                  detectionCount: c.detectionCount + detectionIds.length,
+                  allDetectionIds: [...c.allDetectionIds, ...detectionIds],
+                }
               : c,
           );
         } else {
@@ -231,12 +250,17 @@ export function ClusterReviewClient({
             knownCharacters.find((k) => k.id === targetCharacterId)?.name ??
             targetCharacterId;
           next.push({
-            key: targetKey,
+            key: targetCharacterId,
             characterId: targetCharacterId,
             suggestedName: null,
             label: charName,
             faces: facesToMove,
             isResolved: true,
+            detectionCount: detectionIds.length,
+            allDetectionIds: detectionIds,
+            pageNumbers: [
+              ...new Set(facesToMove.map((f) => f.pageNumber)),
+            ].sort((a, b) => a - b),
           });
         }
 
@@ -263,9 +287,9 @@ export function ClusterReviewClient({
   function handleRename(cluster: CharacterCluster, newCharacterId: string) {
     startTransition(async () => {
       setMsg(null);
-      const detectionIds = cluster.faces
-        .map((f) => f.detectionId)
-        .filter((id) => !id.startsWith("exemplar-only:"));
+      const detectionIds = cluster.allDetectionIds.filter(
+        (id) => !id.startsWith("exemplar-only:"),
+      );
       const exemplarIds = cluster.faces
         .map((f) => f.exemplarId)
         .filter(Boolean) as string[];
@@ -309,17 +333,20 @@ export function ClusterReviewClient({
       {/* Stats bar */}
       <div className="flex flex-wrap items-center gap-4 rounded-lg bg-neutral-900 px-4 py-3 text-sm">
         <span>
-          <strong>{stats.total}</strong> faces
+          <strong>{stats.totalCrops}</strong> crops
+          <span className="ml-1 text-xs text-neutral-500">
+            ({stats.totalDetections} detections)
+          </span>
         </span>
         <span className="text-neutral-500">|</span>
-        <span className="text-emerald-400">{stats.resolved} resolved</span>
+        <span className="text-emerald-400">{stats.resolvedCrops} resolved</span>
         <span className="text-neutral-500">|</span>
         <span
           className={
-            stats.unresolved > 0 ? "text-amber-400" : "text-neutral-500"
+            stats.unresolvedCrops > 0 ? "text-amber-400" : "text-neutral-500"
           }
         >
-          {stats.unresolved} unresolved
+          {stats.unresolvedCrops} unresolved
         </span>
         <span className="text-neutral-500">|</span>
         <span className="text-neutral-400">{stats.confirmed} confirmed</span>
@@ -343,7 +370,7 @@ export function ClusterReviewClient({
         <section>
           <h2 className="mb-3 text-lg font-medium text-amber-400">
             Unresolved (
-            {unresolvedClusters.reduce((s, c) => s + c.faces.length, 0)} faces)
+            {unresolvedClusters.reduce((s, c) => s + c.faces.length, 0)} crops)
           </h2>
           <div className="space-y-4">
             {unresolvedClusters.map((cluster) => (
@@ -360,6 +387,7 @@ export function ClusterReviewClient({
                 onReject={() => handleReject(cluster.key)}
                 onAssign={(targetId) => handleAssign(cluster.key, targetId)}
                 onRename={(newId) => handleRename(cluster, newId)}
+                onPreview={setPreviewFace}
                 variant="unresolved"
               />
             ))}
@@ -372,7 +400,7 @@ export function ClusterReviewClient({
         <section>
           <h2 className="mb-3 text-lg font-medium text-neutral-300">
             Resolved ({resolvedClusters.reduce((s, c) => s + c.faces.length, 0)}{" "}
-            faces)
+            crops)
           </h2>
           <div className="space-y-4">
             {resolvedClusters.map((cluster) => (
@@ -389,6 +417,7 @@ export function ClusterReviewClient({
                 onReject={() => handleReject(cluster.key)}
                 onAssign={(targetId) => handleAssign(cluster.key, targetId)}
                 onRename={(newId) => handleRename(cluster, newId)}
+                onPreview={setPreviewFace}
                 variant="resolved"
               />
             ))}
@@ -410,6 +439,72 @@ export function ClusterReviewClient({
           disabled={!stats.allHandled}
         />
       </div>
+
+      {/* Page preview modal */}
+      {previewFace && (
+        <PagePreviewModal
+          face={previewFace}
+          onClose={() => setPreviewFace(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Page Preview Modal ──────────────────────────────────────── */
+
+function PagePreviewModal({
+  face,
+  onClose,
+}: {
+  face: ClusterFace;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-h-[90vh] max-w-4xl overflow-auto rounded-lg bg-neutral-900 p-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center justify-between px-2">
+          <span className="text-sm text-neutral-300">
+            Page {face.pageNumber}
+            {face.faceBbox.w > 0 && (
+              <span className="ml-2 text-neutral-500">
+                bbox: ({face.faceBbox.x}, {face.faceBbox.y}) {face.faceBbox.w}
+                &times;{face.faceBbox.h}
+              </span>
+            )}
+          </span>
+          <button
+            onClick={onClose}
+            className="rounded px-2 py-1 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+          >
+            Close
+          </button>
+        </div>
+        <div className="relative inline-block">
+          <img
+            src={face.pageImageUrl}
+            alt={`Page ${face.pageNumber}`}
+            className="max-h-[80vh] rounded"
+          />
+          {face.faceBbox.w > 0 && (
+            <div
+              className="pointer-events-none absolute border-2 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.4)]"
+              style={{
+                left: `${face.faceBbox.x * 100}%`,
+                top: `${face.faceBbox.y * 100}%`,
+                width: `${face.faceBbox.w * 100}%`,
+                height: `${face.faceBbox.h * 100}%`,
+              }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -428,6 +523,7 @@ interface ClusterCardProps {
   onReject: () => void;
   onAssign: (targetCharacterId: string) => void;
   onRename: (newCharacterId: string) => void;
+  onPreview: (face: ClusterFace) => void;
   variant: "resolved" | "unresolved";
 }
 
@@ -443,6 +539,7 @@ function ClusterCard({
   onReject,
   onAssign,
   onRename,
+  onPreview,
   variant,
 }: ClusterCardProps) {
   const [showAssign, setShowAssign] = useState(false);
@@ -477,7 +574,13 @@ function ClusterCard({
           )}
         </h3>
         <span className="text-xs text-neutral-500">
-          {cluster.faces.length} face{cluster.faces.length !== 1 && "s"}
+          {cluster.faces.length} crop{cluster.faces.length !== 1 && "s"}
+          {cluster.detectionCount > cluster.faces.length && (
+            <>, {cluster.detectionCount} detections</>
+          )}
+          {cluster.pageNumbers.length > 0 && (
+            <> &middot; pp. {cluster.pageNumbers.join(", ")}</>
+          )}
         </span>
         <ConfidenceBadge value={avgConfidence} label="avg" />
         {allConfirmed && (
@@ -494,7 +597,8 @@ function ClusterCard({
             key={face.detectionId}
             face={face}
             isSelected={selected.has(face.detectionId)}
-            onClick={() => onToggleFace(face.detectionId)}
+            onSelect={() => onToggleFace(face.detectionId)}
+            onPreview={() => onPreview(face)}
           />
         ))}
       </div>
@@ -631,11 +735,13 @@ function ClusterCard({
 function FaceThumbnail({
   face,
   isSelected,
-  onClick,
+  onSelect,
+  onPreview,
 }: {
   face: ClusterFace;
   isSelected: boolean;
-  onClick: () => void;
+  onSelect: () => void;
+  onPreview: () => void;
 }) {
   const borderClass = isSelected
     ? "ring-2 ring-cyan-500"
@@ -644,48 +750,62 @@ function FaceThumbnail({
       : "ring-1 ring-neutral-700";
 
   return (
-    <button
-      onClick={onClick}
-      className={`relative h-[72px] w-[72px] flex-shrink-0 overflow-hidden rounded ${borderClass} transition-all hover:ring-2 hover:ring-cyan-400`}
-      title={`Page ${face.pageNumber} | Confidence: ${(face.confidence * 100).toFixed(0)}%`}
+    <div
+      className={`group relative h-[72px] w-[72px] flex-shrink-0 overflow-hidden rounded ${borderClass} transition-all hover:ring-2 hover:ring-cyan-400`}
     >
-      {face.cropUrl ? (
-        <img
-          src={face.cropUrl}
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-cover"
+      <button
+        onClick={onSelect}
+        className="h-full w-full"
+        title={`Page ${face.pageNumber} | Confidence: ${(face.confidence * 100).toFixed(0)}% | Click to select`}
+      >
+        {face.cropUrl ? (
+          <img
+            src={face.cropUrl}
+            alt=""
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-600">
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0"
+              />
+            </svg>
+          </div>
+        )}
+        <ConfidenceBadge
+          value={face.confidence}
+          className="absolute right-0.5 bottom-0.5"
         />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center bg-neutral-800 text-neutral-600">
-          <svg
-            className="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0"
-            />
-          </svg>
-        </div>
-      )}
-      <ConfidenceBadge
-        value={face.confidence}
-        className="absolute right-0.5 bottom-0.5"
-      />
-      {face.humanVerified && (
-        <span className="absolute top-0.5 left-0.5 text-xs text-emerald-400">
-          &#10003;
+        {face.humanVerified && (
+          <span className="absolute top-0.5 left-0.5 text-xs text-emerald-400">
+            &#10003;
+          </span>
+        )}
+        <span className="absolute bottom-0.5 left-0.5 text-[9px] text-neutral-400">
+          p{face.pageNumber}
         </span>
-      )}
-      <span className="absolute bottom-0.5 left-0.5 text-[9px] text-neutral-400">
-        p{face.pageNumber}
-      </span>
-    </button>
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onPreview();
+        }}
+        className="absolute top-0.5 right-0.5 hidden rounded bg-black/60 px-1 py-0.5 text-[9px] text-cyan-300 group-hover:block hover:bg-black/80"
+        title="Preview on page"
+      >
+        view
+      </button>
+    </div>
   );
 }
 

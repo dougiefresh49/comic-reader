@@ -32,6 +32,7 @@ interface ExemplarRow {
 interface PanelRow {
   id: string;
   page_number: number;
+  bounding_box: { x: number; y: number; w: number; h: number } | null;
 }
 
 async function getClusterData(bookId: string, issueId: string) {
@@ -40,7 +41,7 @@ async function getClusterData(bookId: string, issueId: string) {
   const [panelsRes, exemplarsRes, charsRes] = await Promise.all([
     supabaseAdmin
       .from("panels")
-      .select("id, page_number")
+      .select("id, page_number, bounding_box")
       .eq("book_id", bookId)
       .eq("issue_id", issueId),
     supabaseAdmin
@@ -60,6 +61,7 @@ async function getClusterData(bookId: string, issueId: string) {
   const panels = (panelsRes.data ?? []) as PanelRow[];
   const panelIds = panels.map((p) => p.id);
   const panelPageMap = new Map(panels.map((p) => [p.id, p.page_number]));
+  const panelBboxMap = new Map(panels.map((p) => [p.id, p.bounding_box]));
 
   let detections: DetectionRow[] = [];
   if (panelIds.length > 0) {
@@ -78,87 +80,159 @@ async function getClusterData(bookId: string, issueId: string) {
     name: string;
   }[];
 
-  const exemplarsByKey = new Map<string, ExemplarRow[]>();
-  for (const e of exemplars) {
-    const key = e.character_id ?? `_:${e.suggested_name}`;
-    const arr = exemplarsByKey.get(key) ?? [];
-    arr.push(e);
-    exemplarsByKey.set(key, arr);
+  // Build a map of detection IDs per (character_id or suggested_name) + page
+  const detectionsByCluster = new Map<
+    string,
+    {
+      ids: string[];
+      pages: Set<number>;
+      totalConfidence: number;
+      count: number;
+      anyVerified: boolean;
+    }
+  >();
+  for (const d of detections) {
+    const clusterKey =
+      d.character_id ?? `unresolved:${d.suggested_name ?? "unknown"}`;
+    if (!detectionsByCluster.has(clusterKey)) {
+      detectionsByCluster.set(clusterKey, {
+        ids: [],
+        pages: new Set(),
+        totalConfidence: 0,
+        count: 0,
+        anyVerified: false,
+      });
+    }
+    const entry = detectionsByCluster.get(clusterKey)!;
+    entry.ids.push(d.id);
+    entry.pages.add(panelPageMap.get(d.panel_id) ?? 0);
+    entry.totalConfidence += d.identification_confidence;
+    entry.count++;
+    if (d.human_verified) entry.anyVerified = true;
   }
 
+  // Build faces from exemplars (each exemplar = one unique crop)
   const clusterMap = new Map<
     string,
     { charId: string | null; suggested: string | null; faces: ClusterFace[] }
   >();
 
-  for (const d of detections) {
+  for (const e of exemplars) {
     const clusterKey =
-      d.character_id ?? `unresolved:${d.suggested_name ?? "unknown"}`;
-    const pageNumber = panelPageMap.get(d.panel_id) ?? 0;
+      e.character_id ?? `unresolved:${e.suggested_name ?? "unknown"}`;
 
-    const matchKey = d.character_id ?? `_:${d.suggested_name}`;
-    const candidateExemplars = exemplarsByKey.get(matchKey) ?? [];
-    const matchedExemplar =
-      candidateExemplars.find((e) => e.page_number === pageNumber) ??
-      candidateExemplars[0] ??
-      null;
+    // Find detection on same page for face_bbox + panel_id
+    const matchingDetection = detections.find((d) => {
+      const dKey =
+        d.character_id ?? `unresolved:${d.suggested_name ?? "unknown"}`;
+      return (
+        dKey === clusterKey &&
+        (panelPageMap.get(d.panel_id) ?? 0) === e.page_number
+      );
+    });
+
+    const pageUrl = `${supabaseUrl}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${String(e.page_number).padStart(2, "0")}.webp`;
+
+    const panelBbox = matchingDetection
+      ? panelBboxMap.get(matchingDetection.panel_id)
+      : null;
+    const localBbox = matchingDetection?.face_bbox ?? {
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+    };
+    const pageBbox =
+      panelBbox && localBbox.w > 0
+        ? {
+            x: panelBbox.x + localBbox.x * panelBbox.w,
+            y: panelBbox.y + localBbox.y * panelBbox.h,
+            w: localBbox.w * panelBbox.w,
+            h: localBbox.h * panelBbox.h,
+          }
+        : localBbox;
 
     const face: ClusterFace = {
-      detectionId: d.id,
-      exemplarId: matchedExemplar?.id ?? null,
-      cropUrl: matchedExemplar
-        ? `${supabaseUrl}/storage/v1/object/public/face-exemplars/${matchedExemplar.crop_path}`
-        : null,
-      confidence: d.identification_confidence,
-      humanVerified: d.human_verified,
-      isConfirmed: matchedExemplar?.is_confirmed ?? false,
-      pageNumber,
-      panelId: d.panel_id,
-      faceBbox: d.face_bbox,
+      detectionId: matchingDetection?.id ?? `exemplar-only:${e.id}`,
+      exemplarId: e.id,
+      cropUrl: `${supabaseUrl}/storage/v1/object/public/face-exemplars/${e.crop_path}`,
+      confidence: e.confidence,
+      humanVerified: matchingDetection?.human_verified ?? false,
+      isConfirmed: e.is_confirmed,
+      pageNumber: e.page_number,
+      panelId: matchingDetection?.panel_id ?? "",
+      faceBbox: pageBbox,
+      pageImageUrl: pageUrl,
     };
 
     if (!clusterMap.has(clusterKey)) {
       clusterMap.set(clusterKey, {
-        charId: d.character_id,
-        suggested: d.suggested_name,
+        charId: e.character_id,
+        suggested: e.suggested_name,
         faces: [],
       });
     }
     clusterMap.get(clusterKey)!.faces.push(face);
   }
 
-  // Also include exemplars that have no matching detection (orphaned exemplars)
-  for (const e of exemplars) {
-    const clusterKey =
-      e.character_id ?? `unresolved:${e.suggested_name ?? "unknown"}`;
-    const existing = clusterMap.get(clusterKey);
-    const alreadyLinked = existing?.faces.some((f) => f.exemplarId === e.id);
-    if (!alreadyLinked) {
-      const face: ClusterFace = {
-        detectionId: `exemplar-only:${e.id}`,
-        exemplarId: e.id,
-        cropUrl: `${supabaseUrl}/storage/v1/object/public/face-exemplars/${e.crop_path}`,
-        confidence: e.confidence,
-        humanVerified: false,
-        isConfirmed: e.is_confirmed,
-        pageNumber: e.page_number,
-        panelId: "",
-        faceBbox: { x: 0, y: 0, w: 0, h: 0 },
-      };
-      if (!clusterMap.has(clusterKey)) {
-        clusterMap.set(clusterKey, {
-          charId: e.character_id,
-          suggested: e.suggested_name,
-          faces: [],
-        });
-      }
-      clusterMap.get(clusterKey)!.faces.push(face);
+  // For clusters that have detections but no exemplars, add a placeholder
+  for (const [clusterKey, info] of detectionsByCluster) {
+    if (!clusterMap.has(clusterKey)) {
+      const d = detections.find((det) => {
+        const k =
+          det.character_id ?? `unresolved:${det.suggested_name ?? "unknown"}`;
+        return k === clusterKey;
+      })!;
+      const pageNum = panelPageMap.get(d.panel_id) ?? 0;
+      const pageUrl = `${supabaseUrl}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${String(pageNum).padStart(2, "0")}.webp`;
+      const pBbox = panelBboxMap.get(d.panel_id);
+      const lBbox = d.face_bbox;
+      const pPageBbox =
+        pBbox && lBbox.w > 0
+          ? {
+              x: pBbox.x + lBbox.x * pBbox.w,
+              y: pBbox.y + lBbox.y * pBbox.h,
+              w: lBbox.w * pBbox.w,
+              h: lBbox.h * pBbox.h,
+            }
+          : lBbox;
+      clusterMap.set(clusterKey, {
+        charId: d.character_id,
+        suggested: d.suggested_name,
+        faces: [
+          {
+            detectionId: d.id,
+            exemplarId: null,
+            cropUrl: null,
+            confidence: info.totalConfidence / info.count,
+            humanVerified: info.anyVerified,
+            isConfirmed: false,
+            pageNumber: pageNum,
+            panelId: d.panel_id,
+            faceBbox: pPageBbox,
+            pageImageUrl: pageUrl,
+          },
+        ],
+      });
     }
+  }
+
+  // Attach detection counts and all detection IDs to each cluster
+  for (const [key, val] of clusterMap) {
+    const detInfo = detectionsByCluster.get(key);
+    (val as unknown as Record<string, unknown>).detectionCount =
+      detInfo?.count ?? val.faces.length;
+    (val as unknown as Record<string, unknown>).allDetectionIds =
+      detInfo?.ids ?? val.faces.map((f) => f.detectionId);
+    (val as unknown as Record<string, unknown>).pageNumbers = detInfo
+      ? [...detInfo.pages].sort((a, b) => a - b)
+      : val.faces.map((f) => f.pageNumber);
   }
 
   const clusters: CharacterCluster[] = [];
   for (const [key, val] of clusterMap) {
     val.faces.sort((a, b) => a.pageNumber - b.pageNumber);
+    const extra = val as unknown as Record<string, unknown>;
     clusters.push({
       key,
       characterId: val.charId,
@@ -166,6 +240,12 @@ async function getClusterData(bookId: string, issueId: string) {
       label: val.charId ?? val.suggested ?? "Unknown",
       faces: val.faces,
       isResolved: val.charId !== null,
+      detectionCount: (extra.detectionCount as number) ?? val.faces.length,
+      allDetectionIds:
+        (extra.allDetectionIds as string[]) ??
+        val.faces.map((f) => f.detectionId),
+      pageNumbers:
+        (extra.pageNumbers as number[]) ?? val.faces.map((f) => f.pageNumber),
     });
   }
 
