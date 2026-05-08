@@ -5,9 +5,11 @@ import { useState } from "react";
 export function ApproveClusterButton({
   bookId,
   issueId,
+  disabled,
 }: {
   bookId: string;
   issueId: string;
+  disabled?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [approved, setApproved] = useState(false);
@@ -36,7 +38,7 @@ export function ApproveClusterButton({
   return (
     <button
       onClick={handleApprove}
-      disabled={loading}
+      disabled={loading || disabled}
       className="rounded bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
     >
       {loading ? "Resuming..." : "Approve & Continue Pipeline"}
