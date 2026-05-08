@@ -329,131 +329,139 @@ export function ClusterReviewClient({
   const resolvedClusters = clusters.filter((c) => c.isResolved);
 
   return (
-    <div className="space-y-6">
-      {/* Stats bar */}
-      <div className="flex flex-wrap items-center gap-4 rounded-lg bg-neutral-900 px-4 py-3 text-sm">
-        <span>
-          <strong>{stats.totalCrops}</strong> crops
-          <span className="ml-1 text-xs text-neutral-500">
-            ({stats.totalDetections} detections)
+    <div className="flex gap-6">
+      {/* Left: cluster list */}
+      <div className={`space-y-6 ${previewFace ? "w-1/2" : "w-full"}`}>
+        {/* Stats bar */}
+        <div className="flex flex-wrap items-center gap-4 rounded-lg bg-neutral-900 px-4 py-3 text-sm">
+          <span>
+            <strong>{stats.totalCrops}</strong> crops
+            <span className="ml-1 text-xs text-neutral-500">
+              ({stats.totalDetections} detections)
+            </span>
           </span>
-        </span>
-        <span className="text-neutral-500">|</span>
-        <span className="text-emerald-400">{stats.resolvedCrops} resolved</span>
-        <span className="text-neutral-500">|</span>
-        <span
-          className={
-            stats.unresolvedCrops > 0 ? "text-amber-400" : "text-neutral-500"
-          }
-        >
-          {stats.unresolvedCrops} unresolved
-        </span>
-        <span className="text-neutral-500">|</span>
-        <span className="text-neutral-400">{stats.confirmed} confirmed</span>
-      </div>
-
-      {/* Message banner */}
-      {msg && (
-        <div
-          className={`rounded px-4 py-2 text-sm ${
-            msg.type === "error"
-              ? "bg-red-900/40 text-red-300"
-              : "bg-emerald-900/40 text-emerald-300"
-          }`}
-        >
-          {msg.text}
+          <span className="text-neutral-500">|</span>
+          <span className="text-emerald-400">
+            {stats.resolvedCrops} resolved
+          </span>
+          <span className="text-neutral-500">|</span>
+          <span
+            className={
+              stats.unresolvedCrops > 0 ? "text-amber-400" : "text-neutral-500"
+            }
+          >
+            {stats.unresolvedCrops} unresolved
+          </span>
+          <span className="text-neutral-500">|</span>
+          <span className="text-neutral-400">{stats.confirmed} confirmed</span>
         </div>
-      )}
 
-      {/* Unresolved clusters */}
-      {unresolvedClusters.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-medium text-amber-400">
-            Unresolved (
-            {unresolvedClusters.reduce((s, c) => s + c.faces.length, 0)} crops)
-          </h2>
-          <div className="space-y-4">
-            {unresolvedClusters.map((cluster) => (
-              <ClusterCard
-                key={cluster.key}
-                cluster={cluster}
-                selected={selected.get(cluster.key) ?? new Set()}
-                knownCharacters={knownCharacters}
-                pending={pending}
-                onToggleFace={(id) => toggleFace(cluster.key, id)}
-                onSelectAll={() => selectAllInCluster(cluster)}
-                onClearSelection={() => clearSelection(cluster.key)}
-                onConfirm={() => handleConfirm(cluster)}
-                onReject={() => handleReject(cluster.key)}
-                onAssign={(targetId) => handleAssign(cluster.key, targetId)}
-                onRename={(newId) => handleRename(cluster, newId)}
-                onPreview={setPreviewFace}
-                variant="unresolved"
-              />
-            ))}
+        {/* Message banner */}
+        {msg && (
+          <div
+            className={`rounded px-4 py-2 text-sm ${
+              msg.type === "error"
+                ? "bg-red-900/40 text-red-300"
+                : "bg-emerald-900/40 text-emerald-300"
+            }`}
+          >
+            {msg.text}
           </div>
-        </section>
-      )}
+        )}
 
-      {/* Resolved clusters */}
-      {resolvedClusters.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-lg font-medium text-neutral-300">
-            Resolved ({resolvedClusters.reduce((s, c) => s + c.faces.length, 0)}{" "}
-            crops)
-          </h2>
-          <div className="space-y-4">
-            {resolvedClusters.map((cluster) => (
-              <ClusterCard
-                key={cluster.key}
-                cluster={cluster}
-                selected={selected.get(cluster.key) ?? new Set()}
-                knownCharacters={knownCharacters}
-                pending={pending}
-                onToggleFace={(id) => toggleFace(cluster.key, id)}
-                onSelectAll={() => selectAllInCluster(cluster)}
-                onClearSelection={() => clearSelection(cluster.key)}
-                onConfirm={() => handleConfirm(cluster)}
-                onReject={() => handleReject(cluster.key)}
-                onAssign={(targetId) => handleAssign(cluster.key, targetId)}
-                onRename={(newId) => handleRename(cluster, newId)}
-                onPreview={setPreviewFace}
-                variant="resolved"
-              />
-            ))}
-          </div>
-        </section>
-      )}
+        {/* Unresolved clusters */}
+        {unresolvedClusters.length > 0 && (
+          <section>
+            <h2 className="mb-3 text-lg font-medium text-amber-400">
+              Unresolved (
+              {unresolvedClusters.reduce((s, c) => s + c.faces.length, 0)}{" "}
+              crops)
+            </h2>
+            <div className="space-y-4">
+              {unresolvedClusters.map((cluster) => (
+                <ClusterCard
+                  key={cluster.key}
+                  cluster={cluster}
+                  selected={selected.get(cluster.key) ?? new Set()}
+                  knownCharacters={knownCharacters}
+                  pending={pending}
+                  onToggleFace={(id) => toggleFace(cluster.key, id)}
+                  onSelectAll={() => selectAllInCluster(cluster)}
+                  onClearSelection={() => clearSelection(cluster.key)}
+                  onConfirm={() => handleConfirm(cluster)}
+                  onReject={() => handleReject(cluster.key)}
+                  onAssign={(targetId) => handleAssign(cluster.key, targetId)}
+                  onRename={(newId) => handleRename(cluster, newId)}
+                  onPreview={setPreviewFace}
+                  variant="unresolved"
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-neutral-800 pt-6">
-        <Link
-          href={`/admin/${bookId}/${issueId}/review/pipeline`}
-          className="text-sm text-cyan-400 hover:text-cyan-300"
-        >
-          &larr; Back to pipeline review
-        </Link>
-        <ApproveClusterButton
-          bookId={bookId}
-          issueId={issueId}
-          disabled={!stats.allHandled}
-        />
+        {/* Resolved clusters */}
+        {resolvedClusters.length > 0 && (
+          <section>
+            <h2 className="mb-3 text-lg font-medium text-neutral-300">
+              Resolved (
+              {resolvedClusters.reduce((s, c) => s + c.faces.length, 0)} crops)
+            </h2>
+            <div className="space-y-4">
+              {resolvedClusters.map((cluster) => (
+                <ClusterCard
+                  key={cluster.key}
+                  cluster={cluster}
+                  selected={selected.get(cluster.key) ?? new Set()}
+                  knownCharacters={knownCharacters}
+                  pending={pending}
+                  onToggleFace={(id) => toggleFace(cluster.key, id)}
+                  onSelectAll={() => selectAllInCluster(cluster)}
+                  onClearSelection={() => clearSelection(cluster.key)}
+                  onConfirm={() => handleConfirm(cluster)}
+                  onReject={() => handleReject(cluster.key)}
+                  onAssign={(targetId) => handleAssign(cluster.key, targetId)}
+                  onRename={(newId) => handleRename(cluster, newId)}
+                  onPreview={setPreviewFace}
+                  variant="resolved"
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-neutral-800 pt-6">
+          <Link
+            href={`/admin/${bookId}/${issueId}/review/pipeline`}
+            className="text-sm text-cyan-400 hover:text-cyan-300"
+          >
+            &larr; Back to pipeline review
+          </Link>
+          <ApproveClusterButton
+            bookId={bookId}
+            issueId={issueId}
+            disabled={!stats.allHandled}
+          />
+        </div>
       </div>
 
-      {/* Page preview modal */}
+      {/* Right: sticky page preview panel */}
       {previewFace && (
-        <PagePreviewModal
-          face={previewFace}
-          onClose={() => setPreviewFace(null)}
-        />
+        <div className="w-1/2">
+          <PagePreviewPanel
+            face={previewFace}
+            onClose={() => setPreviewFace(null)}
+          />
+        </div>
       )}
     </div>
   );
 }
 
-/* ── Page Preview Modal ──────────────────────────────────────── */
+/* ── Page Preview Panel (inline, sticky) ─────────────────────── */
 
-function PagePreviewModal({
+function PagePreviewPanel({
   face,
   onClose,
 }: {
@@ -461,49 +469,52 @@ function PagePreviewModal({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative max-h-[90vh] max-w-4xl overflow-auto rounded-lg bg-neutral-900 p-2"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-2 flex items-center justify-between px-2">
-          <span className="text-sm text-neutral-300">
-            Page {face.pageNumber}
-            {face.faceBbox.w > 0 && (
-              <span className="ml-2 text-neutral-500">
-                bbox: ({face.faceBbox.x}, {face.faceBbox.y}) {face.faceBbox.w}
-                &times;{face.faceBbox.h}
-              </span>
-            )}
-          </span>
-          <button
-            onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
-          >
-            Close
-          </button>
-        </div>
-        <div className="relative inline-block">
+    <div className="sticky top-4 rounded-lg border border-neutral-800 bg-neutral-900 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-neutral-300">
+          Page {face.pageNumber}
+        </span>
+        <button
+          onClick={onClose}
+          className="rounded px-2 py-0.5 text-xs text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+        >
+          Close
+        </button>
+      </div>
+
+      {/* Face crop alongside the page */}
+      {face.cropUrl && (
+        <div className="mb-3 flex items-center gap-3">
           <img
-            src={face.pageImageUrl}
-            alt={`Page ${face.pageNumber}`}
-            className="max-h-[80vh] rounded"
+            src={face.cropUrl}
+            alt=""
+            className="h-16 w-16 rounded border border-neutral-700 object-cover"
           />
-          {face.faceBbox.w > 0 && (
-            <div
-              className="pointer-events-none absolute border-2 border-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.4)]"
-              style={{
-                left: `${face.faceBbox.x * 100}%`,
-                top: `${face.faceBbox.y * 100}%`,
-                width: `${face.faceBbox.w * 100}%`,
-                height: `${face.faceBbox.h * 100}%`,
-              }}
-            />
-          )}
+          <div className="text-xs text-neutral-400">
+            <div>Confidence: {(face.confidence * 100).toFixed(0)}%</div>
+            <div>{face.humanVerified ? "Verified" : "Unverified"}</div>
+          </div>
         </div>
+      )}
+
+      {/* Page image with bbox overlay */}
+      <div className="relative">
+        <img
+          src={face.pageImageUrl}
+          alt={`Page ${face.pageNumber}`}
+          className="w-full rounded"
+        />
+        {face.faceBbox.w > 0 && (
+          <div
+            className="pointer-events-none absolute border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.5)]"
+            style={{
+              left: `${face.faceBbox.x * 100}%`,
+              top: `${face.faceBbox.y * 100}%`,
+              width: `${face.faceBbox.w * 100}%`,
+              height: `${face.faceBbox.h * 100}%`,
+            }}
+          />
+        )}
       </div>
     </div>
   );
