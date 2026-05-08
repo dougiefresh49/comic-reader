@@ -23,7 +23,7 @@ export async function roboflowAnalyzeBatch(
 
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
-    const imageUrl = `${supabaseUrl}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/pages/page-${padded}.webp`;
+    const imageUrl = `${supabaseUrl}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${padded}.webp`;
 
     const res = await fetch(workflowUrl, {
       method: "POST",

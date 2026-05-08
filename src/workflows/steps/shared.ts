@@ -93,7 +93,7 @@ export async function getPageList(
 
   const { data: files } = await supabase.storage
     .from("comic-pages")
-    .list(`${bookId}/${issueId}/pages`);
+    .list(`${bookId}/${issueId}`);
 
   if (!files) return [];
 
