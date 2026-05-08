@@ -426,6 +426,8 @@ export async function characterLookaheadPage(
     identification_confidence: number;
   }> = [];
 
+  const pageBase64 = imgBuf.toString("base64");
+
   for (const face of faceCrops) {
     // Retrieve similar exemplars from pgvector
     let exemplarRefs: Array<{
@@ -465,6 +467,8 @@ export async function characterLookaheadPage(
         "image/jpeg",
         knownCharacters,
         exemplarRefs,
+        pageBase64,
+        "image/webp",
       );
     } catch (err: unknown) {
       const status =
@@ -481,6 +485,8 @@ export async function characterLookaheadPage(
               "image/jpeg",
               knownCharacters,
               exemplarRefs,
+              pageBase64,
+              "image/webp",
             );
           } catch {
             continue;

@@ -19,18 +19,31 @@ export interface ExemplarReference {
   confidence: number;
 }
 
-function buildIdentifyPrompt(knownCharacters: string[]): string {
+function buildIdentifyPrompt(
+  knownCharacters: string[],
+  hasPageContext: boolean,
+): string {
   const charList =
     knownCharacters.length > 0
       ? `Known characters in this comic: ${knownCharacters.join(", ")}`
       : "No character list available.";
 
-  return `You are identifying a comic book character from a face crop.
+  const contextNote = hasPageContext
+    ? `You will see TWO images:
+1. The FULL COMIC PAGE — use this for context (scene, costume, body, speech bubbles, surrounding characters)
+2. The CROPPED FACE — this is the specific character to identify
+
+Use the full page to understand who the character is. The crop alone may be ambiguous (e.g. just an eye or chin), but the full page shows costume, body, dialogue, and scene context.`
+    : "You will see a single cropped face image.";
+
+  return `You are identifying a comic book character.
 
 ${charList}
 
+${contextNote}
+
 RULES:
-1. Based on visual features (skin color, mask, helmet, hair, costume, species), identify who this character is.
+1. Based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body visible in full page), identify who this character is.
 2. Use the known characters list if the character matches one.
 3. If you are NOT SURE who this character is, set character_name to null. Do NOT guess.
 4. Only provide a name if you are genuinely confident.
@@ -77,12 +90,24 @@ export async function identifyFace(
   faceImageMimeType: string,
   knownCharacters: string[],
   exemplars?: ExemplarReference[],
+  pageImageBase64?: string,
+  pageImageMimeType?: string,
 ): Promise<FaceIdentification> {
-  const prompt = buildIdentifyPrompt(knownCharacters);
-  const parts: Part[] = [
-    createPartFromText(prompt),
+  const hasPage = !!pageImageBase64;
+  const prompt = buildIdentifyPrompt(knownCharacters, hasPage);
+  const parts: Part[] = [createPartFromText(prompt)];
+
+  if (pageImageBase64 && pageImageMimeType) {
+    parts.push(
+      createPartFromText("FULL PAGE:"),
+      createPartFromBase64(pageImageBase64, pageImageMimeType),
+    );
+  }
+
+  parts.push(
+    createPartFromText(hasPage ? "CROPPED FACE:" : "Face crop:"),
     createPartFromBase64(faceImageBase64, faceImageMimeType),
-  ];
+  );
 
   if (exemplars && exemplars.length > 0) {
     parts.push(
