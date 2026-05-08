@@ -27,6 +27,10 @@ export async function updatePipelineStep(
       pipeline_paused_url: pauseUrl,
     })
     .eq("id", issueId);
+
+  if (paused && pauseUrl) {
+    await notifySlack(bookId, issueId, step, pauseUrl);
+  }
 }
 
 function getPauseUrl(bookId: string, issueId: string, step: string): string {
@@ -42,6 +46,40 @@ function getPauseUrl(bookId: string, issueId: string, step: string): string {
       return `${base}/admin/characters/casting?book=${bookId}&issue=${issueId}`;
     default:
       return `${base}/admin`;
+  }
+}
+
+const STEP_LABELS: Record<string, string> = {
+  "review-clusters": "Character Cluster Review",
+  "review-pages": "Page & Speaker Review",
+  "review-new-characters": "New Character Review",
+  casting: "Voice Casting",
+};
+
+async function notifySlack(
+  bookId: string,
+  issueId: string,
+  step: string,
+  reviewUrl: string,
+) {
+  const token = process.env.SLACK_BOT_TOKEN;
+  const channel = process.env.SLACK_CHANNEL_ID;
+  if (!token || !channel) return;
+
+  const label = STEP_LABELS[step] ?? step;
+  const text = `📋 *Pipeline paused — ${label}*\n\`${bookId}/${issueId}\` is ready for review.\n<${reviewUrl}|Open review page>`;
+
+  try {
+    await globalThis.fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ channel, text }),
+    });
+  } catch {
+    console.warn(`[slack] Failed to notify for ${step} — continuing`);
   }
 }
 
