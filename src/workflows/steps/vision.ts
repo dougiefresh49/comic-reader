@@ -175,13 +175,27 @@ export async function extractForegroundMasksBatch(
   const { createStepClient } = await import("../step-utils");
   const supabase = await createStepClient();
 
-  const FOREGROUND_CLASSES = new Set([
+  const CHARACTER_CLASSES = new Set([
     "comic character",
     "person",
     "face",
     "head",
   ]);
+  const BUBBLE_CLASSES = new Set(["speech bubble"]);
   const MAX_VERTS = 50;
+
+  type PolyPoint = { x: number; y: number };
+
+  function simplifyPoly(points: PolyPoint[]): PolyPoint[] {
+    if (points.length <= MAX_VERTS) return points;
+    let simplified = points;
+    let eps = 0.005;
+    while (simplified.length > MAX_VERTS && eps < 0.1) {
+      simplified = rdpSimplify(points, eps);
+      eps *= 1.5;
+    }
+    return simplified;
+  }
 
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
@@ -232,14 +246,17 @@ export async function extractForegroundMasksBatch(
       };
     });
 
-    const panelPolygons = new Map<
-      string,
-      Array<Array<{ x: number; y: number }>>
-    >();
-    for (const p of panelsPx) panelPolygons.set(p.id, []);
+    const panelCharPolys = new Map<string, PolyPoint[][]>();
+    const panelBubblePolys = new Map<string, PolyPoint[][]>();
+    for (const p of panelsPx) {
+      panelCharPolys.set(p.id, []);
+      panelBubblePolys.set(p.id, []);
+    }
 
     for (const pred of predictions) {
-      if (!FOREGROUND_CLASSES.has(pred.class)) continue;
+      const isChar = CHARACTER_CLASSES.has(pred.class);
+      const isBubble = BUBBLE_CLASSES.has(pred.class);
+      if (!isChar && !isBubble) continue;
       if (pred.points.length < 3) continue;
 
       let cx = 0;
@@ -263,35 +280,36 @@ export async function extractForegroundMasksBatch(
             y: (pt.y - panel.y) / panel.h,
           }));
 
-          let simplified = localPoly;
-          if (simplified.length > MAX_VERTS) {
-            let eps = 0.005;
-            while (simplified.length > MAX_VERTS && eps < 0.1) {
-              simplified = rdpSimplify(localPoly, eps);
-              eps *= 1.5;
-            }
-          }
-
-          panelPolygons.get(panel.id)!.push(simplified);
+          const simplified = simplifyPoly(localPoly);
+          const target = isChar
+            ? panelCharPolys.get(panel.id)!
+            : panelBubblePolys.get(panel.id)!;
+          target.push(simplified);
           break;
         }
       }
     }
 
-    for (const [panelId, polygons] of panelPolygons) {
-      if (polygons.length === 0) continue;
+    for (const p of panelsPx) {
+      const characters = panelCharPolys.get(p.id)!;
+      const bubbles = panelBubblePolys.get(p.id)!;
+      if (characters.length === 0 && bubbles.length === 0) continue;
       await supabase
         .from("panels")
-        .update({ foreground_polygons: polygons })
-        .eq("id", panelId);
+        .update({ foreground_polygons: { characters, bubbles } })
+        .eq("id", p.id);
     }
 
-    const totalPolys = [...panelPolygons.values()].reduce(
+    const totalChars = [...panelCharPolys.values()].reduce(
+      (s, a) => s + a.length,
+      0,
+    );
+    const totalBubbles = [...panelBubblePolys.values()].reduce(
       (s, a) => s + a.length,
       0,
     );
     console.log(
-      `[masks] ${bookId}/${issueId}: page-${padded} → ${totalPolys} foreground polygon(s) across ${panels.length} panel(s)`,
+      `[masks] ${bookId}/${issueId}: page-${padded} → ${totalChars} character + ${totalBubbles} bubble polygon(s) across ${panels.length} panel(s)`,
     );
   }
 }
@@ -549,19 +567,37 @@ export async function getContextPage(
 
   const padded = String(pageNumber).padStart(2, "0");
 
-  // Load book context for richer prompts
+  // Load book + wiki context for richer prompts
   let bookContext: string | undefined;
-  const { data: bookRow } = await supabase
-    .from("books")
-    .select("name, franchises")
-    .eq("id", bookId)
-    .single();
-  if (bookRow) {
+  const [{ data: bookRow }, { data: issueRow }] = await Promise.all([
+    supabase.from("books").select("name, franchises").eq("id", bookId).single(),
+    supabase
+      .from("issues")
+      .select("wiki_summary, wiki_appearances")
+      .eq("book_id", bookId)
+      .eq("id", issueId)
+      .single(),
+  ]);
+  {
     const parts: string[] = [];
-    const bookName = bookRow.name as string;
-    const franchises = bookRow.franchises as string[] | null;
-    if (bookName) parts.push(`Book: ${bookName}`);
-    if (franchises?.length) parts.push(`Franchises: ${franchises.join(", ")}`);
+    if (bookRow) {
+      const bookName = bookRow.name as string;
+      const franchises = bookRow.franchises as string[] | null;
+      if (bookName) parts.push(`Book: ${bookName}`);
+      if (franchises?.length)
+        parts.push(`Franchises: ${franchises.join(", ")}`);
+    }
+    if (issueRow?.wiki_summary) {
+      parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary as string}`);
+    }
+    if (issueRow?.wiki_appearances) {
+      type AppEntry = { name: string; qualifier?: string };
+      const appearances = issueRow.wiki_appearances as AppEntry[];
+      const names = appearances.map((a) =>
+        a.qualifier ? `${a.name} (${a.qualifier})` : a.name,
+      );
+      parts.push(`\nKnown Characters in this issue:\n${names.join(", ")}`);
+    }
     parts.push(
       "Use your knowledge of comics and pop culture to identify characters by their proper canonical names where possible.",
     );

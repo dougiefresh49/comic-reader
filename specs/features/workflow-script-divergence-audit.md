@@ -1,10 +1,10 @@
 # Workflow vs Script Pipeline: Divergence Audit
 
-## Status: `review-needed`
+## Status: `done`
 
-Audit date: 2026-05-06
+Audit date: 2026-05-06 | All items resolved: 2026-05-07
 
-Compared every workflow step in `src/workflows/steps/` against its script counterpart in `scripts/`. The `characterLookaheadPage` divergence was already fixed. Below are the remaining findings.
+Compared every workflow step in `src/workflows/steps/` against its script counterpart in `scripts/`. All divergences have been resolved.
 
 ---
 
@@ -36,67 +36,45 @@ Compared every workflow step in `src/workflows/steps/` against its script counte
 
 ---
 
-## Needs review / input
+## Resolved in follow-up (2026-05-07)
 
-### 4. `generateVoiceDescriptions` — missing book context in prompt (MEDIUM)
+### 4. `getContextPage` — wiki context now injected into Gemini prompts
 
-**File:** `src/workflows/steps/voice.ts:49-56`
+**Was:** Book context only included book name + franchises. No wiki data.
 
-The workflow prompt is generic: "Consolidate these voice description snippets into a single description." The script version injects the book title and `characterContext` instruction from `book-config.json` (e.g., franchise-specific voice guidance like "these are Teenage Mutant Ninja Turtles — give them youthful, energetic voices").
+**Now:** `getContextPage` loads `wiki_summary` and `wiki_appearances` from the `issues` table and injects them into the prompt as "Issue Synopsis" and "Known Characters in this issue". This provides the full character list and plot context that was previously only available in the script pipeline.
 
-**Problem:** `characterContext` is not stored in the DB — it only exists in local `book-config.json` files.
+**Files changed:** `src/workflows/steps/vision.ts`
 
-**Options:**
-- A) Add a `character_context` text column to the `books` table and populate it during book creation
-- B) Use the `franchises` array already in `books` to generate a default context string
-- C) Leave as-is — the voice descriptions are already generated per-bubble during `getContextPage`, this just consolidates them
+### 5. `getCharactersNeedingVoices` — IVC characters excluded from Voice Design
 
-**Recommendation:** Option A is cleanest. It's a one-column migration + one line of code. But this can wait — the prompt quality improvement is marginal since the individual voice descriptions already carry franchise context from `getContextPage`.
+**Was:** All characters without a `voice_id` were sent through Voice Design generation, including IVC characters that should have been set up manually during casting.
 
-### 5. `generateVoiceModel` — no IVC vs voice_design distinction (MEDIUM)
+**Now:** Queries the `castlist` table and excludes characters with a `voice_uuid` (IVC characters whose voice was assigned during the casting pause point). Only characters that genuinely need Voice Design proceed to auto-generation.
 
-**File:** `src/workflows/steps/generation.ts:38-135`
+**Files changed:** `src/workflows/steps/generation.ts`
 
-The workflow creates ElevenLabs Voice Design voices for ALL characters without a `voice_id`. The script version checks the voice registry and skips characters whose source is IVC (instant voice cloning) — those need manual clip preparation and a different API call.
+### 6. `extractForegroundMasksBatch` — bubble polygons now extracted
 
-**Problem:** The workflow would waste ElevenLabs credits creating wrong voices for characters meant to use IVC.
+**Was:** Only character/foreground polygons were extracted from SAM3 segmentation data. Speech bubble polygons were completely absent.
 
-**Options:**
-- A) Add a `voice_source` column to `characters` or `castlist` (values: `voice_design`, `ivc`, `existing`). Skip `voice_design` generation for non-`voice_design` characters.
-- B) Handle this in the casting review pause point — the admin UI already marks which characters get voice_design vs IVC. Only characters explicitly marked for voice_design proceed to auto-generation.
+**Now:** Extracts both character and speech bubble polygons into the structured `{ characters: [...], bubbles: [...] }` format matching the `PanelForegroundPolygons` type used by the frontend's layered panel renderer.
 
-**Recommendation:** Option B — the casting pause point already exists in the workflow. The fix is to filter in `getCharactersNeedingVoices()` to only return characters whose casting method is `voice_design`. Needs to know how casting decisions are stored in the DB.
+**Files changed:** `src/workflows/steps/vision.ts`
 
-### 6. `extractForegroundMasksBatch` — missing bubble polygon extraction (LOW)
+### 7. Wiki context fetch step added to pipeline
 
-**File:** `src/workflows/steps/vision.ts:174-302`
+**Was:** No wiki fetch step existed in the workflow. Character identification and context prompts had no wiki data.
 
-The script version (`scripts/extract-foreground-masks.ts`) extracts both character/foreground polygons AND speech bubble polygons from segmentation data. The workflow only extracts foreground character polygons.
+**Now:** `fetchWikiContextStep` in `src/workflows/steps/wiki.ts` fetches MediaWiki content (synopsis + character appearances) via the shared `src/lib/wiki-fetch.ts` module and persists to the `issues` table. Runs after foreground mask extraction, before character lookahead. The script `scripts/fetch-wiki-context.ts` now delegates to the same shared module.
 
-**Impact:** Bubble polygons are used for the layered panel rendering (SVG clip-paths). Without them, bubbles may render incorrectly in the layered view on workflow-ingested issues.
+**Files changed:** `src/lib/wiki-fetch.ts` (new), `src/workflows/steps/wiki.ts` (new), `src/workflows/ingest-pipeline.ts`, `scripts/fetch-wiki-context.ts`
 
-**Fix:** Add `"speech bubble"` to the `FOREGROUND_CLASSES` set, or extract bubble polygons separately and store them on the `bubbles` table. Need to check if the `bubbles` table has a polygon column.
+### 8. Voice rotation checkout — intentionally excluded
 
-### 7. Missing pipeline steps — wiki context fetch (LOW-MEDIUM)
+**Was:** `voiceRotationCheckout` was called automatically in the pipeline.
 
-The script pipeline has `fetch-wiki-context` which fetches MediaWiki page content for the issue and caches it. This wiki content is injected into every Gemini prompt during `getContextPage`, helping with character identification.
-
-The workflow has no equivalent. The `issues` table has a `wiki_url` column but no step fetches and caches the content.
-
-**Options:**
-- A) Add a `fetchWikiContext` step to the workflow that downloads and stores wiki text in the `issues` table (e.g., `wiki_content` column)
-- B) Fetch wiki content inline during `getContextPage` (simpler but re-fetches per page)
-- C) Skip for now — the improved prompt + exemplar matching may be sufficient
-
-**Recommendation:** Option A eventually, but low priority. The character lookahead + exemplar embeddings already provide strong character identification context.
-
-### 8. Missing `voice-rotation-archive` step (LOW)
-
-After audio generation, the script archives IVC voices back to cold storage to free up ElevenLabs slots. The workflow has `voiceRotationCheckout` (restore) but no archive step after generation completes.
-
-**Impact:** ElevenLabs voice slots may fill up if not archived. Only affects IVC voices.
-
-**Fix:** Add a `voiceRotationArchive` step after `generateAudioBatch` that mirrors the archive logic from `scripts/voice-rotation.ts`.
+**Decision:** Removed from the automated pipeline per user direction. IVC archive/restore is managed manually via the admin dashboard to prevent IVC voices from having to be re-done for follow-up issues in the same series. The admin dashboard's casting UI handles voice rotation when needed.
 
 ---
 

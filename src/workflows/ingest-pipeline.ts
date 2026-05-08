@@ -14,6 +14,7 @@ import {
   getContextPage,
 } from "./steps/vision";
 import { sortPageElements, addBubbleStyles } from "./steps/sort";
+import { fetchWikiContextStep } from "./steps/wiki";
 import {
   generateVoiceDescriptions,
   cleanVoiceDescriptions,
@@ -21,7 +22,6 @@ import {
 import {
   getCharactersNeedingVoices,
   generateVoiceModel,
-  voiceRotationCheckout,
   getBubbleIdsForAudio,
   generateAudioBatch,
 } from "./steps/generation";
@@ -59,6 +59,10 @@ export async function ingestPipeline(input: IngestInput) {
   for (const batch of roboflowBatches) {
     await extractForegroundMasksBatch(bookId, issueId, batch);
   }
+
+  // Wiki context feeds character lookahead and Gemini context prompts
+  await updatePipelineStep(bookId, issueId, "fetch-wiki-context");
+  await fetchWikiContextStep(bookId, issueId);
 
   await updatePipelineStep(bookId, issueId, "character-lookahead");
 
@@ -119,8 +123,9 @@ export async function ingestPipeline(input: IngestInput) {
   await castingHook;
 
   // ── Phase 7: Voice Generation ─────────────────────────────────────
-  await updatePipelineStep(bookId, issueId, "voice-rotation-checkout");
-  await voiceRotationCheckout(bookId, issueId);
+  // Voice rotation checkout is intentionally excluded from the automated
+  // pipeline — IVC archive/restore is managed manually via the admin
+  // dashboard to avoid re-doing IVC setup for follow-up issues.
 
   await updatePipelineStep(bookId, issueId, "generate-voice-models");
   const characters = await getCharactersNeedingVoices(bookId, issueId);

@@ -45,7 +45,7 @@ Backlog and status tracker for planned features. Update status here when work st
 | Smart add flow | `in-progress` | [smart-add-flow.md](smart-add-flow.md) | AI-assisted book/issue discovery. Gemini + Google Search grounding finds wiki pages and reading sources. Two flows: "Add Book" (search + create) and "Add Issue" (auto-detect next + lookup source). Requires Book Parts migration. |
 | Face exemplar embeddings (pgvector) | `done` | [face-exemplar-embeddings.md](face-exemplar-embeddings.md) | `gemini-embedding-2` multimodal embeddings of face crops stored in Supabase pgvector. Retrieves visually similar exemplars during character identification. Self-hosted alternative to Google File Search Store. Infrastructure + script integration complete. 24 exemplars seeded from issue-1. |
 | Workflow lookahead unification | `done` | [workflow-lookahead-integration.md](workflow-lookahead-integration.md) | Shared modules in `src/lib/` for face extraction, character ID, exemplar store, embeddings. Workflow `characterLookaheadPage` rewritten. Scripts delegate to shared modules. |
-| Workflow-script divergence audit | `in-progress` | [workflow-script-divergence-audit.md](workflow-script-divergence-audit.md) | Fixed: context prompt, audio emotion mapping, lookahead. Remaining: voice desc book context, IVC vs voice_design, bubble polygons, wiki fetch. |
+| Workflow-script divergence audit | `done` | [workflow-script-divergence-audit.md](workflow-script-divergence-audit.md) | All 8 items resolved. Wiki fetch step added, bubble polygons extracted, IVC filter on voice gen, voice rotation excluded (manual via admin). Shared modules in `src/lib/`. |
 
 ## Infrastructure
 

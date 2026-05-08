@@ -15,6 +15,17 @@ export async function getCharactersNeedingVoices(
 
   if (!chars || chars.length === 0) return [];
 
+  // Exclude IVC characters — they already have a voice via the casting UI
+  const { data: ivcCast } = await supabase
+    .from("castlist")
+    .select("character")
+    .eq("book_id", bookId)
+    .not("voice_uuid", "is", null);
+
+  const ivcCharacters = new Set(
+    ((ivcCast ?? []) as { character: string }[]).map((c) => c.character),
+  );
+
   const { data: issueBubbles } = await supabase
     .from("bubbles")
     .select("speaker")
@@ -26,11 +37,11 @@ export async function getCharactersNeedingVoices(
   );
 
   const needed = (chars as { id: string }[])
-    .filter((c) => issueSpeakers.has(c.id))
+    .filter((c) => issueSpeakers.has(c.id) && !ivcCharacters.has(c.id))
     .map((c) => c.id);
 
   console.log(
-    `[get-chars] ${bookId}/${issueId}: ${needed.length} characters need voices`,
+    `[get-chars] ${bookId}/${issueId}: ${needed.length} characters need Voice Design (${ivcCharacters.size} IVC excluded)`,
   );
   return needed;
 }
