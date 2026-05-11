@@ -21,6 +21,10 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { env } from "~/env.mjs";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
+import {
+  getVoiceSettingsFromEmotion,
+  SKIPPED_VOICE,
+} from "~/lib/voice-settings.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -112,123 +116,6 @@ function findFuzzyMatch(
 
   return bestMatch ? bestMatch.name : null;
 }
-
-/**
- * Map emotion string to voice settings for overall tone
- * Uses ElevenLabs v3 stability values:
- * - 0.0 = Creative (more emotional and expressive, prone to hallucinations)
- * - 0.5 = Natural (balanced, closest to original voice recording)
- * - 1.0 = Robust (highly stable, less responsive to prompts, consistent like v2)
- *
- * Style amplifies the original speaker's style characteristics.
- * Higher values increase expressiveness but use more computational resources.
- *
- * Based on testing, Creative and Natural produce the best results.
- */
-function getVoiceSettingsFromEmotion(emotion: string): {
-  stability?: number;
-  similarityBoost?: number;
-  style?: number;
-  speed?: number;
-} {
-  const lowerEmotion = emotion.toLowerCase().trim();
-
-  // Default settings (Natural - balanced)
-  let stability: 0.0 | 0.5 | 1.0 = 0.5; // Natural
-  let style = 0.0; // No style amplification by default
-  let speed = 1.0;
-
-  // High intensity emotions - use Creative (0.0) for maximum expressiveness
-  if (
-    lowerEmotion.includes("angry") ||
-    lowerEmotion.includes("furious") ||
-    lowerEmotion.includes("rage") ||
-    lowerEmotion.includes("shouting") ||
-    lowerEmotion.includes("screaming") ||
-    lowerEmotion.includes("yelling") ||
-    lowerEmotion.includes("ecstatic") ||
-    lowerEmotion.includes("terrified") ||
-    lowerEmotion.includes("distraught")
-  ) {
-    stability = 0.0; // Creative - maximum emotional range
-    style = 0.5; // High style amplification for maximum expressiveness
-    speed = 1.1; // Slightly faster
-  }
-  // Sarcastic/mocking - style is a key characteristic, so amplify it
-  else if (
-    lowerEmotion.includes("sarcastic") ||
-    lowerEmotion.includes("mocking") ||
-    lowerEmotion.includes("snide")
-  ) {
-    stability = 0.0; // Creative - for emotional expressiveness
-    style = 0.5; // High style amplification to emphasize sarcastic/mocking tone
-    speed = 1.0;
-  }
-  // Emotional but moderate intensity - use Creative (0.0)
-  else if (
-    lowerEmotion.includes("sad") ||
-    lowerEmotion.includes("depressed") ||
-    lowerEmotion.includes("melancholy") ||
-    lowerEmotion.includes("upset") ||
-    lowerEmotion.includes("excited") ||
-    lowerEmotion.includes("enthusiastic") ||
-    lowerEmotion.includes("happy") ||
-    lowerEmotion.includes("joyful") ||
-    lowerEmotion.includes("surprised") ||
-    lowerEmotion.includes("shocked") ||
-    lowerEmotion.includes("astonished") ||
-    lowerEmotion.includes("fear") ||
-    lowerEmotion.includes("afraid") ||
-    lowerEmotion.includes("anxious") ||
-    lowerEmotion.includes("nervous")
-  ) {
-    stability = 0.0; // Creative - for emotional expressiveness
-    style = 0.3; // Moderate style amplification for emotional content
-    speed =
-      lowerEmotion.includes("sad") || lowerEmotion.includes("depressed")
-        ? 0.9 // Slower for sad emotions
-        : lowerEmotion.includes("excited") || lowerEmotion.includes("happy")
-          ? 1.1 // Faster for happy/excited
-          : 1.0; // Normal for others
-  }
-  // Whispering/quiet - use Natural (0.5) for subtlety, no style needed
-  else if (
-    lowerEmotion.includes("whisper") ||
-    lowerEmotion.includes("quiet") ||
-    lowerEmotion.includes("hushed")
-  ) {
-    stability = 0.5; // Natural - balanced for subtle emotions
-    style = 0.0; // No style amplification for subtle delivery
-    speed = 0.95; // Slightly slower
-  }
-  // Stoic/calm/neutral - use Robust (1.0) for consistency
-  else if (
-    lowerEmotion.includes("stoic") ||
-    lowerEmotion.includes("calm") ||
-    lowerEmotion.includes("neutral") ||
-    lowerEmotion.includes("firm") ||
-    lowerEmotion.includes("defiant")
-  ) {
-    stability = 1.0; // Robust - highly stable for neutral delivery
-    style = 0.0; // No style amplification for neutral delivery
-    speed = 1.0; // Normal speed
-  }
-  // Default to Natural (0.5) if no match
-  // stability already set to 0.5 above, style = 0.0
-
-  return {
-    stability,
-    similarityBoost: 0.75, // Keep voice similarity
-    style,
-    speed,
-  };
-}
-
-// Sentinel value written into castlist when a character's casting task was
-// explicitly skipped from the casting browser UI. Bubbles spoken by these
-// characters are skipped during audio generation rather than falling back
-// to Narrator.
-const SKIPPED_VOICE = "__SKIPPED__";
 
 /**
  * Get voice ID for a character name.

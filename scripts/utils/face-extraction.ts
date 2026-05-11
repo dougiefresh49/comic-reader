@@ -43,6 +43,7 @@ export interface FaceCrop {
   cls: "face" | "head";
   confidence: number;
   imageBuffer: Buffer;
+  jpegBuffer: Buffer;
 }
 
 function polygonToBbox(points: PointPx[]): Box2D {
@@ -144,14 +145,16 @@ async function extractCropsFromSidecar(
     const paddedBox = applyPadding(face.bbox, FACE_PADDING);
     const clampedBox = clampBoxToBounds(paddedBox, imgW, imgH);
 
-    const cropped = await sharp(imgBuf)
-      .extract({
-        left: clampedBox.x,
-        top: clampedBox.y,
-        width: clampedBox.width,
-        height: clampedBox.height,
-      })
-      .toBuffer();
+    const extracted = sharp(imgBuf).extract({
+      left: clampedBox.x,
+      top: clampedBox.y,
+      width: clampedBox.width,
+      height: clampedBox.height,
+    });
+    const [cropped, jpegCropped] = await Promise.all([
+      extracted.clone().toBuffer(),
+      extracted.clone().jpeg({ quality: 85 }).toBuffer(),
+    ]);
 
     crops.push({
       pageNumber: pageNum,
@@ -166,6 +169,7 @@ async function extractCropsFromSidecar(
       cls: face.cls as "face" | "head",
       confidence: face.confidence,
       imageBuffer: cropped,
+      jpegBuffer: jpegCropped,
     });
   }
 

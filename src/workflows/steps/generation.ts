@@ -15,6 +15,17 @@ export async function getCharactersNeedingVoices(
 
   if (!chars || chars.length === 0) return [];
 
+  // Exclude IVC characters — they already have a voice via the casting UI
+  const { data: ivcCast } = await supabase
+    .from("castlist")
+    .select("character")
+    .eq("book_id", bookId)
+    .not("voice_uuid", "is", null);
+
+  const ivcCharacters = new Set(
+    ((ivcCast ?? []) as { character: string }[]).map((c) => c.character),
+  );
+
   const { data: issueBubbles } = await supabase
     .from("bubbles")
     .select("speaker")
@@ -26,11 +37,11 @@ export async function getCharactersNeedingVoices(
   );
 
   const needed = (chars as { id: string }[])
-    .filter((c) => issueSpeakers.has(c.id))
+    .filter((c) => issueSpeakers.has(c.id) && !ivcCharacters.has(c.id))
     .map((c) => c.id);
 
   console.log(
-    `[get-chars] ${bookId}/${issueId}: ${needed.length} characters need voices`,
+    `[get-chars] ${bookId}/${issueId}: ${needed.length} characters need Voice Design (${ivcCharacters.size} IVC excluded)`,
   );
   return needed;
 }
@@ -268,7 +279,7 @@ export async function generateAudioBatch(
 
   const { data: bubbles } = await supabase
     .from("bubbles")
-    .select("id, speaker, text, emotion")
+    .select("id, speaker, text, text_with_cues, emotion")
     .in("id", bubbleIds);
 
   if (!bubbles || bubbles.length === 0) return;
@@ -286,29 +297,34 @@ export async function generateAudioBatch(
 
   const narratorVoice = castMap.get("Narrator") ?? castMap.get("narrator");
 
+  const { getVoiceSettingsFromEmotion, SKIPPED_VOICE } = await import(
+    "~/lib/voice-settings"
+  );
+
   type BubbleRow = {
     id: string;
     speaker: string | null;
     text: string;
+    text_with_cues: string | null;
     emotion: string | null;
   };
 
   let generated = 0;
   for (const bubble of bubbles as BubbleRow[]) {
     const voiceId = castMap.get(bubble.speaker ?? "") ?? narratorVoice;
-    if (!voiceId || !bubble.text) continue;
+    if (!voiceId || voiceId === SKIPPED_VOICE || !bubble.text) continue;
 
-    const stability =
-      bubble.emotion === "angry" || bubble.emotion === "scared"
-        ? 0.3
-        : bubble.emotion === "excited" || bubble.emotion === "happy"
-          ? 0.4
-          : 0.5;
+    const ttsText = bubble.text_with_cues ?? bubble.text;
+    const settings = getVoiceSettingsFromEmotion(bubble.emotion ?? "neutral");
 
     const response = await client.textToSpeech.convertWithTimestamps(voiceId, {
       modelId: "eleven_v3",
-      text: bubble.text,
-      voiceSettings: { stability, similarityBoost: 0.75, style: 0.4 },
+      text: ttsText,
+      voiceSettings: {
+        stability: settings.stability,
+        similarityBoost: settings.similarityBoost,
+        style: settings.style,
+      },
     });
 
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
