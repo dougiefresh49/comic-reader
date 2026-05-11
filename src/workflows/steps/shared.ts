@@ -33,8 +33,31 @@ export async function updatePipelineStep(
   }
 }
 
+export async function markPipelineFailed(
+  bookId: string,
+  issueId: string,
+  currentStep: string,
+) {
+  "use step";
+  const { createStepClient } = await import("../step-utils");
+  const supabase = await createStepClient();
+
+  await supabase
+    .from("issues")
+    .update({
+      pipeline_step: `failed:${currentStep}`,
+      pipeline_paused: false,
+      pipeline_paused_at: null,
+      pipeline_paused_url: null,
+    })
+    .eq("id", issueId);
+}
+
 function getPauseUrl(bookId: string, issueId: string, step: string): string {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const base = vercelUrl
+    ? `https://${vercelUrl}`
+    : (process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000");
   switch (step) {
     case "review-clusters":
       return `${base}/admin/${bookId}/${issueId}/review/clusters`;
