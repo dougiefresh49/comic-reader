@@ -96,34 +96,35 @@ export async function findSimilarExemplars(
   const embedding = await embedImage(jpegBase64);
   const vectorString = `[${embedding.join(",")}]`;
 
-  const { data, error } = await supabase.rpc("match_face_exemplars", {
+  const { data, error } = (await supabase.rpc("match_face_exemplars", {
     query_embedding: vectorString,
     book_ids: bookIds,
     match_limit: limit,
-  });
-
-  if (error) {
-    console.warn(`   [exemplar] search failed: ${error.message}`);
-    return [];
-  }
-
-  return (data ?? []).map(
-    (row: {
+  })) as {
+    data: Array<{
       id: string;
       character_id: string;
       crop_path: string;
       confidence: number;
       similarity: number;
       composite_score: number;
-    }) => ({
-      id: row.id,
-      characterId: row.character_id,
-      cropPath: row.crop_path,
-      confidence: row.confidence,
-      similarity: row.similarity,
-      compositeScore: row.composite_score,
-    }),
-  );
+    }> | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    console.warn(`   [exemplar] search failed: ${error.message}`);
+    return [];
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    characterId: row.character_id,
+    cropPath: row.crop_path,
+    confidence: row.confidence,
+    similarity: row.similarity,
+    compositeScore: row.composite_score,
+  }));
 }
 
 export async function downloadExemplarImage(

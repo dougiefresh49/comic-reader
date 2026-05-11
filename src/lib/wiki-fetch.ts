@@ -110,8 +110,8 @@ export function parseAppearancesFromHtml(html: string): AppearanceEntry[] {
       if (!text) continue;
       if (/^(appearances|appearing|characters|cast|location)/i.test(text))
         continue;
-      const parenMatch = text.match(/^(.+?)\s*\((.+?)\)\s*$/);
-      if (parenMatch && parenMatch[1] && parenMatch[2]) {
+      const parenMatch = /^(.+?)\s*\((.+?)\)\s*$/.exec(text);
+      if (parenMatch?.[1] && parenMatch[2]) {
         entries.push({
           name: parenMatch[1].trim(),
           qualifier: parenMatch[2].trim(),
