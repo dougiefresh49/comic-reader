@@ -5,7 +5,11 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as { bookId: string; issueId: string };
+  const body = (await req.json()) as {
+    bookId: string;
+    issueId: string;
+    fromStep?: string;
+  };
 
   if (!body.bookId || !body.issueId) {
     return Response.json(
@@ -29,7 +33,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabaseAdmin
     .from("issues")
     .update({
-      pipeline_step: "queued",
+      pipeline_step: body.fromStep ?? "queued",
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
@@ -41,13 +45,18 @@ export async function POST(req: NextRequest) {
   }
 
   const run = await start(ingestPipeline, [
-    { bookId: body.bookId, issueId: body.issueId },
+    {
+      bookId: body.bookId,
+      issueId: body.issueId,
+      fromStep: body.fromStep,
+    },
   ]);
 
   return Response.json({
     ok: true,
     bookId: body.bookId,
     issueId: body.issueId,
+    fromStep: body.fromStep ?? null,
     runId: run.runId,
     status: "queued",
   });

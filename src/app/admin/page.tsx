@@ -5,7 +5,7 @@ import {
   type AdminIssueRow,
   type AdminBookInfo,
 } from "~/server/admin/queries";
-import { TriggerIngestButton } from "./TriggerIngestButton";
+import { PipelineActions } from "./PipelineActions";
 
 export const dynamic = "force-dynamic";
 
@@ -204,11 +204,7 @@ function IssueTable({ issues }: { issues: AdminIssueRow[] }) {
   );
 }
 
-function StatusBadge({
-  issue,
-}: {
-  issue: { pipelinePaused: boolean; status: string };
-}) {
+function StatusBadge({ issue }: { issue: AdminIssueRow }) {
   if (issue.pipelinePaused) {
     return (
       <span className="rounded bg-yellow-700/30 px-2 py-0.5 text-xs font-medium text-yellow-300">
@@ -223,6 +219,24 @@ function StatusBadge({
       </span>
     );
   }
+  if (issue.pipelineStep?.startsWith("failed:")) {
+    return (
+      <span className="rounded bg-red-700/30 px-2 py-0.5 text-xs font-medium text-red-300">
+        Failed
+      </span>
+    );
+  }
+  if (
+    issue.pipelineStep &&
+    issue.pipelineStep !== "pages-downloaded" &&
+    issue.pipelineStep !== "complete"
+  ) {
+    return (
+      <span className="rounded bg-cyan-700/30 px-2 py-0.5 text-xs font-medium text-cyan-300">
+        Running
+      </span>
+    );
+  }
   return (
     <span className="rounded bg-neutral-700/30 px-2 py-0.5 text-xs font-medium text-neutral-400">
       {issue.status}
@@ -230,71 +244,24 @@ function StatusBadge({
   );
 }
 
-function ActionButtons({
-  issue,
-}: {
-  issue: {
-    bookId: string;
-    issueId: string;
-    pipelinePaused: boolean;
-    pipelinePausedUrl: string | null;
-    pipelineStep: string | null;
-    hasWebP: boolean;
-    pageCount: number;
-  };
-}) {
-  if (issue.pipelinePaused && issue.pipelinePausedUrl) {
-    return (
-      <Link
-        href={issue.pipelinePausedUrl}
-        className="rounded bg-yellow-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-600"
-      >
-        Resume
-      </Link>
-    );
-  }
-
-  const canTrigger =
-    issue.pageCount > 0 &&
-    (issue.pipelineStep === "pages-downloaded" ||
-      issue.pipelineStep?.startsWith("failed:"));
-
+function ActionButtons({ issue }: { issue: AdminIssueRow }) {
   return (
-    <div className="flex gap-2">
-      {canTrigger && (
-        <TriggerIngestButton bookId={issue.bookId} issueId={issue.issueId} />
-      )}
-      {issue.hasWebP && (
-        <Link
-          href={`/book/${issue.bookId}/${issue.issueId}/1`}
-          className="rounded bg-neutral-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-neutral-600"
-        >
-          View
-        </Link>
-      )}
-      <Link
-        href={`/book/${issue.bookId}/${issue.issueId}/review`}
-        className="rounded bg-cyan-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-cyan-600"
-      >
-        Review
-      </Link>
-      <Link
-        href={`/admin/${issue.bookId}/${issue.issueId}/review/panels`}
-        className="rounded bg-fuchsia-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-fuchsia-600"
-      >
-        Panels
-      </Link>
-      <Link
-        href={`/admin/${issue.bookId}/${issue.issueId}/review/scenes`}
-        className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600"
-      >
-        Scenes
-      </Link>
+    <div className="flex items-center gap-2">
+      <PipelineActions
+        bookId={issue.bookId}
+        issueId={issue.issueId}
+        pipelineStep={issue.pipelineStep}
+        pipelinePaused={issue.pipelinePaused}
+        pipelinePausedAt={issue.pipelinePausedAt}
+        pipelinePausedUrl={issue.pipelinePausedUrl}
+        pageCount={issue.pageCount}
+      />
       <Link
         href={`/admin/${issue.bookId}/${issue.issueId}/review/pipeline`}
-        className="rounded bg-slate-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-500"
+        className="rounded bg-neutral-700 px-2 py-1 text-xs font-medium text-neutral-300 hover:bg-neutral-600"
+        title="Pipeline details"
       >
-        Pipeline
+        Details
       </Link>
     </div>
   );
