@@ -131,7 +131,7 @@ export function PipelineActions({
   }
 
   if (isPaused && pipelinePausedUrl) {
-    const label = REVIEW_STEPS[pipelinePausedAt!] ?? "Review";
+    const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
     return (
       <a
         href={pipelinePausedUrl}
@@ -143,7 +143,7 @@ export function PipelineActions({
   }
 
   if (isRunning) {
-    const label = STEP_LABELS[pipelineStep!] ?? pipelineStep;
+    const label = STEP_LABELS[pipelineStep ?? ""] ?? pipelineStep;
     return (
       <span className="inline-flex items-center gap-1.5 rounded bg-cyan-700/30 px-2.5 py-1 text-xs font-medium text-cyan-300">
         <Spinner /> {label}
