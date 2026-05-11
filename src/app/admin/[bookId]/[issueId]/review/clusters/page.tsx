@@ -51,11 +51,7 @@ async function getClusterData(bookId: string, issueId: string) {
       )
       .eq("book_id", bookId)
       .eq("source_issue", issueId),
-    supabaseAdmin
-      .from("characters")
-      .select("id, name")
-      .eq("book_id", bookId)
-      .order("id"),
+    supabaseAdmin.from("books").select("franchises").eq("id", bookId).single(),
   ]);
 
   const panels = (panelsRes.data ?? []) as PanelRow[];
@@ -75,10 +71,23 @@ async function getClusterData(bookId: string, issueId: string) {
   }
 
   const exemplars = (exemplarsRes.data ?? []) as ExemplarRow[];
-  const knownCharacters = (charsRes.data ?? []) as {
-    id: string;
-    name: string;
-  }[];
+
+  const franchises = (charsRes.data?.franchises as string[] | null) ?? [];
+  let charsQuery = supabaseAdmin
+    .from("characters")
+    .select("id, aliases")
+    .order("id");
+  if (franchises.length > 0) {
+    const filter = franchises.map((f) => `franchise.eq.${f}`).join(",");
+    charsQuery = charsQuery.or(`${filter},franchise.is.null`);
+  }
+  const { data: charRows } = await charsQuery;
+  const knownCharacters = (
+    (charRows ?? []) as { id: string; aliases: string[] | null }[]
+  ).map((c) => ({
+    id: c.id,
+    name: c.aliases?.[0] ?? c.id.replace(/-/g, " "),
+  }));
 
   // Build a map of detection IDs per (character_id or suggested_name) + page
   const detectionsByCluster = new Map<

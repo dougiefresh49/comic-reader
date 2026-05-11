@@ -56,6 +56,14 @@ export function ClusterReviewClient({
     type: "error" | "success";
   } | null>(null);
   const [previewFace, setPreviewFace] = useState<ClusterFace | null>(null);
+  const [previewClusterKey, setPreviewClusterKey] = useState<string | null>(
+    null,
+  );
+
+  const handlePreview = useCallback((face: ClusterFace, clusterKey: string) => {
+    setPreviewFace(face);
+    setPreviewClusterKey(clusterKey);
+  }, []);
 
   const stats = useMemo(() => {
     const totalCrops = clusters.reduce((s, c) => s + c.faces.length, 0);
@@ -328,10 +336,45 @@ export function ClusterReviewClient({
   const unresolvedClusters = clusters.filter((c) => !c.isResolved);
   const resolvedClusters = clusters.filter((c) => c.isResolved);
 
+  const renderClusterCard = (
+    cluster: CharacterCluster,
+    variant: "resolved" | "unresolved",
+  ) => (
+    <div key={cluster.key}>
+      <ClusterCard
+        cluster={cluster}
+        selected={selected.get(cluster.key) ?? new Set()}
+        knownCharacters={knownCharacters}
+        pending={pending}
+        onToggleFace={(id) => toggleFace(cluster.key, id)}
+        onSelectAll={() => selectAllInCluster(cluster)}
+        onClearSelection={() => clearSelection(cluster.key)}
+        onConfirm={() => handleConfirm(cluster)}
+        onReject={() => handleReject(cluster.key)}
+        onAssign={(targetId) => handleAssign(cluster.key, targetId)}
+        onRename={(newId) => handleRename(cluster, newId)}
+        onPreview={(face: ClusterFace) => handlePreview(face, cluster.key)}
+        variant={variant}
+      />
+      {/* Mobile inline preview — shown below the active cluster */}
+      {previewFace && previewClusterKey === cluster.key && (
+        <div className="mt-2 md:hidden">
+          <PagePreviewPanel
+            face={previewFace}
+            onClose={() => {
+              setPreviewFace(null);
+              setPreviewClusterKey(null);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="flex gap-6">
+    <div className="flex flex-col gap-6 md:flex-row">
       {/* Left: cluster list */}
-      <div className={`space-y-6 ${previewFace ? "w-1/2" : "w-full"}`}>
+      <div className={`space-y-6 ${previewFace ? "md:w-1/2" : "w-full"}`}>
         {/* Stats bar */}
         <div className="flex flex-wrap items-center gap-4 rounded-lg bg-neutral-900 px-4 py-3 text-sm">
           <span>
@@ -378,24 +421,9 @@ export function ClusterReviewClient({
               crops)
             </h2>
             <div className="space-y-4">
-              {unresolvedClusters.map((cluster) => (
-                <ClusterCard
-                  key={cluster.key}
-                  cluster={cluster}
-                  selected={selected.get(cluster.key) ?? new Set()}
-                  knownCharacters={knownCharacters}
-                  pending={pending}
-                  onToggleFace={(id) => toggleFace(cluster.key, id)}
-                  onSelectAll={() => selectAllInCluster(cluster)}
-                  onClearSelection={() => clearSelection(cluster.key)}
-                  onConfirm={() => handleConfirm(cluster)}
-                  onReject={() => handleReject(cluster.key)}
-                  onAssign={(targetId) => handleAssign(cluster.key, targetId)}
-                  onRename={(newId) => handleRename(cluster, newId)}
-                  onPreview={setPreviewFace}
-                  variant="unresolved"
-                />
-              ))}
+              {unresolvedClusters.map((c) =>
+                renderClusterCard(c, "unresolved"),
+              )}
             </div>
           </section>
         )}
@@ -408,24 +436,7 @@ export function ClusterReviewClient({
               {resolvedClusters.reduce((s, c) => s + c.faces.length, 0)} crops)
             </h2>
             <div className="space-y-4">
-              {resolvedClusters.map((cluster) => (
-                <ClusterCard
-                  key={cluster.key}
-                  cluster={cluster}
-                  selected={selected.get(cluster.key) ?? new Set()}
-                  knownCharacters={knownCharacters}
-                  pending={pending}
-                  onToggleFace={(id) => toggleFace(cluster.key, id)}
-                  onSelectAll={() => selectAllInCluster(cluster)}
-                  onClearSelection={() => clearSelection(cluster.key)}
-                  onConfirm={() => handleConfirm(cluster)}
-                  onReject={() => handleReject(cluster.key)}
-                  onAssign={(targetId) => handleAssign(cluster.key, targetId)}
-                  onRename={(newId) => handleRename(cluster, newId)}
-                  onPreview={setPreviewFace}
-                  variant="resolved"
-                />
-              ))}
+              {resolvedClusters.map((c) => renderClusterCard(c, "resolved"))}
             </div>
           </section>
         )}
@@ -446,12 +457,15 @@ export function ClusterReviewClient({
         </div>
       </div>
 
-      {/* Right: sticky page preview panel */}
+      {/* Right: sticky page preview panel (desktop only) */}
       {previewFace && (
-        <div className="w-1/2">
+        <div className="hidden md:block md:w-1/2">
           <PagePreviewPanel
             face={previewFace}
-            onClose={() => setPreviewFace(null)}
+            onClose={() => {
+              setPreviewFace(null);
+              setPreviewClusterKey(null);
+            }}
           />
         </div>
       )}
@@ -556,10 +570,10 @@ function ClusterCard({
   const [showAssign, setShowAssign] = useState(false);
   const [search, setSearch] = useState("");
   const [customId, setCustomId] = useState("");
-
   const avgConfidence =
     cluster.faces.reduce((s, f) => s + f.confidence, 0) / cluster.faces.length;
   const allConfirmed = cluster.faces.every((f) => f.humanVerified);
+  const [collapsed, setCollapsed] = useState(allConfirmed);
   const selectedCount = selected.size;
 
   const borderColor =
@@ -576,8 +590,15 @@ function ClusterCard({
 
   return (
     <div className={`rounded-lg border ${borderColor} bg-neutral-900 p-4`}>
-      {/* Header */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      {/* Header — tap to collapse/expand */}
+      <button
+        type="button"
+        onClick={() => setCollapsed((v) => !v)}
+        className="flex w-full flex-wrap items-center gap-2 text-left"
+      >
+        <span className="text-xs text-neutral-500">
+          {collapsed ? "▶" : "▼"}
+        </span>
         <h3 className="text-base font-medium">
           {cluster.label}
           {variant === "unresolved" && (
@@ -599,143 +620,155 @@ function ClusterCard({
             confirmed
           </span>
         )}
-      </div>
+      </button>
 
-      {/* Face grid */}
-      <div className="mb-3 flex flex-wrap gap-2">
-        {cluster.faces.map((face) => (
-          <FaceThumbnail
-            key={face.detectionId}
-            face={face}
-            isSelected={selected.has(face.detectionId)}
-            onSelect={() => onToggleFace(face.detectionId)}
-            onPreview={() => onPreview(face)}
-          />
-        ))}
-      </div>
+      {collapsed && <div className="h-3" />}
+      {!collapsed && (
+        <>
+          <div className="mt-3" />
 
-      {/* Selection controls */}
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <button
-          onClick={onSelectAll}
-          className="text-neutral-400 underline hover:text-neutral-200"
-        >
-          Select all
-        </button>
-        {selectedCount > 0 && (
-          <button
-            onClick={onClearSelection}
-            className="text-neutral-400 underline hover:text-neutral-200"
-          >
-            Clear ({selectedCount})
-          </button>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-wrap gap-2">
-        {variant === "resolved" && !allConfirmed && (
-          <button
-            onClick={onConfirm}
-            disabled={pending}
-            className="rounded bg-emerald-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-          >
-            Confirm All
-          </button>
-        )}
-
-        <button
-          onClick={() => setShowAssign(!showAssign)}
-          disabled={pending}
-          className="rounded bg-cyan-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-700 disabled:opacity-50"
-        >
-          {variant === "unresolved"
-            ? "Assign to Character"
-            : selectedCount > 0
-              ? `Move Selected (${selectedCount})`
-              : "Rename / Merge"}
-        </button>
-
-        {selectedCount > 0 && (
-          <button
-            onClick={onReject}
-            disabled={pending}
-            className="rounded border border-red-800 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-900/30 disabled:opacity-50"
-          >
-            Reject Selected ({selectedCount})
-          </button>
-        )}
-      </div>
-
-      {/* Assign/Rename dropdown */}
-      {showAssign && (
-        <div className="mt-3 rounded border border-neutral-700 bg-neutral-800 p-3">
-          <input
-            type="text"
-            placeholder="Search characters..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="mb-2 w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-cyan-600 focus:outline-none"
-          />
-
-          <div className="mb-2 max-h-40 overflow-y-auto">
-            {filteredChars.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  onAssign(c.id);
-                  setShowAssign(false);
-                  setSearch("");
-                }}
-                disabled={pending}
-                className="block w-full rounded px-2 py-1 text-left text-sm text-neutral-300 hover:bg-neutral-700 disabled:opacity-50"
-              >
-                {c.name}{" "}
-                <span className="text-xs text-neutral-500">({c.id})</span>
-              </button>
+          {/* Face grid */}
+          <div className="mb-3 flex flex-wrap gap-2">
+            {cluster.faces.map((face) => (
+              <FaceThumbnail
+                key={face.detectionId}
+                face={face}
+                isSelected={selected.has(face.detectionId)}
+                onSelect={() => onToggleFace(face.detectionId)}
+                onPreview={() => onPreview(face)}
+              />
             ))}
-            {filteredChars.length === 0 && search && (
-              <p className="px-2 py-1 text-xs text-neutral-500">No matches</p>
+          </div>
+
+          {/* Selection controls */}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+            <button
+              onClick={onSelectAll}
+              className="text-neutral-400 underline hover:text-neutral-200"
+            >
+              Select all
+            </button>
+            {selectedCount > 0 && (
+              <button
+                onClick={onClearSelection}
+                className="text-neutral-400 underline hover:text-neutral-200"
+              >
+                Clear ({selectedCount})
+              </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2 border-t border-neutral-700 pt-2">
-            <input
-              type="text"
-              placeholder="Or type new character ID..."
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              className="flex-1 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-cyan-600 focus:outline-none"
-            />
-            <button
-              onClick={() => {
-                const id = customId.trim().toLowerCase().replace(/\s+/g, "-");
-                if (!id) return;
-                if (cluster.characterId) {
-                  onRename(id);
-                } else {
-                  onAssign(id);
-                }
-                setShowAssign(false);
-                setCustomId("");
-              }}
-              disabled={pending || !customId.trim()}
-              className="rounded bg-cyan-800 px-3 py-1 text-xs font-medium text-white hover:bg-cyan-700 disabled:opacity-50"
-            >
-              Apply
-            </button>
-            <button
-              onClick={() => {
-                setShowAssign(false);
-                setSearch("");
-                setCustomId("");
-              }}
-              className="rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
-            >
-              Cancel
-            </button>
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            {variant === "resolved" && !allConfirmed && (
+              <button
+                onClick={onConfirm}
+                disabled={pending}
+                className="rounded bg-emerald-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Confirm All
+              </button>
+            )}
+
+            {(variant === "unresolved" || selectedCount > 0) && (
+              <button
+                onClick={() => setShowAssign(!showAssign)}
+                disabled={pending}
+                className="rounded bg-cyan-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-cyan-700 disabled:opacity-50"
+              >
+                {variant === "unresolved"
+                  ? "Assign to Character"
+                  : `Move Selected (${selectedCount})`}
+              </button>
+            )}
+
+            {selectedCount > 0 && (
+              <button
+                onClick={onReject}
+                disabled={pending}
+                className="rounded border border-red-800 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-900/30 disabled:opacity-50"
+              >
+                Reject Selected ({selectedCount})
+              </button>
+            )}
           </div>
-        </div>
+
+          {/* Assign/Rename dropdown */}
+          {showAssign && (
+            <div className="mt-3 rounded border border-neutral-700 bg-neutral-800 p-3">
+              <input
+                type="text"
+                placeholder="Search characters..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="mb-2 w-full rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-cyan-600 focus:outline-none"
+              />
+
+              <div className="mb-2 max-h-40 overflow-y-auto">
+                {filteredChars.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      onAssign(c.id);
+                      setShowAssign(false);
+                      setSearch("");
+                    }}
+                    disabled={pending}
+                    className="block w-full rounded px-2 py-1 text-left text-sm text-neutral-300 hover:bg-neutral-700 disabled:opacity-50"
+                  >
+                    {c.name}{" "}
+                    <span className="text-xs text-neutral-500">({c.id})</span>
+                  </button>
+                ))}
+                {filteredChars.length === 0 && search && (
+                  <p className="px-2 py-1 text-xs text-neutral-500">
+                    No matches
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 border-t border-neutral-700 pt-2">
+                <input
+                  type="text"
+                  placeholder="Or type new character ID..."
+                  value={customId}
+                  onChange={(e) => setCustomId(e.target.value)}
+                  className="flex-1 rounded border border-neutral-600 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-cyan-600 focus:outline-none"
+                />
+                <button
+                  onClick={() => {
+                    const id = customId
+                      .trim()
+                      .toLowerCase()
+                      .replace(/\s+/g, "-");
+                    if (!id) return;
+                    if (cluster.characterId) {
+                      onRename(id);
+                    } else {
+                      onAssign(id);
+                    }
+                    setShowAssign(false);
+                    setCustomId("");
+                  }}
+                  disabled={pending || !customId.trim()}
+                  className="rounded bg-cyan-800 px-3 py-1 text-xs font-medium text-white hover:bg-cyan-700 disabled:opacity-50"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAssign(false);
+                    setSearch("");
+                    setCustomId("");
+                  }}
+                  className="rounded px-2 py-1 text-xs text-neutral-400 hover:text-neutral-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -809,9 +842,10 @@ function FaceThumbnail({
       <button
         onClick={(e) => {
           e.stopPropagation();
+          onSelect();
           onPreview();
         }}
-        className="absolute top-0.5 right-0.5 hidden rounded bg-black/60 px-1 py-0.5 text-[9px] text-cyan-300 group-hover:block hover:bg-black/80"
+        className="absolute top-0.5 right-0.5 rounded bg-black/60 px-1 py-0.5 text-[9px] text-cyan-300 hover:bg-black/80 md:hidden md:group-hover:block"
         title="Preview on page"
       >
         view

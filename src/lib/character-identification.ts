@@ -22,37 +22,50 @@ export interface ExemplarReference {
 function buildIdentifyPrompt(
   knownCharacters: string[],
   hasPageContext: boolean,
+  issueContext?: string,
 ): string {
   const charList =
     knownCharacters.length > 0
-      ? `Known characters in this comic: ${knownCharacters.join(", ")}`
-      : "No character list available.";
+      ? `Named characters who may appear: ${knownCharacters.join(", ")}`
+      : "";
+
+  const synopsis = issueContext ? `Issue synopsis: ${issueContext}` : "";
 
   const contextNote = hasPageContext
     ? `You will see TWO images:
-1. The FULL COMIC PAGE — use this for context (scene, costume, body, speech bubbles, surrounding characters)
-2. The CROPPED FACE — this is the specific character to identify
+1. FULL COMIC PAGE — use for context (scene, costume, body, speech bubbles, surrounding characters)
+2. CROPPED FACE — the specific face to identify
 
-Use the full page to understand who the character is. The crop alone may be ambiguous (e.g. just an eye or chin), but the full page shows costume, body, dialogue, and scene context.`
+The crop alone may be ambiguous. Use the full page to see costume, body, dialogue, and scene.`
     : "You will see a single cropped face image.";
 
-  return `You are identifying a comic book character.
-
-${charList}
+  return `You are identifying a character in a comic book panel.
 
 ${contextNote}
+${charList ? `\n${charList}` : ""}
+${synopsis ? `\n${synopsis}` : ""}
 
-RULES:
-1. Based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body visible in full page), identify who this character is.
-2. Use the known characters list if the character matches one.
-3. If you are NOT SURE who this character is, set character_name to null. Do NOT guess.
-4. Only provide a name if you are genuinely confident.
+IDENTIFICATION RULES:
+1. Identify based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body).
+2. If the face matches a named character from the list above, use that name.
+3. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, robot, unnamed soldier, etc.), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT try to match minions to named characters.
+4. If the crop shows only a body part (fist, arm, torso) without a recognizable face, set character_name to null.
+5. If you cannot confidently identify the character, set character_name to null. Do NOT guess or pick a random name from the list.
+
+CONFIDENCE GUIDELINES:
+- 0.95: Unmistakable — unique visual features clearly visible (e.g. green skin + blue mask = Leonardo)
+- 0.85: Very likely — strong visual match with supporting context
+- 0.70: Probable — some features match but crop is partial or ambiguous
+- Below 0.60: Too uncertain — set character_name to null instead
 
 Output JSON only (no markdown fences):
-{"character_name": "Leonardo", "confidence": 0.9, "reasoning": "Blue mask, green skin — TMNT Leonardo"}
+{"character_name": "Leonardo", "confidence": 0.85, "reasoning": "Blue mask, green skin, holding katana — TMNT Leonardo"}
 
-If unsure:
-{"character_name": null, "confidence": 0, "reasoning": "Cannot confidently identify this character"}`;
+If minion/generic enemy:
+{"character_name": "Foot Soldier", "confidence": 0.80, "reasoning": "Dark ninja outfit, generic foot clan soldier"}
+
+If unsure or not a face:
+{"character_name": null, "confidence": 0, "reasoning": "Crop shows only a green fist, no identifiable face"}`;
 }
 
 function buildComparisonPrompt(
@@ -92,9 +105,10 @@ export async function identifyFace(
   exemplars?: ExemplarReference[],
   pageImageBase64?: string,
   pageImageMimeType?: string,
+  issueContext?: string,
 ): Promise<FaceIdentification> {
   const hasPage = !!pageImageBase64;
-  const prompt = buildIdentifyPrompt(knownCharacters, hasPage);
+  const prompt = buildIdentifyPrompt(knownCharacters, hasPage, issueContext);
   const parts: Part[] = [createPartFromText(prompt)];
 
   if (pageImageBase64 && pageImageMimeType) {
@@ -226,6 +240,28 @@ export async function matchFaceToClusters(
   }
 }
 
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function fuzzyNameMatch(a: string, b: string): boolean {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const wordsA = na.split(" ");
+  const wordsB = nb.split(" ");
+  if (wordsA.length >= 2 && wordsB.length >= 2) {
+    if (
+      wordsA[0] === wordsB[0] &&
+      wordsA[wordsA.length - 1] === wordsB[wordsB.length - 1]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function resolveCharacterId(
   supabase: SupabaseClient,
   name: string,
@@ -238,17 +274,17 @@ export async function resolveCharacterId(
     .single();
   if (direct) return directId;
 
-  const { data: byAlias } = await supabase
+  const { data: allChars } = await supabase
     .from("characters")
     .select("id, aliases")
     .limit(200);
 
-  if (byAlias) {
-    for (const row of byAlias) {
+  if (allChars) {
+    for (const row of allChars) {
+      const id = row.id as string;
       const aliases = (row.aliases as string[]) ?? [];
-      if (aliases.some((a) => a.toLowerCase() === name.toLowerCase())) {
-        return row.id as string;
-      }
+      if (fuzzyNameMatch(name, id)) return id;
+      if (aliases.some((a) => fuzzyNameMatch(name, a))) return id;
     }
   }
 
@@ -259,17 +295,45 @@ export async function buildKnownCharacterList(
   supabase: SupabaseClient,
   bookId: string,
 ): Promise<string[]> {
-  const { data: chars } = await supabase
-    .from("characters")
-    .select("id, aliases")
-    .eq("book_id", bookId);
+  const { data: book } = await supabase
+    .from("books")
+    .select("franchises")
+    .eq("id", bookId)
+    .single();
+
+  const franchises = (book?.franchises as string[] | null) ?? [];
+
+  let chars: Array<{ id: string; aliases: string[] | null }>;
+  if (franchises.length > 0) {
+    const franchiseFilter = franchises
+      .map((f) => `franchise.eq.${f}`)
+      .join(",");
+    const { data } = await supabase
+      .from("characters")
+      .select("id, aliases")
+      .or(`${franchiseFilter},franchise.is.null`);
+    chars = (data ?? []) as Array<{ id: string; aliases: string[] | null }>;
+  } else {
+    const { data } = await supabase.from("characters").select("id, aliases");
+    chars = (data ?? []) as Array<{ id: string; aliases: string[] | null }>;
+  }
 
   const names: string[] = [];
-  for (const c of chars ?? []) {
-    const id = c.id as string;
-    names.push(id.replace(/-/g, " "));
-    const aliases = c.aliases as string[] | null;
-    if (aliases) names.push(...aliases);
+  const seen = new Set<string>();
+  for (const c of chars) {
+    const readable = c.id.replace(/-/g, " ");
+    if (!seen.has(readable.toLowerCase())) {
+      names.push(readable);
+      seen.add(readable.toLowerCase());
+    }
+    if (c.aliases) {
+      for (const a of c.aliases) {
+        if (!seen.has(a.toLowerCase())) {
+          names.push(a);
+          seen.add(a.toLowerCase());
+        }
+      }
+    }
   }
   return names;
 }

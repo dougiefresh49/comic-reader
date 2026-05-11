@@ -266,3 +266,18 @@ The `(NEW)` items represent ~5 small migrations:
 Each migration is independent — they don't have to land together.
 Pair each with the workstream that needs it (per the overview's
 phasing table).
+
+---
+
+## Storage bucket organization (tech debt)
+
+The `comic-pages` bucket currently stores files flat:
+`comic-pages/{bookId}/{issueId}/page-XX.webp`
+
+For better organization as more asset types are added (thumbnails, raw source pages, etc.), consider restructuring to:
+`comic-pages/{bookId}/{issueId}/pages/page-XX.webp`
+
+This would require:
+1. Migrating existing files in the bucket
+2. Updating all references (`src/lib/storage.ts`, `src/workflows/steps/vision.ts`, `src/server/admin/panel-review.ts`, cluster review `page.tsx`, Roboflow analyze public URL)
+3. Centralizing the path builder in `src/lib/storage.ts` so the pattern is defined once

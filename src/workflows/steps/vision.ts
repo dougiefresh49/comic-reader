@@ -364,7 +364,7 @@ export async function characterLookaheadPage(
   }
 
   // 2. Download page image from Storage
-  const storagePath = `${bookId}/${issueId}/pages/page-${padded}.webp`;
+  const storagePath = `${bookId}/${issueId}/page-${padded}.webp`;
   const { data: imageBlob } = await supabase.storage
     .from("comic-pages")
     .download(storagePath);
@@ -414,8 +414,55 @@ export async function characterLookaheadPage(
     return;
   }
 
-  // 5. Build known character list
-  const knownCharacters = await buildKnownCharacterList(supabase, bookId);
+  // 5. Build known character list + wiki context
+  const dbCharacters = await buildKnownCharacterList(supabase, bookId);
+
+  const { data: issueRow } = await supabase
+    .from("issues")
+    .select("wiki_summary, wiki_appearances")
+    .eq("book_id", bookId)
+    .eq("id", issueId)
+    .single();
+
+  type WikiAppearance = { name: string; qualifier?: string };
+  const wikiAppearances =
+    (issueRow?.wiki_appearances as WikiAppearance[] | null) ?? [];
+
+  const dbNormalized = new Set(
+    dbCharacters.map((n) =>
+      n.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim(),
+    ),
+  );
+
+  const wikiNames: string[] = [];
+  for (const a of wikiAppearances) {
+    const baseName = a.name;
+    const norm = baseName
+      .toLowerCase()
+      .replace(/[-_]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (dbNormalized.has(norm)) continue;
+    const firstLast = norm.split(" ");
+    if (
+      firstLast.length >= 2 &&
+      [...dbNormalized].some((db) => {
+        const dbWords = db.split(" ");
+        return (
+          dbWords.length >= 2 &&
+          dbWords[0] === firstLast[0] &&
+          dbWords[dbWords.length - 1] === firstLast[firstLast.length - 1]
+        );
+      })
+    ) {
+      continue;
+    }
+    wikiNames.push(a.qualifier ? `${baseName} (${a.qualifier})` : baseName);
+  }
+
+  const knownCharacters = [...new Set([...dbCharacters, ...wikiNames])];
+  const wikiSummary =
+    (issueRow?.wiki_summary as string | undefined) ?? undefined;
 
   // 6. Identify each face with exemplar context
   const detectionRows: Array<{
@@ -469,6 +516,7 @@ export async function characterLookaheadPage(
         exemplarRefs,
         pageBase64,
         "image/webp",
+        wikiSummary,
       );
     } catch (err: unknown) {
       const status =
@@ -487,6 +535,7 @@ export async function characterLookaheadPage(
               exemplarRefs,
               pageBase64,
               "image/webp",
+              wikiSummary,
             );
           } catch {
             continue;
@@ -635,7 +684,7 @@ export async function getContextPage(
     bookContext = parts.join("\n");
   }
 
-  const storagePath = `${bookId}/${issueId}/pages/page-${padded}.webp`;
+  const storagePath = `${bookId}/${issueId}/page-${padded}.webp`;
   const { data: imageBlob } = await supabase.storage
     .from("comic-pages")
     .download(storagePath);
