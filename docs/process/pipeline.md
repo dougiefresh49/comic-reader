@@ -200,7 +200,7 @@ All model strings are centralized in `src/lib/models.ts` (re-exported via `scrip
 |--------|-------|---------|
 | `GEMINI_HIGH` | `gemini-3.1-pro-preview` | `get-context` (context analysis), `find-voice-sources` (research) |
 | `GEMINI_MEDIUM` | `gemini-3-flash-preview` | OCR, `sort-bubbles-gemini`, `character-lookahead`, `scrape-pages`, `split-voice` (speaker ID) |
-| `GEMINI_FAST` | `gemini-3.1-flash-lite-preview` | `repair-cues`, `regenerate-cues` (simple rule-based fixes) |
+| `GEMINI_FAST` | `gemini-3.1-flash-lite` | `repair-cues`, `regenerate-cues` (simple rule-based fixes) |
 
 ---
 

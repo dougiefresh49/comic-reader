@@ -56,7 +56,7 @@ After Phase 1, all model strings live in `scripts/utils/models.ts`.
 |--------|-------|---------|
 | `GEMINI_HIGH` | `gemini-3.1-pro-preview` | Page-level context: speaker ID, emotion, narrative context — needs reasoning |
 | `GEMINI_MEDIUM` | `gemini-3-flash-preview` | Vision tasks: OCR, reading order sorting, voice description consolidation |
-| `GEMINI_FAST` | `gemini-3.1-flash-lite-preview` | Rule-based tasks: cue formatting fixes, simple validation — no reasoning needed |
+| `GEMINI_FAST` | `gemini-3.1-flash-lite` | Rule-based tasks: cue formatting fixes, simple validation — no reasoning needed |
 
 Never hardcode model strings inline. Always import from `scripts/utils/models.ts`.
 
