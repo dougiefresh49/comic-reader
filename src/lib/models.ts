@@ -4,7 +4,7 @@
 
 export const GEMINI_HIGH = "gemini-3.1-pro-preview"; // deep reasoning, page-level context
 export const GEMINI_MEDIUM = "gemini-3-flash-preview"; // vision tasks, OCR, moderate reasoning
-export const GEMINI_FAST = "gemini-3.1-flash-lite-preview"; // simple formatting/validation, no thinking needed
+export const GEMINI_FAST = "gemini-3.1-flash-lite"; // simple formatting/validation, no thinking needed
 
 // ─── Venice image models ───────────────────────────────────────────────────────
 // Phase 1 — character reference images (text-to-image)

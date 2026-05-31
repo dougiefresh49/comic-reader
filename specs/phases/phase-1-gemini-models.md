@@ -14,7 +14,7 @@ Model strings are hardcoded inline across 5 different files. Two are already sta
 // scripts/utils/models.ts  ← NEW FILE
 export const GEMINI_HIGH   = "gemini-3.1-pro-preview";        // deep reasoning, page-level context
 export const GEMINI_MEDIUM = "gemini-3-flash-preview";        // vision tasks, OCR, moderate reasoning
-export const GEMINI_FAST   = "gemini-3.1-flash-lite-preview"; // simple formatting/validation, no thinking needed
+export const GEMINI_FAST   = "gemini-3.1-flash-lite"; // simple formatting/validation, no thinking needed
 ```
 
 **When to use each tier:**
