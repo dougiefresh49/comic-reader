@@ -23,37 +23,41 @@ export default async function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-6 py-10 text-neutral-100">
+    <main className="min-h-screen bg-neutral-950 px-4 py-6 text-neutral-100 sm:px-6 sm:py-10">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
-            <p className="mt-1 text-sm text-neutral-400">
-              Pipeline status across all books and issues.
-            </p>
-          </div>
-          <div className="flex gap-2">
+        <header className="mb-6 sm:mb-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-xl font-semibold sm:text-2xl">
+                Admin Dashboard
+              </h1>
+              <p className="mt-1 text-sm text-neutral-400">
+                Pipeline status across all books and issues.
+              </p>
+            </div>
             <Link
               href="/admin/voices"
-              className="rounded bg-neutral-700 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-600"
+              className="shrink-0 rounded bg-neutral-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-600 sm:px-4 sm:py-2 sm:text-sm"
             >
               Voices
             </Link>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
             <Link
               href="/admin/add-book"
-              className="rounded bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-600"
+              className="rounded bg-cyan-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-600 sm:px-4 sm:py-2 sm:text-sm"
             >
               + Add Book
             </Link>
             <Link
               href="/admin/add-issue"
-              className="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-600"
+              className="rounded bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600 sm:px-4 sm:py-2 sm:text-sm"
             >
               + Add Issue
             </Link>
             <Link
               href="/admin/new-issue"
-              className="rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+              className="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 sm:px-4 sm:py-2 sm:text-sm"
             >
               + Upload Pages
             </Link>
@@ -97,9 +101,9 @@ function BookSection({
 
   return (
     <section>
-      <div className="mb-3 flex items-baseline gap-3">
+      <div className="mb-3 flex flex-wrap items-baseline gap-2 sm:gap-3">
         <h2 className="text-lg font-medium">{book.name}</h2>
-        <div className="flex gap-2 text-xs text-neutral-500">
+        <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
           {book.publisher && <span>{book.publisher}</span>}
           {book.franchises && book.franchises.length > 0 && (
             <span>{book.franchises.join(", ")}</span>
@@ -138,7 +142,7 @@ function BookSection({
                   )}
                 </h3>
                 {partIssues.length > 0 ? (
-                  <IssueTable issues={partIssues} />
+                  <IssueList issues={partIssues} />
                 ) : (
                   <p className="py-2 text-xs text-neutral-600">
                     No issues yet.
@@ -152,54 +156,100 @@ function BookSection({
               <h3 className="mb-1.5 text-sm font-medium text-neutral-400">
                 Unassigned
               </h3>
-              <IssueTable issues={issuesByPart.get(null)!} />
+              <IssueList issues={issuesByPart.get(null)!} />
             </div>
           )}
         </div>
       ) : (
-        <IssueTable issues={issues} />
+        <IssueList issues={issues} />
       )}
     </section>
   );
 }
 
-function IssueTable({ issues }: { issues: AdminIssueRow[] }) {
+function IssueList({ issues }: { issues: AdminIssueRow[] }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-neutral-800">
-      <table className="w-full">
-        <thead className="bg-neutral-900 text-xs text-neutral-400 uppercase">
-          <tr>
-            <th className="px-4 py-2 text-left font-medium">Issue</th>
-            <th className="px-4 py-2 text-left font-medium">Pages</th>
-            <th className="px-4 py-2 text-left font-medium">Bubbles</th>
-            <th className="px-4 py-2 text-left font-medium">Audio</th>
-            <th className="px-4 py-2 text-left font-medium">Pipeline</th>
-            <th className="px-4 py-2 text-left font-medium">State</th>
-            <th className="px-4 py-2 text-left font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-800 text-sm">
-          {issues.map((iss) => (
-            <tr key={`${iss.bookId}/${iss.issueId}`}>
-              <td className="px-4 py-2 text-neutral-300">
-                {iss.number}. {iss.issueName}
-              </td>
-              <td className="px-4 py-2 text-neutral-300">{iss.pageCount}</td>
-              <td className="px-4 py-2 text-neutral-300">{iss.bubbleCount}</td>
-              <td className="px-4 py-2 text-neutral-300">{iss.audioCount}</td>
-              <td className="px-4 py-2 text-neutral-400">
-                {iss.pipelineStep ?? "—"}
-              </td>
-              <td className="px-4 py-2">
-                <StatusBadge issue={iss} />
-              </td>
-              <td className="px-4 py-2">
-                <ActionButtons issue={iss} />
-              </td>
+    <>
+      {/* Desktop: table */}
+      <div className="hidden overflow-hidden rounded-lg border border-neutral-800 md:block">
+        <table className="w-full">
+          <thead className="bg-neutral-900 text-xs text-neutral-400 uppercase">
+            <tr>
+              <th className="px-4 py-2 text-left font-medium">Issue</th>
+              <th className="px-4 py-2 text-left font-medium">Pages</th>
+              <th className="px-4 py-2 text-left font-medium">Bubbles</th>
+              <th className="px-4 py-2 text-left font-medium">Audio</th>
+              <th className="px-4 py-2 text-left font-medium">Pipeline</th>
+              <th className="px-4 py-2 text-left font-medium">State</th>
+              <th className="px-4 py-2 text-left font-medium">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-neutral-800 text-sm">
+            {issues.map((iss) => (
+              <tr key={`${iss.bookId}/${iss.issueId}`}>
+                <td className="px-4 py-2 text-neutral-300">
+                  {iss.number}. {iss.issueName}
+                </td>
+                <td className="px-4 py-2 text-neutral-300">{iss.pageCount}</td>
+                <td className="px-4 py-2 text-neutral-300">
+                  {iss.bubbleCount}
+                </td>
+                <td className="px-4 py-2 text-neutral-300">{iss.audioCount}</td>
+                <td className="px-4 py-2 text-neutral-400">
+                  {iss.pipelineStep ?? "—"}
+                </td>
+                <td className="px-4 py-2">
+                  <StatusBadge issue={iss} />
+                </td>
+                <td className="px-4 py-2">
+                  <ActionButtons issue={iss} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile: cards */}
+      <div className="space-y-3 md:hidden">
+        {issues.map((iss) => (
+          <IssueCard key={`${iss.bookId}/${iss.issueId}`} issue={iss} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+function IssueCard({ issue }: { issue: AdminIssueRow }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-neutral-200">
+            {issue.number}. {issue.issueName}
+          </p>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            {issue.pipelineStep ?? "no pipeline"}
+          </p>
+        </div>
+        <StatusBadge issue={issue} />
+      </div>
+
+      <div className="mt-2 flex gap-4 text-xs text-neutral-400">
+        <span>
+          <span className="text-neutral-500">Pg</span> {issue.pageCount}
+        </span>
+        <span>
+          <span className="text-neutral-500">Bbl</span> {issue.bubbleCount}
+        </span>
+        <span>
+          <span className="text-neutral-500">Aud</span> {issue.audioCount}
+        </span>
+      </div>
+
+      <div className="mt-2.5">
+        <ActionButtons issue={issue} />
+      </div>
     </div>
   );
 }
@@ -211,20 +261,20 @@ function StatusBadge({
 }) {
   if (issue.pipelinePaused) {
     return (
-      <span className="rounded bg-yellow-700/30 px-2 py-0.5 text-xs font-medium text-yellow-300">
+      <span className="shrink-0 rounded bg-yellow-700/30 px-2 py-0.5 text-xs font-medium text-yellow-300">
         Paused
       </span>
     );
   }
   if (issue.status === "ready") {
     return (
-      <span className="rounded bg-emerald-700/30 px-2 py-0.5 text-xs font-medium text-emerald-300">
+      <span className="shrink-0 rounded bg-emerald-700/30 px-2 py-0.5 text-xs font-medium text-emerald-300">
         Ready
       </span>
     );
   }
   return (
-    <span className="rounded bg-neutral-700/30 px-2 py-0.5 text-xs font-medium text-neutral-400">
+    <span className="shrink-0 rounded bg-neutral-700/30 px-2 py-0.5 text-xs font-medium text-neutral-400">
       {issue.status}
     </span>
   );
@@ -244,9 +294,15 @@ function ActionButtons({
   };
 }) {
   if (issue.pipelinePaused && issue.pipelinePausedUrl) {
+    let resumeHref = issue.pipelinePausedUrl;
+    try {
+      resumeHref = new URL(issue.pipelinePausedUrl).pathname;
+    } catch {
+      // already a relative path
+    }
     return (
       <Link
-        href={issue.pipelinePausedUrl}
+        href={resumeHref}
         className="rounded bg-yellow-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-600"
       >
         Resume
@@ -260,7 +316,7 @@ function ActionButtons({
       issue.pipelineStep?.startsWith("failed:"));
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-1.5 sm:gap-2">
       {canTrigger && (
         <TriggerIngestButton bookId={issue.bookId} issueId={issue.issueId} />
       )}
