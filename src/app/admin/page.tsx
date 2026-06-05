@@ -171,7 +171,7 @@ function IssueList({ issues }: { issues: AdminIssueRow[] }) {
   return (
     <>
       {/* Desktop: table */}
-      <div className="hidden overflow-hidden rounded-lg border border-neutral-800 md:block">
+      <div className="hidden overflow-visible rounded-lg border border-neutral-800 md:block">
         <table className="w-full">
           <thead className="bg-neutral-900 text-xs text-neutral-400 uppercase">
             <tr>
