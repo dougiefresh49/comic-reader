@@ -173,6 +173,23 @@ export async function markIssueReady(bookId: string, issueId: string) {
     .eq("id", issueId);
 }
 
+export async function getPanelCount(
+  bookId: string,
+  issueId: string,
+): Promise<number> {
+  "use step";
+  const { createStepClient } = await import("../step-utils");
+  const supabase = await createStepClient();
+
+  const { count } = await supabase
+    .from("panels")
+    .select("id", { count: "exact", head: true })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId);
+
+  return count ?? 0;
+}
+
 export function batchArray<T>(arr: T[], size: number): T[][] {
   const batches: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {

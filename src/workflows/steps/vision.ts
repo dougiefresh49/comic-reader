@@ -21,6 +21,8 @@ export async function roboflowAnalyzeBatch(
     );
   }
 
+  let failedPages = 0;
+
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
     const imageUrl = `${supabaseUrl}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${padded}.webp`;
@@ -39,6 +41,7 @@ export async function roboflowAnalyzeBatch(
       console.warn(
         `[roboflow] page-${padded}: SAM3 workflow ${res.status}: ${text.slice(0, 160)}`,
       );
+      failedPages++;
       continue;
     }
 
@@ -163,6 +166,12 @@ export async function roboflowAnalyzeBatch(
     );
 
     await new Promise((r) => setTimeout(r, 750));
+  }
+
+  if (failedPages === pages.length) {
+    throw new Error(
+      `[roboflow] All ${pages.length} pages in batch failed — Roboflow API may be down or misconfigured`,
+    );
   }
 }
 

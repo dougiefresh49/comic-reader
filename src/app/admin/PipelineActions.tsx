@@ -59,6 +59,14 @@ const STEP_ORDER = [
   "generate-manifest",
 ];
 
+function toRelativePath(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+}
+
 export function PipelineActions({
   bookId,
   issueId,
@@ -72,7 +80,9 @@ export function PipelineActions({
   const [triggered, setTriggered] = useState(false);
 
   const isFailed = pipelineStep?.startsWith("failed:") ?? false;
-  const failedStep = isFailed ? pipelineStep!.replace("failed:", "") : null;
+  const failedStep = isFailed
+    ? (pipelineStep ?? "").replace("failed:", "")
+    : null;
 
   const canStart =
     pageCount > 0 && (!pipelineStep || pipelineStep === "pages-downloaded");
@@ -134,7 +144,7 @@ export function PipelineActions({
     const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
     return (
       <a
-        href={pipelinePausedUrl}
+        href={toRelativePath(pipelinePausedUrl)}
         className="rounded bg-yellow-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-500"
       >
         {label} &rarr;
@@ -192,40 +202,61 @@ function FailedActions({
   const failedIdx = STEP_ORDER.indexOf(failedStep);
 
   return (
-    <div className="relative flex items-center gap-1" ref={menuRef}>
-      <button
-        onClick={() => onTrigger(failedStep)}
-        disabled={loading}
-        className="rounded bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
-        title={`Resume from: ${failedLabel}`}
-      >
-        {loading ? "..." : `Resume`}
-      </button>
+    <div className="relative" ref={menuRef}>
       <button
         onClick={() => setMenuOpen(!menuOpen)}
-        className="rounded bg-neutral-700 px-1.5 py-1 text-xs text-neutral-300 hover:bg-neutral-600"
-        title="More options"
+        disabled={loading}
+        className="flex items-center gap-1.5 rounded bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+        title={`Failed at: ${failedLabel}`}
       >
-        ▾
+        {loading ? (
+          "..."
+        ) : (
+          <>
+            Retry: {failedLabel}{" "}
+            <span className="text-red-300/70">{menuOpen ? "▴" : "▾"}</span>
+          </>
+        )}
       </button>
       {menuOpen && (
-        <div className="absolute top-full right-0 z-50 mt-1 w-56 rounded-lg border border-neutral-700 bg-neutral-800 py-1 shadow-xl">
-          <div className="px-3 py-1.5 text-[10px] font-medium tracking-wide text-neutral-500 uppercase">
-            Restart from step
+        <div className="fixed inset-0 z-40 md:hidden" aria-hidden="true" />
+      )}
+      {menuOpen && (
+        <div className="fixed inset-x-3 bottom-3 z-50 max-h-[70vh] overflow-y-auto rounded-xl border border-neutral-700 bg-neutral-800 py-1 shadow-2xl md:absolute md:inset-auto md:top-full md:right-0 md:bottom-auto md:mt-1 md:w-56 md:rounded-lg">
+          <div className="flex items-center justify-between px-3 py-2 md:py-1.5">
+            <span className="text-[10px] font-medium tracking-wide text-neutral-500 uppercase">
+              Restart from step
+            </span>
+            <button
+              onClick={() => setMenuOpen(false)}
+              className="rounded p-1 text-neutral-500 hover:bg-neutral-700 hover:text-neutral-300 md:hidden"
+            >
+              ✕
+            </button>
           </div>
           <button
             onClick={() => {
               setMenuOpen(false);
               onTrigger();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-neutral-200 hover:bg-neutral-700"
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-neutral-200 hover:bg-neutral-700 md:py-1.5 md:text-xs"
           >
             <span className="text-amber-400">↻</span> Start from beginning
           </button>
           <div className="my-1 border-t border-neutral-700" />
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              onTrigger(failedStep);
+            }}
+            className="flex w-full items-center gap-2 bg-red-900/30 px-3 py-2.5 text-left text-sm font-medium text-red-300 hover:bg-red-900/50 md:py-1.5 md:text-xs"
+          >
+            <span className="text-red-400">▶</span> Retry: {failedLabel}
+          </button>
+          <div className="my-1 border-t border-neutral-700" />
           {STEP_ORDER.map((step, idx) => {
             const label = STEP_LABELS[step] ?? step;
-            const isFailed = step === failedStep;
+            const isFailedStep = step === failedStep;
             return (
               <button
                 key={step}
@@ -233,19 +264,19 @@ function FailedActions({
                   setMenuOpen(false);
                   onTrigger(step);
                 }}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-neutral-700 ${
-                  isFailed
+                className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-neutral-700 md:py-1.5 md:text-xs ${
+                  isFailedStep
                     ? "font-medium text-red-300"
                     : idx < failedIdx
                       ? "text-neutral-400"
                       : "text-neutral-200"
                 }`}
               >
-                {isFailed && <span className="text-red-400">✗</span>}
-                {!isFailed && idx < failedIdx && (
+                {isFailedStep && <span className="text-red-400">✗</span>}
+                {!isFailedStep && idx < failedIdx && (
                   <span className="text-emerald-500">✓</span>
                 )}
-                {!isFailed && idx > failedIdx && (
+                {!isFailedStep && idx > failedIdx && (
                   <span className="text-neutral-600">○</span>
                 )}
                 {label}
