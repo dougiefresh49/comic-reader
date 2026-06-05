@@ -4,6 +4,7 @@ import { FatalError } from "workflow";
 import {
   updatePipelineStep,
   getPageList,
+  getPanelCount,
   markIssueReady,
   markPipelineFailed,
   batchArray,
@@ -87,6 +88,12 @@ export async function ingestPipeline(input: IngestInput) {
       const roboflowBatches = batchArray(pages, 6);
       for (const batch of roboflowBatches) {
         await roboflowAnalyzeBatch(bookId, issueId, batch);
+      }
+      const panelCount = await getPanelCount(bookId, issueId);
+      if (panelCount === 0) {
+        throw new FatalError(
+          "Roboflow produced 0 panels — API may be down or credentials invalid",
+        );
       }
     }
 
