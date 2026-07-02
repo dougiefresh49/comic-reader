@@ -10,6 +10,10 @@ if [ -z "$COMMAND" ]; then
 fi
 
 # Block rm -rf (or rm -r) targeting assets or public/comics
+# Allow "git rm --cached" (index-only removal, keeps files on disk)
+if echo "$COMMAND" | grep -q 'git rm.*--cached'; then
+  exit 0
+fi
 if echo "$COMMAND" | grep -qE 'rm\s+-[rf]{1,3}\s+.*assets/' || \
    echo "$COMMAND" | grep -qE 'rm\s+-[rf]{1,3}\s+.*public/comics/'; then
   jq -n '{
