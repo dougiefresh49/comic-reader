@@ -45,17 +45,10 @@ yarn-error.log*
 # idea files
 .idea
 
-/assets/**/audio/*
-/assets/episodes/
-/assets/**/data/ocr-crops/*
-/assets/**/data/predictions/*
-/assets/**/pages-webp/*
+# comic assets — source of truth is Supabase Storage + DB
+/assets/
+
 /video-test-files/*
-assets/**/checkpoint.json
-/assets/**/new-characters.json
-/assets/**/known-characters.json
-/assets/**/data/wiki-cache.txt
-/assets/**/data/reviewed-speakers.json
 
 # scratch outputs from local scripts (e.g. test-ivc-fidelity)
 /tmp/
@@ -67,4 +60,4 @@ supabase/.temp
 .cursor/mcp.json
 .gemini/
 .mcp.json
-skills-lock.jsonassets/comics/*/issue-*/data/character-lookahead/
+skills-lock.json
