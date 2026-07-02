@@ -134,6 +134,43 @@ pnpm typecheck
 
 ---
 
+## Picking the right models for workflows and subagents
+
+Rankings, higher = better. Cost reflects what we actually pay (subscriptions with generous limits rank cheap), not list price. Intelligence is how hard a problem you can hand the model unsupervised. Taste covers UI/UX, code quality, API design, and copy.
+
+| model        | cost | intelligence | taste | reachable via                    |
+| ------------ | ---- | ------------ | ----- | -------------------------------- |
+| composer-2.5 | 8    | 5            | 5     | cursor-agent CLI (`agent`)       |
+| gpt-5.x      | 8    | 7            | 5     | codex CLI (`codex`)              |
+| sonnet-5     | 5    | 5            | 7     | Agent/Workflow `model: 'sonnet'` |
+| opus-4.8     | 4    | 7            | 8     | Agent/Workflow `model: 'opus'`   |
+| fable-5      | 2    | 9            | 9     | Agent/Workflow `model: 'fable'`  |
+
+How to apply:
+
+- These are defaults, not limits. You have standing permission to override them: if a cheaper model's output doesn't meet the bar, rerun or redo the work with a smarter model without asking. Judge the output, not the price tag. Escalating costs less than shipping mediocre work.
+- Cost is a tie-breaker only; when axes conflict for anything that ships, intelligence > taste > cost.
+- Bulk/mechanical work (clear-spec implementation, formatting sweeps, migrations, batch refactors): composer-2.5 via cursor-agent — it's effectively free and runs in an isolated worktree while you keep working.
+- Anything user-facing (UI, copy, API design) needs taste ≥ 7: sonnet-5 minimum, opus-4.8/fable-5 preferred.
+- Reviews of plans/implementations: fable-5 or opus-4.8, optionally composer-2.5 or gpt-5.x as an extra independent perspective.
+- Never use Haiku. For trivial work (classification, log filtering, glue, bulk edits), use composer-2.5 or gpt-5.x — they're effectively free and better.
+
+Mechanics:
+
+- **Check CLI availability before delegating** — not every machine has every CLI. `command -v agent` for cursor-agent, `command -v codex` for codex. If the CLI you want is missing, fall back to a Claude subagent via the Agent tool instead of telling the user to install anything.
+- composer-2.5 runs through the cursor-agent CLI: `agent --worktree -p --force "prompt"` (see the `cursor-agent` skill for full flags, spec-file workflow, and output formats). Always pass `--force` for tasks that write code; default model is composer, or pin with `--model composer-2.5`.
+- gpt-5.x runs through the codex CLI. Caveat: codex has **no MCP servers configured** on this machine (no Supabase, Vercel, Roboflow, etc.) — give it fully self-contained prompts with explicit file paths and expected outputs, and route any task that needs MCP tools to cursor-agent or a Claude subagent instead.
+- Claude models (sonnet, opus, fable) run via the Agent/Workflow `model` parameter — no CLI needed.
+
+Repo-specific rules for delegated agents:
+
+- Every checkout/worktree needs a valid `.env` before dev, build, or pipeline scripts run — Next.js validates env vars with Zod at config load (`src/env.mjs`), and all pipeline scripts use `tsx --env-file=.env`. Worktrees (including cursor-agent's at `~/.cursor/worktrees/`) do NOT inherit `.env` — tell the agent to copy it from the source checkout first.
+- Do not use `SKIP_ENV_VALIDATION=1` for normal verification — it's for CI/Docker builds only.
+- Delegated agents must run `pnpm format:write` (or `prettier --write` on changed files) before committing.
+- Verification gate for any delegated code task: `pnpm typecheck`, `pnpm lint`, `pnpm format:check` — all clean before handing work back. (No test suite in this repo yet.)
+
+---
+
 ## Roadmap
 
 The end-state vision and phased plan tying every workstream together
