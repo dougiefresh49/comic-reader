@@ -449,9 +449,9 @@ export default function ZenComicReader({
 
   const gestureProps = gestureBind();
 
-  // Narration is content: SpeechBox (or its empty-state card) sits above the
-  // panel transport chrome. In panel mode the HUD play is the ONLY play
-  // control, so SpeechBox gets no onTogglePlay there.
+  // Narration is content: SpeechBox (or its empty-state card) sits below the
+  // panel chrome row, above the progress bar. In panel mode the HUD play is
+  // the ONLY play control, so SpeechBox gets no onTogglePlay there.
   const caption = speech ? (
     <SpeechBox
       speaker={selectedBubble?.speaker}
@@ -462,7 +462,7 @@ export default function ZenComicReader({
       onTogglePlay={panelViewMode ? undefined : togglePlayPause}
     />
   ) : (
-    <div className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 px-4 py-3 text-sm text-neutral-400">
+    <div className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 p-3 text-sm text-neutral-400">
       Tap a bubble to hear it
     </div>
   );

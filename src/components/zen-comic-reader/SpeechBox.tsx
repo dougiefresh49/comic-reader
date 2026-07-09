@@ -96,7 +96,7 @@ export function SpeechBox({
   }, [words, text, activeWordIndex]);
 
   return (
-    <div className="relative flex min-h-[78px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/70 px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+    <div className="relative flex min-h-[78px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/70 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
           {speaker?.trim() ?? "Narrator"}
