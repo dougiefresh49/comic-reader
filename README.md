@@ -1,4 +1,4 @@
-# <img src="public/logo.jpeg" alt="Comic Reader logo" width="40" align="center" /> Comic Reader
+# <img src="public/logo.png" alt="Comic Reader logo" width="40" align="center" /> Comic Reader
 
 Personal "Audible + Kindle for comics" app. Kids learning to read get an interactive comic viewer where tapping a speech bubble plays the character's voice and highlights words in sync (karaoke-style). Family use only — not for sale.
 
