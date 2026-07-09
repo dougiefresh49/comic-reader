@@ -7,8 +7,9 @@ interface EdgePageNavProps {
 }
 
 /**
- * Desktop-only full-height edge strip for page turning. Barely visible at
- * rest; the chevron and gradient fade in on hover (or keyboard focus).
+ * Desktop-only full-height edge strip for page turning. The chevron pill is
+ * always visible at reduced opacity so the affordance is discoverable; it
+ * brightens (and the edge gradient fades in) on hover or keyboard focus.
  * Rendered as a sibling of the gesture container — never inside it — so it
  * can't interfere with pinch/swipe/double-tap handling, and it disappears
  * entirely (pointer-events included) on first/last pages.
@@ -33,7 +34,7 @@ export function EdgePageNav({ side, onNavigate, disabled }: EdgePageNavProps) {
             : "bg-gradient-to-l from-black/40 to-transparent"
         }`}
       />
-      <span className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-neutral-950/80 text-neutral-200 opacity-0 backdrop-blur transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+      <span className="relative flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-neutral-950/80 text-neutral-200 opacity-60 backdrop-blur transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
