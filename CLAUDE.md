@@ -134,6 +134,23 @@ pnpm typecheck
 
 ---
 
+## Code style
+
+- Always strive for concise, simple solutions.
+- If a problem can be solved in a simpler way, propose it.
+- Structured data lives in Supabase (DB + Storage) — don't introduce new local JSON state files; the `assets/` JSON files are legacy from the local pipeline era.
+
+---
+
+## General preferences
+
+- Use pnpm, never npm.
+- Delegation roster: cursor-agent, codex, and Claude models only. Don't delegate to agy/Antigravity (owner call, 2026-07-07 — flaky headless behavior).
+- If asked to do too much work at once, stop and state that clearly.
+- If computer use is helpful for completing or verifying work, prefer the claude-in-chrome MCP for plain web-page checks (this is a web app); shell out to gpt-5.x with Codex (see the `codex-computer-use` skill) for anything needing native UI, audio playback confirmation, or an independent second pair of eyes.
+
+---
+
 ## Picking the right models for workflows and subagents
 
 Rankings, higher = better. Cost reflects what we actually pay (subscriptions with generous limits rank cheap), not list price. Intelligence is how hard a problem you can hand the model unsupervised. Taste covers UI/UX, code quality, API design, and copy.
@@ -141,6 +158,7 @@ Rankings, higher = better. Cost reflects what we actually pay (subscriptions wit
 | model        | cost | intelligence | taste | reachable via                    |
 | ------------ | ---- | ------------ | ----- | -------------------------------- |
 | composer-2.5 | 8    | 5            | 5     | cursor-agent CLI (`agent`)       |
+| grok-4.5     | 8    | 6            | 6     | cursor-agent CLI (`--model grok-4.5-fast-xhigh`; everyday tier `-fast-high`) |
 | gpt-5.x      | 8    | 7            | 5     | codex CLI (`codex`)              |
 | sonnet-5     | 5    | 5            | 7     | Agent/Workflow `model: 'sonnet'` |
 | opus-4.8     | 4    | 7            | 8     | Agent/Workflow `model: 'opus'`   |
@@ -150,24 +168,41 @@ How to apply:
 
 - These are defaults, not limits. You have standing permission to override them: if a cheaper model's output doesn't meet the bar, rerun or redo the work with a smarter model without asking. Judge the output, not the price tag. Escalating costs less than shipping mediocre work.
 - Cost is a tie-breaker only; when axes conflict for anything that ships, intelligence > taste > cost.
-- Bulk/mechanical work (clear-spec implementation, formatting sweeps, migrations, batch refactors): composer-2.5 via cursor-agent — it's effectively free and runs in an isolated worktree while you keep working.
-- Anything user-facing (UI, copy, API design) needs taste ≥ 7: sonnet-5 minimum, opus-4.8/fable-5 preferred.
-- Reviews of plans/implementations: fable-5 or opus-4.8, optionally composer-2.5 or gpt-5.x as an extra independent perspective.
+- Bulk/mechanical work (clear-spec implementation, formatting sweeps, migrations, batch refactors): composer-2.5 or grok-4.5 via cursor-agent (grok audition 2026-07-08: passed a 9-file cross-module task with distinction; prefer grok for trickier multi-file work, composer for pure mechanical) — it's effectively free and runs in an isolated worktree while you keep working.
+- Anything user-facing (UI, copy, API design) needs taste ≥ 7: sonnet-5 minimum, opus-4.8/fable-5 preferred. The Gemini prompts in the pipeline (speaker ID, voice descriptions, reading order) directly shape what kids hear and read — treat prompt edits as user-facing work.
+- Reviews of plans/implementations: fable-5 or opus-4.8, optionally composer-2.5 or gpt-5.x as an extra independent perspective (see the `codex-review` skill).
 - Never use Haiku. For trivial work (classification, log filtering, glue, bulk edits), use composer-2.5 or gpt-5.x — they're effectively free and better.
 
 Mechanics:
 
 - **Check CLI availability before delegating** — not every machine has every CLI. `command -v agent` for cursor-agent, `command -v codex` for codex. If the CLI you want is missing, fall back to a Claude subagent via the Agent tool instead of telling the user to install anything.
 - composer-2.5 runs through the cursor-agent CLI: `agent --worktree -p --force "prompt"` (see the `cursor-agent` skill for full flags, spec-file workflow, and output formats). Always pass `--force` for tasks that write code; default model is composer, or pin with `--model composer-2.5`.
-- gpt-5.x runs through the codex CLI. Caveat: codex has **no MCP servers configured** on this machine (no Supabase, Vercel, Roboflow, etc.) — give it fully self-contained prompts with explicit file paths and expected outputs, and route any task that needs MCP tools to cursor-agent or a Claude subagent instead.
+- gpt-5.x runs through the codex CLI — `codex exec` / `codex review`. On this machine codex has the computer-use plugin set up and MCP servers connected (verify with `codex mcp list` if a task depends on a specific one). Use the `codex-review` and `codex-computer-use` skills; for work they don't cover (investigation, data analysis), run `codex exec -s read-only` directly with a self-contained prompt.
 - Claude models (sonnet, opus, fable) run via the Agent/Workflow `model` parameter — no CLI needed.
+- Codex runs can exceed Bash's 10-minute timeout: pass an explicit timeout, or run in the background and poll for the report file.
+- Parallel implementation agents that write code must use `isolation: 'worktree'` so edits don't collide in the shared checkout.
 
 Repo-specific rules for delegated agents:
 
 - Every checkout/worktree needs a valid `.env` before dev, build, or pipeline scripts run — Next.js validates env vars with Zod at config load (`src/env.mjs`), and all pipeline scripts use `tsx --env-file=.env`. Worktrees (including cursor-agent's at `~/.cursor/worktrees/`) do NOT inherit `.env` — tell the agent to copy it from the source checkout first.
 - Do not use `SKIP_ENV_VALIDATION=1` for normal verification — it's for CI/Docker builds only.
+- Delegated agents must NOT make live Gemini/ElevenLabs/Roboflow calls unless the task is explicitly about pipeline processing — ElevenLabs credits especially are real money. State this in every delegated prompt.
 - Delegated agents must run `pnpm format:write` (or `prettier --write` on changed files) before committing.
 - Verification gate for any delegated code task: `pnpm typecheck`, `pnpm lint`, `pnpm format:check` — all clean before handing work back. (No test suite in this repo yet.)
+
+---
+
+## Verifying this app
+
+The app is a Next.js web app, so most verification is browser-based:
+
+1. `pnpm dev` (needs valid `.env`), then check the reader at `/book/<bookId>/<issueId>` and admin at `/admin`.
+2. Claude can drive the browser directly via the claude-in-chrome MCP — prefer that for page checks, console errors, and screenshots.
+3. Audio playback confirmation ("does tapping a bubble actually play the right voice with word highlighting") benefits from real eyes/ears — shell out via the `codex-computer-use` skill.
+4. Prefer checking DB rows and Supabase Storage over re-running pipeline steps — pipeline runs cost Gemini/ElevenLabs/Roboflow credits.
+5. Production checks: Vercel MCP for deployment status and runtime logs; Supabase MCP for data.
+
+Launching the dev server, taking screenshots, and playing short test audio are fine without asking; ask first before anything that mutates production data, resets pipeline state, or triggers paid pipeline runs.
 
 ---
 
