@@ -21,6 +21,10 @@ import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
 import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
+import {
+  styleToNormRect,
+  unionPanelFocusBounds,
+} from "./zen-comic-reader/PanelView.transforms";
 import { LayeredPanel } from "./zen-comic-reader/LayeredPanel";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
@@ -140,9 +144,19 @@ export default function ZenComicReader({
     }
   }, [clearPanelTimer, setPanelViewPreferred]);
 
+  // Assigned after useAudioPlayback below; ref breaks the ordering cycle
+  // (togglePanelAutoPlay feeds usePanelNavigation which feeds the audio hook).
+  const stopAllRef = useRef<() => void>(() => undefined);
+
   const togglePanelAutoPlay = useCallback(() => {
-    setPanelAutoPlay((p) => !p);
-  }, []);
+    if (panelAutoPlay) {
+      // Turning read-aloud OFF: cancel the pending advance and silence the
+      // currently playing bubble — the HUD play is the only control in panel mode.
+      clearPanelTimer();
+      stopAllRef.current();
+    }
+    setPanelAutoPlay(!panelAutoPlay);
+  }, [panelAutoPlay, clearPanelTimer]);
 
   const navigateNextRef = useRef<(() => void) | null>(null);
   const navigatePrevRef = useRef<(() => void) | null>(null);
@@ -179,6 +193,22 @@ export default function ZenComicReader({
       .filter((b) => idSet.has(b.id))
       .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0));
   }, [activePanel, visibleBubbles]);
+
+  /**
+   * Camera/dim target: panel bbox unioned with its bubble rects so speech
+   * bubbles that overflow the panel stay lit and in frame. Bubble rects come
+   * from the always-present render `style` percentages (`box_2d` is
+   * pixel-space with optional fields). Consumed ONLY by PanelDimOverlay and
+   * PanelViewFrame's camera — LayeredPanel and PanelEffectsOverlay keep the
+   * original `panel.boundingBox` for mask/effect positioning.
+   */
+  const focusBounds = useMemo(() => {
+    if (!activePanel) return null;
+    const rects = orderedPanelBubbles.flatMap((b) =>
+      b.style ? [styleToNormRect(b.style)] : [],
+    );
+    return unionPanelFocusBounds(activePanel.boundingBox, rects);
+  }, [activePanel, orderedPanelBubbles]);
 
   const displayBubbles = useMemo(() => {
     if (!panelViewMode || !panels.length || !activePanel) return visibleBubbles;
@@ -311,6 +341,7 @@ export default function ZenComicReader({
     volume: effectiveVolumes.dialogue,
     playbackRate,
   });
+  stopAllRef.current = stopAll;
 
   const playBubble = useCallback(
     (b: Bubble) => {
@@ -418,6 +449,24 @@ export default function ZenComicReader({
 
   const gestureProps = gestureBind();
 
+  // Narration is content: SpeechBox (or its empty-state card) sits above the
+  // panel transport chrome. In panel mode the HUD play is the ONLY play
+  // control, so SpeechBox gets no onTogglePlay there.
+  const caption = speech ? (
+    <SpeechBox
+      speaker={selectedBubble?.speaker}
+      text={speech.cleanText}
+      words={speech.words}
+      activeWordIndex={activeWordIndex}
+      isPlaying={isPlaying}
+      onTogglePlay={panelViewMode ? undefined : togglePlayPause}
+    />
+  ) : (
+    <div className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 px-4 py-3 text-sm text-neutral-400">
+      Tap a bubble to hear it
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black">
       <TopBar
@@ -452,6 +501,7 @@ export default function ZenComicReader({
               panelIndex={panelIndex}
               reducedMotion={cameraOff}
               pageSize={pageNaturalSize}
+              focusBounds={focusBounds}
             >
               {panelViewMode && activePanel?.foregroundPolygons ? (
                 <LayeredPanel
@@ -483,7 +533,9 @@ export default function ZenComicReader({
                 </>
               )}
               {panelViewMode && activePanel ? (
-                <PanelDimOverlay bbox={activePanel.boundingBox} />
+                <PanelDimOverlay
+                  bbox={focusBounds ?? activePanel.boundingBox}
+                />
               ) : null}
               <PanelAudioLayer
                 panel={activePanel}
@@ -528,7 +580,11 @@ export default function ZenComicReader({
         </div>
       </div>
 
-      <ControlBar pageNumber={pageNumber} pageCount={pageCount}>
+      <ControlBar
+        pageNumber={pageNumber}
+        pageCount={pageCount}
+        hidePageProgress={panelViewMode && panels.length > 0}
+      >
         <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
           {panelViewMode && panels.length > 0 ? (
             <PanelViewHud
@@ -540,22 +596,11 @@ export default function ZenComicReader({
               panelAutoPlay={panelAutoPlay}
               onTogglePanelAutoPlay={togglePanelAutoPlay}
               announceText={announceText}
-            />
-          ) : null}
-
-          {speech ? (
-            <SpeechBox
-              speaker={selectedBubble?.speaker}
-              text={speech.cleanText}
-              words={speech.words}
-              activeWordIndex={activeWordIndex}
-              isPlaying={isPlaying}
-              onTogglePlay={togglePlayPause}
-            />
+            >
+              {caption}
+            </PanelViewHud>
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-neutral-500 italic">
-              Tap a bubble to play
-            </div>
+            caption
           )}
         </div>
       </ControlBar>

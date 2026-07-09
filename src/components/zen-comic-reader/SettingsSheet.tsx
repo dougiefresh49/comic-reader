@@ -6,6 +6,7 @@ import {
   type LayerVolumes,
   type MotionIntensity,
 } from "~/hooks/useSettings";
+import { SheetShell } from "~/components/ui/SheetShell";
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -78,133 +79,101 @@ export function SettingsSheet({
   motionIntensity,
   onSetMotionIntensity,
 }: SettingsSheetProps) {
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onClose}
+    <SheetShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Settings"
+      closeLabel="Close settings"
+      panelClassName="max-h-[85vh] max-w-xl overflow-y-auto pb-5"
     >
-      <div
-        className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-white/10 bg-neutral-950/95 px-4 pt-3 pb-5 shadow-[0_-10px_40px_rgba(0,0,0,0.45)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-3 flex items-center justify-between px-1">
-          <span className="text-sm font-semibold tracking-[0.08em] text-neutral-200 uppercase">
-            Settings
-          </span>
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label="Close settings"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" x2="6" y1="6" y2="18" />
-              <line x1="6" x2="18" y1="6" y2="18" />
-            </svg>
-          </button>
-        </div>
+      <div className="flex flex-col gap-4">
+        {/* ── Audio Section ── */}
+        <section>
+          <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+            Audio
+          </h3>
+          <div className="flex flex-col gap-3">
+            <ToggleRow
+              label="Mute all"
+              hint="Silence everything"
+              enabled={muteAll}
+              onToggle={onToggleMuteAll}
+              icon={<IconVolumeX />}
+            />
+            <ToggleRow
+              label="Voices only"
+              hint="Dialogue only — no music, SFX, or ambience"
+              enabled={voicesOnly}
+              onToggle={onToggleVoicesOnly}
+              icon={<IconMic />}
+            />
+            <PlaybackRateRow
+              value={playbackRate}
+              onChange={onSetPlaybackRate}
+            />
+            <VolumeSection
+              volumes={volumes}
+              onChange={onSetLayerVolume}
+              onReset={onResetVolumes}
+              disabled={muteAll || voicesOnly}
+            />
+          </div>
+        </section>
 
-        <div className="flex flex-col gap-4">
-          {/* ── Audio Section ── */}
-          <section>
-            <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-              Audio
-            </h3>
-            <div className="flex flex-col gap-3">
-              <ToggleRow
-                label="Mute all"
-                hint="Silence everything"
-                enabled={muteAll}
-                onToggle={onToggleMuteAll}
-                icon={<IconVolumeX />}
-              />
-              <ToggleRow
-                label="Voices only"
-                hint="Dialogue only — no music, SFX, or ambience"
-                enabled={voicesOnly}
-                onToggle={onToggleVoicesOnly}
-                icon={<IconMic />}
-              />
-              <PlaybackRateRow
-                value={playbackRate}
-                onChange={onSetPlaybackRate}
-              />
-              <VolumeSection
-                volumes={volumes}
-                onChange={onSetLayerVolume}
-                onReset={onResetVolumes}
-                disabled={muteAll || voicesOnly}
-              />
-            </div>
-          </section>
+        {/* ── Reading Section ── */}
+        <section>
+          <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+            Reading
+          </h3>
+          <div className="flex flex-col gap-3">
+            <ToggleRow
+              label="Auto-advance"
+              hint="Play bubbles continuously"
+              enabled={autoPlayEnabled}
+              onToggle={onToggleAutoPlay}
+              icon={<IconPlayCircle />}
+            />
+            <ToggleRow
+              label="Auto-turn pages"
+              hint="Advance to next page when all bubbles finish"
+              enabled={autoAdvancePage}
+              onToggle={onToggleAutoAdvancePage}
+              icon={<IconBookOpen />}
+            />
+          </div>
+        </section>
 
-          {/* ── Reading Section ── */}
-          <section>
-            <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-              Reading
-            </h3>
-            <div className="flex flex-col gap-3">
-              <ToggleRow
-                label="Auto-advance"
-                hint="Play bubbles continuously"
-                enabled={autoPlayEnabled}
-                onToggle={onToggleAutoPlay}
-                icon={<IconPlayCircle />}
-              />
-              <ToggleRow
-                label="Auto-turn pages"
-                hint="Advance to next page when all bubbles finish"
-                enabled={autoAdvancePage}
-                onToggle={onToggleAutoAdvancePage}
-                icon={<IconBookOpen />}
-              />
-            </div>
-          </section>
-
-          {/* ── Visual Section ── */}
-          <section>
-            <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-              Visual effects
-            </h3>
-            <div className="flex flex-col gap-3">
-              <ToggleRow
-                label="Camera motion"
-                hint="Panel zoom, push-in, and shake effects"
-                enabled={motionIntensity !== "off"}
-                onToggle={() =>
-                  onSetMotionIntensity(
-                    motionIntensity === "off" ? "full" : "off",
-                  )
-                }
-                icon={<IconVideo />}
-              />
-              <ToggleRow
-                label="Particle effects"
-                hint="Sparkles, dust, rain, and other overlays"
-                enabled={motionIntensity === "full"}
-                onToggle={() =>
-                  onSetMotionIntensity(
-                    motionIntensity === "full" ? "reduced" : "full",
-                  )
-                }
-                icon={<IconSparkles />}
-              />
-            </div>
-          </section>
-        </div>
+        {/* ── Visual Section ── */}
+        <section>
+          <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+            Visual effects
+          </h3>
+          <div className="flex flex-col gap-3">
+            <ToggleRow
+              label="Camera motion"
+              hint="Panel zoom, push-in, and shake effects"
+              enabled={motionIntensity !== "off"}
+              onToggle={() =>
+                onSetMotionIntensity(motionIntensity === "off" ? "full" : "off")
+              }
+              icon={<IconVideo />}
+            />
+            <ToggleRow
+              label="Particle effects"
+              hint="Sparkles, dust, rain, and other overlays"
+              enabled={motionIntensity === "full"}
+              onToggle={() =>
+                onSetMotionIntensity(
+                  motionIntensity === "full" ? "reduced" : "full",
+                )
+              }
+              icon={<IconSparkles />}
+            />
+          </div>
+        </section>
       </div>
-    </div>
+    </SheetShell>
   );
 }
 
