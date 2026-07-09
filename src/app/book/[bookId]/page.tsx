@@ -159,7 +159,11 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
                     offlineUrls={offlineUrlsByIssue[issue.id] ?? []}
                   />
                 ) : (
-                  <ComingSoonIssueCard key={issue.id} issue={issue} />
+                  <ComingSoonIssueCard
+                    key={issue.id}
+                    bookId={bookId}
+                    issue={issue}
+                  />
                 ),
               )}
             </div>
@@ -247,15 +251,23 @@ function AvailableIssueCard({
   );
 }
 
-function ComingSoonIssueCard({ issue }: { issue: IssueManifest }) {
+function ComingSoonIssueCard({
+  bookId,
+  issue,
+}: {
+  bookId: string;
+  issue: IssueManifest;
+}) {
   return (
     <div className="flex flex-col rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-3">
+      {/* Real cover when one exists in storage (dimmed); monogram otherwise */}
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900 opacity-60">
         <CoverImage
-          src={null}
+          src={pageImageUrl(bookId, issue.id, 1)}
           alt={`${issue.name} — coming soon`}
           fallbackLabel={issueMonogram(issue)}
           fallbackCaption={null}
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 20vw, 16vw"
         />
       </div>
 
