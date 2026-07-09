@@ -32,6 +32,13 @@ export function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
+/**
+ * Kindle-style letterbox: dark enough that neighbor panels read as "off",
+ * translucent enough that the ~400ms camera spring still glides in context.
+ * Single source of truth for all four masking rects below.
+ */
+const PANEL_DIM_CLASS = "bg-black/85";
+
 export function PanelDimOverlay({
   bbox,
 }: {
@@ -47,17 +54,17 @@ export function PanelDimOverlay({
   return (
     <>
       <div
-        className="pointer-events-auto absolute inset-x-0 top-0 bg-black/50"
+        className={`pointer-events-auto absolute inset-x-0 top-0 ${PANEL_DIM_CLASS}`}
         style={{ height: `${topPct}%` }}
         aria-hidden
       />
       <div
-        className="pointer-events-auto absolute inset-x-0 bottom-0 bg-black/50"
+        className={`pointer-events-auto absolute inset-x-0 bottom-0 ${PANEL_DIM_CLASS}`}
         style={{ top: `${innerBottom}%` }}
         aria-hidden
       />
       <div
-        className="pointer-events-auto absolute left-0 bg-black/50"
+        className={`pointer-events-auto absolute left-0 ${PANEL_DIM_CLASS}`}
         style={{
           top: `${topPct}%`,
           width: `${leftPct}%`,
@@ -66,7 +73,7 @@ export function PanelDimOverlay({
         aria-hidden
       />
       <div
-        className="pointer-events-auto absolute right-0 bg-black/50"
+        className={`pointer-events-auto absolute right-0 ${PANEL_DIM_CLASS}`}
         style={{
           top: `${topPct}%`,
           width: `${100 - innerRight}%`,
@@ -84,6 +91,13 @@ interface PanelViewFrameProps {
   panelIndex: number;
   reducedMotion: boolean;
   pageSize: { w: number; h: number };
+  /**
+   * Camera target: union of the active panel bbox + its bubble rects
+   * (see `unionPanelFocusBounds`). Falls back to the raw panel bbox.
+   * Kept separate from `panel.boundingBox`, which LayeredPanel and the
+   * effects overlay still consume for mask/effect positioning.
+   */
+  focusBounds?: PageDirectedPanel["boundingBox"] | null;
   children: React.ReactNode;
 }
 
@@ -96,6 +110,7 @@ export function PanelViewFrame({
   panelIndex,
   reducedMotion,
   pageSize,
+  focusBounds,
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -131,8 +146,12 @@ export function PanelViewFrame({
     ) {
       return { tx: 0, ty: 0, scale: 1 };
     }
-    return panelTransform(activePanel.boundingBox, containerSize, imageRect);
-  }, [panelViewMode, activePanel, containerSize, imageRect]);
+    return panelTransform(
+      focusBounds ?? activePanel.boundingBox,
+      containerSize,
+      imageRect,
+    );
+  }, [panelViewMode, activePanel, focusBounds, containerSize, imageRect]);
 
   const applyTransform = useCallback((t: PanelTransformResult) => {
     const el = transformRef.current;
@@ -182,10 +201,17 @@ export function PanelViewFrame({
       ? ""
       : cameraEffectClassFromTags(activePanel.effectTags);
 
+  // Reserve room for the bottom chrome. Panel mode stacks caption +
+  // transport rows in the ControlBar (~280px incl. page padding); regular
+  // mode keeps the slimmer 140px reservation.
+  const frameSizeClass = panelViewMode
+    ? "max-h-[calc(100vh-280px)] max-w-[min(100%,calc((100vh-280px)*0.667))]"
+    : "max-h-[calc(100vh-140px)] max-w-[min(100%,calc((100vh-140px)*0.667))]";
+
   return (
     <div
       ref={viewportRef}
-      className="relative mx-auto aspect-[2/3] max-h-[calc(100vh-140px)] w-full max-w-[min(100%,calc((100vh-140px)*0.667))] overflow-hidden select-none"
+      className={`relative mx-auto aspect-[2/3] w-full overflow-hidden select-none ${frameSizeClass}`}
     >
       <div ref={transformRef} className="relative h-full w-full">
         <div
@@ -257,6 +283,8 @@ interface PanelViewHudProps {
   panelAutoPlay: boolean;
   onTogglePanelAutoPlay: () => void;
   announceText: string;
+  /** Caption slot (SpeechBox / empty state) — content sits above the transport chrome. */
+  children?: React.ReactNode;
 }
 
 export function PanelViewHud({
@@ -268,6 +296,7 @@ export function PanelViewHud({
   panelAutoPlay,
   onTogglePanelAutoPlay,
   announceText,
+  children,
 }: PanelViewHudProps) {
   const humanIndex = panelCount > 0 ? panelIndex + 1 : 0;
   const progress = panelCount > 0 ? humanIndex / panelCount : 0;
@@ -283,57 +312,130 @@ export function PanelViewHud({
         {announceText}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-200">
+      {/* Row 1: close (left) + panel position (right) */}
+      <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg bg-white/10 px-3 py-1.5 font-medium hover:bg-white/15"
+          className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Close panel view"
         >
-          × Close
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" x2="6" y1="6" y2="18" />
+            <line x1="6" x2="18" y1="6" y2="18" />
+          </svg>
         </button>
 
-        <span className="text-neutral-400 tabular-nums">
+        <span className="text-sm font-semibold text-neutral-200 tabular-nums">
           Panel {humanIndex} of {panelCount}
         </span>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onTogglePanelAutoPlay}
-            className={`rounded-lg px-3 py-1.5 font-medium ${
-              panelAutoPlay ? "bg-cyan-600 text-white" : "bg-white/10"
-            }`}
-            aria-label={
-              panelAutoPlay ? "Pause panel auto-play" : "Start panel auto-play"
-            }
-            aria-pressed={panelAutoPlay}
-          >
-            {panelAutoPlay ? "⏸ Pause" : "⏯ Play"}
-          </button>
-
-          <button
-            type="button"
-            onClick={onPrev}
-            disabled={panelIndex <= 0}
-            className="rounded-lg bg-white/10 px-3 py-1.5 hover:bg-white/15 disabled:opacity-30"
-            aria-label="Previous panel"
-          >
-            ‹ Prev
-          </button>
-
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={panelIndex >= panelCount - 1}
-            className="rounded-lg bg-white/10 px-3 py-1.5 hover:bg-white/15 disabled:opacity-30"
-            aria-label="Next panel"
-          >
-            Next ›
-          </button>
-        </div>
       </div>
 
+      {/* Caption is content; it sits above the transport buttons. */}
+      {children}
+
+      {/* Row 2: transport — ghost prev / hero play / ghost next */}
+      <div className="flex items-center justify-center gap-6">
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={panelIndex <= 0}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
+          aria-label="Previous panel"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={onTogglePanelAutoPlay}
+          className={`flex h-11 min-w-11 items-center justify-center gap-2 rounded-full transition-colors ${
+            panelAutoPlay
+              ? "bg-cyan-600 px-3 text-white hover:bg-cyan-500"
+              : "bg-white/10 px-5 text-white hover:bg-white/15"
+          }`}
+          aria-label={
+            panelAutoPlay ? "Pause reading aloud" : "Read panels aloud"
+          }
+          aria-pressed={panelAutoPlay}
+        >
+          {panelAutoPlay ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="6" y="4" width="4" height="16" rx="1" />
+              <rect x="14" y="4" width="4" height="16" rx="1" />
+            </svg>
+          ) : (
+            <>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M8 5.14v13.72L19 12 8 5.14z" />
+              </svg>
+              <span className="text-sm font-semibold">Read to me</span>
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={panelIndex >= panelCount - 1}
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
+          aria-label="Next panel"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Single progress story in panel mode (page tick hidden in ControlBar). */}
       <div
         className="h-1 w-full overflow-hidden rounded-full bg-white/10"
         aria-hidden

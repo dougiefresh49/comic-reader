@@ -16,6 +16,70 @@ export interface PanelTransformResult {
   ty: number;
 }
 
+/** A rect in normalized page coordinates (0-1 fractions of the page). */
+export interface NormalizedRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Convert a bubble's CSS percentage style rect (e.g. left: "12.5%") to a
+ * normalized 0-1 page-space rect. Bubble `box_2d` is pixel-space with
+ * optional fields, so the always-present render style is the safe source.
+ */
+export function styleToNormRect(style: {
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+}): NormalizedRect {
+  return {
+    x: parseFloat(style.left) / 100,
+    y: parseFloat(style.top) / 100,
+    w: parseFloat(style.width) / 100,
+    h: parseFloat(style.height) / 100,
+  };
+}
+
+/**
+ * Union of a panel's bounding box and its speech-bubble rects, padded and
+ * clamped to [0,1]. Used ONLY for the focus camera (`panelTransform`) and
+ * the dim overlay — never fed back into `panel.boundingBox` consumers
+ * (LayeredPanel foreground masks and effect overlays map coordinates
+ * relative to the original panel bbox).
+ */
+export function unionPanelFocusBounds(
+  panelBbox: PanelBoundingBox,
+  bubbleRects: NormalizedRect[],
+  pad = 0.01,
+): PanelBoundingBox {
+  let minX = panelBbox.x;
+  let minY = panelBbox.y;
+  let maxX = panelBbox.x + panelBbox.w;
+  let maxY = panelBbox.y + panelBbox.h;
+  for (const r of bubbleRects) {
+    if (
+      !Number.isFinite(r.x) ||
+      !Number.isFinite(r.y) ||
+      !Number.isFinite(r.w) ||
+      !Number.isFinite(r.h)
+    ) {
+      continue;
+    }
+    minX = Math.min(minX, r.x);
+    minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.w);
+    maxY = Math.max(maxY, r.y + r.h);
+  }
+  minX = Math.max(0, minX - pad);
+  minY = Math.max(0, minY - pad);
+  maxX = Math.min(1, maxX + pad);
+  maxY = Math.min(1, maxY + pad);
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
 export interface SpringState {
   tx: number;
   ty: number;
