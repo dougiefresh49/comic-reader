@@ -99,3 +99,4 @@ Backlog and status tracker for planned features. Update status here when work st
 | Episode web player | `/episode/[bookId]/[issueId]` route in Next.js app — after assembly pipeline ships |
 | ~~Spring-curve panel transitions~~ | **Done** — rAF spring physics in `PanelView.transforms.ts`. PR #20. |
 | Action-line position hint in effect tags | Cheap fix for effects placed in wrong corner; precursor to action-line bbox detection. See `segmentation-layering.md` §"Action lines". |
+| Continue-reading resume | Persist last book/issue/page in localStorage (follow `useSettings` conventions, key like `comic-reader.last-read`); on home/book pages offer a "Pick up where you left off" CTA. Requested 2026-07-09 during demo prep — deliberately deferred, not a priority. |
