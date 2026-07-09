@@ -201,11 +201,13 @@ export function PanelViewFrame({
       ? ""
       : cameraEffectClassFromTags(activePanel.effectTags);
 
-  // Reserve room for the bottom chrome. Panel mode stacks caption +
-  // transport rows in the ControlBar (~280px incl. page padding); regular
-  // mode keeps the slimmer 140px reservation.
+  // Reserve room for the bottom chrome. Panel mode: single chrome row
+  // (44px play pill) + gap (8) + caption (min 78) + gap (8) + panel
+  // progress (4) + ControlBar py-2/border (17) + page p-4 (32) ≈ 191px,
+  // plus ~45px caption-growth headroom → 236px. Regular mode keeps the
+  // slimmer 140px reservation.
   const frameSizeClass = panelViewMode
-    ? "max-h-[calc(100vh-280px)] max-w-[min(100%,calc((100vh-280px)*0.667))]"
+    ? "max-h-[calc(100vh-236px)] max-w-[min(100%,calc((100vh-236px)*0.667))]"
     : "max-h-[calc(100vh-140px)] max-w-[min(100%,calc((100vh-140px)*0.667))]";
 
   return (
@@ -283,7 +285,7 @@ interface PanelViewHudProps {
   panelAutoPlay: boolean;
   onTogglePanelAutoPlay: () => void;
   announceText: string;
-  /** Caption slot (SpeechBox / empty state) — content sits above the transport chrome. */
+  /** Caption slot (SpeechBox / empty state) — content sits below the chrome row, above the progress bar. */
   children?: React.ReactNode;
 }
 
@@ -302,7 +304,7 @@ export function PanelViewHud({
   const progress = panelCount > 0 ? humanIndex / panelCount : 0;
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2 px-1">
+    <div className="flex w-full min-w-0 flex-col gap-2">
       <div
         className="sr-only"
         role="status"
@@ -312,12 +314,13 @@ export function PanelViewHud({
         {announceText}
       </div>
 
-      {/* Row 1: close (left) + panel position (right) */}
-      <div className="flex items-center justify-between">
+      {/* Single chrome row: close/exit (left) | transport (centered) | panel position (right).
+          1fr side tracks keep the transport optically centered. */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
+          className="justify-self-start rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Close panel view"
         >
           <svg
@@ -336,52 +339,15 @@ export function PanelViewHud({
           </svg>
         </button>
 
-        <span className="text-sm font-semibold text-neutral-200 tabular-nums">
-          Panel {humanIndex} of {panelCount}
-        </span>
-      </div>
-
-      {/* Caption is content; it sits above the transport buttons. */}
-      {children}
-
-      {/* Row 2: transport — ghost prev / hero play / ghost next */}
-      <div className="flex items-center justify-center gap-6">
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={panelIndex <= 0}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
-          aria-label="Previous panel"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        {/* Transport — ghost prev / hero play / ghost next */}
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={panelIndex <= 0}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
+            aria-label="Previous panel"
           >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          onClick={onTogglePanelAutoPlay}
-          className={`flex h-11 min-w-11 items-center justify-center gap-2 rounded-full transition-colors ${
-            panelAutoPlay
-              ? "bg-cyan-600 px-3 text-white hover:bg-cyan-500"
-              : "bg-white/10 px-5 text-white hover:bg-white/15"
-          }`}
-          aria-label={
-            panelAutoPlay ? "Pause reading aloud" : "Read panels aloud"
-          }
-          aria-pressed={panelAutoPlay}
-        >
-          {panelAutoPlay ? (
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="20"
@@ -389,51 +355,95 @@ export function PanelViewHud({
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.5"
+              strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <rect x="6" y="4" width="4" height="16" rx="1" />
-              <rect x="14" y="4" width="4" height="16" rx="1" />
+              <path d="m15 18-6-6 6-6" />
             </svg>
-          ) : (
-            <>
+          </button>
+
+          <button
+            type="button"
+            onClick={onTogglePanelAutoPlay}
+            className={`flex h-11 min-w-11 items-center justify-center gap-2 rounded-full transition-colors ${
+              panelAutoPlay
+                ? "bg-cyan-600 px-3 text-white hover:bg-cyan-500"
+                : "bg-white/10 px-3 text-white hover:bg-white/15 min-[360px]:px-4"
+            }`}
+            aria-label={
+              panelAutoPlay ? "Pause reading aloud" : "Read panels aloud"
+            }
+            aria-pressed={panelAutoPlay}
+          >
+            {panelAutoPlay ? (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="18"
-                height="18"
+                width="20"
+                height="20"
                 viewBox="0 0 24 24"
-                fill="currentColor"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                <path d="M8 5.14v13.72L19 12 8 5.14z" />
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
               </svg>
-              <span className="text-sm font-semibold">Read to me</span>
-            </>
-          )}
-        </button>
+            ) : (
+              <>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M8 5.14v13.72L19 12 8 5.14z" />
+                </svg>
+                {/* Responsive label: icon-only < 360px, "Read" < sm, "Read to me" on sm+ */}
+                <span className="hidden text-sm font-semibold min-[360px]:inline sm:hidden">
+                  Read
+                </span>
+                <span className="hidden text-sm font-semibold sm:inline">
+                  Read to me
+                </span>
+              </>
+            )}
+          </button>
 
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={panelIndex >= panelCount - 1}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
-          aria-label="Next panel"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={panelIndex >= panelCount - 1}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
+            aria-label="Next panel"
           >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
+
+        <span className="justify-self-end text-sm font-semibold whitespace-nowrap text-neutral-200 tabular-nums">
+          Panel {humanIndex} of {panelCount}
+        </span>
       </div>
+
+      {/* Caption is content; it sits below the chrome row, stretched to a
+          slim gutter (ControlBar px-4 minus 4px → 12px each side). */}
+      <div className="-mx-1 min-w-0">{children}</div>
 
       {/* Single progress story in panel mode (page tick hidden in ControlBar). */}
       <div
