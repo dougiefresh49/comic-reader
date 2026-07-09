@@ -69,22 +69,30 @@ export function OfflineDownload({ urls, label }: Props) {
         type="button"
         disabled={!ready || busy}
         onClick={start}
-        className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+        className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-xs font-medium transition-colors ${
           done
-            ? "bg-emerald-700 text-white"
+            ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
             : busy
-              ? "bg-cyan-700/60 text-white"
-              : "bg-cyan-700 text-white hover:bg-cyan-600 disabled:opacity-40"
+              ? "border-white/15 bg-white/5 text-neutral-400"
+              : "border-white/15 bg-white/5 text-neutral-300 hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none disabled:opacity-40"
         }`}
         aria-label={
           label ? `Download ${label} for offline reading` : "Download offline"
         }
       >
-        {done
-          ? "✓ Available offline"
-          : busy
-            ? `Downloading… ${pct}%`
-            : "Download for offline"}
+        {done ? (
+          <>
+            <IconCheck />
+            Available offline
+          </>
+        ) : busy ? (
+          <span className="tabular-nums">Downloading… {pct}%</span>
+        ) : (
+          <>
+            <IconDownload />
+            Download offline
+          </>
+        )}
       </button>
       {progress && !progress.complete && (
         <div className="h-1 w-full overflow-hidden rounded bg-neutral-800">
@@ -100,5 +108,36 @@ export function OfflineDownload({ urls, label }: Props) {
         </span>
       )}
     </div>
+  );
+}
+
+const svgProps = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 14,
+  height: 14,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function IconDownload() {
+  return (
+    <svg {...svgProps}>
+      <path d="M12 15V3" />
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="m7 10 5 5 5-5" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg {...svgProps}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
   );
 }
