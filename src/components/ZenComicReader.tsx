@@ -625,7 +625,35 @@ export default function ZenComicReader({
               {caption}
             </PanelViewHud>
           ) : (
-            caption
+            <div className="flex w-full items-center gap-2">
+              <div className="min-w-0 flex-1">{caption}</div>
+              {panels.length > 0 && (
+                <button
+                  type="button"
+                  onClick={enterPanelView}
+                  aria-label="Enter panel view"
+                  title="Panel view"
+                  className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-white/15 sm:px-4"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="3" width="8" height="8" rx="1" />
+                    <rect x="14" y="3" width="7" height="8" rx="1" />
+                    <rect x="3" y="14" width="18" height="7" rx="1" />
+                  </svg>
+                  <span className="hidden sm:inline">Panels</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
       </ControlBar>

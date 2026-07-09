@@ -22,6 +22,26 @@ export function SpeechBox({
 }: SpeechBoxProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLSpanElement | null>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
+
+  // Sliding highlight: one absolutely-positioned pill glides over the active
+  // word (transform/width transitions) instead of restyling word spans. The
+  // old per-word `px-1` padding reflowed the whole line on every word change.
+  useEffect(() => {
+    const highlight = highlightRef.current;
+    const target = activeRef.current;
+    if (!highlight) return;
+    if (!target) {
+      highlight.style.opacity = "0";
+      return;
+    }
+    const padX = 3;
+    const padY = 1;
+    highlight.style.opacity = "1";
+    highlight.style.transform = `translate(${target.offsetLeft - padX}px, ${target.offsetTop - padY}px)`;
+    highlight.style.width = `${target.offsetWidth + padX * 2}px`;
+    highlight.style.height = `${target.offsetHeight + padY * 2}px`;
+  }, [activeWordIndex, words, text]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -71,11 +91,7 @@ export function SpeechBox({
         <span
           key={`word-${idx}`}
           ref={isActive ? activeRef : null}
-          className={
-            isActive
-              ? "rounded-md bg-cyan-500/20 px-1 text-white shadow-[0_0_12px_rgba(34,211,238,0.6)]"
-              : "text-white"
-          }
+          className="text-white"
         >
           {content}
         </span>,
@@ -140,7 +156,15 @@ export function SpeechBox({
         ref={containerRef}
         className="max-h-24 overflow-y-auto text-base leading-relaxed text-white/90"
       >
-        {fragments}
+        {/* key={text} remounts the pill per bubble so it never slides between captions */}
+        <div key={text} className="relative">
+          {fragments}
+          <div
+            ref={highlightRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 left-0 rounded-md bg-cyan-400/25 opacity-0 transition-[transform,width,height,opacity] duration-150 ease-out"
+          />
+        </div>
       </div>
     </div>
   );
