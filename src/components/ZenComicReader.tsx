@@ -17,6 +17,11 @@ import { TopBar } from "./zen-comic-reader/TopBar";
 import { ControlBar } from "./zen-comic-reader/ControlBar";
 import { SpeechBox } from "./zen-comic-reader/SpeechBox";
 import { PageSheet } from "./zen-comic-reader/PageSheet";
+import { EdgePageNav } from "./zen-comic-reader/EdgePageNav";
+import {
+  OnboardingOverlay,
+  useOnboarding,
+} from "./zen-comic-reader/OnboardingOverlay";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
@@ -77,6 +82,8 @@ export default function ZenComicReader({
   const systemReducedMotion = usePrefersReducedMotion();
   const focusBeforePanelRef = useRef<Element | null>(null);
   const panelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { isOnboardingOpen, dismissOnboarding } = useOnboarding();
 
   const anySheetOpen = isPageSheetOpen || isSettingsOpen || isViewSheetOpen;
   const { chromeVisible, showChrome, toggleChrome, lockChrome } =
@@ -248,6 +255,9 @@ export default function ZenComicReader({
   const { navigatePrev, navigateNext } = usePageNavigation({
     prevPageLink,
     nextPageLink,
+    // Panel mode has its own arrow-key handler; sheets and the onboarding
+    // overlay own the keyboard while open.
+    keyboardEnabled: !panelViewMode && !anySheetOpen && !isOnboardingOpen,
   });
   navigateNextRef.current = navigateNext;
   navigatePrevRef.current = navigatePrev;
@@ -578,6 +588,21 @@ export default function ZenComicReader({
             </PanelViewFrame>
           </div>
         </div>
+
+        {!panelViewMode ? (
+          <>
+            <EdgePageNav
+              side="left"
+              onNavigate={navigatePrev}
+              disabled={!prevPageLink}
+            />
+            <EdgePageNav
+              side="right"
+              onNavigate={navigateNext}
+              disabled={!nextPageLink}
+            />
+          </>
+        ) : null}
       </div>
 
       <ControlBar
@@ -643,6 +668,10 @@ export default function ZenComicReader({
         motionIntensity={motionIntensity}
         onSetMotionIntensity={setMotionIntensity}
       />
+
+      {isOnboardingOpen ? (
+        <OnboardingOverlay onDismiss={dismissOnboarding} />
+      ) : null}
 
       {!panelViewMode && scale > 1 && (
         <button
