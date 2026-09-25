@@ -1,0 +1,192 @@
+{
+ "generated": "2026-08-21",
+ "cloneSourceRoot": "/Users/dougiefresh49/Movies/library/voice-lab/clone-sources/tmnt-x-mmpr",
+ "cast": [
+  {
+   "character": "Raphael",
+   "file": "TMNT/Raphael__TMNT-1990.mp3",
+   "replaces": "RbsOf5RuEmcgV4XgAWDA",
+   "replacesName": "Raph v2",
+   "status": "cloned",
+   "note": "NEW voice already created: **Raphael 1990 v3 = `66KaORPuFP0qLgNZk7im`** (owner set labels/description in the EL UI). Remaining: swap the ID in the DB/registry, then delete Raph v2 to free the slot.",
+   "approved": true,
+   "tested": "2026-08-21 room sessions, owner: really good and clean"
+  },
+  {
+   "character": "Leonardo",
+   "file": "TMNT/Leonardo__TMNT-1990.mp3",
+   "replaces": "1sca4ecJ4XyU7M176Ei0",
+   "replacesName": "Leonardo",
+   "status": "ready to clone",
+   "note": "Replaces the text-designed Leo. Only 32s (film has little clean Leo) \u2014 works for IVC; a Secret-of-the-Ooze top-up (same actor, Brian Tochi) is possible if it sounds thin."
+  },
+  {
+   "character": "April O'Neil",
+   "file": "TMNT/April-ONeil__TMNT-1990.mp3 **or** TMNT/April-ONeil__TMNT-2012.mp3",
+   "replaces": null,
+   "replacesName": null,
+   "status": "casting",
+   "note": "No April voice exists in EL. Both reels are owner-approved; pick the era (1990 Judith Hoag 83s / 2012 Mae Whitman 85s). Needs a fresh description + labels."
+  },
+  {
+   "character": "Bebop",
+   "file": "TMNT/Bebop__TMNT-2012.mp3 (fallback)",
+   "replaces": "FCFJMCa9ZFu4325AUU3w",
+   "replacesName": "Bebop 2",
+   "status": "casting",
+   "note": "Owner wants the Bay *Out of the Shadows* (2016) Bebop \u2014 no source ripped yet. The 2012 reel (last clip dropped per owner note) is approved as a fallback."
+  },
+  {
+   "character": "Rocksteady",
+   "file": "TMNT/Rocksteady__TMNT-2012.mp3 (fallback)",
+   "replaces": "FBptoKFxS8EhO4XO87xt",
+   "replacesName": "Rocksteady",
+   "status": "casting",
+   "note": "Same as Bebop: Bay version wanted, source missing. 2012 reel trimmed (3\u20138s, 25\u201328s sfx removed) approved as fallback."
+  },
+  {
+   "character": "Master Splinter",
+   "file": "TMNT/Splinter__TMNT-1990.mp3 (alternate)",
+   "replaces": "6G3IoJHUBafcI3SyzELE",
+   "replacesName": "Master Splinter v2",
+   "status": "approved",
+   "note": "Owner keeps the 2012 IVC. 1990 reel (Kevin Clash, 81s) is approved and staged only as an alternate."
+  },
+  {
+   "character": "Shredder",
+   "file": "TMNT/Shredder__TMNT-1990.mp3 (alternate)",
+   "replaces": "zyz29XaJBhGHDfyrCD7d",
+   "replacesName": "Shredder v2",
+   "status": "approved",
+   "note": "Owner keeps the 2012 IVC. 1990 reel staged as an alternate (31s)."
+  },
+  {
+   "character": "Casey Jones",
+   "file": "TMNT/Casey-Jones__TMNT-1990.mp3",
+   "replaces": null,
+   "replacesName": "\u2014",
+   "status": "approved",
+   "note": "Approved reel, no registry character for this book \u2014 only if the script needs him."
+  },
+  {
+   "character": "Baxter Stockman",
+   "file": "TMNT/Baxter-Stockman__TMNT-2012.mp3",
+   "replaces": null,
+   "replacesName": "\u2014",
+   "status": "casting",
+   "note": "Registry lists 9 possible appearances, none voiced. 2012 reel exists but is NOT yet judged on the labeler."
+  },
+  {
+   "character": "Red Ranger (Jason)",
+   "file": "MMPR/Jason__MMPR-1993.mp3",
+   "replaces": "R8tHGp6yBIKs45odIPD1",
+   "replacesName": "Red Ranger",
+   "status": "ready to clone",
+   "note": "Civilian voice (Austin St. John). Morphed delivery = mode, not a second clone \u2014 see ../../../docs/morphed-voice-modes.md."
+  },
+  {
+   "character": "Blue Ranger (Billy)",
+   "file": "MMPR/Billy__MMPR-1993.mp3",
+   "replaces": "eggrlJySU29RodqjhIkX",
+   "replacesName": "Blue Ranger",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Black Ranger (Zack)",
+   "file": "MMPR/Zack__MMPR-1993.mp3",
+   "replaces": "cuy9NDFuCyOdZU0vkcym",
+   "replacesName": "Black Ranger",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Pink Ranger (Kimberly)",
+   "file": "MMPR/Kimberly__MMPR-1993.mp3",
+   "replaces": "E8CavmYRhEEZqRb2s4nt",
+   "replacesName": "Pink Ranger",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Yellow Ranger (Trini)",
+   "file": "MMPR/Trini__MMPR-1993.mp3",
+   "replaces": "hBYwgU1d9wzr397yTscG",
+   "replacesName": "Yellow Ranger",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Green Ranger (Tommy)",
+   "file": "MMPR/Tommy__MMPR-1993.mp3",
+   "replaces": "fDCFh0Z04XCcSmBoHT4j",
+   "replacesName": "Green Ranger",
+   "status": "ready to clone",
+   "note": "Tommy is the clearest civilian-vs-morphed split; mix a few shouted lines into the IVC samples if the morphed mode sounds weak."
+  },
+  {
+   "character": "Zordon",
+   "file": "MMPR/Zordon__MMPR-1993.mp3",
+   "replaces": "NvO7pjO09CWuF87LH2iA",
+   "replacesName": "Zordon",
+   "status": "ready to clone",
+   "note": "Source already has the tube reverb baked in \u2014 that is the character."
+  },
+  {
+   "character": "Alpha 5",
+   "file": "MMPR/Alpha-5__MMPR-1993.mp3",
+   "replaces": "G4FycwjZbrUlO5rnrTGm",
+   "replacesName": "Alpha 5",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Rita Repulsa",
+   "file": "MMPR/Rita-Repulsa__MMPR-1993.mp3",
+   "replaces": "fpszSg5AsrBuI5R9aidj",
+   "replacesName": "Rita Repulsa",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Lord Zedd",
+   "file": "MMPR/Lord-Zedd__MMPR-1993.mp3",
+   "replaces": "xZHSfy1jtZKEX5ypvdGU",
+   "replacesName": "Lord Zedd",
+   "status": "ready to clone",
+   "note": ""
+  },
+  {
+   "character": "Goldar",
+   "file": "MMPR/Goldar__MMPR-1993.mp3",
+   "replaces": null,
+   "replacesName": null,
+   "status": "ready to clone",
+   "note": "No existing EL voice or registry entry \u2014 new character, needs a description."
+  },
+  {
+   "character": "Bulk",
+   "file": "MMPR/Bulk__MMPR-1993.mp3",
+   "replaces": null,
+   "replacesName": "\u2014",
+   "status": "casting",
+   "note": "Registry says needs_clips. Verified reel built 2026-08-21 from 999s of filed Bulk, NOT yet judged \u2014 listen on /reels/power-rangers."
+  },
+  {
+   "character": "Skull / Squatt",
+   "file": "\u2014",
+   "replaces": null,
+   "replacesName": "\u2014",
+   "status": "casting",
+   "note": "Only ~66s filed each in the corpus, below the reel floor. Needs more episodes or a YouTube pull."
+  },
+  {
+   "character": "Krang",
+   "file": "\u2014",
+   "replaces": null,
+   "replacesName": "\u2014",
+   "status": "casting",
+   "note": "No 1987 Krang in the corpus (2012 Kraang is a different voice). Needs a source."
+  }
+ ]
+}

@@ -1,0 +1,248 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TMNT × MMPR — ElevenLabs casting handoff</title><style>body{font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#1a1a1a}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid #ddd;padding:6px 8px;vertical-align:top;text-align:left}th{background:#f3f3f3}code{background:#f3f3f3;padding:1px 4px;border-radius:3px;font-size:12px}h1,h2{margin-top:1.6em}@media(prefers-color-scheme:dark){body{background:#111;color:#eee}th{background:#222}td,th{border-color:#333}code{background:#222}}</style></head><body><h1>TMNT × MMPR — ElevenLabs casting handoff (2026-08-21)</h1>
+<p>Prepared by the voice-lab session. <strong>Nothing in ElevenLabs or the DB has been replaced</strong> except the one test clone (Raphael 1990 v3). The comic-reader agent owns the actual swap (IDs, registry, DB rows) — the owner says there are nuances there that this package does not attempt.</p>
+<h2>Where things are</h2>
+<ul>
+<li>Clone-source audio: <code>~/Movies/library/voice-lab/clone-sources/tmnt-x-mmpr/</code> (<code>TMNT/</code>, <code>MMPR/</code>; all ≤ 1 MB, 31–90 s, owner trim notes already applied; <code>files.json</code> = provenance per file).</li>
+<li><code>elevenlabs-voices-snapshot.json</code> (this folder): every existing own voice — <code>voice_id</code>, category, <strong>description, labels, settings</strong> — fetched 2026-08-21. Replacement voices must carry the same description + labels so they are drop-in (owner rule). Voice-design voices keep their prompt in <code>description</code>, so they can be recreated later (archive-and-restore).</li>
+<li>Audition reels + owner verdicts: labeler <code>the labeler/reels/tmnt</code> and <code>/reels/power-rangers</code> (verdicts in <code>clips/montage-verdicts.json</code>).</li>
+<li>Morphed Ranger voices: <code>docs/morphed-voice-modes.md</code> (one clone per actor; morphed = prompt register + v3 tags + helmet filter).</li>
+</ul>
+<h2>Account state</h2>
+<ul>
+<li>Creator tier, <strong>30/30 voice slots used</strong> (29 before the Raphael test). Every replacement is delete-old → add-new → copy description/labels → swap the ID in the DB. Deleting first is required — there is no free slot.</li>
+<li>All 30 voices are on default settings (stability 0.5 / similarity 0.75 / style 0 / speaker boost on). The settings the owner liked for Raphael 1990 v3 were set in the UI&#39;s generation panel and are <strong>not persisted per voice</strong> — ask the owner for the values before bulk-generating.</li>
+<li>Owner judged EL Audio Isolation on the Raph reel &quot;good mostly, not great in parts&quot; → clone from the raw files, <code>remove_background_noise=false</code>.</li>
+<li>API used for the test (key in comic-reader <code>.env</code>): <code>POST /v1/voices/add</code> multipart <code>name</code>, <code>files</code>, <code>description</code>, <code>labels</code> (JSON string), <code>remove_background_noise</code>; <code>POST /v1/voices/{id}/edit</code> for description/labels; <code>DELETE /v1/voices/{id}</code>.</li>
+</ul>
+<h2>Status legend</h2>
+<p><code>casting</code> = source/era still undecided or reel unjudged · <code>approved</code> = owner-approved reel, not scheduled for a slot · <code>ready to clone</code> = approved file + known target voice, just needs the swap · <code>cloned</code> = EL voice exists</p>
+<h2>Cast</h2>
+<table>
+<thead>
+<tr>
+<th>Character</th>
+<th>Clone file (under clone-sources/tmnt-x-mmpr/)</th>
+<th>s</th>
+<th>Replaces</th>
+<th>Carry over</th>
+<th>Status</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Raphael</td>
+<td><code>TMNT/Raphael__TMNT-1990.mp3</code></td>
+<td>38</td>
+<td><strong>Raph v2</strong> <code>RbsOf5RuEmcgV4XgAWDA</code> (cloned)</td>
+<td>labels: accent=en-new-york, language=en<br>desc: Young adult male. Thick Brooklyn / New York accent. Low-to-mid pitch with significant gravel and rasp. Aggressive, tough, and cynical tone. &#39;Street&#39; tough quality. Sounds physically imposing and muscular. Sarcastic delivery.</td>
+<td><strong>cloned</strong></td>
+<td>NEW voice created, <strong>owner-approved and tested in the room 2026-08-21</strong> (&quot;really good and clean&quot;): <strong>Raphael 1990 v3 = <code>66KaORPuFP0qLgNZk7im</code></strong> (owner set labels/description in the EL UI). Remaining: swap the ID in the DB/registry, then delete Raph v2 to free the slot.</td>
+</tr>
+<tr>
+<td>Leonardo</td>
+<td><code>TMNT/Leonardo__TMNT-1990.mp3</code></td>
+<td>32</td>
+<td><strong>Leonardo</strong> <code>1sca4ecJ4XyU7M176Ei0</code> (generated)</td>
+<td>labels: none<br>desc: A clear, young adult male voice with an American accent. It is disciplined and authoritative, reflecting his leadership role with a generally serious and focused tone.</td>
+<td><strong>ready to clone</strong></td>
+<td>Replaces the text-designed Leo. Only 32s (film has little clean Leo) — works for IVC; a Secret-of-the-Ooze top-up (same actor, Brian Tochi) is possible if it sounds thin.</td>
+</tr>
+<tr>
+<td>April O&#39;Neil</td>
+<td><code>TMNT/April-ONeil__TMNT-1990.mp3 **or** TMNT/April-ONeil__TMNT-2012.mp3</code></td>
+<td>83</td>
+<td>— (new)</td>
+<td>— write new</td>
+<td><strong>casting</strong></td>
+<td>No April voice exists in EL. Both reels are owner-approved; pick the era (1990 Judith Hoag 83s / 2012 Mae Whitman 85s). Needs a fresh description + labels.</td>
+</tr>
+<tr>
+<td>Bebop</td>
+<td><code>TMNT/Bebop__TMNT-2012.mp3 (fallback)</code></td>
+<td>86</td>
+<td><strong>Bebop 2</strong> <code>FCFJMCa9ZFu4325AUU3w</code> (generated)</td>
+<td>labels: language=en<br>desc: A nasally, medium-pitched Mutated Warthog Humanoid male voice with a thick, exaggerated Brooklyn accent. It sounds like a street-smart but dim-witted punk goon from the 80s, blending roughness with a goofy quality.</td>
+<td><strong>casting</strong></td>
+<td>Owner wants the Bay <em>Out of the Shadows</em> (2016) Bebop — no source ripped yet. The 2012 reel (last clip dropped per owner note) is approved as a fallback.</td>
+</tr>
+<tr>
+<td>Rocksteady</td>
+<td><code>TMNT/Rocksteady__TMNT-2012.mp3 (fallback)</code></td>
+<td>46</td>
+<td><strong>Rocksteady</strong> <code>FBptoKFxS8EhO4XO87xt</code> (generated)</td>
+<td>labels: none<br>desc: A deep, gravelly, brutish male voice, characterized by a rough, unintelligent street-thug accent. It projects a tough, aggressive persona, befitting a powerful yet dim-witted henchman.</td>
+<td><strong>casting</strong></td>
+<td>Same as Bebop: Bay version wanted, source missing. 2012 reel trimmed (3–8s, 25–28s sfx removed) approved as fallback.</td>
+</tr>
+<tr>
+<td>Master Splinter</td>
+<td><code>TMNT/Splinter__TMNT-1990.mp3 (alternate)</code></td>
+<td>81</td>
+<td><strong>Master Splinter v2</strong> <code>6G3IoJHUBafcI3SyzELE</code> (cloned)</td>
+<td>labels: age=middle-aged, accent=en-japanese, language=en, gender=male<br>desc: Middle-aged to older male. Deep bass/baritone range. extremely resonant and chest-heavy. Commanding, stoic, and wise. Very slow, deliberate pacing. Slight Transatlantic or refined Asian-American accent influence. Warm but intimidating.</td>
+<td><strong>approved</strong></td>
+<td>Owner keeps the 2012 IVC. 1990 reel (Kevin Clash, 81s) is approved and staged only as an alternate.</td>
+</tr>
+<tr>
+<td>Shredder</td>
+<td><code>TMNT/Shredder__TMNT-1990.mp3 (alternate)</code></td>
+<td>31</td>
+<td><strong>Shredder v2</strong> <code>zyz29XaJBhGHDfyrCD7d</code> (cloned)</td>
+<td>labels: accent=en-japanese, language=en<br>desc: (empty)</td>
+<td><strong>approved</strong></td>
+<td>Owner keeps the 2012 IVC. 1990 reel staged as an alternate (31s).</td>
+</tr>
+<tr>
+<td>Casey Jones</td>
+<td><code>TMNT/Casey-Jones__TMNT-1990.mp3</code></td>
+<td>57</td>
+<td>—</td>
+<td>— write new</td>
+<td><strong>approved</strong></td>
+<td>Approved reel, no registry character for this book — only if the script needs him.</td>
+</tr>
+<tr>
+<td>Baxter Stockman</td>
+<td><code>TMNT/Baxter-Stockman__TMNT-2012.mp3</code></td>
+<td>43</td>
+<td>—</td>
+<td>— write new</td>
+<td><strong>casting</strong></td>
+<td>Registry lists 9 possible appearances, none voiced. 2012 reel exists but is NOT yet judged on the labeler.</td>
+</tr>
+<tr>
+<td>Red Ranger (Jason)</td>
+<td><code>MMPR/Jason__MMPR-1993.mp3</code></td>
+<td>88</td>
+<td><strong>Red Ranger</strong> <code>R8tHGp6yBIKs45odIPD1</code> (generated)</td>
+<td>labels: none<br>desc: A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation.</td>
+<td><strong>ready to clone</strong></td>
+<td>Civilian voice (Austin St. John). Morphed delivery = mode, not a second clone — see ../../../docs/morphed-voice-modes.md.</td>
+</tr>
+<tr>
+<td>Blue Ranger (Billy)</td>
+<td><code>MMPR/Billy__MMPR-1993.mp3</code></td>
+<td>88</td>
+<td><strong>Blue Ranger</strong> <code>eggrlJySU29RodqjhIkX</code> (generated)</td>
+<td>labels: none<br>desc: A youthful, intelligent male voice, clear and articulate, with a calm and measured delivery. Despite his composed demeanor, an underlying tone of concern often permeates his speech, reflecting his thoughtful and serious nature.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Black Ranger (Zack)</td>
+<td><code>MMPR/Zack__MMPR-1993.mp3</code></td>
+<td>87</td>
+<td><strong>Black Ranger</strong> <code>cuy9NDFuCyOdZU0vkcym</code> (generated)</td>
+<td>labels: none<br>desc: A young adult male voice with a clear American accent. It has a smooth, confident, and engaging tone, reflecting his heroic and charismatic personality.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Pink Ranger (Kimberly)</td>
+<td><code>MMPR/Kimberly__MMPR-1993.mp3</code></td>
+<td>90</td>
+<td><strong>Pink Ranger</strong> <code>E8CavmYRhEEZqRb2s4nt</code> (generated)</td>
+<td>labels: none<br>desc: A clear, youthful American female voice. It should sound articulate and natural, capable of conveying a range from calm and conversational to serious or slightly concerned tones.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Yellow Ranger (Trini)</td>
+<td><code>MMPR/Trini__MMPR-1993.mp3</code></td>
+<td>90</td>
+<td><strong>Yellow Ranger</strong> <code>hBYwgU1d9wzr397yTscG</code> (generated)</td>
+<td>labels: none<br>desc: A young, energetic female voice with a clear American accent. She speaks with a lively and spirited tone, reflecting her youthful enthusiasm.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Green Ranger (Tommy)</td>
+<td><code>MMPR/Tommy__MMPR-1993.mp3</code></td>
+<td>86</td>
+<td><strong>Green Ranger</strong> <code>fDCFh0Z04XCcSmBoHT4j</code> (generated)</td>
+<td>labels: none<br>desc: A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge.</td>
+<td><strong>ready to clone</strong></td>
+<td>Tommy is the clearest civilian-vs-morphed split; mix a few shouted lines into the IVC samples if the morphed mode sounds weak.</td>
+</tr>
+<tr>
+<td>Zordon</td>
+<td><code>MMPR/Zordon__MMPR-1993.mp3</code></td>
+<td>89</td>
+<td><strong>Zordon</strong> <code>NvO7pjO09CWuF87LH2iA</code> (generated)</td>
+<td>labels: none<br>desc: Zordon&#39;s voice is deep, booming, resonant, and authoritative, embodying a wise male presence. It possesses a slight ethereal quality, hinting at his bodiless form, and occasionally carries a subtle electronic echo.</td>
+<td><strong>ready to clone</strong></td>
+<td>Source already has the tube reverb baked in — that is the character.</td>
+</tr>
+<tr>
+<td>Alpha 5</td>
+<td><code>MMPR/Alpha-5__MMPR-1993.mp3</code></td>
+<td>85</td>
+<td><strong>Alpha 5</strong> <code>G4FycwjZbrUlO5rnrTGm</code> (generated)</td>
+<td>labels: none<br>desc: A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Rita Repulsa</td>
+<td><code>MMPR/Rita-Repulsa__MMPR-1993.mp3</code></td>
+<td>84</td>
+<td><strong>Rita Repulsa</strong> <code>fpszSg5AsrBuI5R9aidj</code> (generated)</td>
+<td>labels: none<br>desc: A shrill, raspy female voice with a strong theatrical quality. It should convey a wicked, commanding, and sharp presence, embodying her villainous authority.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Lord Zedd</td>
+<td><code>MMPR/Lord-Zedd__MMPR-1993.mp3</code></td>
+<td>84</td>
+<td><strong>Lord Zedd</strong> <code>xZHSfy1jtZKEX5ypvdGU</code> (generated)</td>
+<td>labels: none<br>desc: A deep, gravelly, booming, and terrifying male voice with a commanding and authoritative tone.</td>
+<td><strong>ready to clone</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Goldar</td>
+<td><code>MMPR/Goldar__MMPR-1993.mp3</code></td>
+<td>88</td>
+<td>— (new)</td>
+<td>— write new</td>
+<td><strong>ready to clone</strong></td>
+<td>No existing EL voice or registry entry — new character, needs a description.</td>
+</tr>
+<tr>
+<td>Bulk</td>
+<td><code>MMPR/Bulk__MMPR-1993.mp3</code></td>
+<td>90</td>
+<td>—</td>
+<td>— write new</td>
+<td><strong>casting</strong></td>
+<td>Registry says needs_clips. Verified reel built 2026-08-21 from 999s of filed Bulk, NOT yet judged — listen on /reels/power-rangers.</td>
+</tr>
+<tr>
+<td>Skull / Squatt</td>
+<td><code>—</code></td>
+<td>—</td>
+<td>—</td>
+<td>— write new</td>
+<td><strong>casting</strong></td>
+<td>Only ~66s filed each in the corpus, below the reel floor. Needs more episodes or a YouTube pull.</td>
+</tr>
+<tr>
+<td>Krang</td>
+<td><code>—</code></td>
+<td>—</td>
+<td>—</td>
+<td>— write new</td>
+<td><strong>casting</strong></td>
+<td>No 1987 Krang in the corpus (2012 Kraang is a different voice). Needs a source.</td>
+</tr>
+</tbody></table>
+<h2>Suggested order</h2>
+<ol>
+<li>Finish Raphael: DB/registry → <code>66KaORPuFP0qLgNZk7im</code>, delete <strong>Raph v2</strong> → 1 slot free.</li>
+<li>Rangers ×6 + Zordon/Alpha/Rita/Zedd (10 swaps, each frees its own slot as it goes).</li>
+<li>Leonardo (replace the voice-design), Goldar (new — needs a slot: delete an unused voice-design such as Warbunny/Rock Soldier/Armored Villain, prompts are in the snapshot).</li>
+<li>April once the era is picked; Bebop/Rocksteady once the Bay source exists (or promote the 2012 fallbacks).</li>
+</ol>
+<p>Unjudged reels to listen to first: Bulk, Baxter Stockman, and the two April options.</p>
+</body></html>

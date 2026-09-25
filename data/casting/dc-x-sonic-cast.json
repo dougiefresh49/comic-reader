@@ -1,0 +1,417 @@
+{
+ "book": "DC x Sonic crossover",
+ "generatedFrom": "voice-lab montage-verdicts.json (owner verdict == good)",
+ "elevenlabs": "instant voice clone per character; ~1-3 min sample sweet spot, 10MB cap",
+ "characters": {
+  "Alfred": {
+   "universe": "DC",
+   "primary": {
+    "source": "Justice League: Doom (2012)",
+    "reel": "Casting-DC-JL-Doom/Alfred.mp3",
+    "cloneFile": "DC/Alfred__DC-JL-Doom.mp3",
+    "seconds": 51,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Bane": {
+   "universe": "DC",
+   "primary": {
+    "source": "The Dark Knight Rises (2012, Tom Hardy) \u2014 owner-picked YouTube compilation",
+    "reel": "Casting-Bane-TDKR/Bane.mp3 + Bane (long lines, score under).mp3",
+    "cloneFile": "DC/Bane__Bane-TDKR.mp3",
+    "seconds": 141,
+    "trimmed": false,
+    "ownerNote": "approved 2026-08-21; preferred over the animated Bane",
+    "universe": "DC"
+   },
+   "alternates": [
+    {
+     "source": "Justice League: Doom (2012)",
+     "reel": "Casting-DC-JL-Doom/Bane.mp3",
+     "cloneFile": "DC/Bane__DC-JL-Doom.mp3",
+     "seconds": 25,
+     "trimmed": false,
+     "ownerNote": null,
+     "universe": "DC"
+    }
+   ]
+  },
+  "Batman": {
+   "universe": "DC",
+   "primary": {
+    "source": "Superman/Batman: Apocalypse (2010)",
+    "reel": "Casting-DC-SB-Apocalypse/Batman.mp3",
+    "cloneFile": "DC/Batman__DC-SB-Apocalypse.mp3",
+    "seconds": 87,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": [
+    {
+     "source": "Justice League: Doom (2012)",
+     "reel": "Casting-DC-JL-Doom/Batman.mp3",
+     "cloneFile": "DC/Batman__DC-JL-Doom.mp3",
+     "seconds": 85,
+     "trimmed": false,
+     "ownerNote": null,
+     "universe": "DC"
+    }
+   ]
+  },
+  "Cyborg": {
+   "universe": "DC",
+   "primary": {
+    "source": "Justice League: War (2014)",
+    "reel": "Casting-DC-JL-War/Cyborg.mp3",
+    "cloneFile": "DC/Cyborg__DC-JL-War.mp3",
+    "seconds": 69,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": [
+    {
+     "source": "Justice League: Doom (2012)",
+     "reel": "Casting-DC-JL-Doom/Cyborg.mp3",
+     "cloneFile": "DC/Cyborg__DC-JL-Doom.mp3",
+     "seconds": 56,
+     "trimmed": false,
+     "ownerNote": null,
+     "universe": "DC"
+    }
+   ]
+  },
+  "Darkseid": {
+   "universe": "DC",
+   "primary": {
+    "source": "Superman/Batman: Apocalypse (2010)",
+    "reel": "Casting-DC-SB-Apocalypse/Darkseid.mp3",
+    "cloneFile": "DC/Darkseid__DC-SB-Apocalypse.mp3",
+    "seconds": 86,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Flash": {
+   "universe": "DC",
+   "primary": {
+    "source": "Justice League: Doom (2012)",
+    "reel": "Casting-DC-JL-Doom/Flash.mp3",
+    "cloneFile": "DC/Flash__DC-JL-Doom.mp3",
+    "seconds": 46,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Star Sapphire": {
+   "universe": "DC",
+   "primary": {
+    "source": "Justice League: Doom (2012)",
+    "reel": "Casting-DC-JL-Doom/Star Sapphire.mp3",
+    "cloneFile": "DC/Star-Sapphire__DC-JL-Doom.mp3",
+    "seconds": 33,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Supergirl": {
+   "universe": "DC",
+   "primary": {
+    "source": "Superman/Batman: Apocalypse (2010)",
+    "reel": "Casting-DC-SB-Apocalypse/Supergirl.mp3",
+    "cloneFile": "DC/Supergirl__DC-SB-Apocalypse.mp3",
+    "seconds": 85,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Superman": {
+   "universe": "DC",
+   "primary": {
+    "source": "Superman/Batman: Apocalypse (2010)",
+    "reel": "Casting-DC-SB-Apocalypse/Superman.mp3",
+    "cloneFile": "DC/Superman__DC-SB-Apocalypse.mp3",
+    "seconds": 87,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Wonder Woman": {
+   "universe": "DC",
+   "primary": {
+    "source": "Justice League: Doom (2012)",
+    "reel": "Casting-DC-JL-Doom/Wonder Woman.mp3",
+    "cloneFile": "DC/Wonder-Woman__DC-JL-Doom.mp3",
+    "seconds": 41,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "DC"
+   },
+   "alternates": []
+  },
+  "Amy Rose": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Boom (2014, Cindy Robinson) \u2014 owner-picked YouTube compilation",
+    "reel": "Casting-Amy-SonicBoom/Amy Rose.mp3",
+    "cloneFile": "Sonic/Amy-Rose__Amy-SonicBoom.mp3",
+    "seconds": 170,
+    "trimmed": false,
+    "ownerNote": "reel awaiting verdict; owner chose Boom over Prime (Prime actress plays every Shatterverse Amy variant) and over the shriller game register",
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Big": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Prime (2022)",
+    "reel": "Casting-Big-SonicPrime/Big.mp3",
+    "cloneFile": "Sonic/Big__Big-SonicPrime.mp3",
+    "seconds": 59,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Blaze": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Shadow Generations (2024)",
+    "reel": "Casting-Blaze-ShadowGen/Blaze.mp3",
+    "cloneFile": "Sonic/Blaze__Blaze-ShadowGen.mp3",
+    "seconds": 34,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Charmy": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Chaotix (IDW-era compilation)",
+    "reel": "Casting-Sonic-Chaotix/Charmy.mp3",
+    "cloneFile": "Sonic/Charmy__Sonic-Chaotix.mp3",
+    "seconds": 90,
+    "trimmed": true,
+    "ownerNote": "Whisper character is at 1:07-1:10",
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Dr. Eggman": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Forces (2017)",
+    "reel": "Casting-Sonic-Forces/Dr. Eggman.mp3",
+    "cloneFile": "Sonic/Dr-Eggman__Sonic-Forces.mp3",
+    "seconds": 68,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": [
+    {
+     "source": "Sonic Chaotix (IDW-era compilation)",
+     "reel": "Casting-Sonic-Chaotix/Dr. Eggman.mp3",
+     "cloneFile": "Sonic/Dr-Eggman__Sonic-Chaotix.mp3",
+     "seconds": 51,
+     "trimmed": false,
+     "ownerNote": null,
+     "universe": "Sonic"
+    }
+   ]
+  },
+  "Espio": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Chaotix (IDW-era compilation)",
+    "reel": "Casting-Sonic-Chaotix/Espio.mp3",
+    "cloneFile": "Sonic/Espio__Sonic-Chaotix.mp3",
+    "seconds": 46,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Infinite": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Forces (2017)",
+    "reel": "Casting-Sonic-Forces/Infinite.mp3",
+    "cloneFile": "Sonic/Infinite__Sonic-Forces.mp3",
+    "seconds": 82,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Jet": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Chaotix (IDW-era compilation)",
+    "reel": "Casting-Sonic-Chaotix/Jet.mp3",
+    "cloneFile": "Sonic/Jet__Sonic-Chaotix.mp3",
+    "seconds": 54,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Knuckles": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Forces (2017)",
+    "reel": "Casting-Sonic-Forces/Knuckles.mp3",
+    "cloneFile": "Sonic/Knuckles__Sonic-Forces.mp3",
+    "seconds": 35,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Rouge": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Chaotix (IDW-era compilation)",
+    "reel": "Casting-Sonic-Chaotix/Rouge.mp3",
+    "cloneFile": "Sonic/Rouge__Sonic-Chaotix.mp3",
+    "seconds": 47,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Shadow": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Prime (2022)",
+    "reel": "Casting-Shadow-SonicPrime/Shadow.mp3",
+    "cloneFile": "Sonic/Shadow__Shadow-SonicPrime.mp3",
+    "seconds": 85,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Silver": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Forces (2017)",
+    "reel": "Casting-Sonic-Forces/Silver.mp3",
+    "cloneFile": "Sonic/Silver__Sonic-Forces.mp3",
+    "seconds": 15,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Sonic": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Prime (2022)",
+    "reel": "Casting-Sonic-SonicPrime/Sonic.mp3",
+    "cloneFile": "Sonic/Sonic__Sonic-SonicPrime.mp3",
+    "seconds": 85,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": [
+    {
+     "source": "Sonic Forces (2017)",
+     "reel": "Casting-Sonic-Forces/Sonic.mp3",
+     "cloneFile": "Sonic/Sonic__Sonic-Forces.mp3",
+     "seconds": 68,
+     "trimmed": false,
+     "ownerNote": null,
+     "universe": "Sonic"
+    },
+    {
+     "source": "Sonic Chaotix (IDW-era compilation)",
+     "reel": "Casting-Sonic-Chaotix/Sonic.mp3",
+     "cloneFile": "Sonic/Sonic__Sonic-Chaotix.mp3",
+     "seconds": 47,
+     "trimmed": false,
+     "ownerNote": null,
+     "universe": "Sonic"
+    }
+   ]
+  },
+  "Storm": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Racing: CrossWorlds (2025)",
+    "reel": "Casting-Storm-Crossworlds/Storm.mp3",
+    "cloneFile": "Sonic/Storm__Storm-Crossworlds.mp3",
+    "seconds": 74,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Tails": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Forces (2017)",
+    "reel": "Casting-Sonic-Forces/Tails.mp3",
+    "cloneFile": "Sonic/Tails__Sonic-Forces.mp3",
+    "seconds": 49,
+    "trimmed": true,
+    "ownerNote": "Different character at 31-34 and 53-59, and 1:00-1:03 is noisy and can be removed ",
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Tangle": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Chaotix (IDW-era compilation)",
+    "reel": "Casting-Sonic-Chaotix/Tangle.mp3",
+    "cloneFile": "Sonic/Tangle__Sonic-Chaotix.mp3",
+    "seconds": 45,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  },
+  "Vector": {
+   "universe": "Sonic",
+   "primary": {
+    "source": "Sonic Chaotix (IDW-era compilation)",
+    "reel": "Casting-Sonic-Chaotix/Vector.mp3",
+    "cloneFile": "Sonic/Vector__Sonic-Chaotix.mp3",
+    "seconds": 51,
+    "trimmed": false,
+    "ownerNote": null,
+    "universe": "Sonic"
+   },
+   "alternates": []
+  }
+ }
+}

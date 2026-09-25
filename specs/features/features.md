@@ -46,6 +46,7 @@ Backlog and status tracker for planned features. Update status here when work st
 | Face exemplar embeddings (pgvector) | `done` | [face-exemplar-embeddings.md](face-exemplar-embeddings.md) | `gemini-embedding-2` multimodal embeddings of face crops stored in Supabase pgvector. Retrieves visually similar exemplars during character identification. Self-hosted alternative to Google File Search Store. Infrastructure + script integration complete. 24 exemplars seeded from issue-1. |
 | Workflow lookahead unification | `done` | [workflow-lookahead-integration.md](workflow-lookahead-integration.md) | Shared modules in `src/lib/` for face extraction, character ID, exemplar store, embeddings. Workflow `characterLookaheadPage` rewritten. Scripts delegate to shared modules. |
 | Workflow-script divergence audit | `done` | [workflow-script-divergence-audit.md](workflow-script-divergence-audit.md) | All 8 items resolved. Wiki fetch step added, bubble polygons extracted, IVC filter on voice gen, voice rotation excluded (manual via admin). Shared modules in `src/lib/`. |
+| Voice clip candidates (local prep) | `pending` | [voice-clip-candidates.md](voice-clip-candidates.md) | Automates the grunt work behind the casting gate. Local worker: acquire → isolate (5.1 center channel or `audio-separator`) → pyannote + Whisper → Gemini ID → top-3 ranked clips into Supabase. Casting UI gains play/pick/"Approve & create voice". Extracts `src/lib/voice-clips/` from `split-voice-clip.ts`. Steps 1–5 improve `pnpm split-voice` standalone — ship those first. |
 
 ## Infrastructure
 
@@ -99,4 +100,6 @@ Backlog and status tracker for planned features. Update status here when work st
 | Episode web player | `/episode/[bookId]/[issueId]` route in Next.js app — after assembly pipeline ships |
 | ~~Spring-curve panel transitions~~ | **Done** — rAF spring physics in `PanelView.transforms.ts`. PR #20. |
 | Action-line position hint in effect tags | Cheap fix for effects placed in wrong corner; precursor to action-line bbox detection. See `segmentation-layering.md` §"Action lines". |
+| Dialogue corpus grounding | Byproduct of [voice-clip-candidates.md](voice-clip-candidates.md) — once transcripts of real character dialogue are stored, use them to ground speaker ID in `get-context` (catchphrase/vocabulary matching), voice descriptions, and an ElevenLabs pronunciation dictionary for proper nouns (Shredder, Krang, Dimension X). Grounding, not training — cloning is audio-only. |
+| Music/SFX beds from 5.1 rips | The non-center channels of a 5.1 mix are a dialogue-free music+effects bed, extractable for free with ffmpeg. Free source material for `audio-library` and `music-scenes`. |
 | Continue-reading resume | Persist last book/issue/page in localStorage (follow `useSettings` conventions, key like `comic-reader.last-read`); on home/book pages offer a "Pick up where you left off" CTA. Requested 2026-07-09 during demo prep — deliberately deferred, not a priority. |

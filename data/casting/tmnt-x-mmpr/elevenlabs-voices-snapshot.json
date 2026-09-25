@@ -1,0 +1,467 @@
+{
+ "Black Ranger": {
+  "voice_id": "cuy9NDFuCyOdZU0vkcym",
+  "category": "generated",
+  "description": "A young adult male voice with a clear American accent. It has a smooth, confident, and engaging tone, reflecting his heroic and charismatic personality.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Bebop 2": {
+  "voice_id": "FCFJMCa9ZFu4325AUU3w",
+  "category": "generated",
+  "description": "A nasally, medium-pitched Mutated Warthog Humanoid male voice with a thick, exaggerated Brooklyn accent. It sounds like a street-smart but dim-witted punk goon from the 80s, blending roughness with a goofy quality.",
+  "labels": {
+   "language": "en"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Armored Villain": {
+  "voice_id": "P70H4nshzpgpGx0vAA3z",
+  "category": "generated",
+  "description": "A deep, booming, gravelly male voice with a distinct metallic rasp. It sounds powerfully aggressive, brutish, and menacingly authoritative.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Alpha 5": {
+  "voice_id": "G4FycwjZbrUlO5rnrTGm",
+  "category": "generated",
+  "description": "A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Donatello v2": {
+  "voice_id": "2sV2XnVqQ2RShkIOGFvZ",
+  "category": "cloned",
+  "description": "Young adult American male. Higher pitch range. Slight nasal quality or 'head voice' resonance. Fast-paced, articulate, and enthusiastic delivery. Intelligent, 'geeky', and inquisitive tone. Sounds slightly younger than the leader. Expressive and clear.",
+  "labels": {
+   "language": "en"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "donnie-audio.mp3"
+  ]
+ },
+ "Foot Elite": {
+  "voice_id": "Uo9kYf3kXKz03qyoPMpG",
+  "category": "generated",
+  "description": "A deep, disciplined, and authoritative male voice that is calm yet menacing. It is articulate and resonant, conveying a fanatical conviction, with a slight muffled quality from a mask that does not hinder its clear projection.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Foot Soldier": {
+  "voice_id": "8EsHn25qWtDd2mWwmiYQ",
+  "category": "generated",
+  "description": "A fanatical, raspy male voice, gruff and often muffled by a mask, with an American accent. It conveys an intense, zealous aggression, characteristic of a disciplined ninja cultist or professional henchman, occasionally sounding breathless.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Dr. Boyd": {
+  "voice_id": "Zhgd6Vgnj3TFlPqeH2Ke",
+  "category": "generated",
+  "description": "An intelligent, articulate male voice with an American accent. It maintains a professional demeanor but carries an underlying tone of defensiveness and stress, reflecting a character under pressure.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Master Splinter v2": {
+  "voice_id": "6G3IoJHUBafcI3SyzELE",
+  "category": "cloned",
+  "description": "Middle-aged to older male. Deep bass/baritone range. extremely resonant and chest-heavy. Commanding, stoic, and wise. Very slow, deliberate pacing. Slight Transatlantic or refined Asian-American accent influence. Warm but intimidating.",
+  "labels": {
+   "age": "middle-aged",
+   "accent": "en-japanese",
+   "language": "en",
+   "gender": "male"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "splinter_extracted.mp3"
+  ]
+ },
+ "Karai v2": {
+  "voice_id": "anwrO52UeU1FtcsB1tHj",
+  "category": "cloned",
+  "description": "",
+  "labels": {
+   "language": "en"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "karai_extracted.mp3"
+  ]
+ },
+ "Mikey v2": {
+  "voice_id": "oFMuHQNZ0Bh0jz5SJXQy",
+  "category": "cloned",
+  "description": "",
+  "labels": {
+   "language": "en"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "mikey_extracted-v3.mp3"
+  ]
+ },
+ "Lord Zedd": {
+  "voice_id": "xZHSfy1jtZKEX5ypvdGU",
+  "category": "generated",
+  "description": "A deep, gravelly, booming, and terrifying male voice with a commanding and authoritative tone.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Green Ranger": {
+  "voice_id": "fDCFh0Z04XCcSmBoHT4j",
+  "category": "generated",
+  "description": "A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Leonardo": {
+  "voice_id": "1sca4ecJ4XyU7M176Ei0",
+  "category": "generated",
+  "description": "A clear, young adult male voice with an American accent. It is disciplined and authoritative, reflecting his leadership role with a generally serious and focused tone.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Blue Ranger": {
+  "voice_id": "eggrlJySU29RodqjhIkX",
+  "category": "generated",
+  "description": "A youthful, intelligent male voice, clear and articulate, with a calm and measured delivery. Despite his composed demeanor, an underlying tone of concern often permeates his speech, reflecting his thoughtful and serious nature.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Grace Sterling": {
+  "voice_id": "CBRFW97Lj0x8Fbaic4x2",
+  "category": "generated",
+  "description": "A mature, authoritative, and cold female voice with a crisp, articulate American accent. Her professional and sophisticated tone is commanding and precise, with sharp enunciation and no vocal fry.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Narrator v2": {
+  "voice_id": "l6mRFE6WsbFVDdbMTQyk",
+  "category": "cloned",
+  "description": "",
+  "labels": {
+   "age": "middle-aged",
+   "accent": "en-british",
+   "language": "en",
+   "gender": "female"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "narrator2.mp3"
+  ]
+ },
+ "Red Mutant Ranger": {
+  "voice_id": "EYiikCfvEGJXIrjaniJV",
+  "category": "generated",
+  "description": "A deep, gravelly, brutish male voice, aggressive and loud. It sounds low-intelligence, like a dim-witted thug speaking with primitive sentence structure.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Rocksteady": {
+  "voice_id": "FBptoKFxS8EhO4XO87xt",
+  "category": "generated",
+  "description": "A deep, gravelly, brutish male voice, characterized by a rough, unintelligent street-thug accent. It projects a tough, aggressive persona, befitting a powerful yet dim-witted henchman.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Rita Repulsa": {
+  "voice_id": "fpszSg5AsrBuI5R9aidj",
+  "category": "generated",
+  "description": "A shrill, raspy female voice with a strong theatrical quality. It should convey a wicked, commanding, and sharp presence, embodying her villainous authority.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Raph v2": {
+  "voice_id": "RbsOf5RuEmcgV4XgAWDA",
+  "category": "cloned",
+  "description": "Young adult male. Thick Brooklyn / New York accent. Low-to-mid pitch with significant gravel and rasp. Aggressive, tough, and cynical tone. 'Street' tough quality. Sounds physically imposing and muscular. Sarcastic delivery.",
+  "labels": {
+   "accent": "en-new-york",
+   "language": "en"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "raph.mp3"
+  ]
+ },
+ "Shredder v2": {
+  "voice_id": "zyz29XaJBhGHDfyrCD7d",
+  "category": "cloned",
+  "description": "",
+  "labels": {
+   "accent": "en-japanese",
+   "language": "en"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "shredder_extracted.mp3"
+  ]
+ },
+ "Soldier (recreated)": {
+  "voice_id": "FNFPPu11NCH75amA044c",
+  "category": "cloned",
+  "description": null,
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "generated_audio.mp3"
+  ]
+ },
+ "Zordon": {
+  "voice_id": "NvO7pjO09CWuF87LH2iA",
+  "category": "generated",
+  "description": "Zordon's voice is deep, booming, resonant, and authoritative, embodying a wise male presence. It possesses a slight ethereal quality, hinting at his bodiless form, and occasionally carries a subtle electronic echo.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Pink Ranger": {
+  "voice_id": "E8CavmYRhEEZqRb2s4nt",
+  "category": "generated",
+  "description": "A clear, youthful American female voice. It should sound articulate and natural, capable of conveying a range from calm and conversational to serious or slightly concerned tones.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Warbunny": {
+  "voice_id": "Ur4iSnAWauOSA2qdwx6b",
+  "category": "generated",
+  "description": "A deep, booming, gravelly, and guttural male voice, monstrous and brutish. It projects an aggressively arrogant, theatrical barbarian warlord persona, capable of also sounding primitive and submissive.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Rock Soldier": {
+  "voice_id": "Z0QRcWFZLNfSWpPpb0br",
+  "category": "generated",
+  "description": "A deep, heavy, gravelly male voice, resonating with the sound of grinding stones. It possesses a rough, monstrous quality, projecting an authoritative and intimidating presence.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Red Ranger": {
+  "voice_id": "R8tHGp6yBIKs45odIPD1",
+  "category": "generated",
+  "description": "A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Yellow Ranger": {
+  "voice_id": "hBYwgU1d9wzr397yTscG",
+  "category": "generated",
+  "description": "A young, energetic female voice with a clear American accent. She speaks with a lively and spirited tone, reflecting her youthful enthusiasm.",
+  "labels": {},
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": []
+ },
+ "Raphael 1990 v3": {
+  "voice_id": "66KaORPuFP0qLgNZk7im",
+  "category": "cloned",
+  "description": "Young adult male. Thick Brooklyn / New York accent. Low-to-mid pitch with significant gravel and rasp. Aggressive, tough, and cynical tone. 'Street' tough quality. Sounds physically imposing and muscular. Sarcastic delivery.",
+  "labels": {
+   "language": "en",
+   "accent": "en-new-york"
+  },
+  "settings": {
+   "stability": 0.5,
+   "use_speaker_boost": true,
+   "similarity_boost": 0.75,
+   "style": 0.0,
+   "speed": 1.0
+  },
+  "samples": [
+   "Raphael-1990__raw.mp3"
+  ]
+ }
+}

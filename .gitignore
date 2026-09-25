@@ -61,3 +61,7 @@ supabase/.temp
 .gemini/
 .mcp.json
 skills-lock.json
+
+# local agent config (holds API keys)
+.codex/config.toml
+.claude/projects/
