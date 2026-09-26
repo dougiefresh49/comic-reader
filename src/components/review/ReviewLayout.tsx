@@ -253,12 +253,6 @@ export function ReviewLayout({
   const [applyMessage, setApplyMessage] = useState<string | null>(null);
 
   const handleApplyToDb = useCallback(async () => {
-    const secret = process.env.NEXT_PUBLIC_APPLY_FIXES_SECRET;
-    if (!secret) {
-      setApplyState("error");
-      setApplyMessage("NEXT_PUBLIC_APPLY_FIXES_SECRET not set in client env.");
-      return;
-    }
     const json = buildFixesJson(bookId, issueId, edits, pageOrder, allBubbles);
     if (!json.fixes.length) return;
     setApplyState("applying");
@@ -266,10 +260,9 @@ export function ReviewLayout({
     try {
       const res = await fetch("/api/apply-fixes", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-apply-fixes-secret": secret,
-        },
+        // Basic auth: the browser's session for this origin carries the
+        // credentials, so no secret goes in the client bundle.
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(json),
       });
       if (!res.ok) {

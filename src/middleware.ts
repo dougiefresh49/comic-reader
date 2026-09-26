@@ -1,15 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminAuthFailure, checkAdminAuth } from "~/lib/admin-auth";
 
-// Auth disabled — basic auth browser dialog is more annoying than helpful
-// during active development. Re-enable before any public exposure.
-//
-// Original: HTTP Basic Auth protecting /admin/* and /api/admin/* routes
-// using ADMIN_USERNAME + ADMIN_PASSWORD env vars.
+// HTTP Basic Auth on admin, the review editor and apply-fixes.
+// The rules live in src/lib/admin-auth.ts.
 
-export function middleware(_req: NextRequest) {
-  return NextResponse.next();
+export function middleware(req: NextRequest) {
+  const result = checkAdminAuth(req.headers.get("authorization"));
+  if (result.ok) return NextResponse.next();
+  return adminAuthFailure(result);
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/book/:bookId/:issueId/review/:path*",
+    "/api/apply-fixes",
+  ],
 };

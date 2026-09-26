@@ -1,6 +1,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { type NextRequest } from "next/server";
+import { adminAuthFailure, checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 interface BubbleStyle {
@@ -99,16 +100,8 @@ function pageNumFromIndex(idx: number): number {
 }
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get("x-apply-fixes-secret");
-  if (!process.env.APPLY_FIXES_SECRET) {
-    return Response.json(
-      { error: "APPLY_FIXES_SECRET not configured" },
-      { status: 500 },
-    );
-  }
-  if (secret !== process.env.APPLY_FIXES_SECRET) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const auth = checkAdminAuth(req.headers.get("authorization"));
+  if (!auth.ok) return adminAuthFailure(auth);
 
   let payload: FixesJson;
   try {

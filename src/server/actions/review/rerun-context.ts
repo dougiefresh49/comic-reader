@@ -6,6 +6,8 @@ import {
   createPartFromText,
 } from "@google/genai";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { checkAdminAuth } from "~/lib/admin-auth";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -115,6 +117,8 @@ Then output ONLY this JSON object (no markdown):
 }
 
 export async function rerunContext(args: Args): Promise<Result> {
+  const auth = checkAdminAuth((await headers()).get("authorization"));
+  if (!auth.ok) return { ok: false, error: auth.message };
   if (!process.env.GEMINI_API_KEY) {
     return { ok: false, error: "GEMINI_API_KEY not configured" };
   }
