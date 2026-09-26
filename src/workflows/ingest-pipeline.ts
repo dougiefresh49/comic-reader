@@ -183,6 +183,9 @@ export async function ingestPipeline(input: IngestInput) {
       if (casting.pending === 0) {
         await updatePipelineStep(bookId, issueId, currentStep);
         console.log(`[casting] skipped: all ${casting.speakers} speakers cast`);
+        if (casting.unresolved.length > 0) {
+          console.log(`[casting] unresolved: ${casting.unresolved.join(", ")}`);
+        }
       } else {
         await updatePipelineStep(bookId, issueId, currentStep, true);
         using castingHook = createHook<{ approved: boolean }>({

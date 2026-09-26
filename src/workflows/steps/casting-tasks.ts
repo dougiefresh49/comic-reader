@@ -23,6 +23,8 @@ export interface CastlistCopyRow {
   character: string;
   voice_id: string;
   voice_uuid: string | null;
+  /** True when filling a this-issue row that already exists with null voice_id. */
+  fillGap: boolean;
 }
 
 export interface CastingPlan {
@@ -72,14 +74,26 @@ export async function planCastingTasks(
     speakerSet.add(r.speaker);
   }
 
-  const { data: aliasRows, error: aliasErr } = await client
+  // Globals first, then book-scoped, so the book scope wins on the same alias.
+  const { data: globalAliasRows, error: globalAliasErr } = await client
     .from("aliases")
-    .select("alias, canonical, scope, scope_id")
-    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`);
-  if (aliasErr) throw new Error(aliasErr.message);
+    .select("alias, canonical")
+    .eq("scope", "global");
+  if (globalAliasErr) throw new Error(globalAliasErr.message);
+
+  const { data: bookAliasRows, error: bookAliasErr } = await client
+    .from("aliases")
+    .select("alias, canonical")
+    .eq("scope", "book")
+    .eq("scope_id", bookId);
+  if (bookAliasErr) throw new Error(bookAliasErr.message);
 
   const aliasMap = new Map<string, string>();
-  for (const row of aliasRows ?? []) {
+  for (const row of globalAliasRows ?? []) {
+    const r = row as { alias: string; canonical: string };
+    aliasMap.set(norm(r.alias), r.canonical);
+  }
+  for (const row of bookAliasRows ?? []) {
     const r = row as { alias: string; canonical: string };
     aliasMap.set(norm(r.alias), r.canonical);
   }
@@ -175,31 +189,46 @@ export async function planCastingTasks(
 
     const hasVoice = (c: CastRow): boolean =>
       Boolean(c.voice_id) && c.voice_id !== SKIPPED_VOICE;
+    // Decided: real voice or __SKIPPED__. A null voice_id is a gap, not a decision.
+    const isDecided = (c: CastRow): boolean => c.voice_id != null;
 
-    // Any castlist row already on this issue (voice, skip, or empty) is kept.
-    // Copy-forward only fills gaps; never overwrite a local decision.
-    const thisIssueRow = castlist.find(
+    const thisIssueRows = castlist.filter(
       (c) => c.issue_id === issueId && nameMatches(c),
     );
-    if (thisIssueRow) {
-      if (hasVoice(thisIssueRow)) {
+    if (thisIssueRows.some(isDecided)) {
+      if (thisIssueRows.some(hasVoice)) {
         castCount++;
       }
-      // __SKIPPED__ (and any other existing row) counts as decided: no task.
+      // Decided rows stay; ignoreDuplicates on insert path protects them too.
       continue;
     }
+
+    const gapRows = thisIssueRows.filter((c) => c.voice_id == null);
 
     const otherCast = castlist.find(
       (c) => c.issue_id !== issueId && nameMatches(c) && hasVoice(c),
     );
     if (otherCast?.voice_id) {
       castCount++;
-      if (!copyKeys.has(otherCast.character)) {
+      if (gapRows.length > 0) {
+        for (const gap of gapRows) {
+          if (!copyKeys.has(gap.character)) {
+            copyKeys.add(gap.character);
+            toCopy.push({
+              character: gap.character,
+              voice_id: otherCast.voice_id,
+              voice_uuid: otherCast.voice_uuid,
+              fillGap: true,
+            });
+          }
+        }
+      } else if (!copyKeys.has(otherCast.character)) {
         copyKeys.add(otherCast.character);
         toCopy.push({
           character: otherCast.character,
           voice_id: otherCast.voice_id,
           voice_uuid: otherCast.voice_uuid,
+          fillGap: false,
         });
       }
       continue;
@@ -251,21 +280,40 @@ export async function createCastingTasks(
   const plan = await planCastingTasks(client, bookId, issueId);
 
   for (const row of plan.toCopy) {
-    // ignoreDuplicates: never overwrite an existing this-issue row (e.g. SKIPPED).
-    const { error } = await client.from("castlist").upsert(
-      {
-        book_id: bookId,
-        issue_id: issueId,
-        character: row.character,
-        voice_id: row.voice_id,
-        voice_uuid: row.voice_uuid,
-      },
-      { onConflict: "book_id,issue_id,character", ignoreDuplicates: true },
-    );
-    if (error) {
-      throw new Error(
-        `[casting] castlist copy ${row.character}: ${error.message}`,
+    if (row.fillGap) {
+      // Gap fill: only touch rows whose voice_id is still null.
+      const { error } = await client
+        .from("castlist")
+        .update({
+          voice_id: row.voice_id,
+          voice_uuid: row.voice_uuid,
+        })
+        .eq("book_id", bookId)
+        .eq("issue_id", issueId)
+        .eq("character", row.character)
+        .is("voice_id", null);
+      if (error) {
+        throw new Error(
+          `[casting] castlist fill ${row.character}: ${error.message}`,
+        );
+      }
+    } else {
+      // New row: ignoreDuplicates never overwrites a decided this-issue row.
+      const { error } = await client.from("castlist").upsert(
+        {
+          book_id: bookId,
+          issue_id: issueId,
+          character: row.character,
+          voice_id: row.voice_id,
+          voice_uuid: row.voice_uuid,
+        },
+        { onConflict: "book_id,issue_id,character", ignoreDuplicates: true },
       );
+      if (error) {
+        throw new Error(
+          `[casting] castlist copy ${row.character}: ${error.message}`,
+        );
+      }
     }
   }
 
