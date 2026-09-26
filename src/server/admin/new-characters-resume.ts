@@ -7,8 +7,29 @@ function projectRoot(): string {
   return process.cwd();
 }
 
-function isHookNotFound(message: string): boolean {
+function isHookNotFoundMessage(message: string): boolean {
   return /not found|already resumed|no hook/i.test(message);
+}
+
+async function isHookNotFound(err: unknown): Promise<boolean> {
+  try {
+    const { HookNotFoundError } = await import(
+      /* webpackIgnore: true */
+      /* turbopackIgnore: true */
+      "workflow/errors"
+    );
+    if (
+      HookNotFoundError &&
+      typeof HookNotFoundError.is === "function" &&
+      HookNotFoundError.is(err)
+    ) {
+      return true;
+    }
+  } catch {
+    // workflow/errors unavailable (local dev) or no HookNotFoundError export.
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return isHookNotFoundMessage(msg);
 }
 
 /** Resume the character-review hook and clear pause flags. */
@@ -34,8 +55,13 @@ export async function resumeCharacterReviewAndClearPause(
       resumed = true;
     } catch (err) {
       // Hook missing or already resumed: still clear flags for the local CLI path.
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!isHookNotFound(msg)) resumeError = msg;
+      // Any other resumeHook error: leave flags alone and surface the error.
+      if (!(await isHookNotFound(err))) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
     }
   } catch (err) {
     // Dev bundle can't load workflow/api; treat as no live run, surface the text.
