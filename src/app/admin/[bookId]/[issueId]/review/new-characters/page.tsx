@@ -5,6 +5,7 @@ import {
   getNewCharacterReviews,
 } from "~/server/admin/new-characters";
 import { getKnownCharactersForIssue } from "~/server/admin/speakers";
+import { ApproveContinueButton } from "./ApproveContinueButton";
 import { NewCharactersReviewClient } from "./NewCharactersReviewClient";
 
 export const dynamic = "force-dynamic";
@@ -37,26 +38,31 @@ export default async function ReviewNewCharactersPage({ params }: Params) {
             href="/admin"
             className="text-sm text-neutral-400 hover:text-neutral-200"
           >
-            ← Admin
+            &larr; Admin
           </Link>
           <span className="text-xs text-neutral-500">
             {bookId} / {issueId}
           </span>
         </div>
         <h1 className="mb-2 text-2xl font-semibold">
-          Review New Characters — {bookLabel} / {issueLabel}
+          Review New Characters: {bookLabel} / {issueLabel}
         </h1>
         <p className="mb-8 text-sm text-neutral-400">
           Decide which detected names are new roles vs aliases of existing
           characters before voice sourcing runs.
         </p>
         {empty ? (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">
-            No candidate speakers found for this issue (or everyone is already
-            known, cast, or marked Narrator). Run{" "}
-            <code className="text-neutral-300">clean-voice-descriptions</code>{" "}
-            after bubbles exist if you expected a queue here.
-          </div>
+          <>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">
+              No candidate speakers found for this issue (or everyone is already
+              known, cast, or marked Narrator). Run{" "}
+              <code className="text-neutral-300">clean-voice-descriptions</code>{" "}
+              after bubbles exist if you expected a queue here.
+            </div>
+            <div className="mt-8 flex items-center justify-end">
+              <ApproveContinueButton bookId={bookId} issueId={issueId} />
+            </div>
+          </>
         ) : (
           <NewCharactersReviewClient
             bookId={bookId}

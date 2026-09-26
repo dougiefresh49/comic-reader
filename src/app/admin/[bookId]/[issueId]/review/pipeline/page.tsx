@@ -34,7 +34,7 @@ export default async function PipelineReviewPage({ params }: Params) {
             href="/admin"
             className="text-sm text-neutral-400 hover:text-neutral-200"
           >
-            ← Admin
+            &larr; Admin
           </Link>
           <span className="text-xs text-neutral-500">
             {bookId} / {issueId}
@@ -43,15 +43,15 @@ export default async function PipelineReviewPage({ params }: Params) {
 
         <h1 className="mb-2 text-2xl font-semibold">Pipeline review</h1>
         <p className="mb-2 text-sm text-neutral-400">
-          {issueLabel} — human-in-the-loop steps and tooling while the ingest
-          worker runs.
+          {issueLabel}. Human-in-the-loop steps and tooling for this
+          issue&apos;s ingest run.
         </p>
 
         <div className="mb-8 rounded-lg border border-neutral-800 bg-neutral-900/60 px-4 py-3 text-sm">
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-neutral-300">
             <span>
               <span className="text-neutral-500">Step </span>
-              {issue.pipelineStep ?? "—"}
+              {issue.pipelineStep ?? "none"}
             </span>
             <span>
               <span className="text-neutral-500">Status </span>
@@ -68,7 +68,7 @@ export default async function PipelineReviewPage({ params }: Params) {
               href={resumeHref}
               className="mt-3 inline-flex rounded bg-yellow-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-yellow-600"
             >
-              Open blocking review →
+              Open blocking review &rarr;
             </Link>
           )}
           {canTrigger && (
@@ -97,7 +97,7 @@ export default async function PipelineReviewPage({ params }: Params) {
               Speakers
             </Link>
             <span className="ml-2 text-neutral-600">
-              — correct unknown speakers after context
+              Correct unknown speakers after context
             </span>
           </li>
           <li>
@@ -108,7 +108,7 @@ export default async function PipelineReviewPage({ params }: Params) {
               New characters
             </Link>
             <span className="ml-2 text-neutral-600">
-              — aliases vs new roles before voice sourcing
+              Aliases vs new roles before voice sourcing
             </span>
           </li>
           <li>
@@ -118,9 +118,7 @@ export default async function PipelineReviewPage({ params }: Params) {
             >
               Character clusters
             </Link>
-            <span className="ml-2 text-neutral-600">
-              — face cluster review (stub)
-            </span>
+            <span className="ml-2 text-neutral-600">Face cluster review</span>
           </li>
           <li>
             <Link
@@ -130,7 +128,7 @@ export default async function PipelineReviewPage({ params }: Params) {
               Panels
             </Link>
             <span className="ml-2 text-neutral-600">
-              — panel bounds, effects, bubble assignment
+              Panel bounds, effects, bubble assignment
             </span>
           </li>
           <li>
@@ -141,7 +139,7 @@ export default async function PipelineReviewPage({ params }: Params) {
               Casting
             </Link>
             <span className="ml-2 text-neutral-600">
-              — voice sources &amp; clips (find-voice-sources pause)
+              Voice sources &amp; clips (find-voice-sources pause)
             </span>
           </li>
           <li>
@@ -152,13 +150,13 @@ export default async function PipelineReviewPage({ params }: Params) {
               Voice rotation
             </Link>
             <span className="ml-2 text-neutral-600">
-              — global ElevenLabs / PVC tools
+              Global ElevenLabs / PVC tools
             </span>
           </li>
           <li>
             {issue.hasWebP ? (
               <Link
-                href={`/book/${bookId}/${issueId}/review`}
+                href={`/book/${bookId}/${issueId}/review?mode=pipeline`}
                 className="text-emerald-400 hover:text-emerald-300"
               >
                 Bubble review (reader)
@@ -167,7 +165,7 @@ export default async function PipelineReviewPage({ params }: Params) {
               <span className="text-neutral-600">Bubble review (reader)</span>
             )}
             <span className="ml-2 text-neutral-600">
-              — karaoke-style text review
+              Karaoke-style text review
             </span>
             {!issue.hasWebP && (
               <span className="ml-2 text-neutral-500">

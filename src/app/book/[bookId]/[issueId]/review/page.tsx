@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getManifest, getIssueData } from "~/server";
 import { ReviewLayout } from "~/components/review/ReviewLayout";
 
-export const revalidate = 86400;
+export const dynamic = "force-dynamic";
 
 interface ReviewPageProps {
   params: Promise<{

@@ -1,13 +1,21 @@
 "use server";
 
-import fs from "fs-extra";
-import { dirname } from "path";
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   clearNewCharactersPauseIfComplete,
-  reviewedNewCharactersKeptPath,
+  resumeCharacterReviewAndClearPause,
 } from "~/server/admin/new-characters";
+
+/** Local copy of scripts/utils/registry.ts slugify. Do not import that module. */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+}
 
 export async function aliasNewCharacter(args: {
   bookId: string;
@@ -106,22 +114,24 @@ export async function keepAsNewCharacter(args: {
   issueId: string;
   resolvedName: string;
 }) {
-  const path = reviewedNewCharactersKeptPath(args.bookId, args.issueId);
-  await fs.ensureDir(dirname(path));
-  let kept: string[] = [];
-  if (await fs.pathExists(path)) {
-    try {
-      const data = (await fs.readJson(path)) as { kept?: string[] };
-      kept = [...(data.kept ?? [])];
-    } catch {
-      kept = [];
-    }
-  }
-  if (!kept.includes(args.resolvedName)) {
-    kept.push(args.resolvedName);
-    kept.sort();
-  }
-  await fs.writeJson(path, { kept }, { spaces: 2 });
+  const { data: bookRow } = await supabaseAdmin
+    .from("books")
+    .select("franchises")
+    .eq("id", args.bookId)
+    .maybeSingle();
+  const franchises = (bookRow?.franchises as string[] | null) ?? [];
+  const franchise = franchises[franchises.length - 1] ?? "";
+
+  const id = slugify(args.resolvedName);
+  const { error } = await supabaseAdmin.from("characters").upsert(
+    {
+      id,
+      franchise,
+      aliases: [args.resolvedName],
+    },
+    { onConflict: "id", ignoreDuplicates: true },
+  );
+  if (error) return { ok: false as const, error: error.message };
 
   await clearNewCharactersPauseIfComplete(args.bookId, args.issueId);
 
@@ -138,16 +148,15 @@ export async function unkeepAsNewCharacter(args: {
   issueId: string;
   resolvedName: string;
 }) {
-  const path = reviewedNewCharactersKeptPath(args.bookId, args.issueId);
-  if (!(await fs.pathExists(path))) return { ok: true as const };
-  let kept: string[] = [];
-  try {
-    const data = (await fs.readJson(path)) as { kept?: string[] };
-    kept = (data.kept ?? []).filter((k) => k !== args.resolvedName);
-  } catch {
-    return { ok: true as const };
+  const id = slugify(args.resolvedName);
+  const { error } = await supabaseAdmin
+    .from("characters")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    return { ok: false as const, error: "in use, can't undo" };
   }
-  await fs.writeJson(path, { kept }, { spaces: 2 });
 
   revalidatePath(
     `/admin/${args.bookId}/${args.issueId}/review/new-characters`,
@@ -157,28 +166,14 @@ export async function unkeepAsNewCharacter(args: {
   return { ok: true as const };
 }
 
-export async function skipPipelinePause(args: {
+export async function approveAndContinuePipeline(args: {
   bookId: string;
   issueId: string;
 }) {
-  const { error } = await supabaseAdmin
-    .from("issues")
-    .update({
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    })
-    .eq("book_id", args.bookId)
-    .eq("id", args.issueId)
-    .eq("pipeline_paused_at", "review-new-characters");
-
-  if (error) return { ok: false as const, error: error.message };
-
-  revalidatePath("/admin", "page");
-  revalidatePath(
-    `/admin/${args.bookId}/${args.issueId}/review/new-characters`,
-    "page",
+  const res = await resumeCharacterReviewAndClearPause(
+    args.bookId,
+    args.issueId,
   );
-
+  if (!res.ok) return { ok: false as const, error: res.error };
   return { ok: true as const };
 }
