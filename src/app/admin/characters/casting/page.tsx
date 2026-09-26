@@ -11,6 +11,7 @@ interface SearchParams {
 export default async function CastingPage({ searchParams }: SearchParams) {
   const sp = await searchParams;
   const tasks = await getCastingTasks(sp.book, sp.issue);
+  const hasBookAndIssue = Boolean(sp.book && sp.issue);
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-neutral-100">
@@ -32,14 +33,20 @@ export default async function CastingPage({ searchParams }: SearchParams) {
           Source voice clips and create ElevenLabs voice models for characters.
         </p>
 
-        {tasks.length === 0 ? (
+        {hasBookAndIssue ? (
+          <CastingClient
+            initialTasks={tasks}
+            bookId={sp.book}
+            issueId={sp.issue}
+          />
+        ) : tasks.length === 0 ? (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">
-            No pending casting tasks. Run{" "}
+            No pending casting tasks. Open with{" "}
             <code className="rounded bg-neutral-800 px-1.5 py-0.5">
-              pnpm find-voice-sources -- --book &lt;name&gt; --issue &lt;n&gt;
-              --db
+              ?book=&lt;id&gt;&amp;issue=&lt;id&gt;
             </code>{" "}
-            to populate.
+            after the casting gate has created tasks, or pick a book and issue
+            from the admin dashboard.
           </div>
         ) : (
           <CastingClient
