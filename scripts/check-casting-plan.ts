@@ -6,7 +6,10 @@
  */
 
 import { supabase } from "./lib/supabase.js";
-import { planCastingTasks } from "~/workflows/steps/casting-tasks";
+import {
+  pendingFromPlan,
+  planCastingTasks,
+} from "~/workflows/steps/casting-tasks";
 
 function parseArgs(): { book: string; issue: string } {
   const args = process.argv.slice(2);
@@ -41,7 +44,7 @@ async function main() {
   const { book, issue } = parseArgs();
   const plan = await planCastingTasks(supabase, book, issue);
   const wouldCreate = plan.toCreate.length;
-  const pending = wouldCreate + plan.existingPending;
+  const pending = pendingFromPlan(plan);
   const casting = pending === 0 ? "skip" : "pause";
 
   console.log(

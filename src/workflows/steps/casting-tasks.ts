@@ -11,6 +11,14 @@ function norm(s: string): string {
   return s.toLowerCase().trim();
 }
 
+/** Postgres unique_violation; treat as "row already exists". */
+function isUniqueViolation(error: {
+  code?: string;
+  message?: string;
+}): boolean {
+  return error.code === "23505";
+}
+
 export interface CastlistCopyRow {
   character: string;
   voice_id: string;
@@ -162,21 +170,27 @@ export async function planCastingTasks(
       [speaker, canonical, characterId, ...(char?.aliases ?? [])].map(norm),
     );
 
-    const castMatches = (c: CastRow): boolean => {
-      if (!c.voice_id || c.voice_id === SKIPPED_VOICE) return false;
-      return matchNames.has(norm(c.character));
-    };
+    const nameMatches = (c: CastRow): boolean =>
+      matchNames.has(norm(c.character));
 
-    const thisIssueCast = castlist.find(
-      (c) => c.issue_id === issueId && castMatches(c),
+    const hasVoice = (c: CastRow): boolean =>
+      Boolean(c.voice_id) && c.voice_id !== SKIPPED_VOICE;
+
+    // Any castlist row already on this issue (voice, skip, or empty) is kept.
+    // Copy-forward only fills gaps; never overwrite a local decision.
+    const thisIssueRow = castlist.find(
+      (c) => c.issue_id === issueId && nameMatches(c),
     );
-    if (thisIssueCast) {
-      castCount++;
+    if (thisIssueRow) {
+      if (hasVoice(thisIssueRow)) {
+        castCount++;
+      }
+      // __SKIPPED__ (and any other existing row) counts as decided: no task.
       continue;
     }
 
     const otherCast = castlist.find(
-      (c) => c.issue_id !== issueId && castMatches(c),
+      (c) => c.issue_id !== issueId && nameMatches(c) && hasVoice(c),
     );
     if (otherCast?.voice_id) {
       castCount++;
@@ -214,6 +228,15 @@ export async function planCastingTasks(
 }
 
 /**
+ * Pending count shared by the planner and the workflow wrapper: tasks the
+ * plan would create, plus pending tasks already present for speakers in the
+ * plan. Stale pending rows for already-cast speakers are excluded.
+ */
+export function pendingFromPlan(plan: CastingPlan): number {
+  return plan.toCreate.length + plan.existingPending;
+}
+
+/**
  * Workflow step: apply the plan's castlist copy-forward and casting_task
  * inserts. Returns counts the casting gate uses to decide pause vs skip.
  */
@@ -228,6 +251,7 @@ export async function createCastingTasks(
   const plan = await planCastingTasks(client, bookId, issueId);
 
   for (const row of plan.toCopy) {
+    // ignoreDuplicates: never overwrite an existing this-issue row (e.g. SKIPPED).
     const { error } = await client.from("castlist").upsert(
       {
         book_id: bookId,
@@ -236,10 +260,10 @@ export async function createCastingTasks(
         voice_id: row.voice_id,
         voice_uuid: row.voice_uuid,
       },
-      { onConflict: "book_id,issue_id,character" },
+      { onConflict: "book_id,issue_id,character", ignoreDuplicates: true },
     );
     if (error) {
-      console.warn(
+      throw new Error(
         `[casting] castlist copy ${row.character}: ${error.message}`,
       );
     }
@@ -254,25 +278,22 @@ export async function createCastingTasks(
       status: "pending",
     });
     if (error) {
-      console.warn(`[casting] casting_task ${characterId}: ${error.message}`);
-    } else {
-      created++;
+      if (isUniqueViolation(error)) {
+        // Unique on (book_id, issue_id, character_id): task already exists.
+        continue;
+      }
+      throw new Error(
+        `[casting] casting_task ${characterId}: ${error.message}`,
+      );
     }
+    created++;
   }
-
-  const { count, error: countErr } = await client
-    .from("casting_tasks")
-    .select("id", { count: "exact", head: true })
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("status", "pending");
-  if (countErr) throw new Error(countErr.message);
 
   return {
     speakers: plan.speakers,
     cast: plan.cast,
     created,
-    pending: count ?? 0,
+    pending: pendingFromPlan(plan),
     unresolved: plan.unresolved,
   };
 }

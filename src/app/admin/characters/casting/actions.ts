@@ -3,6 +3,7 @@
 import { GoogleGenAI, createPartFromText } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { resumeHook } from "workflow/api";
+import { HookNotFoundError } from "workflow/errors";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -168,12 +169,16 @@ interface CompleteCastingArgs {
 export async function completeCasting(
   args: CompleteCastingArgs,
 ): Promise<CompleteCastingResult> {
-  const { data: remaining } = await supabaseAdmin
+  const { data: remaining, error: remainingErr } = await supabaseAdmin
     .from("casting_tasks")
     .select("id")
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId)
     .eq("status", "pending");
+
+  if (remainingErr) {
+    return { ok: false, error: remainingErr.message };
+  }
 
   if (remaining && remaining.length > 0) {
     return {
@@ -182,7 +187,7 @@ export async function completeCasting(
     };
   }
 
-  await supabaseAdmin
+  const { error: pauseErr } = await supabaseAdmin
     .from("issues")
     .update({
       pipeline_paused: false,
@@ -193,14 +198,28 @@ export async function completeCasting(
     .eq("id", args.issueId)
     .in("pipeline_paused_at", ["casting", "find-voice-sources"]);
 
+  if (pauseErr) {
+    return { ok: false, error: pauseErr.message };
+  }
+
   let resumed = false;
   try {
     await resumeHook(`ingest:${args.bookId}/${args.issueId}/casting`, {
       approved: true,
     });
     resumed = true;
-  } catch {
-    resumed = false;
+  } catch (err) {
+    // Only a missing hook means no live run was waiting (same case the
+    // resume-hook route maps to 404 / "Hook not found").
+    if (
+      HookNotFoundError.is(err) ||
+      (err instanceof Error && /hook not found/i.test(err.message))
+    ) {
+      resumed = false;
+    } else {
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: message };
+    }
   }
 
   revalidatePath("/admin/characters/casting", "page");
