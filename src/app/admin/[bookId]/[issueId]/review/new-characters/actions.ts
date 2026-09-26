@@ -5,7 +5,7 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   clearNewCharactersPauseIfComplete,
   resumeCharacterReviewAndClearPause,
-} from "~/server/admin/new-characters";
+} from "~/server/admin/new-characters-resume";
 
 /** Local copy of scripts/utils/registry.ts slugify. Do not import that module. */
 function slugify(text: string): string {
@@ -114,24 +114,36 @@ export async function keepAsNewCharacter(args: {
   issueId: string;
   resolvedName: string;
 }) {
-  const { data: bookRow } = await supabaseAdmin
+  const { data: bookRow, error: bookErr } = await supabaseAdmin
     .from("books")
     .select("franchises")
     .eq("id", args.bookId)
     .maybeSingle();
+  if (bookErr) return { ok: false as const, error: bookErr.message };
   const franchises = (bookRow?.franchises as string[] | null) ?? [];
-  const franchise = franchises[franchises.length - 1] ?? "";
+  const franchise = franchises[franchises.length - 1];
+  if (!franchise) {
+    return { ok: false as const, error: "no franchise on book" };
+  }
 
   const id = slugify(args.resolvedName);
-  const { error } = await supabaseAdmin.from("characters").upsert(
-    {
-      id,
-      franchise,
-      aliases: [args.resolvedName],
-    },
-    { onConflict: "id", ignoreDuplicates: true },
-  );
+  if (!id) {
+    return { ok: false as const, error: "name has no slugable characters" };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("characters")
+    .upsert(
+      {
+        id,
+        franchise,
+        aliases: [args.resolvedName],
+      },
+      { onConflict: "id", ignoreDuplicates: true },
+    )
+    .select("id");
   if (error) return { ok: false as const, error: error.message };
+  const inserted = (data?.length ?? 0) > 0;
 
   await clearNewCharactersPauseIfComplete(args.bookId, args.issueId);
 
@@ -140,7 +152,7 @@ export async function keepAsNewCharacter(args: {
     "page",
   );
 
-  return { ok: true as const };
+  return { ok: true as const, inserted };
 }
 
 export async function unkeepAsNewCharacter(args: {
@@ -155,7 +167,10 @@ export async function unkeepAsNewCharacter(args: {
     .eq("id", id);
 
   if (error) {
-    return { ok: false as const, error: "in use, can't undo" };
+    if (error.code === "23503") {
+      return { ok: false as const, error: "in use, can't undo" };
+    }
+    return { ok: false as const, error: error.message };
   }
 
   revalidatePath(
@@ -175,5 +190,9 @@ export async function approveAndContinuePipeline(args: {
     args.issueId,
   );
   if (!res.ok) return { ok: false as const, error: res.error };
-  return { ok: true as const };
+  return {
+    ok: true as const,
+    resumed: res.resumed,
+    ...(res.resumeError ? { resumeError: res.resumeError } : {}),
+  };
 }

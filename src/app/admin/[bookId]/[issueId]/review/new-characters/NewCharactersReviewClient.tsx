@@ -16,7 +16,7 @@ interface Props {
   initialAutoResolved: NewCharacterReview[];
   initialQueue: NewCharacterReview[];
   knownCharacters: string[];
-  /** queue.length + kept-as-new count from server snapshot */
+  /** Pending queue length from the server snapshot */
   initialSnapshotTotal: number;
 }
 
@@ -39,6 +39,9 @@ export function NewCharactersReviewClient({
   const [autoResolved, setAutoResolved] =
     useState<NewCharacterReview[]>(initialAutoResolved);
   const [sessionResolved, setSessionResolved] = useState<SessionResolved[]>([]);
+  const [undoableKeeps, setUndoableKeeps] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -158,6 +161,13 @@ export function NewCharactersReviewClient({
         );
       } else {
         setMsg(null);
+        if (res.inserted) {
+          setUndoableKeeps((prev) => {
+            const next = new Set(prev);
+            next.add(review.resolvedName);
+            return next;
+          });
+        }
       }
     });
   };
@@ -166,6 +176,11 @@ export function NewCharactersReviewClient({
     setAutoResolved((prev) =>
       prev.filter((r) => r.resolvedName !== review.resolvedName),
     );
+    setUndoableKeeps((prev) => {
+      const next = new Set(prev);
+      next.delete(review.resolvedName);
+      return next;
+    });
     setQueue((prev) =>
       [...prev, { ...review, status: "pending" as const }].sort((a, b) =>
         a.resolvedName.localeCompare(b.resolvedName),
@@ -184,6 +199,11 @@ export function NewCharactersReviewClient({
           prev.filter((r) => r.resolvedName !== review.resolvedName),
         );
         setAutoResolved((prev) => [...prev, review]);
+        setUndoableKeeps((prev) => {
+          const next = new Set(prev);
+          next.add(review.resolvedName);
+          return next;
+        });
       } else {
         setMsg(null);
       }
@@ -232,15 +252,16 @@ export function NewCharactersReviewClient({
                 {r.autoReason === "kept_as_new" && (
                   <span className="text-neutral-500">· kept as new</span>
                 )}
-                {r.autoReason === "kept_as_new" && (
-                  <button
-                    type="button"
-                    onClick={() => handleUnkeep(r)}
-                    className="ml-1 text-[10px] text-neutral-500 hover:text-neutral-300"
-                  >
-                    undo
-                  </button>
-                )}
+                {r.autoReason === "kept_as_new" &&
+                  undoableKeeps.has(r.resolvedName) && (
+                    <button
+                      type="button"
+                      onClick={() => handleUnkeep(r)}
+                      className="ml-1 text-[10px] text-neutral-500 hover:text-neutral-300"
+                    >
+                      undo
+                    </button>
+                  )}
               </span>
             ))}
           </div>

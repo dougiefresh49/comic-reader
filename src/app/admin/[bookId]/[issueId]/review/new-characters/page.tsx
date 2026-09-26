@@ -24,10 +24,7 @@ export default async function ReviewNewCharactersPage({ params }: Params) {
       getIssueDisplayLabel(bookId, issueId),
     ]);
 
-  const keptInitially = autoResolved.filter(
-    (r) => r.autoReason === "kept_as_new",
-  ).length;
-  const initialSnapshotTotal = queue.length + keptInitially;
+  const initialSnapshotTotal = queue.length;
   const empty = autoResolved.length === 0 && queue.length === 0;
 
   return (

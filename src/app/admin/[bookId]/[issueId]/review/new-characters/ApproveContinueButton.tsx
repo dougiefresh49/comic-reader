@@ -11,13 +11,13 @@ export function ApproveContinueButton({
   issueId: string;
 }) {
   const [pending, startTransition] = useTransition();
-  const [done, setDone] = useState(false);
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (done) {
+  if (doneMessage) {
     return (
       <span className="rounded bg-emerald-700/30 px-3 py-1.5 text-sm font-medium text-emerald-300">
-        Pipeline resumed
+        {doneMessage}
       </span>
     );
   }
@@ -33,9 +33,18 @@ export function ApproveContinueButton({
             const res = await approveAndContinuePipeline({ bookId, issueId });
             if (!res.ok) {
               setError("error" in res ? res.error : "Failed to resume");
-            } else {
-              setDone(true);
+              return;
             }
+            if (res.resumed) {
+              setDoneMessage("Pipeline resumed");
+              return;
+            }
+            const base = "No live run waiting, pause flags cleared";
+            setDoneMessage(
+              "resumeError" in res && res.resumeError
+                ? `${base}: ${res.resumeError}`
+                : base,
+            );
           });
         }}
         className="rounded bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
