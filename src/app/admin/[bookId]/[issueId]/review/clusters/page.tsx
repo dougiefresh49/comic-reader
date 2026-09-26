@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { ApproveClusterButton } from "./ApproveClusterButton";
 import { ClusterReviewClient } from "./ClusterReviewClient";
 import type { CharacterCluster, ClusterFace } from "./ClusterReviewClient";
 
@@ -309,6 +310,7 @@ export default async function ReviewClustersPage({ params }: Params) {
               >
                 &larr; Back to pipeline review
               </Link>
+              <ApproveClusterButton bookId={bookId} issueId={issueId} />
             </div>
           </>
         ) : (

@@ -1,6 +1,4 @@
 import "server-only";
-import { join } from "path";
-import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   analyzeNewCharacterQueue,
@@ -46,57 +44,4 @@ export async function getIssueDisplayLabel(
   const row = data as { name: string; number: number } | null;
   if (!row) return issueId;
   return row.name?.trim() ? row.name : `Issue ${row.number}`;
-}
-
-/** Path to persisted "kept as new" acknowledgements (relative uses cwd). */
-export function reviewedNewCharactersKeptPath(
-  bookId: string,
-  issueId: string,
-): string {
-  return join(
-    projectRoot(),
-    "assets",
-    "comics",
-    bookId,
-    issueId,
-    "data",
-    "reviewed-new-characters-kept.json",
-  );
-}
-
-/** Clears pipeline pause when no pending new-character reviews remain. */
-export async function clearNewCharactersPauseIfComplete(
-  bookId: string,
-  issueId: string,
-): Promise<void> {
-  const { count } = await supabaseAdmin
-    .from("issues")
-    .select("id", { count: "exact", head: true })
-    .eq("book_id", bookId)
-    .eq("id", issueId)
-    .eq("pipeline_paused", true)
-    .eq("pipeline_paused_at", "review-new-characters");
-
-  if (!count) return;
-
-  const { pendingCount } = await analyzeNewCharacterQueue(
-    supabaseAdmin,
-    bookId,
-    issueId,
-    { projectRoot: projectRoot() },
-  );
-
-  if (pendingCount > 0) return;
-
-  await supabaseAdmin
-    .from("issues")
-    .update({
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
-
-  revalidatePath("/admin", "page");
 }

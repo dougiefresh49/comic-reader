@@ -5,10 +5,10 @@ import type { NewCharacterReview } from "~/server/admin/new-characters";
 import {
   aliasNewCharacter,
   keepAsNewCharacter,
-  skipPipelinePause,
   undoAliasNewCharacter,
   unkeepAsNewCharacter,
 } from "./actions";
+import { ApproveContinueButton } from "./ApproveContinueButton";
 
 interface Props {
   bookId: string;
@@ -16,7 +16,7 @@ interface Props {
   initialAutoResolved: NewCharacterReview[];
   initialQueue: NewCharacterReview[];
   knownCharacters: string[];
-  /** queue.length + kept-as-new count from server snapshot */
+  /** Pending queue length from the server snapshot */
   initialSnapshotTotal: number;
 }
 
@@ -38,8 +38,9 @@ export function NewCharactersReviewClient({
   const [queue, setQueue] = useState<NewCharacterReview[]>(initialQueue);
   const [autoResolved, setAutoResolved] =
     useState<NewCharacterReview[]>(initialAutoResolved);
-  const [sessionResolved, setSessionResolved] = useState<SessionResolved[]>(
-    [],
+  const [sessionResolved, setSessionResolved] = useState<SessionResolved[]>([]);
+  const [undoableKeeps, setUndoableKeeps] = useState<Set<string>>(
+    () => new Set(),
   );
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -146,8 +147,28 @@ export function NewCharactersReviewClient({
         issueId,
         resolvedName: review.resolvedName,
       });
-      if (!res.ok) setMsg("Could not persist keep-as-new.");
-      else setMsg(null);
+      if (!res.ok) {
+        setMsg(
+          `Could not persist keep-as-new${"error" in res && res.error ? `: ${res.error}` : "."}`,
+        );
+        setAutoResolved((prev) =>
+          prev.filter((r) => r.resolvedName !== review.resolvedName),
+        );
+        setQueue((prev) =>
+          [...prev, review].sort((a, b) =>
+            a.resolvedName.localeCompare(b.resolvedName),
+          ),
+        );
+      } else {
+        setMsg(null);
+        if (res.inserted) {
+          setUndoableKeeps((prev) => {
+            const next = new Set(prev);
+            next.add(review.resolvedName);
+            return next;
+          });
+        }
+      }
     });
   };
 
@@ -155,6 +176,11 @@ export function NewCharactersReviewClient({
     setAutoResolved((prev) =>
       prev.filter((r) => r.resolvedName !== review.resolvedName),
     );
+    setUndoableKeeps((prev) => {
+      const next = new Set(prev);
+      next.delete(review.resolvedName);
+      return next;
+    });
     setQueue((prev) =>
       [...prev, { ...review, status: "pending" as const }].sort((a, b) =>
         a.resolvedName.localeCompare(b.resolvedName),
@@ -162,19 +188,25 @@ export function NewCharactersReviewClient({
     );
 
     startTransition(async () => {
-      await unkeepAsNewCharacter({
+      const res = await unkeepAsNewCharacter({
         bookId,
         issueId,
         resolvedName: review.resolvedName,
       });
-    });
-  };
-
-  const handleSkipPause = () => {
-    startTransition(async () => {
-      const res = await skipPipelinePause({ bookId, issueId });
-      if (!res.ok) setMsg(`Error: ${"error" in res ? res.error : "unknown"}`);
-      else setMsg("Pipeline pause cleared for this issue.");
+      if (!res.ok) {
+        setMsg(`Error: ${"error" in res ? res.error : "unknown"}`);
+        setQueue((prev) =>
+          prev.filter((r) => r.resolvedName !== review.resolvedName),
+        );
+        setAutoResolved((prev) => [...prev, review]);
+        setUndoableKeeps((prev) => {
+          const next = new Set(prev);
+          next.add(review.resolvedName);
+          return next;
+        });
+      } else {
+        setMsg(null);
+      }
     });
   };
 
@@ -187,14 +219,7 @@ export function NewCharactersReviewClient({
           </span>{" "}
           reviewed
         </div>
-        <button
-          type="button"
-          onClick={handleSkipPause}
-          disabled={pending}
-          className="rounded border border-neutral-600 bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 hover:bg-neutral-700 disabled:opacity-40"
-        >
-          Skip pipeline pause
-        </button>
+        <ApproveContinueButton bookId={bookId} issueId={issueId} />
       </div>
 
       {msg && (
@@ -227,15 +252,16 @@ export function NewCharactersReviewClient({
                 {r.autoReason === "kept_as_new" && (
                   <span className="text-neutral-500">· kept as new</span>
                 )}
-                {r.autoReason === "kept_as_new" && (
-                  <button
-                    type="button"
-                    onClick={() => handleUnkeep(r)}
-                    className="ml-1 text-[10px] text-neutral-500 hover:text-neutral-300"
-                  >
-                    undo
-                  </button>
-                )}
+                {r.autoReason === "kept_as_new" &&
+                  undoableKeeps.has(r.resolvedName) && (
+                    <button
+                      type="button"
+                      onClick={() => handleUnkeep(r)}
+                      className="ml-1 text-[10px] text-neutral-500 hover:text-neutral-300"
+                    >
+                      undo
+                    </button>
+                  )}
               </span>
             ))}
           </div>
@@ -344,15 +370,13 @@ function QueueCard({
           <span className="ml-3 text-xs text-neutral-400">
             Pages: {review.pageNumbers.join(", ")} ({review.bubbleCount}{" "}
             bubbles){" "}
-            <span className="text-neutral-500">
-              [{review.classification}]
-            </span>
+            <span className="text-neutral-500">[{review.classification}]</span>
           </span>
         </div>
       </div>
 
       {review.sampleText && (
-        <p className="mb-3 rounded bg-neutral-800/50 px-3 py-2 text-xs italic text-neutral-300">
+        <p className="mb-3 rounded bg-neutral-800/50 px-3 py-2 text-xs text-neutral-300 italic">
           Sample: &ldquo;{review.sampleText}&rdquo;
         </p>
       )}
@@ -365,7 +389,7 @@ function QueueCard({
             onClick={onKeep}
             className="rounded bg-emerald-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
           >
-            Keep as new — research appearances
+            Keep as new: research appearances
           </button>
           <button
             type="button"
@@ -422,9 +446,7 @@ function QueueCard({
               Scope
               <select
                 value={scope}
-                onChange={(e) =>
-                  setScope(e.target.value as "global" | "book")
-                }
+                onChange={(e) => setScope(e.target.value as "global" | "book")}
                 className="rounded border border-neutral-700 bg-neutral-950 px-2 py-1"
               >
                 <option value="book">This book</option>

@@ -16,7 +16,7 @@ export const NEW_CHARACTER_SPEECH_TYPES = [
 export interface NewCharacterReview {
   /** Representative raw speaker string from bubbles */
   originalName: string;
-  /** Alias-resolved name — grouping key */
+  /** Alias-resolved name, used as the grouping key */
   resolvedName: string;
   classification: "named" | "generic";
   pageNumbers: number[];
@@ -45,10 +45,17 @@ type BubbleRow = {
   ignored: boolean | null;
 };
 
-function resolveAlias(
-  raw: string,
-  aliasMap: Map<string, string>,
-): string {
+/** Local copy of scripts/utils/registry.ts slugify. Do not import that module. */
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+}
+
+function resolveAlias(raw: string, aliasMap: Map<string, string>): string {
   const key = raw.toLowerCase().trim();
   return aliasMap.get(key) ?? raw;
 }
@@ -74,8 +81,7 @@ async function loadNamedMapFromNewCharactersJson(
       string | { description: string; named?: boolean }
     >;
     for (const [name, entry] of Object.entries(data)) {
-      const named =
-        typeof entry === "string" ? true : entry.named !== false;
+      const named = typeof entry === "string" ? true : entry.named !== false;
       map.set(name, named);
     }
   } catch {
@@ -84,27 +90,19 @@ async function loadNamedMapFromNewCharactersJson(
   return map;
 }
 
-export async function loadKeptResolvedNames(
-  projectRoot: string,
-  bookId: string,
-  issueId: string,
-): Promise<Set<string>> {
-  const path = join(
-    projectRoot,
-    "assets",
-    "comics",
-    bookId,
-    issueId,
-    "data",
-    "reviewed-new-characters-kept.json",
-  );
-  if (!(await fs.pathExists(path))) return new Set();
-  try {
-    const data = (await fs.readJson(path)) as { kept?: string[] };
-    return new Set(data.kept ?? []);
-  } catch {
-    return new Set();
+function matchesCharacterRow(
+  resolvedName: string,
+  rows: Array<{ id: string; aliases: string[] | null }>,
+): boolean {
+  const lower = resolvedName.toLowerCase().trim();
+  const slug = slugify(resolvedName);
+  for (const row of rows) {
+    if (row.id === slug || row.id.toLowerCase() === lower) return true;
+    for (const alias of row.aliases ?? []) {
+      if (alias.toLowerCase().trim() === lower) return true;
+    }
   }
+  return false;
 }
 
 export async function analyzeNewCharacterQueue(
@@ -115,25 +113,28 @@ export async function analyzeNewCharacterQueue(
 ): Promise<NewCharacterQueueResult> {
   const projectRoot = options?.projectRoot;
 
-  const [{ data: bubbleRows, error: bErr }, { data: aliasRows }, { data: caRows }] =
-    await Promise.all([
-      client
-        .from("bubbles")
-        .select(
-          "speaker, page_number, ocr_text, text_with_cues, type, ignored",
-        )
-        .eq("book_id", bookId)
-        .eq("issue_id", issueId)
-        .in("type", [...NEW_CHARACTER_SPEECH_TYPES])
-        .not("speaker", "is", null),
-      client
-        .from("aliases")
-        .select("alias, canonical, scope, scope_id")
-        .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
-      client
-        .from("character_appearances")
-        .select("character_id, voice_status, voice_model_status"),
-    ]);
+  const [
+    { data: bubbleRows, error: bErr },
+    { data: aliasRows },
+    { data: caRows },
+    { data: charRows },
+  ] = await Promise.all([
+    client
+      .from("bubbles")
+      .select("speaker, page_number, ocr_text, text_with_cues, type, ignored")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .in("type", [...NEW_CHARACTER_SPEECH_TYPES])
+      .not("speaker", "is", null),
+    client
+      .from("aliases")
+      .select("alias, canonical, scope, scope_id")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
+    client
+      .from("character_appearances")
+      .select("character_id, voice_status, voice_model_status"),
+    client.from("characters").select("id, aliases"),
+  ]);
 
   if (bErr) {
     console.error("analyzeNewCharacterQueue bubbles:", bErr);
@@ -170,10 +171,13 @@ export async function analyzeNewCharacterQueue(
     castedCharacters.add(r.character);
   }
 
-  let keptNames = new Set<string>();
+  const characterRows = (charRows ?? []) as Array<{
+    id: string;
+    aliases: string[] | null;
+  }>;
+
   let namedFromJson = new Map<string, boolean>();
   if (projectRoot) {
-    keptNames = await loadKeptResolvedNames(projectRoot, bookId, issueId);
     namedFromJson = await loadNamedMapFromNewCharactersJson(
       projectRoot,
       bookId,
@@ -232,9 +236,10 @@ export async function analyzeNewCharacterQueue(
           : "generic";
 
     const isNarrator = resolvedName.trim().toLowerCase() === "narrator";
-    const inRegistry = readyCharacters.has(resolvedName);
+    const inRegistry =
+      readyCharacters.has(resolvedName) ||
+      matchesCharacterRow(resolvedName, characterRows);
     const inCast = castedCharacters.has(resolvedName);
-    const kept = keptNames.has(resolvedName);
 
     const base: Omit<NewCharacterReview, "status" | "autoReason"> = {
       originalName,
@@ -274,15 +279,6 @@ export async function analyzeNewCharacterQueue(
       });
       continue;
     }
-    if (kept) {
-      autoResolved.push({
-        ...base,
-        status: "kept_as_new",
-        resolvedTo: null,
-        autoReason: "kept_as_new",
-      });
-      continue;
-    }
 
     queue.push({
       ...base,
@@ -290,9 +286,7 @@ export async function analyzeNewCharacterQueue(
     });
   }
 
-  autoResolved.sort((a, b) =>
-    a.resolvedName.localeCompare(b.resolvedName),
-  );
+  autoResolved.sort((a, b) => a.resolvedName.localeCompare(b.resolvedName));
   queue.sort((a, b) => a.resolvedName.localeCompare(b.resolvedName));
 
   return {
