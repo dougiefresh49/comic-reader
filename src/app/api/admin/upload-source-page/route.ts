@@ -101,15 +101,21 @@ export async function POST(req: NextRequest) {
     }
 
     const prefix = `${body.bookId}/${body.issueId}/source`;
-    const { data: files, error: listError } = await supabaseAdmin.storage
-      .from(RAW_BUCKET)
-      .list(prefix);
-
-    if (listError) {
-      return Response.json({ error: listError.message }, { status: 500 });
+    const listLimit = 1000;
+    const files: { name: string }[] = [];
+    for (let offset = 0; ; offset += listLimit) {
+      const { data: page, error: listError } = await supabaseAdmin.storage
+        .from(RAW_BUCKET)
+        .list(prefix, { limit: listLimit, offset });
+      if (listError) {
+        return Response.json({ error: listError.message }, { status: 500 });
+      }
+      const batch = page ?? [];
+      files.push(...batch);
+      if (batch.length < listLimit) break;
     }
 
-    const pageFiles = (files ?? [])
+    const pageFiles = files
       .map((f) => {
         const match = /^page-(\d+)\.[a-z0-9]+$/i.exec(f.name);
         if (!match) return null;
@@ -155,9 +161,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (stored === 0) {
+    if (errors.length > 0) {
       return Response.json(
-        { error: `finalize stored 0 pages`, details: errors },
+        {
+          error: `finalize failed for ${errors.length} page(s)`,
+          stored,
+          total: pageFiles.length,
+          errors,
+        },
         { status: 500 },
       );
     }
@@ -179,7 +190,6 @@ export async function POST(req: NextRequest) {
       ok: true,
       stored,
       total: pageFiles.length,
-      errors: errors.length > 0 ? errors : undefined,
     });
   }
 

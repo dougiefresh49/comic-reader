@@ -241,16 +241,24 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        await supabaseAdmin
+        const { error: issueErr } = await supabaseAdmin
           .from("issues")
           .update({
             page_count: uploaded,
-            has_webp: true,
+            has_webp: uploaded > 0,
             pipeline_step: "pages-downloaded",
             source_pages_path: `${body.bookId}/${body.issueId}/source/`,
           })
           .eq("book_id", body.bookId)
           .eq("id", body.issueId);
+
+        if (issueErr) {
+          send({
+            type: "error",
+            message: `issues update failed: ${issueErr.message}`,
+          });
+          return;
+        }
 
         send({
           type: "done",

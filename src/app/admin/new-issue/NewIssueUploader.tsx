@@ -168,8 +168,16 @@ export function NewIssueUploader() {
           issueId,
         }),
       });
+      const finBody = (await finRes.json()) as {
+        error?: string;
+        errors?: string[];
+      };
       if (!finRes.ok) {
-        throw new Error(`finalize: ${finRes.status} ${await finRes.text()}`);
+        const detail =
+          finBody.errors && finBody.errors.length > 0
+            ? finBody.errors.join("; ")
+            : (finBody.error ?? `HTTP ${finRes.status}`);
+        throw new Error(`finalize: ${detail}`);
       }
 
       setStep("done");

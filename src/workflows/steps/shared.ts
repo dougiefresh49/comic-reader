@@ -34,18 +34,24 @@ export async function queryPageList(
   }
   if (!rows || rows.length === 0) return [];
 
-  const { data: files, error: listError } = await supabase.storage
-    .from("comic-pages")
-    .list(`${bookId}/${issueId}`);
-
-  if (listError) {
-    throw new Error(
-      `storage list failed for ${bookId}/${issueId}: ${listError.message}`,
-    );
+  const listLimit = 1000;
+  const files: { name: string }[] = [];
+  for (let offset = 0; ; offset += listLimit) {
+    const { data: page, error: listError } = await supabase.storage
+      .from("comic-pages")
+      .list(`${bookId}/${issueId}`, { limit: listLimit, offset });
+    if (listError) {
+      throw new Error(
+        `storage list failed for ${bookId}/${issueId}: ${listError.message}`,
+      );
+    }
+    const batch = page ?? [];
+    files.push(...batch);
+    if (batch.length < listLimit) break;
   }
 
   const present = new Set(
-    (files ?? [])
+    files
       .map((f) => f.name.toLowerCase())
       .filter((name) => /^page-\d+\.webp$/.test(name)),
   );
