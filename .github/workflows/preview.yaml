@@ -25,3 +25,20 @@ jobs:
       - run: pnpm check
         env:
           SKIP_ENV_VALIDATION: "1"
+
+  spine:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node scripts/spine/spine-lint.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
