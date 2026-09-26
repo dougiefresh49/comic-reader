@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * voice-rotation — keep the active ElevenLabs voice count below the cap
+ * voice-rotation: keep the active ElevenLabs voice count below the cap
  * by archiving voices we don't currently need, and restoring them on
  * demand. Schema: see supabase/migrations/20260501_voice_rotation.sql.
  *
@@ -11,80 +11,33 @@
  *     Report current active/archived/library counts and which books
  *     each active voice is used by.
  *
- *   pnpm voice-rotation -- --archive --book <id> [--dry-run]
- *     Archive every voice used ONLY by book X where keep_active=false:
- *       1. DELETE /v1/voices/{el_id}
- *       2. UPDATE voices SET status='archived', current_elevenlabs_id=null
- *       3. UPDATE castlist SET voice_id=null WHERE voice_uuid=this
- *       4. INSERT into voice_archives (audit log)
+ *   pnpm voice-rotation -- --archive (--book <id> | --voice <id|name>...)
+ *     Plan (default): list which active voices would be deleted, and why
+ *     others are skipped. Pass --execute to actually DELETE on ElevenLabs
+ *     and update the DB. A voice is deletable only when it is active,
+ *     keep_active=false, not excluded, and has a source_clip_path whose
+ *     Storage object exists.
  *
- *   pnpm voice-rotation -- --restore --book <id> [--dry-run]
- *     Restore every archived voice that's referenced by book X's castlist:
- *       1. Fetch source_clip_path from Supabase Storage
- *       2. POST /v1/voices/add with the clip → new el_id
- *       3. UPDATE voices SET status='active', current_elevenlabs_id=new_id
- *       4. UPDATE castlist SET voice_id=new_id WHERE voice_uuid=this
+ *   pnpm voice-rotation -- --restore (--book <id> | --voice <id|name>...)
+ *     Plan (default): list archived voices that would be restored.
+ *     Pass --execute to re-add from source_clip_path.
  *
- * --dry-run shows what would happen without touching ElevenLabs or the DB.
+ * --dry-run still parses for back-compat and does nothing extra (plan is
+ * already the default). --exclude-ids is required with
+ * --archive --book --execute; use --exclude-ids none when empty.
  *
  * Per the 2026-05-01 fidelity test outcome (indistinguishable), the
- * default keep_active is `false` — every voice gets rotated unless
+ * default keep_active is `false`. Every voice gets rotated unless
  * manually flagged. Set `keep_active = true` for main-cast voices only
  * if you want to skip the recreation cost on every ingest.
  */
 
+import { pathToFileURL } from "node:url";
 import { supabase } from "./lib/supabase.js";
 
 const ELEVENLABS_API_BASE = "https://api.elevenlabs.io";
 
-const apiKey = process.env.ELEVENLABS_API_KEY;
-if (!apiKey) {
-  console.error("❌ ELEVENLABS_API_KEY not set.");
-  process.exit(1);
-}
-
-interface Args {
-  mode: "check" | "archive" | "restore";
-  book?: string;
-  dryRun: boolean;
-}
-
-function parseArgs(): Args {
-  const argv = process.argv.slice(2);
-  if (argv.includes("--help") || argv.includes("-h")) {
-    console.log(`
-Usage:
-  pnpm voice-rotation -- --check
-  pnpm voice-rotation -- --archive --book <id> [--dry-run]
-  pnpm voice-rotation -- --restore --book <id> [--dry-run]
-`);
-    process.exit(0);
-  }
-  let mode: Args["mode"] | null = null;
-  let book: string | undefined;
-  let dryRun = false;
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (!a) continue;
-    if (a === "--check") mode = "check";
-    else if (a === "--archive") mode = "archive";
-    else if (a === "--restore") mode = "restore";
-    else if (a === "--book") book = argv[i + 1]?.trim();
-    else if (a.startsWith("--book=")) book = a.split("=")[1]?.trim();
-    else if (a === "--dry-run") dryRun = true;
-  }
-  if (!mode) {
-    console.error("❌ One of --check, --archive, --restore is required.");
-    process.exit(1);
-  }
-  if ((mode === "archive" || mode === "restore") && !book) {
-    console.error(`❌ --book required for --${mode}.`);
-    process.exit(1);
-  }
-  return { mode, book, dryRun };
-}
-
-interface VoiceRow {
+export interface VoiceRow {
   id: string;
   display_name: string;
   series_id: string | null;
@@ -98,18 +51,122 @@ interface VoiceRow {
   archived_at: string | null;
 }
 
-async function fetchAllVoices(): Promise<VoiceRow[]> {
-  const { data, error } = await supabase.from("voices").select("*");
-  if (error) throw new Error(`fetch voices: ${error.message}`);
-  return (data ?? []) as VoiceRow[];
-}
-
-interface CastlistRow {
+export interface CastlistRow {
   book_id: string;
   issue_id: string;
   character: string;
   voice_id: string | null;
   voice_uuid: string | null;
+}
+
+export type ClipExistsFn = (sourceClipPath: string) => Promise<boolean>;
+
+export interface PlanArchiveOpts {
+  /** Scope to voices used only by this book. Mutually exclusive with voiceSelectors. */
+  book?: string;
+  /** Scope to named voices (uuid or display_name). Mutually exclusive with book. */
+  voiceSelectors?: string[];
+  /**
+   * ElevenLabs voice ids to leave alone. Empty set means none excluded
+   * (from `--exclude-ids none` or an empty list). Undefined means the
+   * flag was not passed, so nothing is filtered by exclude.
+   */
+  excludeIds?: Set<string>;
+  clipExists: ClipExistsFn;
+}
+
+export interface ArchiveSkip {
+  voice: VoiceRow;
+  reason: string;
+}
+
+export interface ArchivePlan {
+  deletable: VoiceRow[];
+  skipped: ArchiveSkip[];
+}
+
+interface Args {
+  mode: "check" | "archive" | "restore";
+  book?: string;
+  voices: string[];
+  dryRun: boolean;
+  execute: boolean;
+  excludeIdsRaw: string | undefined;
+}
+
+function parseArgs(): Args {
+  const argv = process.argv.slice(2);
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(`
+Usage:
+  pnpm voice-rotation -- --check
+  pnpm voice-rotation -- --archive (--book <id> | --voice <uuid|name>...) [--exclude-ids <el_id,...>|none] [--execute] [--dry-run]
+  pnpm voice-rotation -- --restore (--book <id> | --voice <uuid|name>...) [--execute] [--dry-run]
+
+Plan is the default for --archive and --restore. Pass --execute to mutate.
+--dry-run still parses and does nothing extra.
+--archive --book … --execute requires --exclude-ids (use none if empty).
+`);
+    process.exit(0);
+  }
+  let mode: Args["mode"] | null = null;
+  let book: string | undefined;
+  const voices: string[] = [];
+  let dryRun = false;
+  let execute = false;
+  let excludeIdsRaw: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (!a) continue;
+    if (a === "--check") mode = "check";
+    else if (a === "--archive") mode = "archive";
+    else if (a === "--restore") mode = "restore";
+    else if (a === "--book") book = argv[++i]?.trim();
+    else if (a.startsWith("--book=")) book = a.split("=")[1]?.trim();
+    else if (a === "--voice") {
+      const v = argv[++i]?.trim();
+      if (v) voices.push(v);
+    } else if (a.startsWith("--voice=")) {
+      const v = a.split("=")[1]?.trim();
+      if (v) voices.push(v);
+    } else if (a === "--exclude-ids") excludeIdsRaw = argv[++i]?.trim();
+    else if (a.startsWith("--exclude-ids="))
+      excludeIdsRaw = a.split("=")[1]?.trim();
+    else if (a === "--dry-run") dryRun = true;
+    else if (a === "--execute") execute = true;
+  }
+  if (!mode) {
+    console.error("❌ One of --check, --archive, --restore is required.");
+    process.exit(1);
+  }
+  if (mode === "archive" || mode === "restore") {
+    const hasBook = Boolean(book);
+    const hasVoice = voices.length > 0;
+    if (hasBook === hasVoice) {
+      console.error(
+        `❌ Exactly one of --book or --voice is required for --${mode}.`,
+      );
+      process.exit(1);
+    }
+  }
+  return { mode, book, voices, dryRun, execute, excludeIdsRaw };
+}
+
+function parseExcludeIds(raw: string | undefined): Set<string> | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === "none" || raw === "") return new Set();
+  return new Set(
+    raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+}
+
+async function fetchAllVoices(): Promise<VoiceRow[]> {
+  const { data, error } = await supabase.from("voices").select("*");
+  if (error) throw new Error(`fetch voices: ${error.message}`);
+  return (data ?? []) as VoiceRow[];
 }
 
 async function fetchCastlist(): Promise<CastlistRow[]> {
@@ -125,20 +182,131 @@ function booksUsingVoice(voiceUuid: string, castlist: CastlistRow[]): string[] {
   return [...books].sort();
 }
 
-async function el(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${ELEVENLABS_API_BASE}${path}`, {
-    ...init,
-    headers: { "xi-api-key": apiKey!, ...(init?.headers ?? {}) },
+function parseClipStoragePath(storagePath: string): {
+  bucket: string;
+  objectPath: string;
+} {
+  // source_clip_path is "<bucket>/<path>" or just "<path>" within comic-voice-clips.
+  const [maybeBucket, ...rest] = storagePath.split("/");
+  const bucket = rest.length > 0 ? maybeBucket! : "comic-voice-clips";
+  const objectPath = rest.length > 0 ? rest.join("/") : storagePath;
+  return { bucket, objectPath };
+}
+
+/** Read-only Storage existence check (list, not download). */
+export async function clipExistsInStorage(
+  storagePath: string,
+): Promise<boolean> {
+  const { bucket, objectPath } = parseClipStoragePath(storagePath);
+  const lastSlash = objectPath.lastIndexOf("/");
+  const folder = lastSlash >= 0 ? objectPath.slice(0, lastSlash) : "";
+  const filename =
+    lastSlash >= 0 ? objectPath.slice(lastSlash + 1) : objectPath;
+  const { data, error } = await supabase.storage.from(bucket).list(folder, {
+    limit: 100,
+    search: filename,
+  });
+  if (error) return false;
+  return (data ?? []).some((entry) => entry.name === filename);
+}
+
+function voiceMatchesSelector(voice: VoiceRow, selector: string): boolean {
+  return voice.id === selector || voice.display_name === selector;
+}
+
+function selectArchiveCandidates(
+  voices: VoiceRow[],
+  castlist: CastlistRow[],
+  opts: Pick<PlanArchiveOpts, "book" | "voiceSelectors">,
+): VoiceRow[] {
+  if (opts.book) {
+    const book = opts.book;
+    return voices.filter((v) => {
+      if (v.status !== "active") return false;
+      if (!v.current_elevenlabs_id) return false;
+      const books = booksUsingVoice(v.id, castlist);
+      return books.length > 0 && books.every((b) => b === book);
+    });
+  }
+  const selectors = opts.voiceSelectors ?? [];
+  return voices.filter((v) => {
+    if (v.status !== "active") return false;
+    if (!v.current_elevenlabs_id) return false;
+    return selectors.some((s) => voiceMatchesSelector(v, s));
   });
 }
 
-async function deleteElevenLabsVoice(elId: string): Promise<void> {
-  const r = await el(`/v1/voices/${elId}`, { method: "DELETE" });
+/**
+ * Pure archive planner. Storage existence is injected so fixtures can stub it.
+ * design_prompt alone is not a restore source (issue #66 decision 1).
+ */
+export async function planArchive(
+  voices: VoiceRow[],
+  castlist: CastlistRow[],
+  opts: PlanArchiveOpts,
+): Promise<ArchivePlan> {
+  const candidates = selectArchiveCandidates(voices, castlist, opts);
+  const deletable: VoiceRow[] = [];
+  const skipped: ArchiveSkip[] = [];
+
+  for (const voice of candidates) {
+    if (voice.keep_active) {
+      skipped.push({ voice, reason: "keep_active" });
+      continue;
+    }
+    if (
+      opts.excludeIds &&
+      voice.current_elevenlabs_id &&
+      opts.excludeIds.has(voice.current_elevenlabs_id)
+    ) {
+      skipped.push({ voice, reason: "excluded" });
+      continue;
+    }
+    if (!voice.source_clip_path) {
+      skipped.push({ voice, reason: "no source_clip_path" });
+      continue;
+    }
+    const exists = await opts.clipExists(voice.source_clip_path);
+    if (!exists) {
+      skipped.push({ voice, reason: "source_clip_path missing in storage" });
+      continue;
+    }
+    deletable.push(voice);
+  }
+
+  return { deletable, skipped };
+}
+
+function requireApiKey(): string {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) {
+    console.error("❌ ELEVENLABS_API_KEY not set.");
+    process.exit(1);
+  }
+  return key;
+}
+
+async function el(
+  path: string,
+  apiKey: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return fetch(`${ELEVENLABS_API_BASE}${path}`, {
+    ...init,
+    headers: { "xi-api-key": apiKey, ...(init?.headers ?? {}) },
+  });
+}
+
+async function deleteElevenLabsVoice(
+  elId: string,
+  apiKey: string,
+): Promise<void> {
+  const r = await el(`/v1/voices/${elId}`, apiKey, { method: "DELETE" });
   if (!r.ok) {
     const text = await r.text();
-    // 404 from EL means the voice is already gone — treat as success.
+    // 404 from EL means the voice is already gone. Treat as success.
     if (r.status === 404) {
-      console.warn(`   ℹ ${elId} already gone on EL (404) — proceeding`);
+      console.warn(`   ℹ ${elId} already gone on EL (404), proceeding`);
       return;
     }
     throw new Error(
@@ -155,13 +323,14 @@ async function createElevenLabsIVC(
   name: string,
   clipBytes: ArrayBuffer,
   filename: string,
+  apiKey: string,
 ): Promise<CreateIVCResult> {
   const form = new FormData();
   form.append("name", name);
   form.append("files", new Blob([clipBytes], { type: "audio/mpeg" }), filename);
   const r = await fetch(`${ELEVENLABS_API_BASE}/v1/voices/add`, {
     method: "POST",
-    headers: { "xi-api-key": apiKey! },
+    headers: { "xi-api-key": apiKey },
     body: form,
   });
   if (!r.ok) {
@@ -172,10 +341,7 @@ async function createElevenLabsIVC(
 }
 
 async function downloadClip(storagePath: string): Promise<ArrayBuffer> {
-  // source_clip_path is "<bucket>/<path>" or just "<path>" within comic-voice-clips.
-  const [maybeBucket, ...rest] = storagePath.split("/");
-  const bucket = rest.length > 0 ? maybeBucket! : "comic-voice-clips";
-  const objectPath = rest.length > 0 ? rest.join("/") : storagePath;
+  const { bucket, objectPath } = parseClipStoragePath(storagePath);
   const { data, error } = await supabase.storage
     .from(bucket)
     .download(objectPath);
@@ -216,42 +382,94 @@ async function runCheck() {
   console.log();
 }
 
-async function runArchive(book: string, dryRun: boolean) {
+function printArchivePlan(
+  plan: ArchivePlan,
+  castlist: CastlistRow[],
+  scopeLabel: string,
+  showBooks: boolean,
+) {
+  const considered = plan.deletable.length + plan.skipped.length;
+  console.log(`\n📦 Archive plan ${scopeLabel}: ${considered} considered\n`);
+
+  for (const { voice, reason } of plan.skipped) {
+    const books = showBooks
+      ? ` used by: ${booksUsingVoice(voice.id, castlist).join(", ") || "none"}`
+      : "";
+    console.log(
+      `   • ${voice.display_name} (uuid=${voice.id.slice(0, 8)}…, el=${voice.current_elevenlabs_id})${books}: skipped, ${reason}`,
+    );
+  }
+  for (const voice of plan.deletable) {
+    const books = showBooks
+      ? ` used by: ${booksUsingVoice(voice.id, castlist).join(", ") || "none"}`
+      : "";
+    console.log(
+      `   • ${voice.display_name} (uuid=${voice.id.slice(0, 8)}…, el=${voice.current_elevenlabs_id})${books}: deletable`,
+    );
+  }
+
+  console.log(
+    `\n${plan.deletable.length} deletable of ${considered} considered\n`,
+  );
+}
+
+async function runArchive(args: Args) {
+  const excludeIds = parseExcludeIds(args.excludeIdsRaw);
+  const shouldExecute = args.execute && !args.dryRun;
+
+  if (shouldExecute && args.book && excludeIds === undefined) {
+    console.error(
+      "❌ --exclude-ids is required with --archive --book --execute (use --exclude-ids none if there are none).",
+    );
+    process.exit(1);
+  }
+
   const [voices, castlist] = await Promise.all([
     fetchAllVoices(),
     fetchCastlist(),
   ]);
 
-  // Candidate: status=active, keep_active=false, used ONLY by `book`.
-  const candidates = voices.filter((v) => {
-    if (v.status !== "active") return false;
-    if (v.keep_active) return false;
-    if (!v.current_elevenlabs_id) return false;
-    const books = booksUsingVoice(v.id, castlist);
-    return books.length > 0 && books.every((b) => b === book);
+  if (args.voices.length > 0) {
+    for (const sel of args.voices) {
+      if (!voices.some((v) => voiceMatchesSelector(v, sel))) {
+        console.error(`❌ --voice ${sel}: no matching voice.`);
+        process.exit(1);
+      }
+    }
+  }
+
+  const plan = await planArchive(voices, castlist, {
+    book: args.book,
+    voiceSelectors: args.voices.length > 0 ? args.voices : undefined,
+    excludeIds,
+    clipExists: clipExistsInStorage,
   });
 
-  console.log(
-    `\n📦 Archive plan for book "${book}": ${candidates.length} voice(s)\n`,
-  );
-  if (candidates.length === 0) {
-    console.log(`   Nothing to archive.\n`);
-    return;
-  }
-  for (const v of candidates) {
-    console.log(
-      `   • ${v.display_name} (uuid=${v.id.slice(0, 8)}…, el=${v.current_elevenlabs_id})`,
-    );
-  }
-  if (dryRun) {
-    console.log(`\n   --dry-run: not touching EL or DB.\n`);
+  const scopeLabel = args.book
+    ? `for book "${args.book}"`
+    : `for --voice ${args.voices.join(", ")}`;
+  printArchivePlan(plan, castlist, scopeLabel, args.voices.length > 0);
+
+  if (!shouldExecute) {
+    if (args.dryRun) console.log(`   --dry-run: not touching EL or DB.\n`);
     return;
   }
 
-  for (const v of candidates) {
+  if (plan.deletable.length === 0) {
+    console.log(`   Nothing deletable, not touching EL or DB.\n`);
+    return;
+  }
+
+  const apiKey = requireApiKey();
+  const bookForLog =
+    args.book ??
+    booksUsingVoice(plan.deletable[0]!.id, castlist)[0] ??
+    "unknown";
+
+  for (const v of plan.deletable) {
     const elId = v.current_elevenlabs_id!;
     console.log(`\n   Archiving ${v.display_name} (${elId})...`);
-    await deleteElevenLabsVoice(elId);
+    await deleteElevenLabsVoice(elId, apiKey);
 
     const archivedAt = new Date().toISOString();
     const updates = await supabase
@@ -275,62 +493,163 @@ async function runArchive(book: string, dryRun: boolean) {
     const archiveLog = await supabase.from("voice_archives").insert({
       voice_id: v.id,
       former_elevenlabs_id: elId,
-      archived_for_book_id: book,
+      archived_for_book_id: bookForLog,
     });
     if (archiveLog.error)
       throw new Error(`insert voice_archives: ${archiveLog.error.message}`);
 
     console.log(`   ✓ archived`);
   }
-  console.log(`\n✅ Archived ${candidates.length} voice(s).\n`);
+  console.log(`\n✅ Archived ${plan.deletable.length} voice(s).\n`);
 }
 
-async function runRestore(book: string, dryRun: boolean) {
+interface RestoreSkip {
+  voice: VoiceRow;
+  reason: string;
+}
+
+interface RestorePlan {
+  restorable: VoiceRow[];
+  skipped: RestoreSkip[];
+}
+
+function selectRestoreCandidates(
+  voices: VoiceRow[],
+  castlist: CastlistRow[],
+  opts: { book?: string; voiceSelectors?: string[] },
+): VoiceRow[] {
+  if (opts.book) {
+    const neededUuids = new Set(
+      castlist
+        .filter((c) => c.book_id === opts.book && c.voice_uuid)
+        .map((c) => c.voice_uuid!),
+    );
+    return voices.filter(
+      (v) => neededUuids.has(v.id) && v.status === "archived",
+    );
+  }
+  const selectors = opts.voiceSelectors ?? [];
+  return voices.filter(
+    (v) =>
+      v.status === "archived" &&
+      selectors.some((s) => voiceMatchesSelector(v, s)),
+  );
+}
+
+async function planRestore(
+  voices: VoiceRow[],
+  castlist: CastlistRow[],
+  opts: {
+    book?: string;
+    voiceSelectors?: string[];
+    clipExists: ClipExistsFn;
+  },
+): Promise<RestorePlan> {
+  const candidates = selectRestoreCandidates(voices, castlist, opts);
+  const restorable: VoiceRow[] = [];
+  const skipped: RestoreSkip[] = [];
+
+  for (const voice of candidates) {
+    if (!voice.source_clip_path) {
+      skipped.push({ voice, reason: "no source_clip_path" });
+      continue;
+    }
+    const exists = await opts.clipExists(voice.source_clip_path);
+    if (!exists) {
+      skipped.push({ voice, reason: "source_clip_path missing in storage" });
+      continue;
+    }
+    restorable.push(voice);
+  }
+  return { restorable, skipped };
+}
+
+function printRestorePlan(
+  plan: RestorePlan,
+  castlist: CastlistRow[],
+  scopeLabel: string,
+  showBooks: boolean,
+) {
+  const considered = plan.restorable.length + plan.skipped.length;
+  console.log(`\n📂 Restore plan ${scopeLabel}: ${considered} considered\n`);
+
+  if (considered === 0) {
+    console.log(`   Nothing to restore, all needed voices already active.\n`);
+    return;
+  }
+
+  for (const { voice, reason } of plan.skipped) {
+    const books = showBooks
+      ? ` used by: ${booksUsingVoice(voice.id, castlist).join(", ") || "none"}`
+      : "";
+    console.log(
+      `   • ${voice.display_name} (uuid=${voice.id.slice(0, 8)}…)${books}: skipped, ${reason}`,
+    );
+  }
+  for (const voice of plan.restorable) {
+    const books = showBooks
+      ? ` used by: ${booksUsingVoice(voice.id, castlist).join(", ") || "none"}`
+      : "";
+    console.log(
+      `   • ${voice.display_name} (uuid=${voice.id.slice(0, 8)}…)${books}: restorable`,
+    );
+  }
+
+  console.log(
+    `\n${plan.restorable.length} restorable of ${considered} considered\n`,
+  );
+}
+
+async function runRestore(args: Args) {
+  const shouldExecute = args.execute && !args.dryRun;
+
   const [voices, castlist] = await Promise.all([
     fetchAllVoices(),
     fetchCastlist(),
   ]);
 
-  const neededUuids = new Set(
-    castlist
-      .filter((c) => c.book_id === book && c.voice_uuid)
-      .map((c) => c.voice_uuid!),
-  );
-
-  const archived = voices.filter(
-    (v) => neededUuids.has(v.id) && v.status === "archived",
-  );
-
-  console.log(
-    `\n📂 Restore plan for book "${book}": ${archived.length} voice(s)\n`,
-  );
-  if (archived.length === 0) {
-    console.log(`   Nothing to restore — all needed voices already active.\n`);
-    return;
-  }
-  for (const v of archived) {
-    const hasClip = v.source_clip_path ? "" : " ⚠ no source_clip_path";
-    console.log(`   • ${v.display_name} (uuid=${v.id.slice(0, 8)}…)${hasClip}`);
-  }
-  if (dryRun) {
-    console.log(`\n   --dry-run: not touching EL or DB.\n`);
-    return;
-  }
-
-  let restored = 0;
-  let skipped = 0;
-  for (const v of archived) {
-    if (!v.source_clip_path) {
-      console.log(
-        `   ⚠ skipping ${v.display_name}: no source_clip_path (rerun backfill or re-source).`,
-      );
-      skipped++;
-      continue;
+  if (args.voices.length > 0) {
+    for (const sel of args.voices) {
+      if (!voices.some((v) => voiceMatchesSelector(v, sel))) {
+        console.error(`❌ --voice ${sel}: no matching voice.`);
+        process.exit(1);
+      }
     }
+  }
+
+  const plan = await planRestore(voices, castlist, {
+    book: args.book,
+    voiceSelectors: args.voices.length > 0 ? args.voices : undefined,
+    clipExists: clipExistsInStorage,
+  });
+
+  const scopeLabel = args.book
+    ? `for book "${args.book}"`
+    : `for --voice ${args.voices.join(", ")}`;
+  printRestorePlan(plan, castlist, scopeLabel, args.voices.length > 0);
+
+  if (!shouldExecute) {
+    if (args.dryRun) console.log(`   --dry-run: not touching EL or DB.\n`);
+    return;
+  }
+
+  if (plan.restorable.length === 0) {
+    console.log(`   Nothing restorable, not touching EL or DB.\n`);
+    return;
+  }
+
+  const apiKey = requireApiKey();
+  let restored = 0;
+  for (const v of plan.restorable) {
     console.log(`\n   Restoring ${v.display_name}...`);
-    const clip = await downloadClip(v.source_clip_path);
-    const filename = v.source_clip_path.split("/").pop() || `${v.id}.mp3`;
-    const created = await createElevenLabsIVC(v.display_name, clip, filename);
+    const clip = await downloadClip(v.source_clip_path!);
+    const filename = v.source_clip_path!.split("/").pop() || `${v.id}.mp3`;
+    const created = await createElevenLabsIVC(
+      v.display_name,
+      clip,
+      filename,
+      apiKey,
+    );
     console.log(`   ✓ new el id: ${created.voice_id}`);
 
     const upd = await supabase
@@ -351,19 +670,31 @@ async function runRestore(book: string, dryRun: boolean) {
       throw new Error(`update castlist: ${castUpd.error.message}`);
     restored++;
   }
-  console.log(
-    `\n✅ Restored ${restored}${skipped > 0 ? ` (skipped ${skipped})` : ""}.\n`,
-  );
+  console.log(`\n✅ Restored ${restored}.\n`);
 }
 
 async function main() {
-  const { mode, book, dryRun } = parseArgs();
-  if (mode === "check") await runCheck();
-  else if (mode === "archive") await runArchive(book!, dryRun);
-  else await runRestore(book!, dryRun);
+  const args = parseArgs();
+  if (args.mode === "check") await runCheck();
+  else if (args.mode === "archive") await runArchive(args);
+  else await runRestore(args);
 }
 
-main().catch((err) => {
-  console.error("❌ voice-rotation:", err);
-  process.exit(1);
-});
+function isMainModule(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return import.meta.url === pathToFileURL(entry).href;
+  } catch {
+    return (
+      entry.endsWith("voice-rotation.ts") || entry.endsWith("voice-rotation.js")
+    );
+  }
+}
+
+if (isMainModule()) {
+  main().catch((err) => {
+    console.error("❌ voice-rotation:", err);
+    process.exit(1);
+  });
+}
