@@ -23,6 +23,7 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
+  const [resumed, setResumed] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [researchingIds, setResearchingIds] = useState<Set<string>>(new Set());
 
@@ -236,7 +237,12 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
         return;
       }
       setCompleted(true);
-      setMsg("Casting complete — pipeline unpaused.");
+      setResumed(res.resumed);
+      setMsg(
+        res.resumed
+          ? "Casting complete. Live workflow resumed."
+          : "Casting complete. No live workflow was waiting on the casting hook.",
+      );
     });
   };
 
@@ -366,12 +372,10 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
       {completed && (
         <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 p-6 text-center">
           <p className="mb-2 text-sm text-emerald-200">
-            Pipeline unpaused. Resume with:
+            {resumed
+              ? "Live workflow resumed from the casting hook."
+              : "No live workflow was waiting. Pause flags for casting were cleared if present."}
           </p>
-          <code className="rounded bg-neutral-800 px-2 py-1 text-xs text-neutral-200">
-            pnpm ingest -- --book {bookId} --issue{" "}
-            {issueId?.replace("issue-", "")}
-          </code>
           <div className="mt-3">
             <a
               href="/admin"

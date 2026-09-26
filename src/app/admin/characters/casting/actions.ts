@@ -2,12 +2,17 @@
 
 import { GoogleGenAI, createPartFromText } from "@google/genai";
 import { revalidatePath } from "next/cache";
+import { resumeHook } from "workflow/api";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 const SKIPPED_VOICE = "__SKIPPED__";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+
+type CompleteCastingResult =
+  | { ok: true; resumed: boolean }
+  | { ok: false; error: string };
 
 interface SaveVoiceIdArgs {
   taskId: string;
@@ -157,12 +162,12 @@ interface CompleteCastingArgs {
 }
 
 /**
- * All casting tasks are done (complete or skipped). Clear the pipeline
- * pause so `pnpm ingest` can resume from where it left off.
+ * All casting tasks are done (complete or skipped). Clear the casting
+ * pause and resume a live workflow hook when one is waiting.
  */
 export async function completeCasting(
   args: CompleteCastingArgs,
-): Promise<ActionResult> {
+): Promise<CompleteCastingResult> {
   const { data: remaining } = await supabaseAdmin
     .from("casting_tasks")
     .select("id")
@@ -186,11 +191,21 @@ export async function completeCasting(
     })
     .eq("book_id", args.bookId)
     .eq("id", args.issueId)
-    .eq("pipeline_paused_at", "find-voice-sources");
+    .in("pipeline_paused_at", ["casting", "find-voice-sources"]);
+
+  let resumed = false;
+  try {
+    await resumeHook(`ingest:${args.bookId}/${args.issueId}/casting`, {
+      approved: true,
+    });
+    resumed = true;
+  } catch {
+    resumed = false;
+  }
 
   revalidatePath("/admin/characters/casting", "page");
   revalidatePath("/admin", "page");
-  return { ok: true };
+  return { ok: true, resumed };
 }
 
 interface CreateVoiceDesignArgs {

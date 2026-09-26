@@ -32,6 +32,7 @@ import {
   consolidateMusicScenes,
   generateManifest,
 } from "./steps/publishing";
+import { createCastingTasks } from "./steps/casting-tasks";
 
 interface IngestInput {
   bookId: string;
@@ -178,11 +179,17 @@ export async function ingestPipeline(input: IngestInput) {
 
     if (run("casting")) {
       currentStep = "casting";
-      await updatePipelineStep(bookId, issueId, currentStep, true);
-      using castingHook = createHook<{ approved: boolean }>({
-        token: `ingest:${bookId}/${issueId}/casting`,
-      });
-      await castingHook;
+      const casting = await createCastingTasks(bookId, issueId);
+      if (casting.pending === 0) {
+        await updatePipelineStep(bookId, issueId, currentStep);
+        console.log(`[casting] skipped: all ${casting.speakers} speakers cast`);
+      } else {
+        await updatePipelineStep(bookId, issueId, currentStep, true);
+        using castingHook = createHook<{ approved: boolean }>({
+          token: `ingest:${bookId}/${issueId}/casting`,
+        });
+        await castingHook;
+      }
     }
 
     // ── Phase 7: Voice Generation ─────────────────────────────────────
