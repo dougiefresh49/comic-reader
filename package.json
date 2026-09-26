@@ -14,6 +14,7 @@
     "preview": "next build && next start",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "db:types": "supabase gen types typescript --project-id sinmmbxrsbpjneccykwd --schema public > src/types/database.ts && prettier --write src/types/database.ts",
     "audio-downloader": "node scripts/audio-downloader.js",
     "video-download": "node scripts/video-download.js",
     "download-comic-images": "python3 scripts/download_comic_images.py",
