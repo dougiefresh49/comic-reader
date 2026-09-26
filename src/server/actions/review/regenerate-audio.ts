@@ -2,6 +2,8 @@
 
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 const AUDIO_BUCKET = "comic-audio";
@@ -32,6 +34,8 @@ function normalizeAlignment(raw: AlignmentRaw | null | undefined) {
 }
 
 export async function regenerateAudio(args: Args) {
+  const auth = checkAdminAuth((await headers()).get("authorization"));
+  if (!auth.ok) return { ok: false, error: auth.message };
   if (!process.env.ELEVENLABS_API_KEY) {
     return { ok: false, error: "ELEVENLABS_API_KEY not configured" };
   }

@@ -36,6 +36,9 @@ export const env = createEnv({
     VENICE_API_KEY: z.string(),
     FREESOUND_API_KEY: z.string().optional(),
     FREESOUND_CLIENT_ID: z.string().optional(),
+    /** Basic auth for /admin, the review editor and apply-fixes (src/lib/admin-auth.ts). */
+    ADMIN_USERNAME: z.string().optional(),
+    ADMIN_PASSWORD: z.string().optional(),
   },
 
   /**
@@ -64,6 +67,8 @@ export const env = createEnv({
     VENICE_API_KEY: process.env.VENICE_API_KEY,
     FREESOUND_API_KEY: process.env.FREESOUND_API_KEY,
     FREESOUND_CLIENT_ID: process.env.FREESOUND_CLIENT_ID,
+    ADMIN_USERNAME: process.env.ADMIN_USERNAME,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
     // NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
   },
   /**
