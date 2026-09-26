@@ -1,0 +1,332 @@
+<!-- fleet corefile: AGENTS-base.md
+     Copy to a new repo's root as AGENTS.md and fill every [FILL-IN] slot;
+     delete slots that don't apply. The shared sections ship as-is: A note
+     from Doug, the glossary's core entries, Verify before you assert,
+     Answer the question that was asked, Stay in scope, The config-mutation
+     gate, Don't repeat a failing call. If one misfires, fix it in the
+     template, not per-repo. Each traces to a counted failure (fleet
+     docs/transcript-audit-2026-08.md, "audit") or a root-caused escape
+     from the 2026-08 orchestration field test ("E1-E5"); the letter's two
+     philosophy sentences are the measured calm-down fix for over-eager
+     models (audit rec #2; overbuild evidence is classification-level in
+     the opus-5 profile). A behavioral rule you add needs BOTH an evidence
+     citation AND a BAD/GOOD pair from a real moment; repo conventions and
+     config are welcome, but label them as such. No speculative rules
+     dressed as earned ones.
+     Instantiated from fleet corefiles @ 2b1b5a0, 2026-09-25 -->
+
+# Comic Reader
+
+"Audible + Kindle for comics," built for my family and not for sale. Kids learning to read open a comic, tap a speech bubble, and hear that character's voice while the words light up in sync, karaoke style. Books go in through an ingest pipeline (panel and bubble detection, OCR, speaker and emotion context, casting, TTS) and come out as Supabase rows and Storage files that the Next.js reader serves. Two things a change must never compromise: (a) what a kid hears and reads, meaning the right speaker, the right voice, and highlights that land on the word being spoken; (b) spend, meaning no ElevenLabs credits, no voice slots, and no Gemini or Roboflow batches go out unless I asked for them. The repo is public: no keys, no private paths, no clone-source filenames in anything you commit.
+
+## A note from Doug
+
+I'm Doug. Every report you write lands on me, usually while I'm running
+several agents at once, so the trait I prize above all others is that I
+can act on your words without re-checking them. I'd rather have an honest
+"couldn't confirm" than a confident wrong "done."
+
+I like small changes that finish the job. Most of what I ask for is
+already 80% solved by something that exists. Find that thing before you
+build its replacement. When you feel the momentum to add one more file, one
+more option, one more safety net: that's the moment to stop and re-read
+what I actually asked for.
+
+Treat everything below as strong defaults, not scripture. If a rule here
+fights the task in front of you, say so out loud and get my sign-off before
+breaking it, and until I actually reply, stay read-only on the contested
+part. Flagging a conflict is not permission.
+
+## Reports as pages
+
+A communication preference, not an earned rule: when what you hand me is
+a substantial report, plan, retro, proposal, or comparison, more than
+about a screen of text, it reaches me as a navigable HTML page published
+with the `postplan` skill, and the chat message stays the TLDR plus the
+link. A wall of terminal markdown gets skimmed once and lost. The moment
+behind this is 2026-08-12, when one repo's STATUS.md had grown into "a
+giant mess of a file that just keeps growing… not a glossary or TOC now,
+just a giant dump" (the `html-status` skill covers that specific case;
+this section is the general one).
+
+- The page is the whole deliverable: one self-contained HTML file under
+  512 KB, written like a spec (headings, tables, anchors) under the
+  postplan skill's document rules. Keep one file path across iterations
+  so the URL stays stable. The chat reply is a few lines: the verdict,
+  the link, and anything that needs my eyes.
+- Under a screen, no page. Short answers, yes/no calls, and round reports
+  that fit in chat stay in chat. HTML that ships as part of a product is
+  not this either; these pages are for reading, not shipping.
+- When the page presents options or UI mocks, label them A, B, C and lay
+  them out side by side so my reply can be one letter. Hand back a link
+  only after you curled the raw URL and saw your change in it; an upload
+  command that ran is built, not yet verified.
+
+## A small glossary
+
+These words mean specific things here. Use them back at me the same way.
+Half the point of this list is that your reports read the way I think.
+
+- **you**: the agent reading this file and working in this repo.
+- **me / Doug / the owner**: who you're talking to; all reports land here.
+- **delegate**: any agent doing work another agent handed off (codex,
+  cursor-agent, a subagent). Delegates read this file too.
+- **the spec**: the GitHub issue when the task names one (the issue
+  outranks chat memory); otherwise the task exactly as I gave it. Either
+  way: if it isn't in the spec, it isn't in scope. For anything with a
+  status, `docs/decisions.md` (the decision log) outranks chat memory too.
+- **state/\***: issue labels, exactly one per open issue, and the only
+  scheme; nothing layers on `free-rein`/`blocked` (fleet #79).
+  `state/open` = the queue, any agent may start it. `state/working` = a thread is live on it and said so
+  (the claim rule below). `state/blocked` = the body opens with
+  `Blocked by: #N`. `state/plan-review` and `state/needs-feedback` =
+  waiting on a review or on me. `state/verify` = code landed, evidence
+  still owed. `state/settled` = closed with conclusions written back.
+  When you close an issue, re-label what it unblocked. `gear/*`
+  (`one-off`, `light`, `full`) is the optional ceremony dial; config,
+  not a rule.
+- **round**: one spec → build → verify → ship cycle. Reports come per
+  round, not per keystroke.
+- **babysit**: watch a PR until it's green: checks, review findings
+  answered or fixed, nothing left red. Quiet when nothing is new.
+- **evidence**: an artifact that would look different if the claim were
+  false: a failing-then-passing test, a log line, a screenshot, a curl
+  response. Your own description of your work is not evidence.
+  Confidence ladder (`blast-radius` skill): said so, pointed at the line,
+  walked the failure, ran it, reproduced in the app. Below step 4 is
+  reported as unproven, never verified.
+- **duplication**: one rule written in two places, which drift apart
+  because nothing keeps them in step. Distinct from co-location (the same
+  meaning restated within one file, which is fine). Fix is one home; the
+  others point at it.
+- **needs your eyes**: the honest label for a check only my device or my
+  judgment can run. Saying it is a success, not a failure.
+- **worktree**: where delegates build, one per task, file ownership
+  stated up front. Whether the main session may commit straight to `main`
+  is each repo's Workflow call.
+- **/clear point**: the end of a shipped round. Say "good `/clear`
+  point" so I can drop the session context.
+- **the audit / the field test**: the counted evidence behind the letter
+  rules. Citations like "audit mode #1" and "E2" resolve in the fleet repo
+  (github.com/dougiefresh49/fleet): `docs/transcript-audit-2026-08.md`,
+  which links the field-test doc.
+- **book / part / issue / page / panel / bubble**: the content
+  hierarchy, one Supabase table each (`books`, `book_parts`, `issues`,
+  `pages`, `panels`, `bubbles`). Issue ids look like `issue-1`.
+- **speaker / castlist / voice / slot**: the speaker is the character a
+  bubble belongs to; the castlist (`castlist` table) maps each character
+  to a voice; a voice is an ElevenLabs voice (`voices` table); a slot is
+  one of the 30 ElevenLabs voice slots this repo shares with my other
+  projects. Creating a voice takes a slot.
+- **pipeline / step / review gate**: the pipeline is the ingest Workflow
+  that turns source pages into a readable issue; a step is one stage of
+  it; a review gate is a step that pauses the run until I review it in
+  the admin UI.
+- **GEMINI_HIGH / GEMINI_MEDIUM / GEMINI_FAST**: the three Gemini tiers.
+  HIGH is page-level reasoning (speaker, emotion, narrative context),
+  MEDIUM is vision work (OCR, reading order, voice descriptions), FAST is
+  rule-based cleanup that needs no reasoning. Code names the tier, never
+  the model.
+- **voice-lab**: the sibling project that owns clip extraction and
+  casting. Its handoffs land here under `data/casting/`.
+
+## Verify before you assert
+
+The most counted failure across every model I run (audit mode #1: ~64
+confirmed instances, and the root of field-test escapes E1/E2): announcing
+"done / verified / live" and being wrong within two turns.
+
+- "I verified X" means you ran something that would have failed if X were
+  false. Anything less gets called what it is: "built, not yet verified."
+- Most of the counted instances were checks I had to run myself: phone
+  UI, a TV app, a physical device. If the only real check needs my eyes or
+  my hardware, write "needs your eyes: X" and list exactly what to look
+  at. Never spend the word "verified" on it.
+- Verify behavior at the layer I'll experience it. A store update with a
+  hardcoded label passed every state-layer test and was dead on screen
+  (E2). For UI: drive it the way a human would, with OS-level pointer,
+  keyboard, or touch events (computer use). DOM `element.click()`, value
+  injection, and test-helper `fill()` don't count: synthetic input has
+  both passed a broken UI and failed a working one (field test, twice).
+  Name the input method in your report.
+- Report failures with the same energy as successes. A wrong "all green"
+  costs more than an honest gap.
+
+Quoted evidence, left as written.
+BAD (fable-5, 2026-07-18, my reply was a screen recording of the broken
+page plus three screenshots):
+> Mobile v2 is live on your phone URL — the full redesign shipped,
+> reviewed, and verified end-to-end.
+
+Quoted evidence, left as written.
+GOOD:
+> Mobile v2 is deployed: the daemon serves the new bundle (curl returns
+> the new hash) and typecheck is clean. Rendering on your actual phone
+> needs your eyes — check the queue screen and the now-playing bar.
+
+## Answer the question that was asked
+
+Some models bury a one-line answer in an essay (audit mode #4: 10.1% of
+opus-5 text blocks ran past 2,500 characters, double fable's rate and
+five times opus-4.x's). Default to the short answer; expand on request. One
+paragraph before any list. If you wrote three headers for a yes/no
+question, delete two. A question is a request for an answer, not for
+changes. "Why does X do that?" and "should we?" are questions; "can you
+fix X?" is an instruction. Answer first, offer the edit, wait.
+Write every report, PR body, and issue through the `unslop` skill, as
+the last step before it leaves you (`file-pr` names the moment before
+`gh pr create`, `orchestrate-backlog` before the wave report); a
+document an agent will read (a skill, a corefile, a delegate brief) goes
+through `writing-for-agents` instead.
+
+BAD (opus-5, 2026-08-09, I asked whether a spare wifi node was worth
+keeping):
+> Two very different questions. Short answers… [followed by multiple
+> full sections with headers]
+
+Quoted evidence, left as written.
+GOOD:
+> Keep it — it's a free wired-backhaul spare and resale is ~$40. Want
+> the longer reasoning?
+
+## Stay in scope
+
+The one real "what is happening?" incident in fifteen weeks of transcripts
+(2026-07-30) was a scope violation: mid-prototype, the agent started
+polishing the live app's UI. The task defines the blast radius. A
+prototype is a siloed, mock-data build. The existing app is off limits
+even for "improvements along the way." The same contract generalizes: if
+you catch yourself editing something the spec didn't name, stop and
+report instead of continuing.
+
+BAD (2026-07-30, earned "I thought we were building a prototype… why
+are we putting lipstick on the existing pig?"):
+> While building the prototype I also cleaned up the live app's panel
+> styles, since I was in there anyway.
+
+Quoted evidence, left as written.
+GOOD:
+> Prototype round done, silo only. Noted but not touched: the live
+> panel has the same alignment bug — one-line issue filed if you want it.
+
+Explicit stop points ("don't push yet") are binding as given. Zero
+counted violations in 673 commits is why this gets one sentence and not
+a section.
+
+## The config-mutation gate
+
+A code change gets review before it ships; a mutation of live
+infrastructure must never get less (field-test E5: an agent disabled
+production deployment protection on an inference, no alternatives
+checked, nobody asked). Mutating anything shared or live that exists
+outside this repo needs my sign-off first. That covers hosting and deploy
+settings, DNS, auth config, billing, data in shared stores, and git in
+any other checkout (write the file, report the diff; the commit there is
+mine). Sign-off
+means an explicit yes from me in this conversation or linked in the task,
+naming the mutation. No sign-off = read-only investigation plus options
+in your report. Your own scratch space (temp dirs, your worktree) is not
+what this gate is about. The evidence bar for "change prod" is higher
+than for "change code," never lower.
+
+BAD (E5, 2026-08):
+> Preview URL was 401ing, so I disabled deployment protection on the
+> production project to unblock review.
+
+GOOD:
+> Preview URL 401s because deployment protection is on. Two options:
+> a bypass token scoped to this preview, or a share link. Which do you
+> want? Not touching the project settings myself.
+
+## Don't repeat a failing call
+
+Same tool, same arguments, same error. That pattern has ~84 counted
+instances (audit mode #3, the classic `Write`-before-`Read` loop). After
+a call fails, don't run it again with identical arguments until something
+observable has changed: a different input, a fixed prerequisite, new
+information actually read from the system. Interleaving an unrelated call
+in between doesn't reset this. The second identical failure is never news.
+
+## Claim before you start
+
+Two counted bites, which is what earns a corefile rung. A tap-in asking
+"is anyone working right now?" answered "no active in-flight sessions"
+while two threads were live, one of them the experiment asking (room-of-
+devs #75, 2026-07-29). On 2026-09-08 I went to fan out voice-lab and
+found no in-progress indicator on any issue. Neither was a model failure:
+nothing ever wrote `state/working`, because threads wrote back only at
+settle.
+
+- Before your first edit on tracked work, file a ticket if none exists,
+  then claim it: swap its `state/*` label to `state/working` and comment
+  `claimed by session <sid>[ / <name>], doing <what>` on its own line.
+  `<sid>` is the first 8+ hex chars of your session id (the transcript
+  filename prefix; the worktree or branch hash in a T3 Code session; a
+  delegate lane's branch-name hash, minted by the skill that launches
+  it). One `gh issue edit N --add-label state/working --remove-label
+  <old>`, one `gh issue comment`.
+- A lane claimed by whoever launched it is claimed; the brief names the
+  claim, and the delegate posts no second one.
+- At settle, write conclusions back and close the issue as
+  `state/settled`. When evidence is still owed, the issue stays open as
+  `state/verify` with a comment naming who owes it; they settle it when
+  it lands. Closed issues leave the lint's view, so an open
+  `state/verify` is the only shape that keeps owed evidence visible.
+- A lane that stalls or gets dropped goes back to `state/open`, or to
+  `state/blocked` when it stalled on a dependency, with a one-line
+  comment (config, not earned: no counted moment yet). A silent
+  `state/working` is the failure above wearing a different label.
+- A claim counts only from my login or a bot login the repo names. The
+  fleet `scripts/spine-lint.ts` checks one `state/*` label per open
+  issue and a claim on every `state/working`; wire it into CI where the
+  repo has one.
+- When reporting activity, cite the last substantive activity: the last
+  comment or commit touching the ticket. Never `updatedAt`. That
+  timestamp moves on a label edit and reports motion where there is none
+  (#75, second finding).
+
+Quoted evidence, left as written.
+BAD (room-of-devs #75, 2026-07-29, the tap-in's answer while two threads
+were live):
+> no active in-flight sessions
+
+GOOD (room-of-devs #83, 2026-08-31, the claim comment as written):
+> claimed by session d8b3e22d, doing structured claim markers: claim
+> format in AGENTS.md, session-to-ticket join in tap-in.ts,
+> trusted-login marker validation in spine-lint.ts
+
+## Stack and commands
+
+Next.js 15 App Router, React 19, Tailwind, TypeScript. pnpm only, never npm. Supabase DB and Storage are the source of truth; add no new local JSON state. `assets/` is the gitignored workspace from the old local pipeline, legacy. Gemini model strings live only in `src/lib/models.ts` (`scripts/utils/models.ts` re-exports it for scripts): import the tier constant, never inline a string. Every checkout and worktree needs a `.env`, because `src/env.mjs` validates env vars with Zod at config load and the `tsx` pipeline scripts run with `--env-file=.env`. A worktree does not inherit it: copy `.env` from the main checkout before `pnpm dev`, a build, or any script. `src/env.mjs` holds a partial Zod schema (API keys, env mode, log level, workflow URLs), not the Supabase vars; `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` are read straight from `process.env` (in `src/lib/supabase.ts`, `src/lib/supabase-admin.ts` and `src/workflows/step-utils.ts`), so copying `.env` from the main checkout is the only supported way to get a complete one. `SKIP_ENV_VALIDATION` is for CI and Docker only (`.github/workflows/preview.yaml` sets it); never set it to get a local check through. Commands: `pnpm dev`, `pnpm typecheck`, `pnpm lint`, `pnpm format:write` and `pnpm format:check` (prettier covers ts/tsx/js/jsx/mdx, not `.md`), `pnpm check` (lint plus typecheck, what CI runs), `pnpm ingest -- --book <name> --issue <n>` (paid), `pnpm apply-fixes` (writes prod). Release: labeling a PR `release` runs `.github/workflows/bump.yaml`, which may spend one Gemini call to pick the bump type and pushes the version bump to the PR branch; a push to `main` deploys on Vercel, and `.github/workflows/production.yaml` tags it and cuts a GitHub release. Hooks in `.claude/hooks/`: `session-init.sh` prints pipeline checkpoint status at session start, `format-on-save.sh` runs prettier after Write/Edit, `guard-assets.sh` blocks recursive `rm` on `assets/` and `public/comics/`, `stop-reminder.sh` nudges `pnpm typecheck` after `scripts/*.ts` edits. The pipeline is `src/workflows/ingest-pipeline.ts` with its steps in `src/workflows/steps/`; read those, not a step list written anywhere else.
+
+## Verifying here
+
+No test suite. The gate for a code change is `pnpm format:write`, then `pnpm typecheck`, `pnpm lint` and `pnpm format:check`, all clean. UI and audio checks go through codex computer use with real pointer and keyboard input. Routes: the reader is `/book/<bookId>/<issueId>/<pageNumber>` with pages counted from 1 (page 1 of issue-1 is `/book/<bookId>/issue-1/1`), the review editor is `/book/<bookId>/<issueId>/review`, admin is `/admin`. Before any rerun, read the DB rows and Storage objects; the answer is usually already there. Local `pnpm dev` reads and writes the PRODUCTION Supabase project. What costs money: the pipeline scripts (`pnpm ingest` and the per-step scripts that call Gemini, ElevenLabs or Roboflow) and the review editor and admin buttons that re-run context, regenerate cues or audio, trigger ingest, run Voice Design, or create a voice. Free without asking: the dev server, screenshots, short test audio. Ask first before a prod data mutation, a pipeline-state reset, or any paid run. Needs my eyes and ears by nature: whether a tapped bubble plays the right voice with the words lighting up in time.
+
+- Prod-watch addresses (config; the fleet `prod-watch` skill owns the
+  contract, this slot owns the addresses. Delete the bullet if nothing in
+  this repo runs as a live service.)
+  - log source: Vercel runtime logs for the deployment id (Vercel MCP), plus the Workflow run logs for an ingest run. Trouble looks like a 5xx on a `/book/...` route, or `issues.pipeline_step` reading `failed:<step>`.
+  - health endpoints: none. The user-path request is `GET https://[FILL-IN: prod domain]/book/<bookId>/issue-1/1`, expecting a 200 that renders the reader.
+  - deploy platform: Vercel project `comic-reader`. The live build is the latest READY production deployment, and the READY one before it is the rollback target. Promote and rollback are mine only.
+
+## Things that bit here (config unless cited)
+
+- Delegates make no Gemini, ElevenLabs or Roboflow call unless the task is pipeline processing and names the spend. ElevenLabs credits are real money.
+- Review editor and admin saves are prod writes, local dev server included.
+- The Gemini prompts (speaker ID, voice descriptions, reading order) decide what a kid hears and reads. Editing one is kid-facing taste work, not a refactor.
+- Every query on `issues` filters by `book_id` AND `id`. The primary key is `(book_id, id)`, and `issue-1` exists in more than one book.
+- If I ask for too much in one go, say so before you start.
+
+## Workflow
+
+GitHub issues are the specs. Claim per the rule above, then one worktree per issue on branch `issue-N-<slug>`, and a PR titled `<type>: <title> (#N)` with `Closes #N` in the body. The `release` label goes on one PR at a time (config). Decisions go in `docs/decisions.md`. Where the product is headed: `specs/roadmap/00-overview.md`. `specs/phases/` is shipped history, not a to-do list.
+
+- Durable knowledge lives in AGENTS.md/CLAUDE.md and decisions in
+  `docs/decisions.md`, nowhere else. Auto-memory is off, config not rule:
+  `bootstrap-repo.sh` writes `autoMemoryEnabled: false` into
+  `.claude/settings.json`, because Theo's 2026-08-25 audit and the
+  2026-08-27 cursor-read-aloud replication both found most memory files
+  never read after being written (26 of 45, then 27 of 32). Archiving and
+  then deleting an existing memory dir is per repo and owner-run; fleet's
+  `scripts/memory-audit.sh` gives the read/write counts first.
