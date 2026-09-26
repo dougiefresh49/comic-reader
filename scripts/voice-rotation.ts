@@ -68,8 +68,8 @@ export interface PlanArchiveOpts {
   voiceSelectors?: string[];
   /**
    * ElevenLabs voice ids to leave alone. Empty set means none excluded
-   * (from `--exclude-ids none` or an empty list). Undefined means the
-   * flag was not passed, so nothing is filtered by exclude.
+   * (from `--exclude-ids none` only). Undefined means the flag was not
+   * passed, so nothing is filtered by exclude.
    */
   excludeIds?: Set<string>;
   clipExists: ClipExistsFn;
@@ -154,13 +154,18 @@ Plan is the default for --archive and --restore. Pass --execute to mutate.
 
 function parseExcludeIds(raw: string | undefined): Set<string> | undefined {
   if (raw === undefined) return undefined;
-  if (raw === "none" || raw === "") return new Set();
-  return new Set(
-    raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  );
+  if (raw === "none") return new Set();
+  const ids = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (ids.length === 0) {
+    console.error(
+      "❌ --exclude-ids must be the literal 'none' or a non-empty comma-separated list of ElevenLabs voice ids.",
+    );
+    process.exit(1);
+  }
+  return new Set(ids);
 }
 
 async function fetchAllVoices(): Promise<VoiceRow[]> {
@@ -207,7 +212,10 @@ export async function clipExistsInStorage(
     search: filename,
   });
   if (error) return false;
-  return (data ?? []).some((entry) => entry.name === filename);
+  // Folders appear as list entries with id: null; only real objects count.
+  return (data ?? []).some(
+    (entry) => entry.name === filename && entry.id !== null,
+  );
 }
 
 function voiceMatchesSelector(voice: VoiceRow, selector: string): boolean {
@@ -438,6 +446,26 @@ async function runArchive(args: Args) {
     }
   }
 
+  if (excludeIds && excludeIds.size > 0) {
+    const knownElIds = new Set(
+      voices
+        .map((v) => v.current_elevenlabs_id)
+        .filter((id): id is string => Boolean(id)),
+    );
+    const unmatched = [...excludeIds].filter((id) => !knownElIds.has(id));
+    for (const id of unmatched) {
+      console.warn(
+        `⚠ --exclude-ids ${id}: no voice has this current_elevenlabs_id`,
+      );
+    }
+    if (unmatched.length > 0 && shouldExecute) {
+      console.error(
+        "❌ --exclude-ids includes id(s) that match no voice; refusing to execute.",
+      );
+      process.exit(1);
+    }
+  }
+
   const plan = await planArchive(voices, castlist, {
     book: args.book,
     voiceSelectors: args.voices.length > 0 ? args.voices : undefined,
@@ -461,13 +489,11 @@ async function runArchive(args: Args) {
   }
 
   const apiKey = requireApiKey();
-  const bookForLog =
-    args.book ??
-    booksUsingVoice(plan.deletable[0]!.id, castlist)[0] ??
-    "unknown";
 
   for (const v of plan.deletable) {
     const elId = v.current_elevenlabs_id!;
+    const bookForLog =
+      args.book ?? booksUsingVoice(v.id, castlist)[0] ?? "unknown";
     console.log(`\n   Archiving ${v.display_name} (${elId})...`);
     await deleteElevenLabsVoice(elId, apiKey);
 
