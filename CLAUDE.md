@@ -4,7 +4,7 @@
      Everything shared lives in AGENTS.md so delegated prompts can shrink
      to "read AGENTS.md, then do issue #N." Keep the roster synced with
      the fleet repo's copy when models or budget posture change.
-     Instantiated from fleet corefiles @ 2b1b5a0, 2026-09-26 -->
+     Instantiated from fleet corefiles @ 2b1b5a0, 2026-09-25 -->
 
 @AGENTS.md
 
@@ -221,7 +221,7 @@ row 9.
 
 - Delegate only to cursor-agent, codex and Claude models. Never agy/Antigravity (owner call 2026-07-07: flaky headless behavior). Never Haiku, not even for trivial work.
 - Browser and computer-use verification goes to codex (the `codex-computer-use` skill) as one delegated round with the whole checklist, audio playback included. claude-in-chrome from the main session is fine for one screenshot plus one console read, nothing more. The reason is the 2026-07-15 owner audit: 92% of usage happened above 150k context, browser-MCP ping-pong from the main loop was 12% of it, and one 13-hour session with ~60 wakeups burned 17.7M cache-read tokens.
-- Every delegate brief restates four AGENTS.md rules: copy `.env` into the worktree, never set `SKIP_ENV_VALIDATION`, the Spend line (no Gemini, ElevenLabs or Roboflow call unless the task is that spend), and `pnpm format:write` before commit.
-- Review lanes: a Gemini prompt or kid-facing copy goes to the fable `reviewer` agent; pipeline and credit logic go to Astra (`codex-review`).
-- DB reads go through Supabase MCP as SELECTs. Schema changes are migration files under `supabase/migrations/`, applied by me or the lead, never by a delegate.
-- voice-lab boundary: its handoffs arrive under `data/casting/`. Never edit the voice-lab checkout; say what it needs in your report.
+- Every delegate brief restates four AGENTS.md rules (config): copy `.env` into the worktree, never set `SKIP_ENV_VALIDATION`, the Spend line (no Gemini, ElevenLabs or Roboflow call unless the task is that spend), and `pnpm format:write` before commit.
+- Review lanes (config): a Gemini prompt or kid-facing copy goes to the fable `reviewer` agent; pipeline and credit logic go to Astra (`codex-review`).
+- DB reads go through Supabase MCP as SELECTs (config). Schema changes are migration files under `supabase/migrations/`, applied by me or the lead, never by a delegate.
+- voice-lab boundary (config): its handoffs arrive under `data/casting/`. Never edit the voice-lab checkout; say what it needs in your report.
