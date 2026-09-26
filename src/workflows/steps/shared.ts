@@ -1,3 +1,7 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { FatalError } from "workflow";
+import { pageStoragePath } from "~/lib/storage";
+
 export interface PageMeta {
   pageNumber: number;
   width: number;
@@ -5,6 +9,76 @@ export interface PageMeta {
 }
 
 export type BoundingBoxJson = { x: number; y: number; w: number; h: number };
+
+/**
+ * Plain (non-step) page list: `pages` rows plus one Storage list check.
+ * Returns [] only when there are no rows. Throws FatalError naming every
+ * page whose WebP is missing from the bucket. Safe for plain `tsx` scripts.
+ */
+export async function queryPageList(
+  supabase: SupabaseClient,
+  bookId: string,
+  issueId: string,
+): Promise<PageMeta[]> {
+  const { data: rows, error } = await supabase
+    .from("pages")
+    .select("number, width, height")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .order("number");
+
+  if (error) {
+    throw new Error(
+      `pages query failed for ${bookId}/${issueId}: ${error.message}`,
+    );
+  }
+  if (!rows || rows.length === 0) return [];
+
+  const listLimit = 1000;
+  const files: { name: string }[] = [];
+  for (let offset = 0; ; offset += listLimit) {
+    const { data: page, error: listError } = await supabase.storage
+      .from("comic-pages")
+      .list(`${bookId}/${issueId}`, { limit: listLimit, offset });
+    if (listError) {
+      throw new Error(
+        `storage list failed for ${bookId}/${issueId}: ${listError.message}`,
+      );
+    }
+    const batch = page ?? [];
+    files.push(...batch);
+    if (batch.length < listLimit) break;
+  }
+
+  const present = new Set(
+    files
+      .map((f) => f.name.toLowerCase())
+      .filter((name) => /^page-\d+\.webp$/.test(name)),
+  );
+
+  const missing: number[] = [];
+  for (const row of rows) {
+    const name = pageStoragePath(bookId, issueId, row.number as number)
+      .split("/")
+      .pop()!
+      .toLowerCase();
+    if (!present.has(name)) {
+      missing.push(row.number as number);
+    }
+  }
+
+  if (missing.length > 0) {
+    throw new FatalError(
+      `Missing WebP for ${bookId}/${issueId} page(s): ${missing.join(", ")}`,
+    );
+  }
+
+  return rows.map((row) => ({
+    pageNumber: row.number as number,
+    width: row.width as number,
+    height: row.height as number,
+  }));
+}
 
 export async function updatePipelineStep(
   bookId: string,
@@ -26,6 +100,7 @@ export async function updatePipelineStep(
       pipeline_paused_at: paused ? step : null,
       pipeline_paused_url: pauseUrl,
     })
+    .eq("book_id", bookId)
     .eq("id", issueId);
 
   if (paused && pauseUrl) {
@@ -50,6 +125,7 @@ export async function markPipelineFailed(
       pipeline_paused_at: null,
       pipeline_paused_url: null,
     })
+    .eq("book_id", bookId)
     .eq("id", issueId);
 }
 
@@ -113,47 +189,7 @@ export async function getPageList(
   "use step";
   const { createStepClient } = await import("../step-utils");
   const supabase = await createStepClient();
-
-  const { data: files } = await supabase.storage
-    .from("comic-pages")
-    .list(`${bookId}/${issueId}`);
-
-  if (!files) return [];
-
-  const pages = files
-    .filter((f) => /^page-\d+\.webp$/i.test(f.name))
-    .map((f) => {
-      const match = /page-(\d+)\.webp$/i.exec(f.name);
-      return {
-        pageNumber: match ? parseInt(match[1]!, 10) : 0,
-        width: 0,
-        height: 0,
-        filename: f.name,
-      };
-    })
-    .sort((a, b) => a.pageNumber - b.pageNumber);
-
-  const { data: metaData } = await supabase.storage
-    .from("comic-pages")
-    .download(`${bookId}/${issueId}/pages.json`);
-
-  if (metaData) {
-    try {
-      const meta = JSON.parse(await metaData.text()) as PageMeta[];
-      const metaMap = new Map(meta.map((m) => [m.pageNumber, m]));
-      for (const page of pages) {
-        const m = metaMap.get(page.pageNumber);
-        if (m) {
-          page.width = m.width;
-          page.height = m.height;
-        }
-      }
-    } catch {
-      // metadata parse failed, continue with zero dimensions
-    }
-  }
-
-  return pages;
+  return queryPageList(supabase, bookId, issueId);
 }
 
 export async function markIssueReady(bookId: string, issueId: string) {
@@ -170,6 +206,7 @@ export async function markIssueReady(bookId: string, issueId: string) {
       pipeline_paused_at: null,
       pipeline_paused_url: null,
     })
+    .eq("book_id", bookId)
     .eq("id", issueId);
 }
 

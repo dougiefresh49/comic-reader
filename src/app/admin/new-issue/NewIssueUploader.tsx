@@ -88,6 +88,7 @@ export function NewIssueUploader() {
 
       // Step 2: upload each file in parallel (limit 5 concurrent)
       let nextIndex = 0;
+      let uploadFailures = 0;
       const workers: Promise<void>[] = [];
       const concurrency = 5;
       const upload = async (idx: number) => {
@@ -124,6 +125,7 @@ export function NewIssueUploader() {
             prev.map((f, i) => (i === idx ? { ...f, status: "done" } : f)),
           );
         } catch (e) {
+          uploadFailures += 1;
           setFiles((prev) =>
             prev.map((f, i) =>
               i === idx
@@ -147,6 +149,37 @@ export function NewIssueUploader() {
         );
       }
       await Promise.all(workers);
+
+      if (uploadFailures > 0) {
+        setError(
+          `${uploadFailures} upload(s) failed. Fix those pages before finalize.`,
+        );
+        setStep("files");
+        return;
+      }
+
+      // Step 3: convert raw sources to WebP and upsert pages rows
+      const finRes = await fetch("/api/admin/upload-source-page", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mode: "finalize",
+          bookId,
+          issueId,
+        }),
+      });
+      const finBody = (await finRes.json()) as {
+        error?: string;
+        errors?: string[];
+      };
+      if (!finRes.ok) {
+        const detail =
+          finBody.errors && finBody.errors.length > 0
+            ? finBody.errors.join("; ")
+            : (finBody.error ?? `HTTP ${finRes.status}`);
+        throw new Error(`finalize: ${detail}`);
+      }
+
       setStep("done");
     } catch (e) {
       setError((e as Error).message);
@@ -324,7 +357,8 @@ export function NewIssueUploader() {
           {step === "done" && (
             <div className="mt-4 space-y-2 text-sm">
               <p className="text-emerald-300">
-                ✓ {completed} of {files.length} pages uploaded.
+                ✓ {completed} of {files.length} pages uploaded and converted to
+                WebP.
               </p>
               {failed > 0 && (
                 <p className="text-red-300">{failed} failed (see badges).</p>

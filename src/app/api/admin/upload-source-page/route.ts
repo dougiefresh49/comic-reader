@@ -1,6 +1,9 @@
 import "server-only";
 import { type NextRequest } from "next/server";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { storePageImage } from "~/lib/page-images";
+
+export const maxDuration = 300;
 
 const RAW_BUCKET = "comic-pages-raw";
 
@@ -18,13 +21,20 @@ interface InitIssueBody {
   number: number;
 }
 
-// POST: { mode: "init" | "url" } + payload
-// init  → upserts books + issues row
-// url   → returns signed upload URL for one file
+interface FinalizeBody {
+  bookId: string;
+  issueId: string;
+}
+
+// POST: { mode: "init" | "url" | "finalize" } + payload
+// init      → upserts books + issues row
+// url       → returns signed upload URL for one file
+// finalize  → convert raw sources to WebP, upsert pages rows, set page_count
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as
     | ({ mode: "url" } & CreateUrlBody)
-    | ({ mode: "init" } & InitIssueBody);
+    | ({ mode: "init" } & InitIssueBody)
+    | ({ mode: "finalize" } & FinalizeBody);
 
   if (body.mode === "init") {
     if (!body.bookId || !body.issueId || !body.number) {
@@ -82,6 +92,104 @@ export async function POST(req: NextRequest) {
       uploadUrl: data.signedUrl,
       token: data.token,
       path,
+    });
+  }
+
+  if (body.mode === "finalize") {
+    if (!body.bookId || !body.issueId) {
+      return Response.json({ error: "missing fields" }, { status: 400 });
+    }
+
+    const prefix = `${body.bookId}/${body.issueId}/source`;
+    const listLimit = 1000;
+    const files: { name: string }[] = [];
+    for (let offset = 0; ; offset += listLimit) {
+      const { data: page, error: listError } = await supabaseAdmin.storage
+        .from(RAW_BUCKET)
+        .list(prefix, { limit: listLimit, offset });
+      if (listError) {
+        return Response.json({ error: listError.message }, { status: 500 });
+      }
+      const batch = page ?? [];
+      files.push(...batch);
+      if (batch.length < listLimit) break;
+    }
+
+    const pageFiles = files
+      .map((f) => {
+        const match = /^page-(\d+)\.[a-z0-9]+$/i.exec(f.name);
+        if (!match) return null;
+        return { name: f.name, pageNumber: parseInt(match[1]!, 10) };
+      })
+      .filter((f): f is { name: string; pageNumber: number } => f !== null)
+      .sort((a, b) => a.pageNumber - b.pageNumber);
+
+    if (pageFiles.length === 0) {
+      return Response.json(
+        { error: `No source pages found at ${prefix}/` },
+        { status: 400 },
+      );
+    }
+
+    let stored = 0;
+    const errors: string[] = [];
+
+    for (const file of pageFiles) {
+      const path = `${prefix}/${file.name}`;
+      const { data: blob, error: dlError } = await supabaseAdmin.storage
+        .from(RAW_BUCKET)
+        .download(path);
+      if (dlError || !blob) {
+        errors.push(
+          `page ${file.pageNumber}: download failed (${dlError?.message ?? "no data"})`,
+        );
+        continue;
+      }
+      try {
+        const buffer = Buffer.from(await blob.arrayBuffer());
+        await storePageImage({
+          bookId: body.bookId,
+          issueId: body.issueId,
+          pageNumber: file.pageNumber,
+          buffer,
+        });
+        stored++;
+      } catch (err) {
+        errors.push(
+          `page ${file.pageNumber}: ${err instanceof Error ? err.message : "unknown"}`,
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      return Response.json(
+        {
+          error: `finalize failed for ${errors.length} page(s)`,
+          stored,
+          total: pageFiles.length,
+          errors,
+        },
+        { status: 500 },
+      );
+    }
+
+    const { error: issueErr } = await supabaseAdmin
+      .from("issues")
+      .update({
+        page_count: stored,
+        has_webp: true,
+      })
+      .eq("book_id", body.bookId)
+      .eq("id", body.issueId);
+
+    if (issueErr) {
+      return Response.json({ error: issueErr.message }, { status: 500 });
+    }
+
+    return Response.json({
+      ok: true,
+      stored,
+      total: pageFiles.length,
     });
   }
 

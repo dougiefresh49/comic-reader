@@ -3,13 +3,22 @@ function storageBase(): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
+/** Canonical object key in the comic-pages bucket: `{book}/{issue}/page-NN.webp`. */
+export function pageStoragePath(
+  bookId: string,
+  issueId: string,
+  pageNumber: number,
+): string {
+  const padded = String(pageNumber).padStart(2, "0");
+  return `${bookId}/${issueId}/page-${padded}.webp`;
+}
+
 export function pageImageUrl(
   bookId: string,
   issueId: string,
   pageNum: number,
 ): string {
-  const padded = String(pageNum).padStart(2, "0");
-  return `${storageBase()}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${padded}.webp`;
+  return `${storageBase()}/storage/v1/object/public/comic-pages/${pageStoragePath(bookId, issueId, pageNum)}`;
 }
 
 export function audioUrl(

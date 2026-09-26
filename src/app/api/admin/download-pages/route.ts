@@ -1,13 +1,11 @@
 import "server-only";
 import { type NextRequest } from "next/server";
 import { z } from "zod";
-import sharp from "sharp";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { storePageImage } from "~/lib/page-images";
 import { GEMINI_MEDIUM } from "~/lib/models";
 
 const RAW_BUCKET = "comic-pages-raw";
-const WEBP_BUCKET = "comic-pages";
-const WEBP_QUALITY = 82;
 
 interface ProgressEvent {
   type: "status" | "page" | "done" | "error";
@@ -171,12 +169,6 @@ export async function POST(req: NextRequest) {
         });
 
         let uploaded = 0;
-        const pagesMetadata: Array<{
-          pageNumber: number;
-          width: number;
-          height: number;
-          filename: string;
-        }> = [];
 
         for (let i = 0; i < collectedUrls.length; i++) {
           const imgUrl = collectedUrls[i]!;
@@ -184,9 +176,7 @@ export async function POST(req: NextRequest) {
           const pageNumber = i + 1;
           const ext = extFromUrl(imgUrl);
           const rawFilename = `page-${num}.${ext}`;
-          const webpFilename = `page-${num}.webp`;
           const rawPath = `${body.bookId}/${body.issueId}/source/${rawFilename}`;
-          const webpPath = `${body.bookId}/${body.issueId}/pages/${webpFilename}`;
 
           try {
             const imgResponse = await fetch(imgUrl);
@@ -205,25 +195,9 @@ export async function POST(req: NextRequest) {
               imgResponse.headers.get("content-type") ??
               `image/${ext === "jpg" ? "jpeg" : ext}`;
 
-            const [webpBuffer, metadata] = await Promise.all([
-              sharp(buffer).webp({ quality: WEBP_QUALITY }).toBuffer(),
-              sharp(buffer).metadata(),
-            ]);
-
-            const width = metadata.width ?? 0;
-            const height = metadata.height ?? 0;
-
-            const [rawResult, webpResult] = await Promise.all([
-              supabaseAdmin.storage
-                .from(RAW_BUCKET)
-                .upload(rawPath, buffer, { contentType, upsert: true }),
-              supabaseAdmin.storage
-                .from(WEBP_BUCKET)
-                .upload(webpPath, webpBuffer, {
-                  contentType: "image/webp",
-                  upsert: true,
-                }),
-            ]);
+            const rawResult = await supabaseAdmin.storage
+              .from(RAW_BUCKET)
+              .upload(rawPath, buffer, { contentType, upsert: true });
 
             if (rawResult.error) {
               send({
@@ -235,29 +209,28 @@ export async function POST(req: NextRequest) {
               continue;
             }
 
-            if (webpResult.error) {
+            try {
+              const { width, height } = await storePageImage({
+                bookId: body.bookId,
+                issueId: body.issueId,
+                pageNumber,
+                buffer,
+              });
+              uploaded++;
               send({
                 type: "page",
-                message: `WebP upload failed for page ${num}: ${webpResult.error.message} (raw OK)`,
+                message: `Uploaded page ${num} (${width}×${height})`,
+                current: pageNumber,
+                total: collectedUrls.length,
+              });
+            } catch (err) {
+              send({
+                type: "page",
+                message: `WebP/pages failed for page ${num}: ${err instanceof Error ? err.message : "unknown"} (raw OK)`,
                 current: pageNumber,
                 total: collectedUrls.length,
               });
             }
-
-            pagesMetadata.push({
-              pageNumber,
-              width,
-              height,
-              filename: webpFilename,
-            });
-
-            uploaded++;
-            send({
-              type: "page",
-              message: `Uploaded page ${num} (${width}×${height})`,
-              current: pageNumber,
-              total: collectedUrls.length,
-            });
           } catch (err) {
             send({
               type: "page",
@@ -268,28 +241,24 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Upload pages metadata as JSON to the WebP bucket
-        if (pagesMetadata.length > 0) {
-          const metadataPath = `${body.bookId}/${body.issueId}/pages.json`;
-          await supabaseAdmin.storage
-            .from(WEBP_BUCKET)
-            .upload(
-              metadataPath,
-              Buffer.from(JSON.stringify(pagesMetadata, null, 2)),
-              { contentType: "application/json", upsert: true },
-            );
-        }
-
-        // Update issue page_count and pipeline_step
-        await supabaseAdmin
+        const { error: issueErr } = await supabaseAdmin
           .from("issues")
           .update({
             page_count: uploaded,
-            has_webp: true,
+            has_webp: uploaded > 0,
             pipeline_step: "pages-downloaded",
             source_pages_path: `${body.bookId}/${body.issueId}/source/`,
           })
+          .eq("book_id", body.bookId)
           .eq("id", body.issueId);
+
+        if (issueErr) {
+          send({
+            type: "error",
+            message: `issues update failed: ${issueErr.message}`,
+          });
+          return;
+        }
 
         send({
           type: "done",
