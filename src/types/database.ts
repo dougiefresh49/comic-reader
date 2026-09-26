@@ -1,0 +1,1301 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5";
+  };
+  public: {
+    Tables: {
+      aliases: {
+        Row: {
+          alias: string;
+          canonical: string;
+          created_at: string | null;
+          id: number;
+          scope: Database["public"]["Enums"]["alias_scope"];
+          scope_id: string | null;
+        };
+        Insert: {
+          alias: string;
+          canonical: string;
+          created_at?: string | null;
+          id?: number;
+          scope?: Database["public"]["Enums"]["alias_scope"];
+          scope_id?: string | null;
+        };
+        Update: {
+          alias?: string;
+          canonical?: string;
+          created_at?: string | null;
+          id?: number;
+          scope?: Database["public"]["Enums"]["alias_scope"];
+          scope_id?: string | null;
+        };
+        Relationships: [];
+      };
+      audio_timestamps: {
+        Row: {
+          alignment: Json | null;
+          book_id: string;
+          bubble_id: string;
+          created_at: string | null;
+          issue_id: string;
+          normalized_alignment: Json | null;
+        };
+        Insert: {
+          alignment?: Json | null;
+          book_id: string;
+          bubble_id: string;
+          created_at?: string | null;
+          issue_id: string;
+          normalized_alignment?: Json | null;
+        };
+        Update: {
+          alignment?: Json | null;
+          book_id?: string;
+          bubble_id?: string;
+          created_at?: string | null;
+          issue_id?: string;
+          normalized_alignment?: Json | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "audio_timestamps_bubble_id_fkey";
+            columns: ["bubble_id"];
+            isOneToOne: true;
+            referencedRelation: "bubbles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      book_parts: {
+        Row: {
+          book_id: string;
+          created_at: string | null;
+          id: string;
+          name: string;
+          number: number;
+          slug: string;
+          total_issues: number | null;
+          wiki_url: string | null;
+        };
+        Insert: {
+          book_id: string;
+          created_at?: string | null;
+          id: string;
+          name: string;
+          number: number;
+          slug: string;
+          total_issues?: number | null;
+          wiki_url?: string | null;
+        };
+        Update: {
+          book_id?: string;
+          created_at?: string | null;
+          id?: string;
+          name?: string;
+          number?: number;
+          slug?: string;
+          total_issues?: number | null;
+          wiki_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "book_parts_book_id_fkey";
+            columns: ["book_id"];
+            isOneToOne: false;
+            referencedRelation: "books";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      books: {
+        Row: {
+          created_at: string | null;
+          franchises: string[] | null;
+          id: string;
+          name: string;
+          publisher: string | null;
+          series_id: string | null;
+          slug: string;
+          total_issues: number | null;
+          wiki_host: string | null;
+          wiki_title_template: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          franchises?: string[] | null;
+          id: string;
+          name: string;
+          publisher?: string | null;
+          series_id?: string | null;
+          slug: string;
+          total_issues?: number | null;
+          wiki_host?: string | null;
+          wiki_title_template?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          franchises?: string[] | null;
+          id?: string;
+          name?: string;
+          publisher?: string | null;
+          series_id?: string | null;
+          slug?: string;
+          total_issues?: number | null;
+          wiki_host?: string | null;
+          wiki_title_template?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "books_series_id_fkey";
+            columns: ["series_id"];
+            isOneToOne: false;
+            referencedRelation: "series";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      bubbles: {
+        Row: {
+          ai_reasoning: string | null;
+          audio_storage_path: string | null;
+          book_id: string;
+          box_2d: Json | null;
+          character_id: string | null;
+          character_type: string | null;
+          created_at: string | null;
+          crop_storage_path: string | null;
+          emotion: string | null;
+          id: string;
+          ignored: boolean;
+          issue_id: string;
+          legacy_id: string | null;
+          needs_audio: boolean;
+          needs_ocr: boolean;
+          ocr_text: string | null;
+          page_number: number;
+          panel_id: string | null;
+          side: string | null;
+          sort_order: number;
+          speaker: string | null;
+          style: Json | null;
+          text_with_cues: string | null;
+          type: string;
+          updated_at: string | null;
+          voice_description: string | null;
+        };
+        Insert: {
+          ai_reasoning?: string | null;
+          audio_storage_path?: string | null;
+          book_id: string;
+          box_2d?: Json | null;
+          character_id?: string | null;
+          character_type?: string | null;
+          created_at?: string | null;
+          crop_storage_path?: string | null;
+          emotion?: string | null;
+          id?: string;
+          ignored?: boolean;
+          issue_id: string;
+          legacy_id?: string | null;
+          needs_audio?: boolean;
+          needs_ocr?: boolean;
+          ocr_text?: string | null;
+          page_number: number;
+          panel_id?: string | null;
+          side?: string | null;
+          sort_order: number;
+          speaker?: string | null;
+          style?: Json | null;
+          text_with_cues?: string | null;
+          type?: string;
+          updated_at?: string | null;
+          voice_description?: string | null;
+        };
+        Update: {
+          ai_reasoning?: string | null;
+          audio_storage_path?: string | null;
+          book_id?: string;
+          box_2d?: Json | null;
+          character_id?: string | null;
+          character_type?: string | null;
+          created_at?: string | null;
+          crop_storage_path?: string | null;
+          emotion?: string | null;
+          id?: string;
+          ignored?: boolean;
+          issue_id?: string;
+          legacy_id?: string | null;
+          needs_audio?: boolean;
+          needs_ocr?: boolean;
+          ocr_text?: string | null;
+          page_number?: number;
+          panel_id?: string | null;
+          side?: string | null;
+          sort_order?: number;
+          speaker?: string | null;
+          style?: Json | null;
+          text_with_cues?: string | null;
+          type?: string;
+          updated_at?: string | null;
+          voice_description?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "bubbles_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "bubbles_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bubbles_panel_id_fkey";
+            columns: ["panel_id"];
+            isOneToOne: false;
+            referencedRelation: "panels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      bubbles_character_id_backup_v1: {
+        Row: {
+          character_id: string | null;
+          id: string | null;
+        };
+        Insert: {
+          character_id?: string | null;
+          id?: string | null;
+        };
+        Update: {
+          character_id?: string | null;
+          id?: string | null;
+        };
+        Relationships: [];
+      };
+      camp_schedules: {
+        Row: {
+          id: string;
+          schedule: Json;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          schedule?: Json;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          schedule?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      casting_tasks: {
+        Row: {
+          book_id: string;
+          character_id: string;
+          completed_at: string | null;
+          created_at: string | null;
+          id: string;
+          issue_id: string;
+          status: string;
+        };
+        Insert: {
+          book_id: string;
+          character_id: string;
+          completed_at?: string | null;
+          created_at?: string | null;
+          id?: string;
+          issue_id: string;
+          status?: string;
+        };
+        Update: {
+          book_id?: string;
+          character_id?: string;
+          completed_at?: string | null;
+          created_at?: string | null;
+          id?: string;
+          issue_id?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "casting_tasks_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "casting_tasks_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      castlist: {
+        Row: {
+          book_id: string;
+          character: string;
+          issue_id: string;
+          voice_id: string | null;
+          voice_uuid: string | null;
+        };
+        Insert: {
+          book_id: string;
+          character: string;
+          issue_id: string;
+          voice_id?: string | null;
+          voice_uuid?: string | null;
+        };
+        Update: {
+          book_id?: string;
+          character?: string;
+          issue_id?: string;
+          voice_id?: string | null;
+          voice_uuid?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "castlist_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "castlist_voice_uuid_fkey";
+            columns: ["voice_uuid"];
+            isOneToOne: false;
+            referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      character_appearances: {
+        Row: {
+          character_id: string;
+          clip_duration_secs: number | null;
+          clip_source_url: string | null;
+          clip_storage_path: string | null;
+          created_at: string | null;
+          id: string;
+          media_title: string | null;
+          media_type: string | null;
+          notes: string | null;
+          voice_actor: string | null;
+          voice_created_at: string | null;
+          voice_description: string | null;
+          voice_id: string | null;
+          voice_model_error: string | null;
+          voice_model_started_at: string | null;
+          voice_model_status: string;
+          voice_status: string | null;
+          voice_type: string | null;
+          year: number | null;
+          youtube_search_terms: string[] | null;
+        };
+        Insert: {
+          character_id: string;
+          clip_duration_secs?: number | null;
+          clip_source_url?: string | null;
+          clip_storage_path?: string | null;
+          created_at?: string | null;
+          id: string;
+          media_title?: string | null;
+          media_type?: string | null;
+          notes?: string | null;
+          voice_actor?: string | null;
+          voice_created_at?: string | null;
+          voice_description?: string | null;
+          voice_id?: string | null;
+          voice_model_error?: string | null;
+          voice_model_started_at?: string | null;
+          voice_model_status?: string;
+          voice_status?: string | null;
+          voice_type?: string | null;
+          year?: number | null;
+          youtube_search_terms?: string[] | null;
+        };
+        Update: {
+          character_id?: string;
+          clip_duration_secs?: number | null;
+          clip_source_url?: string | null;
+          clip_storage_path?: string | null;
+          created_at?: string | null;
+          id?: string;
+          media_title?: string | null;
+          media_type?: string | null;
+          notes?: string | null;
+          voice_actor?: string | null;
+          voice_created_at?: string | null;
+          voice_description?: string | null;
+          voice_id?: string | null;
+          voice_model_error?: string | null;
+          voice_model_started_at?: string | null;
+          voice_model_status?: string;
+          voice_status?: string | null;
+          voice_type?: string | null;
+          year?: number | null;
+          youtube_search_terms?: string[] | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "character_appearances_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      character_face_exemplars: {
+        Row: {
+          book_id: string;
+          character_id: string | null;
+          confidence: number;
+          created_at: string | null;
+          crop_path: string;
+          embedding: string | null;
+          id: string;
+          is_confirmed: boolean | null;
+          page_number: number;
+          source_issue: string;
+          suggested_name: string | null;
+        };
+        Insert: {
+          book_id: string;
+          character_id?: string | null;
+          confidence?: number;
+          created_at?: string | null;
+          crop_path: string;
+          embedding?: string | null;
+          id?: string;
+          is_confirmed?: boolean | null;
+          page_number: number;
+          source_issue: string;
+          suggested_name?: string | null;
+        };
+        Update: {
+          book_id?: string;
+          character_id?: string | null;
+          confidence?: number;
+          created_at?: string | null;
+          crop_path?: string;
+          embedding?: string | null;
+          id?: string;
+          is_confirmed?: boolean | null;
+          page_number?: number;
+          source_issue?: string;
+          suggested_name?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "character_face_exemplars_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      characters: {
+        Row: {
+          aliases: string[];
+          created_at: string | null;
+          franchise: string | null;
+          id: string;
+          updated_at: string | null;
+        };
+        Insert: {
+          aliases?: string[];
+          created_at?: string | null;
+          franchise?: string | null;
+          id: string;
+          updated_at?: string | null;
+        };
+        Update: {
+          aliases?: string[];
+          created_at?: string | null;
+          franchise?: string | null;
+          id?: string;
+          updated_at?: string | null;
+        };
+        Relationships: [];
+      };
+      issues: {
+        Row: {
+          audio_count: number;
+          book_id: string;
+          bubble_count: number;
+          created_at: string | null;
+          has_audio: boolean;
+          has_timestamps: boolean;
+          has_webp: boolean;
+          id: string;
+          name: string;
+          number: number;
+          page_count: number;
+          part_id: string | null;
+          pipeline_paused: boolean;
+          pipeline_paused_at: string | null;
+          pipeline_paused_url: string | null;
+          pipeline_step: string | null;
+          source_pages_path: string | null;
+          source_url: string | null;
+          status: string;
+          wiki_appearances: Json | null;
+          wiki_summary: string | null;
+          wiki_url: string | null;
+        };
+        Insert: {
+          audio_count?: number;
+          book_id: string;
+          bubble_count?: number;
+          created_at?: string | null;
+          has_audio?: boolean;
+          has_timestamps?: boolean;
+          has_webp?: boolean;
+          id: string;
+          name: string;
+          number: number;
+          page_count?: number;
+          part_id?: string | null;
+          pipeline_paused?: boolean;
+          pipeline_paused_at?: string | null;
+          pipeline_paused_url?: string | null;
+          pipeline_step?: string | null;
+          source_pages_path?: string | null;
+          source_url?: string | null;
+          status?: string;
+          wiki_appearances?: Json | null;
+          wiki_summary?: string | null;
+          wiki_url?: string | null;
+        };
+        Update: {
+          audio_count?: number;
+          book_id?: string;
+          bubble_count?: number;
+          created_at?: string | null;
+          has_audio?: boolean;
+          has_timestamps?: boolean;
+          has_webp?: boolean;
+          id?: string;
+          name?: string;
+          number?: number;
+          page_count?: number;
+          part_id?: string | null;
+          pipeline_paused?: boolean;
+          pipeline_paused_at?: string | null;
+          pipeline_paused_url?: string | null;
+          pipeline_step?: string | null;
+          source_pages_path?: string | null;
+          source_url?: string | null;
+          status?: string;
+          wiki_appearances?: Json | null;
+          wiki_summary?: string | null;
+          wiki_url?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "issues_book_id_fkey";
+            columns: ["book_id"];
+            isOneToOne: false;
+            referencedRelation: "books";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "issues_part_id_fkey";
+            columns: ["part_id"];
+            isOneToOne: false;
+            referencedRelation: "book_parts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      music_scenes: {
+        Row: {
+          book_id: string;
+          created_at: string | null;
+          end_panel_id: string | null;
+          id: string;
+          issue_id: string;
+          label: string | null;
+          music_mood: string;
+          start_panel_id: string | null;
+        };
+        Insert: {
+          book_id: string;
+          created_at?: string | null;
+          end_panel_id?: string | null;
+          id?: string;
+          issue_id: string;
+          label?: string | null;
+          music_mood: string;
+          start_panel_id?: string | null;
+        };
+        Update: {
+          book_id?: string;
+          created_at?: string | null;
+          end_panel_id?: string | null;
+          id?: string;
+          issue_id?: string;
+          label?: string | null;
+          music_mood?: string;
+          start_panel_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "music_scenes_end_panel_id_fkey";
+            columns: ["end_panel_id"];
+            isOneToOne: false;
+            referencedRelation: "panels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "music_scenes_start_panel_id_fkey";
+            columns: ["start_panel_id"];
+            isOneToOne: true;
+            referencedRelation: "panels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      page_context: {
+        Row: {
+          book_id: string;
+          created_at: string | null;
+          gemini_model: string | null;
+          issue_id: string;
+          page_number: number;
+          raw_response: Json | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          book_id: string;
+          created_at?: string | null;
+          gemini_model?: string | null;
+          issue_id: string;
+          page_number: number;
+          raw_response?: Json | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          book_id?: string;
+          created_at?: string | null;
+          gemini_model?: string | null;
+          issue_id?: string;
+          page_number?: number;
+          raw_response?: Json | null;
+          updated_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "page_context_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+        ];
+      };
+      page_segmentation: {
+        Row: {
+          book_id: string;
+          created_at: string | null;
+          id: string;
+          image_height: number;
+          image_width: number;
+          issue_id: string;
+          page_number: number;
+          predictions: Json;
+        };
+        Insert: {
+          book_id: string;
+          created_at?: string | null;
+          id?: string;
+          image_height: number;
+          image_width: number;
+          issue_id: string;
+          page_number: number;
+          predictions?: Json;
+        };
+        Update: {
+          book_id?: string;
+          created_at?: string | null;
+          id?: string;
+          image_height?: number;
+          image_width?: number;
+          issue_id?: string;
+          page_number?: number;
+          predictions?: Json;
+        };
+        Relationships: [];
+      };
+      pages: {
+        Row: {
+          book_id: string;
+          height: number;
+          id: number;
+          issue_id: string;
+          number: number;
+          storage_path: string | null;
+          width: number;
+        };
+        Insert: {
+          book_id: string;
+          height: number;
+          id?: number;
+          issue_id: string;
+          number: number;
+          storage_path?: string | null;
+          width: number;
+        };
+        Update: {
+          book_id?: string;
+          height?: number;
+          id?: number;
+          issue_id?: string;
+          number?: number;
+          storage_path?: string | null;
+          width?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pages_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+        ];
+      };
+      panel_character_detections: {
+        Row: {
+          character_id: string | null;
+          cluster_id: number | null;
+          created_at: string;
+          face_bbox: Json;
+          human_verified: boolean;
+          id: string;
+          identification_confidence: number;
+          panel_id: string;
+          suggested_name: string | null;
+        };
+        Insert: {
+          character_id?: string | null;
+          cluster_id?: number | null;
+          created_at?: string;
+          face_bbox: Json;
+          human_verified?: boolean;
+          id?: string;
+          identification_confidence?: number;
+          panel_id: string;
+          suggested_name?: string | null;
+        };
+        Update: {
+          character_id?: string | null;
+          cluster_id?: number | null;
+          created_at?: string;
+          face_bbox?: Json;
+          human_verified?: boolean;
+          id?: string;
+          identification_confidence?: number;
+          panel_id?: string;
+          suggested_name?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "panel_character_detections_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "panel_character_detections_panel_id_fkey";
+            columns: ["panel_id"];
+            isOneToOne: false;
+            referencedRelation: "panels";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      panel_character_detections_backup_v1: {
+        Row: {
+          character_id: string | null;
+          cluster_id: number | null;
+          created_at: string | null;
+          face_bbox: Json | null;
+          human_verified: boolean | null;
+          id: string | null;
+          identification_confidence: number | null;
+          panel_id: string | null;
+        };
+        Insert: {
+          character_id?: string | null;
+          cluster_id?: number | null;
+          created_at?: string | null;
+          face_bbox?: Json | null;
+          human_verified?: boolean | null;
+          id?: string | null;
+          identification_confidence?: number | null;
+          panel_id?: string | null;
+        };
+        Update: {
+          character_id?: string | null;
+          cluster_id?: number | null;
+          created_at?: string | null;
+          face_bbox?: Json | null;
+          human_verified?: boolean | null;
+          id?: string | null;
+          identification_confidence?: number | null;
+          panel_id?: string | null;
+        };
+        Relationships: [];
+      };
+      panels: {
+        Row: {
+          audio_tags: Json;
+          book_id: string;
+          bounding_box: Json;
+          cinematic_description: string | null;
+          created_at: string;
+          effect_positions: Json | null;
+          effect_tags: string[];
+          estimated_duration_seconds: number | null;
+          foreground_polygons: Json | null;
+          id: string;
+          is_new_scene: boolean;
+          issue_id: string;
+          page_number: number;
+          panel_id: string;
+          primary_speaker: string | null;
+          scene_id: string | null;
+          sort_order: number;
+          source: string;
+          updated_at: string;
+        };
+        Insert: {
+          audio_tags?: Json;
+          book_id: string;
+          bounding_box: Json;
+          cinematic_description?: string | null;
+          created_at?: string;
+          effect_positions?: Json | null;
+          effect_tags?: string[];
+          estimated_duration_seconds?: number | null;
+          foreground_polygons?: Json | null;
+          id?: string;
+          is_new_scene?: boolean;
+          issue_id: string;
+          page_number: number;
+          panel_id: string;
+          primary_speaker?: string | null;
+          scene_id?: string | null;
+          sort_order: number;
+          source?: string;
+          updated_at?: string;
+        };
+        Update: {
+          audio_tags?: Json;
+          book_id?: string;
+          bounding_box?: Json;
+          cinematic_description?: string | null;
+          created_at?: string;
+          effect_positions?: Json | null;
+          effect_tags?: string[];
+          estimated_duration_seconds?: number | null;
+          foreground_polygons?: Json | null;
+          id?: string;
+          is_new_scene?: boolean;
+          issue_id?: string;
+          page_number?: number;
+          panel_id?: string;
+          primary_speaker?: string | null;
+          scene_id?: string | null;
+          sort_order?: number;
+          source?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "panels_book_issue_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "panels_scene_id_fkey";
+            columns: ["scene_id"];
+            isOneToOne: false;
+            referencedRelation: "music_scenes";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      pipeline_runs: {
+        Row: {
+          book_id: string;
+          completed_at: string | null;
+          id: string;
+          issue_id: string;
+          started_at: string | null;
+          status: string;
+          steps: Json | null;
+        };
+        Insert: {
+          book_id: string;
+          completed_at?: string | null;
+          id?: string;
+          issue_id: string;
+          started_at?: string | null;
+          status?: string;
+          steps?: Json | null;
+        };
+        Update: {
+          book_id?: string;
+          completed_at?: string | null;
+          id?: string;
+          issue_id?: string;
+          started_at?: string | null;
+          status?: string;
+          steps?: Json | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_runs_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+        ];
+      };
+      series: {
+        Row: {
+          created_at: string | null;
+          id: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string | null;
+          id: string;
+          name: string;
+        };
+        Update: {
+          created_at?: string | null;
+          id?: string;
+          name?: string;
+        };
+        Relationships: [];
+      };
+      speaker_reviews: {
+        Row: {
+          alias_scope: string | null;
+          auto_accepted: boolean;
+          book_id: string;
+          bubble_count: number;
+          created_at: string | null;
+          id: string;
+          issue_id: string;
+          original_name: string;
+          page_numbers: number[] | null;
+          resolved_name: string | null;
+          reviewed_at: string | null;
+          sample_text: string | null;
+          save_as_alias: boolean;
+          status: string;
+        };
+        Insert: {
+          alias_scope?: string | null;
+          auto_accepted?: boolean;
+          book_id: string;
+          bubble_count?: number;
+          created_at?: string | null;
+          id?: string;
+          issue_id: string;
+          original_name: string;
+          page_numbers?: number[] | null;
+          resolved_name?: string | null;
+          reviewed_at?: string | null;
+          sample_text?: string | null;
+          save_as_alias?: boolean;
+          status?: string;
+        };
+        Update: {
+          alias_scope?: string | null;
+          auto_accepted?: boolean;
+          book_id?: string;
+          bubble_count?: number;
+          created_at?: string | null;
+          id?: string;
+          issue_id?: string;
+          original_name?: string;
+          page_numbers?: number[] | null;
+          resolved_name?: string | null;
+          reviewed_at?: string | null;
+          sample_text?: string | null;
+          save_as_alias?: boolean;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "speaker_reviews_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+        ];
+      };
+      voice_archives: {
+        Row: {
+          archived_at: string;
+          archived_for_book_id: string | null;
+          former_elevenlabs_id: string;
+          id: string;
+          voice_id: string;
+        };
+        Insert: {
+          archived_at?: string;
+          archived_for_book_id?: string | null;
+          former_elevenlabs_id: string;
+          id?: string;
+          voice_id: string;
+        };
+        Update: {
+          archived_at?: string;
+          archived_for_book_id?: string | null;
+          former_elevenlabs_id?: string;
+          id?: string;
+          voice_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_archives_voice_id_fkey";
+            columns: ["voice_id"];
+            isOneToOne: false;
+            referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      voices: {
+        Row: {
+          archived_at: string | null;
+          created_at: string;
+          current_elevenlabs_id: string | null;
+          design_prompt: string | null;
+          display_name: string;
+          id: string;
+          keep_active: boolean;
+          series_id: string | null;
+          source_clip_path: string | null;
+          status: string;
+          voice_settings: Json | null;
+        };
+        Insert: {
+          archived_at?: string | null;
+          created_at?: string;
+          current_elevenlabs_id?: string | null;
+          design_prompt?: string | null;
+          display_name: string;
+          id?: string;
+          keep_active?: boolean;
+          series_id?: string | null;
+          source_clip_path?: string | null;
+          status: string;
+          voice_settings?: Json | null;
+        };
+        Update: {
+          archived_at?: string | null;
+          created_at?: string;
+          current_elevenlabs_id?: string | null;
+          design_prompt?: string | null;
+          display_name?: string;
+          id?: string;
+          keep_active?: boolean;
+          series_id?: string | null;
+          source_clip_path?: string | null;
+          status?: string;
+          voice_settings?: Json | null;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      match_face_exemplars: {
+        Args: {
+          book_ids: string[];
+          match_limit?: number;
+          query_embedding: string;
+        };
+        Returns: {
+          character_id: string;
+          composite_score: number;
+          confidence: number;
+          crop_path: string;
+          id: string;
+          similarity: number;
+        }[];
+      };
+    };
+    Enums: {
+      alias_scope: "global" | "series" | "book";
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+};
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<
+  keyof Database,
+  "public"
+>];
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R;
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
+      }
+      ? R
+      : never
+    : never;
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I;
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I;
+      }
+      ? I
+      : never
+    : never;
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U;
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U;
+      }
+      ? U
+      : never
+    : never;
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never;
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals;
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals;
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never;
+
+export const Constants = {
+  public: {
+    Enums: {
+      alias_scope: ["global", "series", "book"],
+    },
+  },
+} as const;
