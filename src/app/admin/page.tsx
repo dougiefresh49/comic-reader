@@ -5,14 +5,45 @@ import {
   type AdminIssueRow,
   type AdminBookInfo,
 } from "~/server/admin/queries";
-import { PipelineActions } from "./PipelineActions";
+import { supabaseAdmin } from "~/lib/supabase-admin";
+import { PipelineActions, type SkippedGate } from "./PipelineActions";
 
 export const dynamic = "force-dynamic";
 
+type PipelineRunSteps = {
+  runId?: string;
+  fromStep?: string | null;
+  skipped?: SkippedGate[];
+};
+
+async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
+  const { data } = (await supabaseAdmin
+    .from("pipeline_runs")
+    .select("book_id, issue_id, steps, started_at")
+    .order("started_at", { ascending: false })) as {
+    data: Array<{
+      book_id: string;
+      issue_id: string;
+      steps: PipelineRunSteps | null;
+      started_at: string | null;
+    }> | null;
+  };
+
+  const map = new Map<string, SkippedGate[]>();
+  for (const row of data ?? []) {
+    const key = `${row.book_id}/${row.issue_id}`;
+    if (map.has(key)) continue;
+    const skipped = row.steps?.skipped;
+    map.set(key, Array.isArray(skipped) ? skipped : []);
+  }
+  return map;
+}
+
 export default async function AdminDashboardPage() {
-  const [issues, books] = await Promise.all([
+  const [issues, books, skippedByIssue] = await Promise.all([
     getAdminIssues(),
     getAdminBooksWithParts(),
+    getLatestSkippedByIssue(),
   ]);
 
   const issuesByBook = new Map<string, AdminIssueRow[]>();
@@ -73,6 +104,7 @@ export default async function AdminDashboardPage() {
                 key={book.id}
                 book={book}
                 issues={issuesByBook.get(book.id) ?? []}
+                skippedByIssue={skippedByIssue}
               />
             ))}
           </div>
@@ -85,9 +117,11 @@ export default async function AdminDashboardPage() {
 function BookSection({
   book,
   issues,
+  skippedByIssue,
 }: {
   book: AdminBookInfo;
   issues: AdminIssueRow[];
+  skippedByIssue: Map<string, SkippedGate[]>;
 }) {
   const hasParts = book.parts.length > 0;
 
@@ -142,7 +176,10 @@ function BookSection({
                   )}
                 </h3>
                 {partIssues.length > 0 ? (
-                  <IssueList issues={partIssues} />
+                  <IssueList
+                    issues={partIssues}
+                    skippedByIssue={skippedByIssue}
+                  />
                 ) : (
                   <p className="py-2 text-xs text-neutral-600">
                     No issues yet.
@@ -156,18 +193,27 @@ function BookSection({
               <h3 className="mb-1.5 text-sm font-medium text-neutral-400">
                 Unassigned
               </h3>
-              <IssueList issues={issuesByPart.get(null)!} />
+              <IssueList
+                issues={issuesByPart.get(null)!}
+                skippedByIssue={skippedByIssue}
+              />
             </div>
           )}
         </div>
       ) : (
-        <IssueList issues={issues} />
+        <IssueList issues={issues} skippedByIssue={skippedByIssue} />
       )}
     </section>
   );
 }
 
-function IssueList({ issues }: { issues: AdminIssueRow[] }) {
+function IssueList({
+  issues,
+  skippedByIssue,
+}: {
+  issues: AdminIssueRow[];
+  skippedByIssue: Map<string, SkippedGate[]>;
+}) {
   return (
     <>
       {/* Desktop: table */}
@@ -202,7 +248,12 @@ function IssueList({ issues }: { issues: AdminIssueRow[] }) {
                   <StatusBadge issue={iss} />
                 </td>
                 <td className="px-4 py-2">
-                  <ActionButtons issue={iss} />
+                  <ActionButtons
+                    issue={iss}
+                    skippedGates={
+                      skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
+                    }
+                  />
                 </td>
               </tr>
             ))}
@@ -213,14 +264,26 @@ function IssueList({ issues }: { issues: AdminIssueRow[] }) {
       {/* Mobile: cards */}
       <div className="space-y-3 md:hidden">
         {issues.map((iss) => (
-          <IssueCard key={`${iss.bookId}/${iss.issueId}`} issue={iss} />
+          <IssueCard
+            key={`${iss.bookId}/${iss.issueId}`}
+            issue={iss}
+            skippedGates={
+              skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
+            }
+          />
         ))}
       </div>
     </>
   );
 }
 
-function IssueCard({ issue }: { issue: AdminIssueRow }) {
+function IssueCard({
+  issue,
+  skippedGates,
+}: {
+  issue: AdminIssueRow;
+  skippedGates: SkippedGate[];
+}) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
       <div className="flex items-start justify-between gap-2">
@@ -248,7 +311,7 @@ function IssueCard({ issue }: { issue: AdminIssueRow }) {
       </div>
 
       <div className="mt-2.5">
-        <ActionButtons issue={issue} />
+        <ActionButtons issue={issue} skippedGates={skippedGates} />
       </div>
     </div>
   );
@@ -294,7 +357,13 @@ function StatusBadge({ issue }: { issue: AdminIssueRow }) {
   );
 }
 
-function ActionButtons({ issue }: { issue: AdminIssueRow }) {
+function ActionButtons({
+  issue,
+  skippedGates,
+}: {
+  issue: AdminIssueRow;
+  skippedGates: SkippedGate[];
+}) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
       <PipelineActions
@@ -305,6 +374,7 @@ function ActionButtons({ issue }: { issue: AdminIssueRow }) {
         pipelinePausedAt={issue.pipelinePausedAt}
         pipelinePausedUrl={issue.pipelinePausedUrl}
         pageCount={issue.pageCount}
+        skippedGates={skippedGates}
       />
       <Link
         href={`/admin/${issue.bookId}/${issue.issueId}/review/pipeline`}

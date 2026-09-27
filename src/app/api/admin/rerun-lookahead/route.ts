@@ -29,11 +29,6 @@ export async function POST(req: NextRequest) {
     ...new Set(panels.map((p) => p.page_number as number)),
   ].sort((a, b) => a - b);
 
-  await supabaseAdmin
-    .from("issues")
-    .update({ pipeline_step: "character-lookahead", pipeline_paused: false })
-    .eq("id", body.issueId);
-
   const results: Array<{ page: number; status: string; error?: string }> = [];
 
   for (const pageNumber of pageNumbers) {
@@ -45,15 +40,6 @@ export async function POST(req: NextRequest) {
       results.push({ page: pageNumber, status: "error", error: msg });
     }
   }
-
-  await supabaseAdmin
-    .from("issues")
-    .update({
-      pipeline_step: "review-clusters",
-      pipeline_paused: true,
-      pipeline_paused_at: "review-clusters",
-    })
-    .eq("id", body.issueId);
 
   return Response.json({ ok: true, pages: results });
 }
