@@ -11,15 +11,27 @@ interface BoundsEditorProps {
   onBodyDragStart: () => void;
 }
 
-const HANDLES: { key: HandleType; style: React.CSSProperties; cursor: string }[] = [
+const HANDLES: {
+  key: HandleType;
+  style: React.CSSProperties;
+  cursor: string;
+}[] = [
   { key: "nw", style: { top: -4, left: -4 }, cursor: "nw-resize" },
-  { key: "n",  style: { top: -4, left: "calc(50% - 4px)" }, cursor: "n-resize" },
+  { key: "n", style: { top: -4, left: "calc(50% - 4px)" }, cursor: "n-resize" },
   { key: "ne", style: { top: -4, right: -4 }, cursor: "ne-resize" },
-  { key: "e",  style: { top: "calc(50% - 4px)", right: -4 }, cursor: "e-resize" },
+  {
+    key: "e",
+    style: { top: "calc(50% - 4px)", right: -4 },
+    cursor: "e-resize",
+  },
   { key: "se", style: { bottom: -4, right: -4 }, cursor: "se-resize" },
-  { key: "s",  style: { bottom: -4, left: "calc(50% - 4px)" }, cursor: "s-resize" },
+  {
+    key: "s",
+    style: { bottom: -4, left: "calc(50% - 4px)" },
+    cursor: "s-resize",
+  },
   { key: "sw", style: { bottom: -4, left: -4 }, cursor: "sw-resize" },
-  { key: "w",  style: { top: "calc(50% - 4px)", left: -4 }, cursor: "w-resize" },
+  { key: "w", style: { top: "calc(50% - 4px)", left: -4 }, cursor: "w-resize" },
 ];
 
 export function BoundsEditor({
