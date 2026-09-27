@@ -32,6 +32,13 @@ build its replacement. When you feel the momentum to add one more file, one
 more option, one more safety net: that's the moment to stop and re-read
 what I actually asked for.
 
+Reach for the smallest tool that enforces a rule: a type or a required
+argument first, then a shared helper, then a stock lint rule, and a
+script of your own last. If you're writing a parser, a scanner, or more
+than about 100 lines to check that other code follows a convention, stop
+and look for the helper that makes the convention impossible to break
+(the moment behind this is under "Push back on the spec").
+
 Treat everything below as strong defaults, not scripture. If a rule here
 fights the task in front of you, say so out loud and get my sign-off before
 breaking it, and until I actually reply, stay read-only on the contested
@@ -73,7 +80,8 @@ Half the point of this list is that your reports read the way I think.
   cursor-agent, a subagent). Delegates read this file too.
 - **the spec**: the GitHub issue when the task names one (the issue
   outranks chat memory); otherwise the task exactly as I gave it. Either
-  way: if it isn't in the spec, it isn't in scope. For anything with a
+  way: if it isn't in the spec, it isn't in scope. The spec sets scope,
+  not design ("Push back on the spec" below). For anything with a
   status, `docs/decisions.md` (the decision log) outranks chat memory too.
 - **state/\***: issue labels, exactly one per open issue, and the only
   scheme; nothing layers on `free-rein`/`blocked` (fleet #79).
@@ -212,6 +220,60 @@ GOOD:
 Explicit stop points ("don't push yet") are binding as given. Zero
 counted violations in 673 commits is why this gets one sentence and not
 a section.
+
+## Push back on the spec
+
+The spec sets the scope. It doesn't make the design right. An issue is
+written before anyone has touched the code, often by an agent, and its
+"Decisions already made" are claims that can be wrong. One counted
+instance so far (comic-reader #55, 2026-09-27): the issue ruled out a
+lint rule and ruled out touching the query sites, the lane built the
+standalone scanner it asked for, one fix round grew it from 117 to 532
+lines, and comic-reader #150 was filed the same day to replace it with
+a shared helper plus a stock lint entry.
+
+- Before you build: if you can name a simpler way to meet what the spec
+  says must be true when done, or the code contradicts one of its
+  decisions, say so first. One comment on the issue: what the spec asks
+  for, what you'd do instead, what that costs. A delegate without `gh`
+  stops and puts the same three things in its report as an
+  `owner call:` question.
+- Then wait for my answer, read-only on the contested part, with the
+  issue on `state/needs-feedback`. Work the question doesn't touch
+  carries on; when there is none, stop. Building the spec as written and
+  saying nothing is the failure. Building your alternative without
+  asking is the scope violation above.
+- The bar is an alternative you can name and a cost you can state. A
+  taste for different names or style is not pushback; build the spec.
+- A simpler way that needs files outside what you own is a cost to
+  state, never a reason to stay quiet. File ownership is scheduling; I
+  can decide to wait for the files.
+- Mid-task: when a fix or a review round would more than double what
+  you built, or one comes back that did, stop and ask whether the
+  design is wrong before the fix goes any further.
+
+The two thresholds, double here and about 100 lines in my note at the
+top, are config: guesses from this one instance, where the script came
+back 4.5 times its first size.
+
+Quoted evidence, left as written.
+BAD (comic-reader #55, 2026-09-27, the orchestrator explaining the
+532-line scanner ten hours after it merged, in answer to my "500 lines
+of checking seems like using a shotgun to hammer a nail in..."):
+> Issue #55 specified a standalone scan script and ruled out touching
+> the query sites, because other lanes owned those files that wave. I
+> built to that spec, then made it worse by asking for parser-like
+> behaviour in the fix round.
+
+Quoted evidence, left as written.
+GOOD (earlier in that same message, so a merge too late; this is the
+comment #55 needed before the build):
+> Something like `issueQuery(client, bookId, issueId)` makes both
+> arguments required, so the compiler does enforce the rule. The guard
+> then shrinks to "nothing calls `.from("issues")` outside that file",
+> which is a one-line grep or a stock ESLint `no-restricted-syntax`
+> entry. [...] Some of those files are in #74's open PR (#139), so it
+> should go after that merges.
 
 ## The config-mutation gate
 
