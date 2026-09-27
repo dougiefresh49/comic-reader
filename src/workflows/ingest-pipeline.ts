@@ -17,10 +17,7 @@ import {
 } from "./steps/vision";
 import { sortPageElements, addBubbleStyles } from "./steps/sort";
 import { fetchWikiContextStep } from "./steps/wiki";
-import {
-  generateVoiceDescriptions,
-  cleanVoiceDescriptions,
-} from "./steps/voice";
+import { generateVoiceDescriptions } from "./steps/voice";
 import {
   getCharactersNeedingVoices,
   generateVoiceModel,
@@ -33,6 +30,11 @@ import {
   generateManifest,
 } from "./steps/publishing";
 import { createCastingTasks } from "./steps/casting-tasks";
+import {
+  countUnresolvedFaces,
+  countPendingNewCharacters,
+  recordGateSkip,
+} from "./steps/gate-checks";
 
 interface IngestInput {
   bookId: string;
@@ -49,8 +51,8 @@ const STEP_ORDER = [
   "get-context",
   "sort-page-elements",
   "review-pages",
-  "generate-voice-descriptions",
   "review-new-characters",
+  "generate-voice-descriptions",
   "casting",
   "generate-voice-models",
   "generate-audio",
@@ -93,7 +95,7 @@ export async function ingestPipeline(input: IngestInput) {
       const panelCount = await getPanelCount(bookId, issueId);
       if (panelCount === 0) {
         throw new FatalError(
-          "Roboflow produced 0 panels — API may be down or credentials invalid",
+          "Roboflow produced 0 panels. API may be down or credentials invalid",
         );
       }
     }
@@ -124,11 +126,29 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 2: Human Review — Character Clusters ────────────────────
     if (run("review-clusters")) {
       currentStep = "review-clusters";
-      await updatePipelineStep(bookId, issueId, currentStep, true);
-      using clusterHook = createHook<{ approved: boolean }>({
-        token: `ingest:${bookId}/${issueId}/cluster-review`,
-      });
-      await clusterHook;
+      const faces = await countUnresolvedFaces(bookId, issueId);
+      if (faces.total === 0) {
+        await updatePipelineStep(bookId, issueId, currentStep);
+        await recordGateSkip(
+          bookId,
+          issueId,
+          "review-clusters",
+          "no unresolved faces",
+          {
+            unresolvedDetections: faces.unresolvedDetections,
+            unresolvedExemplars: faces.unresolvedExemplars,
+          },
+        );
+        console.log(
+          `[review-clusters] skipped: 0 unresolved faces for ${bookId}/${issueId}`,
+        );
+      } else {
+        await updatePipelineStep(bookId, issueId, currentStep, true);
+        using clusterHook = createHook<{ approved: boolean }>({
+          token: `ingest:${bookId}/${issueId}/cluster-review`,
+        });
+        await clusterHook;
+      }
     }
 
     // ── Phase 3: OCR + Context ────────────────────────────────────────
@@ -159,29 +179,48 @@ export async function ingestPipeline(input: IngestInput) {
       await pageReviewHook;
     }
 
-    // ── Phase 5: Voice Processing ─────────────────────────────────────
+    // ── Phase 5: New characters, then voice descriptions ──────────────
+    if (run("review-new-characters")) {
+      currentStep = "review-new-characters";
+      const pendingCount = await countPendingNewCharacters(bookId, issueId);
+      if (pendingCount === 0) {
+        await updatePipelineStep(bookId, issueId, currentStep);
+        await recordGateSkip(
+          bookId,
+          issueId,
+          "review-new-characters",
+          "no pending new characters",
+          { pendingCount },
+        );
+        console.log(
+          `[review-new-characters] skipped: 0 pending for ${bookId}/${issueId}`,
+        );
+      } else {
+        await updatePipelineStep(bookId, issueId, currentStep, true);
+        using characterHook = createHook<{ approved: boolean }>({
+          token: `ingest:${bookId}/${issueId}/character-review`,
+        });
+        await characterHook;
+      }
+    }
+
     if (run("generate-voice-descriptions")) {
       currentStep = "generate-voice-descriptions";
       await updatePipelineStep(bookId, issueId, currentStep);
       await generateVoiceDescriptions(bookId, issueId);
-      await cleanVoiceDescriptions(bookId, issueId);
     }
 
-    // ── Phase 6: Human Review — Characters + Casting ──────────────────
-    if (run("review-new-characters")) {
-      currentStep = "review-new-characters";
-      await updatePipelineStep(bookId, issueId, currentStep, true);
-      using characterHook = createHook<{ approved: boolean }>({
-        token: `ingest:${bookId}/${issueId}/character-review`,
-      });
-      await characterHook;
-    }
-
+    // ── Phase 6: Casting ──────────────────────────────────────────────
     if (run("casting")) {
       currentStep = "casting";
       const casting = await createCastingTasks(bookId, issueId);
       if (casting.pending === 0) {
         await updatePipelineStep(bookId, issueId, currentStep);
+        await recordGateSkip(bookId, issueId, "casting", "all speakers cast", {
+          speakers: casting.speakers,
+          cast: casting.cast,
+          pending: casting.pending,
+        });
         console.log(`[casting] skipped: all ${casting.speakers} speakers cast`);
         if (casting.unresolved.length > 0) {
           console.log(`[casting] unresolved: ${casting.unresolved.join(", ")}`);
