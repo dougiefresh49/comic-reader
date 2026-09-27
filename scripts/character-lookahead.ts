@@ -31,6 +31,7 @@ import {
 } from "./utils/exemplar-store.js";
 import { loadRoster } from "./utils/roster.js";
 import { glob } from "glob";
+import { listBookIssues } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -79,19 +80,21 @@ async function getIssueDbIds(
   issueId: string;
   wikiAppearances: string | null;
 } | null> {
-  const { data: issueRow } = await supabase
-    .from("issues")
-    .select("id, book_id, wiki_appearances")
-    .eq("book_id", bookSlug)
-    .eq("slug", issueSlug)
+  const { data: issueRow } = await listBookIssues(
+    supabase,
+    bookSlug,
+    "id, book_id, wiki_appearances",
+  )
+    // `issues` has no slug column; the cast keeps the pre-#150 query as-is.
+    .eq("slug" as "id", issueSlug)
     .single();
 
   if (!issueRow) {
-    const { data: byBook } = await supabase
-      .from("issues")
-      .select("id, book_id, wiki_appearances")
-      .eq("book_id", bookSlug)
-      .limit(10);
+    const { data: byBook } = await listBookIssues(
+      supabase,
+      bookSlug,
+      "id, book_id, wiki_appearances",
+    ).limit(10);
 
     const match = byBook?.find((r) => {
       const num = issueSlug.replace("issue-", "");

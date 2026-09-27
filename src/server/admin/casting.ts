@@ -1,5 +1,8 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { selectIssue } from "~/lib/issue-queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/types/database";
 
 export interface CastingAppearance {
   id: string;
@@ -175,12 +178,12 @@ async function getWikiVoiceHints(
   const hints = new Map<string, string>();
   if (!bookId || !issueId) return hints;
 
-  const { data } = await supabaseAdmin
-    .from("issues")
-    .select("wiki_appearances")
-    .eq("book_id", bookId)
-    .eq("id", issueId)
-    .maybeSingle();
+  const { data } = await selectIssue(
+    supabaseAdmin as SupabaseClient<Database>,
+    bookId,
+    issueId,
+    "wiki_appearances",
+  ).maybeSingle();
 
   const appearances = (
     data as { wiki_appearances?: WikiAppearanceEntry[] | null }

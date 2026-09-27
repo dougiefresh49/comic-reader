@@ -8,6 +8,7 @@ import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
 import type { CharacterVoiceEntry } from "./generate-character-voice-descriptions.js";
 import { supabase } from "./lib/supabase.js";
 import { analyzeNewCharacterQueue } from "./utils/new-character-queue.js";
+import { updateIssue } from "~/lib/issue-queries.js";
 
 async function upsertAliasInDb(alias: string, canonical: string) {
   if (
@@ -108,16 +109,12 @@ async function runReviewNewCharactersDbMode(
   );
 
   if (pendingCount > 0) {
-    const { error } = await supabase
-      .from("issues")
-      .update({
-        pipeline_step: "review-new-characters",
-        pipeline_paused: true,
-        pipeline_paused_at: "review-new-characters",
-        pipeline_paused_url: adminUrl,
-      })
-      .eq("book_id", book)
-      .eq("id", issue);
+    const { error } = await updateIssue(supabase, book, issue, {
+      pipeline_step: "review-new-characters",
+      pipeline_paused: true,
+      pipeline_paused_at: "review-new-characters",
+      pipeline_paused_url: adminUrl,
+    });
 
     if (error) {
       console.warn(`  ⚠ issues pipeline pause update: ${error.message}`);
@@ -132,16 +129,11 @@ async function runReviewNewCharactersDbMode(
     process.exit(2);
   }
 
-  await supabase
-    .from("issues")
-    .update({
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    })
-    .eq("book_id", book)
-    .eq("id", issue)
-    .eq("pipeline_paused_at", "review-new-characters");
+  await updateIssue(supabase, book, issue, {
+    pipeline_paused: false,
+    pipeline_paused_at: null,
+    pipeline_paused_url: null,
+  }).eq("pipeline_paused_at", "review-new-characters");
 
   console.log(
     `\n✅ No new characters awaiting review — continuing pipeline.\n`,

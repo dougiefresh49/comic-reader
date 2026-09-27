@@ -6,6 +6,9 @@ import { resumeHook } from "workflow/api";
 import { HookNotFoundError } from "workflow/errors";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { updateIssue } from "~/lib/issue-queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/types/database";
 
 const SKIPPED_VOICE = "__SKIPPED__";
 
@@ -187,16 +190,16 @@ export async function completeCasting(
     };
   }
 
-  const { error: pauseErr } = await supabaseAdmin
-    .from("issues")
-    .update({
+  const { error: pauseErr } = await updateIssue(
+    supabaseAdmin as SupabaseClient<Database>,
+    args.bookId,
+    args.issueId,
+    {
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
-    })
-    .eq("book_id", args.bookId)
-    .eq("id", args.issueId)
-    .in("pipeline_paused_at", ["casting", "find-voice-sources"]);
+    },
+  ).in("pipeline_paused_at", ["casting", "find-voice-sources"]);
 
   if (pauseErr) {
     return { ok: false, error: pauseErr.message };

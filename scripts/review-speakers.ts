@@ -8,6 +8,7 @@ import { loadRegistry, hasReadyVoice } from "./utils/registry.js";
 import { loadRoster, getRosterAliasMap } from "./utils/roster.js";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import { supabase } from "./lib/supabase.js";
+import { updateIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -239,16 +240,12 @@ async function runDbMode(book: string, issue: string): Promise<void> {
   }
 
   if (pendingCount > 0) {
-    await supabase
-      .from("issues")
-      .update({
-        pipeline_step: "review-speakers",
-        pipeline_paused: true,
-        pipeline_paused_at: "review-speakers",
-        pipeline_paused_url: adminUrl,
-      })
-      .eq("book_id", book)
-      .eq("id", issue);
+    await updateIssue(supabase, book, issue, {
+      pipeline_step: "review-speakers",
+      pipeline_paused: true,
+      pipeline_paused_at: "review-speakers",
+      pipeline_paused_url: adminUrl,
+    });
 
     console.log(`\n${SEP}`);
     console.log("── Review speakers ──────────────────────────────────────");
@@ -259,16 +256,11 @@ async function runDbMode(book: string, issue: string): Promise<void> {
     process.exit(2);
   }
 
-  await supabase
-    .from("issues")
-    .update({
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    })
-    .eq("book_id", book)
-    .eq("id", issue)
-    .eq("pipeline_paused_at", "review-speakers");
+  await updateIssue(supabase, book, issue, {
+    pipeline_paused: false,
+    pipeline_paused_at: null,
+    pipeline_paused_url: null,
+  }).eq("pipeline_paused_at", "review-speakers");
 
   console.log(`\n✅ No speakers awaiting review — continuing pipeline.\n`);
 }

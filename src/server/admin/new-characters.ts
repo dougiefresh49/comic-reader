@@ -5,6 +5,9 @@ import {
   type NewCharacterReview,
   type NewCharacterQueueResult,
 } from "../../../scripts/utils/new-character-queue";
+import { selectIssue } from "~/lib/issue-queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/types/database";
 
 export type { NewCharacterReview, NewCharacterQueueResult };
 
@@ -35,12 +38,12 @@ export async function getIssueDisplayLabel(
   bookId: string,
   issueId: string,
 ): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("issues")
-    .select("name, number")
-    .eq("book_id", bookId)
-    .eq("id", issueId)
-    .maybeSingle();
+  const { data } = await selectIssue(
+    supabaseAdmin as SupabaseClient<Database>,
+    bookId,
+    issueId,
+    "name, number",
+  ).maybeSingle();
   const row = data as { name: string; number: number } | null;
   if (!row) return issueId;
   return row.name?.trim() ? row.name : `Issue ${row.number}`;

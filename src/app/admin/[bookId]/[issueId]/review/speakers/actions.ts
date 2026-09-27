@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { updateIssue } from "~/lib/issue-queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/types/database";
 
 interface ResolveArgs {
   bookId: string;
@@ -104,16 +107,16 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
   }
 
   // Clear the issue's pause flag if it was paused on review-speakers
-  await supabaseAdmin
-    .from("issues")
-    .update({
+  await updateIssue(
+    supabaseAdmin as SupabaseClient<Database>,
+    bookId,
+    issueId,
+    {
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
-    })
-    .eq("book_id", bookId)
-    .eq("id", issueId)
-    .eq("pipeline_paused_at", "review-speakers");
+    },
+  ).eq("pipeline_paused_at", "review-speakers");
 
   revalidatePath(`/book/${bookId}/${issueId}`, "page");
   revalidatePath(`/book/${bookId}/${issueId}/review`, "page");

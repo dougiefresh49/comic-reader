@@ -1,4 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { selectIssue, updateIssue } from "~/lib/issue-queries";
+import type { Json } from "~/types/database";
+import type { Database } from "~/types/database";
 
 export interface WikiSection {
   toclevel: number;
@@ -204,12 +207,12 @@ export async function fetchAndStoreWikiContext(
     return { summary: null, appearances: null };
   }
 
-  const { data: issue } = await supabase
-    .from("issues")
-    .select("number, wiki_summary")
-    .eq("book_id", bookId)
-    .eq("id", issueId)
-    .single();
+  const { data: issue } = await selectIssue(
+    supabase as SupabaseClient<Database>,
+    bookId,
+    issueId,
+    "number, wiki_summary",
+  ).single();
 
   if (!issue) {
     console.log(`[wiki] ${bookId}/${issueId}: issue not found — skip`);
@@ -218,7 +221,7 @@ export async function fetchAndStoreWikiContext(
 
   if (issue.wiki_summary) {
     console.log(`[wiki] ${bookId}/${issueId}: already has wiki data — skip`);
-    return { summary: issue.wiki_summary as string, appearances: null };
+    return { summary: issue.wiki_summary, appearances: null };
   }
 
   const pageTitle = (book.wiki_title_template as string).replace(
@@ -232,14 +235,15 @@ export async function fetchAndStoreWikiContext(
     return context;
   }
 
-  const { error } = await supabase
-    .from("issues")
-    .update({
+  const { error } = await updateIssue(
+    supabase as SupabaseClient<Database>,
+    bookId,
+    issueId,
+    {
       wiki_summary: context.summary,
-      wiki_appearances: context.appearances,
-    })
-    .eq("id", issueId)
-    .eq("book_id", bookId);
+      wiki_appearances: context.appearances as Json,
+    },
+  );
 
   if (error) {
     console.warn(

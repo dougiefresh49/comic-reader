@@ -11,6 +11,7 @@ import path from "path";
 import pLimit from "p-limit";
 import { fileURLToPath } from "url";
 import { supabase } from "./lib/supabase.js";
+import { upsertIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,17 +80,14 @@ async function main() {
   if (bErr && !bErr.message.includes("duplicate")) {
     console.warn(`books upsert: ${bErr.message}`);
   }
-  const { error: iErr } = await supabase.from("issues").upsert(
-    {
-      id: issueId,
-      book_id: book,
-      number: parseInt(issue, 10),
-      name: `Issue ${issue}`,
-      status: "pending",
-      source_pages_path: sourcePath,
-    },
-    { onConflict: "book_id,id" },
-  );
+  const { error: iErr } = await upsertIssue(supabase, {
+    id: issueId,
+    book_id: book,
+    number: parseInt(issue, 10),
+    name: `Issue ${issue}`,
+    status: "pending",
+    source_pages_path: sourcePath,
+  });
   if (iErr) {
     console.error(`issues upsert: ${iErr.message}`);
     process.exit(1);

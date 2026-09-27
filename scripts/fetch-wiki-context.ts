@@ -12,6 +12,8 @@
 
 import { supabase } from "./lib/supabase.js";
 import { fetchWikiContext } from "~/lib/wiki-fetch.js";
+import { listBookIssues, updateIssue } from "~/lib/issue-queries.js";
+import type { Json } from "~/types/database.js";
 
 interface Args {
   book: string;
@@ -99,11 +101,11 @@ async function main() {
   console.log(`📚 ${book.name}`);
   console.log(`   Wiki: ${book.wiki_host} / ${book.wiki_title_template}\n`);
 
-  let query = supabase
-    .from("issues")
-    .select("id, book_id, number, name, wiki_summary")
-    .eq("book_id", args.book)
-    .order("number");
+  let query = listBookIssues(
+    supabase,
+    args.book,
+    "id, book_id, number, name, wiki_summary",
+  ).order("number");
 
   if (!args.all && args.issue !== undefined) {
     query = query.eq("number", args.issue);
@@ -141,14 +143,15 @@ async function main() {
       continue;
     }
 
-    const { error: updateErr } = await supabase
-      .from("issues")
-      .update({
+    const { error: updateErr } = await updateIssue(
+      supabase,
+      issue.book_id,
+      issue.id,
+      {
         wiki_summary: summary,
-        wiki_appearances: appearances,
-      })
-      .eq("id", issue.id)
-      .eq("book_id", issue.book_id);
+        wiki_appearances: appearances as Json,
+      },
+    );
 
     if (updateErr) {
       console.error(`  ❌ DB update failed: ${updateErr.message}`);

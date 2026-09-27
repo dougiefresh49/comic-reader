@@ -4,6 +4,9 @@ import { z } from "zod";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { GEMINI_MEDIUM } from "~/lib/models";
+import { updateIssue } from "~/lib/issue-queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/types/database";
 
 const RAW_BUCKET = "comic-pages-raw";
 
@@ -241,16 +244,17 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const { error: issueErr } = await supabaseAdmin
-          .from("issues")
-          .update({
+        const { error: issueErr } = await updateIssue(
+          supabaseAdmin as SupabaseClient<Database>,
+          body.bookId,
+          body.issueId,
+          {
             page_count: uploaded,
             has_webp: uploaded > 0,
             pipeline_step: "pages-downloaded",
             source_pages_path: `${body.bookId}/${body.issueId}/source/`,
-          })
-          .eq("book_id", body.bookId)
-          .eq("id", body.issueId);
+          },
+        );
 
         if (issueErr) {
           send({

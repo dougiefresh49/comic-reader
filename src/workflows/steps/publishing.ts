@@ -1,3 +1,4 @@
+import { updateIssue } from "~/lib/issue-queries";
 export async function uploadAudio(bookId: string, issueId: string) {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
@@ -13,11 +14,10 @@ export async function uploadAudio(bookId: string, issueId: string) {
   if (error) throw new Error(error.message);
 
   const n = audioCount ?? 0;
-  const { error: upErr } = await supabase
-    .from("issues")
-    .update({ has_audio: n > 0, audio_count: n })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
+  const { error: upErr } = await updateIssue(supabase, bookId, issueId, {
+    has_audio: n > 0,
+    audio_count: n,
+  });
 
   if (upErr) throw new Error(upErr.message);
 
@@ -156,17 +156,13 @@ export async function generateManifest(bookId: string, issueId: string) {
   const audioCount = audioRes.count ?? 0;
   const timestampCount = tsRes.count ?? 0;
 
-  const { error: upErr } = await supabase
-    .from("issues")
-    .update({
-      page_count: pageCount,
-      bubble_count: bubbleCount,
-      audio_count: audioCount,
-      has_audio: audioCount > 0,
-      has_timestamps: timestampCount > 0,
-    })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
+  const { error: upErr } = await updateIssue(supabase, bookId, issueId, {
+    page_count: pageCount,
+    bubble_count: bubbleCount,
+    audio_count: audioCount,
+    has_audio: audioCount > 0,
+    has_timestamps: timestampCount > 0,
+  });
 
   if (upErr) throw new Error(upErr.message);
 
