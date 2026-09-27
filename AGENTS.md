@@ -370,7 +370,7 @@ No test suite. The gate for a code change is `pnpm format:write`, then `pnpm typ
   contract, this slot owns the addresses. Delete the bullet if nothing in
   this repo runs as a live service.)
   - log source: Vercel runtime logs for the deployment id (Vercel MCP), plus the Workflow run logs for an ingest run. Trouble looks like a 5xx on a `/book/...` route, or `issues.pipeline_step` reading `failed:<step>`.
-  - health endpoints: none. The user-path request is `GET https://[FILL-IN: prod domain]/book/<bookId>/issue-1/1`, expecting a 200 that renders the reader.
+  - health endpoints: none. The user-path request is `GET https://comic-reader-eta.vercel.app/book/tmnt-mmpr-iii/issue-1/1`, expecting a 200 that renders the reader. `/admin` on that domain answers 401 without credentials.
   - deploy platform: Vercel project `comic-reader`. The live build is the latest READY production deployment, and the READY one before it is the rollback target. Promote and rollback are mine only.
 
 ## Things that bit here (config unless cited)
