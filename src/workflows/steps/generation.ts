@@ -2,11 +2,12 @@ import { FatalError } from "workflow";
 import type { Json } from "~/types/database";
 import {
   buildAliasMap,
-  buildCastVoiceMap,
+  buildCastIndex,
   bubbleNeedsAudio,
+  formatCastConflicts,
   normalizeAlignment,
+  planBubblesToSend,
   planCharactersNeedingVoices,
-  speakerKey,
   type AlignmentRaw,
   type AppearanceRow,
   voiceDesignAppearanceId,
@@ -54,7 +55,7 @@ export async function getCharactersNeedingVoices(
   if (appErr) throw new FatalError(appErr.message);
 
   const aliasMap = buildAliasMap(aliasRows ?? []);
-  const castVoiceMap = buildCastVoiceMap(castRows ?? []);
+  const cast = buildCastIndex(castRows ?? []);
   const appearances = (appearanceRows ?? []) as AppearanceRow[];
   const rawSpeakers = (bubbleRows ?? [])
     .map((b) => b.speaker)
@@ -63,7 +64,7 @@ export async function getCharactersNeedingVoices(
   const plan = planCharactersNeedingVoices(
     rawSpeakers,
     aliasMap,
-    castVoiceMap,
+    cast,
     appearances,
   );
 
@@ -292,39 +293,26 @@ export async function generateAudioBatch(
   if (aliasErr) throw new FatalError(aliasErr.message);
 
   const aliasMap = buildAliasMap(aliasRows ?? []);
-  const castMap = buildCastVoiceMap(castRows ?? []);
+  const cast = buildCastIndex(castRows ?? []);
 
-  const { getVoiceSettingsFromEmotion, SKIPPED_VOICE } = await import(
-    "~/lib/voice-settings"
-  );
+  if (cast.conflicts.length > 0) {
+    throw new FatalError(
+      `castlist slug conflicts before audio: ${formatCastConflicts(cast.conflicts)}`,
+    );
+  }
+
+  const { getVoiceSettingsFromEmotion } = await import("~/lib/voice-settings");
+
+  const sendPlan = planBubblesToSend(bubbles, aliasMap, cast);
+  for (const { bubble, reason } of sendPlan.skipped) {
+    console.log(`[audio] skip ${bubble.id}: ${reason}`);
+  }
 
   let generated = 0;
-  const unmatchedSpeakers: string[] = [];
 
-  for (const bubble of bubbles) {
-    if (bubble.audio_storage_path) continue;
-    if (bubble.ignored) continue;
-
+  for (const { bubble, voiceId } of sendPlan.toSend) {
     const ttsText = bubble.text_with_cues ?? bubble.ocr_text;
     if (!ttsText?.trim()) continue;
-
-    const rawSpeaker = bubble.speaker?.trim() ?? "";
-    if (!rawSpeaker) {
-      unmatchedSpeakers.push("(null)");
-      console.log(`[audio] skip ${bubble.id}: no speaker`);
-      continue;
-    }
-
-    const key = speakerKey(rawSpeaker, aliasMap);
-    const voiceId = castMap.get(key);
-    if (!voiceId) {
-      unmatchedSpeakers.push(rawSpeaker);
-      console.log(
-        `[audio] skip ${bubble.id}: unmatched speaker "${rawSpeaker}" (key=${key})`,
-      );
-      continue;
-    }
-    if (voiceId === SKIPPED_VOICE) continue;
 
     const settings = getVoiceSettingsFromEmotion(bubble.emotion ?? "neutral");
 
@@ -390,12 +378,6 @@ export async function generateAudioBatch(
     }
 
     generated++;
-  }
-
-  if (unmatchedSpeakers.length > 0) {
-    console.log(
-      `[audio] unmatched speakers (skipped): ${[...new Set(unmatchedSpeakers)].join(", ")}`,
-    );
   }
 
   console.log(

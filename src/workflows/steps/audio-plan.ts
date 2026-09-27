@@ -4,6 +4,8 @@
  * Copied slug/alias rules live here so scripts do not import "use step" modules.
  */
 
+import { SKIPPED_VOICE } from "~/lib/voice-settings";
+
 export interface AliasRow {
   alias: string;
   canonical: string;
@@ -30,6 +32,7 @@ export interface BubbleAudioRow {
   audio_storage_path: string | null;
   text_with_cues: string | null;
   ocr_text: string | null;
+  emotion?: string | null;
 }
 
 export interface AlignmentRaw {
@@ -44,6 +47,43 @@ export interface NormalizedAlignment {
   characters: string[];
   character_start_times_seconds: number[];
   character_end_times_seconds: number[];
+}
+
+export interface CastConflict {
+  slug: string;
+  rows: CastRow[];
+}
+
+/**
+ * Castlist membership and usable voices, grouped by slug(character).
+ * A null voice_id still counts as membership. The skip sentinel is a
+ * voice_id value for conflict comparison.
+ */
+export interface CastIndex {
+  /** Slugs with any castlist row for the issue. */
+  members: Set<string>;
+  /** Usable voice_id per slug (non-null, conflict-free groups only). */
+  voices: Map<string, string>;
+  conflicts: CastConflict[];
+}
+
+export type BubbleSkipReason =
+  | "ignored"
+  | "has audio"
+  | "no text"
+  | "no speaker"
+  | "unmatched speaker"
+  | "cast without a voice"
+  | "skip sentinel";
+
+export interface SkippedBubble {
+  bubble: BubbleAudioRow;
+  reason: BubbleSkipReason;
+}
+
+export interface BubbleSendPlan {
+  toSend: { bubble: BubbleAudioRow; voiceId: string }[];
+  skipped: SkippedBubble[];
 }
 
 /** Copied from scripts/utils/registry.ts slugify. Do not import that module. */
@@ -77,15 +117,47 @@ export function speakerKey(raw: string, aliasMap: Map<string, string>): string {
   return slugify(resolveAlias(raw, aliasMap));
 }
 
-/** Castlist keyed by slug(character). First non-empty voice_id wins. */
-export function buildCastVoiceMap(rows: CastRow[]): Map<string, string> {
-  const map = new Map<string, string>();
+/**
+ * Group castlist rows by slug. Membership is separate from usable voices.
+ * Rows in a slug group with different voice_id values (null and the skip
+ * sentinel included) are conflicts.
+ */
+export function buildCastIndex(rows: CastRow[]): CastIndex {
+  const bySlug = new Map<string, CastRow[]>();
   for (const r of rows) {
     const key = slugify(r.character);
-    if (!key || map.has(key)) continue;
-    if (r.voice_id) map.set(key, r.voice_id);
+    if (!key) continue;
+    const list = bySlug.get(key) ?? [];
+    list.push(r);
+    bySlug.set(key, list);
   }
-  return map;
+
+  const members = new Set<string>();
+  const voices = new Map<string, string>();
+  const conflicts: CastConflict[] = [];
+
+  for (const [slug, group] of bySlug) {
+    members.add(slug);
+    const distinctVoiceIds = new Set(group.map((r) => r.voice_id));
+    if (distinctVoiceIds.size > 1) {
+      conflicts.push({ slug, rows: group });
+      continue;
+    }
+    const voiceId = group[0]!.voice_id;
+    if (voiceId != null) voices.set(slug, voiceId);
+  }
+
+  return { members, voices, conflicts };
+}
+
+/** Format castlist conflicts for logs and FatalError messages. */
+export function formatCastConflicts(conflicts: CastConflict[]): string {
+  return conflicts
+    .map((c) => {
+      const parts = c.rows.map((r) => `${r.character}=${r.voice_id ?? "null"}`);
+      return `${c.slug}: ${parts.join(", ")}`;
+    })
+    .join("; ");
 }
 
 export function isNarratorKey(key: string): boolean {
@@ -149,6 +221,61 @@ export function selectBubblesNeedingAudio(
   return bubbles.filter(bubbleNeedsAudio);
 }
 
+/**
+ * Bubbles the audio step would send, plus skips with reasons.
+ * Castlist conflicts are checked separately before any ElevenLabs call.
+ */
+export function planBubblesToSend(
+  bubbles: BubbleAudioRow[],
+  aliasMap: Map<string, string>,
+  cast: CastIndex,
+): BubbleSendPlan {
+  const toSend: { bubble: BubbleAudioRow; voiceId: string }[] = [];
+  const skipped: SkippedBubble[] = [];
+
+  for (const bubble of bubbles) {
+    if (bubble.ignored) {
+      skipped.push({ bubble, reason: "ignored" });
+      continue;
+    }
+    if (bubble.audio_storage_path) {
+      skipped.push({ bubble, reason: "has audio" });
+      continue;
+    }
+    const text = bubble.text_with_cues ?? bubble.ocr_text;
+    if (!text?.trim()) {
+      skipped.push({ bubble, reason: "no text" });
+      continue;
+    }
+
+    const rawSpeaker = bubble.speaker?.trim() ?? "";
+    if (!rawSpeaker) {
+      skipped.push({ bubble, reason: "no speaker" });
+      continue;
+    }
+
+    const key = speakerKey(rawSpeaker, aliasMap);
+    if (!cast.members.has(key)) {
+      skipped.push({ bubble, reason: "unmatched speaker" });
+      continue;
+    }
+
+    const voiceId = cast.voices.get(key);
+    if (voiceId == null) {
+      skipped.push({ bubble, reason: "cast without a voice" });
+      continue;
+    }
+    if (voiceId === SKIPPED_VOICE) {
+      skipped.push({ bubble, reason: "skip sentinel" });
+      continue;
+    }
+
+    toSend.push({ bubble, voiceId });
+  }
+
+  return { toSend, skipped };
+}
+
 export function normalizeAlignment(
   raw: AlignmentRaw | null | undefined,
 ): NormalizedAlignment | null {
@@ -164,18 +291,22 @@ export function normalizeAlignment(
 
 export interface SpeakerMatchPlan {
   distinctSpeakers: string[];
+  /** Speakers whose slug has a usable castlist voice_id (including skip sentinel). */
   matched: string[];
+  /** Speakers with no castlist row at all. */
   unmatched: string[];
+  /** Speakers with a castlist row but null voice_id. */
+  castWithoutVoice: string[];
 }
 
 /**
- * Distinct raw speaker strings. A raw string is matched when
- * slug(alias-resolved name) has a castlist voice.
+ * Distinct raw speaker strings. Matched = castlist voice present.
+ * Cast membership without a voice is neither matched nor unmatched.
  */
 export function planSpeakerMatching(
   rawSpeakers: string[],
   aliasMap: Map<string, string>,
-  castVoiceMap: Map<string, string>,
+  cast: CastIndex,
 ): SpeakerMatchPlan {
   const distinct = new Set<string>();
   for (const raw of rawSpeakers) {
@@ -186,12 +317,14 @@ export function planSpeakerMatching(
   const distinctSpeakers = [...distinct].sort();
   const matched: string[] = [];
   const unmatched: string[] = [];
+  const castWithoutVoice: string[] = [];
   for (const raw of distinctSpeakers) {
     const key = speakerKey(raw, aliasMap);
-    if (castVoiceMap.has(key)) matched.push(raw);
+    if (cast.voices.has(key)) matched.push(raw);
+    else if (cast.members.has(key)) castWithoutVoice.push(raw);
     else unmatched.push(raw);
   }
-  return { distinctSpeakers, matched, unmatched };
+  return { distinctSpeakers, matched, unmatched, castWithoutVoice };
 }
 
 export interface CharactersNeedingVoicesPlan {
@@ -203,12 +336,13 @@ export interface CharactersNeedingVoicesPlan {
 
 /**
  * Issue speakers with no castlist row, narrator excluded.
+ * Any castlist membership (including null voice_id) blocks reuse and Voice Design.
  * Ready appearance voices become reuse upserts; the rest need a voice-design description.
  */
 export function planCharactersNeedingVoices(
   rawSpeakers: string[],
   aliasMap: Map<string, string>,
-  castVoiceMap: Map<string, string>,
+  cast: CastIndex,
   appearances: AppearanceRow[],
 ): CharactersNeedingVoicesPlan {
   const keys = new Set<string>();
@@ -223,7 +357,7 @@ export function planCharactersNeedingVoices(
 
   for (const key of [...keys].sort()) {
     if (isNarratorKey(key)) continue;
-    if (castVoiceMap.has(key)) continue;
+    if (cast.members.has(key)) continue;
 
     const readyVoice = pickReadyAppearanceVoice(appearances, key);
     if (readyVoice) {
