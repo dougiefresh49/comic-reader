@@ -1,6 +1,6 @@
 # Feature: Review UI — Phase B (Live Regeneration)
 
-## Status: `blocked`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: Storage migration (S3 / Supabase / Blob) must be completed first
 ## Blocked by: Asset hosting decision — see Known Issues in CLAUDE.md
 

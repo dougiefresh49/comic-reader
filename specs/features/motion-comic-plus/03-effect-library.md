@@ -1,6 +1,6 @@
 # Effect Library
 
-## Status: `pending`
+## Status: tracked in [features.md](../features.md)
 ## Goal: A small reusable library of CSS / canvas / SVG motion effects keyed to Gemini-tagged effect categories
 ## Cost: $0 — pure web tech, all libraries MIT-licensed
 

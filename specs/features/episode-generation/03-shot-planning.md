@@ -1,6 +1,6 @@
 # Phase 2 — Shot Planning
 
-## Status: `done` (implementation lives in `scripts/utils/shot-planner.ts` + `plan-shots` step in `scripts/generate-episode.ts`)
+## Status: tracked in [features.md](../features.md) (implementation lives in `scripts/utils/shot-planner.ts` + `plan-shots` step in `scripts/generate-episode.ts`)
 ## Prerequisites: Phase 1 complete (series.json exists)
 ## Cost: ~$0.05–0.10/issue (Gemini MEDIUM Vision per page; ~24 calls/issue)
 

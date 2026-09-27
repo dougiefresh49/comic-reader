@@ -1,7 +1,159 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
+import { pageImageUrl, pageStoragePath } from "~/lib/storage";
+import type { Database, Json } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
 import { rdpSimplify } from "./shared";
+import {
+  bubbleHasContext,
+  buildContextUpdate,
+  mapBubbleRows,
+  mapPanelRows,
+  mapSegmentationRow,
+  parseRoboflowSam3Output,
+  type ContextParsed,
+  type RoboflowBoxPrediction,
+  type RoboflowSam3Output,
+} from "./vision-rows";
+
+type TypedClient = SupabaseClient<Database>;
+
+export {
+  bubbleHasContext,
+  buildContextUpdate,
+  mapBubbleRows,
+  mapPanelRows,
+  mapSegmentationRow,
+  parseRoboflowSam3Output,
+} from "./vision-rows";
+
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function fuzzyNameMatch(a: string, b: string): boolean {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const wordsA = na.split(" ");
+  const wordsB = nb.split(" ");
+  if (wordsA.length >= 2 && wordsB.length >= 2) {
+    if (
+      wordsA[0] === wordsB[0] &&
+      wordsA[wordsA.length - 1] === wordsB[wordsB.length - 1]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function buildKnownCharacterListOrFatal(
+  supabase: TypedClient,
+  bookId: string,
+  pageLabel: string,
+): Promise<string[]> {
+  const { data: book, error: bookErr } = await supabase
+    .from("books")
+    .select("franchises")
+    .eq("id", bookId)
+    .single();
+  if (bookErr) {
+    throw new FatalError(
+      `books read failed for ${pageLabel}: ${bookErr.message}`,
+    );
+  }
+
+  const franchises = book?.franchises ?? [];
+  let chars: Array<{ id: string; aliases: string[] | null }>;
+  if (franchises.length > 0) {
+    const franchiseFilter = franchises
+      .map((f) => `franchise.eq.${f}`)
+      .join(",");
+    const { data, error } = await supabase
+      .from("characters")
+      .select("id, aliases")
+      .or(`${franchiseFilter},franchise.is.null`);
+    if (error) {
+      throw new FatalError(
+        `characters read failed for ${pageLabel}: ${error.message}`,
+      );
+    }
+    chars = data ?? [];
+  } else {
+    const { data, error } = await supabase
+      .from("characters")
+      .select("id, aliases");
+    if (error) {
+      throw new FatalError(
+        `characters read failed for ${pageLabel}: ${error.message}`,
+      );
+    }
+    chars = data ?? [];
+  }
+
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const c of chars) {
+    const readable = c.id.replace(/-/g, " ");
+    if (!seen.has(readable.toLowerCase())) {
+      names.push(readable);
+      seen.add(readable.toLowerCase());
+    }
+    if (c.aliases) {
+      for (const a of c.aliases) {
+        if (!seen.has(a.toLowerCase())) {
+          names.push(a);
+          seen.add(a.toLowerCase());
+        }
+      }
+    }
+  }
+  return names;
+}
+
+async function resolveCharacterIdOrFatal(
+  supabase: TypedClient,
+  name: string,
+  pageLabel: string,
+): Promise<string | null> {
+  const directId = name.toLowerCase().replace(/\s+/g, "-");
+  const { data: direct, error: directErr } = await supabase
+    .from("characters")
+    .select("id")
+    .eq("id", directId)
+    .maybeSingle();
+  if (directErr) {
+    throw new FatalError(
+      `characters read failed for ${pageLabel}: ${directErr.message}`,
+    );
+  }
+  if (direct) return directId;
+
+  const { data: allChars, error: allErr } = await supabase
+    .from("characters")
+    .select("id, aliases")
+    .limit(200);
+  if (allErr) {
+    throw new FatalError(
+      `characters read failed for ${pageLabel}: ${allErr.message}`,
+    );
+  }
+
+  if (allChars) {
+    for (const row of allChars) {
+      const id = row.id;
+      const aliases = row.aliases ?? [];
+      if (fuzzyNameMatch(name, id)) return id;
+      if (aliases.some((a) => fuzzyNameMatch(name, a))) return id;
+    }
+  }
+
+  return null;
+}
 
 export async function roboflowAnalyzeBatch(
   bookId: string,
@@ -9,168 +161,205 @@ export async function roboflowAnalyzeBatch(
   pages: PageMeta[],
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
-  const workflowUrl = process.env.ROBOFLOW_SAM3_WORKFLOW_URL;
+  const { env } = await import("~/env.mjs");
+  const workflowUrl = env.ROBOFLOW_SAM3_WORKFLOW_URL;
   const apiKey = process.env.ROBOFLOW_API_KEY;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!workflowUrl || !apiKey || !supabaseUrl) {
-    throw new Error(
-      "ROBOFLOW_SAM3_WORKFLOW_URL, ROBOFLOW_API_KEY, and NEXT_PUBLIC_SUPABASE_URL required",
-    );
+  if (!apiKey) {
+    throw new FatalError("ROBOFLOW_API_KEY required");
   }
 
-  let failedPages = 0;
+  const failedPageLabels: string[] = [];
 
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
-    const imageUrl = `${supabaseUrl}/storage/v1/object/public/comic-pages/${bookId}/${issueId}/page-${padded}.webp`;
+    const pageLabel = `page-${padded}`;
 
-    const res = await fetch(workflowUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: apiKey,
-        inputs: { image: { type: "url", value: imageUrl } },
-      }),
-    });
+    const { count: panelCount, error: panelCountErr } = await supabase
+      .from("panels")
+      .select("*", { count: "exact", head: true })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("page_number", page.pageNumber);
+    if (panelCountErr) {
+      throw new FatalError(
+        `panels count failed for ${pageLabel}: ${panelCountErr.message}`,
+      );
+    }
+
+    const { count: segCount, error: segCountErr } = await supabase
+      .from("page_segmentation")
+      .select("*", { count: "exact", head: true })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("page_number", page.pageNumber);
+    if (segCountErr) {
+      throw new FatalError(
+        `page_segmentation count failed for ${pageLabel}: ${segCountErr.message}`,
+      );
+    }
+
+    const { count: bubbleCount, error: bubbleCountErr } = await supabase
+      .from("bubbles")
+      .select("*", { count: "exact", head: true })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("page_number", page.pageNumber);
+    if (bubbleCountErr) {
+      throw new FatalError(
+        `bubbles count failed for ${pageLabel}: ${bubbleCountErr.message}`,
+      );
+    }
+
+    const existingPanels = panelCount ?? 0;
+    const existingSeg = segCount ?? 0;
+    const existingBubbles = bubbleCount ?? 0;
+
+    if (existingPanels > 0 && existingSeg > 0) {
+      console.log(
+        `[roboflow] ${pageLabel}: panels and page_segmentation already present, skip Roboflow call`,
+      );
+      continue;
+    }
+
+    const imageUrl = pageImageUrl(bookId, issueId, page.pageNumber);
+
+    let res: Response;
+    try {
+      res = await fetch(workflowUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: apiKey,
+          inputs: { image: { type: "url", value: imageUrl } },
+        }),
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[roboflow] ${pageLabel}: fetch failed: ${msg.slice(0, 160)}`,
+      );
+      failedPageLabels.push(pageLabel);
+      continue;
+    }
 
     if (!res.ok) {
       const text = await res.text();
       console.warn(
-        `[roboflow] page-${padded}: SAM3 workflow ${res.status}: ${text.slice(0, 160)}`,
+        `[roboflow] ${pageLabel}: SAM3 workflow ${res.status}: ${text.slice(0, 160)}`,
       );
-      failedPages++;
+      failedPageLabels.push(pageLabel);
       continue;
     }
 
-    const data = (await res.json()) as {
-      outputs?: Array<{
-        panel_predictions?: {
-          image: { width: number; height: number };
-          predictions: Array<{
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-            confidence: number;
-            class: string;
-            detection_id: string;
-          }>;
-        };
-        bubble_predictions?: {
-          predictions: Array<{
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-            confidence: number;
-            class: string;
-            detection_id: string;
-          }>;
-        };
-        segmentation_predictions?: {
-          predictions: Array<{
-            class: string;
-            confidence: number;
-            detection_id: string;
-            parent_id: string;
-            points: Array<{ x: number; y: number }>;
-          }>;
-        };
-      }>;
-    };
-
-    const out = data.outputs?.[0];
-    if (!out?.panel_predictions) {
-      console.warn(`[roboflow] page-${padded}: no panel predictions returned`);
+    let data: { outputs?: unknown[] };
+    try {
+      data = (await res.json()) as { outputs?: unknown[] };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[roboflow] ${pageLabel}: non-JSON response: ${msg.slice(0, 160)}`,
+      );
+      failedPageLabels.push(pageLabel);
       continue;
     }
 
-    const imgDims = out.panel_predictions.image;
+    const parsed = parseRoboflowSam3Output(
+      data.outputs?.[0] as RoboflowSam3Output | undefined,
+    );
+    if (!parsed) {
+      console.warn(
+        `[roboflow] ${pageLabel}: missing or malformed predictions in response`,
+      );
+      failedPageLabels.push(pageLabel);
+      continue;
+    }
 
-    const panelRows = out.panel_predictions.predictions.map((p, idx) => ({
-      book_id: bookId,
-      issue_id: issueId,
-      page_number: page.pageNumber,
-      panel_id: `p${padded}-${idx + 1}`,
-      sort_order: idx,
-      bounding_box: {
-        x: (p.x - p.width / 2) / imgDims.width,
-        y: (p.y - p.height / 2) / imgDims.height,
-        w: p.width / imgDims.width,
-        h: p.height / imgDims.height,
-      },
-      confidence: p.confidence,
-    }));
+    const {
+      panelPredictions,
+      image: imgDims,
+      bubblePredictions,
+      segmentationPredictions: segPreds,
+    } = parsed;
+    const panelRows = mapPanelRows(
+      bookId,
+      issueId,
+      page.pageNumber,
+      panelPredictions,
+      imgDims,
+    );
+    const bubbleRows = mapBubbleRows(
+      bookId,
+      issueId,
+      page.pageNumber,
+      bubblePredictions,
+    );
 
-    if (panelRows.length > 0) {
+    if (existingPanels > 0) {
+      console.log(
+        `[roboflow] ${pageLabel}: ${existingPanels} panels already present, skip panels write`,
+      );
+    } else if (panelRows.length > 0) {
       const { error: pErr } = await supabase.from("panels").upsert(panelRows, {
-        onConflict: "book_id,issue_id,page_number,panel_id",
+        onConflict: "book_id,issue_id,panel_id",
+        ignoreDuplicates: true,
       });
-      if (pErr)
-        console.warn(
-          `[roboflow] page-${padded} panels upsert: ${pErr.message}`,
+      if (pErr) {
+        throw new FatalError(
+          `panels upsert failed for ${pageLabel}: ${pErr.message}`,
         );
+      }
     }
 
-    const bubblePreds = out.bubble_predictions?.predictions ?? [];
-    const bubbleRows = bubblePreds.map((b, idx) => ({
-      book_id: bookId,
-      issue_id: issueId,
-      page_number: page.pageNumber,
-      legacy_id: `page-${padded}_b${String(idx + 1).padStart(2, "0")}`,
-      box_2d: {
-        x: Math.round(b.x - b.width / 2),
-        y: Math.round(b.y - b.height / 2),
-        width: Math.round(b.width),
-        height: Math.round(b.height),
-      },
-      confidence: b.confidence,
-    }));
-
-    if (bubbleRows.length > 0) {
+    if (existingBubbles > 0) {
+      console.log(
+        `[roboflow] ${pageLabel}: ${existingBubbles} bubbles already present, skip bubbles write`,
+      );
+    } else if (bubbleRows.length > 0) {
       const { error: bErr } = await supabase
         .from("bubbles")
         .upsert(bubbleRows, {
-          onConflict: "book_id,issue_id,page_number,legacy_id",
+          onConflict: "book_id,issue_id,legacy_id",
+          ignoreDuplicates: true,
         });
-      if (bErr)
-        console.warn(
-          `[roboflow] page-${padded} bubbles upsert: ${bErr.message}`,
+      if (bErr) {
+        throw new FatalError(
+          `bubbles upsert failed for ${pageLabel}: ${bErr.message}`,
         );
+      }
     }
 
-    const segPreds = out.segmentation_predictions?.predictions ?? [];
-    if (segPreds.length > 0) {
-      const { error: sErr } = await supabase.from("page_segmentation").upsert(
-        {
-          book_id: bookId,
-          issue_id: issueId,
-          page_number: page.pageNumber,
-          image_width: imgDims.width,
-          image_height: imgDims.height,
-          predictions: segPreds,
-        },
-        { onConflict: "book_id,issue_id,page_number" },
+    const segRow = mapSegmentationRow(
+      bookId,
+      issueId,
+      page.pageNumber,
+      imgDims,
+      segPreds,
+    );
+    const { error: sErr } = await supabase
+      .from("page_segmentation")
+      .upsert(segRow, {
+        onConflict: "book_id,issue_id,page_number",
+        ignoreDuplicates: true,
+      });
+    if (sErr) {
+      throw new FatalError(
+        `page_segmentation upsert failed for ${pageLabel}: ${sErr.message}`,
       );
-      if (sErr)
-        console.warn(
-          `[roboflow] page-${padded} segmentation upsert: ${sErr.message}`,
-        );
     }
 
     console.log(
-      `[roboflow] ${bookId}/${issueId}: page-${padded} → ${panelRows.length} panels, ${bubbleRows.length} bubbles, ${segPreds.length} segments`,
+      `[roboflow] ${bookId}/${issueId}: ${pageLabel} → ${panelRows.length} panels, ${bubbleRows.length} bubbles, ${segPreds.length} segments`,
     );
 
     await new Promise((r) => setTimeout(r, 750));
   }
 
-  if (failedPages === pages.length) {
-    throw new Error(
-      `[roboflow] All ${pages.length} pages in batch failed — Roboflow API may be down or misconfigured`,
+  if (failedPageLabels.length > 0) {
+    throw new FatalError(
+      `[roboflow] page response failed or malformed: ${failedPageLabels.join(", ")}`,
     );
   }
 }
@@ -181,8 +370,8 @@ export async function extractForegroundMasksBatch(
   pages: PageMeta[],
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
   const CHARACTER_CLASSES = new Set([
     "comic character",
@@ -208,21 +397,28 @@ export async function extractForegroundMasksBatch(
 
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
+    const pageLabel = `page-${padded}`;
 
-    const { data: segRow } = await supabase
+    const { data: segRow, error: segErr } = await supabase
       .from("page_segmentation")
       .select("image_width, image_height, predictions")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("page_number", page.pageNumber)
-      .single();
+      .maybeSingle();
+
+    if (segErr) {
+      throw new FatalError(
+        `page_segmentation read failed for ${pageLabel}: ${segErr.message}`,
+      );
+    }
 
     if (!segRow) {
-      console.log(`[masks] page-${padded}: no segmentation data — skip`);
+      console.log(`[masks] ${pageLabel}: no segmentation data, skip`);
       continue;
     }
 
-    const { data: panels } = await supabase
+    const { data: panels, error: panelsErr } = await supabase
       .from("panels")
       .select("id, bounding_box")
       .eq("book_id", bookId)
@@ -230,13 +426,19 @@ export async function extractForegroundMasksBatch(
       .eq("page_number", page.pageNumber)
       .order("sort_order");
 
+    if (panelsErr) {
+      throw new FatalError(
+        `panels read failed for ${pageLabel}: ${panelsErr.message}`,
+      );
+    }
+
     if (!panels || panels.length === 0) {
-      console.log(`[masks] page-${padded}: no panels — skip`);
+      console.log(`[masks] ${pageLabel}: no panels, skip`);
       continue;
     }
 
-    const imgW = segRow.image_width as number;
-    const imgH = segRow.image_height as number;
+    const imgW = segRow.image_width;
+    const imgH = segRow.image_height;
     const predictions = segRow.predictions as Array<{
       class: string;
       confidence: number;
@@ -247,7 +449,7 @@ export async function extractForegroundMasksBatch(
     const panelsPx: PanelPx[] = panels.map((p) => {
       const bb = p.bounding_box as BoundingBoxJson;
       return {
-        id: p.id as string,
+        id: p.id,
         x: bb.x * imgW,
         y: bb.y * imgH,
         w: bb.w * imgW,
@@ -303,10 +505,15 @@ export async function extractForegroundMasksBatch(
       const characters = panelCharPolys.get(p.id)!;
       const bubbles = panelBubblePolys.get(p.id)!;
       if (characters.length === 0 && bubbles.length === 0) continue;
-      await supabase
+      const { error: updateErr } = await supabase
         .from("panels")
         .update({ foreground_polygons: { characters, bubbles } })
         .eq("id", p.id);
+      if (updateErr) {
+        throw new FatalError(
+          `panels update failed for ${pageLabel}: ${updateErr.message}`,
+        );
+      }
     }
 
     const totalChars = [...panelCharPolys.values()].reduce(
@@ -329,32 +536,38 @@ export async function characterLookaheadPage(
   pageNumber: number,
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
   const { getGeminiClient, getFallbackGeminiClient } = await import(
     "~/lib/gemini-client"
   );
   const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
-  const { identifyFace, resolveCharacterId, buildKnownCharacterList } =
-    await import("~/lib/character-identification");
+  const { identifyFace } = await import("~/lib/character-identification");
   const { findSimilarExemplars, downloadExemplarImage, storeExemplar } =
     await import("~/lib/exemplar-store");
 
   const gemini = getGeminiClient();
   const padded = String(pageNumber).padStart(2, "0");
+  const pageLabel = `page-${padded}`;
 
   // 1. Load segmentation predictions from DB
-  const { data: segRow } = await supabase
+  const { data: segRow, error: segErr } = await supabase
     .from("page_segmentation")
     .select("image_width, image_height, predictions")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber)
-    .single();
+    .maybeSingle();
+
+  if (segErr) {
+    throw new FatalError(
+      `page_segmentation read failed for ${pageLabel}: ${segErr.message}`,
+    );
+  }
 
   if (!segRow) {
-    console.log(`[lookahead] page-${padded}: no segmentation — skip`);
+    console.log(`[lookahead] ${pageLabel}: no segmentation, skip`);
     return;
   }
 
@@ -368,18 +581,24 @@ export async function characterLookaheadPage(
     (p) => (p.class === "face" || p.class === "head") && p.points.length >= 3,
   );
   if (!hasFaces) {
-    console.log(`[lookahead] page-${padded}: no faces detected — skip`);
+    console.log(`[lookahead] ${pageLabel}: no faces detected, skip`);
     return;
   }
 
   // 2. Download page image from Storage
-  const storagePath = `${bookId}/${issueId}/page-${padded}.webp`;
-  const { data: imageBlob } = await supabase.storage
+  const storagePath = pageStoragePath(bookId, issueId, pageNumber);
+  const { data: imageBlob, error: downloadErr } = await supabase.storage
     .from("comic-pages")
     .download(storagePath);
 
+  if (downloadErr) {
+    throw new FatalError(
+      `comic-pages download failed for ${pageLabel}: ${downloadErr.message}`,
+    );
+  }
+
   if (!imageBlob) {
-    console.log(`[lookahead] page-${padded}: image not found — skip`);
+    console.log(`[lookahead] ${pageLabel}: image not found, skip`);
     return;
   }
 
@@ -390,7 +609,7 @@ export async function characterLookaheadPage(
   if (imgW === 0 || imgH === 0) return;
 
   // 3. Load panels from DB
-  const { data: panels } = await supabase
+  const { data: panels, error: panelsErr } = await supabase
     .from("panels")
     .select("id, bounding_box, sort_order")
     .eq("book_id", bookId)
@@ -398,12 +617,18 @@ export async function characterLookaheadPage(
     .eq("page_number", pageNumber)
     .order("sort_order");
 
+  if (panelsErr) {
+    throw new FatalError(
+      `panels read failed for ${pageLabel}: ${panelsErr.message}`,
+    );
+  }
+
   if (!panels || panels.length === 0) return;
 
   const panelRects = panels.map((p) => {
     const bb = p.bounding_box as BoundingBoxJson;
     return {
-      id: p.id as string,
+      id: p.id,
       x: bb.x * imgW,
       y: bb.y * imgH,
       w: bb.w * imgW,
@@ -419,19 +644,29 @@ export async function characterLookaheadPage(
   );
 
   if (faceCrops.length === 0) {
-    console.log(`[lookahead] page-${padded}: no valid face crops — skip`);
+    console.log(`[lookahead] ${pageLabel}: no valid face crops, skip`);
     return;
   }
 
   // 5. Build known character list + wiki context
-  const dbCharacters = await buildKnownCharacterList(supabase, bookId);
+  const dbCharacters = await buildKnownCharacterListOrFatal(
+    supabase,
+    bookId,
+    pageLabel,
+  );
 
-  const { data: issueRow } = await supabase
+  const { data: issueRow, error: issueErr } = await supabase
     .from("issues")
     .select("wiki_summary, wiki_appearances")
     .eq("book_id", bookId)
     .eq("id", issueId)
     .single();
+
+  if (issueErr) {
+    throw new FatalError(
+      `issues read failed for ${pageLabel}: ${issueErr.message}`,
+    );
+  }
 
   type WikiAppearance = { name: string; qualifier?: string };
   const wikiAppearances =
@@ -478,7 +713,7 @@ export async function characterLookaheadPage(
     character_id: string | null;
     suggested_name?: string;
     panel_id: string;
-    face_bbox: object;
+    face_bbox: Json;
     identification_confidence: number;
   }> = [];
 
@@ -510,8 +745,11 @@ export async function characterLookaheadPage(
         }),
       );
       exemplarRefs = refs.filter((r): r is NonNullable<typeof r> => r !== null);
-    } catch {
-      // Exemplar lookup failed — proceed without
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new FatalError(
+        `character_face_exemplars failed for ${pageLabel}: ${msg}`,
+      );
     }
 
     // Identify with exemplar context + key failover
@@ -558,7 +796,11 @@ export async function characterLookaheadPage(
     }
 
     if (result.characterName && result.confidence >= 0.6) {
-      const charId = await resolveCharacterId(supabase, result.characterName);
+      const charId = await resolveCharacterIdOrFatal(
+        supabase,
+        result.characterName,
+        pageLabel,
+      );
 
       detectionRows.push({
         character_id: charId,
@@ -581,8 +823,10 @@ export async function characterLookaheadPage(
             confidence: result.confidence,
             isConfirmed: charId !== null && result.confidence >= 0.9,
           });
-        } catch {
-          // Non-fatal — exemplar storage failure shouldn't stop identification
+        } catch (e) {
+          throw new FatalError(
+            `character_face_exemplars write failed for ${pageLabel}: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }
@@ -593,10 +837,16 @@ export async function characterLookaheadPage(
 
   if (detectionRows.length > 0) {
     const panelIdsInBatch = [...new Set(detectionRows.map((r) => r.panel_id))];
-    const { data: existingDets } = await supabase
+    const { data: existingDets, error: existingErr } = await supabase
       .from("panel_character_detections")
       .select("character_id, suggested_name, panel_id")
       .in("panel_id", panelIdsInBatch);
+
+    if (existingErr) {
+      throw new FatalError(
+        `panel_character_detections read failed for ${pageLabel}: ${existingErr.message}`,
+      );
+    }
 
     const existingKeys = new Set(
       (existingDets ?? []).map(
@@ -620,15 +870,15 @@ export async function characterLookaheadPage(
         .from("panel_character_detections")
         .insert(newRows);
       if (error) {
-        console.warn(
-          `[lookahead] page-${padded}: insert failed: ${error.message}`,
+        throw new FatalError(
+          `panel_character_detections insert failed for ${pageLabel}: ${error.message}`,
         );
       }
     }
   }
 
   console.log(
-    `[lookahead] ${bookId}/${issueId}: page-${padded} → ${faceCrops.length} faces, ${detectionRows.length} identified`,
+    `[lookahead] ${bookId}/${issueId}: ${pageLabel} → ${faceCrops.length} faces, ${detectionRows.length} identified`,
   );
 }
 
@@ -638,14 +888,14 @@ export async function getContextPage(
   pageNumber: number,
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
   const geminiKey = process.env.GEMINI_API_KEY;
   const roboflowKey = process.env.ROBOFLOW_API_KEY;
   const roboflowUrl = process.env.ROBOFLOW_WORKFLOW_URL;
   if (!geminiKey || !roboflowKey || !roboflowUrl) {
-    throw new Error(
+    throw new FatalError(
       "GEMINI_API_KEY, ROBOFLOW_API_KEY, and ROBOFLOW_WORKFLOW_URL required",
     );
   }
@@ -655,10 +905,14 @@ export async function getContextPage(
   const { GEMINI_HIGH } = await import("~/lib/models");
 
   const padded = String(pageNumber).padStart(2, "0");
+  const pageLabel = `page-${padded}`;
 
   // Load book + wiki context for richer prompts
   let bookContext: string | undefined;
-  const [{ data: bookRow }, { data: issueRow }] = await Promise.all([
+  const [
+    { data: bookRow, error: bookErr },
+    { data: issueRow, error: issueErr },
+  ] = await Promise.all([
     supabase.from("books").select("name, franchises").eq("id", bookId).single(),
     supabase
       .from("issues")
@@ -667,17 +921,27 @@ export async function getContextPage(
       .eq("id", issueId)
       .single(),
   ]);
+  if (bookErr) {
+    throw new FatalError(
+      `books read failed for ${pageLabel}: ${bookErr.message}`,
+    );
+  }
+  if (issueErr) {
+    throw new FatalError(
+      `issues read failed for ${pageLabel}: ${issueErr.message}`,
+    );
+  }
   {
     const parts: string[] = [];
     if (bookRow) {
-      const bookName = bookRow.name as string;
-      const franchises = bookRow.franchises as string[] | null;
+      const bookName = bookRow.name;
+      const franchises = bookRow.franchises;
       if (bookName) parts.push(`Book: ${bookName}`);
       if (franchises?.length)
         parts.push(`Franchises: ${franchises.join(", ")}`);
     }
     if (issueRow?.wiki_summary) {
-      parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary as string}`);
+      parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary}`);
     }
     if (issueRow?.wiki_appearances) {
       type AppEntry = { name: string; qualifier?: string };
@@ -693,24 +957,39 @@ export async function getContextPage(
     bookContext = parts.join("\n");
   }
 
-  const storagePath = `${bookId}/${issueId}/page-${padded}.webp`;
-  const { data: imageBlob } = await supabase.storage
+  const storagePath = pageStoragePath(bookId, issueId, pageNumber);
+  const { data: imageBlob, error: downloadErr } = await supabase.storage
     .from("comic-pages")
     .download(storagePath);
 
+  if (downloadErr) {
+    throw new FatalError(
+      `comic-pages download failed for ${pageLabel}: ${downloadErr.message}`,
+    );
+  }
+
   if (!imageBlob) {
-    console.warn(`[context] page-${padded}: image not found — skip`);
+    console.warn(`[context] ${pageLabel}: image not found, skip`);
     return;
   }
 
   const imgBuf = Buffer.from(await imageBlob.arrayBuffer());
 
-  const { data: initialBubbles } = await supabase
+  const bubbleSelect =
+    "id, legacy_id, box_2d, ocr_text, text_with_cues, speaker, ignored";
+
+  const { data: initialBubbles, error: bubblesErr } = await supabase
     .from("bubbles")
-    .select("id, legacy_id, box_2d, ocr_text")
+    .select(bubbleSelect)
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
+
+  if (bubblesErr) {
+    throw new FatalError(
+      `bubbles read failed for ${pageLabel}: ${bubblesErr.message}`,
+    );
+  }
 
   let bubbleData = initialBubbles ?? [];
 
@@ -726,77 +1005,86 @@ export async function getContextPage(
     });
 
     if (!rfRes.ok) {
-      console.warn(`[context] page-${padded}: Roboflow text detection failed`);
+      console.warn(`[context] ${pageLabel}: Roboflow text detection failed`);
       return;
     }
 
     const rfData = (await rfRes.json()) as {
       outputs?: Array<{
         predictions?: {
-          predictions: Array<{
-            x: number;
-            y: number;
-            width: number;
-            height: number;
-            confidence: number;
-          }>;
+          predictions: RoboflowBoxPrediction[];
         };
       }>;
     };
 
     const preds = rfData.outputs?.[0]?.predictions?.predictions ?? [];
     if (preds.length === 0) {
-      console.log(`[context] page-${padded}: no text regions found`);
+      console.log(`[context] ${pageLabel}: no text regions found`);
       return;
     }
 
-    const newBubbles = preds.map((p, idx) => ({
-      book_id: bookId,
-      issue_id: issueId,
-      page_number: pageNumber,
-      legacy_id: `page-${padded}_b${String(idx + 1).padStart(2, "0")}`,
-      box_2d: {
-        x: Math.round(p.x - p.width / 2),
-        y: Math.round(p.y - p.height / 2),
-        width: Math.round(p.width),
-        height: Math.round(p.height),
-      },
-      confidence: p.confidence,
-    }));
+    const newBubbles = mapBubbleRows(bookId, issueId, pageNumber, preds);
 
-    await supabase.from("bubbles").upsert(newBubbles, {
-      onConflict: "book_id,issue_id,page_number,legacy_id",
-    });
-
-    const { data: requeried } = await supabase
+    const { error: upsertErr } = await supabase
       .from("bubbles")
-      .select("id, legacy_id, box_2d, ocr_text")
+      .upsert(newBubbles, {
+        onConflict: "book_id,issue_id,legacy_id",
+        ignoreDuplicates: true,
+      });
+    if (upsertErr) {
+      throw new FatalError(
+        `bubbles upsert failed for ${pageLabel}: ${upsertErr.message}`,
+      );
+    }
+
+    const { data: requeried, error: requeryErr } = await supabase
+      .from("bubbles")
+      .select(bubbleSelect)
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("page_number", pageNumber);
+
+    if (requeryErr) {
+      throw new FatalError(
+        `bubbles read failed for ${pageLabel}: ${requeryErr.message}`,
+      );
+    }
 
     if (!requeried || requeried.length === 0) return;
     bubbleData = requeried;
   }
 
-  const { data: pagePanels } = await supabase
+  const { data: pagePanels, error: pagePanelsErr } = await supabase
     .from("panels")
     .select("id, page_number")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
+  if (pagePanelsErr) {
+    throw new FatalError(
+      `panels read failed for ${pageLabel}: ${pagePanelsErr.message}`,
+    );
+  }
+
   const pageCharNames: string[] = [];
   if (pagePanels && pagePanels.length > 0) {
-    const panelIds = pagePanels.map((p) => p.id as string);
-    const { data: detections } = await supabase
+    const panelIds = pagePanels.map((p) => p.id);
+    const { data: detections, error: detsErr } = await supabase
       .from("panel_character_detections")
       .select("character_id")
       .in("panel_id", panelIds);
 
+    if (detsErr) {
+      throw new FatalError(
+        `panel_character_detections read failed for ${pageLabel}: ${detsErr.message}`,
+      );
+    }
+
     if (detections) {
       for (const d of detections) {
-        const name = (d.character_id as string).replace(/-/g, " ");
+        if (d.character_id == null) continue;
+        const name = d.character_id.replace(/-/g, " ");
         if (!pageCharNames.includes(name)) pageCharNames.push(name);
       }
     }
@@ -807,14 +1095,23 @@ export async function getContextPage(
     legacy_id: string;
     box_2d: { x: number; y: number; width: number; height: number };
     ocr_text: string | null;
+    text_with_cues: string | null;
+    speaker: string | null;
+    ignored: boolean | null;
   };
 
-  const bubbles = bubbleData as BubbleRow[];
+  const allBubbles = bubbleData as BubbleRow[];
+  const bubbles = allBubbles.filter((b) => !bubbleHasContext(b));
+  if (allBubbles.length > 0 && bubbles.length === 0) {
+    console.log(
+      `[context] ${pageLabel}: all bubbles already have context, skip`,
+    );
+    return;
+  }
+
   const uniqueSpeakers: string[] = [];
 
   for (const bubble of bubbles) {
-    if (bubble.ocr_text) continue;
-
     const box = bubble.box_2d;
     if (!box?.width || !box.height) continue;
 
@@ -844,7 +1141,7 @@ export async function getContextPage(
       ocrText = ocrResponse.text?.trim() ?? "";
     } catch {
       console.warn(
-        `[context] page-${padded} bubble ${bubble.legacy_id}: OCR failed`,
+        `[context] ${pageLabel} bubble ${bubble.legacy_id}: OCR failed`,
       );
       continue;
     }
@@ -885,45 +1182,30 @@ export async function getContextPage(
       const jsonMatch = /\{[\s\S]*\}/.exec(responseText);
       if (!jsonMatch) continue;
 
-      const parsed = JSON.parse(jsonMatch[0]) as {
-        type?: string;
-        speaker?: string | null;
-        emotion?: string;
-        characterType?: string;
-        side?: string;
-        voiceDescription?: string;
-        textWithCues?: string;
-      };
-
-      const bubbleType = parsed.type ?? "SPEECH";
-      const speaker =
-        bubbleType === "NARRATION" || bubbleType === "CAPTION"
-          ? "Narrator"
-          : (parsed.speaker ?? null);
+      const parsed = JSON.parse(jsonMatch[0]) as ContextParsed;
+      const update = buildContextUpdate(parsed, ocrText, aiReasoning);
+      const speaker = update.speaker ?? null;
 
       if (speaker && !uniqueSpeakers.includes(speaker)) {
         uniqueSpeakers.push(speaker);
       }
 
-      await supabase
+      const { error: updateErr } = await supabase
         .from("bubbles")
-        .update({
-          ocr_text: ocrText,
-          text: parsed.textWithCues ?? ocrText,
-          type: bubbleType,
-          speaker,
-          emotion: parsed.emotion ?? "neutral",
-          character_type: parsed.characterType ?? null,
-          side: parsed.side ?? null,
-          voice_description: parsed.voiceDescription ?? null,
-          text_with_cues: parsed.textWithCues ?? ocrText,
-          ai_reasoning: aiReasoning,
-          ignored: bubbleType === "SFX" || bubbleType === "BACKGROUND",
-        })
-        .eq("id", bubble.id);
+        .update(update)
+        .eq("id", bubble.id)
+        .is("ocr_text", null)
+        .is("text_with_cues", null)
+        .is("speaker", null);
+      if (updateErr) {
+        throw new FatalError(
+          `bubbles update failed for ${pageLabel}: ${updateErr.message}`,
+        );
+      }
     } catch (e) {
+      if (e instanceof FatalError) throw e;
       console.warn(
-        `[context] page-${padded} bubble ${bubble.legacy_id}: context analysis failed: ${e instanceof Error ? e.message : String(e)}`,
+        `[context] ${pageLabel} bubble ${bubble.legacy_id}: context analysis failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
 
@@ -931,6 +1213,6 @@ export async function getContextPage(
   }
 
   console.log(
-    `[context] ${bookId}/${issueId}: page-${padded} → ${bubbles.length} bubbles processed, ${uniqueSpeakers.length} speakers found`,
+    `[context] ${bookId}/${issueId}: ${pageLabel} → ${bubbles.length} bubbles processed, ${uniqueSpeakers.length} speakers found`,
   );
 }

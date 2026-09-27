@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { resolveCastlistRow } from "./resolve-castlist-row";
 
 const AUDIO_BUCKET = "comic-audio";
 
@@ -81,15 +82,23 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: "Empty text" };
   }
 
-  // Look up voice ID
-  const { data: castRow } = await supabaseAdmin
+  // Look up voice ID: resolveCastlistRow groups rows by slug, errors when voices differ, prefers the exact match
+  const { data: castRows, error: castErr } = await supabaseAdmin
     .from("castlist")
-    .select("voice_id")
+    .select("character, voice_id")
     .eq("book_id", args.bookId)
-    .eq("issue_id", args.issueId)
-    .eq("character", b.speaker)
-    .maybeSingle();
-  const voiceId = (castRow as { voice_id?: string } | null)?.voice_id;
+    .eq("issue_id", args.issueId);
+  if (castErr) {
+    return { ok: false, error: castErr.message };
+  }
+  const resolved = resolveCastlistRow(
+    b.speaker,
+    (castRows ?? []) as { character: string; voice_id: string | null }[],
+  );
+  if (!resolved.ok) {
+    return { ok: false, error: resolved.error };
+  }
+  const voiceId = resolved.row.voice_id;
   if (!voiceId) {
     return {
       ok: false,

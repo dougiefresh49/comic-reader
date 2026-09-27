@@ -1,6 +1,6 @@
 # Motion Comic — Future Improvements
 
-## Status: `pending` (backlog — not blocking cinematic pipeline)
+## Status: tracked in [features.md](../features.md) (backlog, not blocking cinematic pipeline)
 
 Improvements to `pnpm motion-comic` if the motion comic format is worth investing in further. Listed in priority order. Each is independent — pick and choose.
 

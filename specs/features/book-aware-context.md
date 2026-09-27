@@ -1,6 +1,6 @@
 # Feature: Book-Aware Context for Character Identification
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: None — independent of other pending features
 ## Priority: High — fixes character misidentification and wasted research calls on every new issue
 

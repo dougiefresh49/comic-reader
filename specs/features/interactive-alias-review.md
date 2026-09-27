@@ -1,6 +1,6 @@
 # Feature: Interactive Alias Review
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: alias-map.ts backed by `data/alias-map.json` ✅ (done)
 ## Priority: High — eliminates wasted API calls on mis-named characters before find-voice-sources
 

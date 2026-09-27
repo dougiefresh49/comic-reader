@@ -4,7 +4,7 @@
      Everything shared lives in AGENTS.md so delegated prompts can shrink
      to "read AGENTS.md, then do issue #N." Keep the roster synced with
      the fleet repo's copy when models or budget posture change.
-     Instantiated from fleet corefiles @ 2b1b5a0, 2026-09-25 -->
+     Instantiated from fleet corefiles @ 4a9e5f8, 2026-09-27 -->
 
 @AGENTS.md
 
@@ -25,6 +25,7 @@ covers UI/UX, code quality, API design, and copy.
 | ------------- | ---- | ------------ | ----- | ------------------------------------------------------------------------------------ |
 | composer-2.5  | 8    | 5            | 5     | cursor-agent CLI (`agent`)                                                           |
 | grok-4.5      | 8    | 6            | 6     | cursor-agent CLI (`--model cursor-grok-4.5-high`; `-medium`/`-low` for lighter work) |
+| grok-4.7      | 7    | 7            | 3     | cursor-agent CLI (`--model grok-4.7-high`); review and audit only, see below         |
 | gpt-6 Astra   | 7    | 8            | 5     | codex CLI (the config default, at medium effort)                                     |
 | gpt-5.6 Sol   | 7    | 8            | 5     | codex CLI (`codex -m` Sol tier)                                                      |
 | gpt-5.6 Terra | 8    | 7            | 5     | codex CLI (`codex -m` Terra tier)                                                    |
@@ -76,8 +77,8 @@ cited by timestamp; fleet `docs/decisions.md` row 25):
   review or test changes, and prefers codex for computer use on macOS
   (25:07-26:07). It is spiky, sometimes better than Fable and sometimes
   far worse, and at the extremes it loops and burns usage (00:50,
-  04:31). Route it to review and verification lanes, and leave long
-  unattended authoring to Fable. Its roster scores copy gpt-5.6 Sol's
+  04:31). Route it to verification and to the review lanes below that
+  name it, and leave long unattended authoring to Fable. Its roster scores copy gpt-5.6 Sol's
   until we audition it here.
 
 **Briefing opus-5.5** (config from outside evidence, not yet auditioned
@@ -104,12 +105,44 @@ Osmani's Anthropic playbook for the model, cited by timestamp; fleet
   "Which AI Made This?" comparison, and reads opus-5.5's strength as
   following design direction, the don'ts most of all (16:30-17:27).
 
+**grok-4.7** (config from outside evidence plus one audition here:
+Theo's video "Elon promised this one would be good...", 2026-09-22,
+https://www.youtube.com/watch?v=jLgpzgpsWPc, cited by timestamp; fleet
+`docs/decisions.md` row 30):
+
+- Review and audit only. On Theo's codebase-audit bench (each model
+  lists where T3 Code needs work, fable-5.1 and Astra judge) it scored
+  80.7 running in Grok Build, just behind Astra's 83.8 in Codex and
+  ahead of fable-5.1's 69.7 (22:08-23:47). He finds it weaker than
+  fable-5.1 and Astra at the extremes, but with a higher floor, and
+  inquisitive: it digs deeper than models of its class usually do, and
+  has found things fable-5.1 and Astra missed (21:40-22:10). Our one
+  audition through cursor-agent (`grok-4.7-high`, fleet #100, a small
+  roster diff) found every defect Astra found plus four more, in about
+  6 minutes to Astra's 2.
+- Never for design or anything a person looks at. Theo rates its
+  front-end output among the worst he has seen from any model
+  (18:25-18:56), and its 3D game from the prompt Astra got was a mess
+  (24:39-25:37).
+- Not the bulk authoring lane; grok-4.5 keeps that for mechanical
+  work (the builder lanes below). 4.7 spends about
+  twice the tokens of earlier grok models (15:03-15:33), its worst audit
+  run cost almost twice Astra's worst ($19.49 to $11.44) because it kept
+  verifying things that didn't matter (23:45-24:14), and one build ran
+  over an hour (24:11-24:41). The fast, cheap grok Theo liked was 4.5
+  (24:11). His verdict on 4.7 overall: a bit of a flop and a stepping
+  stone (25:39-26:44).
+
 How to apply:
 
 - **Budget posture: go ham with every model EXCEPT Fable** (opus-5.5
   included, at the efforts above). Fable weekly usage is the scarce
-  resource. It drives the main session and burns fast. Sonnet subagents
-  and codex (Astra included) have headroom; use them liberally. Throttle a
+  resource. It drives the main session and burns fast. Sonnet and opus
+  subagents and cursor-agent have headroom; use them liberally. Codex
+  too, with one carve-out: as a PR review gate Astra takes only the
+  class the review lanes below give it (my call, row 33: review rounds
+  in a wave were spending the codex 5-hour window that computer use
+  also draws on; my report, not measured). Throttle a
   provider only when the `ai-usage` skill shows it actually near
   capacity, not preemptively. Budgets are per-pool, not per-token. The
   binding constraint is subscription shape (field test: codex burned 8×
@@ -117,32 +150,66 @@ How to apply:
 - Defaults, not limits. You have standing permission to escalate to a
   smarter model without asking when a cheaper model's output misses the bar.
   Judge the output, not the price tag.
-- Bulk/mechanical work (clear-spec implementation, migrations, batch
-  refactors): composer-2.5 or grok-4.5 via cursor-agent, effectively
-  free and in an isolated worktree; grok for trickier multi-file work.
+- Builder lanes, by how much the builder has to decide (config; owner
+  call 2026-09-27, fleet `docs/decisions.md` row 32):
+  - The test: could you predict the diff before it is written? Yes is
+    mechanical (renames, sweeps, migrations and batch refactors from a
+    written list, however many files): composer-2.5 or grok-4.5 via
+    cursor-agent.
+  - No means the builder decides something (logic, scripts, a fix
+    round, a spec with a design choice in it): opus-5.5, as an Agent
+    subagent in its own worktree, briefed as above. This is the default
+    builder.
+  - Copy, skills, corefile prose and design invention are taste work
+    and follow the taste line below, not this one.
+  - A clear spec does not make work mechanical; every delegated issue
+    has one. On the comic-reader wave of 2026-09-27 grok-4.5 met every
+    gate on three lanes in about four minutes each, and on the one that
+    needed judgment it built the fix brief's four copy-pasted loops and
+    hand-written tokenizer without pushing back on the size (comic-reader
+    #55, the pair under "Push back on the spec" in AGENTS.md).
+  - Long unattended or open-ended lanes stay with fable-5.1.
 - User-facing design *invention* needs taste ≥ 7: sonnet-5 minimum,
   fable-5.1 preferred, opus-5.5 as the budget fallback. Faithful
   implementation against a decided, written design artifact (a Figma
-  node, a vendored mirror, a spec) is well-specced execution, and Astra at
-  high reasoning is a first-class peer there. No written artifact =
-  invention; the taste bar applies.
-- Review lanes, by what could go wrong, not by diff size (config; the
-  evidence is Sol's first round on fleet #60, 2026-08-29, finding three
-  real script bugs in a small deploy-script diff):
+  node, a vendored mirror, a spec) is well-specced execution and goes
+  through the builder lanes above. No written artifact = invention; the
+  taste bar applies.
+- Review lanes, by what could go wrong, not by diff size (config, fleet
+  `docs/decisions.md` row 33; the evidence is Sol's first round on
+  fleet #60, 2026-08-29, finding three real script bugs in a small
+  deploy-script diff, and the grok-4.7 audition on fleet #100):
   - Mechanical diffs (renames, path parametrization, dash sweeps, doc
     moves): the scripted check is the gate (`bash -n`, `tsc`, a literal
     grep), plus at most one grok pass via cursor-agent as a second
     reader, `agent --workspace <repo> -p --mode=ask "Review the diff of
     PR #N against issue #N; list only concrete defects with file:line"`
-    with grok's flag from the roster table.
-  - Logic changes, scripts, anything near a credit guard or a lock
-    file: Astra (the `codex-review` skill) by default.
+    with `--model grok-4.7-high`.
+  - Anything near money or data (credit logic, a credit guard, a lock
+    file, code that writes production rows, a guard for any of those):
+    Astra (the `codex-review` skill), first review and rounds. This
+    line wins over the logic line when a PR fits both; a mechanical
+    diff stays on the mechanical gate wherever it lands. Astra's first round on comic-reader
+    PR #135 (2026-09-27, a guard for a wrong-row write; the verdict is
+    on the PR) found four defects, all then fixed, that the builder's
+    gates and the orchestrator's acceptance checks had passed.
+  - Every other logic change or script: grok-4.7, the same command,
+    for the first review and for every round after a fix.
   - Meaning changes (user-facing text, design, corefile rules,
-    prompts): fable, as the `reviewer` agent, once per PR. Astra owns the
-    iterative rounds. Never two frontier reviews per round.
-  - Composer never reviews. Grok is the only cursor-agent review lane,
-    mainly overflow when `ai-usage` shows codex near its cap; one review
-    per PR from it, and Astra keeps the rounds.
+    prompts): fable, as the `reviewer` agent, once per PR, and that
+    read is the first review whatever else the PR touches. The rounds
+    after it go to Astra when the PR is also in its class, and
+    otherwise to grok-4.7, which checks each fix against fable's
+    finding and does not re-grade the prose. Never two frontier reviews
+    (fable, Astra) per round.
+  - A mechanical PR whose fix changes behavior is a logic PR from the
+    next round on.
+  - Composer and grok-4.5 never review. grok-4.7 is the only
+    cursor-agent review lane. When `ai-usage` shows codex exhausted,
+    the Astra class drops to opus-5.5 without asking me: the `reviewer`
+    agent with `model: 'opus'`, fresh context, first review and rounds.
+    The verdict comment says opus stood in for Astra (my call,
+    2026-09-27).
 - `unslop` grades prose a person reads and `writing-for-agents` grades
   documents an agent consumes; skills, corefiles, and delegate briefs go
   through `writing-for-agents` before they ship.
@@ -171,8 +238,9 @@ row 9.
 
 - During big multi-stage rounds, the main session stops authoring code:
   chunks beyond small surgical edits go to a delegate against a written
-  spec (composer/grok for well-specced work; a fresh-context fable
-  subagent when a chunk needs frontier judgment). The main session does
+  spec (the builder lanes in the roster section; a fresh-context fable
+  subagent when the chunk is taste work or a long open-ended run). The
+  main session does
   specs, targeted diff review, merges. Ordinary small tasks: author freely.
 - Codebase recon goes to composer-2.5 or an Explore subagent (Claude
   Code's read-only search agent type). Don't pull
@@ -198,6 +266,8 @@ row 9.
 - Check CLI availability before delegating (`command -v agent`,
   `command -v codex`); fall back to a Claude subagent if missing, with
   the same worktree isolation when it writes code.
+- opus-5.5: the Agent tool with `model: 'opus'` and
+  `isolation: 'worktree'`.
 - composer/grok: `agent --worktree -p --force "prompt"`; non-`-fast`
   variants only. codex: `codex exec` / `codex review`. The local codex
   config pins the default model (tier slugs drift; check it), pass

@@ -1,6 +1,6 @@
 # Feature: Source Page Upload + Cloud Pipeline Trigger
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: Phase A (Storage buckets) + Phase B (DB schema) + Phase D (pipeline writes to DB)
 
 ---

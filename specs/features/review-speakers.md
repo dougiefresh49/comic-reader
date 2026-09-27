@@ -1,6 +1,6 @@
 # Feature: Review Speakers (post-get-context)
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Priority: High — fixes character naming at the source, reducing alias-map maintenance for all downstream steps
 
 ---

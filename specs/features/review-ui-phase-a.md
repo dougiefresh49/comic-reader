@@ -1,6 +1,6 @@
 # Feature: Review UI — Phase A (Annotation)
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: None — build now
 ## Blocked by: Nothing
 
