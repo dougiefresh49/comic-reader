@@ -4,6 +4,7 @@ This is the repo's decision log. One row per call or parked question, newest fir
 
 | # | date | decision | status |
 |---|------|----------|--------|
+| 63 | 2026-09-27 | #74: the admin click-through was verified against a production build (`next build`, `next start`) because `pnpm dev` cannot compile routes that import `workflow/api`; admin route checks use a production build until #153 lands (PR #139) | assumed (reopens when: #153 lands) |
 | 62 | 2026-09-27 | `codex` MCP servers in this repo read their keys from the shell environment (`ROBOFLOW_API_KEY`, `BROWSERBASE_API_KEY`), never from a value written in `.codex/config.toml` (#48) | accepted |
 | 61 | 2026-09-27 | `scripts/check-issue-scoping.ts` is a text scan that judges each `.from()` chain on its own; it does not follow a table name held in a variable, a statement with no semicolon, or a regex literal, and Astra's findings on those forms were dismissed because no tracked file uses them (#55, PR #135) | assumed (reopens when: the check is wired into CI, or a tracked file uses one of those forms) |
 | 60 | 2026-09-27 | Owner call on row 14: admin merge is the standing path on `main` once the required checks are green and the gate verdict is posted on the PR; the review requirement stays in the ruleset | accepted |
