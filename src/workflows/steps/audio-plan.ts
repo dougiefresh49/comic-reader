@@ -297,11 +297,14 @@ export interface SpeakerMatchPlan {
   unmatched: string[];
   /** Speakers with a castlist row but null voice_id. */
   castWithoutVoice: string[];
+  /** Speakers whose slug has conflicting castlist voice_id values. */
+  conflicted: string[];
 }
 
 /**
  * Distinct raw speaker strings. Matched = castlist voice present.
  * Cast membership without a voice is neither matched nor unmatched.
+ * Conflicted slugs are their own bucket, not cast without a voice.
  */
 export function planSpeakerMatching(
   rawSpeakers: string[],
@@ -315,16 +318,25 @@ export function planSpeakerMatching(
     distinct.add(trimmed);
   }
   const distinctSpeakers = [...distinct].sort();
+  const conflictSlugs = new Set(cast.conflicts.map((c) => c.slug));
   const matched: string[] = [];
   const unmatched: string[] = [];
   const castWithoutVoice: string[] = [];
+  const conflicted: string[] = [];
   for (const raw of distinctSpeakers) {
     const key = speakerKey(raw, aliasMap);
-    if (cast.voices.has(key)) matched.push(raw);
+    if (conflictSlugs.has(key)) conflicted.push(raw);
+    else if (cast.voices.has(key)) matched.push(raw);
     else if (cast.members.has(key)) castWithoutVoice.push(raw);
     else unmatched.push(raw);
   }
-  return { distinctSpeakers, matched, unmatched, castWithoutVoice };
+  return {
+    distinctSpeakers,
+    matched,
+    unmatched,
+    castWithoutVoice,
+    conflicted,
+  };
 }
 
 export interface CharactersNeedingVoicesPlan {

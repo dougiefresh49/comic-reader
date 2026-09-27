@@ -8,6 +8,7 @@ import {
   normalizeAlignment,
   planBubblesToSend,
   planCharactersNeedingVoices,
+  speakerKey,
   type AlignmentRaw,
   type AppearanceRow,
   voiceDesignAppearanceId,
@@ -32,6 +33,7 @@ export async function getCharactersNeedingVoices(
       .select("speaker")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
+      .eq("ignored", false)
       .not("speaker", "is", null),
     supabase
       .from("aliases")
@@ -189,6 +191,9 @@ export async function generateVoiceModel(
   }
 
   const { voice_id } = (await createRes.json()) as { voice_id: string };
+  console.log(
+    `[voice-model] ${characterId}: paid create returned voice_id=${voice_id}`,
+  );
   const voiceCreatedAt = new Date().toISOString();
 
   const { error: upAppErr } = await supabase
@@ -201,7 +206,11 @@ export async function generateVoiceModel(
     })
     .eq("id", appearanceId);
 
-  if (upAppErr) throw new FatalError(upAppErr.message);
+  if (upAppErr) {
+    throw new FatalError(
+      `appearance update failed for ${characterId} voice_id=${voice_id}: ${upAppErr.message}`,
+    );
+  }
 
   const { error: castErr } = await supabase.from("castlist").upsert(
     {
@@ -212,7 +221,11 @@ export async function generateVoiceModel(
     },
     { onConflict: "book_id,issue_id,character" },
   );
-  if (castErr) throw new FatalError(castErr.message);
+  if (castErr) {
+    throw new FatalError(
+      `castlist upsert failed for ${characterId} voice_id=${voice_id}: ${castErr.message}`,
+    );
+  }
 
   console.log(`[voice-model] ${characterId}: created voice ${voice_id}`);
 }
@@ -305,14 +318,17 @@ export async function generateAudioBatch(
 
   const sendPlan = planBubblesToSend(bubbles, aliasMap, cast);
   for (const { bubble, reason } of sendPlan.skipped) {
-    console.log(`[audio] skip ${bubble.id}: ${reason}`);
+    const rawSpeaker = bubble.speaker?.trim() ?? "";
+    const slug = rawSpeaker ? speakerKey(rawSpeaker, aliasMap) : "";
+    console.log(
+      `[audio] skip ${bubble.id} speaker=${rawSpeaker || "(none)"} slug=${slug || "(none)"}: ${reason}`,
+    );
   }
 
   let generated = 0;
 
   for (const { bubble, voiceId } of sendPlan.toSend) {
-    const ttsText = bubble.text_with_cues ?? bubble.ocr_text;
-    if (!ttsText?.trim()) continue;
+    const ttsText = (bubble.text_with_cues ?? bubble.ocr_text)!;
 
     const settings = getVoiceSettingsFromEmotion(bubble.emotion ?? "neutral");
 

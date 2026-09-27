@@ -114,8 +114,13 @@ function runSyntheticCases(): void {
     { character: "green-ranger", voice_id: "voice-b" },
   ];
   const conflictIndex = buildCastIndex(conflictCast);
+  const conflictMatch = planSpeakerMatching(
+    ["Green Ranger", "green-ranger"],
+    buildAliasMap([]),
+    conflictIndex,
+  );
   console.log(
-    `synthetic castlist conflict: count=${conflictIndex.conflicts.length} detail=${formatCastConflicts(conflictIndex.conflicts)}`,
+    `synthetic castlist conflict: count=${conflictIndex.conflicts.length} detail=${formatCastConflicts(conflictIndex.conflicts)} conflicted=${conflictMatch.conflicted.join(",")} cast_without_voice=${conflictMatch.castWithoutVoice.length}`,
   );
 }
 
@@ -142,7 +147,8 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
         "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text",
       )
       .eq("book_id", bookId)
-      .eq("issue_id", issueId),
+      .eq("issue_id", issueId)
+      .eq("ignored", false),
     supabase
       .from("aliases")
       .select("alias, canonical, scope, scope_id")
@@ -182,13 +188,21 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
     appearances,
   );
 
+  const bubblesToSendPart =
+    cast.conflicts.length > 0
+      ? "0 bubbles to send (blocked by conflicts)"
+      : `${sendPlan.toSend.length} bubbles to send`;
+
   console.log(
-    `${matching.distinctSpeakers.length} distinct speaker strings, ${matching.matched.length} matched, ${matching.unmatched.length} unmatched, ${sendPlan.toSend.length} bubbles to send, ${voicePlan.needDesign.length} need Voice Design`,
+    `${matching.distinctSpeakers.length} distinct speaker strings, ${matching.matched.length} matched, ${matching.unmatched.length} unmatched, ${bubblesToSendPart}, ${voicePlan.needDesign.length} need Voice Design`,
   );
   console.log(`castlist conflicts: ${cast.conflicts.length}`);
 
   if (cast.conflicts.length > 0) {
     console.log(`conflicts=${formatCastConflicts(cast.conflicts)}`);
+  }
+  if (matching.conflicted.length > 0) {
+    console.log(`conflicted_speakers=${matching.conflicted.join(",")}`);
   }
   if (matching.unmatched.length > 0) {
     console.log(`unmatched=${matching.unmatched.join(",")}`);
