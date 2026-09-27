@@ -104,12 +104,19 @@ if (bubblesError) {
 const rows = bubbles ?? [];
 let pixelCount = 0;
 let matchCount = 0;
-/** toFixed vs stored rounding only (0 < max field diff ≤ 0.01). */
+/** Whole-hundredths rounding miss: Math.round(diff * 100) === 1. */
 const roundingMisses: Array<{
   id: string;
-  diff: number;
+  cents: number;
   computed: BubbleStyle;
   stored: BubbleStyle;
+}> = [];
+/** Real miss: Math.round(diff * 100) > 1 (or no stored style). */
+const realMisses: Array<{
+  id: string;
+  cents: number | null;
+  computed: BubbleStyle;
+  stored: BubbleStyle | null;
 }> = [];
 
 for (const bubble of rows) {
@@ -128,9 +135,16 @@ for (const bubble of rows) {
   }
   if (stored) {
     const diff = maxFieldDiff(computed, stored);
-    if (diff > 0 && diff <= 0.01) {
-      roundingMisses.push({ id: bubble.id, diff, computed, stored });
+    const cents = Math.round(diff * 100);
+    if (cents === 0) {
+      matchCount++;
+    } else if (cents === 1) {
+      roundingMisses.push({ id: bubble.id, cents, computed, stored });
+    } else {
+      realMisses.push({ id: bubble.id, cents, computed, stored });
     }
+  } else {
+    realMisses.push({ id: bubble.id, cents: null, computed, stored: null });
   }
 }
 
@@ -142,10 +156,19 @@ console.log(`${matchCount}/${pixelCount} match`);
 console.log(`would write: ${wouldWrite}`);
 
 if (roundingMisses.length > 0) {
-  console.log(`rounding near-misses: ${roundingMisses.length}`);
+  console.log(`rounding misses: ${roundingMisses.length}`);
   for (const m of roundingMisses) {
     console.log(
-      `  ${m.id}: maxDiff=${m.diff.toFixed(4)} computed=${JSON.stringify(m.computed)} stored=${JSON.stringify(m.stored)}`,
+      `  ${m.id}: stored=${JSON.stringify(m.stored)} computed=${JSON.stringify(m.computed)}`,
+    );
+  }
+}
+
+if (realMisses.length > 0) {
+  console.log(`real misses: ${realMisses.length}`);
+  for (const m of realMisses) {
+    console.log(
+      `  ${m.id}: stored=${JSON.stringify(m.stored)} computed=${JSON.stringify(m.computed)}`,
     );
   }
 }

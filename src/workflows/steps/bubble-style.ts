@@ -6,6 +6,14 @@ export type BubbleBox2d = {
   height?: number;
 };
 
+/** box_2d with all four numeric pixel fields present. */
+export type PixelBox2d = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 /** Percentage string style written to bubbles.style jsonb. */
 export type BubbleStyle = {
   left: string;
@@ -17,6 +25,13 @@ export type BubbleStyle = {
 export type PageDims = {
   width: number;
   height: number;
+};
+
+/** Inputs proven ready for computeBubbleStyle by the write predicate. */
+export type BubbleStyleReady = {
+  pageWidth: number;
+  pageHeight: number;
+  box2d: PixelBox2d;
 };
 
 /**
@@ -55,7 +70,7 @@ export function computeBubbleStyle(
 }
 
 /** True when box_2d has numeric pixel x, y, width, height. */
-export function hasPixelBox2d(box2d: unknown): box2d is BubbleBox2d {
+export function hasPixelBox2d(box2d: unknown): box2d is PixelBox2d {
   if (!box2d || typeof box2d !== "object") return false;
   const box = box2d as Record<string, unknown>;
   return (
@@ -67,18 +82,26 @@ export function hasPixelBox2d(box2d: unknown): box2d is BubbleBox2d {
 }
 
 /**
- * Why addBubbleStyles would skip this bubble, or null when it should write.
- * Shared by the step and scripts/check-bubble-styles.ts.
+ * Why addBubbleStyles would skip this bubble, or the narrowed dims and box
+ * when it should write. Shared by the step and scripts/check-bubble-styles.ts.
  */
 export function getBubbleStyleSkipReason(
   bubble: { style: unknown; box_2d: unknown },
   pageDims: PageDims | null | undefined,
-): string | null {
-  if (bubble.style != null) return "style already set";
-  if (pageDims == null) return "no page dims";
-  if (pageDims.width <= 0 || pageDims.height <= 0) return "invalid page dims";
-  if (!hasPixelBox2d(bubble.box_2d)) return "incomplete box_2d";
-  return null;
+): { ready: BubbleStyleReady } | { skip: string } {
+  if (bubble.style != null) return { skip: "style already set" };
+  if (pageDims == null) return { skip: "no page dims" };
+  if (pageDims.width <= 0 || pageDims.height <= 0) {
+    return { skip: "invalid page dims" };
+  }
+  if (!hasPixelBox2d(bubble.box_2d)) return { skip: "incomplete box_2d" };
+  return {
+    ready: {
+      pageWidth: pageDims.width,
+      pageHeight: pageDims.height,
+      box2d: bubble.box_2d,
+    },
+  };
 }
 
 /**
@@ -90,5 +113,5 @@ export function shouldWriteBubbleStyle(
   bubble: { style: unknown; box_2d: unknown },
   pageDims: PageDims | null | undefined,
 ): boolean {
-  return getBubbleStyleSkipReason(bubble, pageDims) === null;
+  return "ready" in getBubbleStyleSkipReason(bubble, pageDims);
 }

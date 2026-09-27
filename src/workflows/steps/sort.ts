@@ -7,11 +7,7 @@ import sharp from "sharp";
 import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
-import {
-  type BubbleBox2d,
-  computeBubbleStyle,
-  getBubbleStyleSkipReason,
-} from "./bubble-style";
+import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
 
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
@@ -411,33 +407,28 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
   let skipped = 0;
   for (const bubble of bubbles) {
     const dim = pageDims.get(bubble.page_number);
-    const skipReason = getBubbleStyleSkipReason(bubble, dim);
-    if (skipReason) {
+    const verdict = getBubbleStyleSkipReason(bubble, dim);
+    if ("skip" in verdict) {
       skipped++;
-      console.log(`[styles] skip ${bubble.id}: ${skipReason}`);
+      console.log(`[styles] skip ${bubble.id}: ${verdict.skip}`);
       continue;
     }
 
-    // Predicate already required present, positive dims.
-    const pageWidth = dim?.width ?? 0;
-    const pageHeight = dim?.height ?? 0;
-    const style = computeBubbleStyle(
-      bubble.box_2d as BubbleBox2d | null,
-      pageWidth,
-      pageHeight,
-    );
-    if (!style) {
-      skipped++;
-      console.log(`[styles] skip ${bubble.id}: compute returned null`);
-      continue;
-    }
+    const { pageWidth, pageHeight, box2d } = verdict.ready;
+    const style = computeBubbleStyle(box2d, pageWidth, pageHeight)!;
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("bubbles")
       .update({ style })
       .eq("id", bubble.id)
-      .is("style", null);
+      .is("style", null)
+      .select("id");
     if (error) throw new FatalError(`bubbles: ${error.message}`);
+    if (!updated || updated.length === 0) {
+      skipped++;
+      console.log(`[styles] skip ${bubble.id}: style set concurrently`);
+      continue;
+    }
     written++;
   }
 
