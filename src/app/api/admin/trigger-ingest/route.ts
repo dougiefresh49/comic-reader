@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
   const { data: issue } = (await supabaseAdmin
     .from("issues")
     .select("id, pipeline_step")
+    .eq("book_id", body.bookId)
     .eq("id", body.issueId)
     .single()) as {
     data: { id: string; pipeline_step: string | null } | null;
@@ -30,14 +31,17 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "issue not found" }, { status: 404 });
   }
 
+  const pipelineStep = body.fromStep ?? "roboflow-page-analyze";
+
   const { error } = await supabaseAdmin
     .from("issues")
     .update({
-      pipeline_step: body.fromStep ?? "queued",
+      pipeline_step: pipelineStep,
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
     })
+    .eq("book_id", body.bookId)
     .eq("id", body.issueId);
 
   if (error) {
@@ -52,12 +56,36 @@ export async function POST(req: NextRequest) {
     },
   ]);
 
+  const { error: runError } = await supabaseAdmin.from("pipeline_runs").insert({
+    book_id: body.bookId,
+    issue_id: body.issueId,
+    status: "running",
+    steps: {
+      runId: run.runId,
+      fromStep: body.fromStep ?? null,
+      skipped: [],
+    },
+  });
+
+  if (runError) {
+    console.error("pipeline_runs insert failed after start():", runError);
+    return Response.json({
+      ok: true,
+      bookId: body.bookId,
+      issueId: body.issueId,
+      fromStep: body.fromStep ?? null,
+      runId: run.runId,
+      status: "started",
+      warning: runError.message,
+    });
+  }
+
   return Response.json({
     ok: true,
     bookId: body.bookId,
     issueId: body.issueId,
     fromStep: body.fromStep ?? null,
     runId: run.runId,
-    status: "queued",
+    status: "started",
   });
 }

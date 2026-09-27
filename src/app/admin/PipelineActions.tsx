@@ -1,6 +1,15 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
+
+export interface SkippedGate {
+  gate?: string;
+  reason?: string;
+  counts?: unknown;
+  at?: string;
+}
 
 interface PipelineActionsProps {
   bookId: string;
@@ -10,6 +19,8 @@ interface PipelineActionsProps {
   pipelinePausedAt: string | null;
   pipelinePausedUrl: string | null;
   pageCount: number;
+  status: string;
+  skippedGates?: SkippedGate[];
 }
 
 const REVIEW_STEPS: Record<string, string> = {
@@ -29,8 +40,8 @@ const STEP_LABELS: Record<string, string> = {
   "get-context": "Get context",
   "sort-page-elements": "Sort elements",
   "review-pages": "Page review",
-  "generate-voice-descriptions": "Voice descriptions",
   "review-new-characters": "Character review",
+  "generate-voice-descriptions": "Voice descriptions",
   casting: "Casting",
   "generate-voice-models": "Generate voices",
   "generate-audio": "Generate audio",
@@ -49,8 +60,8 @@ const STEP_ORDER = [
   "get-context",
   "sort-page-elements",
   "review-pages",
-  "generate-voice-descriptions",
   "review-new-characters",
+  "generate-voice-descriptions",
   "casting",
   "generate-voice-models",
   "generate-audio",
@@ -67,6 +78,13 @@ function toRelativePath(url: string): string {
   }
 }
 
+function nextStepAfter(pausedAt: string | null): string | null {
+  if (!pausedAt) return null;
+  const idx = STEP_ORDER.indexOf(pausedAt);
+  if (idx < 0) return pausedAt;
+  return STEP_ORDER[idx + 1] ?? pausedAt;
+}
+
 export function PipelineActions({
   bookId,
   issueId,
@@ -75,9 +93,12 @@ export function PipelineActions({
   pipelinePausedAt,
   pipelinePausedUrl,
   pageCount,
+  status,
+  skippedGates,
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
   const [triggered, setTriggered] = useState(false);
+  const router = useRouter();
 
   const isFailed = pipelineStep?.startsWith("failed:") ?? false;
   const failedStep = isFailed
@@ -140,23 +161,36 @@ export function PipelineActions({
     );
   }
 
-  if (isPaused && pipelinePausedUrl) {
-    const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
+  if (isPaused) {
     return (
-      <a
-        href={toRelativePath(pipelinePausedUrl)}
-        className="rounded bg-yellow-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-500"
-      >
-        {label} &rarr;
-      </a>
+      <PausedActions
+        bookId={bookId}
+        issueId={issueId}
+        pipelinePausedAt={pipelinePausedAt}
+        pipelinePausedUrl={pipelinePausedUrl}
+        status={status}
+        triggerLoading={loading}
+        onTrigger={handleTrigger}
+        onSettled={() => router.refresh()}
+      />
     );
   }
 
   if (isRunning) {
     const label = STEP_LABELS[pipelineStep ?? ""] ?? pipelineStep;
+    const skippedLabels = (skippedGates ?? [])
+      .map((s) => s.gate)
+      .filter((g): g is string => typeof g === "string" && g.length > 0);
     return (
-      <span className="inline-flex items-center gap-1.5 rounded bg-cyan-700/30 px-2.5 py-1 text-xs font-medium text-cyan-300">
-        <Spinner /> {label}
+      <span className="inline-flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-1.5 rounded bg-cyan-700/30 px-2.5 py-1 text-xs font-medium text-cyan-300">
+          <Spinner /> {label}
+        </span>
+        {skippedLabels.length > 0 && (
+          <span className="text-[10px] text-neutral-500">
+            skipped: {skippedLabels.join(", ")}
+          </span>
+        )}
       </span>
     );
   }
@@ -173,6 +207,167 @@ export function PipelineActions({
   }
 
   return <span className="text-xs text-neutral-600">—</span>;
+}
+
+function PausedActions({
+  bookId,
+  issueId,
+  pipelinePausedAt,
+  pipelinePausedUrl,
+  status,
+  triggerLoading,
+  onTrigger,
+  onSettled,
+}: {
+  bookId: string;
+  issueId: string;
+  pipelinePausedAt: string | null;
+  pipelinePausedUrl: string | null;
+  status: string;
+  triggerLoading: boolean;
+  onTrigger: (fromStep?: string) => void;
+  onSettled: () => void;
+}) {
+  const [loading, setLoading] = useState<"resume" | "cancel" | null>(null);
+  const [resumeMissing, setResumeMissing] = useState(false);
+  const [resumed, setResumed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
+  const nextStep = nextStepAfter(pipelinePausedAt);
+  const offerRestart = status !== "ready" && nextStep !== null;
+  const busy = loading !== null || triggerLoading;
+
+  async function handleResume() {
+    if (!pipelinePausedAt) return;
+    const hookStep = PAUSE_TO_HOOK_STEP[pipelinePausedAt] ?? pipelinePausedAt;
+    setLoading("resume");
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/resume-hook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          issueId,
+          step: hookStep,
+        }),
+      });
+      if (res.status === 404) {
+        setResumeMissing(true);
+        return;
+      }
+      if (res.ok) {
+        setResumed(true);
+        return;
+      }
+      let message = "Failed to resume";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (data.error) message = data.error;
+      } catch {
+        /* keep default */
+      }
+      setError(message);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleCancel() {
+    setLoading("cancel");
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/cancel-ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookId, issueId }),
+      });
+      if (res.ok) {
+        onSettled();
+        return;
+      }
+      let message = "Failed to cancel";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (data.error) message = data.error;
+      } catch {
+        /* keep default */
+      }
+      setError(message);
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  function handleRestart() {
+    if (!nextStep) return;
+    const ok = window.confirm(
+      `Restart from ${nextStep}? This starts a new run and re-runs paid steps.`,
+    );
+    if (!ok) return;
+    onTrigger(nextStep);
+  }
+
+  if (resumed) {
+    return (
+      <span className="inline-flex items-center rounded bg-emerald-700/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
+        Resumed
+      </span>
+    );
+  }
+
+  if (resumeMissing) {
+    return (
+      <span className="inline-flex flex-col items-start gap-1">
+        <span className="text-xs text-amber-300">
+          No live run for this pause
+        </span>
+        {offerRestart && (
+          <button
+            onClick={handleRestart}
+            disabled={busy}
+            className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+          >
+            Restart from {nextStep}
+          </button>
+        )}
+        {error && (
+          <span className="max-w-xs text-xs text-red-400">{error}</span>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        {pipelinePausedUrl && (
+          <a
+            href={toRelativePath(pipelinePausedUrl)}
+            className="rounded bg-yellow-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-500"
+          >
+            {label} &rarr;
+          </a>
+        )}
+        <button
+          onClick={handleResume}
+          disabled={busy}
+          className="rounded bg-emerald-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+        >
+          {loading === "resume" ? "..." : "Resume"}
+        </button>
+        <button
+          onClick={handleCancel}
+          disabled={busy}
+          className="rounded bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+        >
+          {loading === "cancel" ? "..." : "Cancel"}
+        </button>
+      </span>
+      {error && <span className="max-w-xs text-xs text-red-400">{error}</span>}
+    </span>
+  );
 }
 
 function FailedActions({
@@ -255,7 +450,7 @@ function FailedActions({
           </button>
           <div className="my-1 border-t border-neutral-700" />
           {STEP_ORDER.map((step, idx) => {
-            const label = STEP_LABELS[step] ?? step;
+            const stepLabel = STEP_LABELS[step] ?? step;
             const isFailedStep = step === failedStep;
             return (
               <button
@@ -279,7 +474,7 @@ function FailedActions({
                 {!isFailedStep && idx > failedIdx && (
                   <span className="text-neutral-600">○</span>
                 )}
-                {label}
+                {stepLabel}
               </button>
             );
           })}
