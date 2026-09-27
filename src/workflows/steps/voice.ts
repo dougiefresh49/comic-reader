@@ -1,5 +1,7 @@
 import { GoogleGenAI, createPartFromText } from "@google/genai";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { GEMINI_MEDIUM } from "~/lib/models";
+import type { Database } from "~/types/database";
 
 /** Copied from scripts/utils/registry.ts slugify. Do not import that module. */
 function slugify(text: string): string {
@@ -35,6 +37,8 @@ export type VoiceDescriptionDecisionKind =
 
 export type VoiceDescriptionDecision = {
   characterId: string;
+  /** Alias target when aliased, otherwise the raw speaker string. */
+  resolvedName: string;
   /** Raw speaker strings that resolved to this character id. */
   speakers: string[];
   snippetCount: number;
@@ -93,6 +97,7 @@ export function planVoiceDescriptions(
   type Acc = {
     speakers: Set<string>;
     snippets: string[];
+    resolvedName: string;
   };
   const byCharacter = new Map<string, Acc>();
 
@@ -102,10 +107,10 @@ export function planVoiceDescriptions(
     const desc = bubble.voice_description?.trim();
     if (!speaker || !desc) continue;
 
-    const { characterId } = resolveSpeaker(speaker, aliasMap);
+    const { characterId, resolvedName } = resolveSpeaker(speaker, aliasMap);
     let acc = byCharacter.get(characterId);
     if (!acc) {
-      acc = { speakers: new Set(), snippets: [] };
+      acc = { speakers: new Set(), snippets: [], resolvedName };
       byCharacter.set(characterId, acc);
     }
     acc.speakers.add(speaker);
@@ -126,6 +131,7 @@ export function planVoiceDescriptions(
     const appearanceId = `${characterId}-voice-design`;
     const base = {
       characterId,
+      resolvedName: acc.resolvedName,
       speakers,
       snippetCount: acc.snippets.length,
       snippets: acc.snippets,
@@ -213,20 +219,16 @@ export function formatVoiceDecision(d: VoiceDescriptionDecision): string {
   }
 }
 
-export async function generateVoiceDescriptions(
+/**
+ * SELECT-only loader for planVoiceDescriptions. Shared by the step and the
+ * acceptance script so speaker resolution and the four queries live in one place.
+ */
+export async function loadVoiceDescriptionPlanInput(
+  client: SupabaseClient<Database>,
   bookId: string,
   issueId: string,
-) {
-  "use step";
-  const { FatalError } = await import("workflow");
-  const { createTypedStepClient } = await import("../step-utils");
-  const supabase = await createTypedStepClient();
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new FatalError("GEMINI_API_KEY not set");
-  const gemini = new GoogleGenAI({ apiKey });
-
-  const { data: bubbleRows, error: bubbleErr } = await supabase
+): Promise<PlanVoiceDescriptionsInput> {
+  const { data: bubbleRows, error: bubbleErr } = await client
     .from("bubbles")
     .select("speaker, voice_description, ignored")
     .eq("book_id", bookId)
@@ -234,14 +236,14 @@ export async function generateVoiceDescriptions(
     .not("voice_description", "is", null)
     .not("speaker", "is", null);
 
-  if (bubbleErr) throw new FatalError(bubbleErr.message);
+  if (bubbleErr) throw new Error(bubbleErr.message);
 
-  const { data: aliasRows, error: aliasErr } = await supabase
+  const { data: aliasRows, error: aliasErr } = await client
     .from("aliases")
     .select("alias, canonical, scope, scope_id")
     .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`);
 
-  if (aliasErr) throw new FatalError(aliasErr.message);
+  if (aliasErr) throw new Error(aliasErr.message);
 
   const bubbles: VoiceBubbleSnippet[] = [];
   for (const row of bubbleRows ?? []) {
@@ -258,7 +260,6 @@ export async function generateVoiceDescriptions(
     canonical: row.canonical,
   }));
 
-  // Resolve ids once so we can load ready / characters / design rows.
   const aliasMap = new Map<string, string>();
   for (const a of aliases) {
     aliasMap.set(a.alias.toLowerCase().trim(), a.canonical);
@@ -277,14 +278,14 @@ export async function generateVoiceDescriptions(
   const existingCharacterIds = new Set<string>();
 
   if (resolvedIdList.length > 0) {
-    const { data: caRows, error: caErr } = await supabase
+    const { data: caRows, error: caErr } = await client
       .from("character_appearances")
       .select(
         "id, character_id, voice_status, voice_model_status, voice_description",
       )
       .in("character_id", resolvedIdList);
 
-    if (caErr) throw new FatalError(caErr.message);
+    if (caErr) throw new Error(caErr.message);
 
     for (const r of caRows ?? []) {
       if (r.voice_status === "ready" || r.voice_model_status === "ready") {
@@ -295,25 +296,48 @@ export async function generateVoiceDescriptions(
       }
     }
 
-    const { data: charRows, error: charErr } = await supabase
+    const { data: charRows, error: charErr } = await client
       .from("characters")
       .select("id")
       .in("id", resolvedIdList);
 
-    if (charErr) throw new FatalError(charErr.message);
+    if (charErr) throw new Error(charErr.message);
 
     for (const r of charRows ?? []) {
       existingCharacterIds.add(r.id);
     }
   }
 
-  const plan = planVoiceDescriptions({
+  return {
     bubbles,
     aliases,
     readyCharacterIds,
     existingCharacterIds,
     designDescriptions,
-  });
+  };
+}
+
+export async function generateVoiceDescriptions(
+  bookId: string,
+  issueId: string,
+) {
+  "use step";
+  const { FatalError } = await import("workflow");
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new FatalError("GEMINI_API_KEY not set");
+  const gemini = new GoogleGenAI({ apiKey });
+
+  let input: PlanVoiceDescriptionsInput;
+  try {
+    input = await loadVoiceDescriptionPlanInput(supabase, bookId, issueId);
+  } catch (e) {
+    throw new FatalError(e instanceof Error ? e.message : String(e));
+  }
+
+  const plan = planVoiceDescriptions(input);
 
   console.log(
     `[voice-desc] ${bookId}/${issueId}: ${plan.characterCount} characters, ${plan.skippedReady} skipped (ready voice), ${plan.toDescribe} to describe` +
@@ -338,11 +362,10 @@ export async function generateVoiceDescriptions(
   let processed = 0;
   for (const d of toDescribe) {
     const list = d.snippets.map((s, idx) => `${idx + 1}. ${s}`).join("\n");
-    const speakerLabel = d.speakers[0] ?? d.characterId;
 
     const prompt = `Consolidate these voice description snippets into a single, concise voice description suitable for ElevenLabs voice design. Focus on tone, pitch, accent, and speaking style. Keep it under 100 words.
 
-Character: "${speakerLabel}"
+Character: "${d.resolvedName}"
 
 Snippets:
 ${list}
@@ -357,7 +380,7 @@ Return ONLY the consolidated description as plain text — no JSON, no markdown.
 
     const text = response.text?.trim();
     if (!text) {
-      throw new FatalError(`No Gemini response for ${d.characterId}`);
+      throw new Error(`No Gemini response for ${d.characterId}`);
     }
 
     const appearanceId = d.appearanceId!;
@@ -369,7 +392,6 @@ Return ONLY the consolidated description as plain text — no JSON, no markdown.
           character_id: d.characterId,
           media_type: "voice_design",
           voice_description: text,
-          voice_model_status: "pending",
         },
         { onConflict: "id" },
       );
