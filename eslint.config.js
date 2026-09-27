@@ -7,11 +7,11 @@ const compat = new FlatCompat({
 
 export default tseslint.config(
   {
-    ignores: [".next", "src/types/database.ts"],
+    ignores: [".next", "src/types/database.ts", "scripts/spine/**"],
   },
   ...compat.extends("next/core-web-vitals"),
   {
-    files: ["**/*.ts", "**/*.tsx"],
+    files: ["src/**/*.ts", "src/**/*.tsx"],
     extends: [
       ...tseslint.configs.recommended,
       ...tseslint.configs.recommendedTypeChecked,
