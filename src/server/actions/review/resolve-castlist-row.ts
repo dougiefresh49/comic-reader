@@ -1,46 +1,46 @@
-/** Local copy of scripts/utils/registry.ts slugify. Do not import that module. */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
+import {
+  buildAliasMap,
+  buildCastIndex,
+  formatCastConflicts,
+  slugify,
+  speakerKey,
+  type AliasRow,
+  type CastRow,
+} from "~/workflows/steps/audio-plan";
 
-export type ResolveCastlistResult<T> =
-  | { ok: true; row: T }
+export type ResolveSpeakerVoiceResult =
+  | { ok: true; voiceId: string | null }
   | { ok: false; error: string };
 
 /**
- * Resolve a bubble speaker (often a slug) to a castlist row.
- * Group by normalized key. Differing voice_id values in the group are a
- * collision (error naming every row). Same voice_id: exact character match
- * first, else the first row in the group.
+ * Resolve a bubble speaker to its castlist voice with the audio step's rule
+ * (audio-plan.ts): an exact castlist.character match picks its own slug
+ * group, otherwise the speaker goes through the aliases table and then the
+ * slug. A slug group whose rows differ in voice_id is an error naming every
+ * row. voiceId is null when the matched group has no voice yet.
  */
-export function resolveCastlistRow<
-  T extends { character: string; voice_id: string | null },
->(speaker: string, castlistRows: T[]): ResolveCastlistResult<T> {
-  const key = slugify(speaker);
-  const group = castlistRows.filter((row) => slugify(row.character) === key);
+export function resolveSpeakerVoice(
+  speaker: string,
+  castRows: CastRow[],
+  aliasRows: AliasRow[],
+): ResolveSpeakerVoiceResult {
+  const raw = speaker.trim();
+  const cast = buildCastIndex(castRows);
+  const exact = castRows.some((row) => row.character === raw);
+  const key = exact ? slugify(raw) : speakerKey(raw, buildAliasMap(aliasRows));
 
-  if (group.length === 0) {
+  const conflict = cast.conflicts.find((c) => c.slug === key);
+  if (conflict) {
     return {
       ok: false,
-      error: `No castlist row for speaker '${speaker}'`,
+      error: `Ambiguous castlist match for speaker '${speaker}': ${formatCastConflicts([conflict])}`,
     };
   }
-
-  const voiceIds = new Set(group.map((row) => row.voice_id));
-  if (voiceIds.size > 1) {
-    const names = group.map((row) => `'${row.character}'`).join(" and ");
+  if (!cast.members.has(key)) {
     return {
       ok: false,
-      error: `Ambiguous castlist match for speaker '${speaker}': ${names}`,
+      error: `No castlist row matched speaker '${speaker}' after alias lookup`,
     };
   }
-
-  const exact = group.find((row) => row.character === speaker);
-  if (exact) return { ok: true, row: exact };
-  return { ok: true, row: group[0]! };
+  return { ok: true, voiceId: cast.voices.get(key) ?? null };
 }

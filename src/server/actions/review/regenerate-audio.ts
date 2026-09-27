@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { resolveCastlistRow } from "./resolve-castlist-row";
+import type { AliasRow, CastRow } from "~/workflows/steps/audio-plan";
+import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
 const AUDIO_BUCKET = "comic-audio";
 
@@ -82,23 +83,36 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: "Empty text" };
   }
 
-  // Look up voice ID: resolveCastlistRow groups rows by slug, errors when voices differ, prefers the exact match
-  const { data: castRows, error: castErr } = await supabaseAdmin
-    .from("castlist")
-    .select("character, voice_id")
-    .eq("book_id", args.bookId)
-    .eq("issue_id", args.issueId);
+  // Look up voice ID with the audio step's rule: exact match, else alias then slug
+  const [
+    { data: castRows, error: castErr },
+    { data: aliasRows, error: aliasErr },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("castlist")
+      .select("character, voice_id")
+      .eq("book_id", args.bookId)
+      .eq("issue_id", args.issueId),
+    supabaseAdmin
+      .from("aliases")
+      .select("alias, canonical")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${args.bookId})`),
+  ]);
   if (castErr) {
     return { ok: false, error: castErr.message };
   }
-  const resolved = resolveCastlistRow(
+  if (aliasErr) {
+    return { ok: false, error: aliasErr.message };
+  }
+  const resolved = resolveSpeakerVoice(
     b.speaker,
-    (castRows ?? []) as { character: string; voice_id: string | null }[],
+    (castRows ?? []) as CastRow[],
+    (aliasRows ?? []) as AliasRow[],
   );
   if (!resolved.ok) {
     return { ok: false, error: resolved.error };
   }
-  const voiceId = resolved.row.voice_id;
+  const voiceId = resolved.voiceId;
   if (!voiceId) {
     return {
       ok: false,
