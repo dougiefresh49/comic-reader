@@ -123,7 +123,7 @@ export async function ingestPipeline(input: IngestInput) {
       }
     }
 
-    // ── Phase 2: Human Review — Character Clusters ────────────────────
+    // ── Phase 2: Human Review, Character Clusters ─────────────────────
     if (run("review-clusters")) {
       currentStep = "review-clusters";
       const faces = await countUnresolvedFaces(bookId, issueId);
