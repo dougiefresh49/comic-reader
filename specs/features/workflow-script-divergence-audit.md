@@ -1,6 +1,6 @@
 # Workflow vs Script Pipeline: Divergence Audit
 
-## Status: `done`
+## Status: tracked in [features.md](features.md)
 
 Audit date: 2026-05-06 | All items resolved: 2026-05-07
 

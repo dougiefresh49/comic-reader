@@ -1,6 +1,6 @@
 # Feature: Smart Add Flow
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: Book Parts migration ([book-parts.md](book-parts.md))
 
 ---

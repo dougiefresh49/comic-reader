@@ -1,6 +1,6 @@
 # MP4 Export (sketch)
 
-## Status: `pending` — last priority
+## Status: tracked in [features.md](../features.md), last priority
 ## Goal: bake the live motion-comic experience into a shareable MP4
 ## Cost: $0 (headless Chromium + ffmpeg, all local)
 

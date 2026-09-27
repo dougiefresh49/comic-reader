@@ -1,6 +1,6 @@
 # Feature: Global Character Registry
 
-## Status: `done`
+## Status: tracked in [features.md](features.md)
 
 ## Prerequisite: None — build before processing any new issues
 

@@ -1,6 +1,6 @@
 # Panel Reader UI
 
-## Status: `pending`
+## Status: tracked in [features.md](../features.md)
 ## Goal: Kindle-style double-tap to enter "panel view," swipe between panels, exit back to full page
 
 ---

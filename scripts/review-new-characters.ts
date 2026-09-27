@@ -43,7 +43,12 @@ type NewCharsMap = Record<string, CharacterVoiceEntry>;
 type BubbleEntry = { type?: string; speaker?: string };
 type Annotation = { type: "renamed" | "merged"; from: string };
 
-function parseArgs(): { book: string; issue: string; auto: boolean; db: boolean } {
+function parseArgs(): {
+  book: string;
+  issue: string;
+  auto: boolean;
+  db: boolean;
+} {
   const args = process.argv.slice(2);
   let book = process.env.COMIC_BOOK ?? "";
   let issue = process.env.COMIC_ISSUE ?? "";
@@ -93,9 +98,14 @@ async function runReviewNewCharactersDbMode(
   const SEP = "─".repeat(62);
   const adminUrl = `/admin/${book}/${issue}/review/new-characters`;
 
-  const { pendingCount } = await analyzeNewCharacterQueue(supabase, book, issue, {
-    projectRoot: PROJECT_ROOT,
-  });
+  const { pendingCount } = await analyzeNewCharacterQueue(
+    supabase,
+    book,
+    issue,
+    {
+      projectRoot: PROJECT_ROOT,
+    },
+  );
 
   if (pendingCount > 0) {
     const { error } = await supabase
@@ -133,7 +143,9 @@ async function runReviewNewCharactersDbMode(
     .eq("id", issue)
     .eq("pipeline_paused_at", "review-new-characters");
 
-  console.log(`\n✅ No new characters awaiting review — continuing pipeline.\n`);
+  console.log(
+    `\n✅ No new characters awaiting review — continuing pipeline.\n`,
+  );
 }
 
 async function main() {

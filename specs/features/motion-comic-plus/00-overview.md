@@ -1,6 +1,6 @@
 # Motion Comic Plus
 
-## Status: `pending` — replaces the cinematic episode-generation direction
+## Status: tracked in [features.md](../features.md), replaces the cinematic episode-generation direction
 ## Goal: a reading experience that's funner than a static comic and faithful to the book medium
 ## Budget target: $0 baseline, ~$5 lifetime cap on AI-generated audio (cached forever)
 

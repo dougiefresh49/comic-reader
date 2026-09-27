@@ -1,6 +1,6 @@
 # Episode Generation — Overview
 
-## Status: `pending`
+## Status: tracked in [features.md](../features.md)
 
 Turn a finished, reviewed comic issue into a watchable video episode using existing pipeline assets (structured dialogue, ElevenLabs audio, character registry) and the Venice.ai API for image and video generation.
 

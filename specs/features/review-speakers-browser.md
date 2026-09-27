@@ -1,6 +1,6 @@
 # Feature: Review Speakers — Browser UI
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: Phase B (DB schema) + Phase D (pipeline writes to DB)
 ## Depends on: `review-speakers.md` (terminal implementation — already built)
 

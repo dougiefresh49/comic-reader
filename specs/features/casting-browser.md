@@ -1,6 +1,6 @@
 # Feature: Casting Browser UI
 
-## Status: `done`
+## Status: tracked in [features.md](features.md)
 
 ---
 
