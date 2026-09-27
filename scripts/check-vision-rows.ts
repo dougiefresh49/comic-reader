@@ -7,9 +7,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  bubbleHasContext,
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
+  type BubbleContextFields,
   type RoboflowBoxPrediction,
   type RoboflowSegPrediction,
 } from "~/workflows/steps/vision-rows";
@@ -118,5 +120,58 @@ for (const row of rows) {
     process.exit(1);
   }
 }
+
+const contextCases: BubbleContextFields[] = [
+  {
+    ocr_text: null,
+    text_with_cues: null,
+    speaker: null,
+    ignored: false,
+  },
+  {
+    ocr_text: "hello",
+    text_with_cues: null,
+    speaker: null,
+    ignored: false,
+  },
+  {
+    ocr_text: null,
+    text_with_cues: null,
+    speaker: "Leonardo",
+    ignored: false,
+  },
+  {
+    ocr_text: null,
+    text_with_cues: null,
+    speaker: null,
+    ignored: true,
+  },
+];
+const needingContext = contextCases.filter((b) => !bubbleHasContext(b));
+if (needingContext.length !== 1 || needingContext[0] !== contextCases[0]) {
+  console.error(
+    `bubbleHasContext: expected only the null-everything bubble, got ${needingContext.length}`,
+  );
+  process.exit(1);
+}
+console.log(
+  `bubbleHasContext: ${needingContext.length}/4 bubbles need context (null everything only)`,
+);
+
+const emptySeg = mapSegmentationRow(bookId, issueId, pageNumber, imgDims, []);
+if (
+  !emptySeg ||
+  emptySeg.page_number !== pageNumber ||
+  !Array.isArray(emptySeg.predictions) ||
+  emptySeg.predictions.length !== 0
+) {
+  console.error(
+    "mapSegmentationRow([]) did not return one empty-predictions row",
+  );
+  process.exit(1);
+}
+console.log(
+  `empty segmentation: 1 row page_number=${emptySeg.page_number} preds=${emptySeg.predictions.length}`,
+);
 
 console.log("ok");

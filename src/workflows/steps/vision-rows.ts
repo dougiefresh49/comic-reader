@@ -99,6 +99,27 @@ export function mapSegmentationRow(
   };
 }
 
+/** Fields used to decide whether a bubble already has reviewed/context data. */
+export type BubbleContextFields = {
+  ocr_text: string | null;
+  text_with_cues: string | null;
+  speaker: string | null;
+  ignored: boolean | null;
+};
+
+/**
+ * True when a bubble already has context and must not be overwritten.
+ * Any of ocr_text, text_with_cues, speaker non-null, or ignored true.
+ */
+export function bubbleHasContext(bubble: BubbleContextFields): boolean {
+  return (
+    bubble.ocr_text != null ||
+    bubble.text_with_cues != null ||
+    bubble.speaker != null ||
+    bubble.ignored === true
+  );
+}
+
 /**
  * Build the `bubbles` update for OCR + speaker/emotion context.
  * `text_with_cues` is the text column; there is no `text` column.

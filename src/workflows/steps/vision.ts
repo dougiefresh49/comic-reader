@@ -1,11 +1,13 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
-import type { Json } from "~/types/database";
+import type { Database, Json } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
 import { rdpSimplify } from "./shared";
 import {
+  bubbleHasContext,
   buildContextUpdate,
   mapBubbleRows,
   mapPanelRows,
@@ -15,12 +17,141 @@ import {
   type RoboflowSegPrediction,
 } from "./vision-rows";
 
+type TypedClient = SupabaseClient<Database>;
+
 export {
+  bubbleHasContext,
   buildContextUpdate,
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
 } from "./vision-rows";
+
+function normalizeForMatch(s: string): string {
+  return s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function fuzzyNameMatch(a: string, b: string): boolean {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const wordsA = na.split(" ");
+  const wordsB = nb.split(" ");
+  if (wordsA.length >= 2 && wordsB.length >= 2) {
+    if (
+      wordsA[0] === wordsB[0] &&
+      wordsA[wordsA.length - 1] === wordsB[wordsB.length - 1]
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function buildKnownCharacterListOrFatal(
+  supabase: TypedClient,
+  bookId: string,
+  pageLabel: string,
+): Promise<string[]> {
+  const { data: book, error: bookErr } = await supabase
+    .from("books")
+    .select("franchises")
+    .eq("id", bookId)
+    .single();
+  if (bookErr) {
+    throw new FatalError(
+      `books read failed for ${pageLabel}: ${bookErr.message}`,
+    );
+  }
+
+  const franchises = book?.franchises ?? [];
+  let chars: Array<{ id: string; aliases: string[] | null }>;
+  if (franchises.length > 0) {
+    const franchiseFilter = franchises
+      .map((f) => `franchise.eq.${f}`)
+      .join(",");
+    const { data, error } = await supabase
+      .from("characters")
+      .select("id, aliases")
+      .or(`${franchiseFilter},franchise.is.null`);
+    if (error) {
+      throw new FatalError(
+        `characters read failed for ${pageLabel}: ${error.message}`,
+      );
+    }
+    chars = data ?? [];
+  } else {
+    const { data, error } = await supabase
+      .from("characters")
+      .select("id, aliases");
+    if (error) {
+      throw new FatalError(
+        `characters read failed for ${pageLabel}: ${error.message}`,
+      );
+    }
+    chars = data ?? [];
+  }
+
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const c of chars) {
+    const readable = c.id.replace(/-/g, " ");
+    if (!seen.has(readable.toLowerCase())) {
+      names.push(readable);
+      seen.add(readable.toLowerCase());
+    }
+    if (c.aliases) {
+      for (const a of c.aliases) {
+        if (!seen.has(a.toLowerCase())) {
+          names.push(a);
+          seen.add(a.toLowerCase());
+        }
+      }
+    }
+  }
+  return names;
+}
+
+async function resolveCharacterIdOrFatal(
+  supabase: TypedClient,
+  name: string,
+  pageLabel: string,
+): Promise<string | null> {
+  const directId = name.toLowerCase().replace(/\s+/g, "-");
+  const { data: direct, error: directErr } = await supabase
+    .from("characters")
+    .select("id")
+    .eq("id", directId)
+    .maybeSingle();
+  if (directErr) {
+    throw new FatalError(
+      `characters read failed for ${pageLabel}: ${directErr.message}`,
+    );
+  }
+  if (direct) return directId;
+
+  const { data: allChars, error: allErr } = await supabase
+    .from("characters")
+    .select("id, aliases")
+    .limit(200);
+  if (allErr) {
+    throw new FatalError(
+      `characters read failed for ${pageLabel}: ${allErr.message}`,
+    );
+  }
+
+  if (allChars) {
+    for (const row of allChars) {
+      const id = row.id;
+      const aliases = row.aliases ?? [];
+      if (fuzzyNameMatch(name, id)) return id;
+      if (aliases.some((a) => fuzzyNameMatch(name, a))) return id;
+    }
+  }
+
+  return null;
+}
 
 export async function roboflowAnalyzeBatch(
   bookId: string,
@@ -38,7 +169,7 @@ export async function roboflowAnalyzeBatch(
     throw new FatalError("ROBOFLOW_API_KEY required");
   }
 
-  let failedPages = 0;
+  const failedPageLabels: string[] = [];
 
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
@@ -107,7 +238,7 @@ export async function roboflowAnalyzeBatch(
       console.warn(
         `[roboflow] ${pageLabel}: SAM3 workflow ${res.status}: ${text.slice(0, 160)}`,
       );
-      failedPages++;
+      failedPageLabels.push(pageLabel);
       continue;
     }
 
@@ -127,27 +258,40 @@ export async function roboflowAnalyzeBatch(
     };
 
     const out = data.outputs?.[0];
-    if (!out?.panel_predictions) {
-      console.warn(`[roboflow] ${pageLabel}: no panel predictions returned`);
+    const panelPreds = out?.panel_predictions?.predictions;
+    const imgDims = out?.panel_predictions?.image;
+    const segPredsRaw = out?.segmentation_predictions?.predictions;
+    if (
+      !out?.panel_predictions ||
+      !imgDims ||
+      !Array.isArray(panelPreds) ||
+      !out.segmentation_predictions ||
+      !Array.isArray(segPredsRaw)
+    ) {
+      console.warn(
+        `[roboflow] ${pageLabel}: missing or malformed predictions in response`,
+      );
+      failedPageLabels.push(pageLabel);
       continue;
     }
 
-    const imgDims = out.panel_predictions.image;
+    const segPreds = segPredsRaw;
     const panelRows = mapPanelRows(
       bookId,
       issueId,
       page.pageNumber,
-      out.panel_predictions.predictions,
+      panelPreds,
       imgDims,
     );
-    const bubblePreds = out.bubble_predictions?.predictions ?? [];
+    const bubblePreds = Array.isArray(out.bubble_predictions?.predictions)
+      ? out.bubble_predictions.predictions
+      : [];
     const bubbleRows = mapBubbleRows(
       bookId,
       issueId,
       page.pageNumber,
       bubblePreds,
     );
-    const segPreds = out.segmentation_predictions?.predictions ?? [];
 
     if (existingPanels > 0) {
       console.log(
@@ -183,25 +327,23 @@ export async function roboflowAnalyzeBatch(
       }
     }
 
-    if (segPreds.length > 0) {
-      const segRow = mapSegmentationRow(
-        bookId,
-        issueId,
-        page.pageNumber,
-        imgDims,
-        segPreds,
+    const segRow = mapSegmentationRow(
+      bookId,
+      issueId,
+      page.pageNumber,
+      imgDims,
+      segPreds,
+    );
+    const { error: sErr } = await supabase
+      .from("page_segmentation")
+      .upsert(segRow, {
+        onConflict: "book_id,issue_id,page_number",
+        ignoreDuplicates: true,
+      });
+    if (sErr) {
+      throw new FatalError(
+        `page_segmentation upsert failed for ${pageLabel}: ${sErr.message}`,
       );
-      const { error: sErr } = await supabase
-        .from("page_segmentation")
-        .upsert(segRow, {
-          onConflict: "book_id,issue_id,page_number",
-          ignoreDuplicates: true,
-        });
-      if (sErr) {
-        throw new FatalError(
-          `page_segmentation upsert failed for ${pageLabel}: ${sErr.message}`,
-        );
-      }
     }
 
     console.log(
@@ -211,9 +353,9 @@ export async function roboflowAnalyzeBatch(
     await new Promise((r) => setTimeout(r, 750));
   }
 
-  if (failedPages === pages.length) {
+  if (failedPageLabels.length > 0) {
     throw new FatalError(
-      `[roboflow] All ${pages.length} pages in batch failed. Roboflow API may be down or misconfigured`,
+      `[roboflow] page response failed or malformed: ${failedPageLabels.join(", ")}`,
     );
   }
 }
@@ -397,8 +539,7 @@ export async function characterLookaheadPage(
     "~/lib/gemini-client"
   );
   const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
-  const { identifyFace, resolveCharacterId, buildKnownCharacterList } =
-    await import("~/lib/character-identification");
+  const { identifyFace } = await import("~/lib/character-identification");
   const { findSimilarExemplars, downloadExemplarImage, storeExemplar } =
     await import("~/lib/exemplar-store");
 
@@ -504,7 +645,11 @@ export async function characterLookaheadPage(
   }
 
   // 5. Build known character list + wiki context
-  const dbCharacters = await buildKnownCharacterList(supabase, bookId);
+  const dbCharacters = await buildKnownCharacterListOrFatal(
+    supabase,
+    bookId,
+    pageLabel,
+  );
 
   const { data: issueRow, error: issueErr } = await supabase
     .from("issues")
@@ -597,7 +742,7 @@ export async function characterLookaheadPage(
       );
       exemplarRefs = refs.filter((r): r is NonNullable<typeof r> => r !== null);
     } catch {
-      // Exemplar lookup failed — proceed without
+      // Exemplar lookup failed, proceed without
     }
 
     // Identify with exemplar context + key failover
@@ -644,7 +789,11 @@ export async function characterLookaheadPage(
     }
 
     if (result.characterName && result.confidence >= 0.6) {
-      const charId = await resolveCharacterId(supabase, result.characterName);
+      const charId = await resolveCharacterIdOrFatal(
+        supabase,
+        result.characterName,
+        pageLabel,
+      );
 
       detectionRows.push({
         character_id: charId,
@@ -667,8 +816,10 @@ export async function characterLookaheadPage(
             confidence: result.confidence,
             isConfirmed: charId !== null && result.confidence >= 0.9,
           });
-        } catch {
-          // Non-fatal — exemplar storage failure shouldn't stop identification
+        } catch (e) {
+          throw new FatalError(
+            `character_face_exemplars write failed for ${pageLabel}: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
       }
     }
@@ -817,9 +968,12 @@ export async function getContextPage(
 
   const imgBuf = Buffer.from(await imageBlob.arrayBuffer());
 
+  const bubbleSelect =
+    "id, legacy_id, box_2d, ocr_text, text_with_cues, speaker, ignored";
+
   const { data: initialBubbles, error: bubblesErr } = await supabase
     .from("bubbles")
-    .select("id, legacy_id, box_2d, ocr_text")
+    .select(bubbleSelect)
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
@@ -878,7 +1032,7 @@ export async function getContextPage(
 
     const { data: requeried, error: requeryErr } = await supabase
       .from("bubbles")
-      .select("id, legacy_id, box_2d, ocr_text")
+      .select(bubbleSelect)
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("page_number", pageNumber);
@@ -934,14 +1088,23 @@ export async function getContextPage(
     legacy_id: string;
     box_2d: { x: number; y: number; width: number; height: number };
     ocr_text: string | null;
+    text_with_cues: string | null;
+    speaker: string | null;
+    ignored: boolean | null;
   };
 
-  const bubbles = bubbleData as BubbleRow[];
+  const allBubbles = bubbleData as BubbleRow[];
+  const bubbles = allBubbles.filter((b) => !bubbleHasContext(b));
+  if (allBubbles.length > 0 && bubbles.length === 0) {
+    console.log(
+      `[context] ${pageLabel}: all bubbles already have context, skip`,
+    );
+    return;
+  }
+
   const uniqueSpeakers: string[] = [];
 
   for (const bubble of bubbles) {
-    if (bubble.ocr_text) continue;
-
     const box = bubble.box_2d;
     if (!box?.width || !box.height) continue;
 
@@ -1023,7 +1186,10 @@ export async function getContextPage(
       const { error: updateErr } = await supabase
         .from("bubbles")
         .update(update)
-        .eq("id", bubble.id);
+        .eq("id", bubble.id)
+        .is("ocr_text", null)
+        .is("text_with_cues", null)
+        .is("speaker", null);
       if (updateErr) {
         throw new FatalError(
           `bubbles update failed for ${pageLabel}: ${updateErr.message}`,
