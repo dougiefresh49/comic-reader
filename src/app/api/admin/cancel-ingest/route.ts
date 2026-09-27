@@ -1,14 +1,9 @@
 import "server-only";
 import { type NextRequest } from "next/server";
 import { getHookByToken, getRun } from "workflow/api";
+import { HookNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-
-const PAUSE_TO_HOOK_STEP: Record<string, string> = {
-  "review-clusters": "cluster-review",
-  "review-pages": "page-review",
-  "review-new-characters": "character-review",
-  casting: "casting",
-};
+import { ingestHookToken } from "./hooks";
 
 type PipelineRunSteps = {
   runId?: string;
@@ -48,21 +43,46 @@ export async function POST(req: NextRequest) {
   }
 
   let runId: string | null = null;
+  let runIdFromHook = false;
 
   if (issue.pipeline_paused && issue.pipeline_paused_at) {
-    const hookStep =
-      PAUSE_TO_HOOK_STEP[issue.pipeline_paused_at] ?? issue.pipeline_paused_at;
-    const token = `ingest:${body.bookId}/${body.issueId}/${hookStep}`;
+    const token = ingestHookToken(
+      body.bookId,
+      body.issueId,
+      issue.pipeline_paused_at,
+    );
     try {
       const hook = await getHookByToken(token);
       runId = hook.runId;
-    } catch {
+      runIdFromHook = true;
+    } catch (err) {
+      if (
+        HookNotFoundError.is(err) ||
+        (err instanceof Error && /hook not found/i.test(err.message))
+      ) {
+        return Response.json(
+          { error: "Hook not found for this pause" },
+          { status: 404 },
+        );
+      }
       return Response.json(
-        { error: "Hook not found for this pause" },
-        { status: 404 },
+        {
+          error: err instanceof Error ? err.message : "Failed to look up hook",
+        },
+        { status: 500 },
       );
     }
   } else {
+    if (
+      issue.pipeline_step === "complete" ||
+      (issue.pipeline_step?.startsWith("failed:") ?? false)
+    ) {
+      return Response.json(
+        { error: "Issue is not cancellable in its current state" },
+        { status: 409 },
+      );
+    }
+
     const { data: runRow } = (await supabaseAdmin
       .from("pipeline_runs")
       .select("id, steps")
@@ -116,7 +136,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: issueError.message }, { status: 500 });
   }
 
-  const { error: runError } = await supabaseAdmin
+  const { data: updatedRuns, error: runError } = (await supabaseAdmin
     .from("pipeline_runs")
     .update({
       status: "cancelled",
@@ -124,10 +144,26 @@ export async function POST(req: NextRequest) {
     })
     .eq("book_id", body.bookId)
     .eq("issue_id", body.issueId)
-    .eq("status", "running");
+    .eq("status", "running")
+    .contains("steps", { runId })
+    .select("id")) as {
+    data: Array<{ id: string }> | null;
+    error: { message: string } | null;
+  };
 
   if (runError) {
     return Response.json({ error: runError.message }, { status: 500 });
+  }
+
+  if (runIdFromHook && (!updatedRuns || updatedRuns.length === 0)) {
+    return Response.json({
+      ok: true,
+      bookId: body.bookId,
+      issueId: body.issueId,
+      runId,
+      failedStep,
+      warning: "No pipeline_runs row carried this runId; none updated",
+    });
   }
 
   return Response.json({

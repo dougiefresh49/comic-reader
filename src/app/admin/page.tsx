@@ -17,9 +17,10 @@ type PipelineRunSteps = {
 };
 
 async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
-  const { data } = (await supabaseAdmin
+  const { data, error } = (await supabaseAdmin
     .from("pipeline_runs")
     .select("book_id, issue_id, steps, started_at")
+    .eq("status", "running")
     .order("started_at", { ascending: false })) as {
     data: Array<{
       book_id: string;
@@ -27,7 +28,12 @@ async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
       steps: PipelineRunSteps | null;
       started_at: string | null;
     }> | null;
+    error: { message: string } | null;
   };
+
+  if (error) {
+    console.error("getLatestSkippedByIssue:", error);
+  }
 
   const map = new Map<string, SkippedGate[]>();
   for (const row of data ?? []) {
@@ -374,6 +380,7 @@ function ActionButtons({
         pipelinePausedAt={issue.pipelinePausedAt}
         pipelinePausedUrl={issue.pipelinePausedUrl}
         pageCount={issue.pageCount}
+        status={issue.status}
         skippedGates={skippedGates}
       />
       <Link

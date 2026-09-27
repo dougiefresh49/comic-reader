@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
 
 export interface SkippedGate {
   gate?: string;
@@ -18,6 +19,7 @@ interface PipelineActionsProps {
   pipelinePausedAt: string | null;
   pipelinePausedUrl: string | null;
   pageCount: number;
+  status: string;
   skippedGates?: SkippedGate[];
 }
 
@@ -26,13 +28,6 @@ const REVIEW_STEPS: Record<string, string> = {
   "review-pages": "Review Pages",
   "review-new-characters": "Review Characters",
   casting: "Review Casting",
-};
-
-const PAUSE_TO_HOOK_STEP: Record<string, string> = {
-  "review-clusters": "cluster-review",
-  "review-pages": "page-review",
-  "review-new-characters": "character-review",
-  casting: "casting",
 };
 
 const STEP_LABELS: Record<string, string> = {
@@ -45,8 +40,8 @@ const STEP_LABELS: Record<string, string> = {
   "get-context": "Get context",
   "sort-page-elements": "Sort elements",
   "review-pages": "Page review",
-  "generate-voice-descriptions": "Voice descriptions",
   "review-new-characters": "Character review",
+  "generate-voice-descriptions": "Voice descriptions",
   casting: "Casting",
   "generate-voice-models": "Generate voices",
   "generate-audio": "Generate audio",
@@ -65,8 +60,8 @@ const STEP_ORDER = [
   "get-context",
   "sort-page-elements",
   "review-pages",
-  "generate-voice-descriptions",
   "review-new-characters",
+  "generate-voice-descriptions",
   "casting",
   "generate-voice-models",
   "generate-audio",
@@ -98,6 +93,7 @@ export function PipelineActions({
   pipelinePausedAt,
   pipelinePausedUrl,
   pageCount,
+  status,
   skippedGates,
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
@@ -172,6 +168,8 @@ export function PipelineActions({
         issueId={issueId}
         pipelinePausedAt={pipelinePausedAt}
         pipelinePausedUrl={pipelinePausedUrl}
+        status={status}
+        triggerLoading={loading}
         onTrigger={handleTrigger}
         onSettled={() => router.refresh()}
       />
@@ -208,7 +206,7 @@ export function PipelineActions({
     );
   }
 
-  return <span className="text-xs text-neutral-600">Idle</span>;
+  return <span className="text-xs text-neutral-600">—</span>;
 }
 
 function PausedActions({
@@ -216,6 +214,8 @@ function PausedActions({
   issueId,
   pipelinePausedAt,
   pipelinePausedUrl,
+  status,
+  triggerLoading,
   onTrigger,
   onSettled,
 }: {
@@ -223,19 +223,26 @@ function PausedActions({
   issueId: string;
   pipelinePausedAt: string | null;
   pipelinePausedUrl: string | null;
+  status: string;
+  triggerLoading: boolean;
   onTrigger: (fromStep?: string) => void;
   onSettled: () => void;
 }) {
   const [loading, setLoading] = useState<"resume" | "cancel" | null>(null);
   const [resumeMissing, setResumeMissing] = useState(false);
+  const [resumed, setResumed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
   const nextStep = nextStepAfter(pipelinePausedAt);
+  const offerRestart = status !== "ready" && nextStep !== null;
+  const busy = loading !== null || triggerLoading;
 
   async function handleResume() {
     if (!pipelinePausedAt) return;
     const hookStep = PAUSE_TO_HOOK_STEP[pipelinePausedAt] ?? pipelinePausedAt;
     setLoading("resume");
+    setError(null);
     try {
       const res = await fetch("/api/admin/resume-hook", {
         method: "POST",
@@ -250,7 +257,18 @@ function PausedActions({
         setResumeMissing(true);
         return;
       }
-      if (res.ok) onSettled();
+      if (res.ok) {
+        setResumed(true);
+        return;
+      }
+      let message = "Failed to resume";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (data.error) message = data.error;
+      } catch {
+        /* keep default */
+      }
+      setError(message);
     } finally {
       setLoading(null);
     }
@@ -258,16 +276,45 @@ function PausedActions({
 
   async function handleCancel() {
     setLoading("cancel");
+    setError(null);
     try {
       const res = await fetch("/api/admin/cancel-ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookId, issueId }),
       });
-      if (res.ok) onSettled();
+      if (res.ok) {
+        onSettled();
+        return;
+      }
+      let message = "Failed to cancel";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (data.error) message = data.error;
+      } catch {
+        /* keep default */
+      }
+      setError(message);
     } finally {
       setLoading(null);
     }
+  }
+
+  function handleRestart() {
+    if (!nextStep) return;
+    const ok = window.confirm(
+      `Restart from ${nextStep}? This starts a new run and re-runs paid steps.`,
+    );
+    if (!ok) return;
+    onTrigger(nextStep);
+  }
+
+  if (resumed) {
+    return (
+      <span className="inline-flex items-center rounded bg-emerald-700/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
+        Resumed
+      </span>
+    );
   }
 
   if (resumeMissing) {
@@ -276,43 +323,49 @@ function PausedActions({
         <span className="text-xs text-amber-300">
           No live run for this pause
         </span>
-        {nextStep && (
+        {offerRestart && (
           <button
-            onClick={() => onTrigger(nextStep)}
-            disabled={loading !== null}
+            onClick={handleRestart}
+            disabled={busy}
             className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
           >
             Restart from {nextStep}
           </button>
+        )}
+        {error && (
+          <span className="max-w-xs text-xs text-red-400">{error}</span>
         )}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      {pipelinePausedUrl && (
-        <a
-          href={toRelativePath(pipelinePausedUrl)}
-          className="rounded bg-yellow-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-500"
+    <span className="inline-flex flex-col items-start gap-1">
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        {pipelinePausedUrl && (
+          <a
+            href={toRelativePath(pipelinePausedUrl)}
+            className="rounded bg-yellow-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-500"
+          >
+            {label} &rarr;
+          </a>
+        )}
+        <button
+          onClick={handleResume}
+          disabled={busy}
+          className="rounded bg-emerald-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
         >
-          {label} &rarr;
-        </a>
-      )}
-      <button
-        onClick={handleResume}
-        disabled={loading !== null}
-        className="rounded bg-emerald-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
-      >
-        {loading === "resume" ? "..." : "Resume"}
-      </button>
-      <button
-        onClick={handleCancel}
-        disabled={loading !== null}
-        className="rounded bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
-      >
-        {loading === "cancel" ? "..." : "Cancel"}
-      </button>
+          {loading === "resume" ? "..." : "Resume"}
+        </button>
+        <button
+          onClick={handleCancel}
+          disabled={busy}
+          className="rounded bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+        >
+          {loading === "cancel" ? "..." : "Cancel"}
+        </button>
+      </span>
+      {error && <span className="max-w-xs text-xs text-red-400">{error}</span>}
     </span>
   );
 }

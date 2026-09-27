@@ -68,7 +68,16 @@ export async function POST(req: NextRequest) {
   });
 
   if (runError) {
-    return Response.json({ error: runError.message }, { status: 500 });
+    console.error("pipeline_runs insert failed after start():", runError);
+    return Response.json({
+      ok: true,
+      bookId: body.bookId,
+      issueId: body.issueId,
+      fromStep: body.fromStep ?? null,
+      runId: run.runId,
+      status: "started",
+      warning: runError.message,
+    });
   }
 
   return Response.json({
