@@ -4,7 +4,7 @@
      Everything shared lives in AGENTS.md so delegated prompts can shrink
      to "read AGENTS.md, then do issue #N." Keep the roster synced with
      the fleet repo's copy when models or budget posture change.
-     Instantiated from fleet corefiles @ 2b1b5a0, 2026-09-25 -->
+     Instantiated from fleet corefiles @ 4a9e5f8, 2026-09-27 -->
 
 @AGENTS.md
 

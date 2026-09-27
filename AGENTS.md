@@ -2,18 +2,19 @@
      Copy to a new repo's root as AGENTS.md and fill every [FILL-IN] slot;
      delete slots that don't apply. The shared sections ship as-is: A note
      from Doug, the glossary's core entries, Verify before you assert,
-     Answer the question that was asked, Stay in scope, The config-mutation
-     gate, Don't repeat a failing call. If one misfires, fix it in the
-     template, not per-repo. Each traces to a counted failure (fleet
-     docs/transcript-audit-2026-08.md, "audit") or a root-caused escape
-     from the 2026-08 orchestration field test ("E1-E5"); the letter's two
+     Answer the question that was asked, Stay in scope, Push back on the
+     spec, The config-mutation gate, Don't repeat a failing call. If one
+     misfires, fix it in the template, not per-repo. Each traces to a
+     counted failure (fleet docs/transcript-audit-2026-08.md, "audit"), a
+     root-caused escape from the 2026-08 orchestration field test
+     ("E1-E5"), or a dated owner moment cited in place; the letter's two
      philosophy sentences are the measured calm-down fix for over-eager
      models (audit rec #2; overbuild evidence is classification-level in
      the opus-5 profile). A behavioral rule you add needs BOTH an evidence
      citation AND a BAD/GOOD pair from a real moment; repo conventions and
      config are welcome, but label them as such. No speculative rules
      dressed as earned ones.
-     Instantiated from fleet corefiles @ 2b1b5a0, 2026-09-25 -->
+     Instantiated from fleet corefiles @ 4a9e5f8, 2026-09-27 -->
 
 # Comic Reader
 
