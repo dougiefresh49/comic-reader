@@ -35,9 +35,21 @@ export type VoiceDescriptionDecisionKind =
   | "skip_unresolved"
   | "describe";
 
+export type VoiceCharacterGroup = {
+  characterId: string;
+  /**
+   * Alias target when any speaker in the group matched an alias; otherwise the
+   * first raw speaker string in sorted order.
+   */
+  resolvedName: string;
+  /** Raw speaker strings that resolved to this character id, sorted. */
+  speakers: string[];
+  snippets: string[];
+};
+
 export type VoiceDescriptionDecision = {
   characterId: string;
-  /** Alias target when aliased, otherwise the raw speaker string. */
+  /** Alias target when aliased, otherwise the stable raw-speaker label. */
   resolvedName: string;
   /** Raw speaker strings that resolved to this character id. */
   speakers: string[];
@@ -58,9 +70,8 @@ export type VoiceDescriptionPlan = {
 };
 
 export type PlanVoiceDescriptionsInput = {
-  bubbles: VoiceBubbleSnippet[];
-  /** Already scoped: global, or book-scoped for this book. */
-  aliases: VoiceAliasRow[];
+  /** Pre-grouped by character id (from groupVoiceBubblesByCharacter). */
+  groups: VoiceCharacterGroup[];
   readyCharacterIds: ReadonlySet<string>;
   existingCharacterIds: ReadonlySet<string>;
   /** Map of `<id>-voice-design` appearance id → voice_description (may be null). */
@@ -83,40 +94,67 @@ function resolveSpeaker(
 }
 
 /**
- * Pure plan: group non-ignored bubble voice snippets by resolved character id
- * and decide skip vs describe. No I/O.
+ * Group non-ignored bubble voice snippets by resolved character id.
+ * Each speaker is resolved once. Label rule: alias target when any speaker
+ * matched an alias, else the first raw speaker string in sorted order.
  */
-export function planVoiceDescriptions(
-  input: PlanVoiceDescriptionsInput,
-): VoiceDescriptionPlan {
+export function groupVoiceBubblesByCharacter(
+  bubbles: VoiceBubbleSnippet[],
+  aliases: VoiceAliasRow[],
+): VoiceCharacterGroup[] {
   const aliasMap = new Map<string, string>();
-  for (const row of input.aliases) {
+  for (const row of aliases) {
     aliasMap.set(row.alias.toLowerCase().trim(), row.canonical);
   }
 
   type Acc = {
     speakers: Set<string>;
     snippets: string[];
-    resolvedName: string;
+    aliasTarget: string | null;
   };
   const byCharacter = new Map<string, Acc>();
 
-  for (const bubble of input.bubbles) {
+  for (const bubble of bubbles) {
     if (bubble.ignored) continue;
     const speaker = bubble.speaker?.trim();
     const desc = bubble.voice_description?.trim();
     if (!speaker || !desc) continue;
 
-    const { characterId, resolvedName } = resolveSpeaker(speaker, aliasMap);
+    const { characterId, resolvedName, aliased } = resolveSpeaker(
+      speaker,
+      aliasMap,
+    );
     let acc = byCharacter.get(characterId);
     if (!acc) {
-      acc = { speakers: new Set(), snippets: [], resolvedName };
+      acc = { speakers: new Set(), snippets: [], aliasTarget: null };
       byCharacter.set(characterId, acc);
     }
     acc.speakers.add(speaker);
     acc.snippets.push(desc);
+    if (aliased) {
+      acc.aliasTarget = resolvedName;
+    }
   }
 
+  const characterIds = [...byCharacter.keys()].sort();
+  return characterIds.map((characterId) => {
+    const acc = byCharacter.get(characterId)!;
+    const speakers = [...acc.speakers].sort();
+    return {
+      characterId,
+      resolvedName: acc.aliasTarget ?? speakers[0]!,
+      speakers,
+      snippets: acc.snippets,
+    };
+  });
+}
+
+/**
+ * Pure plan: decide skip vs describe for each pre-grouped character. No I/O.
+ */
+export function planVoiceDescriptions(
+  input: PlanVoiceDescriptionsInput,
+): VoiceDescriptionPlan {
   const decisions: VoiceDescriptionDecision[] = [];
   let skippedReady = 0;
   let skippedNarrator = 0;
@@ -124,17 +162,15 @@ export function planVoiceDescriptions(
   let skippedUnresolved = 0;
   let toDescribe = 0;
 
-  const characterIds = [...byCharacter.keys()].sort();
-  for (const characterId of characterIds) {
-    const acc = byCharacter.get(characterId)!;
-    const speakers = [...acc.speakers].sort();
+  for (const group of input.groups) {
+    const { characterId } = group;
     const appearanceId = `${characterId}-voice-design`;
     const base = {
       characterId,
-      resolvedName: acc.resolvedName,
-      speakers,
-      snippetCount: acc.snippets.length,
-      snippets: acc.snippets,
+      resolvedName: group.resolvedName,
+      speakers: group.speakers,
+      snippetCount: group.snippets.length,
+      snippets: group.snippets,
     };
 
     if (characterId === "narrator") {
@@ -230,11 +266,12 @@ export async function loadVoiceDescriptionPlanInput(
 ): Promise<PlanVoiceDescriptionsInput> {
   const { data: bubbleRows, error: bubbleErr } = await client
     .from("bubbles")
-    .select("speaker, voice_description, ignored")
+    .select("id, speaker, voice_description, ignored")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .not("voice_description", "is", null)
-    .not("speaker", "is", null);
+    .not("speaker", "is", null)
+    .order("id");
 
   if (bubbleErr) throw new Error(bubbleErr.message);
 
@@ -260,18 +297,8 @@ export async function loadVoiceDescriptionPlanInput(
     canonical: row.canonical,
   }));
 
-  const aliasMap = new Map<string, string>();
-  for (const a of aliases) {
-    aliasMap.set(a.alias.toLowerCase().trim(), a.canonical);
-  }
-  const resolvedIds = new Set<string>();
-  for (const b of bubbles) {
-    if (b.ignored) continue;
-    const speaker = b.speaker?.trim();
-    if (!speaker) continue;
-    resolvedIds.add(resolveSpeaker(speaker, aliasMap).characterId);
-  }
-  const resolvedIdList = [...resolvedIds];
+  const groups = groupVoiceBubblesByCharacter(bubbles, aliases);
+  const resolvedIdList = groups.map((g) => g.characterId);
 
   const readyCharacterIds = new Set<string>();
   const designDescriptions = new Map<string, string | null>();
@@ -309,8 +336,7 @@ export async function loadVoiceDescriptionPlanInput(
   }
 
   return {
-    bubbles,
-    aliases,
+    groups,
     readyCharacterIds,
     existingCharacterIds,
     designDescriptions,

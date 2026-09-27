@@ -1,5 +1,5 @@
 /**
- * Read-only plan for voice descriptions. SELECTs only, then one synthetic case.
+ * Read-only plan for voice descriptions. SELECTs only, then synthetic cases.
  *
  * Usage: pnpm tsx --env-file=.env scripts/plan-voice-descriptions.ts <bookId> <issueId>
  */
@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import {
   formatVoiceDecision,
+  groupVoiceBubblesByCharacter,
   loadVoiceDescriptionPlanInput,
   planVoiceDescriptions,
   type VoiceAliasRow,
@@ -69,12 +70,61 @@ function runSynthetic() {
   const designDescriptions = new Map<string, string | null>();
 
   return planVoiceDescriptions({
-    bubbles,
-    aliases,
+    groups: groupVoiceBubblesByCharacter(bubbles, aliases),
     readyCharacterIds,
     existingCharacterIds,
     designDescriptions,
   });
+}
+
+/** Alias-label stability: raw GREEN RANGER + tommy → label Green Ranger both orders. */
+function runAliasLabelSynthetic() {
+  const aliases: VoiceAliasRow[] = [
+    { alias: "tommy", canonical: "Green Ranger" },
+  ];
+  const readyCharacterIds = new Set<string>();
+  const existingCharacterIds = new Set(["green-ranger"]);
+  const designDescriptions = new Map<string, string | null>();
+
+  const orderA: VoiceBubbleSnippet[] = [
+    {
+      speaker: "GREEN RANGER",
+      voice_description: "raw caps variant",
+      ignored: false,
+    },
+    {
+      speaker: "tommy",
+      voice_description: "alias variant",
+      ignored: false,
+    },
+  ];
+  const orderB: VoiceBubbleSnippet[] = [
+    {
+      speaker: "tommy",
+      voice_description: "alias variant",
+      ignored: false,
+    },
+    {
+      speaker: "GREEN RANGER",
+      voice_description: "raw caps variant",
+      ignored: false,
+    },
+  ];
+
+  const planA = planVoiceDescriptions({
+    groups: groupVoiceBubblesByCharacter(orderA, aliases),
+    readyCharacterIds,
+    existingCharacterIds,
+    designDescriptions,
+  });
+  const planB = planVoiceDescriptions({
+    groups: groupVoiceBubblesByCharacter(orderB, aliases),
+    readyCharacterIds,
+    existingCharacterIds,
+    designDescriptions,
+  });
+
+  return { planA, planB };
 }
 
 async function main() {
@@ -102,6 +152,17 @@ async function main() {
   );
   console.log(
     `Character: tommy → "${tommy?.resolvedName}"; Old Guy → "${oldGuy?.resolvedName}"`,
+  );
+
+  console.log("--- alias-label synthetic ---");
+  const { planA, planB } = runAliasLabelSynthetic();
+  const groupA = planA.decisions.find((d) => d.characterId === "green-ranger");
+  const groupB = planB.decisions.find((d) => d.characterId === "green-ranger");
+  console.log(
+    `order GREEN RANGER then tommy → Character: "${groupA?.resolvedName}"`,
+  );
+  console.log(
+    `order tommy then GREEN RANGER → Character: "${groupB?.resolvedName}"`,
   );
 }
 
