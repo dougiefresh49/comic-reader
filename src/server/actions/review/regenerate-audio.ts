@@ -82,7 +82,7 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: "Empty text" };
   }
 
-  // Look up voice ID (exact character, then slug-normalized match)
+  // Look up voice ID: resolveCastlistRow groups rows by slug, errors when voices differ, prefers the exact match
   const { data: castRows, error: castErr } = await supabaseAdmin
     .from("castlist")
     .select("character, voice_id")
