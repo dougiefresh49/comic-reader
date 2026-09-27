@@ -1,6 +1,6 @@
 # Feature: Review UI — Keyboard Shortcuts, Speaker UX & Sort Order
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: Review UI Phase A (`done`)
 ## Blocked by: Nothing
 

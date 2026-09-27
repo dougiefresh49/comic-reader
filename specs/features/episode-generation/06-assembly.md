@@ -1,6 +1,6 @@
 # Phase 5 — Assembly
 
-## Status: `pending`
+## Status: tracked in [features.md](../features.md)
 ## Prerequisites: Phase 4 complete (all video clips approved)
 ## Cost: ~$0 (FFmpeg only) + ~$1–5 optional (Venice music)
 

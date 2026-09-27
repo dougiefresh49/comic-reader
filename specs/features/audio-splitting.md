@@ -1,6 +1,6 @@
 # Feature: Voice Clip Splitting Tool
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 
 ---
 

@@ -1,6 +1,6 @@
 # Music scenes — group panels into continuous music runs
 
-**Status**: pending — needs review before build
+**Status**: tracked in [features.md](features.md), needs review before build
 
 ## Problem
 

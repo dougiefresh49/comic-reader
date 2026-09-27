@@ -1,6 +1,6 @@
 # Phase 1 — Character Setup
 
-## Status: `pending`
+## Status: tracked in [features.md](../features.md)
 ## Prerequisites: `data/character-registry.json` populated (character-registry feature done)
 ## Cost: ~$2–5 one-time per book (seedream reference images), ~$0.10–0.30 per issue (Gemini aesthetic analysis)
 

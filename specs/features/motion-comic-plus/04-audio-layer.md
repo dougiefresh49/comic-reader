@@ -1,6 +1,6 @@
 # Audio Layer
 
-## Status: `pending`
+## Status: tracked in [features.md](../features.md)
 ## Goal: Three audio tracks — dialogue (existing), ambience+sfx, music — mixed at runtime in the browser, with a content cache so we never pay twice for the same sound
 ## Lifetime cost target: <$10 across all books, fully cached
 

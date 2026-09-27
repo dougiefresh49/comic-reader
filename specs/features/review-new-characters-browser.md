@@ -1,6 +1,6 @@
 # Review New Characters — Browser UI
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Pattern source: mirrors `review-speakers-browser.md` and the shipped speakers review UI almost exactly
 ## Implementer: Cursor agent (this is a delegated implementation)
 

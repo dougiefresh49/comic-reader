@@ -8,7 +8,7 @@
 > where individual shots can be tagged `--hero` to opt into Venice
 > image+video gen.
 
-## Status: `superseded` (default), `pending` (hero-shot opt-in only)
+## Status: tracked in [features.md](../features.md) (hero-shot opt-in only)
 ## Prerequisites: Phase 2 complete (shot-plan.json approved), Phase 1 complete (series.json, character references)
 ## Cost: ~$5–15/issue (~$0.05–0.50 per image × 20–30 shots)
 

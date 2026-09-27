@@ -1,6 +1,6 @@
 # Image Optimization — Future Path
 
-## Status: `pending` (revisit when on Supabase Pro)
+## Status: tracked in [features.md](../features.md) (revisit when on Supabase Pro)
 
 ## Today
 
