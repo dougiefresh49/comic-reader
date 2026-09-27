@@ -8,7 +8,7 @@
 > where individual shots can be tagged `--hero` to opt into Venice
 > image+video gen.
 
-## Status: tracked in [features.md](../features.md) (default), (hero-shot opt-in only)
+## Status: tracked in [features.md](../features.md) (hero-shot opt-in only)
 ## Prerequisites: Phase 3 complete (all panels approved in review-state.json)
 ## Cost: ~$15–50/issue (~$0.50–2.00 per clip × 20–30 shots)
 

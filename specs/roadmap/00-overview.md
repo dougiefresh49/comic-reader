@@ -32,7 +32,7 @@ continuously beneath it all.
 | Foreground / background separation | live | SVG clip-path layering: bg → effects → fg. Uses SAM3 polygons from `panels.foreground_polygons`. Shipped in PR #23. |
 | Wiki context fetch at ingest | live | `fetch-wiki-context` script uses MediaWiki API for Summary + Appearances. Stores in `issues.wiki_summary` / `wiki_appearances`. Shipped in PR #22. |
 | Character lookahead (face cluster + identify) | live | Gemini Flash per-face identification → name-based clustering. Feeds per-page character lists into get-context. PR #28. |
-| Voice rotation (IVC archive/restore) | live | Pipeline wiring (checkout step 8.5, archive step 12.5). passed 2026-05-01 (`1ee42e7`). Shipped in PR #20. |
+| Voice rotation (IVC archive/restore) | live | Pipeline wiring (checkout step 8.5, archive step 12.5). Fidelity test passed 2026-05-01 (`1ee42e7`). Shipped in PR #20. |
 | Admin: bubble↔panel reassign | live | `PanelsReviewClient.tsx`. |
 | Admin: panel reorder | live | Drag-to-reorder via `@dnd-kit/sortable`. Sets `source = "manual"`. Shipped in PR #19. |
 
@@ -208,7 +208,7 @@ profile schema work.
 Tracking here to keep them out of the per-spec docs. Each is blocking
 or shaping a workstream.
 
-- **IVC recreation fidelity test.** passed 2026-05-01 (`1ee42e7`). [04-voice-rotation.md] has the
+- **IVC recreation fidelity test.** Passed 2026-05-01 (`1ee42e7`). [04-voice-rotation.md] has the
   test recipe; the user provided `kaQG4rvOTzT2F2yIXtSN` as a safe-to-
   break IVC for the experiment. Outcome decides whether main-cast
   voices stay live forever or get rotated like everyone else.
