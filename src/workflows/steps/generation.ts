@@ -1,49 +1,89 @@
+import { FatalError } from "workflow";
+import type { Json } from "~/types/database";
+import {
+  buildAliasMap,
+  buildCastVoiceMap,
+  bubbleNeedsAudio,
+  normalizeAlignment,
+  planCharactersNeedingVoices,
+  speakerKey,
+  type AlignmentRaw,
+  type AppearanceRow,
+  voiceDesignAppearanceId,
+} from "./audio-plan";
+
 export async function getCharactersNeedingVoices(
   bookId: string,
   issueId: string,
 ): Promise<string[]> {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
-  const { data: chars } = await supabase
-    .from("characters")
-    .select("id")
-    .eq("book_id", bookId)
-    .is("voice_id", null)
-    .not("voice_description", "is", null);
+  const [
+    { data: bubbleRows, error: bubErr },
+    { data: aliasRows, error: aliasErr },
+    { data: castRows, error: castErr },
+    { data: appearanceRows, error: appErr },
+  ] = await Promise.all([
+    supabase
+      .from("bubbles")
+      .select("speaker")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .not("speaker", "is", null),
+    supabase
+      .from("aliases")
+      .select("alias, canonical, scope, scope_id")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
+    supabase
+      .from("castlist")
+      .select("character, voice_id")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId),
+    supabase
+      .from("character_appearances")
+      .select(
+        "id, character_id, voice_id, voice_status, voice_description, voice_created_at",
+      ),
+  ]);
 
-  if (!chars || chars.length === 0) return [];
+  if (bubErr) throw new FatalError(bubErr.message);
+  if (aliasErr) throw new FatalError(aliasErr.message);
+  if (castErr) throw new FatalError(castErr.message);
+  if (appErr) throw new FatalError(appErr.message);
 
-  // Exclude IVC characters — they already have a voice via the casting UI
-  const { data: ivcCast } = await supabase
-    .from("castlist")
-    .select("character")
-    .eq("book_id", bookId)
-    .not("voice_uuid", "is", null);
+  const aliasMap = buildAliasMap(aliasRows ?? []);
+  const castVoiceMap = buildCastVoiceMap(castRows ?? []);
+  const appearances = (appearanceRows ?? []) as AppearanceRow[];
+  const rawSpeakers = (bubbleRows ?? [])
+    .map((b) => b.speaker)
+    .filter((s): s is string => !!s);
 
-  const ivcCharacters = new Set(
-    ((ivcCast ?? []) as { character: string }[]).map((c) => c.character),
+  const plan = planCharactersNeedingVoices(
+    rawSpeakers,
+    aliasMap,
+    castVoiceMap,
+    appearances,
   );
 
-  const { data: issueBubbles } = await supabase
-    .from("bubbles")
-    .select("speaker")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId);
-
-  const issueSpeakers = new Set(
-    (issueBubbles ?? []).map((b: { speaker: string }) => b.speaker),
-  );
-
-  const needed = (chars as { id: string }[])
-    .filter((c) => issueSpeakers.has(c.id) && !ivcCharacters.has(c.id))
-    .map((c) => c.id);
+  for (const row of plan.reuse) {
+    const { error } = await supabase.from("castlist").upsert(
+      {
+        book_id: bookId,
+        issue_id: issueId,
+        character: row.character,
+        voice_id: row.voice_id,
+      },
+      { onConflict: "book_id,issue_id,character" },
+    );
+    if (error) throw new FatalError(error.message);
+  }
 
   console.log(
-    `[get-chars] ${bookId}/${issueId}: ${needed.length} characters need Voice Design (${ivcCharacters.size} IVC excluded)`,
+    `[get-chars] ${bookId}/${issueId}: ${plan.needDesign.length} need Voice Design, ${plan.reuse.length} castlist reuse from ready appearances`,
   );
-  return needed;
+  return plan.needDesign;
 }
 
 export async function generateVoiceModel(
@@ -52,29 +92,46 @@ export async function generateVoiceModel(
   characterId: string,
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
+  if (!apiKey) throw new FatalError("ELEVENLABS_API_KEY not set");
 
-  const { data: char } = await supabase
-    .from("characters")
-    .select("id, name, voice_description")
-    .eq("id", characterId)
-    .single();
+  const appearanceId = voiceDesignAppearanceId(characterId);
+  const { data: appearance, error: appErr } = await supabase
+    .from("character_appearances")
+    .select(
+      "id, character_id, voice_id, voice_status, voice_description, voice_created_at",
+    )
+    .eq("id", appearanceId)
+    .maybeSingle();
 
-  if (
-    !char ||
-    !(char as { voice_description: string | null }).voice_description
-  ) {
-    console.log(`[voice-model] ${characterId}: no voice description, skipping`);
+  if (appErr) throw new FatalError(appErr.message);
+
+  if (appearance?.voice_status === "ready" && appearance.voice_id?.trim()) {
+    const { error } = await supabase.from("castlist").upsert(
+      {
+        book_id: bookId,
+        issue_id: issueId,
+        character: characterId,
+        voice_id: appearance.voice_id,
+      },
+      { onConflict: "book_id,issue_id,character" },
+    );
+    if (error) throw new FatalError(error.message);
+    console.log(
+      `[voice-model] ${characterId}: already ready, castlist upserted`,
+    );
     return;
   }
 
-  const { name, voice_description } = char as {
-    name: string;
-    voice_description: string;
-  };
+  const voiceDescription = appearance?.voice_description?.trim();
+  if (!voiceDescription) {
+    console.log(
+      `[voice-model] ${characterId}: no voice description on ${appearanceId}, skipping`,
+    );
+    return;
+  }
 
   const designRes = await globalThis.fetch(
     "https://api.elevenlabs.io/v1/text-to-voice/design",
@@ -85,7 +142,7 @@ export async function generateVoiceModel(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        voice_description,
+        voice_description: voiceDescription,
         model_id: "eleven_ttv_v3",
         auto_generate_text: true,
       }),
@@ -94,8 +151,8 @@ export async function generateVoiceModel(
 
   if (!designRes.ok) {
     const err = await designRes.text();
-    throw new Error(
-      `Voice design failed for ${name}: ${designRes.status} ${err.slice(0, 200)}`,
+    throw new FatalError(
+      `Voice design failed for ${characterId}: ${designRes.status} ${err.slice(0, 200)}`,
     );
   }
 
@@ -103,7 +160,9 @@ export async function generateVoiceModel(
     previews: { generated_voice_id: string }[];
   };
   const generatedVoiceId = designData.previews[0]?.generated_voice_id;
-  if (!generatedVoiceId) throw new Error(`No preview returned for ${name}`);
+  if (!generatedVoiceId) {
+    throw new FatalError(`No preview returned for ${characterId}`);
+  }
 
   const createRes = await globalThis.fetch(
     "https://api.elevenlabs.io/v1/text-to-voice",
@@ -114,8 +173,8 @@ export async function generateVoiceModel(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        voice_name: name,
-        voice_description,
+        voice_name: characterId,
+        voice_description: voiceDescription,
         generated_voice_id: generatedVoiceId,
       }),
     },
@@ -123,140 +182,67 @@ export async function generateVoiceModel(
 
   if (!createRes.ok) {
     const err = await createRes.text();
-    throw new Error(
-      `Voice create failed for ${name}: ${createRes.status} ${err.slice(0, 200)}`,
+    throw new FatalError(
+      `Voice create failed for ${characterId}: ${createRes.status} ${err.slice(0, 200)}`,
     );
   }
 
   const { voice_id } = (await createRes.json()) as { voice_id: string };
+  const voiceCreatedAt = new Date().toISOString();
 
-  await supabase.from("characters").update({ voice_id }).eq("id", characterId);
+  const { error: upAppErr } = await supabase
+    .from("character_appearances")
+    .update({
+      voice_id,
+      voice_type: "voice_design",
+      voice_status: "ready",
+      voice_created_at: voiceCreatedAt,
+    })
+    .eq("id", appearanceId);
 
-  await supabase.from("castlist").upsert(
+  if (upAppErr) throw new FatalError(upAppErr.message);
+
+  const { error: castErr } = await supabase.from("castlist").upsert(
     {
       book_id: bookId,
-      character_id: characterId,
-      voice_id,
       issue_id: issueId,
+      character: characterId,
+      voice_id,
     },
-    { onConflict: "book_id,character_id" },
+    { onConflict: "book_id,issue_id,character" },
   );
+  if (castErr) throw new FatalError(castErr.message);
 
-  console.log(`[voice-model] ${name}: created voice ${voice_id}`);
+  console.log(`[voice-model] ${characterId}: created voice ${voice_id}`);
 }
-
-export async function voiceRotationCheckout(bookId: string, _issueId: string) {
-  "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) {
-    console.log("[voice-checkout] ELEVENLABS_API_KEY not set, skipping");
-    return;
-  }
-
-  const [{ data: voices }, { data: castlist }] = await Promise.all([
-    supabase
-      .from("voices")
-      .select("id, display_name, status, source_clip_path"),
-    supabase.from("castlist").select("voice_uuid, book_id"),
-  ]);
-
-  const neededUuids = new Set(
-    ((castlist ?? []) as { voice_uuid: string | null; book_id: string }[])
-      .filter((c) => c.book_id === bookId && c.voice_uuid)
-      .map((c) => c.voice_uuid!),
-  );
-
-  type VoiceRow = {
-    id: string;
-    display_name: string;
-    status: string;
-    source_clip_path: string | null;
-  };
-
-  const archived = ((voices ?? []) as VoiceRow[]).filter(
-    (v) => neededUuids.has(v.id) && v.status === "archived",
-  );
-
-  if (archived.length === 0) {
-    console.log(`[voice-checkout] ${bookId}: all needed voices already active`);
-    return;
-  }
-
-  let restored = 0;
-  for (const v of archived) {
-    if (!v.source_clip_path) continue;
-
-    const [maybeBucket, ...rest] = v.source_clip_path.split("/");
-    const bucket = rest.length > 0 ? maybeBucket! : "comic-voice-clips";
-    const objectPath = rest.length > 0 ? rest.join("/") : v.source_clip_path;
-    const { data: clipData } = await supabase.storage
-      .from(bucket)
-      .download(objectPath);
-    if (!clipData) continue;
-
-    const clipBytes = await clipData.arrayBuffer();
-    const filename = v.source_clip_path.split("/").pop() ?? `${v.id}.mp3`;
-
-    const form = new FormData();
-    form.append("name", v.display_name);
-    form.append(
-      "files",
-      new Blob([clipBytes], { type: "audio/mpeg" }),
-      filename,
-    );
-
-    const r = await globalThis.fetch(
-      "https://api.elevenlabs.io/v1/voices/add",
-      {
-        method: "POST",
-        headers: { "xi-api-key": apiKey },
-        body: form,
-      },
-    );
-    if (!r.ok) continue;
-
-    const { voice_id } = (await r.json()) as { voice_id: string };
-
-    await supabase
-      .from("voices")
-      .update({
-        status: "active",
-        current_elevenlabs_id: voice_id,
-        archived_at: null,
-      })
-      .eq("id", v.id);
-
-    await supabase.from("castlist").update({ voice_id }).eq("voice_uuid", v.id);
-
-    restored++;
-  }
-
-  console.log(
-    `[voice-checkout] ${bookId}: restored ${restored}/${archived.length} voices`,
-  );
-}
+generateVoiceModel.maxRetries = 0;
 
 export async function getBubbleIdsForAudio(
   bookId: string,
   issueId: string,
 ): Promise<string[]> {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
-  const { data: bubbles } = await supabase
+  const { data: bubbles, error } = await supabase
     .from("bubbles")
-    .select("id")
+    .select(
+      "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
+    )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .is("audio_path", null)
-    .not("text", "is", null)
+    .eq("ignored", false)
+    .is("audio_storage_path", null)
     .order("page_number")
     .order("sort_order");
 
-  const ids = (bubbles ?? []).map((b: { id: string }) => b.id);
+  if (error) throw new FatalError(error.message);
+
+  const ids = (bubbles ?? [])
+    .filter((b) => bubbleNeedsAudio(b))
+    .map((b) => b.id);
+
   console.log(
     `[get-bubbles] ${bookId}/${issueId}: ${ids.length} bubbles need audio`,
   );
@@ -269,90 +255,151 @@ export async function generateAudioBatch(
   bubbleIds: string[],
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
   const { ElevenLabsClient } = await import("@elevenlabs/elevenlabs-js");
   const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error("ELEVENLABS_API_KEY not set");
+  if (!apiKey) throw new FatalError("ELEVENLABS_API_KEY not set");
 
-  const client = new ElevenLabsClient({ apiKey });
+  const client = new ElevenLabsClient({ apiKey, maxRetries: 0 });
 
-  const { data: bubbles } = await supabase
+  const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
-    .select("id, speaker, text, text_with_cues, emotion")
+    .select(
+      "id, speaker, emotion, text_with_cues, ocr_text, audio_storage_path, ignored",
+    )
     .in("id", bubbleIds);
 
+  if (bubErr) throw new FatalError(bubErr.message);
   if (!bubbles || bubbles.length === 0) return;
 
-  const { data: castRows } = await supabase
-    .from("castlist")
-    .select("character_id, voice_id")
-    .eq("book_id", bookId);
+  const [
+    { data: castRows, error: castErr },
+    { data: aliasRows, error: aliasErr },
+  ] = await Promise.all([
+    supabase
+      .from("castlist")
+      .select("character, voice_id")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId),
+    supabase
+      .from("aliases")
+      .select("alias, canonical, scope, scope_id")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
+  ]);
 
-  const castMap = new Map(
-    ((castRows ?? []) as { character_id: string; voice_id: string }[]).map(
-      (c) => [c.character_id, c.voice_id],
-    ),
-  );
+  if (castErr) throw new FatalError(castErr.message);
+  if (aliasErr) throw new FatalError(aliasErr.message);
 
-  const narratorVoice = castMap.get("Narrator") ?? castMap.get("narrator");
+  const aliasMap = buildAliasMap(aliasRows ?? []);
+  const castMap = buildCastVoiceMap(castRows ?? []);
 
   const { getVoiceSettingsFromEmotion, SKIPPED_VOICE } = await import(
     "~/lib/voice-settings"
   );
 
-  type BubbleRow = {
-    id: string;
-    speaker: string | null;
-    text: string;
-    text_with_cues: string | null;
-    emotion: string | null;
-  };
-
   let generated = 0;
-  for (const bubble of bubbles as BubbleRow[]) {
-    const voiceId = castMap.get(bubble.speaker ?? "") ?? narratorVoice;
-    if (!voiceId || voiceId === SKIPPED_VOICE || !bubble.text) continue;
+  const unmatchedSpeakers: string[] = [];
 
-    const ttsText = bubble.text_with_cues ?? bubble.text;
+  for (const bubble of bubbles) {
+    if (bubble.audio_storage_path) continue;
+    if (bubble.ignored) continue;
+
+    const ttsText = bubble.text_with_cues ?? bubble.ocr_text;
+    if (!ttsText?.trim()) continue;
+
+    const rawSpeaker = bubble.speaker?.trim() ?? "";
+    if (!rawSpeaker) {
+      unmatchedSpeakers.push("(null)");
+      console.log(`[audio] skip ${bubble.id}: no speaker`);
+      continue;
+    }
+
+    const key = speakerKey(rawSpeaker, aliasMap);
+    const voiceId = castMap.get(key);
+    if (!voiceId) {
+      unmatchedSpeakers.push(rawSpeaker);
+      console.log(
+        `[audio] skip ${bubble.id}: unmatched speaker "${rawSpeaker}" (key=${key})`,
+      );
+      continue;
+    }
+    if (voiceId === SKIPPED_VOICE) continue;
+
     const settings = getVoiceSettingsFromEmotion(bubble.emotion ?? "neutral");
 
-    const response = await client.textToSpeech.convertWithTimestamps(voiceId, {
-      modelId: "eleven_v3",
-      text: ttsText,
-      voiceSettings: {
-        stability: settings.stability,
-        similarityBoost: settings.similarityBoost,
-        style: settings.style,
-      },
-    });
+    let response;
+    try {
+      response = await client.textToSpeech.convertWithTimestamps(voiceId, {
+        modelId: "eleven_v3",
+        text: ttsText,
+        voiceSettings: {
+          stability: settings.stability,
+          similarityBoost: settings.similarityBoost,
+          style: settings.style,
+        },
+      });
+    } catch (e) {
+      throw new FatalError(
+        e instanceof Error ? e.message : `ElevenLabs error for ${bubble.id}`,
+      );
+    }
 
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
+    const storagePath = `${bubble.id}.mp3`;
+    const remotePath = `${bookId}/${issueId}/${storagePath}`;
 
-    const audioPath = `${bookId}/${issueId}/${bubble.id}.mp3`;
-    await supabase.storage.from("comic-audio").upload(audioPath, audioBuffer, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
+    const { error: upErr } = await supabase.storage
+      .from("comic-audio")
+      .upload(remotePath, audioBuffer, {
+        contentType: "audio/mpeg",
+        upsert: true,
+      });
+    if (upErr) throw new FatalError(`upload ${bubble.id}: ${upErr.message}`);
 
-    const alignment = response.normalizedAlignment as {
-      characters?: string[];
-      characterStartTimesSeconds?: number[];
-      characterEndTimesSeconds?: number[];
-    } | null;
+    const alignment = normalizeAlignment(
+      response.alignment as AlignmentRaw | null | undefined,
+    );
+    const normalizedAlignment = normalizeAlignment(
+      response.normalizedAlignment as AlignmentRaw | null | undefined,
+    );
 
-    await supabase
+    const { error: tsErr } = await supabase.from("audio_timestamps").upsert(
+      {
+        bubble_id: bubble.id,
+        book_id: bookId,
+        issue_id: issueId,
+        alignment: alignment as Json | null,
+        normalized_alignment: normalizedAlignment as Json | null,
+      },
+      { onConflict: "bubble_id" },
+    );
+    if (tsErr)
+      throw new FatalError(`timestamps ${bubble.id}: ${tsErr.message}`);
+
+    const { error: bubUpErr } = await supabase
       .from("bubbles")
       .update({
-        audio_path: audioPath,
-        audio_timestamps: alignment ?? null,
+        audio_storage_path: storagePath,
+        needs_audio: false,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", bubble.id);
+    if (bubUpErr) {
+      throw new FatalError(`bubble update ${bubble.id}: ${bubUpErr.message}`);
+    }
 
     generated++;
+  }
+
+  if (unmatchedSpeakers.length > 0) {
+    console.log(
+      `[audio] unmatched speakers (skipped): ${[...new Set(unmatchedSpeakers)].join(", ")}`,
+    );
   }
 
   console.log(
     `[audio] ${bookId}/${issueId}: generated ${generated}/${bubbleIds.length} audio files`,
   );
 }
+generateAudioBatch.maxRetries = 0;
