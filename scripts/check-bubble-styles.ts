@@ -134,7 +134,9 @@ for (const bubble of rows) {
   }
 }
 
-const wouldWrite = rows.filter((b) => shouldWriteBubbleStyle(b)).length;
+const wouldWrite = rows.filter((b) =>
+  shouldWriteBubbleStyle(b, pageDims.get(b.page_number)),
+).length;
 
 console.log(`${matchCount}/${pixelCount} match`);
 console.log(`would write: ${wouldWrite}`);

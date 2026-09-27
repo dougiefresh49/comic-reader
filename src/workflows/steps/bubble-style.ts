@@ -14,15 +14,22 @@ export type BubbleStyle = {
   height: string;
 };
 
+export type PageDims = {
+  width: number;
+  height: number;
+};
+
 /**
  * Pure style math from scripts/add-bubble-styles.ts calculateStyle.
- * Returns null when box_2d lacks numeric x, y, width, or height.
+ * Returns null when box_2d lacks numeric x, y, width, or height, or when
+ * page dims are not positive.
  */
 export function computeBubbleStyle(
   box2d: BubbleBox2d | null | undefined,
   pageWidth: number,
   pageHeight: number,
 ): BubbleStyle | null {
+  if (pageWidth <= 0 || pageHeight <= 0) return null;
   if (!box2d) return null;
   const { x, y, width, height } = box2d;
   if (
@@ -47,20 +54,6 @@ export function computeBubbleStyle(
   };
 }
 
-/**
- * Same filter addBubbleStyles uses: style is null and box_2d has
- * numeric width and height. Existing styles are never overwritten.
- */
-export function shouldWriteBubbleStyle(bubble: {
-  style: unknown;
-  box_2d: unknown;
-}): boolean {
-  if (bubble.style != null) return false;
-  if (!bubble.box_2d || typeof bubble.box_2d !== "object") return false;
-  const box = bubble.box_2d as Record<string, unknown>;
-  return typeof box.width === "number" && typeof box.height === "number";
-}
-
 /** True when box_2d has numeric pixel x, y, width, height. */
 export function hasPixelBox2d(box2d: unknown): box2d is BubbleBox2d {
   if (!box2d || typeof box2d !== "object") return false;
@@ -71,4 +64,31 @@ export function hasPixelBox2d(box2d: unknown): box2d is BubbleBox2d {
     typeof box.width === "number" &&
     typeof box.height === "number"
   );
+}
+
+/**
+ * Why addBubbleStyles would skip this bubble, or null when it should write.
+ * Shared by the step and scripts/check-bubble-styles.ts.
+ */
+export function getBubbleStyleSkipReason(
+  bubble: { style: unknown; box_2d: unknown },
+  pageDims: PageDims | null | undefined,
+): string | null {
+  if (bubble.style != null) return "style already set";
+  if (pageDims == null) return "no page dims";
+  if (pageDims.width <= 0 || pageDims.height <= 0) return "invalid page dims";
+  if (!hasPixelBox2d(bubble.box_2d)) return "incomplete box_2d";
+  return null;
+}
+
+/**
+ * Same filter addBubbleStyles uses: style is null, page dims are present
+ * and positive, and box_2d has numeric x, y, width, and height.
+ * Existing styles are never overwritten.
+ */
+export function shouldWriteBubbleStyle(
+  bubble: { style: unknown; box_2d: unknown },
+  pageDims: PageDims | null | undefined,
+): boolean {
+  return getBubbleStyleSkipReason(bubble, pageDims) === null;
 }

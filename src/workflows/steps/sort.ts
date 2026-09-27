@@ -10,7 +10,7 @@ import { pageStoragePath } from "~/lib/storage";
 import {
   type BubbleBox2d,
   computeBubbleStyle,
-  shouldWriteBubbleStyle,
+  getBubbleStyleSkipReason,
 } from "./bubble-style";
 
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
@@ -407,26 +407,41 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
 
   if (!bubbles || bubbles.length === 0) return;
 
-  let updated = 0;
+  let written = 0;
+  let skipped = 0;
   for (const bubble of bubbles) {
-    if (!shouldWriteBubbleStyle(bubble)) continue;
     const dim = pageDims.get(bubble.page_number);
-    if (!dim) continue;
+    const skipReason = getBubbleStyleSkipReason(bubble, dim);
+    if (skipReason) {
+      skipped++;
+      console.log(`[styles] skip ${bubble.id}: ${skipReason}`);
+      continue;
+    }
 
+    // Predicate already required present, positive dims.
+    const pageWidth = dim?.width ?? 0;
+    const pageHeight = dim?.height ?? 0;
     const style = computeBubbleStyle(
       bubble.box_2d as BubbleBox2d | null,
-      dim.width,
-      dim.height,
+      pageWidth,
+      pageHeight,
     );
-    if (!style) continue;
+    if (!style) {
+      skipped++;
+      console.log(`[styles] skip ${bubble.id}: compute returned null`);
+      continue;
+    }
 
     const { error } = await supabase
       .from("bubbles")
       .update({ style })
-      .eq("id", bubble.id);
+      .eq("id", bubble.id)
+      .is("style", null);
     if (error) throw new FatalError(`bubbles: ${error.message}`);
-    updated++;
+    written++;
   }
 
-  console.log(`[styles] ${bookId}/${issueId}: updated ${updated} bubbles`);
+  console.log(
+    `[styles] ${bookId}/${issueId}: written ${written}, skipped ${skipped}`,
+  );
 }
