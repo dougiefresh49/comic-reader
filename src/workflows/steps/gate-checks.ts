@@ -1,9 +1,5 @@
 import type { Json } from "~/types/database";
-import {
-  countPendingNewCharacters as queryPendingNewCharacters,
-  countUnresolvedFaces as queryUnresolvedFaces,
-  type UnresolvedFaceCounts,
-} from "./gate-counts";
+import type { UnresolvedFaceCounts } from "./gate-counts";
 
 export type { UnresolvedFaceCounts };
 
@@ -21,6 +17,9 @@ export async function countUnresolvedFaces(
 ): Promise<UnresolvedFaceCounts> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
+  const { countUnresolvedFaces: queryUnresolvedFaces } = await import(
+    "./gate-counts"
+  );
   const client = await createTypedStepClient();
   return queryUnresolvedFaces(client, bookId, issueId);
 }
@@ -32,6 +31,9 @@ export async function countPendingNewCharacters(
 ): Promise<number> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
+  const { countPendingNewCharacters: queryPendingNewCharacters } = await import(
+    "./gate-counts"
+  );
   const client = await createTypedStepClient();
   return queryPendingNewCharacters(client, bookId, issueId);
 }

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { FatalError } from "workflow";
 import { analyzeNewCharacterQueue } from "../../../scripts/utils/new-character-queue";
 
 export interface UnresolvedFaceCounts {
@@ -72,16 +73,55 @@ export async function countUnresolvedFaces(
 /**
  * Pending new-character reviews for (book, issue). Calls
  * analyzeNewCharacterQueue without projectRoot (no filesystem reads).
+ * Probes bubbles first so a failed read cannot look like an empty queue.
  */
 export async function countPendingNewCharacters(
   client: SupabaseClient,
   bookId: string,
   issueId: string,
 ): Promise<number> {
-  const { pendingCount } = await analyzeNewCharacterQueue(
+  // Head count before the helper: its bubbles failure path returns empty
+  // lists and pendingCount 0, which would skip the gate.
+  const { error: bubbleError } = await client
+    .from("bubbles")
+    .select("id", { count: "exact", head: true })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId);
+
+  if (bubbleError) {
+    throw new FatalError(
+      `countPendingNewCharacters bubbles ${bookId}/${issueId}: ${bubbleError.message}`,
+    );
+  }
+
+  const { autoResolved, queue, pendingCount } = await analyzeNewCharacterQueue(
     client,
     bookId,
     issueId,
   );
+
+  // Zero resolved + zero pending with speaker-bearing bubbles means the
+  // helper's bubbles read failed (same masked empty return).
+  if (autoResolved.length === 0 && queue.length === 0) {
+    const { count: withSpeakerCount, error: speakerError } = await client
+      .from("bubbles")
+      .select("id", { count: "exact", head: true })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .not("speaker", "is", null);
+
+    if (speakerError) {
+      throw new FatalError(
+        `countPendingNewCharacters bubbles ${bookId}/${issueId}: ${speakerError.message}`,
+      );
+    }
+
+    if ((withSpeakerCount ?? 0) > 0) {
+      throw new FatalError(
+        `countPendingNewCharacters bubbles ${bookId}/${issueId}: analyzeNewCharacterQueue returned empty with speaker-bearing bubbles present`,
+      );
+    }
+  }
+
   return pendingCount;
 }
