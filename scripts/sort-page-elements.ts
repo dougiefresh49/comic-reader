@@ -122,10 +122,7 @@ Options:
     }
     if (arg === "--api-key") {
       const next = args[i + 1];
-      if (
-        next &&
-        (next === "GEMINI_API_KEY" || next === "GEMINI_API_KEY_2")
-      ) {
+      if (next && (next === "GEMINI_API_KEY" || next === "GEMINI_API_KEY_2")) {
         apiKeyName = next;
       }
     }
@@ -172,11 +169,7 @@ function bubbleSnippet(b: BubbleRow): string {
   return t.length > 120 ? `${t.slice(0, 117)}...` : t;
 }
 
-function bubbleLayoutLine(
-  b: BubbleRow,
-  imgW: number,
-  imgH: number,
-): string {
+function bubbleLayoutLine(b: BubbleRow, imgW: number, imgH: number): string {
   let x = b.box_2d?.x ?? 0;
   let y = b.box_2d?.y ?? 0;
   let w = b.box_2d?.width ?? 0;
@@ -351,13 +344,7 @@ function sortBubbleRowsHeuristic(
   const positioned = bubbles.map((b) => {
     let x = b.box_2d?.x ?? 0;
     let y = b.box_2d?.y ?? 0;
-    if (
-      x === 0 &&
-      y === 0 &&
-      b.style &&
-      imgW > 0 &&
-      imgH > 0
-    ) {
+    if (x === 0 && y === 0 && b.style && imgW > 0 && imgH > 0) {
       const pct = (s: string | undefined) => parseFloat(s ?? "0") / 100;
       x = Math.floor(pct(b.style.left) * imgW);
       y = Math.floor(pct(b.style.top) * imgH);
@@ -494,9 +481,8 @@ async function main() {
         plan,
       );
 
-      const panelUpdates = [...panelOrders.entries()].map(
-        ([id, sort_order]) =>
-          supabase.from("panels").update({ sort_order }).eq("id", id),
+      const panelUpdates = [...panelOrders.entries()].map(([id, sort_order]) =>
+        supabase.from("panels").update({ sort_order }).eq("id", id),
       );
       const bubbleUpdates = [...bubbleGlobalOrder.entries()].map(
         ([id, sort_order]) =>
@@ -525,7 +511,9 @@ async function main() {
     }
   }
 
-  console.log(`\n✅ Done. Updated: ${ok} page(s). Failed/skipped: ${failed}.\n`);
+  console.log(
+    `\n✅ Done. Updated: ${ok} page(s). Failed/skipped: ${failed}.\n`,
+  );
 }
 
 main().catch((err) => {
