@@ -7,8 +7,6 @@ import { HookNotFoundError } from "workflow/errors";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { updateIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 const SKIPPED_VOICE = "__SKIPPED__";
 
@@ -191,7 +189,7 @@ export async function completeCasting(
   }
 
   const { error: pauseErr } = await updateIssue(
-    supabaseAdmin as SupabaseClient<Database>,
+    supabaseAdmin,
     args.bookId,
     args.issueId,
     {

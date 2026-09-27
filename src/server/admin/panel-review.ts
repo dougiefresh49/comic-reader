@@ -8,8 +8,6 @@ import type {
 } from "~/types/panels";
 import type { AudioTags } from "~/lib/panel-tags";
 import { selectIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 export interface PanelReviewBubble {
   /** uuid */
@@ -114,7 +112,7 @@ export async function getPanelReviewData(
         .order("page_number")
         .order("sort_order"),
       selectIssue(
-        supabaseAdmin as SupabaseClient<Database>,
+        supabaseAdmin,
         bookId,
         issueId,
         "number, name, page_count, books(name)",

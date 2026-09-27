@@ -5,8 +5,6 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { updateIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 const RAW_BUCKET = "comic-pages-raw";
 
@@ -245,7 +243,7 @@ export async function POST(req: NextRequest) {
         }
 
         const { error: issueErr } = await updateIssue(
-          supabaseAdmin as SupabaseClient<Database>,
+          supabaseAdmin,
           body.bookId,
           body.issueId,
           {

@@ -5,8 +5,6 @@ import { HookNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestHookToken } from "./hooks";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 type PipelineRunSteps = {
   runId?: string;
@@ -28,7 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: issue } = (await selectIssue(
-    supabaseAdmin as SupabaseClient<Database>,
+    supabaseAdmin,
     body.bookId,
     body.issueId,
     "id, pipeline_step, pipeline_paused, pipeline_paused_at",
@@ -125,7 +123,7 @@ export async function POST(req: NextRequest) {
     "error";
 
   const { error: issueError } = await updateIssue(
-    supabaseAdmin as SupabaseClient<Database>,
+    supabaseAdmin,
     body.bookId,
     body.issueId,
     {

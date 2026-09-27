@@ -1,8 +1,6 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
 import { selectIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 export interface PipelineReviewIssue {
   issueId: string;
@@ -23,7 +21,7 @@ export async function getPipelineReviewIssue(
   issueId: string,
 ): Promise<PipelineReviewIssue | null> {
   const { data, error } = await selectIssue(
-    supabase as SupabaseClient<Database>,
+    supabase,
     bookId,
     issueId,
     "id, book_id, number, name, page_count, has_webp, status, pipeline_step, pipeline_paused, pipeline_paused_at, pipeline_paused_url",

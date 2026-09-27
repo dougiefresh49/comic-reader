@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
 import type { Json } from "~/types/database";
-import type { Database } from "~/types/database";
 
 export interface WikiSection {
   toclevel: number;
@@ -208,7 +207,7 @@ export async function fetchAndStoreWikiContext(
   }
 
   const { data: issue } = await selectIssue(
-    supabase as SupabaseClient<Database>,
+    supabase,
     bookId,
     issueId,
     "number, wiki_summary",
@@ -235,15 +234,10 @@ export async function fetchAndStoreWikiContext(
     return context;
   }
 
-  const { error } = await updateIssue(
-    supabase as SupabaseClient<Database>,
-    bookId,
-    issueId,
-    {
-      wiki_summary: context.summary,
-      wiki_appearances: context.appearances as Json,
-    },
-  );
+  const { error } = await updateIssue(supabase, bookId, issueId, {
+    wiki_summary: context.summary,
+    wiki_appearances: context.appearances as Json,
+  });
 
   if (error) {
     console.warn(

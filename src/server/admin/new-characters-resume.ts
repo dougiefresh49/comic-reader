@@ -3,8 +3,6 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { analyzeNewCharacterQueue } from "../../../scripts/utils/new-character-queue";
 import { countIssue, updateIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 function projectRoot(): string {
   return process.cwd();
@@ -71,16 +69,11 @@ export async function resumeCharacterReviewAndClearPause(
     resumeError = err instanceof Error ? err.message : String(err);
   }
 
-  const { error } = await updateIssue(
-    supabaseAdmin as SupabaseClient<Database>,
-    bookId,
-    issueId,
-    {
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    },
-  ).eq("pipeline_paused_at", "review-new-characters");
+  const { error } = await updateIssue(supabaseAdmin, bookId, issueId, {
+    pipeline_paused: false,
+    pipeline_paused_at: null,
+    pipeline_paused_url: null,
+  }).eq("pipeline_paused_at", "review-new-characters");
 
   if (error) return { ok: false, error: error.message };
 
@@ -97,11 +90,7 @@ export async function clearNewCharactersPauseIfComplete(
   bookId: string,
   issueId: string,
 ): Promise<void> {
-  const { count } = await countIssue(
-    supabaseAdmin as SupabaseClient<Database>,
-    bookId,
-    issueId,
-  )
+  const { count } = await countIssue(supabaseAdmin, bookId, issueId)
     .eq("pipeline_paused", true)
     .eq("pipeline_paused_at", "review-new-characters");
 

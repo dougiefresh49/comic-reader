@@ -6,8 +6,6 @@ import {
   type NewCharacterQueueResult,
 } from "../../../scripts/utils/new-character-queue";
 import { selectIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 export type { NewCharacterReview, NewCharacterQueueResult };
 
@@ -39,7 +37,7 @@ export async function getIssueDisplayLabel(
   issueId: string,
 ): Promise<string> {
   const { data } = await selectIssue(
-    supabaseAdmin as SupabaseClient<Database>,
+    supabaseAdmin,
     bookId,
     issueId,
     "name, number",

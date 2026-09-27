@@ -36,6 +36,28 @@ export default tseslint.config(
     },
   },
   {
+    // issues has PK (book_id, id): query it only through src/lib/issue-queries.ts (#150).
+    files: ["**/*.ts", "**/*.tsx"],
+    ignores: ["src/lib/issue-queries.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='from'][arguments.0.value='issues']",
+          message:
+            "Query issues through src/lib/issue-queries.ts, which requires the book id.",
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='from'][arguments.0.quasis.0.value.cooked='issues']",
+          message:
+            "Query issues through src/lib/issue-queries.ts, which requires the book id.",
+        },
+      ],
+    },
+  },
+  {
     linterOptions: {
       reportUnusedDisableDirectives: true,
     },

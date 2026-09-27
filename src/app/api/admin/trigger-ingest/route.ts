@@ -4,8 +4,6 @@ import { start } from "workflow/api";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
@@ -22,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: issue } = (await selectIssue(
-    supabaseAdmin as SupabaseClient<Database>,
+    supabaseAdmin,
     body.bookId,
     body.issueId,
     "id, pipeline_step",
@@ -37,7 +35,7 @@ export async function POST(req: NextRequest) {
   const pipelineStep = body.fromStep ?? "roboflow-page-analyze";
 
   const { error } = await updateIssue(
-    supabaseAdmin as SupabaseClient<Database>,
+    supabaseAdmin,
     body.bookId,
     body.issueId,
     {

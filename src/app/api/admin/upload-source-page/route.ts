@@ -3,8 +3,6 @@ import { type NextRequest } from "next/server";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { updateIssue, upsertIssue } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 export const maxDuration = 300;
 
@@ -57,17 +55,14 @@ export async function POST(req: NextRequest) {
       }
     }
     const sourcePath = `${body.bookId}/${body.issueId}/source/`;
-    const { error: issueErr } = await upsertIssue(
-      supabaseAdmin as SupabaseClient<Database>,
-      {
-        id: body.issueId,
-        book_id: body.bookId,
-        number: body.number,
-        name: body.issueName ?? `Issue ${body.number}`,
-        status: "pending",
-        source_pages_path: sourcePath,
-      },
-    );
+    const { error: issueErr } = await upsertIssue(supabaseAdmin, {
+      id: body.issueId,
+      book_id: body.bookId,
+      number: body.number,
+      name: body.issueName ?? `Issue ${body.number}`,
+      status: "pending",
+      source_pages_path: sourcePath,
+    });
     if (issueErr) {
       return Response.json({ error: issueErr.message }, { status: 500 });
     }
@@ -177,7 +172,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { error: issueErr } = await updateIssue(
-      supabaseAdmin as SupabaseClient<Database>,
+      supabaseAdmin,
       body.bookId,
       body.issueId,
       {

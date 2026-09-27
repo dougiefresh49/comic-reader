@@ -1,8 +1,6 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
 import { listAllIssues } from "~/lib/issue-queries";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/types/database";
 
 export interface AdminIssueRow {
   bookId: string;
@@ -48,7 +46,7 @@ interface IssueQueryRow {
 
 export async function getAdminIssues(): Promise<AdminIssueRow[]> {
   const { data, error } = await listAllIssues(
-    supabase as SupabaseClient<Database>,
+    supabase,
     "id, book_id, number, name, part_id, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps, status, pipeline_step, pipeline_paused, pipeline_paused_at, pipeline_paused_url, books(id, name), book_parts(id, name, number)",
   )
     .order("book_id")
