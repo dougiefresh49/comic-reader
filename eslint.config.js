@@ -37,7 +37,6 @@ export default tseslint.config(
   },
   {
     // issues has PK (book_id, id): query it only through src/lib/issue-queries.ts (#150).
-    files: ["**/*.ts", "**/*.tsx"],
     ignores: ["src/lib/issue-queries.ts"],
     rules: {
       "no-restricted-syntax": [
