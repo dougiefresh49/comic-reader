@@ -1,6 +1,6 @@
 # Feature: Voice Clip Candidates (local prep behind the casting gate)
 
-## Status: `pending`
+## Status: `superseded` by voice-lab handoffs (`docs/decisions.md` row 26); step 8 carries into #108
 
 ---
 
