@@ -1,6 +1,6 @@
 # Panel Direction
 
-## Status: `partial` — `detect-panels` shipped (Roboflow); `describe-panels` is a stub
+## Status: tracked in [features.md](../features.md), `detect-panels` shipped (Roboflow); `describe-panels` is a stub
 ## Goal: Two-step pipeline — Roboflow detects panel rects, Gemini describes each panel + tags effects/audio
 ## Cost: ~$0.10 per issue (Gemini MEDIUM only; Roboflow on a flat-rate plan)
 

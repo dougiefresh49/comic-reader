@@ -1,6 +1,6 @@
 # Feature: Unify Character Lookahead — Script → Workflow + Exemplar Embeddings
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 
 ## Prerequisite: Face exemplar embeddings (done — pgvector + `gemini-embedding-2` infrastructure in place, 27 exemplars seeded from issue-1)
 

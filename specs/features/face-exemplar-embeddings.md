@@ -1,6 +1,6 @@
 # Feature: Face Exemplar Embeddings (pgvector + gemini-embedding-2)
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 
 ## Prerequisite: Character lookahead pipeline (done), `character_face_exemplars` migration (done)
 

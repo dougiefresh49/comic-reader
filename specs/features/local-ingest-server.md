@@ -1,6 +1,6 @@
 # Feature: Ingest Pipeline — Cloud Workflow
 
-## Status: `in-progress`
+## Status: tracked in [features.md](features.md)
 
 ---
 

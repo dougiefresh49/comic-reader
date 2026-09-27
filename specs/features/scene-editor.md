@@ -1,6 +1,6 @@
 # Scene Editor — review UI for music scene grouping
 
-**Status**: `pending` — needs user review of UX approach
+**Status**: tracked in [features.md](features.md), needs user review of UX approach
 
 ---
 

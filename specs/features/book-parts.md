@@ -1,6 +1,6 @@
 # Feature: Book Parts (Multi-Part Series Support)
 
-## Status: `pending`
+## Status: tracked in [features.md](features.md)
 ## Prerequisite: None (additive schema change)
 ## Blocks: Smart Add Flow (for multi-part series like TMNT x MMPR)
 

@@ -1,6 +1,6 @@
 # SAM3 segmentation → particle layering
 
-**Status**: pending — needs review before build
+**Status**: tracked in [features.md](features.md), needs review before build
 
 ## Problem
 

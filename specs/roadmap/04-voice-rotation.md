@@ -175,6 +175,10 @@ IVC slot but it's archived right after the book publishes (no
 
 ## The fidelity test
 
+Ran 2026-05-01 (commit `1ee42e7`). Verdict: indistinguishable.
+Recreated Soldier as `FNFPPu11NCH75amA044c`.
+Source was ElevenLabs' stored samples, not our Storage.
+
 The whole archive/restore plan rests on one assumption: **a
 recreated IVC sounds the same as the original when fed the same
 source clip + settings**. If timbre drifts noticeably, we can't
