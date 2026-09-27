@@ -121,18 +121,17 @@ export function useBoundsEditor({
   }, [containerRef]);
 
   const onHandlePointerDown = useCallback(
-    (handle: HandleType) =>
-      (e: React.PointerEvent<HTMLElement>) => {
-        e.stopPropagation();
-        e.preventDefault();
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        dragRef.current = {
-          handle,
-          startX: e.clientX,
-          startY: e.clientY,
-          startBounds: styleToPct(style),
-        };
-      },
+    (handle: HandleType) => (e: React.PointerEvent<HTMLElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      dragRef.current = {
+        handle,
+        startX: e.clientX,
+        startY: e.clientY,
+        startBounds: styleToPct(style),
+      };
+    },
     [style],
   );
 

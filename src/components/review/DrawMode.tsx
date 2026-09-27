@@ -10,7 +10,12 @@ interface DrawModeProps {
   onCancel: () => void;
 }
 
-export function DrawMode({ active, containerRef, onDraw, onCancel }: DrawModeProps) {
+export function DrawMode({
+  active,
+  containerRef,
+  onDraw,
+  onCancel,
+}: DrawModeProps) {
   const [rect, setRect] = useState<{
     x: number;
     y: number;
