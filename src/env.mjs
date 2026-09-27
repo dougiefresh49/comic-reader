@@ -28,7 +28,7 @@ export const env = createEnv({
       .string()
       .url()
       .default(
-        "https://serverless.roboflow.com/infer/workflows/fresh-space/comic-page-analyzer-v3-full-page-sam3",
+        "https://serverless.roboflow.com/fresh-space/workflows/comic-page-analyzer-v3-full-page-sam3-1780693180656",
       ),
     GEMINI_API_KEY: z.string(),
     GEMINI_API_KEY_2: z.string(),

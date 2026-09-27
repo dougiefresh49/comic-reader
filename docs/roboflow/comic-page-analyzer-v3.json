@@ -1,0 +1,123 @@
+{
+  "specification": {
+    "version": "1.0",
+    "inputs": [
+      {
+        "type": "WorkflowImage",
+        "name": "image"
+      }
+    ],
+    "steps": [
+      {
+        "type": "roboflow_core/roboflow_object_detection_model@v3",
+        "name": "bubble_model",
+        "images": "$inputs.image",
+        "model_id": "find-speech-bubbles-fmu3y/4",
+        "confidence_mode": "custom",
+        "custom_confidence": 0.3
+      },
+      {
+        "type": "roboflow_core/sam3@v3",
+        "name": "sam3_full_page",
+        "images": "$inputs.image",
+        "model_id": "sam3/sam3_final",
+        "class_names": [
+          "comic character",
+          "person",
+          "face",
+          "head",
+          "speech bubble"
+        ],
+        "confidence": 0.4,
+        "output_format": "polygons"
+      },
+      {
+        "type": "roboflow_core/roboflow_object_detection_model@v3",
+        "name": "panel_model",
+        "images": "$inputs.image",
+        "model_id": "find-comic-panel-v1/1",
+        "confidence_mode": "custom"
+      }
+    ],
+    "outputs": [
+      {
+        "type": "JsonField",
+        "name": "bubble_predictions",
+        "selector": "$steps.bubble_model.predictions"
+      },
+      {
+        "type": "JsonField",
+        "name": "segmentation_predictions",
+        "selector": "$steps.sam3_full_page.predictions"
+      },
+      {
+        "type": "JsonField",
+        "name": "panel_predictions",
+        "coordinates_system": "own",
+        "selector": "$steps.panel_model.predictions"
+      }
+    ],
+    "metadata": {
+      "ui": {
+        "nodes": {
+          "$inputs": {
+            "x": 330,
+            "y": 0
+          },
+          "$steps.bubble_model": {
+            "x": 330,
+            "y": 236
+          },
+          "$steps.sam3_full_page": {
+            "x": 660,
+            "y": 236
+          },
+          "$outputs": {
+            "x": 330,
+            "y": 387
+          },
+          "$steps.panel_model": {
+            "x": -16.3597694840836,
+            "y": 233.4204171240395
+          }
+        },
+        "edges": [
+          {
+            "source": "$inputs",
+            "target": "$steps.bubble_model",
+            "inputProperty": "images",
+            "sourceSelector": "image"
+          },
+          {
+            "source": "$inputs",
+            "target": "$steps.sam3_full_page",
+            "inputProperty": "images",
+            "sourceSelector": "image"
+          },
+          {
+            "source": "$steps.bubble_model",
+            "target": "$outputs",
+            "sourceSelector": "predictions"
+          },
+          {
+            "source": "$steps.sam3_full_page",
+            "target": "$outputs",
+            "sourceSelector": "predictions"
+          },
+          {
+            "source": "$inputs",
+            "target": "$steps.panel_model",
+            "inputProperty": "images",
+            "sourceSelector": "image"
+          },
+          {
+            "source": "$steps.panel_model",
+            "target": "$outputs",
+            "sourceSelector": "predictions"
+          }
+        ],
+        "groups": []
+      }
+    }
+  }
+}
