@@ -57,9 +57,13 @@ supabase/.temp
 # local AI tooling
 .agents/
 .claude/worktrees/
+.claude/skills/
 .cursor/mcp.json
+.cursor/mcp.json.*
+.cursor/settings.json
 .gemini/
 .mcp.json
+.audit/
 skills-lock.json
 
 # local agent config (holds API keys)
