@@ -4,8 +4,7 @@ This is the repo's decision log. One row per call or parked question, newest fir
 
 | # | date | decision | status |
 |---|------|----------|--------|
-| 65 | 2026-09-27 | #69: the production domain is `comic-reader-eta.vercel.app`, named in the public AGENTS.md now that #52 put `/admin` behind auth, and the user-path check is `/book/tmnt-mmpr-iii/issue-1/1` (owner call) | accepted |
-| 64 | 2026-09-27 | Row 14: PRs on `main` merge with `gh pr merge --admin` for now, once checks are green and the PR's review gate has passed; the ruleset's review requirement stays as it is (owner call) | accepted |
+| 64 | 2026-09-27 | #69: the production domain is `comic-reader-eta.vercel.app`, named in the public AGENTS.md now that #52 put `/admin` behind auth, and the user-path check is `/book/tmnt-mmpr-iii/issue-1/1` (owner call) | accepted |
 | 63 | 2026-09-27 | #74: the admin click-through was verified against a production build (`next build`, `next start`) because `pnpm dev` cannot compile routes that import `workflow/api`; admin route checks use a production build until #153 lands (PR #139) | assumed (reopens when: #153 lands) |
 | 62 | 2026-09-27 | `codex` MCP servers in this repo read their keys from the shell environment (`ROBOFLOW_API_KEY`, `BROWSERBASE_API_KEY`), never from a value written in `.codex/config.toml` (#48) | accepted |
 | 61 | 2026-09-27 | `scripts/check-issue-scoping.ts` is a text scan that judges each `.from()` chain on its own; it does not follow a table name held in a variable, a statement with no semicolon, or a regex literal, and Astra's findings on those forms were dismissed because no tracked file uses them (#55, PR #135) | assumed (reopens when: the check is wired into CI, or a tracked file uses one of those forms) |
