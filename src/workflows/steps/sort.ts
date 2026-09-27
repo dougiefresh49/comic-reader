@@ -4,7 +4,10 @@ import {
   createPartFromText,
 } from "@google/genai";
 import sharp from "sharp";
+import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
+import { pageStoragePath } from "~/lib/storage";
+import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
 
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
@@ -260,15 +263,15 @@ export async function sortPageElements(
   pageNumber: number,
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");
   const gemini = new GoogleGenAI({ apiKey });
 
   const padded = String(pageNumber).padStart(2, "0");
-  const storagePath = `${bookId}/${issueId}/pages/page-${padded}.webp`;
+  const storagePath = pageStoragePath(bookId, issueId, pageNumber);
 
   const { data: imageBlob, error: dlErr } = await supabase.storage
     .from("comic-pages")
@@ -276,7 +279,7 @@ export async function sortPageElements(
 
   if (dlErr || !imageBlob) {
     console.warn(
-      `[sort] ${bookId}/${issueId}: page-${padded}: missing WebP (${dlErr?.message ?? "no data"}) — skip`,
+      `[sort] ${bookId}/${issueId}: page-${padded}: missing WebP (${dlErr?.message ?? "no data"}), skip`,
     );
     return;
   }
@@ -293,7 +296,7 @@ export async function sortPageElements(
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
-  if (pErr) throw new Error(`panels query: ${pErr.message}`);
+  if (pErr) throw new FatalError(`panels: ${pErr.message}`);
 
   const { data: bubbleRows, error: bErr } = await supabase
     .from("bubbles")
@@ -304,14 +307,14 @@ export async function sortPageElements(
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
-  if (bErr) throw new Error(`bubbles query: ${bErr.message}`);
+  if (bErr) throw new FatalError(`bubbles: ${bErr.message}`);
 
   const panels = (panelRows ?? []) as SortPanelRow[];
   const bubbles = (bubbleRows ?? []) as SortBubbleRow[];
 
   if (panels.length === 0 && bubbles.length === 0) {
     console.log(
-      `[sort] ${bookId}/${issueId}: page-${padded}: no panels or bubbles — skip`,
+      `[sort] ${bookId}/${issueId}: page-${padded}: no panels or bubbles, skip`,
     );
     return;
   }
@@ -326,9 +329,11 @@ export async function sortPageElements(
     );
     const results = await Promise.all(bubbleUpdates);
     const errResult = results.find((r) => r.error);
-    if (errResult?.error) throw new Error(errResult.error.message);
+    if (errResult?.error) {
+      throw new FatalError(`bubbles: ${errResult.error.message}`);
+    }
     console.log(
-      `[sort] ${bookId}/${issueId}: page-${padded}: 0 panels — heuristic bubble sort (${bubbles.length})`,
+      `[sort] ${bookId}/${issueId}: page-${padded}: 0 panels, heuristic bubble sort (${bubbles.length})`,
     );
     return;
   }
@@ -357,7 +362,9 @@ export async function sortPageElements(
 
   const results = await Promise.all([...panelUpdates, ...bubbleUpdates]);
   const errResult = results.find((r) => r.error);
-  if (errResult?.error) throw new Error(errResult.error.message);
+  if (errResult?.error) {
+    throw new FatalError(`panels/bubbles: ${errResult.error.message}`);
+  }
 
   console.log(
     `[sort] ${bookId}/${issueId}: page-${padded}: ${panels.length} panel(s), ${bubbles.length} bubble(s)`,
@@ -366,14 +373,16 @@ export async function sortPageElements(
 
 export async function addBubbleStyles(bookId: string, issueId: string) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
-  const { data: pages } = await supabase
+  const { data: pages, error: pagesError } = await supabase
     .from("pages")
-    .select("page_number, width, height")
+    .select("number, width, height")
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
+
+  if (pagesError) throw new FatalError(`pages: ${pagesError.message}`);
 
   if (!pages || pages.length === 0) {
     console.log(`[styles] ${bookId}/${issueId}: no pages found, skipping`);
@@ -381,55 +390,49 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
   }
 
   const pageDims = new Map(
-    pages.map((p: { page_number: number; width: number; height: number }) => [
-      p.page_number,
-      { width: p.width, height: p.height },
-    ]),
+    pages.map((p) => [p.number, { width: p.width, height: p.height }]),
   );
 
-  const { data: bubbles } = await supabase
+  const { data: bubbles, error: bubblesError } = await supabase
     .from("bubbles")
-    .select("id, page_number, x, y, width, height")
+    .select("id, page_number, box_2d, style")
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
 
+  if (bubblesError) throw new FatalError(`bubbles: ${bubblesError.message}`);
+
   if (!bubbles || bubbles.length === 0) return;
 
-  type BubbleRow = {
-    id: string;
-    page_number: number;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  let written = 0;
+  let skipped = 0;
+  for (const bubble of bubbles) {
+    const dim = pageDims.get(bubble.page_number);
+    const verdict = getBubbleStyleSkipReason(bubble, dim);
+    if ("skip" in verdict) {
+      skipped++;
+      console.log(`[styles] skip ${bubble.id}: ${verdict.skip}`);
+      continue;
+    }
 
-  const updates = (bubbles as BubbleRow[])
-    .filter((b) => pageDims.has(b.page_number))
-    .map((b) => {
-      const dim = pageDims.get(b.page_number)!;
-      return {
-        id: b.id,
-        style_left: (b.x / dim.width) * 100,
-        style_top: (b.y / dim.height) * 100,
-        style_width: (b.width / dim.width) * 100,
-        style_height: (b.height / dim.height) * 100,
-      };
-    });
+    const { pageWidth, pageHeight, box2d } = verdict.ready;
+    const style = computeBubbleStyle(box2d, pageWidth, pageHeight)!;
 
-  for (const u of updates) {
-    await supabase
+    const { data: updated, error } = await supabase
       .from("bubbles")
-      .update({
-        style_left: u.style_left,
-        style_top: u.style_top,
-        style_width: u.style_width,
-        style_height: u.style_height,
-      })
-      .eq("id", u.id);
+      .update({ style })
+      .eq("id", bubble.id)
+      .is("style", null)
+      .select("id");
+    if (error) throw new FatalError(`bubbles: ${error.message}`);
+    if (!updated || updated.length === 0) {
+      skipped++;
+      console.log(`[styles] skip ${bubble.id}: style set concurrently`);
+      continue;
+    }
+    written++;
   }
 
   console.log(
-    `[styles] ${bookId}/${issueId}: updated ${updates.length} bubbles`,
+    `[styles] ${bookId}/${issueId}: written ${written}, skipped ${skipped}`,
   );
 }
