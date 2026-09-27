@@ -11,8 +11,10 @@ import {
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
+  parseRoboflowSam3Output,
   type BubbleContextFields,
   type RoboflowBoxPrediction,
+  type RoboflowSam3Output,
   type RoboflowSegPrediction,
 } from "~/workflows/steps/vision-rows";
 
@@ -172,6 +174,57 @@ if (
 }
 console.log(
   `empty segmentation: 1 row page_number=${emptySeg.page_number} preds=${emptySeg.predictions.length}`,
+);
+
+const emptyValid: RoboflowSam3Output = {
+  panel_predictions: { image: { width: 100, height: 100 }, predictions: [] },
+  bubble_predictions: { predictions: [] },
+  segmentation_predictions: { predictions: [] },
+};
+if (parseRoboflowSam3Output(emptyValid) === null) {
+  console.error("all-three-empty should be valid");
+  process.exit(1);
+}
+
+const missingPanels: RoboflowSam3Output = {
+  bubble_predictions: { predictions: [] },
+  segmentation_predictions: { predictions: [] },
+};
+if (parseRoboflowSam3Output(missingPanels) !== null) {
+  console.error("missing panels should be malformed");
+  process.exit(1);
+}
+
+const missingBubbles: RoboflowSam3Output = {
+  panel_predictions: { image: { width: 100, height: 100 }, predictions: [] },
+  segmentation_predictions: { predictions: [] },
+};
+if (parseRoboflowSam3Output(missingBubbles) !== null) {
+  console.error("missing bubbles should be malformed");
+  process.exit(1);
+}
+
+const missingSeg: RoboflowSam3Output = {
+  panel_predictions: { image: { width: 100, height: 100 }, predictions: [] },
+  bubble_predictions: { predictions: [] },
+};
+if (parseRoboflowSam3Output(missingSeg) !== null) {
+  console.error("missing segmentation should be malformed");
+  process.exit(1);
+}
+
+const nonArrayBubbles: RoboflowSam3Output = {
+  panel_predictions: { image: { width: 100, height: 100 }, predictions: [] },
+  bubble_predictions: { predictions: undefined },
+  segmentation_predictions: { predictions: [] },
+};
+if (parseRoboflowSam3Output(nonArrayBubbles) !== null) {
+  console.error("non-array bubble predictions should be malformed");
+  process.exit(1);
+}
+
+console.log(
+  "parseRoboflowSam3Output: missing panels/bubbles/seg rejected; all-empty accepted",
 );
 
 console.log("ok");

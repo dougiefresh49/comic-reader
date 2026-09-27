@@ -29,6 +29,63 @@ export type ContextParsed = {
   textWithCues?: string;
 };
 
+/** Shape of one SAM3 workflow `outputs[0]` entry before validation. */
+export type RoboflowSam3Output = {
+  panel_predictions?: {
+    image?: { width: number; height: number };
+    predictions?: RoboflowBoxPrediction[];
+  };
+  bubble_predictions?: {
+    predictions?: RoboflowBoxPrediction[];
+  };
+  segmentation_predictions?: {
+    predictions?: RoboflowSegPrediction[];
+  };
+};
+
+/** Validated SAM3 predictions ready for the row mappers. */
+export type ParsedRoboflowSam3 = {
+  panelPredictions: RoboflowBoxPrediction[];
+  image: { width: number; height: number };
+  bubblePredictions: RoboflowBoxPrediction[];
+  segmentationPredictions: RoboflowSegPrediction[];
+};
+
+/**
+ * Parse a SAM3 workflow output. Returns null when any required
+ * predictions object is missing or its predictions value is not an array.
+ * Present empty arrays are valid.
+ */
+export function parseRoboflowSam3Output(
+  out: RoboflowSam3Output | null | undefined,
+): ParsedRoboflowSam3 | null {
+  const panelPreds = out?.panel_predictions?.predictions;
+  const imgDims = out?.panel_predictions?.image;
+  const bubblePreds = out?.bubble_predictions?.predictions;
+  const segPreds = out?.segmentation_predictions?.predictions;
+
+  if (
+    !out?.panel_predictions ||
+    !imgDims ||
+    typeof imgDims.width !== "number" ||
+    typeof imgDims.height !== "number" ||
+    !Array.isArray(panelPreds) ||
+    !out.bubble_predictions ||
+    !Array.isArray(bubblePreds) ||
+    !out.segmentation_predictions ||
+    !Array.isArray(segPreds)
+  ) {
+    return null;
+  }
+
+  return {
+    panelPredictions: panelPreds,
+    image: imgDims,
+    bubblePredictions: bubblePreds,
+    segmentationPredictions: segPreds,
+  };
+}
+
 /** Map Roboflow panel centre-pixel boxes to `panels` insert rows. */
 export function mapPanelRows(
   bookId: string,

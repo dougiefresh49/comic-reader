@@ -12,9 +12,10 @@ import {
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
+  parseRoboflowSam3Output,
   type ContextParsed,
   type RoboflowBoxPrediction,
-  type RoboflowSegPrediction,
+  type RoboflowSam3Output,
 } from "./vision-rows";
 
 type TypedClient = SupabaseClient<Database>;
@@ -25,6 +26,7 @@ export {
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
+  parseRoboflowSam3Output,
 } from "./vision-rows";
 
 function normalizeForMatch(s: string): string {
@@ -224,14 +226,24 @@ export async function roboflowAnalyzeBatch(
 
     const imageUrl = pageImageUrl(bookId, issueId, page.pageNumber);
 
-    const res = await fetch(workflowUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: apiKey,
-        inputs: { image: { type: "url", value: imageUrl } },
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch(workflowUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: apiKey,
+          inputs: { image: { type: "url", value: imageUrl } },
+        }),
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[roboflow] ${pageLabel}: fetch failed: ${msg.slice(0, 160)}`,
+      );
+      failedPageLabels.push(pageLabel);
+      continue;
+    }
 
     if (!res.ok) {
       const text = await res.text();
@@ -242,32 +254,22 @@ export async function roboflowAnalyzeBatch(
       continue;
     }
 
-    const data = (await res.json()) as {
-      outputs?: Array<{
-        panel_predictions?: {
-          image: { width: number; height: number };
-          predictions: RoboflowBoxPrediction[];
-        };
-        bubble_predictions?: {
-          predictions: RoboflowBoxPrediction[];
-        };
-        segmentation_predictions?: {
-          predictions: RoboflowSegPrediction[];
-        };
-      }>;
-    };
+    let data: { outputs?: unknown[] };
+    try {
+      data = (await res.json()) as { outputs?: unknown[] };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(
+        `[roboflow] ${pageLabel}: non-JSON response: ${msg.slice(0, 160)}`,
+      );
+      failedPageLabels.push(pageLabel);
+      continue;
+    }
 
-    const out = data.outputs?.[0];
-    const panelPreds = out?.panel_predictions?.predictions;
-    const imgDims = out?.panel_predictions?.image;
-    const segPredsRaw = out?.segmentation_predictions?.predictions;
-    if (
-      !out?.panel_predictions ||
-      !imgDims ||
-      !Array.isArray(panelPreds) ||
-      !out.segmentation_predictions ||
-      !Array.isArray(segPredsRaw)
-    ) {
+    const parsed = parseRoboflowSam3Output(
+      data.outputs?.[0] as RoboflowSam3Output | undefined,
+    );
+    if (!parsed) {
       console.warn(
         `[roboflow] ${pageLabel}: missing or malformed predictions in response`,
       );
@@ -275,22 +277,24 @@ export async function roboflowAnalyzeBatch(
       continue;
     }
 
-    const segPreds = segPredsRaw;
+    const {
+      panelPredictions,
+      image: imgDims,
+      bubblePredictions,
+      segmentationPredictions: segPreds,
+    } = parsed;
     const panelRows = mapPanelRows(
       bookId,
       issueId,
       page.pageNumber,
-      panelPreds,
+      panelPredictions,
       imgDims,
     );
-    const bubblePreds = Array.isArray(out.bubble_predictions?.predictions)
-      ? out.bubble_predictions.predictions
-      : [];
     const bubbleRows = mapBubbleRows(
       bookId,
       issueId,
       page.pageNumber,
-      bubblePreds,
+      bubblePredictions,
     );
 
     if (existingPanels > 0) {
@@ -741,8 +745,11 @@ export async function characterLookaheadPage(
         }),
       );
       exemplarRefs = refs.filter((r): r is NonNullable<typeof r> => r !== null);
-    } catch {
-      // Exemplar lookup failed, proceed without
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new FatalError(
+        `character_face_exemplars failed for ${pageLabel}: ${msg}`,
+      );
     }
 
     // Identify with exemplar context + key failover
