@@ -420,20 +420,28 @@ Return as a JSON array only, with no markdown formatting or extra text.`;
         .replace(/-+/g, "-")
         .slice(0, 80);
 
-      await supabaseAdmin.from("character_appearances").upsert(
-        {
-          id,
-          character_id: args.characterId,
-          media_title: app.mediaTitle,
-          year: app.year,
-          voice_actor: app.voiceActor,
-          media_type: app.mediaType,
-          youtube_search_terms: app.youtubeSearchTerms,
-          notes: app.notes,
-          voice_model_status: "pending",
-        },
-        { onConflict: "id" },
-      );
+      const { error } = await supabaseAdmin
+        .from("character_appearances")
+        .upsert(
+          {
+            id,
+            character_id: args.characterId,
+            media_title: app.mediaTitle,
+            year: app.year,
+            voice_actor: app.voiceActor,
+            media_type: app.mediaType,
+            youtube_search_terms: app.youtubeSearchTerms,
+            notes: app.notes,
+            voice_model_status: "pending",
+          },
+          { onConflict: "id" },
+        );
+      if (error) {
+        return {
+          ok: false,
+          error: `character_appearances upsert failed: ${error.message}`,
+        };
+      }
     }
 
     revalidatePath("/admin/characters/casting", "page");
