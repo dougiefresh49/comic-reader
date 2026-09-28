@@ -37,6 +37,41 @@ function must<T>(res: { data: T | null; error: { message: string } | null }) {
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "-");
 
+/**
+ * Production character id (slug) -> made-up fixture id (#186, decision row
+ * 77). A DRY_RUN run must never resolve a speaker or face to a global
+ * `characters` row, so every made-up id matches no `characters.id` or alias
+ * under `fuzzyNameMatch` (substring either way). Recheck against a SELECT of
+ * `characters` when adding one. `trini` is `yellow-ranger`'s alias, so both
+ * map to one id. `narrator` stays as is.
+ */
+const FIXTURE_IDS: Record<string, string> = {
+  raphael: "tessik",
+  leonardo: "marwen",
+  donatello: "fenwick",
+  michelangelo: "pollux",
+  warbunny: "hopscald",
+  karai: "vessa",
+  "alpha-5": "gizmo-9",
+  "red-ranger": "crimson-vole",
+  "pink-ranger": "rose-vole",
+  "green-ranger": "moss-vole",
+  "yellow-ranger": "amber-vole",
+  trini: "amber-vole",
+  "foot-soldier": "drab-grunt",
+  "foot-elite": "drab-captain",
+  "putty-foot-soldier": "clay-grunt",
+};
+
+/** Throws on an unmapped name so a re-record cannot write a production id. */
+function fixtureId(name: string): string {
+  const key = slug(name);
+  if (key === "narrator") return key;
+  const id = Object.hasOwn(FIXTURE_IDS, key) ? FIXTURE_IDS[key] : undefined;
+  if (!id) throw new Error(`no made-up fixture id for "${name}"`);
+  return id;
+}
+
 async function recordPage(page: number, idx: number): Promise<FixturePage> {
   const scope = (table: string) =>
     supabase
@@ -171,13 +206,27 @@ async function main() {
 
   const voiceDescriptions: Record<string, string> = {};
   for (const a of appearances) {
+    const key = fixtureId(a.character_id);
     const preferred = a.id === `${a.character_id}-voice-design`;
-    if (preferred || !voiceDescriptions[a.character_id]) {
-      voiceDescriptions[a.character_id] = a.voice_description;
+    if (preferred || !voiceDescriptions[key]) {
+      voiceDescriptions[key] = a.voice_description;
     }
   }
 
-  const fixture: IngestFixture = { pages, voiceDescriptions };
+  const fixture: IngestFixture = {
+    pages: pages.map((p) => ({
+      ...p,
+      bubbles: p.bubbles.map((b) => ({
+        ...b,
+        speaker: b.speaker && fixtureId(b.speaker),
+      })),
+      faces: p.faces.map((f) => ({
+        ...f,
+        characterName: fixtureId(f.characterName),
+      })),
+    })),
+    voiceDescriptions,
+  };
   const out = join(process.cwd(), INGEST_FIXTURE_PATH);
   mkdirSync(dirname(out), { recursive: true });
   // One polygon point per line would triple the file; keep points inline.

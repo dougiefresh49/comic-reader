@@ -12,6 +12,15 @@ import {
   skipAndAddLater,
 } from "./actions";
 
+/** One failed character from a bulk Voice Design run, as the action returned it. */
+export interface BulkFailure {
+  characterId: string;
+  characterName: string;
+  error?: string;
+  /** Set when ElevenLabs created the voice before the save failed. */
+  voiceId?: string;
+}
+
 interface Props {
   initialTasks: CastingTask[];
   bookId?: string;
@@ -26,6 +35,7 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
   const [resumed, setResumed] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [researchingIds, setResearchingIds] = useState<Set<string>>(new Set());
+  const [bulkFailures, setBulkFailures] = useState<BulkFailure[]>([]);
 
   const unresearched = tasks.filter((t) => !t.researched);
   const researched = tasks.filter((t) => t.researched);
@@ -53,11 +63,13 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
     setResearchingIds(ids);
 
     startTransition(async () => {
+      const errors: string[] = [];
       for (const task of toResearch) {
         const res = await researchCharacter({
           characterId: task.characterId,
           franchise: task.franchise ?? undefined,
         });
+        if (!res.ok) errors.push(`${task.characterName}: ${res.error}`);
         if (res.ok && res.appearances) {
           setTasks((prev) =>
             prev.map((t) =>
@@ -101,7 +113,9 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
       }
       setSelected(new Set());
       setMsg(
-        `Researched ${toResearch.length} character${toResearch.length === 1 ? "" : "s"}.`,
+        errors.length > 0
+          ? `Error: ${errors.join("; ")}`
+          : `Researched ${toResearch.length} character${toResearch.length === 1 ? "" : "s"}.`,
       );
     });
   };
@@ -116,6 +130,7 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
     )
       return;
 
+    setBulkFailures([]);
     startTransition(async () => {
       const res = await bulkVoiceDesign({
         tasks: toDesign.map((t) => ({
@@ -132,9 +147,19 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
         );
         setTasks((prev) => prev.filter((t) => !doneIds.has(t.characterId)));
         const failed = res.results.filter((r) => !r.ok);
+        setBulkFailures(
+          failed.map((f) => ({
+            characterId: f.characterId,
+            characterName:
+              toDesign.find((t) => t.characterId === f.characterId)
+                ?.characterName ?? f.characterId,
+            error: f.error,
+            voiceId: f.voiceId,
+          })),
+        );
         if (failed.length > 0) {
           setMsg(
-            `Designed ${doneIds.size} voice(s). ${failed.length} failed: ${failed.map((f) => f.characterId).join(", ")}`,
+            `Designed ${doneIds.size} voice(s). ${failed.length} failed, listed below.`,
           );
         } else {
           setMsg(`Designed ${doneIds.size} voice(s) via Voice Design.`);
@@ -253,6 +278,8 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
           {msg}
         </div>
       )}
+
+      <BulkFailureList failures={bulkFailures} />
 
       {/* ── Phase 1: Triage — select characters to research ── */}
       {unresearched.length > 0 && (
@@ -387,6 +414,31 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Each failed character from the last bulk Voice Design run, with its error and voice id. */
+export function BulkFailureList({ failures }: { failures: BulkFailure[] }) {
+  if (failures.length === 0) return null;
+  return (
+    <ul className="space-y-2 rounded border border-cyan-700 bg-cyan-900/20 px-4 py-2 text-sm text-cyan-200">
+      {failures.map((f) => (
+        <li key={f.characterId}>
+          <span className="font-medium text-neutral-100">
+            {f.characterName}
+          </span>
+          : {f.error ?? "Voice Design failed."}
+          {f.voiceId && (
+            <div className="mt-1 text-xs text-neutral-400">
+              Voice ID{" "}
+              <code className="rounded bg-neutral-800 px-1 font-mono text-xs text-neutral-200 select-all">
+                {f.voiceId}
+              </code>
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -86,12 +86,12 @@ export async function registerCastVoice(
     if (insertErr) {
       // 23505: another write registered this id first (voices_current_el_id_uniq).
       if (insertErr.code !== "23505") return fail(insertErr.message);
-      // A voices row exists now; only its id is unknown if the lookup fails.
+      // A failed lookup leaves the winner's row unconfirmed but likely, so
+      // stage `voices`; a lookup that finds nothing confirms no row.
       const { data: raced, error: raceErr } = await findVoice();
       if (raceErr)
         return { ok: false, error: raceErr.message, stage: "voices" };
-      if (!raced)
-        return { ok: false, error: insertErr.message, stage: "voices" };
+      if (!raced) return fail(insertErr.message);
       voiceUuid = raced.id;
     } else {
       voiceUuid = inserted.id;
