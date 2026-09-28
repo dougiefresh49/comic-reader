@@ -2,6 +2,10 @@ import { fixturePageFor, logSpend } from "./dry-run";
 
 let base64Cursor = 0;
 
+export function resetRoboflowCursor(): void {
+  base64Cursor = 0;
+}
+
 /**
  * One `outputs[0]` that satisfies both workflows: the SAM3 keys read by
  * `roboflowAnalyzeBatch` and the `predictions.predictions` read by the

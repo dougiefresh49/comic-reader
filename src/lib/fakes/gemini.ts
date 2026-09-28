@@ -6,6 +6,7 @@ import {
   logSpend,
   type FixtureBubble,
 } from "./dry-run";
+import { resetRoboflowCursor } from "./roboflow";
 
 const EMBEDDING_DIMENSIONS = 768;
 
@@ -28,6 +29,17 @@ function allBubbles(): FixtureBubble[] {
 let ocrCursor = 0;
 let faceCursor = 0;
 
+/**
+ * Reset every call-order cursor the fakes keep (OCR, face ID, Roboflow
+ * base64). Modules outlive a run under `next dev` and step retries, so the
+ * smoke runner (#92) calls this at the start of each run.
+ */
+export function resetFakeCursors(): void {
+  ocrCursor = 0;
+  faceCursor = 0;
+  resetRoboflowCursor();
+}
+
 function ocr(): string {
   const withText = allBubbles().filter((b) => b.ocrText);
   return withText[ocrCursor++ % withText.length]!.ocrText;
@@ -36,7 +48,10 @@ function ocr(): string {
 function context(prompt: string): string {
   const text = /\* \*\*Text:\*\* "([\s\S]*?)"\n/.exec(prompt)?.[1] ?? "";
   const bubbles = allBubbles();
-  const b = bubbles.find((x) => x.ocrText === text) ?? bubbles[0]!;
+  const b = bubbles.find((x) => x.ocrText === text);
+  if (!b) {
+    throw new Error(`DRY_RUN: no context fixture for "${text.slice(0, 80)}"`);
+  }
   // gates: the first speech bubble on fixture page 1 gets an unknown speaker.
   const stranger = isGatesScenario() && b === bubbles[0];
   return `<scratchpad>DRY_RUN fixture ${b.legacyId}</scratchpad>\n${JSON.stringify(

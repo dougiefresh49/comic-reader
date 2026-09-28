@@ -33,6 +33,7 @@ const { getElevenLabsClient, elevenLabsFetch } = await import(
   "~/lib/elevenlabs-client"
 );
 const { identifyFace } = await import("~/lib/character-identification");
+const { resetFakeCursors } = await import("~/lib/fakes/gemini");
 const { buildContextPrompt } = await import("~/lib/gemini-prompts");
 const { parseRoboflowSam3Output } = await import(
   "~/workflows/steps/vision-rows"
@@ -99,11 +100,23 @@ const box = { x: 0, y: 0, width: 10, height: 10 };
 const ctx = await ask(GEMINI_HIGH, buildContextPrompt(ocrText, box, []));
 const ctxJson = JSON.parse(/\{[\s\S]*\}/.exec(ctx)![0]) as { speaker: string };
 console.log(`gemini context: speaker=${ctxJson.speaker}`);
+await assert.rejects(
+  ask(GEMINI_HIGH, buildContextPrompt("NOT A FIXTURE", box, [])),
+  /no context fixture for "NOT A FIXTURE"/,
+);
+console.log("gemini context unmatched text: threw");
 
 const face = await identifyFace(gemini, "AAAA", "image/jpeg", ["Raphael"]);
 console.log(
   `gemini face-id: ${face.characterName} confidence=${face.confidence}`,
 );
+if (process.env.DRY_RUN_SCENARIO === "gates") {
+  // A second run in the same process must see the unresolved face again.
+  resetFakeCursors();
+  const again = await identifyFace(gemini, "AAAA", "image/jpeg", []);
+  assert.equal(again.characterName, "smoke-stranger");
+  console.log(`gemini face-id after resetFakeCursors: ${again.characterName}`);
+}
 
 const sort = await ask(
   GEMINI_MEDIUM,
