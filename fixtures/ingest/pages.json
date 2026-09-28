@@ -3555,7 +3555,7 @@
      "sortOrder": 0,
      "ocrText": "...THOUGH THIS BANTER WAS A WHOLE LOT BETTER IN MY HEAD.",
      "type": "SPEECH",
-     "speaker": "tessik",
+     "speaker": "smoke-tessik",
      "emotion": "Sarcastic and straining",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -3567,7 +3567,7 @@
      "sortOrder": 1,
      "ocrText": "YOU FLEET-FOOTED TORTOISES ARE MY IMMORTAL FOES.",
      "type": "SPEECH",
-     "speaker": "hopscald",
+     "speaker": "smoke-hopscald",
      "emotion": "Hateful and dramatic",
      "side": "VILLAIN",
      "characterType": "MINOR",
@@ -3579,7 +3579,7 @@
      "sortOrder": 2,
      "ocrText": "WARBUNNY WILL SILENCE THE CRITIQUES ONCE AND FOR ALL.",
      "type": "SPEECH",
-     "speaker": "hopscald",
+     "speaker": "smoke-hopscald",
      "emotion": "Menacing and determined",
      "side": "VILLAIN",
      "characterType": "MINOR",
@@ -3591,7 +3591,7 @@
      "sortOrder": 3,
      "ocrText": "BRING THE SWING, BUNNY BOY!",
      "type": "SPEECH",
-     "speaker": "fenwick",
+     "speaker": "smoke-fenwick",
      "emotion": null,
      "side": null,
      "characterType": null,
@@ -3603,7 +3603,7 @@
      "sortOrder": 4,
      "ocrText": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT.",
      "type": "SPEECH",
-     "speaker": "tessik",
+     "speaker": "smoke-tessik",
      "emotion": null,
      "side": null,
      "characterType": null,
@@ -3615,7 +3615,7 @@
      "sortOrder": 5,
      "ocrText": "YOU'RE WORSE THAN BILLY.",
      "type": "SPEECH",
-     "speaker": "amber-vole",
+     "speaker": "smoke-ambervole",
      "emotion": null,
      "side": null,
      "characterType": null,
@@ -3627,7 +3627,7 @@
      "sortOrder": 6,
      "ocrText": "ALPHA, THIS IS TRINI. DO YOU COPY?",
      "type": "SPEECH",
-     "speaker": "amber-vole",
+     "speaker": "smoke-ambervole",
      "emotion": "Focused",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -3639,7 +3639,7 @@
      "sortOrder": 7,
      "ocrText": "AYE-YI-YI! ROGER THAT, TRINI.",
      "type": "SPEECH",
-     "speaker": "gizmo-9",
+     "speaker": "smoke-gizmo9",
      "emotion": "frantic acknowledgment",
      "side": "HERO",
      "characterType": "MINOR",
@@ -3651,7 +3651,7 @@
      "sortOrder": 8,
      "ocrText": "ARE YOU ALRIGHT?",
      "type": "SPEECH",
-     "speaker": "gizmo-9",
+     "speaker": "smoke-gizmo9",
      "emotion": "frantic acknowledgment",
      "side": null,
      "characterType": null,
@@ -3663,7 +3663,7 @@
      "sortOrder": 9,
      "ocrText": "WE'RE NEARLY DONE FIGHTING ONE OF ZEDD'S MOST ADORABLE MONSTERS.",
      "type": "SPEECH",
-     "speaker": "amber-vole",
+     "speaker": "smoke-ambervole",
      "emotion": "Sarcastic banter",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -3675,7 +3675,7 @@
      "sortOrder": 10,
      "ocrText": "ONCE THAT'S DONE, PARIS SHOULD BE ALL SAFE AND SOUND AGAIN.",
      "type": "SPEECH",
-     "speaker": "amber-vole",
+     "speaker": "smoke-ambervole",
      "emotion": "Optimistic and reassuring",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -3685,55 +3685,55 @@
    ],
    "faces": [
     {
-     "characterName": "hopscald",
+     "characterName": "smoke-hopscald",
      "confidence": 0.95
     },
     {
-     "characterName": "vessa",
+     "characterName": "smoke-vessa",
      "confidence": 0.85
     },
     {
-     "characterName": "fenwick",
+     "characterName": "smoke-fenwick",
      "confidence": 0.95
     },
     {
-     "characterName": "vessa",
+     "characterName": "smoke-vessa",
      "confidence": 0.95
     },
     {
-     "characterName": "tessik",
+     "characterName": "smoke-tessik",
      "confidence": 0.95
     },
     {
-     "characterName": "tessik",
+     "characterName": "smoke-tessik",
      "confidence": 0.95
     },
     {
-     "characterName": "amber-vole",
+     "characterName": "smoke-ambervole",
      "confidence": 0.95
     },
     {
-     "characterName": "amber-vole",
+     "characterName": "smoke-ambervole",
      "confidence": 0.95
     },
     {
-     "characterName": "hopscald",
+     "characterName": "smoke-hopscald",
      "confidence": 0.95
     },
     {
-     "characterName": "hopscald",
+     "characterName": "smoke-hopscald",
      "confidence": 0.95
     },
     {
-     "characterName": "hopscald",
+     "characterName": "smoke-hopscald",
      "confidence": 0.95
     },
     {
-     "characterName": "hopscald",
+     "characterName": "smoke-hopscald",
      "confidence": 0.95
     },
     {
-     "characterName": "hopscald",
+     "characterName": "smoke-hopscald",
      "confidence": 0.95
     }
    ]
@@ -7455,7 +7455,7 @@
      "sortOrder": 0,
      "ocrText": "DUDES, DOESN'T THIS KINDA FEEL LIKE ONE OF THOSE CRAZY AWESOME VINTAGE SIDE SCROLLER VIDEO GAMES?",
      "type": "SPEECH",
-     "speaker": "pollux",
+     "speaker": "smoke-pollux",
      "emotion": "Excited and playful",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -7479,7 +7479,7 @@
      "sortOrder": 2,
      "ocrText": "WE GOTTA WORK ON YOUR DEFINITION OF \"AWESOME,\" MICHELANGELO.",
      "type": "SPEECH",
-     "speaker": "crimson-vole",
+     "speaker": "smoke-crimsonvole",
      "emotion": null,
      "side": null,
      "characterType": null,
@@ -7491,7 +7491,7 @@
      "sortOrder": 3,
      "ocrText": "EXACTLY!",
      "type": "SPEECH",
-     "speaker": "pollux",
+     "speaker": "smoke-pollux",
      "emotion": "Enthusiastic and carefree",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -7503,7 +7503,7 @@
      "sortOrder": 4,
      "ocrText": "WE LIVE FOR THE FOOT. WE DIE FOR THE FOOT.",
      "type": "SPEECH",
-     "speaker": "drab-grunt",
+     "speaker": "smoke-drabgrunt",
      "emotion": "Fanatical",
      "side": "VILLAIN",
      "characterType": "EXTRA",
@@ -7515,7 +7515,7 @@
      "sortOrder": 5,
      "ocrText": "LET THE FIRE OF OUR CAUSE...",
      "type": "SPEECH",
-     "speaker": "drab-captain",
+     "speaker": "smoke-drabcaptain",
      "emotion": "Fanatical",
      "side": "VILLAIN",
      "characterType": "EXTRA",
@@ -7527,7 +7527,7 @@
      "sortOrder": 6,
      "ocrText": "...ENGULF ALL THOSE WHO STAND AGAINST IT!",
      "type": "SPEECH",
-     "speaker": "drab-captain",
+     "speaker": "smoke-drabcaptain",
      "emotion": "Shouting/Fanatical",
      "side": "VILLAIN",
      "characterType": "EXTRA",
@@ -7539,7 +7539,7 @@
      "sortOrder": 7,
      "ocrText": "Wait, they can throw fireballs now?",
      "type": "SPEECH",
-     "speaker": "rose-vole",
+     "speaker": "smoke-rosevole",
      "emotion": "Surprised then envious",
      "side": "HERO",
      "characterType": "MAJOR",
@@ -7551,7 +7551,7 @@
      "sortOrder": 8,
      "ocrText": "Among other things.",
      "type": "SPEECH",
-     "speaker": "moss-vole",
+     "speaker": "smoke-mossvole",
      "emotion": "strained",
      "side": null,
      "characterType": null,
@@ -7563,7 +7563,7 @@
      "sortOrder": 9,
      "ocrText": "I wanna throw fireballs.",
      "type": "SPEECH",
-     "speaker": "rose-vole",
+     "speaker": "smoke-rosevole",
      "emotion": null,
      "side": null,
      "characterType": null,
@@ -7573,71 +7573,71 @@
    ],
    "faces": [
     {
-     "characterName": "clay-grunt",
+     "characterName": "smoke-claygrunt",
      "confidence": 0.95
     },
     {
-     "characterName": "rose-vole",
+     "characterName": "smoke-rosevole",
      "confidence": 0.95
     },
     {
-     "characterName": "clay-grunt",
+     "characterName": "smoke-claygrunt",
      "confidence": 0.95
     },
     {
-     "characterName": "drab-captain",
+     "characterName": "smoke-drabcaptain",
      "confidence": 0.95
     },
     {
-     "characterName": "rose-vole",
+     "characterName": "smoke-rosevole",
      "confidence": 0.95
     },
     {
-     "characterName": "marwen",
+     "characterName": "smoke-marwen",
      "confidence": 0.95
     },
     {
-     "characterName": "moss-vole",
+     "characterName": "smoke-mossvole",
      "confidence": 0.95
     },
     {
-     "characterName": "crimson-vole",
+     "characterName": "smoke-crimsonvole",
      "confidence": 0.95
     },
     {
-     "characterName": "clay-grunt",
+     "characterName": "smoke-claygrunt",
      "confidence": 0.9
     },
     {
-     "characterName": "drab-grunt",
+     "characterName": "smoke-drabgrunt",
      "confidence": 0.95
     },
     {
-     "characterName": "moss-vole",
+     "characterName": "smoke-mossvole",
      "confidence": 0.95
     },
     {
-     "characterName": "drab-grunt",
+     "characterName": "smoke-drabgrunt",
      "confidence": 0.95
     },
     {
-     "characterName": "drab-grunt",
+     "characterName": "smoke-drabgrunt",
      "confidence": 0.95
     }
    ]
   }
  ],
  "voiceDescriptions": {
-  "gizmo-9": "A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality.",
-  "fenwick": "A teenage male voice with an intelligent, articulate American accent. It's confident and often sarcastic, carrying a relaxed yet inquisitive tone with a subtle tech-nerd inflection.",
-  "drab-captain": "A deep, disciplined, and authoritative male voice that is calm yet menacing. It is articulate and resonant, conveying a fanatical conviction, with a slight muffled quality from a mask that does not hinder its clear projection.",
-  "drab-grunt": "A fanatical, raspy male voice, gruff and often muffled by a mask, with an American accent. It conveys an intense, zealous aggression, characteristic of a disciplined ninja cultist or professional henchman, occasionally sounding breathless.",
-  "moss-vole": "A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge.",
-  "pollux": "A young, high-energy American male voice with a distinct surfer dude accent. The tone is typically playful and enthusiastic, ready for action or a good time.",
+  "smoke-gizmo9": "A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality.",
+  "smoke-fenwick": "A teenage male voice with an intelligent, articulate American accent. It's confident and often sarcastic, carrying a relaxed yet inquisitive tone with a subtle tech-nerd inflection.",
+  "smoke-drabcaptain": "A deep, disciplined, and authoritative male voice that is calm yet menacing. It is articulate and resonant, conveying a fanatical conviction, with a slight muffled quality from a mask that does not hinder its clear projection.",
+  "smoke-drabgrunt": "A fanatical, raspy male voice, gruff and often muffled by a mask, with an American accent. It conveys an intense, zealous aggression, characteristic of a disciplined ninja cultist or professional henchman, occasionally sounding breathless.",
+  "smoke-mossvole": "A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge.",
+  "smoke-pollux": "A young, high-energy American male voice with a distinct surfer dude accent. The tone is typically playful and enthusiastic, ready for action or a good time.",
   "narrator": "A deep, resonant, and wise male voice with a philosophical storytelling tone. It's serious, authoritative, and cinematic, delivering narration with both epic gravitas and professional clarity.",
-  "rose-vole": "A youthful American female voice, energetic and distinctly sassy. It projects confidence and a heroic spirit, suitable for a dynamic and courageous character.",
-  "tessik": "A gruff, gritty young male voice with a deep tone. It features a thick, street-smart Brooklyn/New York accent, embodying a tough and rebellious character.",
-  "crimson-vole": "A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation.",
-  "hopscald": "A deep, booming, gravelly, and guttural male voice, monstrous and brutish. It projects an aggressively arrogant, theatrical barbarian warlord persona, capable of also sounding primitive and submissive."
+  "smoke-rosevole": "A youthful American female voice, energetic and distinctly sassy. It projects confidence and a heroic spirit, suitable for a dynamic and courageous character.",
+  "smoke-tessik": "A gruff, gritty young male voice with a deep tone. It features a thick, street-smart Brooklyn/New York accent, embodying a tough and rebellious character.",
+  "smoke-crimsonvole": "A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation.",
+  "smoke-hopscald": "A deep, booming, gravelly, and guttural male voice, monstrous and brutish. It projects an aggressively arrogant, theatrical barbarian warlord persona, capable of also sounding primitive and submissive."
  }
 }
