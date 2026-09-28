@@ -125,7 +125,9 @@ async function truth(book: string, issues: string[], panelIssues: string[]) {
     const [pages, bubbles, panels] = await Promise.all([
       q("pages", "number, width, height"),
       q("bubbles", "id, page_number, box_2d, ignored"),
-      q("panels", "panel_id, page_number, bounding_box"),
+      panelIssues.includes(issue)
+        ? q("panels", "panel_id, page_number, bounding_box")
+        : { data: [], error: null },
     ]);
     const err = pages.error ?? bubbles.error ?? panels.error;
     if (err) fail(`SELECT failed for ${book}/${issue}: ${err.message}`);
@@ -174,7 +176,7 @@ async function truth(book: string, issues: string[], panelIssues: string[]) {
         out.bubbles.push({ id: b.id, box });
       }
       const pagePanels = panelRows.filter((r) => r.page_number === p.number);
-      if (panelIssues.includes(issue) && pagePanels.length > 0) {
+      if (pagePanels.length > 0) {
         out.panels = pagePanels.map((r) => ({
           id: r.panel_id,
           box: r.bounding_box,
