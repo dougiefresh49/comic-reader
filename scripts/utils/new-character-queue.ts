@@ -115,9 +115,9 @@ export async function analyzeNewCharacterQueue(
 
   const [
     { data: bubbleRows, error: bErr },
-    { data: aliasRows },
-    { data: caRows },
-    { data: charRows },
+    { data: aliasRows, error: aliasErr },
+    { data: caRows, error: caErr },
+    { data: charRows, error: charErr },
   ] = await Promise.all([
     client
       .from("bubbles")
@@ -136,16 +136,24 @@ export async function analyzeNewCharacterQueue(
     client.from("characters").select("id, aliases"),
   ]);
 
-  if (bErr) {
-    console.error("analyzeNewCharacterQueue bubbles:", bErr);
-    return { autoResolved: [], queue: [], pendingCount: 0 };
-  }
+  // A failed read must throw: an empty result reads as "nothing pending"
+  // and would skip the new-characters gate.
+  const fail = (table: string, message: string): never => {
+    throw new Error(
+      `analyzeNewCharacterQueue ${table} ${bookId}/${issueId}: ${message}`,
+    );
+  };
+  if (bErr) fail("bubbles", bErr.message);
+  if (aliasErr) fail("aliases", aliasErr.message);
+  if (caErr) fail("character_appearances", caErr.message);
+  if (charErr) fail("characters", charErr.message);
 
-  const { data: castRows } = await client
+  const { data: castRows, error: castErr } = await client
     .from("castlist")
     .select("character")
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
+  if (castErr) fail("castlist", castErr.message);
 
   const aliasMap = new Map<string, string>();
   for (const r of (aliasRows ?? []) as Array<{
