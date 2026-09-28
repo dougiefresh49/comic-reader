@@ -9,6 +9,19 @@ import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
 
+/**
+ * A Supabase error with a Postgres or PostgREST code is a data error that a
+ * retry won't cure, so it fails the step now. No code means no database answer:
+ * a dropped connection comes back as `TypeError: fetch failed` with code "", and
+ * PGRST0xx means PostgREST couldn't reach Postgres. Those throw a plain Error so
+ * the Workflow retries the step.
+ */
+function dbError(label: string, error: { message: string; code?: string }) {
+  const message = `${label}: ${error.message}`;
+  const transient = !error.code || error.code.startsWith("PGRST0");
+  return transient ? new Error(message) : new FatalError(message);
+}
+
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
 interface SortPanelRow {
@@ -295,7 +308,7 @@ export async function sortPageElements(
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
-  if (pErr) throw new FatalError(`panels: ${pErr.message}`);
+  if (pErr) throw dbError("panels", pErr);
 
   const { data: bubbleRows, error: bErr } = await supabase
     .from("bubbles")
@@ -306,7 +319,7 @@ export async function sortPageElements(
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
-  if (bErr) throw new FatalError(`bubbles: ${bErr.message}`);
+  if (bErr) throw dbError("bubbles", bErr);
 
   const panels = (panelRows ?? []) as SortPanelRow[];
   const bubbles = (bubbleRows ?? []) as SortBubbleRow[];
@@ -328,9 +341,7 @@ export async function sortPageElements(
     );
     const results = await Promise.all(bubbleUpdates);
     const errResult = results.find((r) => r.error);
-    if (errResult?.error) {
-      throw new FatalError(`bubbles: ${errResult.error.message}`);
-    }
+    if (errResult?.error) throw dbError("bubbles", errResult.error);
     console.log(
       `[sort] ${bookId}/${issueId}: page-${padded}: 0 panels, heuristic bubble sort (${bubbles.length})`,
     );
@@ -361,9 +372,7 @@ export async function sortPageElements(
 
   const results = await Promise.all([...panelUpdates, ...bubbleUpdates]);
   const errResult = results.find((r) => r.error);
-  if (errResult?.error) {
-    throw new FatalError(`panels/bubbles: ${errResult.error.message}`);
-  }
+  if (errResult?.error) throw dbError("panels/bubbles", errResult.error);
 
   console.log(
     `[sort] ${bookId}/${issueId}: page-${padded}: ${panels.length} panel(s), ${bubbles.length} bubble(s)`,
@@ -381,7 +390,7 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
 
-  if (pagesError) throw new FatalError(`pages: ${pagesError.message}`);
+  if (pagesError) throw dbError("pages", pagesError);
 
   if (!pages || pages.length === 0) {
     console.log(`[styles] ${bookId}/${issueId}: no pages found, skipping`);
@@ -398,7 +407,7 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
 
-  if (bubblesError) throw new FatalError(`bubbles: ${bubblesError.message}`);
+  if (bubblesError) throw dbError("bubbles", bubblesError);
 
   if (!bubbles || bubbles.length === 0) return;
 
@@ -422,7 +431,7 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
       .eq("id", bubble.id)
       .is("style", null)
       .select("id");
-    if (error) throw new FatalError(`bubbles: ${error.message}`);
+    if (error) throw dbError("bubbles", error);
     if (!updated || updated.length === 0) {
       skipped++;
       console.log(`[styles] skip ${bubble.id}: style set concurrently`);
