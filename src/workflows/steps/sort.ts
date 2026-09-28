@@ -1,4 +1,5 @@
 import {
+  type GenerateContentResponse,
   type GoogleGenAI,
   createPartFromBase64,
   createPartFromText,
@@ -8,6 +9,53 @@ import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
+
+/**
+ * A Supabase error with a Postgres or PostgREST code is a data error that a
+ * retry won't cure, so it fails the step now. No code means no database answer:
+ * a dropped connection comes back as `TypeError: fetch failed` with code "", and
+ * PGRST0xx means PostgREST couldn't reach Postgres. Those throw a plain Error so
+ * the Workflow retries the step.
+ */
+function dbError(label: string, error: { message: string; code?: string }) {
+  const message = `${label}: ${error.message}`;
+  const transient = !error.code || error.code.startsWith("PGRST0");
+  return transient ? new Error(message) : new FatalError(message);
+}
+
+/**
+ * Writes after a paid Gemini call. A Workflow retry would repeat that call, so
+ * transient failures re-send only the failed writes here, up to 3 attempts.
+ */
+async function writeAfterPaidCall(
+  label: string,
+  writes: (() => PromiseLike<{
+    error: Parameters<typeof dbError>[1] | null;
+  }>)[],
+) {
+  for (let attempt = 1; ; attempt++) {
+    // A write that throws or rejects counts as a codeless (transient) error.
+    const results = await Promise.all(
+      writes.map((write) =>
+        Promise.resolve()
+          .then(write)
+          .then(
+            (r) => r.error,
+            (e: unknown) => ({ message: String(e) }),
+          ),
+      ),
+    );
+    const errors = results.flatMap((err) => (err ? [dbError(label, err)] : []));
+    if (errors.length === 0) return;
+    const fatal = errors.find((e) => e instanceof FatalError);
+    if (fatal) throw fatal;
+    if (attempt === 3) {
+      throw new FatalError(`${errors[0]!.message} (after 3 attempts)`);
+    }
+    writes = writes.filter((_, i) => results[i]);
+    await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+  }
+}
 
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
@@ -96,14 +144,18 @@ function bubbleLayoutLine(
   return `- bubbleId: ${b.id}\n  assigned_panel_uuid: ${panelHint}\n  bbox_normalized: x=${nx.toFixed(4)}, y=${ny.toFixed(4)}, w=${nw.toFixed(4)}, h=${nh.toFixed(4)}\n  text: "${bubbleSnippet(b).replace(/"/g, '\\"')}"\n  ignored: ${b.ignored}`;
 }
 
-async function getSortPlanFromGemini(
+/**
+ * The paid call only. The caller reads `.text` (an SDK getter that can throw)
+ * and parses it inside its fail-fast block.
+ */
+async function getSortPlanResponseFromGemini(
   gemini: GoogleGenAI,
   pageImage: Buffer,
   imgW: number,
   imgH: number,
   panels: SortPanelRow[],
   bubbles: SortBubbleRow[],
-): Promise<GeminiSortResponse> {
+): Promise<GenerateContentResponse> {
   const panelLines = panels
     .map((p) => {
       const bb = p.bounding_box;
@@ -155,20 +207,10 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
   );
   const textPart = createPartFromText(prompt);
 
-  const response = await gemini.models.generateContent({
+  return gemini.models.generateContent({
     model: GEMINI_MEDIUM,
     contents: [imagePart, textPart],
   });
-
-  const text = response.text;
-  if (!text) throw new Error("No text response from Gemini");
-
-  const jsonText = extractJsonObject(text);
-  const parsed = JSON.parse(jsonText) as GeminiSortResponse;
-  if (!parsed.panels || !Array.isArray(parsed.panels)) {
-    throw new Error("Invalid response: missing panels array");
-  }
-  return parsed;
 }
 
 function validateAndFlattenOrders(
@@ -295,7 +337,7 @@ export async function sortPageElements(
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
-  if (pErr) throw new FatalError(`panels: ${pErr.message}`);
+  if (pErr) throw dbError("panels", pErr);
 
   const { data: bubbleRows, error: bErr } = await supabase
     .from("bubbles")
@@ -306,7 +348,7 @@ export async function sortPageElements(
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber);
 
-  if (bErr) throw new FatalError(`bubbles: ${bErr.message}`);
+  if (bErr) throw dbError("bubbles", bErr);
 
   const panels = (panelRows ?? []) as SortPanelRow[];
   const bubbles = (bubbleRows ?? []) as SortBubbleRow[];
@@ -327,9 +369,11 @@ export async function sortPageElements(
         supabase.from("bubbles").update({ sort_order }).eq("id", id),
     );
     const results = await Promise.all(bubbleUpdates);
-    const errResult = results.find((r) => r.error);
-    if (errResult?.error) {
-      throw new FatalError(`bubbles: ${errResult.error.message}`);
+    const errors = results.flatMap((r) =>
+      r.error ? [dbError("bubbles", r.error)] : [],
+    );
+    if (errors[0]) {
+      throw errors.find((e) => e instanceof FatalError) ?? errors[0];
     }
     console.log(
       `[sort] ${bookId}/${issueId}: page-${padded}: 0 panels, heuristic bubble sort (${bubbles.length})`,
@@ -337,7 +381,7 @@ export async function sortPageElements(
     return;
   }
 
-  const plan = await getSortPlanFromGemini(
+  const response = await getSortPlanResponseFromGemini(
     gemini,
     pageImage,
     imgW,
@@ -345,24 +389,38 @@ export async function sortPageElements(
     panels,
     bubbles,
   );
-  const { panelOrders, bubbleGlobalOrder } = validateAndFlattenOrders(
-    panels,
-    bubbles,
-    plan,
-  );
 
-  const panelUpdates = [...panelOrders.entries()].map(([id, sort_order]) =>
-    supabase.from("panels").update({ sort_order }).eq("id", id),
-  );
-  const bubbleUpdates = [...bubbleGlobalOrder.entries()].map(
-    ([id, sort_order]) =>
-      supabase.from("bubbles").update({ sort_order }).eq("id", id),
-  );
+  // Past the paid call: a Workflow retry would pay for Gemini again, so every
+  // failure from here on is a FatalError, including the `.text` getter.
+  try {
+    const text = response.text;
+    if (!text) throw new Error("No text response from Gemini");
+    const plan = JSON.parse(extractJsonObject(text)) as GeminiSortResponse;
+    if (!plan.panels || !Array.isArray(plan.panels)) {
+      throw new Error("Invalid response: missing panels array");
+    }
+    const { panelOrders, bubbleGlobalOrder } = validateAndFlattenOrders(
+      panels,
+      bubbles,
+      plan,
+    );
 
-  const results = await Promise.all([...panelUpdates, ...bubbleUpdates]);
-  const errResult = results.find((r) => r.error);
-  if (errResult?.error) {
-    throw new FatalError(`panels/bubbles: ${errResult.error.message}`);
+    await writeAfterPaidCall("panels/bubbles", [
+      ...[...panelOrders.entries()].map(
+        ([id, sort_order]) =>
+          () =>
+            supabase.from("panels").update({ sort_order }).eq("id", id),
+      ),
+      ...[...bubbleGlobalOrder.entries()].map(
+        ([id, sort_order]) =>
+          () =>
+            supabase.from("bubbles").update({ sort_order }).eq("id", id),
+      ),
+    ]);
+  } catch (e) {
+    if (e instanceof FatalError) throw e;
+    const message = e instanceof Error ? e.message : String(e);
+    throw new FatalError(`sort plan: ${message}`);
   }
 
   console.log(
@@ -381,7 +439,7 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
 
-  if (pagesError) throw new FatalError(`pages: ${pagesError.message}`);
+  if (pagesError) throw dbError("pages", pagesError);
 
   if (!pages || pages.length === 0) {
     console.log(`[styles] ${bookId}/${issueId}: no pages found, skipping`);
@@ -398,7 +456,7 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
     .eq("book_id", bookId)
     .eq("issue_id", issueId);
 
-  if (bubblesError) throw new FatalError(`bubbles: ${bubblesError.message}`);
+  if (bubblesError) throw dbError("bubbles", bubblesError);
 
   if (!bubbles || bubbles.length === 0) return;
 
@@ -422,7 +480,7 @@ export async function addBubbleStyles(bookId: string, issueId: string) {
       .eq("id", bubble.id)
       .is("style", null)
       .select("id");
-    if (error) throw new FatalError(`bubbles: ${error.message}`);
+    if (error) throw dbError("bubbles", error);
     if (!updated || updated.length === 0) {
       skipped++;
       console.log(`[styles] skip ${bubble.id}: style set concurrently`);
