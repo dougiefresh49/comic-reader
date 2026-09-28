@@ -74,11 +74,18 @@ export function SpeechBox({
 
     const nodes: React.ReactNode[] = [];
     let cursor = 0;
+    // While a word is active, text after it is faint so a kid can find their
+    // place. Color only: weight or padding per word would reflow the line.
+    const isFuture = (idx: number) =>
+      activeWordIndex !== null && idx > activeWordIndex;
 
     words.forEach((word, idx) => {
       if (cursor < word.cleanTextStart) {
         nodes.push(
-          <span key={`gap-${idx}`} className="text-white/80">
+          <span
+            key={`gap-${idx}`}
+            className={isFuture(idx) ? "text-white/50" : "text-white/80"}
+          >
             {text.slice(cursor, word.cleanTextStart)}
           </span>,
         );
@@ -91,7 +98,7 @@ export function SpeechBox({
         <span
           key={`word-${idx}`}
           ref={isActive ? activeRef : null}
-          className="text-white"
+          className={isFuture(idx) ? "text-white/50" : "text-white"}
         >
           {content}
         </span>,
@@ -102,7 +109,10 @@ export function SpeechBox({
 
     if (cursor < text.length) {
       nodes.push(
-        <span key="tail" className="text-white/80">
+        <span
+          key="tail"
+          className={isFuture(words.length) ? "text-white/50" : "text-white/80"}
+        >
           {text.slice(cursor)}
         </span>,
       );
