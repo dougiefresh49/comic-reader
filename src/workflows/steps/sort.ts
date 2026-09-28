@@ -1,4 +1,5 @@
 import {
+  type GenerateContentResponse,
   type GoogleGenAI,
   createPartFromBase64,
   createPartFromText,
@@ -143,15 +144,18 @@ function bubbleLayoutLine(
   return `- bubbleId: ${b.id}\n  assigned_panel_uuid: ${panelHint}\n  bbox_normalized: x=${nx.toFixed(4)}, y=${ny.toFixed(4)}, w=${nw.toFixed(4)}, h=${nh.toFixed(4)}\n  text: "${bubbleSnippet(b).replace(/"/g, '\\"')}"\n  ignored: ${b.ignored}`;
 }
 
-/** The paid call only; the caller parses the text so it can fail fast. */
-async function getSortPlanTextFromGemini(
+/**
+ * The paid call only. The caller reads `.text` (an SDK getter that can throw)
+ * and parses it inside its fail-fast block.
+ */
+async function getSortPlanResponseFromGemini(
   gemini: GoogleGenAI,
   pageImage: Buffer,
   imgW: number,
   imgH: number,
   panels: SortPanelRow[],
   bubbles: SortBubbleRow[],
-): Promise<string | undefined> {
+): Promise<GenerateContentResponse> {
   const panelLines = panels
     .map((p) => {
       const bb = p.bounding_box;
@@ -203,11 +207,10 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
   );
   const textPart = createPartFromText(prompt);
 
-  const response = await gemini.models.generateContent({
+  return gemini.models.generateContent({
     model: GEMINI_MEDIUM,
     contents: [imagePart, textPart],
   });
-  return response.text;
 }
 
 function validateAndFlattenOrders(
@@ -378,7 +381,7 @@ export async function sortPageElements(
     return;
   }
 
-  const text = await getSortPlanTextFromGemini(
+  const response = await getSortPlanResponseFromGemini(
     gemini,
     pageImage,
     imgW,
@@ -388,8 +391,9 @@ export async function sortPageElements(
   );
 
   // Past the paid call: a Workflow retry would pay for Gemini again, so every
-  // failure from here on is a FatalError.
+  // failure from here on is a FatalError, including the `.text` getter.
   try {
+    const text = response.text;
     if (!text) throw new Error("No text response from Gemini");
     const plan = JSON.parse(extractJsonObject(text)) as GeminiSortResponse;
     if (!plan.panels || !Array.isArray(plan.panels)) {
