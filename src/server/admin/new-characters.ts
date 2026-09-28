@@ -13,13 +13,30 @@ function projectRoot(): string {
   return process.cwd();
 }
 
+/**
+ * The page renders `error` in place of the queue, so a failed read never
+ * looks like an empty queue and error.tsx never hides the message.
+ */
 export async function getNewCharacterReviews(
   bookId: string,
   issueId: string,
-): Promise<NewCharacterQueueResult> {
-  return analyzeNewCharacterQueue(supabaseAdmin, bookId, issueId, {
-    projectRoot: projectRoot(),
-  });
+): Promise<NewCharacterQueueResult & { error: string | null }> {
+  try {
+    const result = await analyzeNewCharacterQueue(
+      supabaseAdmin,
+      bookId,
+      issueId,
+      { projectRoot: projectRoot() },
+    );
+    return { ...result, error: null };
+  } catch (err) {
+    return {
+      autoResolved: [],
+      queue: [],
+      pendingCount: 0,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 export async function getBookDisplayLabel(bookId: string): Promise<string> {
