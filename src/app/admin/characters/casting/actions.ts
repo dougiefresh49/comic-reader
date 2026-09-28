@@ -39,9 +39,21 @@ export interface RegisterCastVoiceInput {
   designPrompt?: string;
 }
 
+/**
+ * How far a failed save got: `none` wrote nothing, `voices` wrote or found
+ * the voices row (`voiceUuid`) but not castlist, `castlist` wrote both but
+ * did not complete the casting task.
+ */
+type CastSaveFailure = {
+  ok: false;
+  error: string;
+  stage: "none" | "voices" | "castlist";
+  voiceUuid?: string;
+};
+
 export type RegisterCastVoiceResult =
   | { ok: true; voiceUuid: string }
-  | { ok: false; error: string };
+  | CastSaveFailure;
 
 /**
  * Registers the voice and points castlist at it: finds the `voices` row
@@ -57,6 +69,11 @@ export async function registerCastVoice(
   input: RegisterCastVoiceInput,
 ): Promise<RegisterCastVoiceResult> {
   const db = client as SupabaseClient<Database>;
+  const fail = (error: string): CastSaveFailure => ({
+    ok: false,
+    error,
+    stage: "none",
+  });
 
   const findVoice = () =>
     db
@@ -66,7 +83,7 @@ export async function registerCastVoice(
       .maybeSingle();
 
   const { data: existing, error: findErr } = await findVoice();
-  if (findErr) return { ok: false, error: findErr.message };
+  if (findErr) return fail(findErr.message);
 
   let voiceUuid = existing?.id;
   if (!voiceUuid) {
@@ -88,12 +105,10 @@ export async function registerCastVoice(
       .single();
     if (insertErr) {
       // 23505: another write registered this id first (voices_current_el_id_uniq).
-      if (insertErr.code !== "23505") {
-        return { ok: false, error: insertErr.message };
-      }
+      if (insertErr.code !== "23505") return fail(insertErr.message);
       const { data: raced, error: raceErr } = await findVoice();
-      if (raceErr) return { ok: false, error: raceErr.message };
-      if (!raced) return { ok: false, error: insertErr.message };
+      if (raceErr) return fail(raceErr.message);
+      if (!raced) return fail(insertErr.message);
       voiceUuid = raced.id;
     } else {
       voiceUuid = inserted.id;
@@ -110,15 +125,23 @@ export async function registerCastVoice(
     },
     { onConflict: "book_id,issue_id,character" },
   );
-  if (castErr) return { ok: false, error: castErr.message };
+  if (castErr) {
+    return { ok: false, error: castErr.message, stage: "voices", voiceUuid };
+  }
 
   return { ok: true, voiceUuid };
 }
 
-/** `registered`: the voices and castlist rows were written before the failure. */
-type SaveCastVoiceResult =
-  | { ok: true }
-  | { ok: false; error: string; registered: boolean };
+/** One sentence per stage, so the reader knows which rows to look for. */
+function castSaveFailureMessage(voiceId: string, f: CastSaveFailure) {
+  if (f.stage === "voices") {
+    return `Voice ${voiceId} has voices row ${f.voiceUuid}, but the castlist was not updated (${f.error}).`;
+  }
+  if (f.stage === "castlist") {
+    return `Voice ${voiceId} is registered, but the casting task was not marked complete (${f.error}).`;
+  }
+  return `Voice ${voiceId} exists in ElevenLabs but was not registered (${f.error}).`;
+}
 
 /**
  * Shared by the paste and Voice Design paths: marks the chosen appearance,
@@ -126,7 +149,7 @@ type SaveCastVoiceResult =
  */
 async function saveCastVoice(
   args: SaveVoiceIdArgs & { designPrompt?: string },
-): Promise<SaveCastVoiceResult> {
+): Promise<{ ok: true } | CastSaveFailure> {
   const voiceId = args.voiceId.trim();
 
   if (args.appearanceId) {
@@ -138,7 +161,7 @@ async function saveCastVoice(
         voice_model_status: "ready",
       })
       .eq("id", args.appearanceId);
-    if (error) return { ok: false, error: error.message, registered: false };
+    if (error) return { ok: false, error: error.message, stage: "none" };
   }
 
   const registered = await registerCastVoice(supabaseAdmin, {
@@ -148,9 +171,7 @@ async function saveCastVoice(
     elevenLabsId: voiceId,
     designPrompt: args.designPrompt,
   });
-  if (!registered.ok) {
-    return { ok: false, error: registered.error, registered: false };
-  }
+  if (!registered.ok) return registered;
 
   const { error: taskErr } = await supabaseAdmin
     .from("casting_tasks")
@@ -159,7 +180,14 @@ async function saveCastVoice(
       completed_at: new Date().toISOString(),
     })
     .eq("id", args.taskId);
-  if (taskErr) return { ok: false, error: taskErr.message, registered: true };
+  if (taskErr) {
+    return {
+      ok: false,
+      error: taskErr.message,
+      stage: "castlist",
+      voiceUuid: registered.voiceUuid,
+    };
+  }
 
   revalidatePath("/admin/characters/casting", "page");
   revalidatePath("/admin", "page");
@@ -176,7 +204,12 @@ export async function saveVoiceId(
   if (!args.voiceId.trim()) {
     return { ok: false, error: "Voice ID required" };
   }
-  return saveCastVoice(args);
+  const res = await saveCastVoice(args);
+  if (res.ok) return res;
+  return {
+    ok: false,
+    error: castSaveFailureMessage(args.voiceId.trim(), res),
+  };
 }
 
 interface SkipArgs {
@@ -413,16 +446,16 @@ export async function createVoiceDesign(
 
     if (!saveResult.ok) {
       // The voice already holds an ElevenLabs slot: return, log and name its id.
-      const stage = saveResult.registered
-        ? `Voice ${voiceId} is registered, but the casting task was not marked complete`
-        : `Voice ${voiceId} exists in ElevenLabs but was not registered`;
+      const row = saveResult.voiceUuid
+        ? ` voices_row=${saveResult.voiceUuid}`
+        : "";
       console.error(
-        `[casting] Voice Design save failed: book=${args.bookId} issue=${args.issueId} character=${args.characterId} voice=${voiceId} registered=${saveResult.registered}: ${saveResult.error}`,
+        `[casting] Voice Design save failed: book=${args.bookId} issue=${args.issueId} character=${args.characterId} voice=${voiceId} stage=${saveResult.stage}${row}: ${saveResult.error}`,
       );
       return {
         ok: false,
         voiceId,
-        error: `${stage} (${saveResult.error}). Running Voice Design again creates a second voice and takes another slot.`,
+        error: `${castSaveFailureMessage(voiceId, saveResult)} Running Voice Design again creates a second voice and takes another slot.`,
       };
     }
     return { ok: true, voiceId };
