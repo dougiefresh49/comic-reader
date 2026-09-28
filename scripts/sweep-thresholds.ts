@@ -2,19 +2,21 @@
 /**
  * Sweep the bubble and panel detection thresholds against the reviewed boxes (#180).
  *
- *   pnpm sweep-thresholds truth   [--book B] [--issues issue-1,issue-2,issue-3]
- *   pnpm sweep-thresholds capture --count N [--book B] [--issues ...]
+ *   pnpm sweep-thresholds truth   [--book B] [--issues issue-1,issue-2,issue-3] [--panel-issues issue-1]
+ *   pnpm sweep-thresholds capture --count N [--book B] [--issues ...] [--panel-issues ...]
  *   pnpm sweep-thresholds report  [--book B]
  *
  * truth: free. SELECTs the reviewed boxes and writes one
  *   fixtures/thresholds/<book>/<issue>/page-NN.truth.json per `pages` row.
  *   Bubbles with ignored = true, or a box_2d without a positive width and
- *   height, are left out. `panels` is null on a page with no panel rows, and
- *   the panel model is not scored on that page.
+ *   height, are left out. `panels` is null on a page with no panel rows, or
+ *   in an issue not named by --panel-issues, and the panel model is not called
+ *   or scored on that page. Only issue-1's panel rows have been reviewed; the
+ *   others come straight from the model and would score it against itself.
  * capture: PAID. Runs truth first, so newly reviewed pages join. Then one
- *   Roboflow call per model per page that has a truth file and no
- *   page-NN.<model>.json yet, at confidence FLOOR. It prints the count
- *   and the pages, then refuses to start unless --count equals that count and
+ *   Roboflow call per model per page that has a truth file with non-null
+ *   boxes for that model and no page-NN.<model>.json yet, at confidence
+ *   FLOOR. It prints the count and the pages, then refuses to start unless --count equals that count and
  *   the count is at most MAX_CALLS. Each file is written as soon as its call
  *   returns; the first failed call stops the run.
  * report: no network. Replays every saved prediction at 0.05..0.95.
@@ -111,7 +113,7 @@ function truthPages(book: string): Page[] {
     );
 }
 
-async function truth(book: string, issues: string[]) {
+async function truth(book: string, issues: string[], panelIssues: string[]) {
   const { supabase } = await import("./lib/supabase.js");
   for (const issue of issues) {
     const q = (table: "pages" | "bubbles" | "panels", cols: string) =>
@@ -172,7 +174,7 @@ async function truth(book: string, issues: string[]) {
         out.bubbles.push({ id: b.id, box });
       }
       const pagePanels = panelRows.filter((r) => r.page_number === p.number);
-      if (pagePanels.length > 0) {
+      if (panelIssues.includes(issue) && pagePanels.length > 0) {
         out.panels = pagePanels.map((r) => ({
           id: r.panel_id,
           box: r.bounding_box,
@@ -192,14 +194,17 @@ async function truth(book: string, issues: string[]) {
   }
 }
 
-async function capture(book: string, issues: string[]) {
+async function capture(book: string, issues: string[], panelIssues: string[]) {
   // Newly reviewed pages count (decision 3): refresh the truth files first.
-  await truth(book, issues);
-  const work = truthPages(book).flatMap((p) =>
-    MODEL_KEYS.filter(
-      (m) => !fs.existsSync(path.join(p.dir, `${p.page}.${m}.json`)),
-    ).map((m) => ({ ...p, model: m })),
-  );
+  await truth(book, issues, panelIssues);
+  const work = truthPages(book).flatMap((p) => {
+    const t = readJson<TruthFile>(path.join(p.dir, `${p.page}.truth.json`));
+    return MODEL_KEYS.filter(
+      (m) =>
+        t[m] !== null &&
+        !fs.existsSync(path.join(p.dir, `${p.page}.${m}.json`)),
+    ).map((m) => ({ ...p, model: m }));
+  });
   console.log(
     `capture would make ${work.length} Roboflow call(s) at confidence ${FLOOR}:`,
   );
@@ -384,15 +389,16 @@ function report(book: string) {
 
 const book = flag("book") ?? "tmnt-mmpr-iii";
 const issues = (flag("issues") ?? "issue-1,issue-2,issue-3").split(",");
+const panelIssues = (flag("panel-issues") ?? "issue-1").split(",");
 const cmd = process.argv[2];
 if (cmd === "truth") {
-  await truth(book, issues);
+  await truth(book, issues, panelIssues);
 } else if (cmd === "capture") {
-  await capture(book, issues);
+  await capture(book, issues, panelIssues);
 } else if (cmd === "report") {
   report(book);
 } else {
   fail(
-    "Usage: sweep-thresholds <truth|capture|report> [--book B] [--issues a,b] [--count N]",
+    "Usage: sweep-thresholds <truth|capture|report> [--book B] [--issues a,b] [--panel-issues a] [--count N]",
   );
 }
