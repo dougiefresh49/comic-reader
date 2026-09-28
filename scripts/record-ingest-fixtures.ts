@@ -67,7 +67,7 @@ const FIXTURE_IDS: Record<string, string> = {
 function fixtureId(name: string): string {
   const key = slug(name);
   if (key === "narrator") return key;
-  const id = FIXTURE_IDS[key];
+  const id = Object.hasOwn(FIXTURE_IDS, key) ? FIXTURE_IDS[key] : undefined;
   if (!id) throw new Error(`no made-up fixture id for "${name}"`);
   return id;
 }
