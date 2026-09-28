@@ -15,8 +15,9 @@ import {
   planBubblesToSend,
   planCharactersNeedingVoices,
   planSpeakerMatching,
+  readPlanningAppearances,
   selectBubblesNeedingAudio,
-  type AppearanceRow,
+  speakerKeys,
   type BubbleAudioRow,
   type CastRow,
 } from "~/workflows/steps/audio-plan";
@@ -139,7 +140,6 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
     { data: bubbleRows, error: bubErr },
     { data: aliasRows, error: aliasErr },
     { data: castRows, error: castErr },
-    { data: appearanceRows, error: appErr },
   ] = await Promise.all([
     supabase
       .from("bubbles")
@@ -158,25 +158,22 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
       .select("character, voice_id")
       .eq("book_id", bookId)
       .eq("issue_id", issueId),
-    supabase
-      .from("character_appearances")
-      .select(
-        "id, character_id, voice_id, voice_status, voice_description, voice_created_at",
-      ),
   ]);
 
   if (bubErr) throw new Error(bubErr.message);
   if (aliasErr) throw new Error(aliasErr.message);
   if (castErr) throw new Error(castErr.message);
-  if (appErr) throw new Error(appErr.message);
 
   const aliasMap = buildAliasMap(aliasRows ?? []);
   const cast = buildCastIndex(castRows ?? []);
-  const appearances = (appearanceRows ?? []) as AppearanceRow[];
 
   const rawSpeakers = (bubbleRows ?? [])
     .map((b) => b.speaker)
     .filter((s): s is string => !!s);
+  const appearances = await readPlanningAppearances(
+    supabase,
+    speakerKeys(rawSpeakers, aliasMap),
+  );
 
   const matching = planSpeakerMatching(rawSpeakers, aliasMap, cast);
   const bubbles = (bubbleRows ?? []) as BubbleAudioRow[];
