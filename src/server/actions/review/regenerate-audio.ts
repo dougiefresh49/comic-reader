@@ -147,18 +147,27 @@ export async function regenerateAudio(args: Args) {
       response.normalizedAlignment as AlignmentRaw | null | undefined,
     );
 
-    await supabaseAdmin.from("audio_timestamps").upsert(
-      {
-        bubble_id: b.id,
-        book_id: args.bookId,
-        issue_id: args.issueId,
-        alignment,
-        normalized_alignment: normalizedAlignment,
-      },
-      { onConflict: "bubble_id" },
-    );
+    // Credits are spent by now, so a failed write says so to the reviewer.
+    const writeFailed = (table: string, message: string) => ({
+      ok: false,
+      error: `The audio was generated and paid for, but saving it to ${table} for bubble ${b.id} failed: ${message}. Regenerating will spend ElevenLabs credits again.`,
+    });
 
-    await supabaseAdmin
+    const { error: tsErr } = await supabaseAdmin
+      .from("audio_timestamps")
+      .upsert(
+        {
+          bubble_id: b.id,
+          book_id: args.bookId,
+          issue_id: args.issueId,
+          alignment,
+          normalized_alignment: normalizedAlignment,
+        },
+        { onConflict: "bubble_id" },
+      );
+    if (tsErr) return writeFailed("audio_timestamps", tsErr.message);
+
+    const { error: bubbleErr } = await supabaseAdmin
       .from("bubbles")
       .update({
         needs_audio: false,
@@ -166,6 +175,7 @@ export async function regenerateAudio(args: Args) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", b.id);
+    if (bubbleErr) return writeFailed("bubbles", bubbleErr.message);
 
     revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
     revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
