@@ -1,10 +1,12 @@
 /**
- * Pure planning helpers for audio generation.
+ * Planning helpers for audio generation, plus the one SELECT they plan from.
  * Used by generation steps and scripts/plan-audio.ts (SELECT-only).
  * Copied slug/alias rules live here so scripts do not import "use step" modules.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { SKIPPED_VOICE } from "~/lib/voice-settings";
+import type { Database } from "~/types/database";
 
 export interface AliasRow {
   alias: string;
@@ -115,6 +117,57 @@ export function resolveAlias(
 /** Speaker key = slug(alias-resolved name). */
 export function speakerKey(raw: string, aliasMap: Map<string, string>): string {
   return slugify(resolveAlias(raw, aliasMap));
+}
+
+/** Distinct speaker keys for non-blank raw speaker strings. */
+export function speakerKeys(
+  rawSpeakers: string[],
+  aliasMap: Map<string, string>,
+): Set<string> {
+  const keys = new Set<string>();
+  for (const raw of rawSpeakers) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    keys.add(speakerKey(trimmed, aliasMap));
+  }
+  return keys;
+}
+
+/**
+ * The character_appearances rows planCharactersNeedingVoices can look up for
+ * these speaker keys: rows whose character_id is a key (ready voices), and
+ * rows whose id is `<key>-voice-design` (descriptions). The second read is
+ * needed because some voice-design rows carry another character_id.
+ * Unfiltered, the read stops silently at Supabase's 1,000-row cap. An issue
+ * has a few dozen speakers, so each id list stays far below URL limits.
+ * Throws on a read error.
+ */
+export async function readPlanningAppearances(
+  client: SupabaseClient<Database>,
+  speakerIds: Iterable<string>,
+): Promise<AppearanceRow[]> {
+  const ids = [...new Set(speakerIds)];
+  if (ids.length === 0) return [];
+  const columns =
+    "id, character_id, voice_id, voice_status, voice_description, voice_created_at";
+  const [byCharacter, byDesignId] = await Promise.all([
+    client
+      .from("character_appearances")
+      .select(columns)
+      .in("character_id", ids),
+    client
+      .from("character_appearances")
+      .select(columns)
+      .in("id", ids.map(voiceDesignAppearanceId)),
+  ]);
+  if (byCharacter.error) throw new Error(byCharacter.error.message);
+  if (byDesignId.error) throw new Error(byDesignId.error.message);
+
+  const rows = new Map<string, AppearanceRow>();
+  for (const row of [...(byCharacter.data ?? []), ...(byDesignId.data ?? [])]) {
+    rows.set(row.id, row);
+  }
+  return [...rows.values()];
 }
 
 /**
@@ -357,12 +410,7 @@ export function planCharactersNeedingVoices(
   cast: CastIndex,
   appearances: AppearanceRow[],
 ): CharactersNeedingVoicesPlan {
-  const keys = new Set<string>();
-  for (const raw of rawSpeakers) {
-    const trimmed = raw.trim();
-    if (!trimmed) continue;
-    keys.add(speakerKey(trimmed, aliasMap));
-  }
+  const keys = speakerKeys(rawSpeakers, aliasMap);
 
   const reuse: { character: string; voice_id: string }[] = [];
   const needDesign: string[] = [];
