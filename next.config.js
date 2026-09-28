@@ -7,7 +7,7 @@ import { withWorkflow } from "workflow/next";
 
 /** @type {import("next").NextConfig} */
 const config = {
-  serverExternalPackages: ["@browserbasehq/stagehand"],
+  serverExternalPackages: ["@browserbasehq/stagehand", "workflow"],
   images: {
     // Comic pages are already WebP and served from Supabase Storage's CDN.
     // unoptimized: true bypasses Vercel's image optimizer entirely so we
@@ -25,4 +25,12 @@ const config = {
   },
 };
 
-export default withWorkflow(config);
+const workflowConfig = withWorkflow(config);
+
+// withWorkflow writes its loader rules to the top-level `turbopack` key,
+// which Next 15.3 introduced. Next 15.2 reads them from `experimental.turbo`.
+/** @type {typeof workflowConfig} */
+export default async function nextConfig(phase, ctx) {
+  const { turbopack, ...rest } = await workflowConfig(phase, ctx);
+  return { ...rest, experimental: { ...rest.experimental, turbo: turbopack } };
+}
