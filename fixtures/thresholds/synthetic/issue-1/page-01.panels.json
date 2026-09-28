@@ -1,0 +1,12 @@
+{
+ "model": "find-comic-panel-v1/1",
+ "floor": 0.05,
+ "response": {
+  "image": { "width": 1000, "height": 1000 },
+  "predictions": [
+   { "x": 250, "y": 250, "width": 500, "height": 500, "confidence": 0.97, "class": "panel", "detection_id": "r1-exact-p01-01" },
+   { "x": 750, "y": 300, "width": 500, "height": 600, "confidence": 0.47, "class": "panel", "detection_id": "r2-tall-p01-02" },
+   { "x": 500, "y": 800, "width": 1000, "height": 400, "confidence": 0.12, "class": "panel", "detection_id": "r3-empty-strip" }
+  ]
+ }
+}
