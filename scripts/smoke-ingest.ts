@@ -177,9 +177,12 @@ function castSpeakers(omitLegacyId: string | null) {
     : null;
   const speakers = new Set<string>();
   for (const b of bubbles) {
-    if (!b.speaker || b.type === "NARRATION" || b.type === "CAPTION") continue;
-    if (normName(b.speaker) === "narrator") continue;
-    speakers.add(b.speaker);
+    // The context step writes "Narrator" for narration, and casting resolves
+    // it to characters.narrator, so it is cast like tmnt-mmpr-iii's issues.
+    const narration = b.type === "NARRATION" || b.type === "CAPTION";
+    if (narration || normName(b.speaker ?? "") === "narrator") {
+      speakers.add("Narrator");
+    } else if (b.speaker) speakers.add(b.speaker);
   }
   if (omitted) speakers.delete(omitted);
   return { speakers: [...speakers].sort(), omitted };
@@ -373,15 +376,20 @@ function logHits(logPath: string): string[] {
   return lines.filter((l) => LOG_FAILURES.some((re) => re.test(l)));
 }
 
-/** Error lines plus stack frames that point into the repo's own code. */
+/**
+ * Error lines, the failing step name, and stack frames outside node_modules
+ * (the repo's own code; under `next dev` a step's frame is a `.next` chunk,
+ * and `stepName` names the source file).
+ */
 function logErrors(logPath: string): string[] {
   return readFileSync(logPath, "utf8")
     .split("\n")
     .filter(
       (l) =>
-        /\[Workflow\]|Error|failed/.test(l) ||
-        /\bat .*(src|scripts)\/.*:\d+/.test(l),
+        /\[Workflow\]|stepName:|Error|failed/.test(l) ||
+        (/\bat /.test(l) && !/node_modules|node:internal/.test(l)),
     )
+    .map((l) => l.replaceAll(process.cwd(), "."))
     .slice(-40);
 }
 

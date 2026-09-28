@@ -1,10 +1,10 @@
 {
-  "description": "DRY_RUN_SCENARIO=gates: one unknown face and the Smoke Stranger speaker, and no castlist row for the speaker of page-01_b02 (Warbunny's bubble before #186). That row is inserted just before the casting gate resumes.",
+  "description": "DRY_RUN_SCENARIO=gates: one unknown face and the Smoke Stranger speaker, and no castlist row for the speaker of page-01_b02. Casting skips: planCastingTasks only makes tasks for speakers with a characters row, and made-up ids have none (option A). If casting ever pauses, the script inserts the left-out row before it resumes.",
   "gates": [
     { "gate": "review-clusters", "expect": "pause" },
     { "gate": "review-pages", "expect": "pause" },
     { "gate": "review-new-characters", "expect": "pause" },
-    { "gate": "casting", "expect": "pause" }
+    { "gate": "casting", "expect": "skip" }
   ],
   "omitCastForLegacyId": "page-01_b02",
   "counts": { "panels": 8, "page_segmentation": 2, "bubbles": 21 }
