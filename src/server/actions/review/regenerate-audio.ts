@@ -37,27 +37,35 @@ function normalizeAlignment(raw: AlignmentRaw | null | undefined) {
 
 type Step = "generate" | "upload" | "timings" | "bubble" | "refresh";
 
+const PIPELINE_AGAIN =
+  " The next pipeline audio run will generate this bubble again and spend credits.";
+
 /**
  * The error for a failure at or after the paid ElevenLabs call: what the
  * reader plays now, and that a retry spends credits again. The reader of
  * this text is the owner in the review editor. With no stored path the
  * reader plays `${bubble.id}.mp3`, which is where the upload goes.
+ * `restoreError` is set when a failed upload could not put the old
+ * timings row back.
  */
 function afterSpendError(
   step: Step,
   bubbleId: string,
   hadAudio: boolean,
   message: string,
+  restoreError: string | null = null,
 ) {
   const saved =
     step === "generate"
       ? `Generating audio for bubble ${bubbleId} failed (${message}), and ElevenLabs may have charged for it.`
       : step === "upload"
-        ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
+        ? restoreError === null
+          ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
+          : `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}) and the old word timings could not be put back (${restoreError}), so ${hadAudio ? "the old audio now plays with the new word timings and highlighting will be wrong until a regenerate succeeds." : "a timings row was saved with no audio behind it."}`
         : step === "timings"
-          ? `The new audio for bubble ${bubbleId} is live in the reader, but its word timings did not save to audio_timestamps (${message}), so highlighting will be wrong until a regenerate succeeds.`
+          ? `Audio for bubble ${bubbleId} was generated and paid for, but its word timings did not save to audio_timestamps (${message}), so nothing was saved${hadAudio ? " and the reader still plays the old audio with its own timings." : `.${PIPELINE_AGAIN}`}`
           : step === "bubble"
-            ? `The new audio and word timings for bubble ${bubbleId} are saved, but the bubbles row was not updated (${message}).${hadAudio ? "" : " The next pipeline audio run will generate this bubble again and spend credits."}`
+            ? `The new audio and word timings for bubble ${bubbleId} are saved, but the bubbles row was not updated (${message}).${hadAudio ? "" : PIPELINE_AGAIN}`
             : `The new audio and word timings for bubble ${bubbleId} are saved, and only the page refresh failed (${message}), so reload the page to hear it.`;
   return {
     ok: false as const,
@@ -150,6 +158,44 @@ export async function regenerateAudio(args: Args) {
     };
   }
 
+  // The timings row is written before the upload, so a failed timings write
+  // leaves the old take whole. If the upload then fails, the old row goes
+  // back, which is why it is read here, before any credits are spent.
+  const { data: oldTs, error: oldTsErr } = await supabaseAdmin
+    .from("audio_timestamps")
+    .select("alignment, normalized_alignment")
+    .eq("bubble_id", b.id)
+    .maybeSingle();
+  if (oldTsErr) {
+    return { ok: false, error: oldTsErr.message };
+  }
+  const oldTimings = oldTs as {
+    alignment: unknown;
+    normalized_alignment: unknown;
+  } | null;
+  /** Puts the old timings row back; returns the error text if that fails. */
+  async function restoreTimings(): Promise<string | null> {
+    try {
+      const { error } = oldTimings
+        ? await supabaseAdmin.from("audio_timestamps").upsert(
+            {
+              bubble_id: b.id,
+              book_id: args.bookId,
+              issue_id: args.issueId,
+              ...oldTimings,
+            },
+            { onConflict: "bubble_id" },
+          )
+        : await supabaseAdmin
+            .from("audio_timestamps")
+            .delete()
+            .eq("bubble_id", b.id);
+      return error?.message ?? null;
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+
   const hadAudio = b.audio_storage_path != null;
   let step: Step = "generate";
   try {
@@ -164,16 +210,6 @@ export async function regenerateAudio(args: Args) {
 
     const storagePath = b.audio_storage_path ?? `${b.id}.mp3`;
     const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
-    step = "upload";
-    const { error: upErr } = await supabaseAdmin.storage
-      .from(AUDIO_BUCKET)
-      .upload(remotePath, audioBuffer, {
-        contentType: "audio/mpeg",
-        upsert: true,
-      });
-    if (upErr) {
-      return afterSpendError(step, b.id, hadAudio, upErr.message);
-    }
 
     const alignment = normalizeAlignment(
       response.alignment as AlignmentRaw | null | undefined,
@@ -199,6 +235,26 @@ export async function regenerateAudio(args: Args) {
       return afterSpendError(step, b.id, hadAudio, tsErr.message);
     }
 
+    step = "upload";
+    const { error: upErr } = await supabaseAdmin.storage
+      .from(AUDIO_BUCKET)
+      .upload(remotePath, audioBuffer, {
+        contentType: "audio/mpeg",
+        upsert: true,
+      });
+    if (upErr) {
+      return afterSpendError(
+        step,
+        b.id,
+        hadAudio,
+        upErr.message,
+        await restoreTimings(),
+      );
+    }
+
+    // From here the reader loads the new take and its timings: the stored
+    // path is unchanged, or it is null and the reader falls back to
+    // `${b.id}.mp3`, where the upload went.
     step = "bubble";
     const { error: bubbleErr } = await supabaseAdmin
       .from("bubbles")
@@ -221,6 +277,13 @@ export async function regenerateAudio(args: Args) {
       audioStoragePath: storagePath,
     };
   } catch (e) {
-    return afterSpendError(step, b.id, hadAudio, (e as Error).message);
+    const restoreError = step === "upload" ? await restoreTimings() : null;
+    return afterSpendError(
+      step,
+      b.id,
+      hadAudio,
+      (e as Error).message,
+      restoreError,
+    );
   }
 }
