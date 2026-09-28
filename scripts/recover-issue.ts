@@ -33,18 +33,22 @@ const RAW_BUCKET = "comic-pages-raw";
 interface Recipe {
   /** Directory at GIT_REV holding bubbles.json, pages.json and pages/*.jpg; absent = raw JPEGs already in storage. */
   gitDir?: string;
+  /** Bounds --skip-pages before anything is read. */
+  pageCount: number;
   resume: string[];
 }
 
 const RECIPES: Record<string, Recipe> = {
   "tmnt-mmpr-iii/issue-3": {
     gitDir: "assets/comics/tmnt-mmpr-iii/issue-3",
+    pageCount: 24,
     resume: [
       'Resume at fromStep: "sort-page-elements", once issue-3 has panels (run #88\'s script on it first).',
       "Never run roboflow-page-analyze or get-context on issue-3: they overwrite the reviewed bubble boxes and speakers.",
     ],
   },
   "tmnt-mmpr-iii/issue-4": {
+    pageCount: 36,
     resume: ["Run the full pipeline from roboflow-page-analyze."],
   },
 };
@@ -89,17 +93,46 @@ function parseArgs() {
     );
     process.exit(1);
   }
+  const recipe = RECIPES[`${book}/${issue}`];
+  if (!recipe) {
+    console.error(
+      `No recovery recipe for ${book}/${issue}. Known: ${Object.keys(RECIPES).join(", ")}`,
+    );
+    process.exit(1);
+  }
   const skip = new Set<number>();
-  for (const part of (value("--skip-pages") ?? "").split(",")) {
-    if (!part) continue;
-    const [a, b] = part.split("-").map(Number);
-    for (let n = a!; n <= (b ?? a!); n++) skip.add(n);
+  if (argv.includes("--skip-pages")) {
+    const raw = value("--skip-pages");
+    const fail = (why: string): never => {
+      console.error(`--skip-pages: ${why}`);
+      process.exit(1);
+    };
+    for (const part of (raw ?? fail("needs a value, e.g. 1,34-36")).split(
+      ",",
+    )) {
+      const m =
+        /^(\d+)(?:-(\d+))?$/.exec(part) ?? fail(`"${part}" is not N or N-M`);
+      const a = Number(m[1]);
+      const b = Number(m[2] ?? m[1]);
+      if (b < a) fail(`"${part}" runs backwards`);
+      if (a < 1 || b > recipe.pageCount) {
+        fail(`"${part}" is outside ${issue}'s pages 1-${recipe.pageCount}`);
+      }
+      for (let n = a; n <= b; n++) skip.add(n);
+    }
   }
   const dump = argv.includes("--dump-payload")
     ? (value("--dump-payload") ??
       path.join(os.tmpdir(), `recover-${book}-${issue}-bubbles.json`))
     : undefined;
-  return { book, issue, execute: argv.includes("--execute"), skip, dump };
+  return {
+    book,
+    issue,
+    recipe,
+    execute: argv.includes("--execute"),
+    skip,
+    dump,
+  };
 }
 
 function gitShow(file: string): Buffer {
@@ -278,14 +311,7 @@ async function perform(w: PlannedWrite, bookId: string, issueId: string) {
 }
 
 async function main() {
-  const { book, issue, execute, skip, dump } = parseArgs();
-  const recipe = RECIPES[`${book}/${issue}`];
-  if (!recipe) {
-    console.error(
-      `No recovery recipe for ${book}/${issue}. Known: ${Object.keys(RECIPES).join(", ")}`,
-    );
-    process.exit(1);
-  }
+  const { book, issue, recipe, execute, skip, dump } = parseArgs();
 
   const { data: row, error } = await selectIssue(
     supabase,
