@@ -33,17 +33,25 @@ async function writeAfterPaidCall(
   }>)[],
 ) {
   for (let attempt = 1; ; attempt++) {
-    const results = await Promise.all(writes.map((write) => write()));
-    const errors = results.flatMap((r) =>
-      r.error ? [dbError(label, r.error)] : [],
+    // A write that throws or rejects counts as a codeless (transient) error.
+    const results = await Promise.all(
+      writes.map((write) =>
+        Promise.resolve()
+          .then(write)
+          .then(
+            (r) => r.error,
+            (e: unknown) => ({ message: String(e) }),
+          ),
+      ),
     );
+    const errors = results.flatMap((err) => (err ? [dbError(label, err)] : []));
     if (errors.length === 0) return;
     const fatal = errors.find((e) => e instanceof FatalError);
     if (fatal) throw fatal;
     if (attempt === 3) {
       throw new FatalError(`${errors[0]!.message} (after 3 attempts)`);
     }
-    writes = writes.filter((_, i) => results[i]!.error);
+    writes = writes.filter((_, i) => results[i]);
     await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
   }
 }
@@ -135,14 +143,15 @@ function bubbleLayoutLine(
   return `- bubbleId: ${b.id}\n  assigned_panel_uuid: ${panelHint}\n  bbox_normalized: x=${nx.toFixed(4)}, y=${ny.toFixed(4)}, w=${nw.toFixed(4)}, h=${nh.toFixed(4)}\n  text: "${bubbleSnippet(b).replace(/"/g, '\\"')}"\n  ignored: ${b.ignored}`;
 }
 
-async function getSortPlanFromGemini(
+/** The paid call only; the caller parses the text so it can fail fast. */
+async function getSortPlanTextFromGemini(
   gemini: GoogleGenAI,
   pageImage: Buffer,
   imgW: number,
   imgH: number,
   panels: SortPanelRow[],
   bubbles: SortBubbleRow[],
-): Promise<GeminiSortResponse> {
+): Promise<string | undefined> {
   const panelLines = panels
     .map((p) => {
       const bb = p.bounding_box;
@@ -198,16 +207,7 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
     model: GEMINI_MEDIUM,
     contents: [imagePart, textPart],
   });
-
-  const text = response.text;
-  if (!text) throw new Error("No text response from Gemini");
-
-  const jsonText = extractJsonObject(text);
-  const parsed = JSON.parse(jsonText) as GeminiSortResponse;
-  if (!parsed.panels || !Array.isArray(parsed.panels)) {
-    throw new Error("Invalid response: missing panels array");
-  }
-  return parsed;
+  return response.text;
 }
 
 function validateAndFlattenOrders(
@@ -366,15 +366,19 @@ export async function sortPageElements(
         supabase.from("bubbles").update({ sort_order }).eq("id", id),
     );
     const results = await Promise.all(bubbleUpdates);
-    const errResult = results.find((r) => r.error);
-    if (errResult?.error) throw dbError("bubbles", errResult.error);
+    const errors = results.flatMap((r) =>
+      r.error ? [dbError("bubbles", r.error)] : [],
+    );
+    if (errors[0]) {
+      throw errors.find((e) => e instanceof FatalError) ?? errors[0];
+    }
     console.log(
       `[sort] ${bookId}/${issueId}: page-${padded}: 0 panels, heuristic bubble sort (${bubbles.length})`,
     );
     return;
   }
 
-  const plan = await getSortPlanFromGemini(
+  const text = await getSortPlanTextFromGemini(
     gemini,
     pageImage,
     imgW,
@@ -382,24 +386,38 @@ export async function sortPageElements(
     panels,
     bubbles,
   );
-  const { panelOrders, bubbleGlobalOrder } = validateAndFlattenOrders(
-    panels,
-    bubbles,
-    plan,
-  );
 
-  await writeAfterPaidCall("panels/bubbles", [
-    ...[...panelOrders.entries()].map(
-      ([id, sort_order]) =>
-        () =>
-          supabase.from("panels").update({ sort_order }).eq("id", id),
-    ),
-    ...[...bubbleGlobalOrder.entries()].map(
-      ([id, sort_order]) =>
-        () =>
-          supabase.from("bubbles").update({ sort_order }).eq("id", id),
-    ),
-  ]);
+  // Past the paid call: a Workflow retry would pay for Gemini again, so every
+  // failure from here on is a FatalError.
+  try {
+    if (!text) throw new Error("No text response from Gemini");
+    const plan = JSON.parse(extractJsonObject(text)) as GeminiSortResponse;
+    if (!plan.panels || !Array.isArray(plan.panels)) {
+      throw new Error("Invalid response: missing panels array");
+    }
+    const { panelOrders, bubbleGlobalOrder } = validateAndFlattenOrders(
+      panels,
+      bubbles,
+      plan,
+    );
+
+    await writeAfterPaidCall("panels/bubbles", [
+      ...[...panelOrders.entries()].map(
+        ([id, sort_order]) =>
+          () =>
+            supabase.from("panels").update({ sort_order }).eq("id", id),
+      ),
+      ...[...bubbleGlobalOrder.entries()].map(
+        ([id, sort_order]) =>
+          () =>
+            supabase.from("bubbles").update({ sort_order }).eq("id", id),
+      ),
+    ]);
+  } catch (e) {
+    if (e instanceof FatalError) throw e;
+    const message = e instanceof Error ? e.message : String(e);
+    throw new FatalError(`sort plan: ${message}`);
+  }
 
   console.log(
     `[sort] ${bookId}/${issueId}: page-${padded}: ${panels.length} panel(s), ${bubbles.length} bubble(s)`,
