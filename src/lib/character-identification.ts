@@ -106,6 +106,8 @@ export async function identifyFace(
   pageImageBase64?: string,
   pageImageMimeType?: string,
   issueContext?: string,
+  /** The ingest step sets this: a failed call must not read as no match. */
+  options?: { throwOnApiError?: boolean },
 ): Promise<FaceIdentification> {
   const hasPage = !!pageImageBase64;
   const prompt = buildIdentifyPrompt(knownCharacters, hasPage, issueContext);
@@ -139,12 +141,18 @@ export async function identifyFace(
     }
   }
 
+  let response;
   try {
-    const response = await gemini.models.generateContent({
+    response = await gemini.models.generateContent({
       model: GEMINI_MEDIUM,
       contents: [{ role: "user", parts }],
     });
+  } catch (err) {
+    if (options?.throwOnApiError) throw err;
+    return { characterName: null, confidence: 0 };
+  }
 
+  try {
     const text = response.text?.trim() ?? "";
     const cleaned = text
       .replace(/^```json\s*/i, "")
