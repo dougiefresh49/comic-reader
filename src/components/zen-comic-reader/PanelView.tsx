@@ -103,6 +103,8 @@ interface PanelViewFrameProps {
 
 /**
  * Wraps the comic page layer: applies zoom/pan toward the active panel and dims non-active regions.
+ * `children` render inside the page plane (`data-page-plane`), a box at the
+ * rendered image rect, so they position in page percent.
  */
 export function PanelViewFrame({
   panelViewMode,
@@ -221,7 +223,21 @@ export function PanelViewFrame({
           className={`relative h-full w-full ${cameraEffectClass}`}
           style={{ transformOrigin: "center center" }}
         >
-          {children}
+          {/* Page plane: sized to the page's own aspect so object-contain
+              never letterboxes and every page-% overlay in `children`
+              lands on the art. Full frame until the natural size loads. */}
+          <div
+            data-page-plane
+            className="absolute"
+            style={{
+              left: imageRect.x,
+              top: imageRect.y,
+              width: imageRect.w,
+              height: imageRect.h,
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>
