@@ -3,7 +3,7 @@
  * Sweep the bubble and panel detection thresholds against the reviewed boxes (#180).
  *
  *   pnpm sweep-thresholds truth   [--book B] [--issues issue-1,issue-2,issue-3]
- *   pnpm sweep-thresholds capture --count N [--book B]
+ *   pnpm sweep-thresholds capture --count N [--book B] [--issues ...]
  *   pnpm sweep-thresholds report  [--book B]
  *
  * truth: free. SELECTs the reviewed boxes and writes one
@@ -11,8 +11,9 @@
  *   Bubbles with ignored = true, or a box_2d without a positive width and
  *   height, are left out. `panels` is null on a page with no panel rows, and
  *   the panel model is not scored on that page.
- * capture: PAID. One Roboflow call per model per page that has a truth file
- *   and no page-NN.<model>.json yet, at confidence FLOOR. It prints the count
+ * capture: PAID. Runs truth first, so newly reviewed pages join. Then one
+ *   Roboflow call per model per page that has a truth file and no
+ *   page-NN.<model>.json yet, at confidence FLOOR. It prints the count
  *   and the pages, then refuses to start unless --count equals that count and
  *   the count is at most MAX_CALLS. Each file is written as soon as its call
  *   returns; the first failed call stops the run.
@@ -191,7 +192,9 @@ async function truth(book: string, issues: string[]) {
   }
 }
 
-async function capture(book: string) {
+async function capture(book: string, issues: string[]) {
+  // Newly reviewed pages count (decision 3): refresh the truth files first.
+  await truth(book, issues);
   const work = truthPages(book).flatMap((p) =>
     MODEL_KEYS.filter(
       (m) => !fs.existsSync(path.join(p.dir, `${p.page}.${m}.json`)),
@@ -310,6 +313,8 @@ function report(book: string) {
     }
     printed++;
     const total = scored.reduce((n, s) => n + s.truthBoxes.length, 0);
+    // Panel ids repeat across issues, so a found box is keyed by where it lives.
+    const key = (s: Page, id: string) => `${book}/${s.issue}/${s.page}/${id}`;
     const found = new Set<string>();
     const rows = THRESHOLDS.map((t) => {
       let tp = 0;
@@ -318,7 +323,7 @@ function report(book: string) {
         const r = match(s.truthBoxes, s.preds, t);
         tp += r.matched.size;
         extras += r.extras;
-        r.matched.forEach((id) => found.add(id));
+        r.matched.forEach((id) => found.add(key(s, id)));
       }
       const precision = tp + extras === 0 ? NaN : tp / (tp + extras);
       return {
@@ -358,7 +363,7 @@ function report(book: string) {
     );
     const blind = scored.flatMap((s) =>
       s.truthBoxes
-        .filter((g) => !found.has(g.id))
+        .filter((g) => !found.has(key(s, g.id)))
         .map((g) => ({
           s,
           g,
@@ -378,11 +383,12 @@ function report(book: string) {
 }
 
 const book = flag("book") ?? "tmnt-mmpr-iii";
+const issues = (flag("issues") ?? "issue-1,issue-2,issue-3").split(",");
 const cmd = process.argv[2];
 if (cmd === "truth") {
-  await truth(book, (flag("issues") ?? "issue-1,issue-2,issue-3").split(","));
+  await truth(book, issues);
 } else if (cmd === "capture") {
-  await capture(book);
+  await capture(book, issues);
 } else if (cmd === "report") {
   report(book);
 } else {
