@@ -35,33 +35,30 @@ function normalizeAlignment(raw: AlignmentRaw | null | undefined) {
   };
 }
 
-type AfterSpendFailure =
-  | "upload"
-  | "audio_timestamps"
-  | "bubbles"
-  | "exception";
+type Step = "generate" | "upload" | "timings" | "bubble" | "refresh";
 
 /**
- * The error for a failure after the paid ElevenLabs call: what is on disk
- * now, and that a retry spends credits again. The reader is the owner in
- * the review editor.
+ * The error for a failure at or after the paid ElevenLabs call: what the
+ * reader plays now, and that a retry spends credits again. The reader of
+ * this text is the owner in the review editor. With no stored path the
+ * reader plays `${bubble.id}.mp3`, which is where the upload goes.
  */
 function afterSpendError(
-  failure: AfterSpendFailure,
+  step: Step,
   bubbleId: string,
   hadAudio: boolean,
   message: string,
 ) {
   const saved =
-    failure === "upload"
-      ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
-      : failure === "audio_timestamps" && hadAudio
-        ? `The new audio for bubble ${bubbleId} replaced the old file, but its word timings did not save to audio_timestamps (${message}), so highlighting will be off until a regenerate succeeds.`
-        : failure === "audio_timestamps"
-          ? `The new audio for bubble ${bubbleId} is saved, but its word timings did not save to audio_timestamps (${message}) and the bubble does not point to the file yet.`
-          : failure === "bubbles"
-            ? `The new audio and word timings for bubble ${bubbleId} are saved, but the bubbles row was not updated (${message}).`
-            : `Audio for bubble ${bubbleId} was generated and paid for, but an error stopped the save partway (${message}).`;
+    step === "generate"
+      ? `Generating audio for bubble ${bubbleId} failed (${message}), and ElevenLabs may have charged for it.`
+      : step === "upload"
+        ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
+        : step === "timings"
+          ? `The new audio for bubble ${bubbleId} is live in the reader, but its word timings did not save to audio_timestamps (${message}), so highlighting will be wrong until a regenerate succeeds.`
+          : step === "bubble"
+            ? `The new audio and word timings for bubble ${bubbleId} are saved, but the bubbles row was not updated (${message}).${hadAudio ? "" : " The next pipeline audio run will generate this bubble again and spend credits."}`
+            : `The new audio and word timings for bubble ${bubbleId} are saved, and only the page refresh failed (${message}), so reload the page to hear it.`;
   return {
     ok: false as const,
     error: `${saved} Regenerating will spend ElevenLabs credits again.`,
@@ -154,7 +151,7 @@ export async function regenerateAudio(args: Args) {
   }
 
   const hadAudio = b.audio_storage_path != null;
-  let paid = false;
+  let step: Step = "generate";
   try {
     const client = new ElevenLabsClient({
       apiKey: process.env.ELEVENLABS_API_KEY,
@@ -163,11 +160,11 @@ export async function regenerateAudio(args: Args) {
       modelId: "eleven_v3",
       text,
     });
-    paid = true;
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 
     const storagePath = b.audio_storage_path ?? `${b.id}.mp3`;
     const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
+    step = "upload";
     const { error: upErr } = await supabaseAdmin.storage
       .from(AUDIO_BUCKET)
       .upload(remotePath, audioBuffer, {
@@ -175,7 +172,7 @@ export async function regenerateAudio(args: Args) {
         upsert: true,
       });
     if (upErr) {
-      return afterSpendError("upload", b.id, hadAudio, upErr.message);
+      return afterSpendError(step, b.id, hadAudio, upErr.message);
     }
 
     const alignment = normalizeAlignment(
@@ -185,6 +182,7 @@ export async function regenerateAudio(args: Args) {
       response.normalizedAlignment as AlignmentRaw | null | undefined,
     );
 
+    step = "timings";
     const { error: tsErr } = await supabaseAdmin
       .from("audio_timestamps")
       .upsert(
@@ -198,9 +196,10 @@ export async function regenerateAudio(args: Args) {
         { onConflict: "bubble_id" },
       );
     if (tsErr) {
-      return afterSpendError("audio_timestamps", b.id, hadAudio, tsErr.message);
+      return afterSpendError(step, b.id, hadAudio, tsErr.message);
     }
 
+    step = "bubble";
     const { error: bubbleErr } = await supabaseAdmin
       .from("bubbles")
       .update({
@@ -210,9 +209,10 @@ export async function regenerateAudio(args: Args) {
       })
       .eq("id", b.id);
     if (bubbleErr) {
-      return afterSpendError("bubbles", b.id, hadAudio, bubbleErr.message);
+      return afterSpendError(step, b.id, hadAudio, bubbleErr.message);
     }
 
+    step = "refresh";
     revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
     revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
 
@@ -221,9 +221,6 @@ export async function regenerateAudio(args: Args) {
       audioStoragePath: storagePath,
     };
   } catch (e) {
-    const message = (e as Error).message;
-    return paid
-      ? afterSpendError("exception", b.id, hadAudio, message)
-      : { ok: false, error: message };
+    return afterSpendError(step, b.id, hadAudio, (e as Error).message);
   }
 }
