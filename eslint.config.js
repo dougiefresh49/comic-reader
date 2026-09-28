@@ -7,11 +7,11 @@ const compat = new FlatCompat({
 
 export default tseslint.config(
   {
-    ignores: [".next", "src/types/database.ts"],
+    ignores: [".next", "src/types/database.ts", "scripts/spine/**"],
   },
   ...compat.extends("next/core-web-vitals"),
   {
-    files: ["**/*.ts", "**/*.tsx"],
+    files: ["src/**/*.ts", "src/**/*.tsx"],
     extends: [
       ...tseslint.configs.recommended,
       ...tseslint.configs.recommendedTypeChecked,
@@ -32,6 +32,27 @@ export default tseslint.config(
       "@typescript-eslint/no-misused-promises": [
         "error",
         { checksVoidReturn: { attributes: false } },
+      ],
+    },
+  },
+  {
+    // issues has PK (book_id, id): query it only through src/lib/issue-queries.ts (#150).
+    ignores: ["src/lib/issue-queries.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.property.name='from'][arguments.0.value='issues']",
+          message:
+            "Query issues through src/lib/issue-queries.ts, which requires the book id.",
+        },
+        {
+          selector:
+            "CallExpression[callee.property.name='from'][arguments.0.quasis.0.value.cooked='issues']",
+          message:
+            "Query issues through src/lib/issue-queries.ts, which requires the book id.",
+        },
       ],
     },
   },

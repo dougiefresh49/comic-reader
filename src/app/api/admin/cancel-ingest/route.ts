@@ -4,6 +4,7 @@ import { getHookByToken, getRun } from "workflow/api";
 import { HookNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestHookToken } from "./hooks";
+import { selectIssue, updateIssue } from "~/lib/issue-queries";
 
 type PipelineRunSteps = {
   runId?: string;
@@ -24,12 +25,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: issue } = (await supabaseAdmin
-    .from("issues")
-    .select("id, pipeline_step, pipeline_paused, pipeline_paused_at")
-    .eq("book_id", body.bookId)
-    .eq("id", body.issueId)
-    .single()) as {
+  const { data: issue } = (await selectIssue(
+    supabaseAdmin,
+    body.bookId,
+    body.issueId,
+    "id, pipeline_step, pipeline_paused, pipeline_paused_at",
+  ).single()) as {
     data: {
       id: string;
       pipeline_step: string | null;
@@ -121,16 +122,17 @@ export async function POST(req: NextRequest) {
       : issue.pipeline_step) ??
     "error";
 
-  const { error: issueError } = await supabaseAdmin
-    .from("issues")
-    .update({
+  const { error: issueError } = await updateIssue(
+    supabaseAdmin,
+    body.bookId,
+    body.issueId,
+    {
       pipeline_step: `failed:${failedStep}`,
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
-    })
-    .eq("book_id", body.bookId)
-    .eq("id", body.issueId);
+    },
+  );
 
   if (issueError) {
     return Response.json({ error: issueError.message }, { status: 500 });

@@ -7,6 +7,7 @@ import type {
   PanelForegroundPolygons,
 } from "~/types/panels";
 import type { AudioTags } from "~/lib/panel-tags";
+import { selectIssue } from "~/lib/issue-queries";
 
 export interface PanelReviewBubble {
   /** uuid */
@@ -110,12 +111,12 @@ export async function getPanelReviewData(
         .eq("issue_id", issueId)
         .order("page_number")
         .order("sort_order"),
-      supabaseAdmin
-        .from("issues")
-        .select("number, name, page_count, books(name)")
-        .eq("book_id", bookId)
-        .eq("id", issueId)
-        .single(),
+      selectIssue(
+        supabaseAdmin,
+        bookId,
+        issueId,
+        "number, name, page_count, books(name)",
+      ).single(),
     ]);
 
   const panels = (panelRows ?? []) as PanelRow[];

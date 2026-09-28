@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FatalError } from "workflow";
 import { pageStoragePath } from "~/lib/storage";
+import { updateIssue } from "~/lib/issue-queries";
 
 export interface PageMeta {
   pageNumber: number;
@@ -87,21 +88,17 @@ export async function updatePipelineStep(
   paused = false,
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
   const pauseUrl = paused ? getPauseUrl(bookId, issueId, step) : null;
 
-  await supabase
-    .from("issues")
-    .update({
-      pipeline_step: step,
-      pipeline_paused: paused,
-      pipeline_paused_at: paused ? step : null,
-      pipeline_paused_url: pauseUrl,
-    })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
+  await updateIssue(supabase, bookId, issueId, {
+    pipeline_step: step,
+    pipeline_paused: paused,
+    pipeline_paused_at: paused ? step : null,
+    pipeline_paused_url: pauseUrl,
+  });
 
   if (paused && pauseUrl) {
     await notifySlack(bookId, issueId, step, pauseUrl);
@@ -114,19 +111,15 @@ export async function markPipelineFailed(
   currentStep: string,
 ) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
-  await supabase
-    .from("issues")
-    .update({
-      pipeline_step: `failed:${currentStep}`,
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
+  await updateIssue(supabase, bookId, issueId, {
+    pipeline_step: `failed:${currentStep}`,
+    pipeline_paused: false,
+    pipeline_paused_at: null,
+    pipeline_paused_url: null,
+  });
 }
 
 function getPauseUrl(bookId: string, issueId: string, step: string): string {
@@ -194,20 +187,16 @@ export async function getPageList(
 
 export async function markIssueReady(bookId: string, issueId: string) {
   "use step";
-  const { createStepClient } = await import("../step-utils");
-  const supabase = await createStepClient();
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
 
-  await supabase
-    .from("issues")
-    .update({
-      pipeline_step: "complete",
-      status: "ready",
-      pipeline_paused: false,
-      pipeline_paused_at: null,
-      pipeline_paused_url: null,
-    })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
+  await updateIssue(supabase, bookId, issueId, {
+    pipeline_step: "complete",
+    status: "ready",
+    pipeline_paused: false,
+    pipeline_paused_at: null,
+    pipeline_paused_url: null,
+  });
 }
 
 export async function getPanelCount(

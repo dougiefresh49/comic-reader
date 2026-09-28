@@ -3,6 +3,7 @@
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { insertIssue, listBookIssues } from "~/lib/issue-queries";
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: string };
@@ -49,10 +50,11 @@ export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
     data: { id: string; number: number; name: string; slug: string }[] | null;
   };
 
-  const { data: maxIssue } = (await supabaseAdmin
-    .from("issues")
-    .select("number")
-    .eq("book_id", bookId)
+  const { data: maxIssue } = (await listBookIssues(
+    supabaseAdmin,
+    bookId,
+    "number",
+  )
     .order("number", { ascending: false })
     .limit(1)
     .single()) as { data: { number: number } | null };
@@ -81,10 +83,7 @@ export async function lookupNextIssue(
   bookId: string,
   partId?: string,
 ): Promise<Result<NextIssueInfo>> {
-  let query = supabaseAdmin
-    .from("issues")
-    .select("number")
-    .eq("book_id", bookId)
+  let query = listBookIssues(supabaseAdmin, bookId, "number")
     .order("number", { ascending: false })
     .limit(1);
 
@@ -182,17 +181,15 @@ export async function createIssue(
   args: CreateIssueArgs,
 ): Promise<Result<{ id: string }>> {
   const issueId = `issue-${args.issueNumber}`;
-  const { data, error } = (await supabaseAdmin
-    .from("issues")
-    .insert({
-      id: issueId,
-      book_id: args.bookId,
-      number: args.issueNumber,
-      name: `Issue ${args.issueNumber}`,
-      part_id: args.partId ?? null,
-      wiki_url: args.wikiUrl,
-      source_url: args.sourceUrl,
-    })
+  const { data, error } = (await insertIssue(supabaseAdmin, {
+    id: issueId,
+    book_id: args.bookId,
+    number: args.issueNumber,
+    name: `Issue ${args.issueNumber}`,
+    part_id: args.partId ?? null,
+    wiki_url: args.wikiUrl,
+    source_url: args.sourceUrl,
+  })
     .select("id")
     .single()) as {
     data: { id: string } | null;

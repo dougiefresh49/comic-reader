@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { upsertIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -106,22 +107,19 @@ async function migrateIssue(bookId: string, issueDir: string): Promise<void> {
     ? Object.keys(fs.readJsonSync(audioTsPath) as object).length
     : 0;
 
-  const { error: issueError } = await supabase.from("issues").upsert(
-    {
-      id: issueId,
-      book_id: bookId,
-      number: issueNum,
-      name: `Issue ${issueNum}`,
-      page_count: pageCount,
-      bubble_count: bubbleCount,
-      audio_count: audioCount,
-      has_webp: fs.existsSync(join(issueDir, "pages-webp")),
-      has_audio: fs.existsSync(join(issueDir, "audio")),
-      has_timestamps: fs.existsSync(audioTsPath),
-      status: audioCount > 0 ? "ready" : "processing",
-    },
-    { onConflict: "book_id,id" },
-  );
+  const { error: issueError } = await upsertIssue(supabase, {
+    id: issueId,
+    book_id: bookId,
+    number: issueNum,
+    name: `Issue ${issueNum}`,
+    page_count: pageCount,
+    bubble_count: bubbleCount,
+    audio_count: audioCount,
+    has_webp: fs.existsSync(join(issueDir, "pages-webp")),
+    has_audio: fs.existsSync(join(issueDir, "audio")),
+    has_timestamps: fs.existsSync(audioTsPath),
+    status: audioCount > 0 ? "ready" : "processing",
+  });
   if (issueError) throw new Error(`issues upsert: ${issueError.message}`);
   console.log(
     `    ✓ issues row (${pageCount} pages, ${bubbleCount} bubbles, ${audioCount} timestamps)`,

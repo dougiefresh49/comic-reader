@@ -19,6 +19,7 @@ import {
 } from "./utils/registry.js";
 import type { AppearanceEntry, MediaType } from "./types/registry.js";
 import { supabase } from "./lib/supabase.js";
+import { updateIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -412,16 +413,12 @@ async function runBookMode(
     console.log("Writing to DB for casting browser UI...\n");
 
     // Pause issue first so the dashboard reflects state immediately
-    await supabase
-      .from("issues")
-      .update({
-        pipeline_step: "find-voice-sources",
-        pipeline_paused: true,
-        pipeline_paused_at: "find-voice-sources",
-        pipeline_paused_url: `/admin/characters/casting?book=${book}&issue=${issue}`,
-      })
-      .eq("book_id", book)
-      .eq("id", issue);
+    await updateIssue(supabase, book, issue, {
+      pipeline_step: "find-voice-sources",
+      pipeline_paused: true,
+      pipeline_paused_at: "find-voice-sources",
+      pipeline_paused_url: `/admin/characters/casting?book=${book}&issue=${issue}`,
+    });
 
     let charsUpserted = 0;
     let tasksUpserted = 0;
@@ -538,15 +535,11 @@ async function runBookMode(
     }
 
     // No pending tasks → clear pause flag and let pipeline continue
-    await supabase
-      .from("issues")
-      .update({
-        pipeline_paused: false,
-        pipeline_paused_at: null,
-        pipeline_paused_url: null,
-      })
-      .eq("book_id", book)
-      .eq("id", issue);
+    await updateIssue(supabase, book, issue, {
+      pipeline_paused: false,
+      pipeline_paused_at: null,
+      pipeline_paused_url: null,
+    });
     console.log("✓ All characters already cast — continuing pipeline\n");
     return;
   }

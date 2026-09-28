@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import { start } from "workflow/api";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
+import { selectIssue, updateIssue } from "~/lib/issue-queries";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
@@ -18,12 +19,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { data: issue } = (await supabaseAdmin
-    .from("issues")
-    .select("id, pipeline_step")
-    .eq("book_id", body.bookId)
-    .eq("id", body.issueId)
-    .single()) as {
+  const { data: issue } = (await selectIssue(
+    supabaseAdmin,
+    body.bookId,
+    body.issueId,
+    "id, pipeline_step",
+  ).single()) as {
     data: { id: string; pipeline_step: string | null } | null;
   };
 
@@ -33,16 +34,17 @@ export async function POST(req: NextRequest) {
 
   const pipelineStep = body.fromStep ?? "roboflow-page-analyze";
 
-  const { error } = await supabaseAdmin
-    .from("issues")
-    .update({
+  const { error } = await updateIssue(
+    supabaseAdmin,
+    body.bookId,
+    body.issueId,
+    {
       pipeline_step: pipelineStep,
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
-    })
-    .eq("book_id", body.bookId)
-    .eq("id", body.issueId);
+    },
+  );
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });

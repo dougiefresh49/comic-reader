@@ -18,6 +18,7 @@ import fs from "fs-extra";
 import pLimit from "p-limit";
 import { join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
+import { upsertIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -481,23 +482,20 @@ async function publishToSupabase(
   const hasWebp = webpList.length > 0;
   const hasAudio = audioList.length > 0;
 
-  const { error: issueErr } = await supabase.from("issues").upsert(
-    {
-      id: issueId,
-      book_id: bookId,
-      number: issueNum,
-      name: `Issue ${issueNum}`,
-      page_count: finalPageCount,
-      bubble_count: bubbleCount,
-      audio_count: audioForIssue,
-      has_webp: hasWebp,
-      has_audio: hasAudio,
-      has_timestamps: hasTimestamps,
-      status: "ready",
-      pipeline_step: "copy-to-public",
-    },
-    { onConflict: "book_id,id" },
-  );
+  const { error: issueErr } = await upsertIssue(supabase, {
+    id: issueId,
+    book_id: bookId,
+    number: issueNum,
+    name: `Issue ${issueNum}`,
+    page_count: finalPageCount,
+    bubble_count: bubbleCount,
+    audio_count: audioForIssue,
+    has_webp: hasWebp,
+    has_audio: hasAudio,
+    has_timestamps: hasTimestamps,
+    status: "ready",
+    pipeline_step: "copy-to-public",
+  });
   if (issueErr) throw new Error(`issues upsert: ${issueErr.message}`);
 
   console.log("   ✓ issues row updated\n");

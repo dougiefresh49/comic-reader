@@ -8,6 +8,7 @@ import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { supabase } from "./lib/supabase.js";
+import { upsertIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -152,21 +153,18 @@ async function main() {
         console.log(`   📄 Processing ${issueId}...`);
         const stats = await getIssueStats(issuePath, issueId);
         const num = parseInt(issueId.replace("issue-", "") || "0", 10);
-        const { error: issErr } = await supabase.from("issues").upsert(
-          {
-            id: issueId,
-            book_id: bookId,
-            number: num,
-            name: stats.name,
-            page_count: stats.pageCount,
-            bubble_count: stats.bubbleCount,
-            audio_count: stats.audioCount,
-            has_webp: stats.hasWebP,
-            has_audio: stats.hasAudio,
-            has_timestamps: stats.hasTimestamps,
-          },
-          { onConflict: "book_id,id" },
-        );
+        const { error: issErr } = await upsertIssue(supabase, {
+          id: issueId,
+          book_id: bookId,
+          number: num,
+          name: stats.name,
+          page_count: stats.pageCount,
+          bubble_count: stats.bubbleCount,
+          audio_count: stats.audioCount,
+          has_webp: stats.hasWebP,
+          has_audio: stats.hasAudio,
+          has_timestamps: stats.hasTimestamps,
+        });
         if (issErr) {
           throw new Error(
             `issues upsert (${bookId}/${issueId}): ${issErr.message}`,

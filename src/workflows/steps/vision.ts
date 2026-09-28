@@ -17,6 +17,7 @@ import {
   type RoboflowBoxPrediction,
   type RoboflowSam3Output,
 } from "./vision-rows";
+import { selectIssue } from "~/lib/issue-queries";
 
 type TypedClient = SupabaseClient<Database>;
 
@@ -655,12 +656,12 @@ export async function characterLookaheadPage(
     pageLabel,
   );
 
-  const { data: issueRow, error: issueErr } = await supabase
-    .from("issues")
-    .select("wiki_summary, wiki_appearances")
-    .eq("book_id", bookId)
-    .eq("id", issueId)
-    .single();
+  const { data: issueRow, error: issueErr } = await selectIssue(
+    supabase,
+    bookId,
+    issueId,
+    "wiki_summary, wiki_appearances",
+  ).single();
 
   if (issueErr) {
     throw new FatalError(
@@ -914,12 +915,12 @@ export async function getContextPage(
     { data: issueRow, error: issueErr },
   ] = await Promise.all([
     supabase.from("books").select("name, franchises").eq("id", bookId).single(),
-    supabase
-      .from("issues")
-      .select("wiki_summary, wiki_appearances")
-      .eq("book_id", bookId)
-      .eq("id", issueId)
-      .single(),
+    selectIssue(
+      supabase,
+      bookId,
+      issueId,
+      "wiki_summary, wiki_appearances",
+    ).single(),
   ]);
   if (bookErr) {
     throw new FatalError(

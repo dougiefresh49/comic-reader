@@ -5,8 +5,10 @@ if [[ "$VERCEL_ENV" == "production" ]]; then
   exit 1
 fi
 
-# Build Previews only when associated with a PR
-if [[ "$VERCEL_ENV" == "preview" && -n "$VERCEL_GIT_PULL_REQUEST_ID" ]]; then
+# Build Previews for issue branches (issue-N-<slug>, the PR branch rule).
+# Keyed on the branch, not the PR id: branches are pushed before their PR
+# opens, so the first build would never see a PR id (#162).
+if [[ "$VERCEL_ENV" == "preview" && "$VERCEL_GIT_COMMIT_REF" == issue-* ]]; then
   exit 1
 fi
 
