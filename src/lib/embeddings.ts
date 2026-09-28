@@ -1,4 +1,6 @@
 import { GoogleGenAI, createPartFromBase64 } from "@google/genai";
+import { isDryRun } from "./fakes/dry-run";
+import { getFakeGeminiClient } from "./fakes/gemini";
 
 const EMBEDDING_MODEL = "gemini-embedding-2";
 export const EMBEDDING_DIMENSIONS = 768;
@@ -7,6 +9,7 @@ let primaryClient: GoogleGenAI | null = null;
 let fallbackClient: GoogleGenAI | null = null;
 
 function getPrimaryClient(): GoogleGenAI {
+  if (isDryRun()) return getFakeGeminiClient();
   if (!primaryClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
@@ -16,6 +19,7 @@ function getPrimaryClient(): GoogleGenAI {
 }
 
 function getFallbackClient(): GoogleGenAI | null {
+  if (isDryRun()) return null;
   if (!fallbackClient) {
     const apiKey = process.env.GEMINI_API_KEY_2;
     if (!apiKey) return null;

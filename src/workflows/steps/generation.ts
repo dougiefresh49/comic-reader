@@ -136,21 +136,16 @@ export async function generateVoiceModel(
     return;
   }
 
-  const designRes = await globalThis.fetch(
-    "https://api.elevenlabs.io/v1/text-to-voice/design",
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        voice_description: voiceDescription,
-        model_id: "eleven_ttv_v3",
-        auto_generate_text: true,
-      }),
-    },
-  );
+  const { elevenLabsFetch } = await import("~/lib/elevenlabs-client");
+  const designRes = await elevenLabsFetch("/v1/text-to-voice/design", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      voice_description: voiceDescription,
+      model_id: "eleven_ttv_v3",
+      auto_generate_text: true,
+    }),
+  });
 
   if (!designRes.ok) {
     const err = await designRes.text();
@@ -167,21 +162,15 @@ export async function generateVoiceModel(
     throw new FatalError(`No preview returned for ${characterId}`);
   }
 
-  const createRes = await globalThis.fetch(
-    "https://api.elevenlabs.io/v1/text-to-voice",
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        voice_name: characterId,
-        voice_description: voiceDescription,
-        generated_voice_id: generatedVoiceId,
-      }),
-    },
-  );
+  const createRes = await elevenLabsFetch("/v1/text-to-voice", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      voice_name: characterId,
+      voice_description: voiceDescription,
+      generated_voice_id: generatedVoiceId,
+    }),
+  });
 
   if (!createRes.ok) {
     const err = await createRes.text();
@@ -271,11 +260,11 @@ export async function generateAudioBatch(
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
-  const { ElevenLabsClient } = await import("@elevenlabs/elevenlabs-js");
+  const { getElevenLabsClient } = await import("~/lib/elevenlabs-client");
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new FatalError("ELEVENLABS_API_KEY not set");
 
-  const client = new ElevenLabsClient({ apiKey, maxRetries: 0 });
+  const client = await getElevenLabsClient();
 
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")

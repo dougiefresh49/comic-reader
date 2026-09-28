@@ -1,4 +1,4 @@
-import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { createPartFromText } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import type { Database } from "~/types/database";
@@ -354,7 +354,8 @@ export async function generateVoiceDescriptions(
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new FatalError("GEMINI_API_KEY not set");
-  const gemini = new GoogleGenAI({ apiKey });
+  const { getGeminiClient } = await import("~/lib/gemini-client");
+  const gemini = getGeminiClient();
 
   let input: PlanVoiceDescriptionsInput;
   try {

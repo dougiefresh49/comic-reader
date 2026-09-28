@@ -167,6 +167,7 @@ export async function roboflowAnalyzeBatch(
 
   const { env } = await import("~/env.mjs");
   const workflowUrl = env.ROBOFLOW_SAM3_WORKFLOW_URL;
+  const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const apiKey = process.env.ROBOFLOW_API_KEY;
   if (!apiKey) {
     throw new FatalError("ROBOFLOW_API_KEY required");
@@ -229,13 +230,9 @@ export async function roboflowAnalyzeBatch(
 
     let res: Response;
     try {
-      res = await fetch(workflowUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: apiKey,
-          inputs: { image: { type: "url", value: imageUrl } },
-        }),
+      res = await runRoboflowWorkflow(workflowUrl, {
+        type: "url",
+        value: imageUrl,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -902,6 +899,7 @@ export async function getContextPage(
   }
 
   const { getGeminiClient: getGemini } = await import("~/lib/gemini-client");
+  const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const gemini = getGemini();
   const { GEMINI_HIGH } = await import("~/lib/models");
 
@@ -996,13 +994,9 @@ export async function getContextPage(
 
   if (bubbleData.length === 0) {
     const base64Image = imgBuf.toString("base64");
-    const rfRes = await fetch(roboflowUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: roboflowKey,
-        inputs: { image: { type: "base64", value: base64Image } },
-      }),
+    const rfRes = await runRoboflowWorkflow(roboflowUrl, {
+      type: "base64",
+      value: base64Image,
     });
 
     if (!rfRes.ok) {
