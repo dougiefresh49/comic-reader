@@ -380,6 +380,9 @@ function startDevServer(tmp: string, dryScenario: string | null) {
     ...process.env,
     PORT: String(PORT),
     WORKFLOW_LOCAL_BASE_URL: BASE,
+    // withWorkflow (next.config) forces `.next/workflow-data` unless the
+    // world is already chosen; a shared dir keeps hook tokens of killed runs.
+    WORKFLOW_TARGET_WORLD: "local",
     WORKFLOW_LOCAL_DATA_DIR: join(tmp, "workflow-data"),
     // Step retries log at info level only; this namespace makes them visible.
     DEBUG: "workflow:step:info",
@@ -520,6 +523,7 @@ async function runPipeline(
   logPath: string,
   insertOmitted: (() => Record<string, unknown>) | null,
   resumed: string[],
+  run: { id?: string },
 ): Promise<void> {
   const trig = await post("/api/admin/trigger-ingest", {
     bookId: BOOK,
@@ -531,6 +535,7 @@ async function runPipeline(
     );
   }
   console.log(`trigger-ingest: ${trig.text}`);
+  run.id = (JSON.parse(trig.text) as { runId?: string }).runId;
 
   const pauses = scenario.gates.filter((g) => g.expect === "pause");
   const started = Date.now();
@@ -584,19 +589,25 @@ async function runPipeline(
   }
 }
 
-async function readRun(): Promise<{ status: string; skipped: Skip[] } | null> {
+type RunRow = {
+  status: string;
+  completed_at: string | null;
+  steps: { skipped?: Skip[] } | null;
+};
+
+/** This run's pipeline_runs row, matched on the trigger's runId. */
+async function readRun(runId: string | undefined): Promise<RunRow | null> {
+  if (!runId) return null;
   const rows = must(
     await supabase
       .from("pipeline_runs")
-      .select("status, steps")
+      .select("status, completed_at, steps")
       .eq("book_id", BOOK)
       .eq("issue_id", ISSUE)
-      .order("started_at", { ascending: false })
-      .limit(1),
+      .eq("steps->>runId", runId),
     "pipeline_runs",
-  ) as Array<{ status: string; steps: { skipped?: Skip[] } | null }>;
-  const r = rows[0];
-  return r ? { status: r.status, skipped: r.steps?.skipped ?? [] } : null;
+  ) as RunRow[];
+  return rows[0] ?? null;
 }
 
 /** One line per expected gate; returns the mismatches. */
@@ -867,6 +878,7 @@ async function main(): Promise<number> {
   let child: ChildProcess | null = null;
   let logPath: string | null = null;
   const resumed: string[] = [];
+  const runRef: { id?: string } = {};
   let before: Record<string, string> | null = null;
   let wrote = false;
   try {
@@ -886,7 +898,7 @@ async function main(): Promise<number> {
     child = dev.child;
     logPath = dev.logPath;
     await waitForServer();
-    await runPipeline(scenario, logPath, insertOmitted, resumed);
+    await runPipeline(scenario, logPath, insertOmitted, resumed, runRef);
     console.log("pipeline_step = complete");
   } catch (err) {
     problems.push(errText(err));
@@ -896,14 +908,16 @@ async function main(): Promise<number> {
 
   try {
     if (wrote) {
-      const run = await readRun();
-      problems.push(...gateReport(scenario, resumed, run?.skipped ?? []));
+      const run = await readRun(runRef.id);
+      problems.push(
+        ...gateReport(scenario, resumed, run?.steps?.skipped ?? []),
+      );
       if (problems.length === 0) problems.push(...(await assertRows(scenario)));
-      if (run?.status === "running") {
-        console.log(
-          "finding: pipeline_runs.status is still 'running' (nothing sets it to complete); not asserted",
-        );
-      }
+      const closed = run?.status === "completed" && run.completed_at !== null;
+      console.log(
+        `pipeline_runs (runId ${runRef.id ?? "none"}): status = ${run?.status ?? "no row"}, completed_at = ${run?.completed_at ?? "null"}`,
+      );
+      if (!closed) problems.push("pipeline_runs row is not completed");
     }
   } catch (err) {
     problems.push(errText(err));
