@@ -1,11 +1,23 @@
 /**
- * Fixture-only acceptance for vision row mappers (#70).
- * No DB calls and no network calls.
+ * Fixture-only acceptance for vision row mappers (#70) and for the vision
+ * failures that must surface (#145). No DB calls and no network calls:
+ * `fetch` is stubbed before any case runs.
  *
  * Usage: pnpm tsx --env-file=.env scripts/check-vision-rows.ts
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { FatalError } from "workflow";
+import { embedImage } from "~/lib/embeddings";
+import * as exemplarStore from "~/lib/exemplar-store";
+import type { Database } from "~/types/database";
+import {
+  exemplarRefsOrFatal,
+  hasStoredFaceDetections,
+  readSam3Response,
+  roboflowTextPredictionsOrFatal,
+} from "~/workflows/steps/vision";
 import {
   bubbleHasContext,
   mapBubbleRows,
@@ -227,4 +239,193 @@ console.log(
   "parseRoboflowSam3Output: missing panels/bubbles/seg rejected; all-empty accepted",
 );
 
+// #145: each failure surfaces. Fake Responses, a fake Supabase client, the
+// DRY_RUN embedding fake, and a fetch stub that answers only the 429 cases.
+globalThis.fetch = () => Promise.reject(new Error("network blocked"));
+type Res = { data?: unknown; error?: { message: string }; count?: number };
+function fakeClient(tables: Record<string, Res> = {}, rpc = {}, dl = {}) {
+  const writes: string[] = [];
+  const query = (table: string): unknown => {
+    const q: Record<string, unknown> = {
+      then: (ok: (r: Res) => void) => ok({ data: null, ...tables[table] }),
+    };
+    for (const m of ["select", "eq", "in", "limit", "order"]) q[m] = () => q;
+    q.insert = () => (writes.push(`insert ${table}`), q);
+    return q;
+  };
+  const client = {
+    from: query,
+    rpc: async () => ({ data: null, error: null, ...rpc }),
+    storage: {
+      from: (b: string) => ({
+        download: async () => ({ data: null, error: null, ...dl }),
+        upload: async () => (writes.push(`upload ${b}`), { error: null }),
+      }),
+    },
+  };
+  return { client: client as unknown as SupabaseClient<Database>, writes };
+}
+
+let failed = 0;
+async function check(name: string, run: () => Promise<unknown>, want: RegExp) {
+  let got: string;
+  try {
+    got = `returned ${JSON.stringify(await run())}`;
+  } catch (e) {
+    got = `threw ${e instanceof FatalError ? "FatalError" : "Error"}: ${(e as Error).message}`;
+  }
+  const pass = want.test(got);
+  if (!pass) failed++;
+  console.log(`${pass ? "pass" : "FAIL"} ${name}: ${got}`);
+}
+
+const badCalls: Record<string, () => Promise<Response>> = {
+  "fetch rejected": () => Promise.reject(new Error("ECONNRESET")),
+  "500, body unreadable": async () =>
+    new Response(
+      new ReadableStream({
+        start: (c) => c.error(new Error("socket hang up")),
+      }),
+      { status: 500 },
+    ),
+  "non-JSON body": async () => new Response("<html>oops</html>"),
+  "JSON null body": async () => new Response("null"),
+  "no predictions": async () => new Response('{"outputs":[{}]}'),
+};
+for (const [name, call] of Object.entries(badCalls)) {
+  await check(
+    `SAM3 ${name}`,
+    () => readSam3Response(call),
+    /^returned \{"failure"/,
+  );
+  await check(
+    `text fallback ${name}`,
+    () => roboflowTextPredictionsOrFatal(call, "page-03"),
+    /^threw FatalError: Roboflow text detection failed for page-03/,
+  );
+}
+await check(
+  "text fallback, no text regions",
+  () =>
+    roboflowTextPredictionsOrFatal(
+      async () =>
+        new Response('{"outputs":[{"predictions":{"predictions":[]}}]}'),
+      "page-03",
+    ),
+  /^returned \[\]$/,
+);
+
+process.env.DRY_RUN = "1";
+const rpcDown = fakeClient({}, { error: { message: "rpc timeout" } }).client;
+await check(
+  "findSimilarExemplars rpc error",
+  () => exemplarStore.findSimilarExemplars(rpcDown, "AAAA", [bookId]),
+  /threw Error: match_face_exemplars rpc failed: rpc timeout/,
+);
+await check(
+  "findSimilarExemplars no rows",
+  () =>
+    exemplarStore.findSimilarExemplars(fakeClient().client, "AAAA", [bookId]),
+  /^returned \[\]$/,
+);
+await check(
+  "exemplar lookup rpc error",
+  () => exemplarRefsOrFatal(exemplarStore, rpcDown, "AAAA", bookId, "page-03"),
+  /threw FatalError: exemplar lookup failed for page-03: match_face_exemplars/,
+);
+const dlDown = fakeClient(
+  {},
+  {},
+  { error: { message: "Object not found" } },
+).client;
+await check(
+  "downloadExemplarImage error",
+  () => exemplarStore.downloadExemplarImage(dlDown, "a/b.jpg"),
+  /threw Error: face-exemplars download failed for a\/b.jpg/,
+);
+await check(
+  "downloadExemplarImage no data",
+  () => exemplarStore.downloadExemplarImage(fakeClient().client, "a/b.jpg"),
+  /^returned null$/,
+);
+const dupDown = fakeClient({
+  character_face_exemplars: { error: { message: "read timeout" } },
+});
+const params = {
+  jpegBuffer: Buffer.from("x"),
+  characterId: "leonardo",
+  bookId,
+  sourceIssue: issueId,
+  pageNumber,
+  confidence: 0.9,
+  isConfirmed: true,
+};
+await check(
+  "storeExemplar duplicate check error",
+  () => exemplarStore.storeExemplar(dupDown.client, params),
+  /threw Error: character_face_exemplars read failed: read timeout/,
+);
+await check(
+  "storeExemplar wrote nothing",
+  async () => dupDown.writes,
+  /^returned \[\]$/,
+);
+
+const dets = (r: Res) => fakeClient({ panel_character_detections: r }).client;
+await check(
+  "lookahead rerun, detections stored",
+  () => hasStoredFaceDetections(dets({ count: 2 }), ["p1"], "page-03"),
+  /^returned true$/,
+);
+await check(
+  "lookahead rerun, half-done page",
+  () => hasStoredFaceDetections(dets({ count: 0 }), ["p1"], "page-03"),
+  /^returned false$/,
+);
+await check(
+  "lookahead detections read error",
+  () =>
+    hasStoredFaceDetections(
+      dets({ error: { message: "boom" } }),
+      ["p1"],
+      "page-03",
+    ),
+  /threw FatalError: panel_character_detections read failed for page-03/,
+);
+
+process.env.DRY_RUN = "0";
+process.env.GEMINI_API_KEY = "primary-key";
+process.env.GEMINI_API_KEY_2 = "fallback-key";
+let okKey = "fallback-key";
+globalThis.fetch = async (_url, init) => {
+  const key = new Headers(init?.headers).get("x-goog-api-key");
+  if (key === okKey)
+    return new Response('{"embeddings":[{"values":[0.1,0.2]}]}');
+  return new Response('{"error":{"code":429,"message":"quota"}}', {
+    status: 429,
+  });
+};
+await check(
+  "embedding 429, fallback key answers",
+  () => embedImage("AAAA"),
+  /^returned \[0.1,0.2\]$/,
+);
+okKey = "none";
+await check(
+  "embedding 429 on both keys",
+  () =>
+    exemplarRefsOrFatal(
+      exemplarStore,
+      fakeClient().client,
+      "AAAA",
+      bookId,
+      "page-03",
+    ),
+  /threw FatalError: exemplar lookup failed for page-03: Gemini embedding failed/,
+);
+
+if (failed > 0) {
+  console.error(`${failed} failure case(s) did not surface`);
+  process.exit(1);
+}
 console.log("ok");

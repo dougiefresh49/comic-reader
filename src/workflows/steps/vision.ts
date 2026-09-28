@@ -14,10 +14,15 @@ import {
   mapSegmentationRow,
   parseRoboflowSam3Output,
   type ContextParsed,
+  type ParsedRoboflowSam3,
   type RoboflowBoxPrediction,
   type RoboflowSam3Output,
 } from "./vision-rows";
 import { selectIssue } from "~/lib/issue-queries";
+import type {
+  downloadExemplarImage,
+  findSimilarExemplars,
+} from "~/lib/exemplar-store";
 
 type TypedClient = SupabaseClient<Database>;
 
@@ -29,6 +34,158 @@ export {
   mapSegmentationRow,
   parseRoboflowSam3Output,
 } from "./vision-rows";
+
+function errorText(err: unknown): string {
+  return (err instanceof Error ? err.message : String(err)).slice(0, 160);
+}
+
+type RoboflowRead = { data: { outputs?: unknown[] } } | { failure: string };
+
+/**
+ * One Roboflow call read down to a JSON object, or the reason it failed.
+ * Never throws: each caller decides between the failed-pages list and a
+ * FatalError.
+ */
+export async function readRoboflowJson(
+  call: () => Promise<Response>,
+): Promise<RoboflowRead> {
+  let res: Response;
+  try {
+    res = await call();
+  } catch (err: unknown) {
+    return { failure: `fetch failed: ${errorText(err)}` };
+  }
+  if (!res.ok) {
+    const body = await res
+      .text()
+      .catch((err: unknown) => `(body unreadable: ${errorText(err)})`);
+    return { failure: `HTTP ${res.status}: ${body.slice(0, 160)}` };
+  }
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch (err: unknown) {
+    return { failure: `non-JSON response: ${errorText(err)}` };
+  }
+  if (!data || typeof data !== "object") {
+    return { failure: `response body is ${String(data)}, not an object` };
+  }
+  return { data: data as { outputs?: unknown[] } };
+}
+
+export async function readSam3Response(
+  call: () => Promise<Response>,
+): Promise<{ parsed: ParsedRoboflowSam3 } | { failure: string }> {
+  const read = await readRoboflowJson(call);
+  if ("failure" in read) return read;
+  const parsed = parseRoboflowSam3Output(
+    read.data.outputs?.[0] as RoboflowSam3Output | undefined,
+  );
+  return parsed
+    ? { parsed }
+    : { failure: "missing or malformed predictions in response" };
+}
+
+/**
+ * The `getContextPage` fallback for a page with no bubbles. Every failure is
+ * fatal: a workflow retry would call Roboflow and bill it again. An empty
+ * predictions array is a page with no text, not a failure.
+ */
+export async function roboflowTextPredictionsOrFatal(
+  call: () => Promise<Response>,
+  pageLabel: string,
+): Promise<RoboflowBoxPrediction[]> {
+  const read = await readRoboflowJson(call);
+  if ("failure" in read) {
+    throw new FatalError(
+      `Roboflow text detection failed for ${pageLabel}: ${read.failure}`,
+    );
+  }
+  const first = read.data.outputs?.[0] as
+    | { predictions?: { predictions?: unknown } }
+    | undefined;
+  const preds = first?.predictions?.predictions;
+  if (!Array.isArray(preds)) {
+    throw new FatalError(
+      `Roboflow text detection failed for ${pageLabel}: no predictions array in response`,
+    );
+  }
+  return preds as RoboflowBoxPrediction[];
+}
+
+/**
+ * A page's lookahead is finished when any of its panels has a
+ * `panel_character_detections` row. That insert is the step's last write
+ * and one statement, while exemplars are stored face by face before it, so
+ * a page that failed partway has no detections and runs again.
+ */
+export async function hasStoredFaceDetections(
+  supabase: TypedClient,
+  panelIds: string[],
+  pageLabel: string,
+): Promise<boolean> {
+  if (panelIds.length === 0) return false;
+  const { count, error } = await supabase
+    .from("panel_character_detections")
+    .select("id", { count: "exact", head: true })
+    .in("panel_id", panelIds);
+  if (error) {
+    throw new FatalError(
+      `panel_character_detections read failed for ${pageLabel}: ${error.message}`,
+    );
+  }
+  return (count ?? 0) > 0;
+}
+
+export type ExemplarRef = {
+  characterName: string;
+  jpegBase64: string;
+  confidence: number;
+};
+
+type ExemplarStore = {
+  findSimilarExemplars: typeof findSimilarExemplars;
+  downloadExemplarImage: typeof downloadExemplarImage;
+};
+
+/**
+ * Similar stored faces for one crop. The embedding already retries a 429 on
+ * the fallback key (`~/lib/embeddings`), so anything that reaches here is
+ * fatal for the page. The store is passed in: an import here would pull
+ * Node-only modules into the workflow bundle.
+ */
+export async function exemplarRefsOrFatal(
+  { findSimilarExemplars, downloadExemplarImage }: ExemplarStore,
+  supabase: TypedClient,
+  faceJpegBase64: string,
+  bookId: string,
+  pageLabel: string,
+): Promise<ExemplarRef[]> {
+  try {
+    const matches = await findSimilarExemplars(
+      supabase,
+      faceJpegBase64,
+      [bookId],
+      3,
+    );
+    const refs = await Promise.all(
+      matches.map(async (m) => {
+        const img = await downloadExemplarImage(supabase, m.cropPath);
+        if (!img) return null;
+        return {
+          characterName: m.characterId,
+          jpegBase64: img.toString("base64"),
+          confidence: m.confidence,
+        };
+      }),
+    );
+    return refs.filter((r): r is ExemplarRef => r !== null);
+  } catch (err: unknown) {
+    throw new FatalError(
+      `exemplar lookup failed for ${pageLabel}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 function normalizeForMatch(s: string): string {
   return s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
@@ -228,49 +385,11 @@ export async function roboflowAnalyzeBatch(
 
     const imageUrl = pageImageUrl(bookId, issueId, page.pageNumber);
 
-    let res: Response;
-    try {
-      res = await runRoboflowWorkflow(workflowUrl, {
-        type: "url",
-        value: imageUrl,
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[roboflow] ${pageLabel}: fetch failed: ${msg.slice(0, 160)}`,
-      );
-      failedPageLabels.push(pageLabel);
-      continue;
-    }
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.warn(
-        `[roboflow] ${pageLabel}: SAM3 workflow ${res.status}: ${text.slice(0, 160)}`,
-      );
-      failedPageLabels.push(pageLabel);
-      continue;
-    }
-
-    let data: { outputs?: unknown[] };
-    try {
-      data = (await res.json()) as { outputs?: unknown[] };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(
-        `[roboflow] ${pageLabel}: non-JSON response: ${msg.slice(0, 160)}`,
-      );
-      failedPageLabels.push(pageLabel);
-      continue;
-    }
-
-    const parsed = parseRoboflowSam3Output(
-      data.outputs?.[0] as RoboflowSam3Output | undefined,
+    const read = await readSam3Response(() =>
+      runRoboflowWorkflow(workflowUrl, { type: "url", value: imageUrl }),
     );
-    if (!parsed) {
-      console.warn(
-        `[roboflow] ${pageLabel}: missing or malformed predictions in response`,
-      );
+    if ("failure" in read) {
+      console.warn(`[roboflow] ${pageLabel}: SAM3 workflow ${read.failure}`);
       failedPageLabels.push(pageLabel);
       continue;
     }
@@ -280,7 +399,7 @@ export async function roboflowAnalyzeBatch(
       image: imgDims,
       bubblePredictions,
       segmentationPredictions: segPreds,
-    } = parsed;
+    } = read.parsed;
     const panelRows = mapPanelRows(
       bookId,
       issueId,
@@ -542,8 +661,7 @@ export async function characterLookaheadPage(
   );
   const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
   const { identifyFace } = await import("~/lib/character-identification");
-  const { findSimilarExemplars, downloadExemplarImage, storeExemplar } =
-    await import("~/lib/exemplar-store");
+  const exemplarStore = await import("~/lib/exemplar-store");
 
   const gemini = getGeminiClient();
   const padded = String(pageNumber).padStart(2, "0");
@@ -583,7 +701,37 @@ export async function characterLookaheadPage(
     return;
   }
 
-  // 2. Download page image from Storage
+  // 2. Load panels from DB; skip a page whose faces are already stored
+  const { data: panels, error: panelsErr } = await supabase
+    .from("panels")
+    .select("id, bounding_box, sort_order")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("page_number", pageNumber)
+    .order("sort_order");
+
+  if (panelsErr) {
+    throw new FatalError(
+      `panels read failed for ${pageLabel}: ${panelsErr.message}`,
+    );
+  }
+
+  if (!panels || panels.length === 0) return;
+
+  if (
+    await hasStoredFaceDetections(
+      supabase,
+      panels.map((p) => p.id),
+      pageLabel,
+    )
+  ) {
+    console.log(
+      `[lookahead] ${pageLabel}: face detections already stored, skip`,
+    );
+    return;
+  }
+
+  // 3. Download page image from Storage
   const storagePath = pageStoragePath(bookId, issueId, pageNumber);
   const { data: imageBlob, error: downloadErr } = await supabase.storage
     .from("comic-pages")
@@ -605,23 +753,6 @@ export async function characterLookaheadPage(
   const imgW = meta.width ?? 0;
   const imgH = meta.height ?? 0;
   if (imgW === 0 || imgH === 0) return;
-
-  // 3. Load panels from DB
-  const { data: panels, error: panelsErr } = await supabase
-    .from("panels")
-    .select("id, bounding_box, sort_order")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("page_number", pageNumber)
-    .order("sort_order");
-
-  if (panelsErr) {
-    throw new FatalError(
-      `panels read failed for ${pageLabel}: ${panelsErr.message}`,
-    );
-  }
-
-  if (!panels || panels.length === 0) return;
 
   const panelRects = panels.map((p) => {
     const bb = p.bounding_box as BoundingBoxJson;
@@ -719,36 +850,13 @@ export async function characterLookaheadPage(
 
   for (const face of faceCrops) {
     // Retrieve similar exemplars from pgvector
-    let exemplarRefs: Array<{
-      characterName: string;
-      jpegBase64: string;
-      confidence: number;
-    }> = [];
-    try {
-      const matches = await findSimilarExemplars(
-        supabase,
-        face.jpegBuffer.toString("base64"),
-        [bookId],
-        3,
-      );
-      const refs = await Promise.all(
-        matches.map(async (m) => {
-          const img = await downloadExemplarImage(supabase, m.cropPath);
-          if (!img) return null;
-          return {
-            characterName: m.characterId,
-            jpegBase64: img.toString("base64"),
-            confidence: m.confidence,
-          };
-        }),
-      );
-      exemplarRefs = refs.filter((r): r is NonNullable<typeof r> => r !== null);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new FatalError(
-        `character_face_exemplars failed for ${pageLabel}: ${msg}`,
-      );
-    }
+    const exemplarRefs = await exemplarRefsOrFatal(
+      exemplarStore,
+      supabase,
+      face.jpegBuffer.toString("base64"),
+      bookId,
+      pageLabel,
+    );
 
     // Identify with exemplar context + key failover
     let result;
@@ -811,7 +919,7 @@ export async function characterLookaheadPage(
       // Store face as exemplar (confirmed if resolved + high confidence)
       if (result.confidence >= 0.7) {
         try {
-          await storeExemplar(supabase, {
+          await exemplarStore.storeExemplar(supabase, {
             jpegBuffer: face.jpegBuffer,
             characterId: charId,
             suggestedName: charId ? undefined : result.characterName,
@@ -994,25 +1102,14 @@ export async function getContextPage(
 
   if (bubbleData.length === 0) {
     const base64Image = imgBuf.toString("base64");
-    const rfRes = await runRoboflowWorkflow(roboflowUrl, {
-      type: "base64",
-      value: base64Image,
-    });
-
-    if (!rfRes.ok) {
-      console.warn(`[context] ${pageLabel}: Roboflow text detection failed`);
-      return;
-    }
-
-    const rfData = (await rfRes.json()) as {
-      outputs?: Array<{
-        predictions?: {
-          predictions: RoboflowBoxPrediction[];
-        };
-      }>;
-    };
-
-    const preds = rfData.outputs?.[0]?.predictions?.predictions ?? [];
+    const preds = await roboflowTextPredictionsOrFatal(
+      () =>
+        runRoboflowWorkflow(roboflowUrl, {
+          type: "base64",
+          value: base64Image,
+        }),
+      pageLabel,
+    );
     if (preds.length === 0) {
       console.log(`[context] ${pageLabel}: no text regions found`);
       return;
