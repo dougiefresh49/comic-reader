@@ -7,11 +7,13 @@
  * Usage: pnpm backfill-panels -- --book <book> --issue <issue-N>
  *          [--pages 5 | 3,7 | 1-4] [--execute] [--force] [--cache-dir <dir>]
  *
- * One SAM3 workflow call per page, the call roboflowAnalyzeBatch makes. Each
- * page's response is cached as <cache-dir>/page-NN.json once it parses, and a
- * later run (dry or --execute) calls Roboflow only for pages with no file.
- * The issue must have no panels; --force deletes them first (the run's pages
- * only when --pages is given).
+ * One SAM3 workflow call per page, the call roboflowAnalyzeBatch makes. A
+ * response with panels is cached as <cache-dir>/<book>__<issue>__page-NN.json,
+ * recording its book, issue and page, and a later run (dry or --execute) calls
+ * Roboflow only for pages with no file. A response with no panels is not
+ * cached and that page is written as nothing.
+ * The issue must have no panels; --force deletes a page's panels just before
+ * writing its new ones, so a page with nothing to write keeps what it has.
  */
 
 import fs from "fs";
@@ -224,13 +226,29 @@ function linkBubble(
   };
 }
 
-function readCache(file: string): ParsedRoboflowSam3 {
-  const data = JSON.parse(fs.readFileSync(file, "utf8")) as {
-    outputs?: RoboflowSam3Output[];
-  };
+type CacheEntry = {
+  book?: string;
+  issue?: string;
+  page?: number;
+  outputs?: RoboflowSam3Output[];
+};
+
+/** A file recorded for another book, issue or page is refused, never used. */
+function readCache(
+  file: string,
+  book: string,
+  issue: string,
+  pageNumber: number,
+): ParsedRoboflowSam3 {
+  const data = JSON.parse(fs.readFileSync(file, "utf8")) as CacheEntry;
+  if (data.book !== book || data.issue !== issue || data.page !== pageNumber) {
+    fail(
+      `${path.basename(file)} records ${data.book}/${data.issue} page ${data.page}, not ${book}/${issue} page ${pageNumber}. Refusing to use it.`,
+    );
+  }
   return (
     parseRoboflowSam3Output(data.outputs?.[0]) ??
-    fail(`${file}: missing or malformed predictions`)
+    fail(`${path.basename(file)}: missing or malformed predictions`)
   );
 }
 
@@ -245,25 +263,29 @@ async function callRoboflow(
     type: "url",
     value: pageImageUrl(book, issue, pageNumber),
   });
-  if (!res.ok) {
-    const body = (await res.text()).slice(0, 200);
-    throw new Error(`page ${pageNumber}: Roboflow HTTP ${res.status}: ${body}`);
-  }
+  // The body stays out of the log: an error body can echo the request key.
+  if (!res.ok)
+    throw new Error(`page ${pageNumber}: Roboflow HTTP ${res.status}`);
   const out = ((await res.json()) as { outputs?: RoboflowSam3Output[] })
     .outputs?.[0];
   const parsed = parseRoboflowSam3Output(out);
   if (!out || !parsed) {
     throw new Error(`page ${pageNumber}: missing or malformed predictions`);
   }
+  // No panels is not cached, so a later run asks again instead of trusting it.
+  if (parsed.panelPredictions.length === 0) return parsed;
   // Only the three prediction objects go to disk: no key, no image URL.
   const { panel_predictions, bubble_predictions, segmentation_predictions } =
     out;
-  const cached = {
+  const entry: CacheEntry = {
+    book,
+    issue,
+    page: pageNumber,
     outputs: [
       { panel_predictions, bubble_predictions, segmentation_predictions },
     ],
   };
-  fs.writeFileSync(file, JSON.stringify(cached));
+  fs.writeFileSync(file, JSON.stringify(entry));
   return parsed;
 }
 
@@ -294,18 +316,26 @@ async function main() {
   if (countErr) fail(`panels count: ${countErr.message}`);
   if ((existing ?? 0) > 0 && !force) {
     fail(
-      `${book}/${issue} already has ${existing} panels. Refusing. --force deletes this issue's panels first${pages ? " (the --pages pages only)" : ""}, and bubbles on them lose their panel_id.`,
+      `${book}/${issue} already has ${existing} panels. Refusing. --force replaces the panels on each page that gets new ones, and bubbles on replaced panels lose their panel_id until relinked.`,
     );
   }
 
   fs.mkdirSync(cacheDir, { recursive: true });
-  const cacheFile = (n: number) => path.join(cacheDir, `page-${pad(n)}.json`);
+  const prefix = `${book}__${issue}__`;
+  const cacheFile = (n: number) =>
+    path.join(cacheDir, `${prefix}page-${pad(n)}.json`);
   const toCall = runNumbers.filter((n) => !fs.existsSync(cacheFile(n)));
+  const others = fs
+    .readdirSync(cacheDir)
+    .filter((f) => f.endsWith(".json") && !f.startsWith(prefix));
   console.log(`${book}/${issue}, ${execute ? "EXECUTE" : "dry run"}`);
   console.log(`Cache: ${cacheDir}`);
+  if (others.length) {
+    console.log(`Not used, not named for this issue: ${others.join(", ")}`);
+  }
   if (force && existing) {
     console.log(
-      `--force: ${execute ? "deletes" : "would delete"} ${pages ? `the panels on pages ${runNumbers.join(", ")}` : `all ${existing} panels`} before writing`,
+      `--force: ${execute ? "replaces" : "would replace"} the panels on each page that gets new ones; pages with no panels returned keep theirs`,
     );
   }
   console.log(
@@ -342,7 +372,7 @@ async function main() {
     const file = cacheFile(n);
     let parsed: ParsedRoboflowSam3;
     if (fs.existsSync(file)) {
-      parsed = readCache(file);
+      parsed = readCache(file, book, issue, n);
     } else {
       parsed = await callRoboflow(workflowUrl, book, issue, n, file);
       await new Promise((r) => setTimeout(r, 750));
@@ -373,12 +403,15 @@ async function main() {
       0,
     );
     const masks = panels.reduce((s, p) => s + (fg(p)?.bubbles.length ?? 0), 0);
-    if (panels.length === 0) noPanels.push(n);
+    if (panels.length === 0) {
+      noPanels.push(n);
+      console.log(
+        `page ${n}: no panels returned, nothing will be written, ${links.length} bubbles left unlinked`,
+      );
+      continue;
+    }
     console.log(
-      `page ${n}: ${panels.length} panels detected, ${linked} bubbles linked, ${links.length - linked} left unlinked` +
-        (panels.length
-          ? `, ${chars} character + ${masks} bubble polygons`
-          : ", nothing will be written"),
+      `page ${n}: ${panels.length} panels detected, ${linked} bubbles linked, ${links.length - linked} left unlinked, ${chars} character + ${masks} bubble polygons`,
     );
     for (const p of panels) {
       const b = p.bounding_box;
@@ -393,7 +426,7 @@ async function main() {
     }
   }
   if (noPanels.length) {
-    console.log(`Pages with no panels: ${noPanels.join(", ")}`);
+    console.log(`Pages with no panels returned: ${noPanels.join(", ")}`);
   }
 
   if (!execute) {
@@ -401,19 +434,18 @@ async function main() {
     return;
   }
 
-  if (force) {
-    let del = supabase
-      .from("panels")
-      .delete()
-      .eq("book_id", book)
-      .eq("issue_id", issue);
-    if (pages) del = del.in("page_number", runNumbers);
-    const { error } = await del;
-    if (error) fail(`--force delete: ${error.message}`);
-  }
-
   for (const { pageNumber: n, parsed, panels, links } of plans) {
     if (panels.length === 0) continue;
+    // Only reached with this page's new rows built: --force never empties a page.
+    if (force) {
+      const { error } = await supabase
+        .from("panels")
+        .delete()
+        .eq("book_id", book)
+        .eq("issue_id", issue)
+        .eq("page_number", n);
+      if (error) fail(`page ${n}: --force delete failed: ${error.message}`);
+    }
     const { data: inserted, error: pErr } = await supabase
       .from("panels")
       .insert(panels)
