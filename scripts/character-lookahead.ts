@@ -31,7 +31,7 @@ import {
 } from "./utils/exemplar-store.js";
 import { loadRoster } from "./utils/roster.js";
 import { glob } from "glob";
-import { listBookIssues } from "~/lib/issue-queries.js";
+import { selectIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -73,46 +73,25 @@ function parseArgs(): {
 }
 
 async function getIssueDbIds(
-  bookSlug: string,
-  issueSlug: string,
+  bookId: string,
+  issueId: string,
 ): Promise<{
   bookId: string;
   issueId: string;
   wikiAppearances: string | null;
 } | null> {
-  const { data: issueRow } = await listBookIssues(
+  const { data: issueRow } = await selectIssue(
     supabase,
-    bookSlug,
+    bookId,
+    issueId,
     "id, book_id, wiki_appearances",
-  )
-    // `issues` has no slug column; the cast keeps the pre-#150 query as-is.
-    .eq("slug" as "id", issueSlug)
-    .single();
+  ).maybeSingle();
 
-  if (!issueRow) {
-    const { data: byBook } = await listBookIssues(
-      supabase,
-      bookSlug,
-      "id, book_id, wiki_appearances",
-    ).limit(10);
-
-    const match = byBook?.find((r) => {
-      const num = issueSlug.replace("issue-", "");
-      return String(r.id).includes(num) || String(r.book_id) === bookSlug;
-    });
-    if (match) {
-      return {
-        bookId: match.book_id as string,
-        issueId: match.id as string,
-        wikiAppearances: (match.wiki_appearances as string) ?? null,
-      };
-    }
-    return null;
-  }
+  if (!issueRow) return null;
 
   return {
-    bookId: issueRow.book_id as string,
-    issueId: issueRow.id as string,
+    bookId: issueRow.book_id,
+    issueId: issueRow.id,
     wikiAppearances: (issueRow.wiki_appearances as string) ?? null,
   };
 }
