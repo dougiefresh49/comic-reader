@@ -22,6 +22,32 @@ function dbError(label: string, error: { message: string; code?: string }) {
   return transient ? new Error(message) : new FatalError(message);
 }
 
+/**
+ * Writes after a paid Gemini call. A Workflow retry would repeat that call, so
+ * transient failures re-send only the failed writes here, up to 3 attempts.
+ */
+async function writeAfterPaidCall(
+  label: string,
+  writes: (() => PromiseLike<{
+    error: Parameters<typeof dbError>[1] | null;
+  }>)[],
+) {
+  for (let attempt = 1; ; attempt++) {
+    const results = await Promise.all(writes.map((write) => write()));
+    const errors = results.flatMap((r) =>
+      r.error ? [dbError(label, r.error)] : [],
+    );
+    if (errors.length === 0) return;
+    const fatal = errors.find((e) => e instanceof FatalError);
+    if (fatal) throw fatal;
+    if (attempt === 3) {
+      throw new FatalError(`${errors[0]!.message} (after 3 attempts)`);
+    }
+    writes = writes.filter((_, i) => results[i]!.error);
+    await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+  }
+}
+
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
 interface SortPanelRow {
@@ -362,17 +388,18 @@ export async function sortPageElements(
     plan,
   );
 
-  const panelUpdates = [...panelOrders.entries()].map(([id, sort_order]) =>
-    supabase.from("panels").update({ sort_order }).eq("id", id),
-  );
-  const bubbleUpdates = [...bubbleGlobalOrder.entries()].map(
-    ([id, sort_order]) =>
-      supabase.from("bubbles").update({ sort_order }).eq("id", id),
-  );
-
-  const results = await Promise.all([...panelUpdates, ...bubbleUpdates]);
-  const errResult = results.find((r) => r.error);
-  if (errResult?.error) throw dbError("panels/bubbles", errResult.error);
+  await writeAfterPaidCall("panels/bubbles", [
+    ...[...panelOrders.entries()].map(
+      ([id, sort_order]) =>
+        () =>
+          supabase.from("panels").update({ sort_order }).eq("id", id),
+    ),
+    ...[...bubbleGlobalOrder.entries()].map(
+      ([id, sort_order]) =>
+        () =>
+          supabase.from("bubbles").update({ sort_order }).eq("id", id),
+    ),
+  ]);
 
   console.log(
     `[sort] ${bookId}/${issueId}: page-${padded}: ${panels.length} panel(s), ${bubbles.length} bubble(s)`,
