@@ -1,0 +1,13 @@
+{
+ "model": "find-speech-bubbles-fmu3y/4",
+ "floor": 0.05,
+ "response": {
+  "image": { "width": 1000, "height": 1000 },
+  "predictions": [
+   { "x": 200, "y": 150, "width": 200, "height": 100, "confidence": 0.9, "class": "speech bubble", "detection_id": "p1-exact-a" },
+   { "x": 510, "y": 500, "width": 200, "height": 200, "confidence": 0.62, "class": "speech bubble", "detection_id": "p2-close-b" },
+   { "x": 210, "y": 150, "width": 200, "height": 100, "confidence": 0.37, "class": "speech bubble", "detection_id": "p3-duplicate-a" },
+   { "x": 150, "y": 850, "width": 100, "height": 100, "confidence": 0.2, "class": "speech bubble", "detection_id": "p4-empty-area" }
+  ]
+ }
+}

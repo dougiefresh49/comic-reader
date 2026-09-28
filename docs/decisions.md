@@ -4,6 +4,22 @@ This is the repo's decision log. One row per call or parked question, newest fir
 
 | # | date | decision | status |
 |---|------|----------|--------|
+| 103 | 2026-09-28 | Wave 4 follow-ups filed from its review gates and lanes: #191 (switch a take's audio and timings together), #205 (character-lookahead and exemplar read errors) and #206 (review editor order against reader order) | accepted |
+| 102 | 2026-09-28 | #145: the lane's Owns gained `identifyFace` in `src/lib/character-identification.ts` for fix dispatch 2, because that helper swallows API failures and the step cannot fail a page without it; other callers keep their behavior (PR #189) | assumed (reopens when: the owner objects to the added file) |
+| 101 | 2026-09-28 | #180: ground truth leaves out 18 issue-1 bubbles whose `box_2d` has no width, so 382 bubbles are scored in issues 1 and 2 and not the 400 the issue names (PR #188) | accepted |
+| 100 | 2026-09-28 | #180: whether `capture` skips panel calls on the 52 pages with no `panels` rows, which makes it 96 inferences and not 148 | open |
+| 99 | 2026-09-28 | #177: whether five existing page 20 rows are renumbered so the two new rows play in reading order, or the new rows are appended as 6 and 7 and play last | open |
+| 98 | 2026-09-28 | #177: Astra's should-fix that the two new boxes leave out the balloon tails is dismissed, because the six reviewed rows on the page leave them out too | accepted |
+| 97 | 2026-09-28 | #145: the lane added about 185 lines of cases to `scripts/check-vision-rows.ts`, past the 100-line stop; the orchestrator kept them because they are test cases for the failures the issue lists and not a convention scanner (PR #189) | assumed (reopens when: the owner wants the cases cut or a test runner added) |
+| 96 | 2026-09-28 | #174: Astra's should-fix on PR #187 (upload and timings restore both fail) is dismissed for that PR and filed as #191, because closing it needs one Postgres function that switches audio and timings together, which is a migration | accepted |
+| 95 | 2026-09-28 | #175: no separate once-only slot warning in the bulk failure list, because each failure that carries a voice id already ends with that sentence from `createVoiceDesign` (PR #184) | accepted |
+| 94 | 2026-09-28 | #148: whether the 6 voice-design rows filed under `soldier` and `foot-soldier` are intended, given one has a ready voice the planner would hand to a `soldier` speaker with no castlist row | open |
+| 93 | 2026-09-28 | #148: the shared read filters `character_appearances` by `character_id` and also by the `<key>-voice-design` row id, because 6 of 33 voice-design rows sit under another `character_id` and a `character_id` filter alone would change the plan (PR #183) | accepted |
+| 92 | 2026-09-28 | #145: `scripts/check-vision-rows.ts` is in the lane's Owns because the issue's Acceptance names it | accepted |
+| 91 | 2026-09-28 | #147: the lane's Owns gained one new file, `src/workflows/steps/pipeline-runs.ts`, because a workflow's database write has to live in a step function (PR #185) | assumed (reopens when: the owner objects to the added file) |
+| 90 | 2026-09-28 | #180: `capture` refuses to start unless it is passed the exact count of inferences it is about to make and refuses any count over 148, and a free SELECT-only step saves the reviewed boxes to disk so `report` needs no network (orchestrator's brief) | assumed (reopens when: the owner wants a different guard) |
+| 89 | 2026-09-28 | #177 has no PR: the lane prepares the two rows as files, a separate reviewer checks them against the page, and the orchestrator runs the insert under row 84 | accepted |
+| 88 | 2026-09-28 | Wave 4 launch: #175's review gate is the money-or-data lane although its issue says `Review: meaning, then money or data`; the orchestrator reads the error copy in the diff (owner call at launch) | accepted |
 | 87 | 2026-09-28 | #65: active learning is off on the `find-comic-panel-v1` workflow as well, turned off with the owner's yes, so no detection workflow uploads pages by itself | accepted |
 | 86 | 2026-09-28 | #65 Q5: the detection thresholds get a free local sweep against the reviewed boxes, and it does not wait for more reviewed pages; the one paid step is a bounded capture run that needs the owner's yes when it runs (#180) | accepted |
 | 85 | 2026-09-28 | #65 Q2 and Q3: active learning is off on the `find-speech-bubbles` workflow, turned off with the owner's yes, and #105 may upload reviewed pages and box corrections to the public project | accepted |

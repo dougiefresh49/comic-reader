@@ -1,0 +1,28 @@
+{
+  "description": "DRY_RUN_SCENARIO=gates: one unknown face and the Smoke Stranger speaker (no characters row), and no castlist row for the speaker of page-01_b02. The script inserts that row just before the casting gate resumes (the owner pasting a voice id).",
+  "gates": [
+    {
+      "gate": "review-clusters",
+      "expect": "pause"
+    },
+    {
+      "gate": "review-pages",
+      "expect": "pause"
+    },
+    {
+      "gate": "review-new-characters",
+      "expect": "pause"
+    },
+    {
+      "gate": "casting",
+      "expect": "pause"
+    }
+  ],
+  "omitCastForLegacyId": "page-01_b02",
+  "counts": {
+    "panels": 8,
+    "page_segmentation": 2,
+    "bubbles": 21
+  },
+  "strangerBubbles": 1
+}

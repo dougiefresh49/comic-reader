@@ -1,0 +1,28 @@
+{
+  "description": "Every fixture id has a smoke characters row and a castlist row (option B), so only review-pages pauses.",
+  "gates": [
+    {
+      "gate": "review-clusters",
+      "expect": "skip"
+    },
+    {
+      "gate": "review-pages",
+      "expect": "pause"
+    },
+    {
+      "gate": "review-new-characters",
+      "expect": "skip"
+    },
+    {
+      "gate": "casting",
+      "expect": "skip"
+    }
+  ],
+  "omitCastForLegacyId": null,
+  "counts": {
+    "panels": 8,
+    "page_segmentation": 2,
+    "bubbles": 21
+  },
+  "strangerBubbles": 0
+}
