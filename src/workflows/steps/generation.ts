@@ -8,9 +8,10 @@ import {
   normalizeAlignment,
   planBubblesToSend,
   planCharactersNeedingVoices,
+  readPlanningAppearances,
   speakerKey,
+  speakerKeys,
   type AlignmentRaw,
-  type AppearanceRow,
   voiceDesignAppearanceId,
 } from "./audio-plan";
 
@@ -26,7 +27,6 @@ export async function getCharactersNeedingVoices(
     { data: bubbleRows, error: bubErr },
     { data: aliasRows, error: aliasErr },
     { data: castRows, error: castErr },
-    { data: appearanceRows, error: appErr },
   ] = await Promise.all([
     supabase
       .from("bubbles")
@@ -44,24 +44,23 @@ export async function getCharactersNeedingVoices(
       .select("character, voice_id")
       .eq("book_id", bookId)
       .eq("issue_id", issueId),
-    supabase
-      .from("character_appearances")
-      .select(
-        "id, character_id, voice_id, voice_status, voice_description, voice_created_at",
-      ),
   ]);
 
   if (bubErr) throw new FatalError(bubErr.message);
   if (aliasErr) throw new FatalError(aliasErr.message);
   if (castErr) throw new FatalError(castErr.message);
-  if (appErr) throw new FatalError(appErr.message);
 
   const aliasMap = buildAliasMap(aliasRows ?? []);
   const cast = buildCastIndex(castRows ?? []);
-  const appearances = (appearanceRows ?? []) as AppearanceRow[];
   const rawSpeakers = (bubbleRows ?? [])
     .map((b) => b.speaker)
     .filter((s): s is string => !!s);
+  const appearances = await readPlanningAppearances(
+    supabase,
+    speakerKeys(rawSpeakers, aliasMap),
+  ).catch((err: unknown) => {
+    throw new FatalError(err instanceof Error ? err.message : String(err));
+  });
 
   const plan = planCharactersNeedingVoices(
     rawSpeakers,
