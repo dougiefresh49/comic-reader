@@ -1,5 +1,5 @@
 import {
-  GoogleGenAI,
+  type GoogleGenAI,
   createPartFromBase64,
   createPartFromText,
 } from "@google/genai";
@@ -266,9 +266,8 @@ export async function sortPageElements(
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
-  const gemini = new GoogleGenAI({ apiKey });
+  const { getGeminiClient } = await import("~/lib/gemini-client");
+  const gemini = getGeminiClient();
 
   const padded = String(pageNumber).padStart(2, "0");
   const storagePath = pageStoragePath(bookId, issueId, pageNumber);

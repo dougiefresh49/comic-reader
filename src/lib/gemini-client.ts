@@ -1,9 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
+import { isDryRun } from "./fakes/dry-run";
+import { getFakeGeminiClient } from "./fakes/gemini";
 
 let primaryClient: GoogleGenAI | null = null;
 let fallbackClient: GoogleGenAI | null = null;
 
+/** Under DRY_RUN: the fixture-backed fake, and no key is read. */
 export function getGeminiClient(): GoogleGenAI {
+  if (isDryRun()) return getFakeGeminiClient();
   if (!primaryClient) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error("GEMINI_API_KEY not set");
@@ -13,6 +17,7 @@ export function getGeminiClient(): GoogleGenAI {
 }
 
 export function getFallbackGeminiClient(): GoogleGenAI | null {
+  if (isDryRun()) return null;
   if (!fallbackClient) {
     const apiKey = process.env.GEMINI_API_KEY_2;
     if (!apiKey) return null;
