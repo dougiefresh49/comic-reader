@@ -29,7 +29,10 @@ import {
   consolidateMusicScenes,
   generateManifest,
 } from "./steps/publishing";
-import { createCastingTasks } from "./steps/casting-tasks";
+import {
+  acceptUnresolvedAsSilent,
+  createCastingTasks,
+} from "./steps/casting-tasks";
 import {
   countUnresolvedFaces,
   countPendingNewCharacters,
@@ -216,8 +219,9 @@ export async function ingestPipeline(input: IngestInput) {
       currentStep = "casting";
       const casting = await createCastingTasks(bookId, issueId);
       const unresolved = casting.unresolved.length;
-      // Unresolved speakers pause the gate too: resuming it accepts their
-      // bubbles as silent (counted as silentBubbles by generateManifest).
+      // Unresolved speakers pause the gate too. Resuming it accepts them as
+      // silent: acceptUnresolvedAsSilent writes their skip-sentinel castlist
+      // rows, and generateManifest counts their bubbles as silentBubbles.
       if (casting.pending === 0 && unresolved === 0) {
         const reason =
           casting.cast === casting.speakers
@@ -242,6 +246,12 @@ export async function ingestPipeline(input: IngestInput) {
           token: `ingest:${bookId}/${issueId}/casting`,
         });
         await castingHook;
+        const silenced = await acceptUnresolvedAsSilent(bookId, issueId);
+        if (silenced.length > 0) {
+          console.log(
+            `[casting] resumed: ${silenced.length} unresolved speakers accepted as silent: ${silenced.join(", ")}`,
+          );
+        }
       }
     }
 

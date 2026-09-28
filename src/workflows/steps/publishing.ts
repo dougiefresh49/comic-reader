@@ -154,7 +154,8 @@ export async function generateManifest(bookId: string, issueId: string) {
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("ignored", false)
-      .is("audio_storage_path", null),
+      .is("audio_storage_path", null)
+      .not("speaker", "is", null),
   ]);
 
   if (pageRes.error) throw new Error(pageRes.error.message);
@@ -167,10 +168,11 @@ export async function generateManifest(bookId: string, issueId: string) {
   const bubbleCount = bubbleRes.count ?? 0;
   const audioCount = audioRes.count ?? 0;
   const timestampCount = tsRes.count ?? 0;
-  // Bubbles the audio step would voice but that have no audio: the ones a
-  // resumed casting gate accepted as silent, plus any other audio skip.
+  // Spoken bubbles (text and a speaker) with no audio: the ones a resumed
+  // casting gate accepted as silent, plus any other audio skip. Speakerless
+  // bubbles such as SFX are never voiced, so they are not counted.
   const silentBubbles = (unvoicedRes.data ?? []).filter(
-    bubbleNeedsAudio,
+    (b) => bubbleNeedsAudio(b) && !!b.speaker?.trim(),
   ).length;
 
   const { error: upErr } = await updateIssue(supabase, bookId, issueId, {
