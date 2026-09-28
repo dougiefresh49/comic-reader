@@ -61,6 +61,7 @@
     "generate-episode": "tsx --env-file=.env scripts/generate-episode.ts",
     "migrate-to-db": "tsx --env-file=.env scripts/migrate-to-db.ts",
     "recover-issue": "tsx --conditions=react-server --env-file=.env scripts/recover-issue.ts",
+    "backfill-panels": "tsx --env-file=.env scripts/backfill-panels.ts",
     "sweep-thresholds": "tsx --env-file=.env scripts/sweep-thresholds.ts",
     "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",
     "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts",
