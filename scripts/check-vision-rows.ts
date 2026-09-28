@@ -9,6 +9,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FatalError } from "workflow";
+import type { GoogleGenAI } from "@google/genai";
+import { identifyFace } from "~/lib/character-identification";
 import { embedImage } from "~/lib/embeddings";
 import * as exemplarStore from "~/lib/exemplar-store";
 import type { Database } from "~/types/database";
@@ -404,17 +406,47 @@ await check(
   /threw FatalError: panel_character_detections read failed for page-03/,
 );
 
+// The real identifyFace on the step's path, with a mocked generateContent.
+const gemini = (answer: () => Promise<unknown>) =>
+  ({ models: { generateContent: answer } }) as unknown as GoogleGenAI;
+const apiError = (status: number) => () =>
+  Promise.reject(Object.assign(new Error(`HTTP ${status}`), { status }));
+const identify = (primary: GoogleGenAI, fallback: GoogleGenAI | null) =>
+  identifyFaceOrFatal(
+    (c) =>
+      identifyFace(
+        c,
+        "AAAA",
+        "image/jpeg",
+        [],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { throwOnApiError: true },
+      ),
+    primary,
+    () => fallback,
+    "page-03",
+  );
 await check(
   "face identification 500",
+  () => identify(gemini(apiError(500)), gemini(apiError(500))),
+  /^threw FatalError: Gemini face identification failed for page-03: HTTP 500/,
+);
+await check(
+  "face identification 429 on both keys",
+  () => identify(gemini(apiError(429)), gemini(apiError(429))),
+  /^threw FatalError: Gemini face identification failed for page-03: HTTP 429/,
+);
+await check(
+  "face identification, no match",
   () =>
-    identifyFaceOrFatal(
-      () =>
-        Promise.reject(Object.assign(new Error("internal"), { status: 500 })),
-      "primary",
-      () => "fallback",
-      "page-03",
+    identify(
+      gemini(async () => ({ text: '{"character_name":null,"confidence":0}' })),
+      null,
     ),
-  /^threw FatalError: Gemini face identification failed for page-03: internal/,
+  /^returned \{"characterName":null,"confidence":0\}$/,
 );
 
 process.env.DRY_RUN = "0";

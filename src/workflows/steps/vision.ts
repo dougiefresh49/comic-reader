@@ -911,6 +911,7 @@ export async function characterLookaheadPage(
           pageBase64,
           "image/webp",
           wikiSummary,
+          { throwOnApiError: true },
         ),
       gemini,
       getFallbackGeminiClient,
