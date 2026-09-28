@@ -91,6 +91,37 @@ class SmokeFailure extends Error {}
 const fail = (msg: string): never => {
   throw new SmokeFailure(msg);
 };
+// ── Signals: the handler only flags and stops the server; main() cleans up ─
+const INTERRUPTED = "interrupted by a signal";
+const live: { child: ChildProcess | null } = { child: null };
+let stopping = false;
+/** Called between phases and in every wait loop; main's finally cleans up. */
+const checkStop = () => {
+  if (stopping) fail(INTERRUPTED);
+};
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, () => {
+    console.log(
+      stopping
+        ? `\n${sig}: still cleaning up`
+        : `\n${sig}: stopping; cleanup will run, further Ctrl-C is ignored`,
+    );
+    stopping = true;
+    if (live.child) void stopDevServer(live.child);
+  });
+}
+// Synchronous last resort, so no exit path leaves the dev server's group up.
+process.on("exit", () => {
+  const c = live.child;
+  if (c?.pid && c.exitCode === null && c.signalCode === null) {
+    try {
+      process.kill(-c.pid, "SIGKILL");
+    } catch {
+      /* group already gone */
+    }
+  }
+});
+
 /** Any error becomes a reported problem, so cleanup always runs. */
 const errText = (err: unknown) =>
   err instanceof SmokeFailure
@@ -463,11 +494,12 @@ async function startDevServer(tmp: string, dryScenario: string | null) {
   const fd = openSync(logPath, "a");
   // Checked right before the spawn: the server on 3082 must be this child.
   await assertPortFree();
-  const child = spawn("pnpm", ["dev", "-p", String(PORT)], {
+  checkStop();
+  const child = (live.child = spawn("pnpm", ["dev", "-p", String(PORT)], {
     env,
     detached: true,
     stdio: ["ignore", fd, fd],
-  });
+  }));
   child.on("error", (err) => (childError = err));
   console.log(`dev server: pid ${child.pid}, log ${logPath}`);
   return { child, logPath };
@@ -493,6 +525,7 @@ let childError: Error | null = null;
 async function waitForServer(child: ChildProcess): Promise<void> {
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
+    checkStop();
     if (childError) fail(`dev server spawn failed: ${childError.message}`);
     if (child.exitCode !== null || child.signalCode !== null) {
       fail(
@@ -573,6 +606,7 @@ async function resume(gate: string): Promise<void> {
   const step = PAUSE_TO_HOOK_STEP[gate] ?? gate;
   const deadline = Date.now() + RESUME_RETRY_MS;
   for (;;) {
+    checkStop();
     const res = await post("/api/admin/resume-hook", {
       bookId: BOOK,
       issueId: ISSUE,
@@ -614,6 +648,7 @@ async function runPipeline(
   let lastChange = Date.now();
   let row = await readIssue();
   for (;;) {
+    checkStop();
     const hits = logHits(logPath);
     if (hits.length > 0) {
       fail(`server log shows a failure:\n  ${hits.join("\n  ")}`);
@@ -926,29 +961,33 @@ function printEstimate(): void {
 // ── Main ────────────────────────────────────────────────────────────────
 const CLEANUP_CMD =
   "pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --cleanup-only";
-/** What a signal handler must undo: the dev server and any smoke writes. */
-const live: { child: ChildProcess | null; wrote: boolean } = {
-  child: null,
-  wrote: false,
-};
-let stopping = false;
-async function onSignal(sig: NodeJS.Signals): Promise<void> {
-  if (stopping) return;
-  stopping = true;
-  console.log(`\n${sig}: stopping the dev server, then cleaning up`);
+const CLEANUP_TIMEOUT_MS = 3 * 60_000;
+
+/** The one cleanup path; any count but 0, a failure or the time limit prints the fix. */
+async function runCleanup(): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new SmokeFailure(
+            `cleanup timed out after ${CLEANUP_TIMEOUT_MS / 1000}s`,
+          ),
+        ),
+      CLEANUP_TIMEOUT_MS,
+    );
+  });
   try {
-    if (live.child) await stopDevServer(live.child);
-    if (live.wrote) {
-      const c = await cleanup();
-      console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
-    }
+    const c = await Promise.race([cleanup(), limit]);
+    console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
+    if (c.rows + c.objects === 0) return true;
   } catch (err) {
-    console.log(`cleanup failed: ${errText(err)}\nrun: ${CLEANUP_CMD}`);
+    console.log(`cleanup failed: ${errText(err)}`);
+  } finally {
+    clearTimeout(timer);
   }
-  process.exit(1);
-}
-for (const sig of ["SIGINT", "SIGTERM"] as const) {
-  process.on(sig, () => void onSignal(sig));
+  console.log(`run: ${CLEANUP_CMD}`);
+  return false;
 }
 
 async function main(): Promise<number> {
@@ -961,9 +1000,7 @@ async function main(): Promise<number> {
       console.error(errText(err));
       return 1;
     }
-    const c = await cleanup();
-    console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
-    return c.rows + c.objects === 0 ? 0 : 1;
+    return (await runCleanup()) ? 0 : 1;
   }
   if (real || confirmSpend) {
     printEstimate();
@@ -992,12 +1029,12 @@ async function main(): Promise<number> {
   ) as Scenario;
 
   const problems: string[] = [];
-  let child: ChildProcess | null = null;
   let logPath: string | null = null;
   const resumed: string[] = [];
   const runRef: { id?: string } = {};
   let before: Snapshot | null = null;
   let tmp: string | null = null;
+  let wrote = false;
   try {
     await assertSmokeIds();
     await assertPortFree();
@@ -1008,26 +1045,25 @@ async function main(): Promise<number> {
       );
     }
     before = await snapshot();
-    live.wrote = true;
+    checkStop();
+    wrote = true;
     const { insertOmitted } = await setup(scenario);
+    checkStop();
     tmp = mkdtempSync(join(tmpdir(), "smoke-ingest-"));
     const dev = await startDevServer(tmp, real ? null : scenarioName);
-    child = live.child = dev.child;
     logPath = dev.logPath;
+    checkStop();
     await waitForServer(dev.child);
     await runPipeline(scenario, logPath, insertOmitted, resumed, runRef);
     console.log("pipeline_step = complete");
   } catch (err) {
     problems.push(errText(err));
   } finally {
-    if (child) await stopDevServer(child);
+    if (live.child) await stopDevServer(live.child);
   }
 
-  // A signal handler owns the rest; it cleans up and exits.
-  if (stopping) return new Promise<number>(() => undefined);
-  const wrote = live.wrote;
   try {
-    if (wrote) {
+    if (wrote && !stopping) {
       const run = await readRun(runRef.id);
       problems.push(
         ...gateReport(scenario, resumed, run?.steps?.skipped ?? []),
@@ -1050,10 +1086,8 @@ async function main(): Promise<number> {
       console.log(
         `cleanup, isolation and dry-run checks: skipped (--keep leaves the smoke rows in place)\nclean up later with: ${CLEANUP_CMD}`,
       );
-    } else if (wrote) {
-      const c = await cleanup();
-      console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
-      if (c.rows + c.objects > 0) problems.push("cleanup left rows or objects");
+    } else if (wrote && !(await runCleanup())) {
+      problems.push("cleanup left rows or objects");
     }
     if (before && !flag("--keep")) {
       const diffs = diffSnapshots(before, await snapshot());
@@ -1066,6 +1100,7 @@ async function main(): Promise<number> {
       for (const r of fakes) problems.push(`fake voice id left: ${r}`);
     }
   }
+  if (stopping && !problems.includes(INTERRUPTED)) problems.push(INTERRUPTED);
   if (tmp && problems.length === 0) {
     rmSync(join(tmp, "workflow-data"), { recursive: true, force: true });
     console.log(`server log kept: ${logPath}`);
