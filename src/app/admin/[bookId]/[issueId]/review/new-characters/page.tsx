@@ -16,13 +16,17 @@ interface Params {
 
 export default async function ReviewNewCharactersPage({ params }: Params) {
   const { bookId, issueId } = await params;
-  const [{ autoResolved, queue }, knownCharacters, bookLabel, issueLabel] =
-    await Promise.all([
-      getNewCharacterReviews(bookId, issueId),
-      getKnownCharactersForIssue(bookId),
-      getBookDisplayLabel(bookId),
-      getIssueDisplayLabel(bookId, issueId),
-    ]);
+  const [
+    { autoResolved, queue, error },
+    knownCharacters,
+    bookLabel,
+    issueLabel,
+  ] = await Promise.all([
+    getNewCharacterReviews(bookId, issueId),
+    getKnownCharactersForIssue(bookId),
+    getBookDisplayLabel(bookId),
+    getIssueDisplayLabel(bookId, issueId),
+  ]);
 
   const initialSnapshotTotal = queue.length;
   const empty = autoResolved.length === 0 && queue.length === 0;
@@ -48,7 +52,11 @@ export default async function ReviewNewCharactersPage({ params }: Params) {
           Decide which detected names are new roles vs aliases of existing
           characters before voice sourcing runs.
         </p>
-        {empty ? (
+        {error ? (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">
+            Could not read the new-character queue: {error}
+          </div>
+        ) : empty ? (
           <>
             <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">
               No candidate speakers found for this issue (or everyone is already
