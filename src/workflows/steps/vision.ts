@@ -110,14 +110,54 @@ export async function roboflowTextPredictionsOrFatal(
       `Roboflow text detection failed for ${pageLabel}: no predictions array in response`,
     );
   }
+  const bad = preds.findIndex(
+    (p: Record<string, unknown> | null) =>
+      !p || !["x", "y", "width", "height"].every((k) => Number.isFinite(p[k])),
+  );
+  if (bad !== -1) {
+    throw new FatalError(
+      `Roboflow text detection failed for ${pageLabel}: prediction ${bad} is not a box`,
+    );
+  }
   return preds as RoboflowBoxPrediction[];
+}
+
+/**
+ * One face identification, retried on the fallback key after a 429. Any
+ * other failure is fatal, so a page with a failed face stores no detections
+ * and a rerun does it again.
+ */
+export async function identifyFaceOrFatal<C, T>(
+  run: (client: C) => Promise<T>,
+  primary: C,
+  getFallback: () => C | null,
+  pageLabel: string,
+): Promise<T> {
+  try {
+    return await run(primary);
+  } catch (err: unknown) {
+    let last = err;
+    const status = (err as { status?: number } | null)?.status;
+    const fallback = status === 429 ? getFallback() : null;
+    if (fallback) {
+      try {
+        return await run(fallback);
+      } catch (retryErr: unknown) {
+        last = retryErr;
+      }
+    }
+    throw new FatalError(
+      `Gemini face identification failed for ${pageLabel}: ${errorText(last)}`,
+    );
+  }
 }
 
 /**
  * A page's lookahead is finished when any of its panels has a
  * `panel_character_detections` row. That insert is the step's last write
- * and one statement, while exemplars are stored face by face before it, so
- * a page that failed partway has no detections and runs again.
+ * and one statement, and a failed face is fatal before it
+ * (`identifyFaceOrFatal`), so a page with any face unhandled has no
+ * detections and runs again.
  */
 export async function hasStoredFaceDetections(
   supabase: TypedClient,
@@ -859,47 +899,23 @@ export async function characterLookaheadPage(
     );
 
     // Identify with exemplar context + key failover
-    let result;
-    try {
-      result = await identifyFace(
-        gemini,
-        face.jpegBuffer.toString("base64"),
-        "image/jpeg",
-        knownCharacters,
-        exemplarRefs,
-        pageBase64,
-        "image/webp",
-        wikiSummary,
-      );
-    } catch (err: unknown) {
-      const status =
-        err && typeof err === "object" && "status" in err
-          ? (err as { status: number }).status
-          : 0;
-      if (status === 429) {
-        const fallback = getFallbackGeminiClient();
-        if (fallback) {
-          try {
-            result = await identifyFace(
-              fallback,
-              face.jpegBuffer.toString("base64"),
-              "image/jpeg",
-              knownCharacters,
-              exemplarRefs,
-              pageBase64,
-              "image/webp",
-              wikiSummary,
-            );
-          } catch {
-            continue;
-          }
-        } else {
-          continue;
-        }
-      } else {
-        continue;
-      }
-    }
+    const faceBase64 = face.jpegBuffer.toString("base64");
+    const result = await identifyFaceOrFatal(
+      (client) =>
+        identifyFace(
+          client,
+          faceBase64,
+          "image/jpeg",
+          knownCharacters,
+          exemplarRefs,
+          pageBase64,
+          "image/webp",
+          wikiSummary,
+        ),
+      gemini,
+      getFallbackGeminiClient,
+      pageLabel,
+    );
 
     if (result.characterName && result.confidence >= 0.6) {
       const charId = await resolveCharacterIdOrFatal(

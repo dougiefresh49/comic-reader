@@ -15,6 +15,7 @@ import type { Database } from "~/types/database";
 import {
   exemplarRefsOrFatal,
   hasStoredFaceDetections,
+  identifyFaceOrFatal,
   readSam3Response,
   roboflowTextPredictionsOrFatal,
 } from "~/workflows/steps/vision";
@@ -315,6 +316,16 @@ await check(
   /^returned \[\]$/,
 );
 
+await check(
+  "text fallback, [null] entry",
+  () =>
+    roboflowTextPredictionsOrFatal(
+      async () =>
+        new Response('{"outputs":[{"predictions":{"predictions":[null]}}]}'),
+      "page-03",
+    ),
+  /^threw FatalError: Roboflow text detection failed for page-03: prediction 0 is not a box/,
+);
 process.env.DRY_RUN = "1";
 const rpcDown = fakeClient({}, { error: { message: "rpc timeout" } }).client;
 await check(
@@ -391,6 +402,19 @@ await check(
       "page-03",
     ),
   /threw FatalError: panel_character_detections read failed for page-03/,
+);
+
+await check(
+  "face identification 500",
+  () =>
+    identifyFaceOrFatal(
+      () =>
+        Promise.reject(Object.assign(new Error("internal"), { status: 500 })),
+      "primary",
+      () => "fallback",
+      "page-03",
+    ),
+  /^threw FatalError: Gemini face identification failed for page-03: internal/,
 );
 
 process.env.DRY_RUN = "0";
