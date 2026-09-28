@@ -34,6 +34,7 @@ const { getElevenLabsClient, elevenLabsFetch } = await import(
 );
 const { identifyFace } = await import("~/lib/character-identification");
 const { resetFakeCursors } = await import("~/lib/fakes/gemini");
+const { loadIngestFixture } = await import("~/lib/fakes/dry-run");
 const { buildContextPrompt } = await import("~/lib/gemini-prompts");
 const { parseRoboflowSam3Output } = await import(
   "~/workflows/steps/vision-rows"
@@ -126,8 +127,9 @@ console.log(`gemini sort: ${sort}`);
 
 const voice = await ask(
   GEMINI_MEDIUM,
-  'Consolidate these voice description snippets into one.\n\nCharacter: "Raphael"\n',
+  'Consolidate these voice description snippets into one.\n\nCharacter: "smoke-tessik"\n',
 );
+assert.equal(voice, loadIngestFixture().voiceDescriptions["smoke-tessik"]);
 console.log(`gemini voice-description: ${voice.slice(0, 60)}...`);
 
 const a = await embedText("Raphael");
