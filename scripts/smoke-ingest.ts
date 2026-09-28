@@ -15,7 +15,8 @@
  *   ... --real --confirm-spend   (#97 only: no DRY_RUN, paid calls)
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, openSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -81,6 +82,8 @@ type Scenario = {
   gates: Expect[];
   omitCastForLegacyId: string | null;
   counts: Record<string, number>;
+  /** Bubbles the gates fake gives the uncast "Smoke Stranger". */
+  strangerBubbles: number;
 };
 type Skip = { gate: string; reason: string };
 
@@ -113,6 +116,23 @@ function withEqs<Q extends { eq(column: string, value: string): Q }>(
   return q;
 }
 
+type Page<T> = PromiseLike<{
+  data: T[] | null;
+  error: { message: string } | null;
+}>;
+/** Every row, 1000 at a time; `page` must order on a unique key. */
+async function paged<T>(
+  page: (from: number, to: number) => Page<T>,
+  what: string,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const rows = must(await page(from, from + 999), what) ?? [];
+    out.push(...rows);
+    if (rows.length < 1000) return out;
+  }
+}
+
 async function countOf(table: string, eqs: Eqs = {}): Promise<number> {
   const q = supabase.from(table).select("*", { count: "exact", head: true });
   const { count, error } = await withEqs(q, eqs);
@@ -131,6 +151,20 @@ const confirmSpend = flag("--confirm-spend");
 const normName = (s: string) =>
   s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
 const PREFIX = "smoke-";
+
+/** Mirrors fuzzyNameMatch in src/workflows/steps/vision.ts (not exported). */
+function fuzzy(a: string, b: string): boolean {
+  const [na, nb] = [normName(a), normName(b)];
+  if (!na || !nb) return false;
+  if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+  const [wa, wb] = [na.split(" "), nb.split(" ")];
+  return (
+    wa.length >= 2 &&
+    wb.length >= 2 &&
+    wa[0] === wb[0] &&
+    wa.at(-1) === wb.at(-1)
+  );
+}
 
 /** Distinct non-narrator speaker and face ids in fixtures/ingest/pages.json. */
 function fixtureIds(): string[] {
@@ -159,26 +193,23 @@ async function assertSmokeIds(): Promise<void> {
       `fixture ids without the "${PREFIX}" prefix (#196); refusing to start: ${unprefixed.join(", ")}`,
     );
   }
-  const rows = must(
-    await supabase.from("characters").select("id, aliases"),
+  const rows = await paged<{ id: string; aliases: string[] | null }>(
+    (a, b) =>
+      supabase.from("characters").select("id, aliases").order("id").range(a, b),
     "characters select",
-  ) as Array<{ id: string; aliases: string[] | null }>;
+  );
   const leftovers = rows.filter((c) => smokeIds().includes(c.id));
   if (leftovers.length > 0) {
     fail(
       `characters rows left by a crashed run: ${leftovers.map((c) => c.id).join(", ")}. Run --cleanup-only first.`,
     );
   }
-  // fuzzyNameMatch (vision.ts) matches substrings, so a smoke id must not
-  // resolve to a production character either.
+  // A smoke name must not resolve to a production character either,
+  // including the gates-only stranger names from src/lib/fakes/gemini.ts.
   const hits: string[] = [];
-  for (const id of ids) {
-    const n = normName(id);
+  for (const id of [...ids, "smoke-stranger", "Smoke Stranger"]) {
     for (const c of rows) {
-      const match = [c.id, ...(c.aliases ?? [])].find((v) => {
-        const m = normName(v);
-        return m && (m.includes(n) || n.includes(m));
-      });
+      const match = [c.id, ...(c.aliases ?? [])].find((v) => fuzzy(id, v));
       if (match) hits.push(`${id} ~ characters.${c.id} (${match})`);
     }
   }
@@ -190,36 +221,60 @@ async function assertSmokeIds(): Promise<void> {
 }
 
 // ── Isolation snapshot ──────────────────────────────────────────────────
-async function snapshot(): Promise<Record<string, string>> {
-  const issues = must(await listAllIssues(supabase, "*"), "issues snapshot")
-    .filter((r) => r.book_id !== BOOK)
-    .map((r) => JSON.stringify(r))
-    .sort();
-  const ids = async (table: string, column: string) =>
-    (
-      must(
-        await supabase
-          .from(table)
-          .select("id")
-          .not(column, "in", inList(smokeIds()))
-          .order("id"),
-        `${table} ids`,
-      ) as Array<{ id: string }>
-    )
-      .map((r) => r.id)
-      .join(",");
+/** Per table: row key → hash of the whole row, for every non-smoke row. */
+type Snapshot = Record<string, Map<string, string>>;
+const rowHash = (r: unknown) =>
+  createHash("sha256").update(JSON.stringify(r)).digest("hex");
+
+async function snapshot(): Promise<Snapshot> {
+  type Row = Record<string, unknown> & { id: string | number };
+  const hashed = (rows: Row[], key: (r: Row) => string = (r) => `${r.id}`) =>
+    new Map(rows.map((r) => [key(r), rowHash(r)]));
+  // Global tables, minus the smoke ids (column), ordered on the primary key.
+  const global = (table: string, column?: string, scopeGlobal = false) =>
+    paged<Row>((a, b) => {
+      let q = supabase.from(table).select("*");
+      if (scopeGlobal) q = q.eq("scope", "global");
+      if (column) q = q.not(column, "in", inList(smokeIds()));
+      return q.order("id").range(a, b);
+    }, table);
+  const issues = await paged<Row>(
+    (a, b) =>
+      listAllIssues(supabase, "*")
+        .neq("book_id", BOOK)
+        .order("book_id")
+        .order("id")
+        .range(a, b) as unknown as Page<Row>,
+    "issues",
+  );
   return {
-    "other books' issues": issues.join("\n"),
-    characters: String(await countOf("characters")),
-    character_appearances: String(await countOf("character_appearances")),
-    voices: String(await countOf("voices")),
-    "global aliases": String(await countOf("aliases", { scope: "global" })),
-    "non-smoke characters ids": await ids("characters", "id"),
-    "non-smoke character_appearances ids": await ids(
-      "character_appearances",
-      "character_id",
+    "issues (other books)": hashed(
+      issues,
+      (r) => `${r.book_id as string}/${r.id}`,
     ),
+    characters: hashed(await global("characters", "id")),
+    character_appearances: hashed(
+      await global("character_appearances", "character_id"),
+    ),
+    voices: hashed(await global("voices")),
+    "global aliases": hashed(await global("aliases", undefined, true)),
   };
+}
+
+/** One line per table that differs, naming the added, removed or changed keys. */
+function diffSnapshots(before: Snapshot, after: Snapshot): string[] {
+  const out: string[] = [];
+  for (const [table, was] of Object.entries(before)) {
+    const now = after[table] ?? new Map<string, string>();
+    const keys = new Set([...was.keys(), ...now.keys()]);
+    const changed = [...keys].filter((k) => was.get(k) !== now.get(k));
+    if (changed.length > 0) {
+      out.push(
+        `${table}: ${changed.length} rows differ (${changed.slice(0, 10).join(", ")}${changed.length > 10 ? ", ..." : ""})`,
+      );
+    }
+  }
+  return out;
 }
 
 /** `dry-run-` voice ids in shared rows; outside the smoke ids only, or anywhere. */
@@ -365,17 +420,17 @@ async function setup(scenario: Scenario) {
 }
 
 // ── Dev server ──────────────────────────────────────────────────────────
-async function assertPortFree(): Promise<void> {
+async function assertPortFree(why = "refusing to start"): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const srv = createServer();
     srv.once("error", () =>
-      reject(new SmokeFailure(`port ${PORT} is in use; refusing to start`)),
+      reject(new SmokeFailure(`port ${PORT} is in use; ${why}`)),
     );
     srv.listen(PORT, () => srv.close(() => resolve()));
   });
 }
 
-function startDevServer(tmp: string, dryScenario: string | null) {
+async function startDevServer(tmp: string, dryScenario: string | null) {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     PORT: String(PORT),
@@ -394,6 +449,11 @@ function startDevServer(tmp: string, dryScenario: string | null) {
   if (dryScenario) {
     env.DRY_RUN = "1";
     env.DRY_RUN_SCENARIO = dryScenario;
+    // Every API key is a placeholder, so an un-faked call fails at auth
+    // instead of spending. Supabase vars and admin credentials stay real.
+    for (const key of Object.keys(env)) {
+      if (/API_KEY/.test(key)) env[key] = "placeholder-dry-run";
+    }
     for (const key of REQUIRED_KEYS) env[key] ||= "placeholder-dry-run";
   } else {
     delete env.DRY_RUN;
@@ -401,11 +461,14 @@ function startDevServer(tmp: string, dryScenario: string | null) {
   }
   const logPath = join(tmp, "dev-server.log");
   const fd = openSync(logPath, "a");
+  // Checked right before the spawn: the server on 3082 must be this child.
+  await assertPortFree();
   const child = spawn("pnpm", ["dev", "-p", String(PORT)], {
     env,
     detached: true,
     stdio: ["ignore", fd, fd],
   });
+  child.on("error", (err) => (childError = err));
   console.log(`dev server: pid ${child.pid}, log ${logPath}`);
   return { child, logPath };
 }
@@ -425,9 +488,17 @@ async function stopDevServer(child: ChildProcess): Promise<void> {
   kill("SIGKILL");
 }
 
-async function waitForServer(): Promise<void> {
+let childError: Error | null = null;
+
+async function waitForServer(child: ChildProcess): Promise<void> {
   const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
+    if (childError) fail(`dev server spawn failed: ${childError.message}`);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      fail(
+        `dev server exited (${child.exitCode ?? child.signalCode}) before answering`,
+      );
+    }
     try {
       await fetch(`${BASE}/api/admin/resume-hook`);
       return;
@@ -693,9 +764,18 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
       !stamps.has(b.id) ||
       !files.has(b.audio_storage_path),
   );
+  // Every fixture bubble with text has a cast speaker (Narrator included),
+  // except the stranger's; so zero cast bubbles cannot pass.
+  const want =
+    loadIngestFixture()
+      .pages.flatMap((p) => p.bubbles)
+      .filter((b) => b.ocrText).length - scenario.strangerBubbles;
   console.log(
-    `cast bubbles = ${castBubbles.length}, with audio + audio_timestamps + mp3 = ${castBubbles.length - missing.length}`,
+    `cast bubbles = ${castBubbles.length} (fixture implies ${want}), with audio + audio_timestamps + mp3 = ${castBubbles.length - missing.length}`,
   );
+  if (castBubbles.length !== want) {
+    bad.push(`cast bubbles = ${castBubbles.length}, expected ${want}`);
+  }
   if (missing.length > 0) {
     bad.push(`${missing.length} cast bubbles lack audio or timestamps`);
   }
@@ -713,7 +793,9 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
 
   // Smoke ids may carry dry-run voices until cleanup; nothing else may.
   const fakes = await fakeVoiceRows(true);
-  console.log(`dry-run voice ids outside the smoke ids = ${fakes.length}`);
+  console.log(
+    `dry-run voice ids outside the smoke ids = ${fakes.length} (smoke rows may carry one until cleanup)`,
+  );
   for (const r of fakes) bad.push(`fake voice id in a shared row: ${r}`);
   return bad;
 }
@@ -842,8 +924,43 @@ function printEstimate(): void {
 }
 
 // ── Main ────────────────────────────────────────────────────────────────
+const CLEANUP_CMD =
+  "pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --cleanup-only";
+/** What a signal handler must undo: the dev server and any smoke writes. */
+const live: { child: ChildProcess | null; wrote: boolean } = {
+  child: null,
+  wrote: false,
+};
+let stopping = false;
+async function onSignal(sig: NodeJS.Signals): Promise<void> {
+  if (stopping) return;
+  stopping = true;
+  console.log(`\n${sig}: stopping the dev server, then cleaning up`);
+  try {
+    if (live.child) await stopDevServer(live.child);
+    if (live.wrote) {
+      const c = await cleanup();
+      console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
+    }
+  } catch (err) {
+    console.log(`cleanup failed: ${errText(err)}\nrun: ${CLEANUP_CMD}`);
+  }
+  process.exit(1);
+}
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, () => void onSignal(sig));
+}
+
 async function main(): Promise<number> {
   if (flag("--cleanup-only")) {
+    try {
+      await assertPortFree(
+        "a smoke run or its dev server may still be alive; stop it first",
+      );
+    } catch (err) {
+      console.error(errText(err));
+      return 1;
+    }
     const c = await cleanup();
     console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
     return c.rows + c.objects === 0 ? 0 : 1;
@@ -879,8 +996,8 @@ async function main(): Promise<number> {
   let logPath: string | null = null;
   const resumed: string[] = [];
   const runRef: { id?: string } = {};
-  let before: Record<string, string> | null = null;
-  let wrote = false;
+  let before: Snapshot | null = null;
+  let tmp: string | null = null;
   try {
     await assertSmokeIds();
     await assertPortFree();
@@ -891,13 +1008,13 @@ async function main(): Promise<number> {
       );
     }
     before = await snapshot();
-    wrote = true;
+    live.wrote = true;
     const { insertOmitted } = await setup(scenario);
-    const tmp = mkdtempSync(join(tmpdir(), "smoke-ingest-"));
-    const dev = startDevServer(tmp, real ? null : scenarioName);
-    child = dev.child;
+    tmp = mkdtempSync(join(tmpdir(), "smoke-ingest-"));
+    const dev = await startDevServer(tmp, real ? null : scenarioName);
+    child = live.child = dev.child;
     logPath = dev.logPath;
-    await waitForServer();
+    await waitForServer(dev.child);
     await runPipeline(scenario, logPath, insertOmitted, resumed, runRef);
     console.log("pipeline_step = complete");
   } catch (err) {
@@ -906,6 +1023,9 @@ async function main(): Promise<number> {
     if (child) await stopDevServer(child);
   }
 
+  // A signal handler owns the rest; it cleans up and exits.
+  if (stopping) return new Promise<number>(() => undefined);
+  const wrote = live.wrote;
   try {
     if (wrote) {
       const run = await readRun(runRef.id);
@@ -926,24 +1046,31 @@ async function main(): Promise<number> {
       console.log(`server log errors (${logPath}):`);
       for (const l of logErrors(logPath)) console.log(`  ${l}`);
     }
-    if (wrote && !flag("--keep")) {
+    if (wrote && flag("--keep")) {
+      console.log(
+        `cleanup, isolation and dry-run checks: skipped (--keep leaves the smoke rows in place)\nclean up later with: ${CLEANUP_CMD}`,
+      );
+    } else if (wrote) {
       const c = await cleanup();
       console.log(`cleanup: ${c.rows} rows, ${c.objects} objects`);
       if (c.rows + c.objects > 0) problems.push("cleanup left rows or objects");
-    } else if (wrote) {
-      console.log("cleanup: skipped (--keep)");
     }
-    if (before) {
-      const after = await snapshot();
-      const changed = Object.keys(before).filter((k) => before[k] !== after[k]);
-      console.log(
-        `isolation: ${changed.length === 0 ? "unchanged" : `CHANGED ${changed.join(", ")}`}`,
-      );
-      if (changed.length > 0) problems.push(`isolation: ${changed.join(", ")}`);
+    if (before && !flag("--keep")) {
+      const diffs = diffSnapshots(before, await snapshot());
+      console.log(`isolation: ${diffs.length === 0 ? "unchanged" : "CHANGED"}`);
+      for (const d of diffs) problems.push(`isolation: ${d}`);
       const fakes = await fakeVoiceRows(false);
-      console.log(`dry-run voice ids after cleanup = ${fakes.length}`);
+      console.log(
+        `dry-run voice ids after cleanup = ${fakes.length} (smoke rows included)`,
+      );
       for (const r of fakes) problems.push(`fake voice id left: ${r}`);
     }
+  }
+  if (tmp && problems.length === 0) {
+    rmSync(join(tmp, "workflow-data"), { recursive: true, force: true });
+    console.log(`server log kept: ${logPath}`);
+  } else if (tmp) {
+    console.log(`kept for inspection: ${tmp} (server log and workflow-data)`);
   }
 
   console.log(
