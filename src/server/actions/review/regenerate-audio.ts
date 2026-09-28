@@ -35,6 +35,39 @@ function normalizeAlignment(raw: AlignmentRaw | null | undefined) {
   };
 }
 
+type AfterSpendFailure =
+  | "upload"
+  | "audio_timestamps"
+  | "bubbles"
+  | "exception";
+
+/**
+ * The error for a failure after the paid ElevenLabs call: what is on disk
+ * now, and that a retry spends credits again. The reader is the owner in
+ * the review editor.
+ */
+function afterSpendError(
+  failure: AfterSpendFailure,
+  bubbleId: string,
+  hadAudio: boolean,
+  message: string,
+) {
+  const saved =
+    failure === "upload"
+      ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
+      : failure === "audio_timestamps" && hadAudio
+        ? `The new audio for bubble ${bubbleId} replaced the old file, but its word timings did not save to audio_timestamps (${message}), so highlighting will be off until a regenerate succeeds.`
+        : failure === "audio_timestamps"
+          ? `The new audio for bubble ${bubbleId} is saved, but its word timings did not save to audio_timestamps (${message}) and the bubble does not point to the file yet.`
+          : failure === "bubbles"
+            ? `The new audio and word timings for bubble ${bubbleId} are saved, but the bubbles row was not updated (${message}).`
+            : `Audio for bubble ${bubbleId} was generated and paid for, but an error stopped the save partway (${message}).`;
+  return {
+    ok: false as const,
+    error: `${saved} Regenerating will spend ElevenLabs credits again.`,
+  };
+}
+
 export async function regenerateAudio(args: Args) {
   const auth = checkAdminAuth((await headers()).get("authorization"));
   if (!auth.ok) return { ok: false, error: auth.message };
@@ -120,6 +153,8 @@ export async function regenerateAudio(args: Args) {
     };
   }
 
+  const hadAudio = b.audio_storage_path != null;
+  let paid = false;
   try {
     const client = new ElevenLabsClient({
       apiKey: process.env.ELEVENLABS_API_KEY,
@@ -128,6 +163,7 @@ export async function regenerateAudio(args: Args) {
       modelId: "eleven_v3",
       text,
     });
+    paid = true;
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 
     const storagePath = b.audio_storage_path ?? `${b.id}.mp3`;
@@ -138,7 +174,9 @@ export async function regenerateAudio(args: Args) {
         contentType: "audio/mpeg",
         upsert: true,
       });
-    if (upErr) return { ok: false, error: `upload: ${upErr.message}` };
+    if (upErr) {
+      return afterSpendError("upload", b.id, hadAudio, upErr.message);
+    }
 
     const alignment = normalizeAlignment(
       response.alignment as AlignmentRaw | null | undefined,
@@ -146,12 +184,6 @@ export async function regenerateAudio(args: Args) {
     const normalizedAlignment = normalizeAlignment(
       response.normalizedAlignment as AlignmentRaw | null | undefined,
     );
-
-    // Credits are spent by now, so a failed write says so to the reviewer.
-    const writeFailed = (table: string, message: string) => ({
-      ok: false,
-      error: `The audio was generated and paid for, but saving it to ${table} for bubble ${b.id} failed: ${message}. Regenerating will spend ElevenLabs credits again.`,
-    });
 
     const { error: tsErr } = await supabaseAdmin
       .from("audio_timestamps")
@@ -165,7 +197,9 @@ export async function regenerateAudio(args: Args) {
         },
         { onConflict: "bubble_id" },
       );
-    if (tsErr) return writeFailed("audio_timestamps", tsErr.message);
+    if (tsErr) {
+      return afterSpendError("audio_timestamps", b.id, hadAudio, tsErr.message);
+    }
 
     const { error: bubbleErr } = await supabaseAdmin
       .from("bubbles")
@@ -175,7 +209,9 @@ export async function regenerateAudio(args: Args) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", b.id);
-    if (bubbleErr) return writeFailed("bubbles", bubbleErr.message);
+    if (bubbleErr) {
+      return afterSpendError("bubbles", b.id, hadAudio, bubbleErr.message);
+    }
 
     revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
     revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
@@ -185,6 +221,9 @@ export async function regenerateAudio(args: Args) {
       audioStoragePath: storagePath,
     };
   } catch (e) {
-    return { ok: false, error: (e as Error).message };
+    const message = (e as Error).message;
+    return paid
+      ? afterSpendError("exception", b.id, hadAudio, message)
+      : { ok: false, error: message };
   }
 }
