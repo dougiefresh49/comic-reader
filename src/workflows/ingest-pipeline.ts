@@ -35,6 +35,7 @@ import {
   countPendingNewCharacters,
   recordGateSkip,
 } from "./steps/gate-checks";
+import { closePipelineRun } from "./steps/pipeline-runs";
 
 interface IngestInput {
   bookId: string;
@@ -274,9 +275,11 @@ export async function ingestPipeline(input: IngestInput) {
     }
 
     await markIssueReady(bookId, issueId);
+    await closePipelineRun(bookId, issueId, "completed");
 
     return { bookId, issueId, status: "ready" };
   } catch (err) {
+    await closePipelineRun(bookId, issueId, "failed");
     if (err instanceof FatalError) {
       await markPipelineFailed(bookId, issueId, currentStep);
       throw err;
