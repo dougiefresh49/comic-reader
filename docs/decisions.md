@@ -4,6 +4,7 @@ This is the repo's decision log. One row per call or parked question, newest fir
 
 | # | date | decision | status |
 |---|------|----------|--------|
+| 87 | 2026-09-28 | #65: active learning is off on the `find-comic-panel-v1` workflow as well, turned off with the owner's yes, so no detection workflow uploads pages by itself | accepted |
 | 86 | 2026-09-28 | #65 Q5: the detection thresholds get a free local sweep against the reviewed boxes, and it does not wait for more reviewed pages; the one paid step is a bounded capture run that needs the owner's yes when it runs (#180) | accepted |
 | 85 | 2026-09-28 | #65 Q2 and Q3: active learning is off on the `find-speech-bubbles` workflow, turned off with the owner's yes, and #105 may upload reviewed pages and box corrections to the public project | accepted |
 | 84 | 2026-09-28 | Wave 4 may write to production in two places with the owner's yes: #92's smoke run, only under `book_id = 'smoke-test'` and the `smoke-test/` Storage prefix, and #177's two new bubble rows on issue-3 page 20 | accepted |
