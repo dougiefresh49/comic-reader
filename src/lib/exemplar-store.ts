@@ -23,6 +23,18 @@ export interface ExemplarMatch {
   compositeScore: number;
 }
 
+/** `embedImage` already tries the fallback key on a 429; name the service. */
+async function embedOrThrow(jpegBase64: string): Promise<number[]> {
+  try {
+    return await embedImage(jpegBase64);
+  } catch (err: unknown) {
+    throw new Error(
+      `Gemini embedding failed: ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
+    );
+  }
+}
+
 export async function storeExemplar(
   supabase: SupabaseClient,
   params: StoreExemplarParams,
@@ -40,7 +52,12 @@ export async function storeExemplar(
     query = query.eq("suggested_name", params.suggestedName);
   }
 
-  const { data: existing } = await query.limit(1);
+  const { data: existing, error: existingErr } = await query.limit(1);
+  if (existingErr) {
+    throw new Error(
+      `character_face_exemplars read failed: ${existingErr.message}`,
+    );
+  }
   if (existing?.[0]) {
     return existing[0].id as string;
   }
@@ -60,7 +77,7 @@ export async function storeExemplar(
     throw new Error(`Storage upload failed: ${uploadError.message}`);
   }
 
-  const embedding = await embedImage(params.jpegBuffer.toString("base64"));
+  const embedding = await embedOrThrow(params.jpegBuffer.toString("base64"));
   const vectorString = `[${embedding.join(",")}]`;
 
   const row: Record<string, unknown> = {
@@ -93,7 +110,7 @@ export async function findSimilarExemplars(
   bookIds: string[],
   limit = 5,
 ): Promise<ExemplarMatch[]> {
-  const embedding = await embedImage(jpegBase64);
+  const embedding = await embedOrThrow(jpegBase64);
   const vectorString = `[${embedding.join(",")}]`;
 
   const { data, error } = (await supabase.rpc("match_face_exemplars", {
@@ -113,8 +130,7 @@ export async function findSimilarExemplars(
   };
 
   if (error) {
-    console.warn(`   [exemplar] search failed: ${error.message}`);
-    return [];
+    throw new Error(`match_face_exemplars rpc failed: ${error.message}`);
   }
 
   return (data ?? []).map((row) => ({
@@ -135,12 +151,12 @@ export async function downloadExemplarImage(
     .from(STORAGE_BUCKET)
     .download(cropPath);
 
-  if (error || !data) {
-    console.warn(
-      `   [exemplar] download failed ${cropPath}: ${error?.message}`,
+  if (error) {
+    throw new Error(
+      `${STORAGE_BUCKET} download failed for ${cropPath}: ${error.message}`,
     );
-    return null;
   }
+  if (!data) return null;
 
   return Buffer.from(await data.arrayBuffer());
 }

@@ -50,6 +50,14 @@ export function updateIssue(
     .eq("id", issueId);
 }
 
+export function deleteIssue(client: Client, bookId: string, issueId: string) {
+  return db(client)
+    .from("issues")
+    .delete()
+    .eq("book_id", bookId)
+    .eq("id", issueId);
+}
+
 /** The row carries `book_id` and `id`; the Insert type makes both required. */
 export function insertIssue(client: Client, row: IssueInsert) {
   return db(client).from("issues").insert(row);

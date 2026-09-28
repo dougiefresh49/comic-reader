@@ -44,23 +44,29 @@ const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, "-");
  * under `fuzzyNameMatch` (substring either way). Recheck against a SELECT of
  * `characters` when adding one. `trini` is `yellow-ranger`'s alias, so both
  * map to one id. `narrator` stays as is.
+ *
+ * Every id starts with `smoke-` so the smoke run's cleanup of the
+ * `characters` rows it creates has a safe filter (#92 decision 0, #196).
+ * `fuzzyNameMatch` also treats two multi-word names that share their first
+ * and last word as a match, and every id shares `smoke`, so each id has a
+ * last word no other id (or `smoke-stranger`) uses.
  */
 const FIXTURE_IDS: Record<string, string> = {
-  raphael: "tessik",
-  leonardo: "marwen",
-  donatello: "fenwick",
-  michelangelo: "pollux",
-  warbunny: "hopscald",
-  karai: "vessa",
-  "alpha-5": "gizmo-9",
-  "red-ranger": "crimson-vole",
-  "pink-ranger": "rose-vole",
-  "green-ranger": "moss-vole",
-  "yellow-ranger": "amber-vole",
-  trini: "amber-vole",
-  "foot-soldier": "drab-grunt",
-  "foot-elite": "drab-captain",
-  "putty-foot-soldier": "clay-grunt",
+  raphael: "smoke-tessik",
+  leonardo: "smoke-marwen",
+  donatello: "smoke-fenwick",
+  michelangelo: "smoke-pollux",
+  warbunny: "smoke-hopscald",
+  karai: "smoke-vessa",
+  "alpha-5": "smoke-gizmo9",
+  "red-ranger": "smoke-crimsonvole",
+  "pink-ranger": "smoke-rosevole",
+  "green-ranger": "smoke-mossvole",
+  "yellow-ranger": "smoke-ambervole",
+  trini: "smoke-ambervole",
+  "foot-soldier": "smoke-drabgrunt",
+  "foot-elite": "smoke-drabcaptain",
+  "putty-foot-soldier": "smoke-claygrunt",
 };
 
 /** Throws on an unmapped name so a re-record cannot write a production id. */

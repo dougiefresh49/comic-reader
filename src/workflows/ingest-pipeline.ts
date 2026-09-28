@@ -29,7 +29,10 @@ import {
   consolidateMusicScenes,
   generateManifest,
 } from "./steps/publishing";
-import { createCastingTasks } from "./steps/casting-tasks";
+import {
+  acceptUnresolvedAsSilent,
+  createCastingTasks,
+} from "./steps/casting-tasks";
 import {
   countUnresolvedFaces,
   countPendingNewCharacters,
@@ -215,23 +218,40 @@ export async function ingestPipeline(input: IngestInput) {
     if (run("casting")) {
       currentStep = "casting";
       const casting = await createCastingTasks(bookId, issueId);
-      if (casting.pending === 0) {
+      const unresolved = casting.unresolved.length;
+      // Unresolved speakers pause the gate too. Resuming it accepts them as
+      // silent: acceptUnresolvedAsSilent writes their skip-sentinel castlist
+      // rows, and generateManifest counts their bubbles as silentBubbles.
+      if (casting.pending === 0 && unresolved === 0) {
+        const reason =
+          casting.cast === casting.speakers
+            ? "all speakers cast"
+            : "no speakers pending or unresolved";
         await updatePipelineStep(bookId, issueId, currentStep);
-        await recordGateSkip(bookId, issueId, "casting", "all speakers cast", {
+        await recordGateSkip(bookId, issueId, "casting", reason, {
           speakers: casting.speakers,
           cast: casting.cast,
           pending: casting.pending,
+          unresolved,
         });
-        console.log(`[casting] skipped: all ${casting.speakers} speakers cast`);
-        if (casting.unresolved.length > 0) {
-          console.log(`[casting] unresolved: ${casting.unresolved.join(", ")}`);
-        }
+        console.log(
+          `[casting] skipped: ${reason} (${casting.cast} of ${casting.speakers} cast, 0 unresolved)`,
+        );
       } else {
+        console.log(
+          `[casting] paused: ${casting.cast} of ${casting.speakers} cast, ${casting.pending} pending, ${unresolved} unresolved${unresolved > 0 ? `: ${casting.unresolved.join(", ")}` : ""}`,
+        );
         await updatePipelineStep(bookId, issueId, currentStep, true);
         using castingHook = createHook<{ approved: boolean }>({
           token: `ingest:${bookId}/${issueId}/casting`,
         });
         await castingHook;
+        const silenced = await acceptUnresolvedAsSilent(bookId, issueId);
+        if (silenced.length > 0) {
+          console.log(
+            `[casting] resumed: ${silenced.length} unresolved speakers accepted as silent: ${silenced.join(", ")}`,
+          );
+        }
       }
     }
 

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildCastIndex, slugify as castSlug, speakerKey } from "./audio-plan";
 
 const SPEECH_TYPES = ["SPEECH", "NARRATION", "CAPTION"] as const;
 const SKIPPED_VOICE = "__SKIPPED__";
@@ -34,6 +35,12 @@ export interface CastingPlan {
   toCopy: CastlistCopyRow[];
   toCreate: string[];
   existingPending: number;
+  /**
+   * Skip-sentinel castlist rows, keyed the way the audio step keys speakers,
+   * that mark each unresolved speaker silent. Written only when the owner
+   * resumes the casting gate (acceptUnresolvedAsSilent).
+   */
+  toSilence: CastlistCopyRow[];
 }
 
 export interface CreateCastingTasksResult {
@@ -166,17 +173,37 @@ export async function planCastingTasks(
 
   const unresolved: string[] = [];
   const toCopy: CastlistCopyRow[] = [];
+  const toSilence: CastlistCopyRow[] = [];
   const toCreateSet = new Set<string>();
   const pendingSeen = new Set<string>();
   const copyKeys = new Set<string>();
+  const silenceKeys = new Set<string>();
+  const protectedKeys = new Set<string>();
   let castCount = 0;
+
+  // This issue's castlist as the audio step reads it: grouped by slug, the
+  // same key speakerKey gives a bubble speaker.
+  const issueCastRows = castlist.filter((c) => c.issue_id === issueId);
+  const issueCast = buildCastIndex(issueCastRows);
 
   for (const speaker of speakerSet) {
     const characterId = resolveCharacterId(speaker);
     if (!characterId) {
+      // No characters row. A decided castlist row under the audio key (a
+      // voice or the skip sentinel) still settles the speaker.
+      const key = speakerKey(speaker, aliasMap);
+      const decided = issueCast.voices.get(key);
+      if (decided !== undefined) {
+        if (decided !== SKIPPED_VOICE) castCount++;
+        continue;
+      }
       unresolved.push(speaker);
+      if (key) silenceKeys.add(key);
       continue;
     }
+    // Audio reads this speaker under these keys, so they are never silenced.
+    protectedKeys.add(speakerKey(speaker, aliasMap));
+    protectedKeys.add(castSlug(characterId));
 
     const char = characters.find((c) => c.id === characterId);
     const canonical = aliasMap.get(norm(speaker)) ?? speaker;
@@ -246,6 +273,34 @@ export async function planCastingTasks(
     toCreateSet.add(characterId);
   }
 
+  // Silence plan for unresolved speakers. Casting and audio key a speaker
+  // differently (`Dr. Doom` misses character `dr-doom` here but is `dr-doom`
+  // in audio), so skip any key a resolved speaker or a pending task uses.
+  for (const t of (taskRows ?? []) as TaskRow[]) {
+    if (t.status === "pending") protectedKeys.add(castSlug(t.character_id));
+  }
+  for (const key of silenceKeys) {
+    if (protectedKeys.has(key)) continue;
+    const group = issueCastRows.filter((c) => castSlug(c.character) === key);
+    // A real voice in the group is a conflict the audio step reports; leave
+    // it. Otherwise fill the null rows (a replay after a partial fill finds
+    // only the sentinel set), or add one row under the key.
+    if (group.some((c) => c.voice_id != null && c.voice_id !== SKIPPED_VOICE))
+      continue;
+    const rows =
+      group.length > 0
+        ? group.filter((c) => c.voice_id == null)
+        : [{ character: key }];
+    for (const c of rows) {
+      toSilence.push({
+        character: c.character,
+        voice_id: SKIPPED_VOICE,
+        voice_uuid: null,
+        fillGap: group.length > 0,
+      });
+    }
+  }
+
   return {
     speakers: speakerSet.size,
     cast: castCount,
@@ -253,6 +308,7 @@ export async function planCastingTasks(
     toCopy,
     toCreate: [...toCreateSet],
     existingPending: pendingSeen.size,
+    toSilence,
   };
 }
 
@@ -266,20 +322,16 @@ export function pendingFromPlan(plan: CastingPlan): number {
 }
 
 /**
- * Workflow step: apply the plan's castlist copy-forward and casting_task
- * inserts. Returns counts the casting gate uses to decide pause vs skip.
+ * Write castlist rows for this issue. A fillGap row only updates rows whose
+ * voice_id is still null; a new row never overwrites a decided one.
  */
-export async function createCastingTasks(
+async function writeCastlistRows(
+  client: SupabaseClient,
   bookId: string,
   issueId: string,
-): Promise<CreateCastingTasksResult> {
-  "use step";
-
-  const { createStepClient } = await import("../step-utils");
-  const client = await createStepClient();
-  const plan = await planCastingTasks(client, bookId, issueId);
-
-  for (const row of plan.toCopy) {
+  rows: CastlistCopyRow[],
+): Promise<void> {
+  for (const row of rows) {
     if (row.fillGap) {
       // Gap fill: only touch rows whose voice_id is still null.
       const { error } = await client
@@ -316,6 +368,23 @@ export async function createCastingTasks(
       }
     }
   }
+}
+
+/**
+ * Workflow step: apply the plan's castlist copy-forward and casting_task
+ * inserts. Returns counts the casting gate uses to decide pause vs skip.
+ */
+export async function createCastingTasks(
+  bookId: string,
+  issueId: string,
+): Promise<CreateCastingTasksResult> {
+  "use step";
+
+  const { createStepClient } = await import("../step-utils");
+  const client = await createStepClient();
+  const plan = await planCastingTasks(client, bookId, issueId);
+
+  await writeCastlistRows(client, bookId, issueId, plan.toCopy);
 
   let created = 0;
   for (const characterId of plan.toCreate) {
@@ -344,4 +413,24 @@ export async function createCastingTasks(
     pending: pendingFromPlan(plan),
     unresolved: plan.unresolved,
   };
+}
+
+/**
+ * Workflow step, run when the owner resumes a casting pause: the owner has
+ * accepted every speaker still unresolved as silent. Writes the skip sentinel
+ * under the audio step's speaker key, so voice design and TTS both skip them
+ * and the next run's casting plan counts them as decided. Returns the
+ * speakers silenced.
+ */
+export async function acceptUnresolvedAsSilent(
+  bookId: string,
+  issueId: string,
+): Promise<string[]> {
+  "use step";
+
+  const { createStepClient } = await import("../step-utils");
+  const client = await createStepClient();
+  const plan = await planCastingTasks(client, bookId, issueId);
+  await writeCastlistRows(client, bookId, issueId, plan.toSilence);
+  return plan.unresolved;
 }
