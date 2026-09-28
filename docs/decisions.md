@@ -4,6 +4,8 @@ This is the repo's decision log. One row per call or parked question, newest fir
 
 | # | date | decision | status |
 |---|------|----------|--------|
+| 86 | 2026-09-28 | #65 Q5: the detection thresholds get a free local sweep against the reviewed boxes, and it does not wait for more reviewed pages; the one paid step is a bounded capture run that needs the owner's yes when it runs (#180) | accepted |
+| 85 | 2026-09-28 | #65 Q2 and Q3: active learning is off on the `find-speech-bubbles` workflow, turned off with the owner's yes, and #105 may upload reviewed pages and box corrections to the public project | accepted |
 | 84 | 2026-09-28 | Wave 4 may write to production in two places with the owner's yes: #92's smoke run, only under `book_id = 'smoke-test'` and the `smoke-test/` Storage prefix, and #177's two new bubble rows on issue-3 page 20 | accepted |
 | 83 | 2026-09-28 | #60: the owner listened to issue-1 page 3 and the Billy bubbles on page 13 (regenerated under #80) and both play with the highlight on the spoken word | accepted |
 | 82 | 2026-09-28 | Row 38 (#65): Roboflow stays on the free Public plan, and pages, models and workflows stay public for now on the condition that others can clone them but not run them on this workspace; whether Roboflow has such a setting is not confirmed (owner call) | assumed (reopens when: the owner checks the project settings, or a book's pages must not be public) |
