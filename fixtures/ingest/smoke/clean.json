@@ -1,0 +1,11 @@
+{
+  "description": "Every fixture speaker is cast. Made-up ids have no characters row, so the clusters gate pauses (owner call on #92, option A).",
+  "gates": [
+    { "gate": "review-clusters", "expect": "pause" },
+    { "gate": "review-pages", "expect": "pause" },
+    { "gate": "review-new-characters", "expect": "skip" },
+    { "gate": "casting", "expect": "skip" }
+  ],
+  "omitCastForLegacyId": null,
+  "counts": { "panels": 8, "page_segmentation": 2, "bubbles": 21 }
+}
