@@ -1,7 +1,7 @@
 import "server-only";
 import { type NextRequest } from "next/server";
 import { getHookByToken, getRun } from "workflow/api";
-import { HookNotFoundError } from "workflow/errors";
+import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestHookToken } from "./hooks";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
@@ -86,14 +86,25 @@ export async function POST(req: NextRequest) {
 
     const { data: runRow } = (await supabaseAdmin
       .from("pipeline_runs")
-      .select("id, steps")
+      .select("id, status, steps")
       .eq("book_id", body.bookId)
       .eq("issue_id", body.issueId)
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle()) as {
-      data: { id: string; steps: PipelineRunSteps | null } | null;
+      data: {
+        id: string;
+        status: string;
+        steps: PipelineRunSteps | null;
+      } | null;
     };
+
+    if (runRow && runRow.status !== "running") {
+      return Response.json(
+        { error: `Newest pipeline run is ${runRow.status}, not running` },
+        { status: 409 },
+      );
+    }
 
     runId = runRow?.steps?.runId ?? null;
     if (!runId) {
@@ -104,8 +115,34 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Confirm the run is live before cancel() and before any write.
+  let run: ReturnType<typeof getRun>;
   try {
-    await getRun(runId).cancel();
+    run = getRun(runId);
+    const status = await run.status;
+    if (status !== "pending" && status !== "running") {
+      return Response.json(
+        { error: `Run ${runId} is ${status}, not live` },
+        { status: 409 },
+      );
+    }
+  } catch (err) {
+    if (WorkflowRunNotFoundError.is(err)) {
+      return Response.json(
+        { error: `Run ${runId} not found` },
+        { status: 404 },
+      );
+    }
+    return Response.json(
+      {
+        error: err instanceof Error ? err.message : "Failed to read run status",
+      },
+      { status: 500 },
+    );
+  }
+
+  try {
+    await run.cancel();
   } catch (err) {
     return Response.json(
       {
