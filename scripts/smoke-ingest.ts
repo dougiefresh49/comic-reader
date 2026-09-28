@@ -5,7 +5,9 @@
  * the rows the reader needs, then deletes everything it wrote.
  *
  * Writes only under book_id 'smoke-test' and the `smoke-test/` Storage prefix
- * (decision row 84). Global tables are read, never written.
+ * (decision row 84), plus `characters` rows for the fixtures' `smoke-` ids
+ * and any `character_appearances` rows the run writes for them (option B,
+ * owner's answers on #92). Every other global table is read, never written.
  *
  * Usage:
  *   pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --scenario clean|gates [--keep]
@@ -20,6 +22,7 @@ import { join } from "node:path";
 import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
 import { loadIngestFixture } from "~/lib/fakes/dry-run";
 import {
+  deleteIssue,
   insertIssue,
   listAllIssues,
   listBookIssues,
@@ -85,6 +88,11 @@ class SmokeFailure extends Error {}
 const fail = (msg: string): never => {
   throw new SmokeFailure(msg);
 };
+/** Any error becomes a reported problem, so cleanup always runs. */
+const errText = (err: unknown) =>
+  err instanceof SmokeFailure
+    ? err.message
+    : `unexpected: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`;
 
 function must<T>(
   res: { data: T | null; error: { message: string } | null },
@@ -119,36 +127,64 @@ const scenarioName = argv[argv.indexOf("--scenario") + 1];
 const real = flag("--real");
 const confirmSpend = flag("--confirm-spend");
 
-// ── Precondition: fixtures carry made-up character ids (#186, row 77) ──
+// ── Smoke character ids (option B, owner's answers on #92) ────────────
 const normName = (s: string) =>
   s.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+const PREFIX = "smoke-";
 
-async function assertMadeUpIds(): Promise<void> {
-  const fixture = loadIngestFixture();
-  const names = new Set<string>();
-  for (const p of fixture.pages) {
-    for (const b of p.bubbles) if (b.speaker) names.add(b.speaker);
-    for (const f of p.faces) names.add(f.characterName);
+/** Distinct non-narrator speaker and face ids in fixtures/ingest/pages.json. */
+function fixtureIds(): string[] {
+  const ids = new Set<string>();
+  for (const p of loadIngestFixture().pages) {
+    for (const b of p.bubbles) if (b.speaker) ids.add(b.speaker);
+    for (const f of p.faces) ids.add(f.characterName);
+  }
+  return [...ids].filter((id) => normName(id) !== "narrator").sort();
+}
+
+/**
+ * The only global rows setup and cleanup touch: exact fixture ids that carry
+ * the prefix, plus `smoke-stranger` in case a step created one (gates).
+ */
+const smokeIds = () =>
+  [...fixtureIds(), "smoke-stranger"].filter((id) => id.startsWith(PREFIX));
+const inList = (ids: string[]) => `(${ids.join(",")})`;
+
+/** Checked before any write. */
+async function assertSmokeIds(): Promise<void> {
+  const ids = fixtureIds();
+  const unprefixed = ids.filter((id) => !id.startsWith(PREFIX));
+  if (unprefixed.length > 0) {
+    fail(
+      `fixture ids without the "${PREFIX}" prefix (#196); refusing to start: ${unprefixed.join(", ")}`,
+    );
   }
   const rows = must(
     await supabase.from("characters").select("id, aliases"),
     "characters select",
   ) as Array<{ id: string; aliases: string[] | null }>;
+  const leftovers = rows.filter((c) => smokeIds().includes(c.id));
+  if (leftovers.length > 0) {
+    fail(
+      `characters rows left by a crashed run: ${leftovers.map((c) => c.id).join(", ")}. Run --cleanup-only first.`,
+    );
+  }
+  // fuzzyNameMatch (vision.ts) matches substrings, so a smoke id must not
+  // resolve to a production character either.
   const hits: string[] = [];
-  for (const name of names) {
-    const n = normName(name);
-    if (!n || n === "narrator") continue;
+  for (const id of ids) {
+    const n = normName(id);
     for (const c of rows) {
       const match = [c.id, ...(c.aliases ?? [])].find((v) => {
         const m = normName(v);
         return m && (m.includes(n) || n.includes(m));
       });
-      if (match) hits.push(`${name} ~ characters.${c.id} (${match})`);
+      if (match) hits.push(`${id} ~ characters.${c.id} (${match})`);
     }
   }
   if (hits.length > 0) {
     fail(
-      `fixtures/ingest/pages.json names production characters (#186 not merged?); refusing to start:\n  ${hits.slice(0, 20).join("\n  ")}${hits.length > 20 ? `\n  ... ${hits.length - 20} more` : ""}`,
+      `fixture ids match production characters; refusing to start:\n  ${hits.slice(0, 20).join("\n  ")}${hits.length > 20 ? `\n  ... ${hits.length - 20} more` : ""}`,
     );
   }
 }
@@ -159,13 +195,50 @@ async function snapshot(): Promise<Record<string, string>> {
     .filter((r) => r.book_id !== BOOK)
     .map((r) => JSON.stringify(r))
     .sort();
+  const ids = async (table: string, column: string) =>
+    (
+      must(
+        await supabase
+          .from(table)
+          .select("id")
+          .not(column, "in", inList(smokeIds()))
+          .order("id"),
+        `${table} ids`,
+      ) as Array<{ id: string }>
+    )
+      .map((r) => r.id)
+      .join(",");
   return {
     "other books' issues": issues.join("\n"),
     characters: String(await countOf("characters")),
     character_appearances: String(await countOf("character_appearances")),
     voices: String(await countOf("voices")),
     "global aliases": String(await countOf("aliases", { scope: "global" })),
+    "non-smoke characters ids": await ids("characters", "id"),
+    "non-smoke character_appearances ids": await ids(
+      "character_appearances",
+      "character_id",
+    ),
   };
+}
+
+/** `dry-run-` voice ids in shared rows; outside the smoke ids only, or anywhere. */
+async function fakeVoiceRows(outsideSmoke: boolean): Promise<string[]> {
+  let q = supabase
+    .from("character_appearances")
+    .select("id, character_id, voice_id")
+    .like("voice_id", "dry-run-%");
+  if (outsideSmoke) q = q.not("character_id", "in", inList(smokeIds()));
+  const appearances = must(await q, "fake voice ids") as unknown[];
+  const cast = must(
+    await supabase
+      .from("castlist")
+      .select("book_id, issue_id, character, voice_id")
+      .neq("book_id", BOOK)
+      .like("voice_id", "dry-run-%"),
+    "castlist fake voices",
+  ) as unknown[];
+  return [...appearances, ...cast].map((r) => JSON.stringify(r));
 }
 
 // ── Setup ───────────────────────────────────────────────────────────────
@@ -205,6 +278,15 @@ async function setup(scenario: Scenario) {
       franchises: src.franchises,
     }),
     "books insert",
+  );
+  // Real rows, so faces resolve and casting sees the speakers. smoke-stranger
+  // gets none and stays unresolved in gates.
+  const franchise = src.franchises?.[0] ?? null;
+  must(
+    await supabase
+      .from("characters")
+      .insert(fixtureIds().map((id) => ({ id, franchise, aliases: [] }))),
+    "characters insert",
   );
   must(
     await insertIssue(supabase, {
@@ -277,7 +359,7 @@ async function setup(scenario: Scenario) {
     "castlist seed",
   );
   console.log(
-    `setup: book, issue, ${SRC_PAGES.length} pages, castlist ${speakers.length} rows${omitted ? ` (left out: ${omitted})` : ""}`,
+    `setup: book, ${fixtureIds().length} characters, issue, ${SRC_PAGES.length} pages, castlist ${speakers.length} rows${omitted ? ` (left out: ${omitted})` : ""}`,
   );
   return { insertOmitted: omitted ? () => row(omitted) : null };
 }
@@ -618,27 +700,10 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
   console.log(`issues.status = ${issue.status}`);
   if (issue.status !== "ready") bad.push(`issues.status = ${issue.status}`);
 
-  const fakeVoices = must(
-    await supabase
-      .from("character_appearances")
-      .select("id, character_id, voice_id")
-      .like("voice_id", "dry-run-%"),
-    "character_appearances fake voices",
-  ) as unknown[];
-  const fakeCast = must(
-    await supabase
-      .from("castlist")
-      .select("book_id, issue_id, character, voice_id")
-      .neq("book_id", BOOK)
-      .like("voice_id", "dry-run-%"),
-    "castlist fake voices",
-  ) as unknown[];
-  console.log(
-    `dry-run voice ids: character_appearances = ${fakeVoices.length}, castlist outside ${BOOK} = ${fakeCast.length}`,
-  );
-  for (const r of [...fakeVoices, ...fakeCast]) {
-    bad.push(`fake voice id in a shared row: ${JSON.stringify(r)}`);
-  }
+  // Smoke ids may carry dry-run voices until cleanup; nothing else may.
+  const fakes = await fakeVoiceRows(true);
+  console.log(`dry-run voice ids outside the smoke ids = ${fakes.length}`);
+  for (const r of fakes) bad.push(`fake voice id in a shared row: ${r}`);
   return bad;
 }
 
@@ -660,12 +725,32 @@ async function listObjects(bucket: string, prefix: string): Promise<string[]> {
   }
 }
 
-/** Every smoke-owned row set, in FK-safe delete order. */
+/** Every smoke-owned book row set, in FK-safe delete order. */
 const SMOKE_ROWS: Array<[string, Eqs]> = [
   ...BOOK_TABLES.map((t): [string, Eqs] => [t, { book_id: BOOK }]),
   ["books", { id: BOOK }],
   ["aliases", { scope: "book", scope_id: BOOK }],
 ];
+/**
+ * Global rows keyed on a smoke id, deleted after the book rows (bubbles,
+ * casting_tasks, character_face_exemplars and panel_character_detections
+ * also reference characters.id). The prefix filter is a second guard.
+ */
+const smokeGlobal = (del: boolean) =>
+  (
+    [
+      ["character_appearances", "character_id"],
+      ["characters", "id"],
+    ] as const
+  ).map(([table, column]) => {
+    const q = del
+      ? supabase.from(table).delete()
+      : supabase.from(table).select("*", { count: "exact", head: true });
+    return [
+      table,
+      q.in(column, smokeIds()).like(column, `${PREFIX}%`),
+    ] as const;
+  });
 
 async function cleanup(): Promise<{ rows: number; objects: number }> {
   // panels.scene_id and music_scenes reference each other.
@@ -680,15 +765,12 @@ async function cleanup(): Promise<{ rows: number; objects: number }> {
   for (const [table, eqs] of SMOKE_ROWS) {
     const res =
       table === "issues"
-        ? // issue-queries.ts has no delete helper; both keys filter it.
-          // eslint-disable-next-line no-restricted-syntax
-          await supabase
-            .from("issues")
-            .delete()
-            .eq("book_id", BOOK)
-            .eq("id", ISSUE)
+        ? await deleteIssue(supabase, BOOK, ISSUE)
         : await withEqs(supabase.from(table).delete(), eqs);
     must(res, `delete ${table}`);
+  }
+  for (const [table, q] of smokeGlobal(true)) {
+    must(await q, `delete ${table} (smoke ids)`);
   }
   for (const bucket of BUCKETS) {
     const paths = await listObjects(bucket, BOOK);
@@ -699,15 +781,28 @@ async function cleanup(): Promise<{ rows: number; objects: number }> {
       );
     }
   }
+  return remaining();
+}
 
+/** Smoke rows and objects still present, book-scoped and global. */
+async function remaining(): Promise<{ rows: number; objects: number }> {
   let rows = 0;
-  for (const [table, eqs] of SMOKE_ROWS) {
-    const n =
-      table === "issues"
-        ? must(await listBookIssues(supabase, BOOK, "id"), "issues").length
-        : await countOf(table, eqs);
+  const add = (table: string, n: number) => {
     if (n) console.log(`  remaining ${table}: ${n}`);
     rows += n;
+  };
+  for (const [table, eqs] of SMOKE_ROWS) {
+    add(
+      table,
+      table === "issues"
+        ? must(await listBookIssues(supabase, BOOK, "id"), "issues").length
+        : await countOf(table, eqs),
+    );
+  }
+  for (const [table, q] of smokeGlobal(false)) {
+    const { count, error } = await q;
+    if (error) fail(`${table} count: ${error.message}`);
+    add(`${table} (smoke ids)`, count ?? 0);
   }
   let objects = 0;
   for (const bucket of BUCKETS) {
@@ -775,11 +870,13 @@ async function main(): Promise<number> {
   let before: Record<string, string> | null = null;
   let wrote = false;
   try {
-    if (!real) await assertMadeUpIds();
+    await assertSmokeIds();
     await assertPortFree();
-    const leftover = await cleanup();
+    const leftover = await remaining();
     if (leftover.rows + leftover.objects > 0) {
-      fail(`pre-run cleanup left ${leftover.rows} rows`);
+      fail(
+        `${leftover.rows} rows and ${leftover.objects} objects left by an earlier run. Run --cleanup-only first.`,
+      );
     }
     before = await snapshot();
     wrote = true;
@@ -792,8 +889,7 @@ async function main(): Promise<number> {
     await runPipeline(scenario, logPath, insertOmitted, resumed);
     console.log("pipeline_step = complete");
   } catch (err) {
-    if (!(err instanceof SmokeFailure)) throw err;
-    problems.push(err.message);
+    problems.push(errText(err));
   } finally {
     if (child) await stopDevServer(child);
   }
@@ -810,8 +906,7 @@ async function main(): Promise<number> {
       }
     }
   } catch (err) {
-    if (!(err instanceof SmokeFailure)) throw err;
-    problems.push(err.message);
+    problems.push(errText(err));
   } finally {
     if (logPath && problems.length > 0) {
       console.log(`server log errors (${logPath}):`);
@@ -831,6 +926,9 @@ async function main(): Promise<number> {
         `isolation: ${changed.length === 0 ? "unchanged" : `CHANGED ${changed.join(", ")}`}`,
       );
       if (changed.length > 0) problems.push(`isolation: ${changed.join(", ")}`);
+      const fakes = await fakeVoiceRows(false);
+      console.log(`dry-run voice ids after cleanup = ${fakes.length}`);
+      for (const r of fakes) problems.push(`fake voice id left: ${r}`);
     }
   }
 
