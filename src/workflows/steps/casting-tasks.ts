@@ -178,6 +178,7 @@ export async function planCastingTasks(
   const pendingSeen = new Set<string>();
   const copyKeys = new Set<string>();
   const silenceKeys = new Set<string>();
+  const protectedKeys = new Set<string>();
   let castCount = 0;
 
   // This issue's castlist as the audio step reads it: grouped by slug, the
@@ -197,22 +198,12 @@ export async function planCastingTasks(
         continue;
       }
       unresolved.push(speaker);
-      if (!key || silenceKeys.has(key)) continue;
-      silenceKeys.add(key);
-      const group = issueCastRows.filter((c) => castSlug(c.character) === key);
-      // A group with any voice_id set is a conflict the audio step reports;
-      // leave it. Otherwise fill the null rows, or add one row under the key.
-      if (group.some((c) => c.voice_id != null)) continue;
-      for (const c of group.length > 0 ? group : [{ character: key }]) {
-        toSilence.push({
-          character: c.character,
-          voice_id: SKIPPED_VOICE,
-          voice_uuid: null,
-          fillGap: group.length > 0,
-        });
-      }
+      if (key) silenceKeys.add(key);
       continue;
     }
+    // Audio reads this speaker under these keys, so they are never silenced.
+    protectedKeys.add(speakerKey(speaker, aliasMap));
+    protectedKeys.add(castSlug(characterId));
 
     const char = characters.find((c) => c.id === characterId);
     const canonical = aliasMap.get(norm(speaker)) ?? speaker;
@@ -280,6 +271,34 @@ export async function planCastingTasks(
     }
 
     toCreateSet.add(characterId);
+  }
+
+  // Silence plan for unresolved speakers. Casting and audio key a speaker
+  // differently (`Dr. Doom` misses character `dr-doom` here but is `dr-doom`
+  // in audio), so skip any key a resolved speaker or a pending task uses.
+  for (const t of (taskRows ?? []) as TaskRow[]) {
+    if (t.status === "pending") protectedKeys.add(castSlug(t.character_id));
+  }
+  for (const key of silenceKeys) {
+    if (protectedKeys.has(key)) continue;
+    const group = issueCastRows.filter((c) => castSlug(c.character) === key);
+    // A real voice in the group is a conflict the audio step reports; leave
+    // it. Otherwise fill the null rows (a replay after a partial fill finds
+    // only the sentinel set), or add one row under the key.
+    if (group.some((c) => c.voice_id != null && c.voice_id !== SKIPPED_VOICE))
+      continue;
+    const rows =
+      group.length > 0
+        ? group.filter((c) => c.voice_id == null)
+        : [{ character: key }];
+    for (const c of rows) {
+      toSilence.push({
+        character: c.character,
+        voice_id: SKIPPED_VOICE,
+        voice_uuid: null,
+        fillGap: group.length > 0,
+      });
+    }
   }
 
   return {
