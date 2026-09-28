@@ -115,13 +115,18 @@ export async function registerCastVoice(
   return { ok: true, voiceUuid };
 }
 
+/** `registered`: the voices and castlist rows were written before the failure. */
+type SaveCastVoiceResult =
+  | { ok: true }
+  | { ok: false; error: string; registered: boolean };
+
 /**
  * Shared by the paste and Voice Design paths: marks the chosen appearance,
  * registers the voice on the castlist, and completes the casting task.
  */
 async function saveCastVoice(
   args: SaveVoiceIdArgs & { designPrompt?: string },
-): Promise<ActionResult> {
+): Promise<SaveCastVoiceResult> {
   const voiceId = args.voiceId.trim();
 
   if (args.appearanceId) {
@@ -133,7 +138,7 @@ async function saveCastVoice(
         voice_model_status: "ready",
       })
       .eq("id", args.appearanceId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: error.message, registered: false };
   }
 
   const registered = await registerCastVoice(supabaseAdmin, {
@@ -143,7 +148,9 @@ async function saveCastVoice(
     elevenLabsId: voiceId,
     designPrompt: args.designPrompt,
   });
-  if (!registered.ok) return registered;
+  if (!registered.ok) {
+    return { ok: false, error: registered.error, registered: false };
+  }
 
   const { error: taskErr } = await supabaseAdmin
     .from("casting_tasks")
@@ -152,7 +159,7 @@ async function saveCastVoice(
       completed_at: new Date().toISOString(),
     })
     .eq("id", args.taskId);
-  if (taskErr) return { ok: false, error: taskErr.message };
+  if (taskErr) return { ok: false, error: taskErr.message, registered: true };
 
   revalidatePath("/admin/characters/casting", "page");
   revalidatePath("/admin", "page");
@@ -185,36 +192,27 @@ interface SkipArgs {
  * is marked skipped so the dashboard hides it but it can be revisited.
  */
 export async function skipAndAddLater(args: SkipArgs): Promise<ActionResult> {
-  const { data: existing } = await supabaseAdmin
-    .from("castlist")
-    .select("character")
-    .eq("book_id", args.bookId)
-    .eq("issue_id", args.issueId)
-    .eq("character", args.characterId)
-    .maybeSingle();
-  if (!existing) {
-    await supabaseAdmin.from("castlist").insert({
+  // voice_uuid is cleared so voice rotation never restores a voice over the skip.
+  const { error: castErr } = await supabaseAdmin.from("castlist").upsert(
+    {
       book_id: args.bookId,
       issue_id: args.issueId,
       character: args.characterId,
       voice_id: SKIPPED_VOICE,
-    });
-  } else {
-    await supabaseAdmin
-      .from("castlist")
-      .update({ voice_id: SKIPPED_VOICE })
-      .eq("book_id", args.bookId)
-      .eq("issue_id", args.issueId)
-      .eq("character", args.characterId);
-  }
+      voice_uuid: null,
+    },
+    { onConflict: "book_id,issue_id,character" },
+  );
+  if (castErr) return { ok: false, error: castErr.message };
 
-  await supabaseAdmin
+  const { error: taskErr } = await supabaseAdmin
     .from("casting_tasks")
     .update({
       status: "skipped",
       completed_at: new Date().toISOString(),
     })
     .eq("id", args.taskId);
+  if (taskErr) return { ok: false, error: taskErr.message };
 
   revalidatePath("/admin/characters/casting", "page");
   return { ok: true };
@@ -414,10 +412,17 @@ export async function createVoiceDesign(
     });
 
     if (!saveResult.ok) {
-      // The voice exists in ElevenLabs and holds a slot; keep its id visible.
+      // The voice already holds an ElevenLabs slot: return, log and name its id.
+      const stage = saveResult.registered
+        ? `Voice ${voiceId} is registered, but the casting task was not marked complete`
+        : `Voice ${voiceId} exists in ElevenLabs but was not registered`;
+      console.error(
+        `[casting] Voice Design save failed: book=${args.bookId} issue=${args.issueId} character=${args.characterId} voice=${voiceId} registered=${saveResult.registered}: ${saveResult.error}`,
+      );
       return {
         ok: false,
-        error: `Voice ${voiceId} was created in ElevenLabs but not saved: ${saveResult.error}`,
+        voiceId,
+        error: `${stage} (${saveResult.error}). Running Voice Design again creates a second voice and takes another slot.`,
       };
     }
     return { ok: true, voiceId };
@@ -553,8 +558,9 @@ export async function bulkVoiceDesign(args: BulkVoiceDesignArgs): Promise<
     results.push({
       characterId: task.characterId,
       ok: res.ok,
-      voiceId: res.ok ? (res as { voiceId?: string }).voiceId : undefined,
-      error: !res.ok ? (res as { error: string }).error : undefined,
+      // Set on a failure too when the voice was created before the save failed.
+      voiceId: res.voiceId,
+      error: res.ok ? undefined : res.error,
     });
   }
 
