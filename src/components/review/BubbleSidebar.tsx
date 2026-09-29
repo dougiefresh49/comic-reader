@@ -23,10 +23,12 @@ import { pageImageUrl } from "~/lib/storage";
 import { regenerateCues } from "~/server/actions/review/regenerate-cues";
 import { regenerateAudio } from "~/server/actions/review/regenerate-audio";
 import { rerunContext } from "~/server/actions/review/rerun-context";
+import { PanelPicker, type ReviewPanel } from "./PanelPicker";
 
 interface BubbleSidebarProps {
   bubble: LocalBubble | null;
   bubbles: LocalBubble[];
+  panels: ReviewPanel[];
   characters: string[];
   redoSet: Set<string>;
   selectedId: string | null;
@@ -133,6 +135,8 @@ function styleToPctValues(style: LocalBubble["style"]) {
 
 function BubbleDetail({
   bubble,
+  position,
+  panels,
   characters,
   isRedo,
   speakerRef,
@@ -145,6 +149,8 @@ function BubbleDetail({
   onDelete,
 }: {
   bubble: LocalBubble;
+  position: number | null;
+  panels: ReviewPanel[];
   characters: string[];
   isRedo: boolean;
   speakerRef: React.RefObject<HTMLInputElement | null>;
@@ -177,8 +183,6 @@ function BubbleDetail({
     });
   }, [bubble.id]);
   const pct = styleToPctValues(bubble.style);
-  const readingIndex =
-    bubble.box_2d.index !== undefined ? bubble.box_2d.index + 1 : "?";
 
   // Auto-focus speaker when bubble changes
   useEffect(() => {
@@ -197,7 +201,7 @@ function BubbleDetail({
       {/* header */}
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-neutral-100">
-          Bubble #{readingIndex}
+          Bubble #{position ?? "?"}
         </span>
         <button
           onClick={onMarkRedo}
@@ -210,6 +214,14 @@ function BubbleDetail({
           {isRedo ? "✕ Marked for Redo" : "Mark for Redo"}
         </button>
       </div>
+
+      {bubble._status === "new" && panels.length > 0 && (
+        <PanelPicker
+          panels={panels}
+          value={bubble.panelId ?? null}
+          onChange={(panelId) => onChange({ panelId })}
+        />
+      )}
 
       {/* Speaker */}
       <label className="flex flex-col gap-1">
@@ -499,11 +511,13 @@ function BubbleDetail({
 
 function SortableBubbleRow({
   bubble,
+  position,
   isSelected,
   isRedo,
   onSelect,
 }: {
   bubble: LocalBubble;
+  position: number;
   isSelected: boolean;
   isRedo: boolean;
   onSelect: () => void;
@@ -522,8 +536,6 @@ function SortableBubbleRow({
     transition,
   };
 
-  const readingIndex =
-    bubble.box_2d.index !== undefined ? bubble.box_2d.index + 1 : "?";
   const previewText =
     bubble.ocr_text.length > 35
       ? bubble.ocr_text.slice(0, 35) + "…"
@@ -554,7 +566,7 @@ function SortableBubbleRow({
         }`}
       >
         <span className="w-5 shrink-0 font-mono text-neutral-500">
-          #{readingIndex}
+          #{position}
         </span>
         <span className="w-20 shrink-0 truncate font-medium text-neutral-300">
           {bubble.speaker ?? "[unassigned]"}
@@ -573,6 +585,7 @@ function SortableBubbleRow({
 export function BubbleSidebar({
   bubble,
   bubbles,
+  panels,
   characters,
   redoSet,
   selectedId,
@@ -607,6 +620,7 @@ export function BubbleSidebar({
 
   const visibleBubbles = bubbles.filter((b) => b._status !== "deleted");
   const visibleIds = visibleBubbles.map((b) => b.id);
+  const selectedPosition = bubble ? visibleIds.indexOf(bubble.id) + 1 : 0;
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -625,6 +639,8 @@ export function BubbleSidebar({
         {bubble ? (
           <BubbleDetail
             bubble={bubble}
+            position={selectedPosition > 0 ? selectedPosition : null}
+            panels={panels}
             characters={characters}
             isRedo={redoSet.has(bubble.id)}
             speakerRef={speakerRef}
@@ -658,10 +674,11 @@ export function BubbleSidebar({
               items={visibleIds}
               strategy={verticalListSortingStrategy}
             >
-              {visibleBubbles.map((b) => (
+              {visibleBubbles.map((b, i) => (
                 <SortableBubbleRow
                   key={b.id}
                   bubble={b}
+                  position={i + 1}
                   isSelected={b.id === selectedId}
                   isRedo={redoSet.has(b.id)}
                   onSelect={() => onSelect(b.id)}

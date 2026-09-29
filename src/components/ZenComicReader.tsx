@@ -126,16 +126,14 @@ export default function ZenComicReader({
 
   const visibleBubbles = useMemo(
     () =>
-      bubbles
-        .filter(
-          (b) =>
-            !b.ignored &&
-            (b.type === "SPEECH" ||
-              b.type === "NARRATION" ||
-              b.type === "CAPTION") &&
-            b.style,
-        )
-        .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0)),
+      bubbles.filter(
+        (b) =>
+          !b.ignored &&
+          (b.type === "SPEECH" ||
+            b.type === "NARRATION" ||
+            b.type === "CAPTION") &&
+          b.style,
+      ),
     [bubbles],
   );
 
@@ -196,9 +194,7 @@ export default function ZenComicReader({
   const orderedPanelBubbles = useMemo(() => {
     if (!activePanel) return [];
     const idSet = new Set(activePanel.bubbleIds);
-    return visibleBubbles
-      .filter((b) => idSet.has(b.id))
-      .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0));
+    return visibleBubbles.filter((b) => idSet.has(b.id));
   }, [activePanel, visibleBubbles]);
 
   /**
@@ -384,9 +380,7 @@ export default function ZenComicReader({
     const panel = panels[panelIndex];
     if (!panel) return;
     const idSet = new Set(panel.bubbleIds);
-    const list = visibleBubbles
-      .filter((b) => idSet.has(b.id))
-      .sort((a, b) => (a.box_2d.index ?? 0) - (b.box_2d.index ?? 0));
+    const list = visibleBubbles.filter((b) => idSet.has(b.id));
     if (!list.length) {
       const ms =
         panel.estimatedDurationSeconds != null
