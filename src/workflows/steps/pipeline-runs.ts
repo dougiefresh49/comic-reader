@@ -1,4 +1,74 @@
 import { getWorkflowMetadata } from "workflow";
+import type { Json } from "~/types/database";
+import type { createTypedStepClient } from "../step-utils";
+
+type StepClient = Awaited<ReturnType<typeof createTypedStepClient>>;
+export type RunSteps = Record<string, Json | undefined>;
+
+const STEPS_WRITE_ATTEMPTS = 5;
+
+/**
+ * Read-modify-write of this run's pipeline_runs.steps, the only place that
+ * writes steps after trigger-ingest's insert. The row is matched by
+ * steps->>runId and status 'running', as closePipelineRun matches it; a
+ * pre-#147 row has no runId and is never written. The update is a
+ * compare-and-swap: it also filters on steps being equal (jsonb equality)
+ * to what was read, so a concurrent writer makes it match zero rows and it
+ * reads again and reapplies `next`, up to STEPS_WRITE_ATTEMPTS times. Every
+ * failure is logged, not thrown.
+ */
+export async function updateRunSteps(
+  client: StepClient,
+  bookId: string,
+  issueId: string,
+  runId: string,
+  next: (steps: RunSteps) => RunSteps,
+  logTag: string,
+): Promise<void> {
+  const where = `${bookId}/${issueId} run ${runId}`;
+  for (let attempt = 1; attempt <= STEPS_WRITE_ATTEMPTS; attempt++) {
+    const { data: rows, error: readErr } = await client
+      .from("pipeline_runs")
+      .select("id, steps")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("steps->>runId", runId)
+      .eq("status", "running")
+      .limit(1);
+    if (readErr) {
+      console.log(
+        `[${logTag}] pipeline_runs read failed for ${where}: ${readErr.message}`,
+      );
+      return;
+    }
+    const row = rows?.[0];
+    if (!row) {
+      console.log(
+        `[${logTag}] no running pipeline_runs row for ${where}; steps not written`,
+      );
+      return;
+    }
+
+    const current = row.steps as RunSteps;
+    const { data: written, error: writeErr } = await client
+      .from("pipeline_runs")
+      .update({ steps: next(current) as Json })
+      .eq("id", row.id)
+      .eq("status", "running")
+      .eq("steps", JSON.stringify(current))
+      .select("id");
+    if (writeErr) {
+      console.log(
+        `[${logTag}] pipeline_runs write failed for ${where}: ${writeErr.message}`,
+      );
+      return;
+    }
+    if (written && written.length > 0) return;
+  }
+  console.log(
+    `[${logTag}] steps changed under every one of ${STEPS_WRITE_ATTEMPTS} writes for ${where}; gave up`,
+  );
+}
 
 /**
  * Close this run's pipeline_runs row. Matches the row by steps->>runId,
