@@ -5,7 +5,7 @@ import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
-import { ingestHookToken } from "~/app/api/admin/cancel-ingest/hooks";
+import { PAUSE_TO_HOOK_STEP, ingestHookToken } from "../cancel-ingest/hooks";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
@@ -39,37 +39,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "issue not found" }, { status: 404 });
   }
 
-  // A paused run holds its gate's hook token (`ingestHookToken`), and every
-  // run of this issue uses the same tokens, so a second run fails at that
-  // gate with HookConflictError (#208). Refuse only while the old run is
-  // live: a pause whose hook is gone, or a row whose run is gone or done, is
-  // stale and passes. A lookup that errors (not a clean not-found) refuses.
-  const { data: openRuns, error: openRunsError } = (await supabaseAdmin
-    .from("pipeline_runs")
-    .select("id, steps")
-    .eq("book_id", body.bookId)
-    .eq("issue_id", body.issueId)
-    .eq("status", "running")
-    .order("started_at", { ascending: false })) as {
-    data: Array<{ id: string; steps: { runId?: string } | null }> | null;
-    error: { message: string } | null;
-  };
-
-  if (openRunsError) {
-    return Response.json({ error: openRunsError.message }, { status: 500 });
-  }
-
+  // Every run of an issue shares the gate hook tokens, so a second run dies
+  // with HookConflictError while an older one holds a gate (#208). Refuse only
+  // while that run is live; stale state passes, a lookup error refuses.
   const label = `${body.bookId}/${body.issueId}`;
-  const refuse = (runId: string, state: string) =>
-    Response.json(
-      {
-        error: `Run ${runId} of ${label} is ${state}. Cancel it first with cancel-ingest, then trigger again.`,
-        runId,
-        pausedAt: issue.pipeline_paused ? issue.pipeline_paused_at : null,
-        pipelineStep: issue.pipeline_step,
-      },
-      { status: 409 },
-    );
   const checkFailed = (what: string, err: unknown) =>
     Response.json(
       {
@@ -77,27 +50,66 @@ export async function POST(req: NextRequest) {
       },
       { status: 409 },
     );
+
+  const { data: runs, error: runsError } = (await supabaseAdmin
+    .from("pipeline_runs")
+    .select("id, status, steps")
+    .eq("book_id", body.bookId)
+    .eq("issue_id", body.issueId)
+    .order("started_at", { ascending: false })) as {
+    data: Array<{
+      id: string;
+      status: string;
+      steps: { runId?: string } | null;
+    }> | null;
+    error: { message: string } | null;
+  };
+  if (runsError) return checkFailed("a run", new Error(runsError.message));
+
+  // Mirrors cancel-ingest/route.ts: with a pause flag it cancels that gate's
+  // hook holder; without one, the newest row's run unless the issue ended.
+  const pausedAt = issue.pipeline_paused ? issue.pipeline_paused_at : null;
+  const ended =
+    issue.pipeline_step === "complete" ||
+    (issue.pipeline_step?.startsWith("failed:") ?? false);
+  const refuse = (runId: string, state: string, gate?: string) => {
+    const newest = runs?.[0];
+    const cancelIngestWorks = pausedAt
+      ? gate === pausedAt
+      : !ended && newest?.status === "running" && newest.steps?.runId === runId;
+    const remedy = cancelIngestWorks
+      ? "Cancel it first with cancel-ingest"
+      : `cancel-ingest cannot cancel it from this state, so cancel run ${runId} with the Workflow CLI or the Workflow dashboard`;
+    return Response.json(
+      {
+        error: `Run ${runId} of ${label} is ${state}. ${remedy}, then trigger again.`,
+        runId,
+        pausedAt,
+        pipelineStep: issue.pipeline_step,
+      },
+      { status: 409 },
+    );
+  };
   const stale: string[] = [];
 
-  if (issue.pipeline_paused && issue.pipeline_paused_at) {
-    const pausedAt = issue.pipeline_paused_at;
+  for (const gate of Object.keys(PAUSE_TO_HOOK_STEP)) {
     try {
       const hook = await getHookByToken(
-        ingestHookToken(body.bookId, body.issueId, pausedAt),
+        ingestHookToken(body.bookId, body.issueId, gate),
       );
-      return refuse(hook.runId, `paused at ${pausedAt}`);
+      return refuse(hook.runId, `paused at ${gate}`, gate);
     } catch (err) {
-      const notFound =
-        HookNotFoundError.is(err) ||
-        (err instanceof Error && /hook not found/i.test(err.message));
-      if (!notFound) return checkFailed(`the run paused at ${pausedAt}`, err);
-      stale.push(`pause flag at ${pausedAt} with no hook`);
+      if (!HookNotFoundError.is(err)) {
+        return checkFailed(`a run paused at ${gate}`, err);
+      }
     }
-  } else if (issue.pipeline_paused) {
-    stale.push("pause flag with no pipeline_paused_at");
+  }
+  if (issue.pipeline_paused) {
+    stale.push(`pause flag at ${pausedAt ?? "(none)"} with no hook`);
   }
 
-  for (const row of openRuns ?? []) {
+  for (const row of runs ?? []) {
+    if (row.status !== "running") continue;
     const runId = row.steps?.runId;
     if (!runId) {
       stale.push(`running row ${row.id} with no runId`);
