@@ -7,9 +7,12 @@
  * description and labels on existing rows (matched on
  * current_elevenlabs_id), plus design_prompt for generated voices where it
  * is null. With --room-characters it flags the voices the room also uses
- * (consumers = {comic,room}). For every book it turns each staged clone
- * file with status "ready to clone" or "approved" into an archived
- * candidate row whose source clip is uploaded to comic-voice-clips.
+ * (consumers = {comic,room}) and, where the snapshot has no description,
+ * takes it from that voice's room profile. For every book it turns each
+ * casting/<book>/cast.json row with status "ready to clone" or "approved"
+ * into an archived candidate row whose source clip is uploaded to
+ * comic-voice-clips. The row's display_name carries its variant, as in
+ * "April O'Neil (1990)", and lab_default carries the row's `default`.
  *
  * Dry run is the default and makes zero writes. --execute uploads each
  * candidate clip, checks the stored copy against the local md5, then writes
@@ -41,15 +44,12 @@ const CONTENT_TYPES: Record<string, string> = {
   ".wav": "audio/wav",
 };
 
+// Every book's cast sheet is casting/<book>/cast.json; only some have a snapshot.
 const BOOKS = {
   "tmnt-x-mmpr": {
-    cast: "casting/tmnt-x-mmpr/cast.json",
     snapshot: "casting/tmnt-x-mmpr/elevenlabs-voices-snapshot.json",
   },
-  "dc-x-sonic": {
-    cast: "casting/dc-x-sonic/dc-x-sonic-cast.json",
-    snapshot: null,
-  },
+  "dc-x-sonic": { snapshot: null },
 } as const;
 type Book = keyof typeof BOOKS;
 
@@ -105,13 +105,29 @@ interface Character {
   aliases: string[] | null;
 }
 
+interface RoomProfile {
+  personality?: string | null;
+  speechStyle?: string | null;
+}
+
+interface CastRow {
+  character: string;
+  variant?: string | null;
+  default?: boolean;
+  file: string;
+  status: string;
+}
+
 interface StagedClip {
   character: string;
+  displayName: string;
+  isDefault: boolean;
   file: string;
 }
 
 interface Candidate {
-  character: string;
+  displayName: string;
+  isDefault: boolean;
   localPath: string;
   objectPath: string;
   contentType: string;
@@ -154,48 +170,48 @@ function characterResolver(chars: Character[]) {
   };
 }
 
-/** Staged clone files from the book's cast file; rejects go to `skip`. */
+/** One line from a room profile, or null when it has neither field. */
+function roomDescription(p: RoomProfile | undefined): string | null {
+  const personality = p?.personality?.trim();
+  const style = p?.speechStyle?.trim();
+  if (!personality && !style) return null;
+  return [personality, style ? `Speech style: ${style}` : null]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** Staged clone files from the book's cast.json rows; rejects go to `skip`. */
 function stagedClips(
-  book: Book,
-  cast: unknown,
+  rows: CastRow[],
   skip: (what: string, reason: string) => void,
 ): StagedClip[] {
+  const names = new Set<string>();
+  const defaults = new Set<string>();
   const out: StagedClip[] = [];
-  if (book === "dc-x-sonic") {
-    // No per-row status: the file lists reels the owner judged good, except
-    // where the owner note says the verdict is still pending.
-    const chars = (
-      cast as {
-        characters: Record<
-          string,
-          { primary?: { cloneFile?: string; ownerNote?: string | null } }
-        >;
-      }
-    ).characters;
-    for (const [character, c] of Object.entries(chars)) {
-      if (!c.primary?.cloneFile) skip(character, "no primary cloneFile");
-      else if (/awaiting verdict/i.test(c.primary.ownerNote ?? ""))
-        skip(character, "owner note says the reel is awaiting a verdict");
-      else out.push({ character, file: c.primary.cloneFile });
-    }
-    return out;
-  }
-  const rows = (
-    cast as { cast: { character: string; file: string; status: string }[] }
-  ).cast;
   for (const r of rows) {
-    if (/\s(?:\*\*)?or(?:\*\*)?\s/i.test(r.file)) {
-      skip(r.character, "two files (A or B), pending #114");
-      continue;
+    const variant = r.variant?.trim();
+    const displayName = variant ? `${r.character} (${variant})` : r.character;
+    if (names.has(displayName))
+      throw new Error(
+        `cast.json has two rows named "${displayName}"; each needs its own variant`,
+      );
+    names.add(displayName);
+    if (r.default === true) {
+      if (defaults.has(r.character))
+        throw new Error(
+          `cast.json marks more than one default for ${r.character}`,
+        );
+      defaults.add(r.character);
     }
     if (!CANDIDATE_STATUSES.has(r.status)) {
-      skip(r.character, `status "${r.status}"`);
+      skip(displayName, `status "${r.status}"`);
       continue;
     }
-    // Drop trailing notes like "(alternate)" or "(fallback)".
     out.push({
       character: r.character,
-      file: r.file.replace(/\s*\([^)]*\)\s*$/, "").trim(),
+      displayName,
+      isDefault: r.default === true,
+      file: r.file,
     });
   }
   return out;
@@ -214,9 +230,15 @@ async function main() {
     "consumers, description, labels, source_clip_md5",
   );
   const characterCol = await hasColumns("character_id");
+  const labDefaultCol = await hasColumns("lab_default");
   if (args.execute && !registryCols)
     throw new Error(
       "voices is missing the registry columns; apply the voices_registry_columns migration before --execute",
+    );
+  // A candidate written without its flag is never revisited: reruns skip it.
+  if (args.execute && !labDefaultCol)
+    throw new Error(
+      "voices.lab_default is missing; apply the voices_lab_default migration before --execute",
     );
 
   const select = [
@@ -256,8 +278,12 @@ async function main() {
     return u.set;
   };
   const lines = { updates: [] as string[], room: [] as string[] };
-  // Rows the snapshot gives no description; the owner writes these in EL.
+  // Rows neither the snapshot nor a room profile describes; the owner writes
+  // these in EL.
   const noDescription: string[] = [];
+  const room = args.roomCharacters
+    ? await readJson<Record<string, RoomProfile>>(args.roomCharacters)
+    : null;
 
   // 1. Existing rows: description, labels, design_prompt from the snapshot.
   if (inputs.snapshot) {
@@ -276,30 +302,30 @@ async function main() {
         continue;
       }
       const set = setFor(row);
-      const desc = s.description?.trim() || null;
+      const snapDesc = s.description?.trim() || null;
+      const desc = snapDesc ?? roomDescription(room?.[s.voice_id]);
       const fields: string[] = [];
       if (desc) {
         set.description = desc;
-        fields.push("description");
+        fields.push(snapDesc ? "description" : "description (room profile)");
       } else noDescription.push(row.display_name);
       set.labels = s.labels ?? {};
       fields.push("labels");
-      if (s.category === "generated" && desc && row.design_prompt == null) {
-        set.design_prompt = desc;
+      if (s.category === "generated" && snapDesc && row.design_prompt == null) {
+        set.design_prompt = snapDesc;
         fields.push("design_prompt");
       }
       const charId = resolve(row.display_name);
       if (charId && characterCol && row.character_id == null)
         set.character_id = charId;
       lines.updates.push(
-        `  ~ ${row.display_name} (${s.voice_id}, ${s.category}): ${fields.join(", ")}${desc ? "" : " (snapshot has no description)"}; character ${charId ?? "unmatched"}`,
+        `  ~ ${row.display_name} (${s.voice_id}, ${s.category}): ${fields.join(", ")}${desc ? "" : " (no description in the snapshot or a room profile)"}; character ${charId ?? "unmatched"}`,
       );
     }
   }
 
   // 2. Voices the room also uses.
-  if (args.roomCharacters) {
-    const room = await readJson<Record<string, unknown>>(args.roomCharacters);
+  if (room) {
     for (const elId of Object.keys(room)) {
       const row = byElId.get(elId);
       if (!row) {
@@ -322,34 +348,37 @@ async function main() {
   }
 
   // 3. Candidates from staged clone files.
-  const cast = await readJson<unknown>(path.join(labRepo, inputs.cast));
+  const cast = await readJson<{ cast: CastRow[] }>(
+    path.join(labRepo, "casting", args.book, "cast.json"),
+  );
   const candidates: Candidate[] = [];
-  for (const clip of stagedClips(args.book, cast, skip)) {
+  for (const clip of stagedClips(cast.cast, skip)) {
     const localPath = path.resolve(cloneRoot, clip.file);
     const rel = path.relative(cloneRoot, localPath);
     if (rel.startsWith("..") || path.isAbsolute(rel)) {
-      skip(clip.character, `file path leaves the clone root: ${clip.file}`);
+      skip(clip.displayName, `file path leaves the clone root: ${clip.file}`);
       continue;
     }
     // Flat object name: voice-rotation.ts reads a "/" in source_clip_path
     // as a bucket prefix.
     const objectPath = `${args.book}__${rel.split(path.sep).join("__")}`;
     if (importedPaths.has(objectPath)) {
-      skip(clip.character, `already imported as ${objectPath}`);
+      skip(clip.displayName, `already imported as ${objectPath}`);
       continue;
     }
     const contentType = CONTENT_TYPES[path.extname(rel).toLowerCase()];
     if (!contentType) {
-      skip(clip.character, `bucket takes mp3, m4a or wav only: ${rel}`);
+      skip(clip.displayName, `bucket takes mp3, m4a or wav only: ${rel}`);
       continue;
     }
     if (!existsSync(localPath)) {
-      skip(clip.character, `file missing: ${rel}`);
+      skip(clip.displayName, `file missing: ${rel}`);
       continue;
     }
     const buf = await readFile(localPath);
     candidates.push({
-      character: clip.character,
+      displayName: clip.displayName,
+      isDefault: clip.isDefault,
       localPath,
       objectPath,
       contentType,
@@ -368,6 +397,9 @@ async function main() {
   console.log(
     `voices.character_id: ${characterCol ? "present, filled where null" : "missing (#95), matches print only"}`,
   );
+  console.log(
+    `voices.lab_default: ${labDefaultCol ? "present" : "missing, migration not applied yet (plan only)"}`,
+  );
   console.log(`\nUpdates from the snapshot (${lines.updates.length}):`);
   lines.updates.forEach((l) => console.log(l));
   console.log(
@@ -377,7 +409,7 @@ async function main() {
   console.log(`\nCandidates (${candidates.length}), status archived:`);
   for (const c of candidates)
     console.log(
-      `  + ${c.character}: character ${c.characterId ?? "unmatched (stays null)"}; upload ${path.relative(cloneRoot, c.localPath)} -> ${BUCKET}/${c.objectPath} (${(c.bytes / 1e6).toFixed(2)} MB, md5 ${c.md5})`,
+      `  + ${c.displayName}${c.isDefault ? " [default]" : ""}: character ${c.characterId ?? "unmatched (stays null)"}; upload ${path.relative(cloneRoot, c.localPath)} -> ${BUCKET}/${c.objectPath} (${(c.bytes / 1e6).toFixed(2)} MB, md5 ${c.md5})`,
     );
   console.log(`\nSkips (${skips.length}):`);
   skips.forEach((l) => console.log(l));
@@ -386,7 +418,7 @@ async function main() {
   );
   const descriptionGap =
     noDescription.length > 0
-      ? `Incomplete: ${noDescription.length} updated row(s) still have no description, because the snapshot has none: ${noDescription.join(", ")}. Add it in ElevenLabs, refresh the snapshot, and rerun.`
+      ? `Incomplete: ${noDescription.length} updated row(s) still have no description, because neither the snapshot nor a room profile has one: ${noDescription.join(", ")}. Add it in ElevenLabs, refresh the snapshot, and rerun.`
       : null;
   if (descriptionGap) console.log(descriptionGap);
 
@@ -429,14 +461,15 @@ async function main() {
       continue;
     }
     const { error } = await supabase.from("voices").insert({
-      display_name: c.character,
+      display_name: c.displayName,
+      lab_default: c.isDefault,
       status: "archived",
       current_elevenlabs_id: null,
       source_clip_path: c.objectPath,
       source_clip_md5: c.md5,
       ...(characterCol && c.characterId ? { character_id: c.characterId } : {}),
     });
-    if (error) failures.push(`insert ${c.character}: ${error.message}`);
+    if (error) failures.push(`insert ${c.displayName}: ${error.message}`);
   }
 
   if (failures.length > 0) {
