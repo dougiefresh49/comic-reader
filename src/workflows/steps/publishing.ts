@@ -1,6 +1,7 @@
 import { getWorkflowMetadata } from "workflow";
 import { updateIssue } from "~/lib/issue-queries";
 import { bubbleNeedsAudio } from "./audio-plan";
+import { updateRunSteps } from "./pipeline-runs";
 export async function uploadAudio(bookId: string, issueId: string) {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
@@ -124,7 +125,7 @@ export async function generateManifest(bookId: string, issueId: string) {
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
 
-  const [pageRes, bubbleRes, audioRes, tsRes, unvoicedRes] = await Promise.all([
+  const [pageRes, bubbleRes, audioRes, tsRes] = await Promise.all([
     supabase
       .from("pages")
       .select("id", { count: "exact", head: true })
@@ -146,7 +147,26 @@ export async function generateManifest(bookId: string, issueId: string) {
       .select("bubble_id", { count: "exact", head: true })
       .eq("book_id", bookId)
       .eq("issue_id", issueId),
-    supabase
+  ]);
+
+  if (pageRes.error) throw new Error(pageRes.error.message);
+  if (bubbleRes.error) throw new Error(bubbleRes.error.message);
+  if (audioRes.error) throw new Error(audioRes.error.message);
+  if (tsRes.error) throw new Error(tsRes.error.message);
+
+  const pageCount = pageRes.count ?? 0;
+  const bubbleCount = bubbleRes.count ?? 0;
+  const audioCount = audioRes.count ?? 0;
+  const timestampCount = tsRes.count ?? 0;
+  // Spoken bubbles (text and a speaker) with no audio: the ones a resumed
+  // casting gate accepted as silent, plus any other audio skip. Speakerless
+  // bubbles such as SFX are never voiced, so they are not counted. The text
+  // test is bubbleNeedsAudio, which a head count cannot express, so this
+  // pages through the candidates until a page comes back empty (a short
+  // page does not end it: max_rows may be under the page size).
+  let silentBubbles = 0;
+  for (let from = 0; ; ) {
+    const { data, error } = await supabase
       .from("bubbles")
       .select(
         "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text",
@@ -155,25 +175,16 @@ export async function generateManifest(bookId: string, issueId: string) {
       .eq("issue_id", issueId)
       .eq("ignored", false)
       .is("audio_storage_path", null)
-      .not("speaker", "is", null),
-  ]);
-
-  if (pageRes.error) throw new Error(pageRes.error.message);
-  if (bubbleRes.error) throw new Error(bubbleRes.error.message);
-  if (audioRes.error) throw new Error(audioRes.error.message);
-  if (tsRes.error) throw new Error(tsRes.error.message);
-  if (unvoicedRes.error) throw new Error(unvoicedRes.error.message);
-
-  const pageCount = pageRes.count ?? 0;
-  const bubbleCount = bubbleRes.count ?? 0;
-  const audioCount = audioRes.count ?? 0;
-  const timestampCount = tsRes.count ?? 0;
-  // Spoken bubbles (text and a speaker) with no audio: the ones a resumed
-  // casting gate accepted as silent, plus any other audio skip. Speakerless
-  // bubbles such as SFX are never voiced, so they are not counted.
-  const silentBubbles = (unvoicedRes.data ?? []).filter(
-    (b) => bubbleNeedsAudio(b) && !!b.speaker?.trim(),
-  ).length;
+      .not("speaker", "is", null)
+      .order("id")
+      .range(from, from + 999);
+    if (error) throw new Error(error.message);
+    if (data.length === 0) break;
+    silentBubbles += data.filter(
+      (b) => bubbleNeedsAudio(b) && !!b.speaker?.trim(),
+    ).length;
+    from += data.length;
+  }
 
   const { error: upErr } = await updateIssue(supabase, bookId, issueId, {
     page_count: pageCount,
@@ -189,37 +200,14 @@ export async function generateManifest(bookId: string, issueId: string) {
     `[manifest] ${bookId}/${issueId}: ${pageCount} pages, ${bubbleCount} bubbles, ${audioCount} audio, ${timestampCount} timestamps, ${silentBubbles} silent`,
   );
 
-  // Record silentBubbles on this run's pipeline_runs row, matched by runId as
-  // closePipelineRun does. Logged, not thrown, like the other run writes.
-  const { workflowRunId } = getWorkflowMetadata();
-  const { data: runRows, error: runErr } = await supabase
-    .from("pipeline_runs")
-    .select("id, steps")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("steps->>runId", workflowRunId)
-    .eq("status", "running")
-    .limit(1);
-  const runRow = runRows?.[0];
-  if (runErr || !runRow) {
-    console.log(
-      `[manifest] silentBubbles not recorded for ${bookId}/${issueId} run ${workflowRunId}: ${runErr?.message ?? "no running pipeline_runs row"}`,
-    );
-    return;
-  }
-  const prevSteps =
-    runRow.steps !== null &&
-    typeof runRow.steps === "object" &&
-    !Array.isArray(runRow.steps)
-      ? runRow.steps
-      : {};
-  const { error: stepsErr } = await supabase
-    .from("pipeline_runs")
-    .update({ steps: { ...prevSteps, silentBubbles } })
-    .eq("id", runRow.id);
-  if (stepsErr) {
-    console.log(
-      `[manifest] silentBubbles write failed for ${bookId}/${issueId}: ${stepsErr.message}`,
-    );
-  }
+  // Record silentBubbles on this run's pipeline_runs row. Logged, not
+  // thrown, like the other run writes.
+  await updateRunSteps(
+    supabase,
+    bookId,
+    issueId,
+    getWorkflowMetadata().workflowRunId,
+    (steps) => ({ ...steps, silentBubbles }),
+    "manifest",
+  );
 }
