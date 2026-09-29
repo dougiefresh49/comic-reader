@@ -304,6 +304,15 @@ async function main() {
   }
 
   if (!overwrite && (await fs.pathExists(CACHE_PATH))) {
+    const cached = (await fs.readJSON(CACHE_PATH)) as {
+      failedPages?: string[];
+    };
+    if (cached.failedPages?.length) {
+      console.error(
+        `\n❌ character-lookahead for ${book}/${issue} skipped ${cached.failedPages.join(", ")} last run. Rerun with --overwrite.\n`,
+      );
+      process.exit(1);
+    }
     console.log(
       `\n✅ character-lookahead already complete for ${book}/${issue} (use --overwrite to rerun)\n`,
     );
@@ -358,6 +367,11 @@ async function main() {
     clusterId: number;
     bboxPanelLocal: { x: number; y: number; w: number; h: number };
   }> = [];
+  const failedPages: Array<{
+    pageNumber: number;
+    label: string;
+    reason: string;
+  }> = [];
 
   for (const filename of sidecars) {
     const pageNum = parseInt(
@@ -369,18 +383,35 @@ async function main() {
     const crops = await extractFaceCropsForPage(SAM3_DIR, WEBP_DIR, pageNum);
     if (crops.length === 0) continue;
 
-    totalCrops += crops.length;
     console.log(`   page-${padded}: ${crops.length} faces`);
 
-    // Retrieve exemplars and identify all faces on this page
+    // Read every face's exemplars before any identify call on this page, so
+    // a failed read skips the page without paying for its faces.
+    let exemplarsByFace: Array<ExemplarReference[] | undefined>;
+    try {
+      exemplarsByFace = useExemplars
+        ? await Promise.all(
+            crops.map((face) => getExemplarsForFace(face, dbInfo!.bookId)),
+          )
+        : crops.map(() => undefined);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      failedPages.push({
+        pageNumber: pageNum,
+        label: `page-${padded}`,
+        reason,
+      });
+      console.warn(
+        `   ⚠ page-${padded}: exemplar read failed, page skipped: ${reason}`,
+      );
+      continue;
+    }
+
+    totalCrops += crops.length;
     const identifications = await Promise.all(
-      crops.map(async (face) => {
-        let exemplars: ExemplarReference[] | undefined;
-        if (useExemplars) {
-          exemplars = await getExemplarsForFace(face, dbInfo!.bookId);
-        }
-        return identifySingleFace(gemini, face, knownCharacters, exemplars);
-      }),
+      crops.map((face, i) =>
+        identifySingleFace(gemini, face, knownCharacters, exemplarsByFace[i]),
+      ),
     );
 
     for (let i = 0; i < crops.length; i++) {
@@ -496,8 +527,11 @@ async function main() {
   const panelsByPage = await getPanelsByPage(bookId, issueId);
 
   if (overwrite) {
+    // A skipped page has no new rows, so its stored detections stay.
+    const skipped = new Set(failedPages.map((f) => f.pageNumber));
     const allPanelIds: string[] = [];
-    for (const panels of panelsByPage.values()) {
+    for (const [pageNumber, panels] of panelsByPage) {
+      if (skipped.has(pageNumber)) continue;
       for (const p of panels) allPanelIds.push(p.id);
     }
     if (allPanelIds.length > 0) {
@@ -573,9 +607,22 @@ async function main() {
         confidence: c.confidence,
       })),
       insertedDetections: insertedCount,
+      failedPages: failedPages.map((f) => f.label),
     },
     { spaces: 2 },
   );
+
+  if (failedPages.length > 0) {
+    console.error(
+      `\n❌ ${failedPages.length} page(s) skipped after a failed exemplar read; ${insertedCount} detections from the other pages persisted:`,
+    );
+    for (const f of failedPages) console.error(`   ${f.label}: ${f.reason}`);
+    console.error(
+      `   Rerun with --overwrite once the exemplar store answers. That rerun pays again for every page.\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
 
   console.log(`\n✅ Character lookahead complete for ${book}/${issue}`);
   console.log(
