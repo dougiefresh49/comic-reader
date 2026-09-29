@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
+import { filterSliverPanels } from "~/lib/panel-filter";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
@@ -441,11 +442,34 @@ export async function roboflowAnalyzeBatch(
       bubblePredictions,
       segmentationPredictions: segPreds,
     } = read.parsed;
+    // Filter before the final map so sort_order and panel_id stay contiguous.
+    const { kept, dropped } = filterSliverPanels(
+      mapPanelRows(
+        bookId,
+        issueId,
+        page.pageNumber,
+        panelPredictions,
+        imgDims,
+      ).map((row, idx) => ({
+        idx,
+        bounding_box: row.bounding_box as BoundingBoxJson,
+      })),
+      bubblePredictions.map((b) => ({
+        x: b.x / imgDims.width,
+        y: b.y / imgDims.height,
+      })),
+    );
+    for (const { bounding_box: b } of dropped) {
+      console.log(
+        `[roboflow] ${pageLabel}: dropped sliver panel x ${b.x.toFixed(3)} y ${b.y.toFixed(3)} w ${b.w.toFixed(3)} h ${b.h.toFixed(3)}`,
+      );
+    }
+    const keptIdx = new Set(kept.map((c) => c.idx));
     const panelRows = mapPanelRows(
       bookId,
       issueId,
       page.pageNumber,
-      panelPredictions,
+      panelPredictions.filter((_, idx) => keptIdx.has(idx)),
       imgDims,
     );
     const bubbleRows = mapBubbleRows(
