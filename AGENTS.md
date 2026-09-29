@@ -14,7 +14,7 @@
      citation AND a BAD/GOOD pair from a real moment; repo conventions and
      config are welcome, but label them as such. No speculative rules
      dressed as earned ones.
-     Instantiated from fleet corefiles @ 4a9e5f8, 2026-09-27 -->
+     Instantiated from fleet corefiles @ 0cdb881, 2026-09-29 -->
 
 # Comic Reader
 
@@ -197,6 +197,75 @@ Quoted evidence, left as written.
 GOOD:
 > Keep it — it's a free wired-backhaul spare and resale is ~$40. Want
 > the longer reasoning?
+
+## Owner items I can answer
+
+I answer most of what you hand me at the end of a round, often from
+another thread and sometimes by voice, so a report has to stand on its
+own. One comic-reader week of rounds showed what it costs when it
+doesn't (fleet #106; the audit is `docs/owner-report-audit-2026-09.md`
+in the fleet repo). 84% of the issues a round report cited never got a
+title in that message. Closing reports mixed a median of 4.5 decisions,
+needs-your-eyes checks, and reversible calls into one list. 18 of my
+messages asked an agent to explain its own report.
+
+- In anything you hand me (a report, a PR body, an issue comment), every
+  issue, PR, or decision row is a link, and its first mention in that
+  message carries its title: `[#80](url) "Speaker stopgap for unmatched
+  bubbles"`, or "row 70 (`incremental: false` in tsconfig)". A bare
+  `#80` or "row 70" hands the lookup back to me.
+- Every round report ends with its owner items. The first line of that
+  block says what I must do, or "no action required".
+  - **Decisions**, numbered O1, O2, …, one per item: the linked issue,
+    the question in a sentence, the options, and `Recommend:`. Never
+    "A/B above"; restate it.
+  - **Needs your eyes**, numbered E1, E2, … (report items, not the
+    field-test escapes): checks only I can run, each saying exactly
+    what to look at.
+  - Calls you made that I can reverse go on the page or the issue, not
+    in these lists.
+  I should be able to answer in one line: "O1 B, O2 A, E1 done".
+- When you stop on a decision, post that O-item as a comment on its
+  issue, name your session id, and move the issue to
+  `state/needs-feedback`. Chat scrolls away; the issue is where I and
+  every other thread can find it. A delegate without `gh` hands the
+  O-item up in its report instead, as under "Push back on the spec".
+  Everything waiting on me, across repos: `gh search issues --owner
+  dougiefresh49 --state open --label state/needs-feedback`.
+
+The target shape, one of each:
+
+```
+You owe one decision and one check.
+
+Decisions
+O1. [#18](https://github.com/acme/shop/issues/18) "Migrate orders
+    table to UUID keys": backfill in one transaction (A, locks the
+    table ~2 min) or in batches (B, no lock, ~80 more lines)?
+    Recommend: B.
+
+Needs your eyes
+E1. [#12](https://github.com/acme/shop/issues/12) "Add coupon codes
+    at checkout": on your phone, apply SAVE10 at checkout and confirm
+    the total drops.
+```
+
+Quoted evidence, left as written. Both come from one wave report
+(comic-reader, 2026-09-28), written before this rule: the GOOD item
+carries the options and a recommendation, but not yet the O-number,
+the link, or the `Recommend:` line.
+
+BAD, my reply was "#148 - I'm not sure what you mean by 'sit under'":
+> 3. **#148 data:** six voice-design rows sit under `character_id`
+> `soldier` or `foot-soldier` [...] Are they intended, or leftovers to
+> clean up?
+
+GOOD, my reply was "#177 - option A":
+> 2. **#177 order of the two new page 20 rows.**
+>    - **A (recommended):** renumber five existing rows in the same
+>      transaction, so the page plays in reading order.
+>    - **B:** append as 6 and 7; no existing row changes, but both play
+>      last.
 
 ## Stay in scope
 
