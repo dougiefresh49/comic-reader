@@ -162,16 +162,21 @@ function stagedClips(
 ): StagedClip[] {
   const out: StagedClip[] = [];
   if (book === "dc-x-sonic") {
-    // No per-row status: the file only lists reels the owner judged good.
+    // No per-row status: the file lists reels the owner judged good, except
+    // where the owner note says the verdict is still pending.
     const chars = (
       cast as {
-        characters: Record<string, { primary?: { cloneFile?: string } }>;
+        characters: Record<
+          string,
+          { primary?: { cloneFile?: string; ownerNote?: string | null } }
+        >;
       }
     ).characters;
     for (const [character, c] of Object.entries(chars)) {
-      if (c.primary?.cloneFile)
-        out.push({ character, file: c.primary.cloneFile });
-      else skip(character, "no primary cloneFile");
+      if (!c.primary?.cloneFile) skip(character, "no primary cloneFile");
+      else if (/awaiting verdict/i.test(c.primary.ownerNote ?? ""))
+        skip(character, "owner note says the reel is awaiting a verdict");
+      else out.push({ character, file: c.primary.cloneFile });
     }
     return out;
   }
@@ -251,6 +256,8 @@ async function main() {
     return u.set;
   };
   const lines = { updates: [] as string[], room: [] as string[] };
+  // Rows the snapshot gives no description; the owner writes these in EL.
+  const noDescription: string[] = [];
 
   // 1. Existing rows: description, labels, design_prompt from the snapshot.
   if (inputs.snapshot) {
@@ -274,7 +281,7 @@ async function main() {
       if (desc) {
         set.description = desc;
         fields.push("description");
-      }
+      } else noDescription.push(row.display_name);
       set.labels = s.labels ?? {};
       fields.push("labels");
       if (s.category === "generated" && desc && row.design_prompt == null) {
@@ -377,6 +384,11 @@ async function main() {
   console.log(
     `\nSummary: ${lines.updates.length} updates, ${lines.room.length} room flags, ${candidates.length} candidates, ${skips.length} skips`,
   );
+  const descriptionGap =
+    noDescription.length > 0
+      ? `Incomplete: ${noDescription.length} updated row(s) still have no description, because the snapshot has none: ${noDescription.join(", ")}. Add it in ElevenLabs, refresh the snapshot, and rerun.`
+      : null;
+  if (descriptionGap) console.log(descriptionGap);
 
   if (!args.execute) {
     console.log("Dry run: nothing written. Pass --execute to apply.\n");
@@ -433,8 +445,10 @@ async function main() {
     process.exit(1);
   }
   console.log(
-    `\nDone: ${updates.size} rows updated, ${candidates.length} candidates uploaded and inserted.\n`,
+    `\nDone: ${updates.size} rows updated, ${candidates.length} candidates uploaded and inserted.`,
   );
+  if (descriptionGap) console.log(descriptionGap);
+  console.log();
 }
 
 main().catch((err) => {
