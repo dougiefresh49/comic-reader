@@ -1,6 +1,7 @@
 import { GoogleGenAI, createPartFromBase64 } from "@google/genai";
 import { isDryRun } from "./fakes/dry-run";
 import { getFakeGeminiClient } from "./fakes/gemini";
+import { ambientLlmMeta, embedContentLogged } from "./llm-usage";
 
 const EMBEDDING_MODEL = "gemini-embedding-2";
 export const EMBEDDING_DIMENSIONS = 768;
@@ -51,11 +52,15 @@ export async function embedImage(
   mimeType = "image/jpeg",
 ): Promise<number[]> {
   return embedWithRetry(async (client) => {
-    const result = await client.models.embedContent({
-      model: EMBEDDING_MODEL,
-      contents: [createPartFromBase64(imageBase64, mimeType)],
-      config: { outputDimensionality: EMBEDDING_DIMENSIONS },
-    });
+    const result = await embedContentLogged(
+      client,
+      {
+        model: EMBEDDING_MODEL,
+        contents: [createPartFromBase64(imageBase64, mimeType)],
+        config: { outputDimensionality: EMBEDDING_DIMENSIONS },
+      },
+      ambientLlmMeta("embedding"),
+    );
     return result.embeddings?.[0]?.values ?? [];
   });
 }
@@ -63,11 +68,15 @@ export async function embedImage(
 export async function embedText(text: string): Promise<number[]> {
   if (!text.trim()) return new Array(EMBEDDING_DIMENSIONS).fill(0) as number[];
   return embedWithRetry(async (client) => {
-    const result = await client.models.embedContent({
-      model: EMBEDDING_MODEL,
-      contents: text,
-      config: { outputDimensionality: EMBEDDING_DIMENSIONS },
-    });
+    const result = await embedContentLogged(
+      client,
+      {
+        model: EMBEDDING_MODEL,
+        contents: text,
+        config: { outputDimensionality: EMBEDDING_DIMENSIONS },
+      },
+      ambientLlmMeta("embedding"),
+    );
     return result.embeddings?.[0]?.values ?? [];
   });
 }

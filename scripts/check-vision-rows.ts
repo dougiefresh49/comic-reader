@@ -1,6 +1,7 @@
 /**
- * Fixture-only acceptance for vision row mappers (#70) and for the vision
- * failures that must surface (#145). No DB calls and no network calls:
+ * Fixture-only acceptance for vision row mappers (#70), for the vision
+ * failures that must surface (#145), and for complete panel audio_tags
+ * (#222). No DB calls and no network calls:
  * `fetch` is stubbed before any case runs.
  *
  * Usage: pnpm tsx --env-file=.env scripts/check-vision-rows.ts
@@ -24,8 +25,10 @@ import {
 import {
   bubbleHasContext,
   mapBubbleRows,
+  mapForegroundPolygons,
   mapPanelRows,
   mapSegmentationRow,
+  normalizePanelAudioTags,
   parseRoboflowSam3Output,
   type BubbleContextFields,
   type RoboflowBoxPrediction,
@@ -478,6 +481,257 @@ await check(
       "page-03",
     ),
   /threw FatalError: exemplar lookup failed for page-03: Gemini embedding failed/,
+);
+
+// #222: a panel row whose audio_tags is `{}` 500'd the reader. Every stored
+// value comes back with all three keys, and the mapper writes all three.
+const fullTags = String.raw`\{"ambience":\[\],"sfx":\[\],"music_mood":"transition_neutral"\}`;
+const tagCases: Record<string, unknown> = {
+  "{}": {},
+  null: null,
+  "a string": "oops",
+  "wrong-typed fields": { ambience: "rain", sfx: [1], music_mood: 3 },
+};
+for (const [name, stored] of Object.entries(tagCases)) {
+  await check(
+    `audio_tags ${name}`,
+    async () => normalizePanelAudioTags(stored),
+    new RegExp(`^returned ${fullTags}$`),
+  );
+}
+await check(
+  "audio_tags partial keeps sfx",
+  async () => normalizePanelAudioTags({ sfx: ["boom"] }),
+  /^returned \{"ambience":\[\],"sfx":\["boom"\],"music_mood":"transition_neutral"\}$/,
+);
+await check(
+  "mapPanelRows audio_tags",
+  async () => panelRows.map((r) => r.audio_tags),
+  new RegExp(String.raw`^returned \[(${fullTags},){5}${fullTags}\]$`),
+);
+
+// #221: a page with no panels (a cover, full-page art) comes back with an
+// empty panel list and a null panel image size, while the bubble and
+// segmentation predictions carry the real one. Its bubbles must be read.
+const nullImage = { width: null, height: null };
+const pageImage = { width: 1000, height: 1500 };
+const bubbleBox = { x: 50, y: 60, width: 20, height: 10, confidence: 0.9 };
+const noPanelPage: RoboflowSam3Output = {
+  panel_predictions: { image: nullImage, predictions: [] },
+  bubble_predictions: { image: pageImage, predictions: [bubbleBox] },
+  segmentation_predictions: { image: pageImage, predictions: [] },
+};
+const noPanelParsed = String.raw`\{"panelPredictions":\[\],"image":\{"width":1000,"height":1500\},"bubblePredictions":\[\{"x":50,"y":60,"width":20,"height":10,"confidence":0.9\}\],"segmentationPredictions":\[\]\}`;
+await check(
+  "no-panel page parses",
+  async () => parseRoboflowSam3Output(noPanelPage),
+  new RegExp(`^returned ${noPanelParsed}$`),
+);
+await check(
+  "no-panel page, size from segmentation",
+  async () =>
+    parseRoboflowSam3Output({
+      ...noPanelPage,
+      bubble_predictions: { predictions: [] },
+      segmentation_predictions: {
+        image: { width: 800, height: 1200 },
+        predictions: [],
+      },
+    }),
+  /"image":\{"width":800,"height":1200\}/,
+);
+await check(
+  "no-panel page, bubble_predictions missing",
+  async () =>
+    parseRoboflowSam3Output({
+      panel_predictions: noPanelPage.panel_predictions,
+      segmentation_predictions: noPanelPage.segmentation_predictions,
+    }),
+  /^returned null$/,
+);
+await check(
+  "panel boxes with a null panel image size",
+  async () =>
+    parseRoboflowSam3Output({
+      ...noPanelPage,
+      panel_predictions: { image: nullImage, predictions: [bubbleBox] },
+    }),
+  /^returned null$/,
+);
+await check(
+  "no-panel page, no image size anywhere",
+  async () =>
+    parseRoboflowSam3Output({
+      panel_predictions: { image: nullImage, predictions: [] },
+      bubble_predictions: { image: nullImage, predictions: [bubbleBox] },
+      segmentation_predictions: { predictions: [] },
+    }),
+  /^returned null$/,
+);
+await check(
+  "SAM3 no-panel page is not a failed page",
+  () =>
+    readSam3Response(
+      async () => new Response(JSON.stringify({ outputs: [noPanelPage] })),
+    ),
+  new RegExp(`^returned \\{"parsed":${noPanelParsed}\\}$`),
+);
+
+// The foreground mapping (#219), the one helper the workflow step and
+// backfill-panels both call. The panels rows the step reads are the real
+// thing here, so the case goes through `mapPanelRows`' own formula instead of
+// a hand copy of it. Each polygon is up to 50 vertices, so the case prints
+// the per-panel summary and an FNV-1a digest of the exact JSON: the digest
+// moves if any coordinate moves.
+const foregroundPanels = panelRows.map((p) => ({
+  bounding_box: p.bounding_box as {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  },
+}));
+
+function digest(json: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < json.length; i++) {
+    h ^= json.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}
+
+function foregroundSummary(
+  polys: ReturnType<typeof mapForegroundPolygons>,
+): string {
+  return polys
+    .map(
+      (p, i) =>
+        `p${i} ${p.characters.length}c[${p.characters
+          .map((q) => q.length)
+          .join(",")}] ${p.bubbles.length}b[${p.bubbles
+          .map((q) => q.length)
+          .join(",")}]`,
+    )
+    .join(" ");
+}
+
+const savedForeground = mapForegroundPolygons(
+  foregroundPanels,
+  imgDims,
+  fixture.segmentation_predictions.predictions,
+);
+await check(
+  "saved page maps to foreground polygons",
+  async () => ({
+    digest: digest(JSON.stringify(savedForeground)),
+    polygons: foregroundSummary(savedForeground),
+  }),
+  // Produced by the inline mapping in extractForegroundMasksBatch before
+  // #219, on this same fixture: 66 character and 10 bubble polygons, every
+  // coordinate unchanged.
+  /^returned \{"digest":"308afb80","polygons":"p0 0c\[\] 3b\[15,20,27\] p1 15c\[16,7,24,38,23,25,5,38,9,7,15,10,8,8,8\] 1b\[12\] p2 14c\[37,23,28,27,24,20,6,5,5,12,5,12,6,7\] 2b\[11,10\] p3 13c\[22,46,20,11,15,17,9,13,10,9,11,9,9\] 1b\[12\] p4 1c\[26\] 2b\[10,11\] p5 23c\[29,7,26,48,41,30,14,14,30,4,13,3,21,12,32,38,12,8,8,14,13,12,9\] 1b\[13\]"\}$/,
+);
+await check(
+  "one panel, one character: centroid picks the panel, panel-local and unclamped",
+  async () => {
+    const poly = [
+      { x: 100, y: 100 },
+      { x: 300, y: 100 },
+      { x: 300, y: 300 },
+      { x: 100, y: 300 },
+    ];
+    return mapForegroundPolygons(
+      [{ bounding_box: { x: 0.5, y: 0.5, w: 0.5, h: 0.5 } }],
+      { width: 400, height: 400 },
+      [{ class: "comic character", points: poly }],
+    );
+  },
+  /^returned \[\{"characters":\[\[\{"x":-0.5,"y":-0.5\},\{"x":0.5,"y":-0.5\},\{"x":0.5,"y":0.5\},\{"x":-0.5,"y":0.5\}\]\],"bubbles":\[\]\}\]$/,
+);
+await check(
+  "two overlapping panels: the polygon goes to the first one only",
+  async () =>
+    mapForegroundPolygons(
+      [
+        { bounding_box: { x: 0, y: 0, w: 0.8, h: 1 } },
+        { bounding_box: { x: 0.5, y: 0, w: 0.5, h: 1 } },
+      ],
+      { width: 100, height: 100 },
+      [
+        {
+          class: "comic character",
+          points: [
+            { x: 50, y: 10 },
+            { x: 79, y: 10 },
+            { x: 79, y: 89 },
+            { x: 50, y: 89 },
+          ],
+        },
+      ],
+    ),
+  /^returned \[\{"characters":\[\[\{"x":0.625,"y":0.1\},\{"x":0.9875,"y":0.1\},\{"x":0.9875,"y":0.89\},\{"x":0.625,"y":0.89\}\]\],"bubbles":\[\]\},\{"characters":\[\],"bubbles":\[\]\}\]$/,
+);
+await check(
+  "a polygon whose centroid is in no panel is dropped",
+  async () =>
+    mapForegroundPolygons(
+      [{ bounding_box: { x: 0, y: 0, w: 0.25, h: 0.25 } }],
+      { width: 100, height: 100 },
+      [
+        {
+          class: "speech bubble",
+          points: [
+            { x: 80, y: 80 },
+            { x: 99, y: 80 },
+            { x: 99, y: 99 },
+          ],
+        },
+      ],
+    ),
+  /^returned \[\{"characters":\[\],"bubbles":\[\]\}\]$/,
+);
+await check(
+  "fewer than three points is not a polygon",
+  async () =>
+    mapForegroundPolygons(
+      [{ bounding_box: { x: 0, y: 0, w: 1, h: 1 } }],
+      { width: 100, height: 100 },
+      [
+        {
+          class: "face",
+          points: [
+            { x: 10, y: 10 },
+            { x: 90, y: 90 },
+          ],
+        },
+      ],
+    ),
+  /^returned \[\{"characters":\[\],"bubbles":\[\]\}\]$/,
+);
+await check(
+  "an unlisted class is not a character or a bubble",
+  async () =>
+    mapForegroundPolygons(
+      [{ bounding_box: { x: 0, y: 0, w: 1, h: 1 } }],
+      { width: 100, height: 100 },
+      [
+        {
+          class: "speed lines",
+          points: [
+            { x: 10, y: 10 },
+            { x: 90, y: 10 },
+            { x: 90, y: 90 },
+          ],
+        },
+      ],
+    ),
+  /^returned \[\{"characters":\[\],"bubbles":\[\]\}\]$/,
+);
+await check(
+  "no panels in, no polygons out",
+  async () => mapForegroundPolygons([], { width: 100, height: 100 }, []),
+  /^returned \[\]$/,
 );
 
 if (failed > 0) {
