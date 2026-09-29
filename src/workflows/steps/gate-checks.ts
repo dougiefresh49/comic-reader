@@ -1,5 +1,7 @@
+import { getWorkflowMetadata } from "workflow";
 import type { Json } from "~/types/database";
 import type { UnresolvedFaceCounts } from "./gate-counts";
+import { updateRunSteps } from "./pipeline-runs";
 
 export type { UnresolvedFaceCounts };
 
@@ -39,9 +41,9 @@ export async function countPendingNewCharacters(
 }
 
 /**
- * Append a skip record to pipeline_runs.steps.skipped on the latest
- * status='running' row for (book_id, issue_id). If no such row exists,
- * log and return the record unchanged.
+ * Append a skip record to pipeline_runs.steps.skipped on this run's row
+ * (updateRunSteps matches it by runId). A missing row or a failed write is
+ * logged; the record is returned either way.
  */
 export async function recordGateSkip(
   bookId: string,
@@ -61,52 +63,20 @@ export async function recordGateSkip(
     at: new Date().toISOString(),
   };
 
-  const { data: rows, error: selectError } = await client
-    .from("pipeline_runs")
-    .select("id, steps")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("status", "running")
-    .order("started_at", { ascending: false })
-    .limit(1);
-
-  if (selectError) {
-    console.log(
-      `[gate-skip] pipeline_runs select failed for ${bookId}/${issueId}: ${selectError.message}`,
-    );
-    return record;
-  }
-
-  const row = rows?.[0];
-  if (!row) {
-    console.log(
-      `[gate-skip] no running pipeline_runs row for ${bookId}/${issueId}; skip not persisted`,
-    );
-    return record;
-  }
-
-  const prev =
-    row.steps !== null &&
-    typeof row.steps === "object" &&
-    !Array.isArray(row.steps)
-      ? (row.steps as Record<string, Json | undefined>)
-      : {};
-  const prevSkipped = Array.isArray(prev.skipped) ? prev.skipped : [];
-  const nextSteps = {
-    ...prev,
-    skipped: [...prevSkipped, record as Json],
-  } as Json;
-
-  const { error: updateError } = await client
-    .from("pipeline_runs")
-    .update({ steps: nextSteps })
-    .eq("id", row.id);
-
-  if (updateError) {
-    console.log(
-      `[gate-skip] pipeline_runs update failed for ${bookId}/${issueId}: ${updateError.message}`,
-    );
-  }
+  await updateRunSteps(
+    client,
+    bookId,
+    issueId,
+    getWorkflowMetadata().workflowRunId,
+    (steps) => ({
+      ...steps,
+      skipped: [
+        ...(Array.isArray(steps.skipped) ? steps.skipped : []),
+        record as Json,
+      ],
+    }),
+    "gate-skip",
+  );
 
   return record;
 }
