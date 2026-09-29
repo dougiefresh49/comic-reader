@@ -22,10 +22,16 @@ interface BubbleRow {
   audio_storage_path: string | null;
   page_number: number;
   sort_order: number;
+  audio_timestamps?: TimestampRow | TimestampRow[] | null;
 }
 
+/**
+ * The embedded `audio_timestamps` row for a bubble. `bubble_id` is unique
+ * over the FK to `bubbles`, so PostgREST returns one row, as an object. The
+ * array form is accepted so a shape change reads as a missing take rather
+ * than a crash.
+ */
 interface TimestampRow {
-  bubble_id: string;
   alignment: AudioTimestamps["alignment"];
   normalized_alignment: AudioTimestamps["normalized_alignment"];
 }
@@ -66,6 +72,10 @@ function rowToBubble(row: BubbleRow): Bubble {
 
 /**
  * Fetches page data including bubbles and audio timestamps for a given comic page
+ *
+ * The timestamps come back embedded on the bubble row, so one statement
+ * answers both. A second read could land after a regenerate swapped the
+ * audio path and paired one take's path with another's word timings.
  */
 export async function getPageData(
   bookId: string,
@@ -81,7 +91,7 @@ export async function getPageData(
     const { data: bubbleRows, error: bubbleError } = await supabase
       .from("bubbles")
       .select(
-        "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order",
+        "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment)",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
@@ -94,27 +104,14 @@ export async function getPageData(
     }
 
     const rows = (bubbleRows ?? []) as BubbleRow[];
-    const bubbleIds = rows.map((r) => r.id);
-
-    let tsRows: TimestampRow[] = [];
-    if (bubbleIds.length > 0) {
-      const { data: tsData, error: tsError } = await supabase
-        .from("audio_timestamps")
-        .select("bubble_id, alignment, normalized_alignment")
-        .eq("book_id", bookId)
-        .eq("issue_id", issueId)
-        .in("bubble_id", bubbleIds);
-
-      if (tsError) {
-        console.error("getPageData timestamps:", tsError);
-      } else {
-        tsRows = (tsData ?? []) as TimestampRow[];
-      }
-    }
 
     const timestamps: Record<string, AudioTimestamps> = {};
-    for (const ts of tsRows) {
-      timestamps[ts.bubble_id] = {
+    for (const row of rows) {
+      const embedded = row.audio_timestamps;
+      if (!embedded) continue;
+      const ts = Array.isArray(embedded) ? embedded[0] : embedded;
+      if (!ts) continue;
+      timestamps[row.id] = {
         alignment: ts.alignment ?? null,
         normalized_alignment: ts.normalized_alignment ?? null,
       };
