@@ -102,8 +102,8 @@ function isStringArray(value: unknown): value is string[] {
  * Turn a stored `panels.audio_tags` value into a complete PanelAudioTags.
  * The column default is `{}`, and a panel row holding it 500'd the reader
  * (#222), so each field is checked on its own: a field with the right type
- * is kept, a missing or wrong-typed one comes from the default. Returns
- * fresh arrays, never the default's.
+ * is kept, a missing or wrong-typed one comes from the default. A fallback
+ * array is a copy, so callers never share the default's own arrays.
  */
 export function normalizePanelAudioTags(value: unknown): PanelAudioTags {
   const tags =
