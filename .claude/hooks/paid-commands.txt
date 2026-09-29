@@ -1,0 +1,30 @@
+# Paid-command list v1, shared by the PreToolUse guards (#85).
+# One rule per line, so adding a paid command is a one-line change.
+#
+# Line forms:
+#   <ERE> :: <reason>            matched against the whole command line
+#   <ERE> && <ERE> :: <reason>   several conditions, all of which must hold
+#   @from-step:<step-id> :: <reason>   paid only when ingest resumes at or
+#                                     after <step-id>; the step order is read
+#                                     from scripts/ingest.ts at run time
+#   file:<path> :: <reason>       an Edit or Write to that path is guarded
+#
+# Lines starting with # are comments. Pattern matching names the package.json
+# scripts, so `pnpm generate-audio` is caught and `pnpm generate-audio-thing`
+# is not. The character class around each script name is what buys that.
+
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?generate-audio([^[:alnum:]_-]|$) :: Paid: generate-audio synthesizes the whole issue with ElevenLabs. Re-run it as LIVE_API_OK=1 pnpm generate-audio ... only if the task named that spend.
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?generate-voice-models([^[:alnum:]_-]|$) :: Paid: Voice Design takes real ElevenLabs voice slots, and the account is at its cap. Re-run it as LIVE_API_OK=1 pnpm generate-voice-models ... only if the task named that spend.
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?regenerate-timestamps([^[:alnum:]_-]|$) :: Paid: regenerating timestamps re-calls ElevenLabs for every cue. Re-run it as LIVE_API_OK=1 pnpm regenerate-timestamps ... only if the task named that spend.
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?get-context([^[:alnum:]_-]|$) :: Paid: get-context runs a Gemini call per issue. Re-run it as LIVE_API_OK=1 pnpm get-context ... only if the task named that spend.
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?motion-comic([^[:alnum:]_-]|$) :: Paid: motion-comic calls Gemini for the motion plan. Re-run it as LIVE_API_OK=1 pnpm motion-comic ... only if the task named that spend.
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?split-voice([^[:alnum:]_-]|$) :: Paid: split-voice builds a new voice, which takes a voice slot. Re-run it as LIVE_API_OK=1 pnpm split-voice ... only if the task named that spend.
+(^|[^[:alnum:]_-])pnpm[[:space:]]+(run[[:space:]]+)?voice-rotation([^[:alnum:]_-]|$).*--(archive|restore|execute)([^[:alnum:]_-]|$) :: Paid: that flag renames or deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation ... only if the task named that spend.
+# A GET is free, so this asks for two things at once (the " && " form): the
+# host is ElevenLabs, and the method is not GET. The method is spelled out in
+# character classes because macOS grep has no case-insensitive mode.
+curl.*api\.elevenlabs\.io && .*(-[Xx][[:space:]]*([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|--request[[:space:]]*([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|(-[dFT][[:space:]]|--data|--form|--upload-file)) :: Paid: that is a write against the ElevenLabs API, not a GET. Re-run it as LIVE_API_OK=1 curl ... only if the task named that spend.
+@from-step:generate-voice-models :: Paid: resuming ingest at or after this step re-spends ElevenLabs credits and voice slots. Re-run it as LIVE_API_OK=1 pnpm ingest -- ... --from-step <step> only if the task named that spend.
+file:src/lib/models.ts :: Paid: this file holds the Gemini model ids and caps. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
+file:src/lib/voice-settings.ts :: Paid: this file holds the voice settings for paid synthesis. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
+file:src/lib/tts-request.ts :: Paid: this file builds the ElevenLabs TTS request. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
