@@ -33,6 +33,7 @@ covers UI/UX, code quality, API design, and copy.
 | sonnet-5      | 5    | 5            | 7     | Agent/Workflow `model: 'sonnet'`                                                     |
 | opus-5.5      | 8    | 8            | 7     | Agent/Workflow `model: 'opus'`                                                       |
 | fable-5.1     | 2    | 9            | 9     | Agent/Workflow `model: 'fable'`                                                      |
+| space-bunny   | 10   | 7?           | ?     | `claude-bunny` (OpenRouter `stealth/space-bunny-alpha`), see below                   |
 
 **opus-5.5 vs fable-5.1** (config from outside evidence, not yet
 auditioned here: Theo's day-one video "Anthropic Actually Fixed Opus",
@@ -132,6 +133,27 @@ https://www.youtube.com/watch?v=jLgpzgpsWPc, cited by timestamp; fleet
   over an hour (24:11-24:41). The fast, cheap grok Theo liked was 4.5
   (24:11). His verdict on 4.7 overall: a bit of a flop and a stepping
   stone (25:39-26:44).
+
+**space-bunny-alpha** (config from one audition here, row 146 in this
+repo's `docs/decisions.md`; the `7?` and `?` are placeholders, not
+scores):
+
+- An OpenRouter stealth model, $0 per token while in stealth. It runs
+  in the full Claude Code harness through `~/.local/bin/claude-bunny`,
+  which sets the OpenRouter env for that one process, so AGENTS.md,
+  CLAUDE.md and the hooks all apply. It is not an Agent tool model;
+  launch it from Bash in its own worktree like cursor-agent.
+- Delegate runs need `--strict-mcp-config`. With a custom
+  `ANTHROPIC_BASE_URL` Claude Code loads every MCP tool schema up front,
+  and the first #219 run filled its context with 163 Roboflow tools and
+  stopped with auto-compact thrashing.
+- On #219 (a bounded logic refactor) it built a diff that matched the
+  old behavior exactly in 3 minutes, and fixed the review's three nits
+  in 1. Treat it as a builder candidate, not a lane: one data point,
+  no taste read, and no longer or judgment-heavy run yet.
+- Stealth models often log prompts for their maker and can vanish or
+  start charging. Its logging policy wasn't on its page. Keep secrets
+  out of what it reads beyond the worktree `.env`.
 
 How to apply:
 
