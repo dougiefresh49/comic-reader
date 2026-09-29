@@ -141,9 +141,9 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 2: Human Review, Character Clusters ─────────────────────
     if (run("review-clusters")) {
       currentStep = "review-clusters";
-      await recordStepStart(bookId, issueId, currentStep);
       const faces = await countUnresolvedFaces(bookId, issueId);
       if (faces.total === 0) {
+        await recordStepStart(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(
           bookId,
@@ -158,7 +158,11 @@ export async function ingestPipeline(input: IngestInput) {
         console.log(
           `[review-clusters] skipped: 0 unresolved faces for ${bookId}/${issueId}`,
         );
+        await recordStepEnd(bookId, issueId, currentStep);
       } else {
+        // No work between the gate opening and closing, so this step gets no
+        // window of its own: the pause is the gate wait's row, not a step's
+        // time (#255).
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using clusterHook = createHook<{ approved: boolean }>({
@@ -167,7 +171,6 @@ export async function ingestPipeline(input: IngestInput) {
         await clusterHook;
         await recordGateWait(bookId, issueId, currentStep, "close");
       }
-      await recordStepEnd(bookId, issueId, currentStep);
     }
 
     // ── Phase 3: OCR + Context ────────────────────────────────────────
@@ -195,23 +198,22 @@ export async function ingestPipeline(input: IngestInput) {
 
     if (run("review-pages")) {
       currentStep = "review-pages";
+      // Gate only, same shape as review-clusters: the wait is its own row.
       await updatePipelineStep(bookId, issueId, currentStep, true);
-      await recordStepStart(bookId, issueId, currentStep);
       await recordGateWait(bookId, issueId, currentStep, "open");
       using pageReviewHook = createHook<{ approved: boolean }>({
         token: `ingest:${bookId}/${issueId}/page-review`,
       });
       await pageReviewHook;
       await recordGateWait(bookId, issueId, currentStep, "close");
-      await recordStepEnd(bookId, issueId, currentStep);
     }
 
     // ── Phase 5: New characters, then voice descriptions ──────────────
     if (run("review-new-characters")) {
       currentStep = "review-new-characters";
-      await recordStepStart(bookId, issueId, currentStep);
       const pendingCount = await countPendingNewCharacters(bookId, issueId);
       if (pendingCount === 0) {
+        await recordStepStart(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(
           bookId,
@@ -223,7 +225,9 @@ export async function ingestPipeline(input: IngestInput) {
         console.log(
           `[review-new-characters] skipped: 0 pending for ${bookId}/${issueId}`,
         );
+        await recordStepEnd(bookId, issueId, currentStep);
       } else {
+        // Gate only, same shape as review-clusters.
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using characterHook = createHook<{ approved: boolean }>({
@@ -232,7 +236,6 @@ export async function ingestPipeline(input: IngestInput) {
         await characterHook;
         await recordGateWait(bookId, issueId, currentStep, "close");
       }
-      await recordStepEnd(bookId, issueId, currentStep);
     }
 
     if (run("generate-voice-descriptions")) {
@@ -246,7 +249,6 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 6: Casting ──────────────────────────────────────────────
     if (run("casting")) {
       currentStep = "casting";
-      await recordStepStart(bookId, issueId, currentStep);
       const casting = await createCastingTasks(bookId, issueId);
       const unresolved = casting.unresolved.length;
       // Unresolved speakers pause the gate too. Resuming it accepts them as
@@ -257,6 +259,7 @@ export async function ingestPipeline(input: IngestInput) {
           casting.cast === casting.speakers
             ? "all speakers cast"
             : "no speakers pending or unresolved";
+        await recordStepStart(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(bookId, issueId, "casting", reason, {
           speakers: casting.speakers,
@@ -267,6 +270,7 @@ export async function ingestPipeline(input: IngestInput) {
         console.log(
           `[casting] skipped: ${reason} (${casting.cast} of ${casting.speakers} cast, 0 unresolved)`,
         );
+        await recordStepEnd(bookId, issueId, currentStep);
       } else {
         console.log(
           `[casting] paused: ${casting.cast} of ${casting.speakers} cast, ${casting.pending} pending, ${unresolved} unresolved${unresolved > 0 ? `: ${casting.unresolved.join(", ")}` : ""}`,
@@ -278,14 +282,17 @@ export async function ingestPipeline(input: IngestInput) {
         });
         await castingHook;
         await recordGateWait(bookId, issueId, currentStep, "close");
+        // The only work here is after the gate, so the window opens once the
+        // pause is recorded and the wait is out of it.
+        await recordStepStart(bookId, issueId, currentStep);
         const silenced = await acceptUnresolvedAsSilent(bookId, issueId);
         if (silenced.length > 0) {
           console.log(
             `[casting] resumed: ${silenced.length} unresolved speakers accepted as silent: ${silenced.join(", ")}`,
           );
         }
+        await recordStepEnd(bookId, issueId, currentStep);
       }
-      await recordStepEnd(bookId, issueId, currentStep);
     }
 
     // ── Phase 7: Voice Generation ─────────────────────────────────────
