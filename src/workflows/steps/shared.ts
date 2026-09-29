@@ -1,13 +1,27 @@
+import { getWorkflowMetadata } from "workflow";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { FatalError } from "workflow";
 import { pageStoragePath } from "~/lib/storage";
 import { updateIssue } from "~/lib/issue-queries";
+import { updateRunSteps } from "./pipeline-runs";
 
 export interface PageMeta {
   pageNumber: number;
   width: number;
   height: number;
 }
+
+/**
+ * One step's wall-clock window on pipeline_runs.steps.timings, keyed by the
+ * step name. `endedAt` is absent while the step is still running, so a run
+ * that died mid-step shows which step it died in. `pages` is set on the
+ * page-looping steps so seconds per page falls out of the same query (#255).
+ */
+export type StepTiming = {
+  startedAt: string;
+  endedAt?: string;
+  pages?: number;
+};
 
 export type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
@@ -103,6 +117,78 @@ export async function updatePipelineStep(
   if (paused && pauseUrl) {
     await notifySlack(bookId, issueId, step, pauseUrl);
   }
+}
+
+/**
+ * Read-modify-write of this run's timings. Shared by recordStepStart and
+ * recordStepEnd so the jsonb shape has one home. updateRunSteps is the
+ * compare-and-swap writer and logs its own failures.
+ */
+async function writeStepTiming(
+  client: Parameters<typeof updateRunSteps>[0],
+  bookId: string,
+  issueId: string,
+  step: string,
+  apply: (previous: StepTiming | undefined) => StepTiming,
+): Promise<void> {
+  await updateRunSteps(
+    client,
+    bookId,
+    issueId,
+    getWorkflowMetadata().workflowRunId,
+    (steps) => {
+      const timings = { ...((steps.timings as object) ?? {}) } as Record<
+        string,
+        StepTiming
+      >;
+      return {
+        ...steps,
+        timings: { ...timings, [step]: apply(timings[step]) },
+      };
+    },
+    "step-timing",
+  );
+}
+
+/**
+ * Open this step's timing window. A step: the clock inside the step, never
+ * in the workflow body, because the body replays and its `Date` is seeded
+ * (#255). `pages` is the page count for the page-looping steps.
+ */
+export async function recordStepStart(
+  bookId: string,
+  issueId: string,
+  step: string,
+  pages?: number,
+): Promise<void> {
+  "use step";
+  const { createTypedStepClient } = await import("../step-utils");
+  const client = await createTypedStepClient();
+  const startedAt = new Date().toISOString();
+
+  await writeStepTiming(client, bookId, issueId, step, (previous) => ({
+    ...previous,
+    startedAt,
+    ...(pages === undefined ? {} : { pages }),
+  }));
+}
+
+/** Close this step's timing window. Keeps the start and page count. */
+export async function recordStepEnd(
+  bookId: string,
+  issueId: string,
+  step: string,
+): Promise<void> {
+  "use step";
+  const { createTypedStepClient } = await import("../step-utils");
+  const client = await createTypedStepClient();
+  const endedAt = new Date().toISOString();
+
+  await writeStepTiming(client, bookId, issueId, step, (previous) => ({
+    ...previous,
+    startedAt: previous?.startedAt ?? endedAt,
+    endedAt,
+  }));
 }
 
 export async function markPipelineFailed(
