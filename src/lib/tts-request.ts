@@ -43,17 +43,32 @@ export interface TtsRequestOptions {
    *   returns for every emotion.
    * - `voice_settings.use_speaker_boost`: a boolean, server default true. It
    *   raises resemblance to the original speaker and costs latency. The
-   *   reference documents no `eleven_v3` behaviour that overrides this, and
-   *   the voice-settings table has no field for it, so every request leaves
-   *   it to the server default.
+   *   voice-settings table has no field for it, so every request leaves it to
+   *   the server default.
    * - `model_id`: defaults to `eleven_multilingual_v2` when omitted.
-   *
-   * The reference carries nothing model-specific about which voice settings
-   * `eleven_v3` honours or ignores, so nothing here says v3 drops any of
-   * them. Confirming it needs a live call, which this lane does not spend.
    */
   withContext?: boolean;
 }
+
+/**
+ * What `eleven_v3` does with `voiceSettings`, read 2026-09-29, no call made.
+ *
+ * `stability` and `style` are available on v3 and are the only two settings
+ * that reach the model. ElevenLabs documents, on the Text to Speech playground
+ * page (https://elevenlabs.io/docs/eleven-creative/playground/text-to-speech#voice-settings):
+ *
+ * - "Speed is not available for the Eleven v3 model."
+ * - "Similarity is not available for the Eleven v3 model."
+ * - "Speaker Boost is not available for the Eleven v3 model."
+ *
+ * So `speed` and `similarityBoost` are sent on every request and dropped by
+ * v3. The builder still sends them: the request is one object for every call
+ * site, and dropping fields per model belongs to #111, which owns the
+ * settings table. The consequence worth knowing: `getVoiceSettingsFromEmotion`
+ * varies `speed` per emotion and holds `similarityBoost` at a constant 0.75,
+ * so on v3 only the `stability` and `style` columns in that table change what
+ * a kid hears. `speed` is inert until the model or the table changes.
+ */
 
 /** The SDK's `BodyTextToSpeechFullWithTimestamps`, narrowed to what we send. */
 export interface TtsRequest {
