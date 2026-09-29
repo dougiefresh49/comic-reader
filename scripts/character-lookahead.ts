@@ -304,6 +304,15 @@ async function main() {
   }
 
   if (!overwrite && (await fs.pathExists(CACHE_PATH))) {
+    const cached = (await fs.readJSON(CACHE_PATH)) as {
+      failedPages?: string[];
+    };
+    if (cached.failedPages?.length) {
+      console.error(
+        `\n❌ character-lookahead for ${book}/${issue} skipped ${cached.failedPages.join(", ")} last run. Rerun with --overwrite.\n`,
+      );
+      process.exit(1);
+    }
     console.log(
       `\n✅ character-lookahead already complete for ${book}/${issue} (use --overwrite to rerun)\n`,
     );
@@ -358,7 +367,11 @@ async function main() {
     clusterId: number;
     bboxPanelLocal: { x: number; y: number; w: number; h: number };
   }> = [];
-  const failedPages: Array<{ label: string; reason: string }> = [];
+  const failedPages: Array<{
+    pageNumber: number;
+    label: string;
+    reason: string;
+  }> = [];
 
   for (const filename of sidecars) {
     const pageNum = parseInt(
@@ -383,7 +396,11 @@ async function main() {
         : crops.map(() => undefined);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
-      failedPages.push({ label: `page-${padded}`, reason });
+      failedPages.push({
+        pageNumber: pageNum,
+        label: `page-${padded}`,
+        reason,
+      });
       console.warn(
         `   ⚠ page-${padded}: exemplar read failed, page skipped: ${reason}`,
       );
@@ -510,8 +527,11 @@ async function main() {
   const panelsByPage = await getPanelsByPage(bookId, issueId);
 
   if (overwrite) {
+    // A skipped page has no new rows, so its stored detections stay.
+    const skipped = new Set(failedPages.map((f) => f.pageNumber));
     const allPanelIds: string[] = [];
-    for (const panels of panelsByPage.values()) {
+    for (const [pageNumber, panels] of panelsByPage) {
+      if (skipped.has(pageNumber)) continue;
       for (const p of panels) allPanelIds.push(p.id);
     }
     if (allPanelIds.length > 0) {
@@ -598,7 +618,7 @@ async function main() {
     );
     for (const f of failedPages) console.error(`   ${f.label}: ${f.reason}`);
     console.error(
-      `   A rerun without --overwrite reports this issue complete. Rerun with --overwrite once the exemplar store answers.\n`,
+      `   Rerun with --overwrite once the exemplar store answers. That rerun pays again for every page.\n`,
     );
     process.exitCode = 1;
     return;
