@@ -46,24 +46,26 @@ const PIPELINE_AGAIN =
  * The error for a failure at or after the paid ElevenLabs call: what the
  * reader plays now, and that a retry spends credits again. The reader of
  * this text is the owner in the review editor. `unconfirmed` is a switch
- * call that failed with no answer from the database, so it may have saved.
+ * call with no usable answer from the database, so it may have saved;
+ * `readerRoute` is the reader page to check it on.
  */
 function afterSpendError(
   step: Step,
   bubbleId: string,
   hadAudio: boolean,
   message: string,
+  readerRoute = "",
 ) {
   const saved =
     step === "generate"
       ? `Generating audio for bubble ${bubbleId} failed (${message}), and ElevenLabs may have charged for it.`
       : step === "upload"
-        ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
+        ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved${hadAudio ? " and the reader still plays the old audio with its own timings." : `.${PIPELINE_AGAIN}`}`
         : step === "switch"
           ? `Audio for bubble ${bubbleId} was generated and paid for, but its word timings and audio path did not save (${message}), so nothing was saved${hadAudio ? " and the reader still plays the old audio with its own timings." : `.${PIPELINE_AGAIN}`}`
           : step === "unconfirmed"
-            ? `Audio for bubble ${bubbleId} was generated and paid for, but saving its word timings and audio path got no answer from the database (${message}), so it may still have saved: the reader plays either the old take or the new one, each with its own timings. Reload the review page to see which.`
-            : `The new audio and word timings for bubble ${bubbleId} are saved, but the page refresh failed (${message}), so the reader may play the old take for up to a day.`;
+            ? `Audio for bubble ${bubbleId} was generated and paid for, but saving its word timings and audio path got no usable answer from the database (${message}), so it may still have saved. ${hadAudio ? "The reader plays either the old take or the new one, each with its own timings." : "The bubble has either no audio or the new take with its own timings."} Open ${readerRoute} and tap the bubble to hear which.${hadAudio ? "" : " If it has no audio, the next pipeline audio run will generate this bubble again and spend credits."}`
+            : `The new audio and word timings for bubble ${bubbleId} are saved, but the page refresh failed (${message}), so the reader may ${hadAudio ? "play the old take" : "show this bubble with no audio"} for up to a day.`;
   return {
     ok: false as const,
     error: `${saved} Regenerating will spend ElevenLabs credits again.`,
@@ -165,6 +167,20 @@ export async function regenerateAudio(args: Args) {
   const hadAudio = b.audio_storage_path != null;
   const storagePath = `${b.id}-take-${randomUUID().slice(0, 8)}.mp3`;
   const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
+  // A concrete URL with no type: its tag is the page's own pathname tag.
+  const readerRoute = `/book/${args.bookId}/${args.issueId}/${b.page_number}`;
+
+  /** The switch may have saved: refresh the reader page so it shows which. */
+  function unconfirmed(message: string) {
+    try {
+      revalidatePath(readerRoute);
+    } catch (e) {
+      console.warn(
+        `[regenerate-audio] could not refresh ${readerRoute} (${(e as Error).message})`,
+      );
+    }
+    return afterSpendError("unconfirmed", b.id, hadAudio, message, readerRoute);
+  }
 
   let step: Step = "generate";
   try {
@@ -218,15 +234,11 @@ export async function regenerateAudio(args: Args) {
       },
     );
     if (switchErr) {
-      // Only an answer with a code proves the rollback. With no code or
-      // status 0 the transaction may still commit, so the new take stays.
-      if (!switchErr.code || status === 0) {
-        return afterSpendError(
-          "unconfirmed",
-          b.id,
-          hadAudio,
-          switchErr.message,
-        );
+      // Only a coded answer below 500 proves the rollback. With no code,
+      // status 0 or a 5xx the transaction may still commit, so the new take
+      // stays.
+      if (!switchErr.code || status === 0 || status >= 500) {
+        return unconfirmed(switchErr.message);
       }
       const { error: rmErr } = await supabaseAdmin.storage
         .from(AUDIO_BUCKET)
@@ -241,9 +253,7 @@ export async function regenerateAudio(args: Args) {
     }
 
     step = "refresh";
-    // A concrete URL with no type: its tag is the page's own pathname tag.
-    revalidatePath(`/book/${args.bookId}/${args.issueId}/${b.page_number}`);
-    revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
+    revalidatePath(readerRoute);
 
     return {
       ok: true,
@@ -251,11 +261,7 @@ export async function regenerateAudio(args: Args) {
     };
   } catch (e) {
     // A throw from the switch call is an unanswered call too.
-    return afterSpendError(
-      step === "switch" ? "unconfirmed" : step,
-      b.id,
-      hadAudio,
-      (e as Error).message,
-    );
+    if (step === "switch") return unconfirmed((e as Error).message);
+    return afterSpendError(step, b.id, hadAudio, (e as Error).message);
   }
 }

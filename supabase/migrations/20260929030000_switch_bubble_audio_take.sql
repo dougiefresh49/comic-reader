@@ -1,8 +1,9 @@
 -- Switch a bubble to a new audio take in one transaction: the word timings
 -- row and bubbles.audio_storage_path change together or not at all, so the
 -- reader never plays one take against another take's timings (#191).
--- Returns the audio_storage_path the switch replaced, so the caller can
--- remove that object. Raises when no bubbles row matches all three ids.
+-- Returns the audio_storage_path the switch replaced. The regenerate action
+-- keeps that object, because pages rendered before the switch still play it.
+-- Raises when no bubbles row matches all three ids.
 CREATE FUNCTION switch_bubble_audio_take(
   p_bubble_id uuid,
   p_book_id text,
