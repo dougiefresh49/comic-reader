@@ -1043,6 +1043,7 @@ async function main(): Promise<number> {
   try {
     await assertSmokeIds();
     await assertPortFree();
+    checkStop();
     const leftover = await remaining();
     if (leftover.rows + leftover.objects > 0) {
       fail(
