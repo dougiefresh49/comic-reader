@@ -25,6 +25,24 @@ function dbError(label: string, error: { message: string; code?: string }) {
 }
 
 /**
+ * Storage answers a missing object with HTTP 400 and statusCode "404"; that page
+ * has no image to sort, so this returns null and the step skips the page. Any
+ * other failure is a download that didn't finish: a dropped connection comes
+ * back with no status, a gateway failure with a 5xx, and a download can return
+ * neither error nor data. Those return a plain Error so the Workflow retries the
+ * step, which costs nothing because the download runs before the Gemini call.
+ */
+export function downloadError(
+  label: string,
+  error: { message: string; statusCode?: string } | null,
+) {
+  if (error?.statusCode === "404") return null;
+  return new Error(
+    `${label}: page image download failed (${error?.message ?? "no data"})`,
+  );
+}
+
+/**
  * Writes after a paid Gemini call. A Workflow retry would repeat that call, so
  * transient failures re-send only the failed writes here, up to 3 attempts.
  */
@@ -323,6 +341,11 @@ export async function sortPageElements(
     .download(storagePath);
 
   if (dlErr || !imageBlob) {
+    const retry = downloadError(
+      `sort ${bookId}/${issueId} page-${padded}`,
+      dlErr,
+    );
+    if (retry) throw retry;
     console.warn(
       `[sort] ${bookId}/${issueId}: page-${padded}: missing WebP (${dlErr?.message ?? "no data"}), skip`,
     );
