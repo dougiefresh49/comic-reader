@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { supabaseAdmin } from "~/lib/supabase-admin";
 import { getCastingTasks } from "~/server/admin/casting";
+import { planCastingTasks } from "~/workflows/steps/casting-tasks";
 import { CastingClient } from "./CastingClient";
 
 export const dynamic = "force-dynamic";
@@ -8,10 +10,26 @@ interface SearchParams {
   searchParams: Promise<{ book?: string; issue?: string }>;
 }
 
+/** Speakers the casting gate leaves silent on resume; null when the read failed. */
+async function getUnresolvedSpeakers(
+  bookId: string,
+  issueId: string,
+): Promise<string[] | null> {
+  try {
+    const plan = await planCastingTasks(supabaseAdmin, bookId, issueId);
+    return plan.unresolved;
+  } catch (err) {
+    console.error("planCastingTasks:", err);
+    return null;
+  }
+}
+
 export default async function CastingPage({ searchParams }: SearchParams) {
   const sp = await searchParams;
   const tasks = await getCastingTasks(sp.book, sp.issue);
   const hasBookAndIssue = Boolean(sp.book && sp.issue);
+  const unresolvedSpeakers =
+    sp.book && sp.issue ? await getUnresolvedSpeakers(sp.book, sp.issue) : [];
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-neutral-100">
@@ -36,6 +54,7 @@ export default async function CastingPage({ searchParams }: SearchParams) {
         {hasBookAndIssue ? (
           <CastingClient
             initialTasks={tasks}
+            unresolvedSpeakers={unresolvedSpeakers}
             bookId={sp.book}
             issueId={sp.issue}
           />
@@ -51,6 +70,7 @@ export default async function CastingPage({ searchParams }: SearchParams) {
         ) : (
           <CastingClient
             initialTasks={tasks}
+            unresolvedSpeakers={unresolvedSpeakers}
             bookId={sp.book}
             issueId={sp.issue}
           />

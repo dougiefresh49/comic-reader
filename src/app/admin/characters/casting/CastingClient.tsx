@@ -23,11 +23,18 @@ export interface BulkFailure {
 
 interface Props {
   initialTasks: CastingTask[];
+  /** planCastingTasks().unresolved for this issue; null when the read failed. */
+  unresolvedSpeakers: string[] | null;
   bookId?: string;
   issueId?: string;
 }
 
-export function CastingClient({ initialTasks, bookId, issueId }: Props) {
+export function CastingClient({
+  initialTasks,
+  unresolvedSpeakers,
+  bookId,
+  issueId,
+}: Props) {
   const [tasks, setTasks] = useState<CastingTask[]>(initialTasks);
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -281,6 +288,20 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
 
       <BulkFailureList failures={bulkFailures} />
 
+      {!completed && unresolvedSpeakers === null && (
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
+          Could not check for unresolved speakers. See the server log.
+        </div>
+      )}
+
+      {!completed && unresolvedSpeakers && unresolvedSpeakers.length > 0 && (
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
+          <strong className="text-neutral-300">Unresolved speakers:</strong>{" "}
+          {unresolvedSpeakers.join(", ")}. Their bubbles will have no audio if
+          you resume the pipeline.
+        </div>
+      )}
+
       {/* ── Phase 1: Triage — select characters to research ── */}
       {unresearched.length > 0 && (
         <section>
@@ -384,7 +405,9 @@ export function CastingClient({ initialTasks, bookId, issueId }: Props) {
       {tasks.length === 0 && !completed && bookId && issueId && (
         <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 p-6 text-center">
           <p className="mb-3 text-sm text-emerald-200">
-            All characters cast. Ready to resume the pipeline.
+            {unresolvedSpeakers?.length === 0
+              ? "All characters cast. Ready to resume the pipeline."
+              : "No casting tasks left."}
           </p>
           <button
             onClick={handleCompleteCasting}
