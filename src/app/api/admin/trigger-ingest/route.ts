@@ -1,6 +1,7 @@
 import "server-only";
 import { type NextRequest } from "next/server";
-import { getHookByToken, start } from "workflow/api";
+import { getHookByToken, getRun, start } from "workflow/api";
+import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
@@ -40,15 +41,17 @@ export async function POST(req: NextRequest) {
 
   // A paused run holds its gate's hook token (`ingestHookToken`), and every
   // run of this issue uses the same tokens, so a second run fails at that
-  // gate with HookConflictError (#208). Refuse before writing or starting.
+  // gate with HookConflictError (#208). Refuse only while the old run is
+  // live: a pause whose hook is gone, or a row whose run is gone or done, is
+  // stale and passes. A lookup that errors (not a clean not-found) refuses.
   const { data: openRuns, error: openRunsError } = (await supabaseAdmin
     .from("pipeline_runs")
-    .select("steps")
+    .select("id, steps")
     .eq("book_id", body.bookId)
     .eq("issue_id", body.issueId)
     .eq("status", "running")
     .order("started_at", { ascending: false })) as {
-    data: Array<{ steps: { runId?: string } | null }> | null;
+    data: Array<{ id: string; steps: { runId?: string } | null }> | null;
     error: { message: string } | null;
   };
 
@@ -56,32 +59,70 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: openRunsError.message }, { status: 500 });
   }
 
-  if (issue.pipeline_paused || (openRuns?.length ?? 0) > 0) {
-    const pausedAt = issue.pipeline_paused
-      ? (issue.pipeline_paused_at ?? issue.pipeline_step ?? "an unknown step")
-      : null;
-    let runId = openRuns?.[0]?.steps?.runId ?? null;
-    if (issue.pipeline_paused && issue.pipeline_paused_at) {
-      try {
-        const hook = await getHookByToken(
-          ingestHookToken(body.bookId, body.issueId, issue.pipeline_paused_at),
-        );
-        runId = hook.runId;
-      } catch {
-        // No hook for this pause: keep the pipeline_runs run id.
-      }
-    }
-    const state = pausedAt
-      ? `paused at ${pausedAt}`
-      : `running (pipeline_step ${issue.pipeline_step ?? "unknown"})`;
-    return Response.json(
+  const label = `${body.bookId}/${body.issueId}`;
+  const refuse = (runId: string, state: string) =>
+    Response.json(
       {
-        error: `Run ${runId ?? "(run id unknown)"} of ${body.bookId}/${body.issueId} is ${state}. Cancel it first with cancel-ingest, then trigger again. If cancel-ingest answers that the run or its hook is not found, or that the issue is not cancellable, the pause flag or pipeline_runs row is stale and has to be cleared by hand.`,
+        error: `Run ${runId} of ${label} is ${state}. Cancel it first with cancel-ingest, then trigger again.`,
         runId,
-        pausedAt,
+        pausedAt: issue.pipeline_paused ? issue.pipeline_paused_at : null,
         pipelineStep: issue.pipeline_step,
       },
       { status: 409 },
+    );
+  const checkFailed = (what: string, err: unknown) =>
+    Response.json(
+      {
+        error: `Could not check whether ${what} of ${label} is still live, so nothing was started: ${err instanceof Error ? err.message : String(err)}`,
+      },
+      { status: 409 },
+    );
+  const stale: string[] = [];
+
+  if (issue.pipeline_paused && issue.pipeline_paused_at) {
+    const pausedAt = issue.pipeline_paused_at;
+    try {
+      const hook = await getHookByToken(
+        ingestHookToken(body.bookId, body.issueId, pausedAt),
+      );
+      return refuse(hook.runId, `paused at ${pausedAt}`);
+    } catch (err) {
+      const notFound =
+        HookNotFoundError.is(err) ||
+        (err instanceof Error && /hook not found/i.test(err.message));
+      if (!notFound) return checkFailed(`the run paused at ${pausedAt}`, err);
+      stale.push(`pause flag at ${pausedAt} with no hook`);
+    }
+  } else if (issue.pipeline_paused) {
+    stale.push("pause flag with no pipeline_paused_at");
+  }
+
+  for (const row of openRuns ?? []) {
+    const runId = row.steps?.runId;
+    if (!runId) {
+      stale.push(`running row ${row.id} with no runId`);
+      continue;
+    }
+    try {
+      const status = await getRun(runId).status;
+      if (status === "pending" || status === "running") {
+        return refuse(
+          runId,
+          `${status} (pipeline_step ${issue.pipeline_step ?? "unknown"})`,
+        );
+      }
+      stale.push(`running row ${row.id} whose run ${runId} is ${status}`);
+    } catch (err) {
+      if (!WorkflowRunNotFoundError.is(err)) {
+        return checkFailed(`run ${runId}`, err);
+      }
+      stale.push(`running row ${row.id} whose run ${runId} is not found`);
+    }
+  }
+
+  if (stale.length > 0) {
+    console.log(
+      `[trigger-ingest] ${label}: treating as stale, starting anyway: ${stale.join("; ")}`,
     );
   }
 
