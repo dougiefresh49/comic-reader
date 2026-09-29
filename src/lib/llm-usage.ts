@@ -130,12 +130,18 @@ function errorText(err: unknown): string {
 
 let client: SupabaseClient | undefined;
 
+/** A stalled insert must not hold a step after the paid call returned. */
+const INSERT_TIMEOUT_MS = 5000;
+
 async function insertRow(row: LlmCallRow): Promise<void> {
   if (!client) {
     const { createStepClient } = await import("~/workflows/step-utils");
     client = await createStepClient();
   }
-  const { error } = await client.from("llm_calls").insert(row);
+  const { error } = await client
+    .from("llm_calls")
+    .insert(row)
+    .abortSignal(AbortSignal.timeout(INSERT_TIMEOUT_MS));
   if (error) throw new Error(error.message);
 }
 
