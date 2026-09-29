@@ -509,6 +509,73 @@ await check(
   new RegExp(String.raw`^returned \[(${fullTags},){5}${fullTags}\]$`),
 );
 
+// #221: a page with no panels (a cover, full-page art) comes back with an
+// empty panel list and a null panel image size, while the bubble and
+// segmentation predictions carry the real one. Its bubbles must be read.
+const nullImage = { width: null, height: null };
+const pageImage = { width: 1000, height: 1500 };
+const bubbleBox = { x: 50, y: 60, width: 20, height: 10, confidence: 0.9 };
+const noPanelPage: RoboflowSam3Output = {
+  panel_predictions: { image: nullImage, predictions: [] },
+  bubble_predictions: { image: pageImage, predictions: [bubbleBox] },
+  segmentation_predictions: { image: pageImage, predictions: [] },
+};
+const noPanelParsed = String.raw`\{"panelPredictions":\[\],"image":\{"width":1000,"height":1500\},"bubblePredictions":\[\{"x":50,"y":60,"width":20,"height":10,"confidence":0.9\}\],"segmentationPredictions":\[\]\}`;
+await check(
+  "no-panel page parses",
+  async () => parseRoboflowSam3Output(noPanelPage),
+  new RegExp(`^returned ${noPanelParsed}$`),
+);
+await check(
+  "no-panel page, size from segmentation",
+  async () =>
+    parseRoboflowSam3Output({
+      ...noPanelPage,
+      bubble_predictions: { predictions: [] },
+      segmentation_predictions: {
+        image: { width: 800, height: 1200 },
+        predictions: [],
+      },
+    }),
+  /"image":\{"width":800,"height":1200\}/,
+);
+await check(
+  "no-panel page, bubble_predictions missing",
+  async () =>
+    parseRoboflowSam3Output({
+      panel_predictions: noPanelPage.panel_predictions,
+      segmentation_predictions: noPanelPage.segmentation_predictions,
+    }),
+  /^returned null$/,
+);
+await check(
+  "panel boxes with a null panel image size",
+  async () =>
+    parseRoboflowSam3Output({
+      ...noPanelPage,
+      panel_predictions: { image: nullImage, predictions: [bubbleBox] },
+    }),
+  /^returned null$/,
+);
+await check(
+  "no-panel page, no image size anywhere",
+  async () =>
+    parseRoboflowSam3Output({
+      panel_predictions: { image: nullImage, predictions: [] },
+      bubble_predictions: { image: nullImage, predictions: [bubbleBox] },
+      segmentation_predictions: { predictions: [] },
+    }),
+  /^returned null$/,
+);
+await check(
+  "SAM3 no-panel page is not a failed page",
+  () =>
+    readSam3Response(
+      async () => new Response(JSON.stringify({ outputs: [noPanelPage] })),
+    ),
+  new RegExp(`^returned \\{"parsed":${noPanelParsed}\\}$`),
+);
+
 if (failed > 0) {
   console.error(`${failed} failure case(s) did not surface`);
   process.exit(1);

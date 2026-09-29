@@ -268,21 +268,7 @@ async function callRoboflow(
     throw new Error(`page ${pageNumber}: Roboflow HTTP ${res.status}`);
   const out = ((await res.json()) as { outputs?: RoboflowSam3Output[] })
     .outputs?.[0];
-  // A page with no panels (a cover) comes back with an empty panel list and
-  // a null image size, which the shared parser reads as malformed.
-  const noPanels =
-    Array.isArray(out?.panel_predictions?.predictions) &&
-    out.panel_predictions.predictions.length === 0 &&
-    Array.isArray(out.bubble_predictions?.predictions) &&
-    Array.isArray(out.segmentation_predictions?.predictions);
-  const parsed = noPanels
-    ? {
-        panelPredictions: [],
-        image: { width: 0, height: 0 },
-        bubblePredictions: [],
-        segmentationPredictions: [],
-      }
-    : parseRoboflowSam3Output(out);
+  const parsed = parseRoboflowSam3Output(out);
   if (!out || !parsed) {
     throw new Error(`page ${pageNumber}: missing or malformed predictions`);
   }
