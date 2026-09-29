@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import type { AliasRow, CastRow } from "~/workflows/steps/audio-plan";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
@@ -86,7 +87,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
+      "id, legacy_id, speaker, emotion, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -101,6 +102,7 @@ export async function regenerateAudio(args: Args) {
     id: string;
     legacy_id: string | null;
     speaker: string | null;
+    emotion: string | null;
     ocr_text: string | null;
     text_with_cues: string | null;
     type: string;
@@ -192,14 +194,14 @@ export async function regenerateAudio(args: Args) {
         step: "review:regenerate-audio",
         bookId: args.bookId,
         issueId: args.issueId,
-        model: "eleven_v3",
+        model: TTS_MODEL,
       },
       text.length,
       () =>
-        client.textToSpeech.convertWithTimestamps(voiceId, {
-          modelId: "eleven_v3",
-          text,
-        }),
+        client.textToSpeech.convertWithTimestamps(
+          voiceId,
+          buildTtsRequest({ text, emotion: b.emotion, voiceId }),
+        ),
     );
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 
