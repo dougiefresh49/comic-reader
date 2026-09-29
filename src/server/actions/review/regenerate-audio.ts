@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -36,7 +37,7 @@ function normalizeAlignment(raw: AlignmentRaw | null | undefined) {
   };
 }
 
-type Step = "generate" | "upload" | "timings" | "bubble" | "refresh";
+type Step = "generate" | "upload" | "switch" | "unconfirmed" | "refresh";
 
 const PIPELINE_AGAIN =
   " The next pipeline audio run will generate this bubble again and spend credits.";
@@ -44,29 +45,24 @@ const PIPELINE_AGAIN =
 /**
  * The error for a failure at or after the paid ElevenLabs call: what the
  * reader plays now, and that a retry spends credits again. The reader of
- * this text is the owner in the review editor. With no stored path the
- * reader plays `${bubble.id}.mp3`, which is where the upload goes.
- * `restoreError` is set when a failed upload could not put the old
- * timings row back.
+ * this text is the owner in the review editor. `unconfirmed` is a failed
+ * switch call whose outcome could not be read back.
  */
 function afterSpendError(
   step: Step,
   bubbleId: string,
   hadAudio: boolean,
   message: string,
-  restoreError: string | null = null,
 ) {
   const saved =
     step === "generate"
       ? `Generating audio for bubble ${bubbleId} failed (${message}), and ElevenLabs may have charged for it.`
       : step === "upload"
-        ? restoreError === null
-          ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
-          : `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}) and the old word timings could not be put back (${restoreError}), so ${hadAudio ? "the old audio now plays with the new word timings and highlighting will be wrong until a regenerate succeeds." : "a timings row was saved with no audio behind it."}`
-        : step === "timings"
-          ? `Audio for bubble ${bubbleId} was generated and paid for, but its word timings did not save to audio_timestamps (${message}), so nothing was saved${hadAudio ? " and the reader still plays the old audio with its own timings." : `.${PIPELINE_AGAIN}`}`
-          : step === "bubble"
-            ? `The new audio and word timings for bubble ${bubbleId} are saved, but the bubbles row was not updated (${message}).${hadAudio ? "" : PIPELINE_AGAIN}`
+        ? `Audio for bubble ${bubbleId} was generated and paid for, but the Storage upload failed (${message}), so nothing was saved.`
+        : step === "switch"
+          ? `Audio for bubble ${bubbleId} was generated and paid for, but its word timings and audio path did not save (${message}), so nothing was saved${hadAudio ? " and the reader still plays the old audio with its own timings." : `.${PIPELINE_AGAIN}`}`
+          : step === "unconfirmed"
+            ? `Audio for bubble ${bubbleId} was generated and paid for, but saving its word timings and audio path returned an error (${message}) and the bubble could not be read back, so the reader plays either the old take or the new one, each with its own timings. Reload the review page to see which.`
             : `The new audio and word timings for bubble ${bubbleId} are saved, and only the page refresh failed (${message}), so reload the page to hear it.`;
   return {
     ok: false as const,
@@ -159,45 +155,53 @@ export async function regenerateAudio(args: Args) {
     };
   }
 
-  // The timings row is written before the upload, so a failed timings write
-  // leaves the old take whole. If the upload then fails, the old row goes
-  // back, which is why it is read here, before any credits are spent.
-  const { data: oldTs, error: oldTsErr } = await supabaseAdmin
-    .from("audio_timestamps")
-    .select("alignment, normalized_alignment")
-    .eq("bubble_id", b.id)
-    .maybeSingle();
-  if (oldTsErr) {
-    return { ok: false, error: oldTsErr.message };
-  }
-  const oldTimings = oldTs as {
-    alignment: unknown;
-    normalized_alignment: unknown;
-  } | null;
-  /** Puts the old timings row back; returns the error text if that fails. */
-  async function restoreTimings(): Promise<string | null> {
+  // Each take goes to a path no earlier take used, so the upload never
+  // touches what the reader plays. switch_bubble_audio_take then changes the
+  // timings row and bubbles.audio_storage_path in one transaction: until it
+  // commits, the reader has the old take and its own timings.
+  const hadAudio = b.audio_storage_path != null;
+  const folder = `${args.bookId}/${args.issueId}`;
+  const storagePath = `${b.id}-take-${randomUUID().slice(0, 8)}.mp3`;
+
+  /** Best-effort: a failed removal leaves an unused object and is logged. */
+  async function removeTake(path: string, why: string) {
     try {
-      const { error } = oldTimings
-        ? await supabaseAdmin.from("audio_timestamps").upsert(
-            {
-              bubble_id: b.id,
-              book_id: args.bookId,
-              issue_id: args.issueId,
-              ...oldTimings,
-            },
-            { onConflict: "bubble_id" },
-          )
-        : await supabaseAdmin
-            .from("audio_timestamps")
-            .delete()
-            .eq("bubble_id", b.id);
-      return error?.message ?? null;
+      const { error } = await supabaseAdmin.storage
+        .from(AUDIO_BUCKET)
+        .remove([`${folder}/${path}`]);
+      if (error) throw new Error(error.message);
     } catch (e) {
-      return (e as Error).message;
+      console.warn(
+        `[regenerate-audio] ${why}: could not remove ${folder}/${path} (${(e as Error).message}), left in Storage unused`,
+      );
     }
   }
 
-  const hadAudio = b.audio_storage_path != null;
+  /**
+   * After the switch call errors. The transaction may still have committed
+   * (a lost response), so the row decides: true if it names the new take,
+   * false if not, null if it could not be read.
+   */
+  async function switchLanded(): Promise<boolean | null> {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from("bubbles")
+        .select("audio_storage_path")
+        .eq("id", b.id)
+        .eq("book_id", args.bookId)
+        .eq("issue_id", args.issueId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      const row = data as { audio_storage_path: string | null } | null;
+      return row?.audio_storage_path === storagePath;
+    } catch (e) {
+      console.warn(
+        `[regenerate-audio] could not read bubble ${b.id} back after a failed switch (${(e as Error).message})`,
+      );
+      return null;
+    }
+  }
+
   let step: Step = "generate";
   try {
     const client = new ElevenLabsClient({
@@ -219,9 +223,6 @@ export async function regenerateAudio(args: Args) {
     );
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 
-    const storagePath = b.audio_storage_path ?? `${b.id}.mp3`;
-    const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
-
     const alignment = normalizeAlignment(
       response.alignment as AlignmentRaw | null | undefined,
     );
@@ -229,72 +230,57 @@ export async function regenerateAudio(args: Args) {
       response.normalizedAlignment as AlignmentRaw | null | undefined,
     );
 
-    step = "timings";
-    const { error: tsErr } = await supabaseAdmin
-      .from("audio_timestamps")
-      .upsert(
-        {
-          bubble_id: b.id,
-          book_id: args.bookId,
-          issue_id: args.issueId,
-          alignment,
-          normalized_alignment: normalizedAlignment,
-        },
-        { onConflict: "bubble_id" },
-      );
-    if (tsErr) {
-      return afterSpendError(step, b.id, hadAudio, tsErr.message);
-    }
-
     step = "upload";
     const { error: upErr } = await supabaseAdmin.storage
       .from(AUDIO_BUCKET)
-      .upload(remotePath, audioBuffer, {
+      .upload(`${folder}/${storagePath}`, audioBuffer, {
         contentType: "audio/mpeg",
-        upsert: true,
+        upsert: false,
       });
     if (upErr) {
-      return afterSpendError(
-        step,
-        b.id,
-        hadAudio,
-        upErr.message,
-        await restoreTimings(),
-      );
+      return afterSpendError(step, b.id, hadAudio, upErr.message);
     }
 
-    // From here the reader loads the new take and its timings: the stored
-    // path is unchanged, or it is null and the reader falls back to
-    // `${b.id}.mp3`, where the upload went.
-    step = "bubble";
-    const { error: bubbleErr } = await supabaseAdmin
-      .from("bubbles")
-      .update({
-        needs_audio: false,
-        audio_storage_path: storagePath,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", b.id);
-    if (bubbleErr) {
-      return afterSpendError(step, b.id, hadAudio, bubbleErr.message);
+    step = "switch";
+    let previousPath: string | null;
+    try {
+      const res = await supabaseAdmin.rpc("switch_bubble_audio_take", {
+        p_bubble_id: b.id,
+        p_book_id: args.bookId,
+        p_issue_id: args.issueId,
+        p_audio_storage_path: storagePath,
+        p_alignment: alignment,
+        p_normalized_alignment: normalizedAlignment,
+      });
+      if (res.error) throw new Error(res.error.message);
+      // The function returns the audio_storage_path it replaced.
+      previousPath = res.data as string | null;
+    } catch (e) {
+      const message = (e as Error).message;
+      const landed = await switchLanded();
+      if (landed === null) {
+        return afterSpendError("unconfirmed", b.id, hadAudio, message);
+      }
+      if (!landed) {
+        await removeTake(storagePath, "the switch did not commit");
+        return afterSpendError(step, b.id, hadAudio, message);
+      }
+      previousPath = b.audio_storage_path;
     }
 
     step = "refresh";
     revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
     revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
 
+    if (previousPath && previousPath !== storagePath) {
+      await removeTake(previousPath, "old take after the switch");
+    }
+
     return {
       ok: true,
       audioStoragePath: storagePath,
     };
   } catch (e) {
-    const restoreError = step === "upload" ? await restoreTimings() : null;
-    return afterSpendError(
-      step,
-      b.id,
-      hadAudio,
-      (e as Error).message,
-      restoreError,
-    );
+    return afterSpendError(step, b.id, hadAudio, (e as Error).message);
   }
 }
