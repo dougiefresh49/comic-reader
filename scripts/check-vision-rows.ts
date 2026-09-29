@@ -1,6 +1,7 @@
 /**
- * Fixture-only acceptance for vision row mappers (#70) and for the vision
- * failures that must surface (#145). No DB calls and no network calls:
+ * Fixture-only acceptance for vision row mappers (#70), for the vision
+ * failures that must surface (#145), and for complete panel audio_tags
+ * (#222). No DB calls and no network calls:
  * `fetch` is stubbed before any case runs.
  *
  * Usage: pnpm tsx --env-file=.env scripts/check-vision-rows.ts
@@ -26,6 +27,7 @@ import {
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
+  normalizePanelAudioTags,
   parseRoboflowSam3Output,
   type BubbleContextFields,
   type RoboflowBoxPrediction,
@@ -478,6 +480,100 @@ await check(
       "page-03",
     ),
   /threw FatalError: exemplar lookup failed for page-03: Gemini embedding failed/,
+);
+
+// #222: a panel row whose audio_tags is `{}` 500'd the reader. Every stored
+// value comes back with all three keys, and the mapper writes all three.
+const fullTags = String.raw`\{"ambience":\[\],"sfx":\[\],"music_mood":"transition_neutral"\}`;
+const tagCases: Record<string, unknown> = {
+  "{}": {},
+  null: null,
+  "a string": "oops",
+  "wrong-typed fields": { ambience: "rain", sfx: [1], music_mood: 3 },
+};
+for (const [name, stored] of Object.entries(tagCases)) {
+  await check(
+    `audio_tags ${name}`,
+    async () => normalizePanelAudioTags(stored),
+    new RegExp(`^returned ${fullTags}$`),
+  );
+}
+await check(
+  "audio_tags partial keeps sfx",
+  async () => normalizePanelAudioTags({ sfx: ["boom"] }),
+  /^returned \{"ambience":\[\],"sfx":\["boom"\],"music_mood":"transition_neutral"\}$/,
+);
+await check(
+  "mapPanelRows audio_tags",
+  async () => panelRows.map((r) => r.audio_tags),
+  new RegExp(String.raw`^returned \[(${fullTags},){5}${fullTags}\]$`),
+);
+
+// #221: a page with no panels (a cover, full-page art) comes back with an
+// empty panel list and a null panel image size, while the bubble and
+// segmentation predictions carry the real one. Its bubbles must be read.
+const nullImage = { width: null, height: null };
+const pageImage = { width: 1000, height: 1500 };
+const bubbleBox = { x: 50, y: 60, width: 20, height: 10, confidence: 0.9 };
+const noPanelPage: RoboflowSam3Output = {
+  panel_predictions: { image: nullImage, predictions: [] },
+  bubble_predictions: { image: pageImage, predictions: [bubbleBox] },
+  segmentation_predictions: { image: pageImage, predictions: [] },
+};
+const noPanelParsed = String.raw`\{"panelPredictions":\[\],"image":\{"width":1000,"height":1500\},"bubblePredictions":\[\{"x":50,"y":60,"width":20,"height":10,"confidence":0.9\}\],"segmentationPredictions":\[\]\}`;
+await check(
+  "no-panel page parses",
+  async () => parseRoboflowSam3Output(noPanelPage),
+  new RegExp(`^returned ${noPanelParsed}$`),
+);
+await check(
+  "no-panel page, size from segmentation",
+  async () =>
+    parseRoboflowSam3Output({
+      ...noPanelPage,
+      bubble_predictions: { predictions: [] },
+      segmentation_predictions: {
+        image: { width: 800, height: 1200 },
+        predictions: [],
+      },
+    }),
+  /"image":\{"width":800,"height":1200\}/,
+);
+await check(
+  "no-panel page, bubble_predictions missing",
+  async () =>
+    parseRoboflowSam3Output({
+      panel_predictions: noPanelPage.panel_predictions,
+      segmentation_predictions: noPanelPage.segmentation_predictions,
+    }),
+  /^returned null$/,
+);
+await check(
+  "panel boxes with a null panel image size",
+  async () =>
+    parseRoboflowSam3Output({
+      ...noPanelPage,
+      panel_predictions: { image: nullImage, predictions: [bubbleBox] },
+    }),
+  /^returned null$/,
+);
+await check(
+  "no-panel page, no image size anywhere",
+  async () =>
+    parseRoboflowSam3Output({
+      panel_predictions: { image: nullImage, predictions: [] },
+      bubble_predictions: { image: nullImage, predictions: [bubbleBox] },
+      segmentation_predictions: { predictions: [] },
+    }),
+  /^returned null$/,
+);
+await check(
+  "SAM3 no-panel page is not a failed page",
+  () =>
+    readSam3Response(
+      async () => new Response(JSON.stringify({ outputs: [noPanelPage] })),
+    ),
+  new RegExp(`^returned \\{"parsed":${noPanelParsed}\\}$`),
 );
 
 if (failed > 0) {
