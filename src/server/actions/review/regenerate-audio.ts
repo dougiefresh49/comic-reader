@@ -45,8 +45,8 @@ const PIPELINE_AGAIN =
 /**
  * The error for a failure at or after the paid ElevenLabs call: what the
  * reader plays now, and that a retry spends credits again. The reader of
- * this text is the owner in the review editor. `unconfirmed` is a failed
- * switch call whose outcome could not be read back.
+ * this text is the owner in the review editor. `unconfirmed` is a switch
+ * call that failed with no answer from the database, so it may have saved.
  */
 function afterSpendError(
   step: Step,
@@ -62,8 +62,8 @@ function afterSpendError(
         : step === "switch"
           ? `Audio for bubble ${bubbleId} was generated and paid for, but its word timings and audio path did not save (${message}), so nothing was saved${hadAudio ? " and the reader still plays the old audio with its own timings." : `.${PIPELINE_AGAIN}`}`
           : step === "unconfirmed"
-            ? `Audio for bubble ${bubbleId} was generated and paid for, but saving its word timings and audio path returned an error (${message}) and the bubble could not be read back, so the reader plays either the old take or the new one, each with its own timings. Reload the review page to see which.`
-            : `The new audio and word timings for bubble ${bubbleId} are saved, and only the page refresh failed (${message}), so reload the page to hear it.`;
+            ? `Audio for bubble ${bubbleId} was generated and paid for, but saving its word timings and audio path got no answer from the database (${message}), so it may still have saved: the reader plays either the old take or the new one, each with its own timings. Reload the review page to see which.`
+            : `The new audio and word timings for bubble ${bubbleId} are saved, but the page refresh failed (${message}), so the reader may play the old take for up to a day.`;
   return {
     ok: false as const,
     error: `${saved} Regenerating will spend ElevenLabs credits again.`,
@@ -84,7 +84,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, ocr_text, text_with_cues, type, ignored, audio_storage_path, book_id, issue_id",
+      "id, legacy_id, speaker, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -104,6 +104,7 @@ export async function regenerateAudio(args: Args) {
     type: string;
     ignored: boolean | null;
     audio_storage_path: string | null;
+    page_number: number;
   };
   const b = bubble as BubbleRow;
 
@@ -158,49 +159,12 @@ export async function regenerateAudio(args: Args) {
   // Each take goes to a path no earlier take used, so the upload never
   // touches what the reader plays. switch_bubble_audio_take then changes the
   // timings row and bubbles.audio_storage_path in one transaction: until it
-  // commits, the reader has the old take and its own timings.
+  // commits, the reader has the old take and its own timings. The old object
+  // is never removed: a page cached before the switch still carries the old
+  // path with the old timings, and that pair keeps playing correctly.
   const hadAudio = b.audio_storage_path != null;
-  const folder = `${args.bookId}/${args.issueId}`;
   const storagePath = `${b.id}-take-${randomUUID().slice(0, 8)}.mp3`;
-
-  /** Best-effort: a failed removal leaves an unused object and is logged. */
-  async function removeTake(path: string, why: string) {
-    try {
-      const { error } = await supabaseAdmin.storage
-        .from(AUDIO_BUCKET)
-        .remove([`${folder}/${path}`]);
-      if (error) throw new Error(error.message);
-    } catch (e) {
-      console.warn(
-        `[regenerate-audio] ${why}: could not remove ${folder}/${path} (${(e as Error).message}), left in Storage unused`,
-      );
-    }
-  }
-
-  /**
-   * After the switch call errors. The transaction may still have committed
-   * (a lost response), so the row decides: true if it names the new take,
-   * false if not, null if it could not be read.
-   */
-  async function switchLanded(): Promise<boolean | null> {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from("bubbles")
-        .select("audio_storage_path")
-        .eq("id", b.id)
-        .eq("book_id", args.bookId)
-        .eq("issue_id", args.issueId)
-        .maybeSingle();
-      if (error) throw new Error(error.message);
-      const row = data as { audio_storage_path: string | null } | null;
-      return row?.audio_storage_path === storagePath;
-    } catch (e) {
-      console.warn(
-        `[regenerate-audio] could not read bubble ${b.id} back after a failed switch (${(e as Error).message})`,
-      );
-      return null;
-    }
-  }
+  const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
 
   let step: Step = "generate";
   try {
@@ -233,7 +197,7 @@ export async function regenerateAudio(args: Args) {
     step = "upload";
     const { error: upErr } = await supabaseAdmin.storage
       .from(AUDIO_BUCKET)
-      .upload(`${folder}/${storagePath}`, audioBuffer, {
+      .upload(remotePath, audioBuffer, {
         contentType: "audio/mpeg",
         upsert: false,
       });
@@ -242,45 +206,56 @@ export async function regenerateAudio(args: Args) {
     }
 
     step = "switch";
-    let previousPath: string | null;
-    try {
-      const res = await supabaseAdmin.rpc("switch_bubble_audio_take", {
+    const { error: switchErr, status } = await supabaseAdmin.rpc(
+      "switch_bubble_audio_take",
+      {
         p_bubble_id: b.id,
         p_book_id: args.bookId,
         p_issue_id: args.issueId,
         p_audio_storage_path: storagePath,
         p_alignment: alignment,
         p_normalized_alignment: normalizedAlignment,
-      });
-      if (res.error) throw new Error(res.error.message);
-      // The function returns the audio_storage_path it replaced.
-      previousPath = res.data as string | null;
-    } catch (e) {
-      const message = (e as Error).message;
-      const landed = await switchLanded();
-      if (landed === null) {
-        return afterSpendError("unconfirmed", b.id, hadAudio, message);
+      },
+    );
+    if (switchErr) {
+      // Only an answer with a code proves the rollback. With no code or
+      // status 0 the transaction may still commit, so the new take stays.
+      if (!switchErr.code || status === 0) {
+        return afterSpendError(
+          "unconfirmed",
+          b.id,
+          hadAudio,
+          switchErr.message,
+        );
       }
-      if (!landed) {
-        await removeTake(storagePath, "the switch did not commit");
-        return afterSpendError(step, b.id, hadAudio, message);
+      const { error: rmErr } = await supabaseAdmin.storage
+        .from(AUDIO_BUCKET)
+        .remove([remotePath])
+        .catch((e: Error) => ({ error: e }));
+      if (rmErr) {
+        console.warn(
+          `[regenerate-audio] could not remove unused ${remotePath} (${rmErr.message})`,
+        );
       }
-      previousPath = b.audio_storage_path;
+      return afterSpendError(step, b.id, hadAudio, switchErr.message);
     }
 
     step = "refresh";
-    revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
+    // A concrete URL with no type: its tag is the page's own pathname tag.
+    revalidatePath(`/book/${args.bookId}/${args.issueId}/${b.page_number}`);
     revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
-
-    if (previousPath && previousPath !== storagePath) {
-      await removeTake(previousPath, "old take after the switch");
-    }
 
     return {
       ok: true,
       audioStoragePath: storagePath,
     };
   } catch (e) {
-    return afterSpendError(step, b.id, hadAudio, (e as Error).message);
+    // A throw from the switch call is an unanswered call too.
+    return afterSpendError(
+      step === "switch" ? "unconfirmed" : step,
+      b.id,
+      hadAudio,
+      (e as Error).message,
+    );
   }
 }
