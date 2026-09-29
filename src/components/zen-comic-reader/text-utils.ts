@@ -26,6 +26,12 @@ export const stripAudioTags = (value: string): string =>
 /**
  * Build word-level timings from ElevenLabs character alignment while
  * simultaneously producing a cleaned text string with audio tags removed.
+ *
+ * The clean text is built in the same pass as the offsets, following the
+ * `stripAudioTags` rules (tags dropped, whitespace runs collapsed to one
+ * space, no leading or trailing space), so every `cleanTextStart` and
+ * `cleanTextEnd` indexes into it as-is. Never post-process `cleanText` after
+ * this loop: any trim or collapse would shift the offsets.
  */
 export function buildWordTimings(
   alignment?: CharacterAlignment | null,
@@ -51,19 +57,23 @@ export function buildWordTimings(
   let wordStartTime: number | null = null;
   let wordEndTime: number | null = null;
   let charStartIndex = 0;
+  let charEndIndex = 0;
   let cleanTextStart = 0;
-  const cleanBuilder: string[] = [];
+  // Whitespace seen since the last kept character; written as one space only
+  // when another kept character follows, which collapses runs and trims.
+  let pendingSpace = false;
+  let cleanText = "";
 
-  const pushWord = (currentIndex: number, cleanIndex: number) => {
+  const pushWord = () => {
     if (!buffer || wordStartTime === null || wordEndTime === null) return;
     words.push({
       word: buffer,
-      start: wordStartTime ?? MIN_TIME,
-      end: wordEndTime ?? wordStartTime ?? MIN_TIME,
+      start: wordStartTime,
+      end: wordEndTime,
       charStartIndex,
-      charEndIndex: currentIndex,
+      charEndIndex,
       cleanTextStart,
-      cleanTextEnd: cleanIndex,
+      cleanTextEnd: cleanText.length,
     });
     buffer = "";
     wordStartTime = null;
@@ -86,34 +96,30 @@ export function buildWordTimings(
       continue;
     }
 
-    const isWhitespace = /\s/.test(ch);
-
-    // Always mirror the raw (tagless) characters into the clean text builder
-    cleanBuilder.push(ch);
-
-    if (isWhitespace) {
+    if (/\s/.test(ch)) {
       // Whitespace ends a word
-      pushWord(i - 1, cleanBuilder.length - 1);
-      cleanTextStart = cleanBuilder.length;
+      pushWord();
+      pendingSpace = true;
       continue;
     }
+
+    if (pendingSpace && cleanText) cleanText += " ";
+    pendingSpace = false;
 
     if (!buffer) {
       wordStartTime = start;
       charStartIndex = i;
-      cleanTextStart = cleanBuilder.length - 1;
+      cleanTextStart = cleanText.length;
     }
 
+    cleanText += ch;
     buffer += ch;
     wordEndTime = end;
-
-    // If it's the last character, flush
-    if (i === characters.length - 1) {
-      pushWord(i, cleanBuilder.length);
-    }
+    charEndIndex = i;
   }
 
-  const cleanText = stripAudioTags(cleanBuilder.join(""));
+  // Flush the last word, including one followed only by a tag
+  pushWord();
 
   return { cleanText, words };
 }
