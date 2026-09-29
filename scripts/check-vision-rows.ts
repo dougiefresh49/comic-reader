@@ -578,16 +578,17 @@ await check(
 );
 
 // The foreground mapping (#219), the one helper the workflow step and
-// backfill-panels both call. The saved page's panel boxes stand in for the
-// panels rows the step reads, in sort_order. Each polygon is up to 50
-// vertices, so the case prints the per-panel summary and an FNV-1a digest of
-// the exact JSON: the digest moves if any coordinate moves.
-const foregroundPanels = fixture.panel_predictions.predictions.map((p) => ({
-  bounding_box: {
-    x: (p.x - p.width / 2) / imgDims.width,
-    y: (p.y - p.height / 2) / imgDims.height,
-    w: p.width / imgDims.width,
-    h: p.height / imgDims.height,
+// backfill-panels both call. The panels rows the step reads are the real
+// thing here, so the case goes through `mapPanelRows`' own formula instead of
+// a hand copy of it. Each polygon is up to 50 vertices, so the case prints
+// the per-panel summary and an FNV-1a digest of the exact JSON: the digest
+// moves if any coordinate moves.
+const foregroundPanels = panelRows.map((p) => ({
+  bounding_box: p.bounding_box as {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
   },
 }));
 
@@ -632,7 +633,7 @@ await check(
   /^returned \{"digest":"308afb80","polygons":"p0 0c\[\] 3b\[15,20,27\] p1 15c\[16,7,24,38,23,25,5,38,9,7,15,10,8,8,8\] 1b\[12\] p2 14c\[37,23,28,27,24,20,6,5,5,12,5,12,6,7\] 2b\[11,10\] p3 13c\[22,46,20,11,15,17,9,13,10,9,11,9,9\] 1b\[12\] p4 1c\[26\] 2b\[10,11\] p5 23c\[29,7,26,48,41,30,14,14,30,4,13,3,21,12,32,38,12,8,8,14,13,12,9\] 1b\[13\]"\}$/,
 );
 await check(
-  "one panel, one character: centroid picks the panel, local 0..1",
+  "one panel, one character: centroid picks the panel, panel-local and unclamped",
   async () => {
     const poly = [
       { x: 100, y: 100 },
@@ -647,6 +648,29 @@ await check(
     );
   },
   /^returned \[\{"characters":\[\[\{"x":-0.5,"y":-0.5\},\{"x":0.5,"y":-0.5\},\{"x":0.5,"y":0.5\},\{"x":-0.5,"y":0.5\}\]\],"bubbles":\[\]\}\]$/,
+);
+await check(
+  "two overlapping panels: the polygon goes to the first one only",
+  async () =>
+    mapForegroundPolygons(
+      [
+        { bounding_box: { x: 0, y: 0, w: 0.8, h: 1 } },
+        { bounding_box: { x: 0.5, y: 0, w: 0.5, h: 1 } },
+      ],
+      { width: 100, height: 100 },
+      [
+        {
+          class: "comic character",
+          points: [
+            { x: 50, y: 10 },
+            { x: 79, y: 10 },
+            { x: 79, y: 89 },
+            { x: 50, y: 89 },
+          ],
+        },
+      ],
+    ),
+  /^returned \[\{"characters":\[\[\{"x":0.625,"y":0.1\},\{"x":0.9875,"y":0.1\},\{"x":0.9875,"y":0.89\},\{"x":0.625,"y":0.89\}\]\],"bubbles":\[\]\},\{"characters":\[\],"bubbles":\[\]\}\]$/,
 );
 await check(
   "a polygon whose centroid is in no panel is dropped",

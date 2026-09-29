@@ -308,7 +308,9 @@ function simplifyPoly(points: PanelLocalPolygon): PanelLocalPolygon {
 
 /**
  * Map SAM3 segmentation predictions to per-panel foreground polygons in
- * panel-local 0..1 coordinates (#219). One polygon goes to the first panel
+ * panel-local coordinates, relative to the panel's own box and unclamped:
+ * a polygon reaching past the panel edge comes back outside 0..1 (#219). One
+ * polygon goes to the first panel
  * holding its centroid, in the order `panels` is passed, and a panel with
  * nothing in it gets empty lists: writing `foreground_polygons` is the
  * caller's call, not this function's. Pure: no client, no fetch, no writes.

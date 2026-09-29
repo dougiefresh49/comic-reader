@@ -138,7 +138,8 @@ function orderedPanels(
 
 /**
  * A polygon goes to the first panel in reading order that holds its
- * centroid, in panel-local 0..1 coordinates, simplified to at most 50
+ * centroid, in panel-local coordinates relative to that panel's own box and
+ * unclamped, simplified to at most 50
  * vertices. The mapping itself is `mapForegroundPolygons` (#219), the same
  * one the workflow step calls.
  */
