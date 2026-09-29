@@ -5,15 +5,16 @@ import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
-import { rdpSimplify } from "./shared";
 import {
   bubbleHasContext,
   buildContextUpdate,
   mapBubbleRows,
+  mapForegroundPolygons,
   mapPanelRows,
   mapSegmentationRow,
   parseRoboflowSam3Output,
   type ContextParsed,
+  type ForegroundPrediction,
   type ParsedRoboflowSam3,
   type RoboflowBoxPrediction,
   type RoboflowSam3Output,
@@ -530,28 +531,6 @@ export async function extractForegroundMasksBatch(
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
 
-  const CHARACTER_CLASSES = new Set([
-    "comic character",
-    "person",
-    "face",
-    "head",
-  ]);
-  const BUBBLE_CLASSES = new Set(["speech bubble"]);
-  const MAX_VERTS = 50;
-
-  type PolyPoint = { x: number; y: number };
-
-  function simplifyPoly(points: PolyPoint[]): PolyPoint[] {
-    if (points.length <= MAX_VERTS) return points;
-    let simplified = points;
-    let eps = 0.005;
-    while (simplified.length > MAX_VERTS && eps < 0.1) {
-      simplified = rdpSimplify(points, eps);
-      eps *= 1.5;
-    }
-    return simplified;
-  }
-
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
     const pageLabel = `page-${padded}`;
@@ -596,71 +575,20 @@ export async function extractForegroundMasksBatch(
 
     const imgW = segRow.image_width;
     const imgH = segRow.image_height;
-    const predictions = segRow.predictions as Array<{
-      class: string;
-      confidence: number;
-      points: Array<{ x: number; y: number }>;
-    }>;
+    const predictions = segRow.predictions as ForegroundPrediction[];
 
-    type PanelPx = { id: string; x: number; y: number; w: number; h: number };
-    const panelsPx: PanelPx[] = panels.map((p) => {
-      const bb = p.bounding_box as BoundingBoxJson;
-      return {
-        id: p.id,
-        x: bb.x * imgW,
-        y: bb.y * imgH,
-        w: bb.w * imgW,
-        h: bb.h * imgH,
-      };
-    });
+    const foreground = mapForegroundPolygons(
+      panels.map((p) => ({ bounding_box: p.bounding_box as BoundingBoxJson })),
+      { width: imgW, height: imgH },
+      predictions,
+    );
 
-    const panelCharPolys = new Map<string, PolyPoint[][]>();
-    const panelBubblePolys = new Map<string, PolyPoint[][]>();
-    for (const p of panelsPx) {
-      panelCharPolys.set(p.id, []);
-      panelBubblePolys.set(p.id, []);
-    }
-
-    for (const pred of predictions) {
-      const isChar = CHARACTER_CLASSES.has(pred.class);
-      const isBubble = BUBBLE_CLASSES.has(pred.class);
-      if (!isChar && !isBubble) continue;
-      if (pred.points.length < 3) continue;
-
-      let cx = 0;
-      let cy = 0;
-      for (const pt of pred.points) {
-        cx += pt.x;
-        cy += pt.y;
-      }
-      cx /= pred.points.length;
-      cy /= pred.points.length;
-
-      for (const panel of panelsPx) {
-        if (
-          cx >= panel.x &&
-          cx <= panel.x + panel.w &&
-          cy >= panel.y &&
-          cy <= panel.y + panel.h
-        ) {
-          const localPoly = pred.points.map((pt) => ({
-            x: (pt.x - panel.x) / panel.w,
-            y: (pt.y - panel.y) / panel.h,
-          }));
-
-          const simplified = simplifyPoly(localPoly);
-          const target = isChar
-            ? panelCharPolys.get(panel.id)!
-            : panelBubblePolys.get(panel.id)!;
-          target.push(simplified);
-          break;
-        }
-      }
-    }
-
-    for (const p of panelsPx) {
-      const characters = panelCharPolys.get(p.id)!;
-      const bubbles = panelBubblePolys.get(p.id)!;
+    let totalChars = 0;
+    let totalBubbles = 0;
+    for (const [i, p] of panels.entries()) {
+      const { characters, bubbles } = foreground[i]!;
+      totalChars += characters.length;
+      totalBubbles += bubbles.length;
       if (characters.length === 0 && bubbles.length === 0) continue;
       const { error: updateErr } = await supabase
         .from("panels")
@@ -673,14 +601,6 @@ export async function extractForegroundMasksBatch(
       }
     }
 
-    const totalChars = [...panelCharPolys.values()].reduce(
-      (s, a) => s + a.length,
-      0,
-    );
-    const totalBubbles = [...panelBubblePolys.values()].reduce(
-      (s, a) => s + a.length,
-      0,
-    );
     console.log(
       `[masks] ${bookId}/${issueId}: page-${padded} → ${totalChars} character + ${totalBubbles} bubble polygon(s) across ${panels.length} panel(s)`,
     );
@@ -702,10 +622,17 @@ export async function characterLookaheadPage(
   const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
   const { identifyFace } = await import("~/lib/character-identification");
   const exemplarStore = await import("~/lib/exemplar-store");
+  const { withLlmMeta } = await import("~/lib/llm-usage");
 
   const gemini = getGeminiClient();
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
+  const llmMeta = {
+    step: "character-lookahead",
+    bookId,
+    issueId,
+    pageNumber,
+  };
 
   // 1. Load segmentation predictions from DB
   const { data: segRow, error: segErr } = await supabase
@@ -890,32 +817,36 @@ export async function characterLookaheadPage(
 
   for (const face of faceCrops) {
     // Retrieve similar exemplars from pgvector
-    const exemplarRefs = await exemplarRefsOrFatal(
-      exemplarStore,
-      supabase,
-      face.jpegBuffer.toString("base64"),
-      bookId,
-      pageLabel,
+    const exemplarRefs = await withLlmMeta(llmMeta, () =>
+      exemplarRefsOrFatal(
+        exemplarStore,
+        supabase,
+        face.jpegBuffer.toString("base64"),
+        bookId,
+        pageLabel,
+      ),
     );
 
     // Identify with exemplar context + key failover
     const faceBase64 = face.jpegBuffer.toString("base64");
-    const result = await identifyFaceOrFatal(
-      (client) =>
-        identifyFace(
-          client,
-          faceBase64,
-          "image/jpeg",
-          knownCharacters,
-          exemplarRefs,
-          pageBase64,
-          "image/webp",
-          wikiSummary,
-          { throwOnApiError: true },
-        ),
-      gemini,
-      getFallbackGeminiClient,
-      pageLabel,
+    const result = await withLlmMeta(llmMeta, () =>
+      identifyFaceOrFatal(
+        (client) =>
+          identifyFace(
+            client,
+            faceBase64,
+            "image/jpeg",
+            knownCharacters,
+            exemplarRefs,
+            pageBase64,
+            "image/webp",
+            wikiSummary,
+            { throwOnApiError: true },
+          ),
+        gemini,
+        getFallbackGeminiClient,
+        pageLabel,
+      ),
     );
 
     if (result.characterName && result.confidence >= 0.6) {
@@ -935,17 +866,20 @@ export async function characterLookaheadPage(
 
       // Store face as exemplar (confirmed if resolved + high confidence)
       if (result.confidence >= 0.7) {
+        const suggestedName = charId ? undefined : result.characterName;
         try {
-          await exemplarStore.storeExemplar(supabase, {
-            jpegBuffer: face.jpegBuffer,
-            characterId: charId,
-            suggestedName: charId ? undefined : result.characterName,
-            bookId,
-            sourceIssue: issueId,
-            pageNumber,
-            confidence: result.confidence,
-            isConfirmed: charId !== null && result.confidence >= 0.9,
-          });
+          await withLlmMeta(llmMeta, () =>
+            exemplarStore.storeExemplar(supabase, {
+              jpegBuffer: face.jpegBuffer,
+              characterId: charId,
+              suggestedName,
+              bookId,
+              sourceIssue: issueId,
+              pageNumber,
+              confidence: result.confidence,
+              isConfirmed: charId !== null && result.confidence >= 0.9,
+            }),
+          );
         } catch (e) {
           throw new FatalError(
             `character_face_exemplars write failed for ${pageLabel}: ${e instanceof Error ? e.message : String(e)}`,
@@ -1027,9 +961,11 @@ export async function getContextPage(
   const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const gemini = getGemini();
   const { GEMINI_HIGH } = await import("~/lib/models");
+  const { generateContentLogged } = await import("~/lib/llm-usage");
 
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
+  const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
 
   // Load book + wiki context for richer prompts
   let bookContext: string | undefined;
@@ -1242,10 +1178,11 @@ export async function getContextPage(
         "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting.",
       );
 
-      const ocrResponse = await gemini.models.generateContent({
-        model: GEMINI_MEDIUM,
-        contents: [ocrImagePart, ocrPrompt],
-      });
+      const ocrResponse = await generateContentLogged(
+        gemini,
+        { model: GEMINI_MEDIUM, contents: [ocrImagePart, ocrPrompt] },
+        llmMeta,
+      );
 
       ocrText = ocrResponse.text?.trim() ?? "";
     } catch {
@@ -1275,10 +1212,11 @@ export async function getContextPage(
       const pageImagePart = cpb64(imgBuf.toString("base64"), "image/webp");
       const contextTextPart = cpt(contextPrompt);
 
-      const contextResponse = await gemini.models.generateContent({
-        model: GEMINI_HIGH,
-        contents: [pageImagePart, contextTextPart],
-      });
+      const contextResponse = await generateContentLogged(
+        gemini,
+        { model: GEMINI_HIGH, contents: [pageImagePart, contextTextPart] },
+        llmMeta,
+      );
 
       const responseText = contextResponse.text?.trim() ?? "";
 

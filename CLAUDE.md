@@ -4,7 +4,7 @@
      Everything shared lives in AGENTS.md so delegated prompts can shrink
      to "read AGENTS.md, then do issue #N." Keep the roster synced with
      the fleet repo's copy when models or budget posture change.
-     Instantiated from fleet corefiles @ 4a9e5f8, 2026-09-27 -->
+     Instantiated from fleet corefiles @ 0cdb881, 2026-09-29 -->
 
 @AGENTS.md
 
@@ -30,9 +30,10 @@ covers UI/UX, code quality, API design, and copy.
 | gpt-5.6 Sol   | 7    | 8            | 5     | codex CLI (`codex -m` Sol tier)                                                      |
 | gpt-5.6 Terra | 8    | 7            | 5     | codex CLI (`codex -m` Terra tier)                                                    |
 | gpt-5.6 Luna  | 8    | 4            | 4     | codex CLI (`codex -m` Luna tier)                                                     |
-| sonnet-5      | 5    | 5            | 7     | Agent/Workflow `model: 'sonnet'`                                                     |
+| sonnet-5.5    | 7    | 7            | 6     | Agent/Workflow `model: 'sonnet'`; research subagents by default, see below           |
 | opus-5.5      | 8    | 8            | 7     | Agent/Workflow `model: 'opus'`                                                       |
 | fable-5.1     | 2    | 9            | 9     | Agent/Workflow `model: 'fable'`                                                      |
+| space-bunny   | 10   | 7?           | ?     | `claude-bunny` (OpenRouter `stealth/space-bunny-alpha`), see below                   |
 
 **opus-5.5 vs fable-5.1** (config from outside evidence, not yet
 auditioned here: Theo's day-one video "Anthropic Actually Fixed Opus",
@@ -133,6 +134,64 @@ https://www.youtube.com/watch?v=jLgpzgpsWPc, cited by timestamp; fleet
   (24:11). His verdict on 4.7 overall: a bit of a flop and a stepping
   stone (25:39-26:44).
 
+**space-bunny-alpha** (config from one audition here, row 146 in this
+repo's `docs/decisions.md`; the `7?` and `?` are placeholders, not
+scores):
+
+- An OpenRouter stealth model, $0 per token while in stealth. It runs
+  in the full Claude Code harness through `~/.local/bin/claude-bunny`,
+  which sets the OpenRouter env for that one process, so AGENTS.md,
+  CLAUDE.md and the hooks all apply. It is not an Agent tool model;
+  launch it from Bash in its own worktree like cursor-agent.
+- Delegate runs need `--strict-mcp-config`. With a custom
+  `ANTHROPIC_BASE_URL` Claude Code loads every MCP tool schema up front,
+  and the first #219 run filled its context with 163 Roboflow tools and
+  stopped with auto-compact thrashing.
+- On #219 (a bounded logic refactor) it built a diff that matched the
+  old behavior exactly in 3 minutes, and fixed the review's three nits
+  in 1. Treat it as a builder candidate, not a lane: one data point,
+  no taste read, and no longer or judgment-heavy run yet.
+- Stealth models often log prompts for their maker and can vanish or
+  start charging. Its logging policy wasn't on its page. Keep secrets
+  out of what it reads beyond the worktree `.env`.
+
+**sonnet-5.5** (config from outside evidence, not yet auditioned here:
+Theo's video "OpenAI should be scared of this one", 2026-09-29,
+https://www.youtube.com/watch?v=8WbW_n95wc4, cited by timestamp; fleet
+`docs/decisions.md` row 35):
+
+- A subagent for opus-5.5 or fable-5.1 to send on research, not a
+  model you pick for the work itself. Theo won't prompt it directly
+  and wants his Opus to call it (21:02-21:59, 30:30-31:02). Good fits:
+  codebase deep dives, finding where a behavior lives, confirming a
+  hunch about an API (30:02-30:33), and the analysis before a plan
+  (24:18-24:49). The `scout` agent is on the `sonnet` alias but at
+  medium effort, below the effort line here, and it searches the web,
+  not the codebase.
+- The evidence: on Theo's T3 Code audit bench (break up a huge PR and
+  propose a landing plan) it scored a bit above opus-5.5 at about half
+  the cost and in about 5 minutes, where Opus took almost twice as long
+  and Astra almost three times. Astra still wrote the best plan by far
+  (22:26-24:20). The panel page he showed notes Sonnet ran four days
+  later on a bigger PR, so its small edge over Opus is not like-for-like.
+- Not a builder. It burns tokens: 272K per task on Cursor Bench to
+  Opus's 218K, and more than 5x Astra (17:27-18:26). Cache reads got no
+  discount the way Opus and Fable did, so on like-for-like code work it
+  costs about what Opus does or more (08:44-11:06); the cost score is
+  for that work, and research ran at half Opus's cost. It streams faster
+  (about 150 tokens/s to Opus's 100 on his subscription) but ran
+  Theo's game demo slower, 43 minutes to Opus's 36 (18:23-18:55). The
+  builder lanes below stay as they are.
+- Not for design. Its front-end showcase entries came out a little
+  worse than opus-5.5's and far worse than fable-5.1's (19:27-21:04),
+  which is why its taste score sits below the design bar. Its prose
+  is a step up from sonnet-5 per Anthropic's announcement, which Theo
+  read on air without testing it himself (07:13).
+- Run it at high or xhigh. Never max: xhigh beat max on Frontier Code,
+  and max made it the priciest run Artificial Analysis has logged,
+  level with fable-5.1 (11:05-14:11, 14:37-15:01). Never low, and medium
+  loses more on Sonnet than on Opus (16:13-17:03).
+
 How to apply:
 
 - **Budget posture: go ham with every model EXCEPT Fable** (opus-5.5
@@ -169,8 +228,8 @@ How to apply:
     hand-written tokenizer without pushing back on the size (comic-reader
     #55, the pair under "Push back on the spec" in AGENTS.md).
   - Long unattended or open-ended lanes stay with fable-5.1.
-- User-facing design *invention* needs taste ≥ 7: sonnet-5 minimum,
-  fable-5.1 preferred, opus-5.5 as the budget fallback. Faithful
+- User-facing design *invention* needs taste ≥ 7: fable-5.1 preferred,
+  opus-5.5 as the budget fallback. Faithful
   implementation against a decided, written design artifact (a Figma
   node, a vendored mirror, a spec) is well-specced execution and goes
   through the builder lanes above. No written artifact = invention; the
@@ -243,7 +302,8 @@ row 9.
   main session does
   specs, targeted diff review, merges. Ordinary small tasks: author freely.
 - Codebase recon goes to composer-2.5 or an Explore subagent (Claude
-  Code's read-only search agent type). Don't pull
+  Code's read-only search agent type); when finding the answer takes
+  judgment, a sonnet-5.5 subagent (the sonnet-5.5 notes above). Don't pull
   2,000-line files into the main context when a delegate can return the
   20 lines that matter.
 - Batch verification into ONE delegated round with the complete

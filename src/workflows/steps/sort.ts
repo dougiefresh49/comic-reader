@@ -6,6 +6,7 @@ import {
 } from "@google/genai";
 import sharp from "sharp";
 import { FatalError } from "workflow";
+import type { LlmCallMeta } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
@@ -21,6 +22,24 @@ function dbError(label: string, error: { message: string; code?: string }) {
   const message = `${label}: ${error.message}`;
   const transient = !error.code || error.code.startsWith("PGRST0");
   return transient ? new Error(message) : new FatalError(message);
+}
+
+/**
+ * Storage answers a missing object with HTTP 400 and statusCode "404"; that page
+ * has no image to sort, so this returns null and the step skips the page. Any
+ * other failure is a download that didn't finish: a dropped connection comes
+ * back with no status, a gateway failure with a 5xx, and a download can return
+ * neither error nor data. Those return a plain Error so the Workflow retries the
+ * step, which costs nothing because the download runs before the Gemini call.
+ */
+export function downloadError(
+  label: string,
+  error: { message: string; statusCode?: string } | null,
+) {
+  if (error?.statusCode === "404") return null;
+  return new Error(
+    `${label}: page image download failed (${error?.message ?? "no data"})`,
+  );
 }
 
 /**
@@ -155,6 +174,7 @@ async function getSortPlanResponseFromGemini(
   imgH: number,
   panels: SortPanelRow[],
   bubbles: SortBubbleRow[],
+  llmMeta: LlmCallMeta,
 ): Promise<GenerateContentResponse> {
   const panelLines = panels
     .map((p) => {
@@ -207,10 +227,12 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
   );
   const textPart = createPartFromText(prompt);
 
-  return gemini.models.generateContent({
-    model: GEMINI_MEDIUM,
-    contents: [imagePart, textPart],
-  });
+  const { generateContentLogged } = await import("~/lib/llm-usage");
+  return generateContentLogged(
+    gemini,
+    { model: GEMINI_MEDIUM, contents: [imagePart, textPart] },
+    llmMeta,
+  );
 }
 
 function validateAndFlattenOrders(
@@ -319,6 +341,11 @@ export async function sortPageElements(
     .download(storagePath);
 
   if (dlErr || !imageBlob) {
+    const retry = downloadError(
+      `sort ${bookId}/${issueId} page-${padded}`,
+      dlErr,
+    );
+    if (retry) throw retry;
     console.warn(
       `[sort] ${bookId}/${issueId}: page-${padded}: missing WebP (${dlErr?.message ?? "no data"}), skip`,
     );
@@ -388,6 +415,7 @@ export async function sortPageElements(
     imgH,
     panels,
     bubbles,
+    { step: "sort-page-elements", bookId, issueId, pageNumber },
   );
 
   // Past the paid call: a Workflow retry would pay for Gemini again, so every
