@@ -111,17 +111,21 @@ export function TriggerRefusalNotice({
   issueId,
   refusal,
   onCancelled,
+  onCancellingChange,
 }: {
   bookId: string;
   issueId: string;
   refusal: TriggerRefusal;
   onCancelled: () => void;
+  /** Callers disable their trigger buttons while a cancel is in flight. */
+  onCancellingChange: (cancelling: boolean) => void;
 }) {
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCancel() {
     setCancelling(true);
+    onCancellingChange(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/cancel-ingest", {
@@ -143,6 +147,7 @@ export function TriggerRefusalNotice({
       setError(message);
     } finally {
       setCancelling(false);
+      onCancellingChange(false);
     }
   }
 
@@ -177,7 +182,9 @@ export function PipelineActions({
   const [loading, setLoading] = useState(false);
   const [triggered, setTriggered] = useState(false);
   const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
+  const busy = loading || cancelling;
 
   const isFailed = pipelineStep?.startsWith("failed:") ?? false;
   const failedStep = isFailed
@@ -227,6 +234,7 @@ export function PipelineActions({
             setRefusal(null);
             router.refresh();
           }}
+          onCancellingChange={setCancelling}
         />
       </span>
     ) : (
@@ -245,7 +253,7 @@ export function PipelineActions({
     return withRefusal(
       <button
         onClick={() => handleTrigger()}
-        disabled={loading}
+        disabled={busy}
         className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
       >
         {loading ? "..." : "Start Pipeline"}
@@ -257,7 +265,7 @@ export function PipelineActions({
     return withRefusal(
       <FailedActions
         failedStep={failedStep}
-        loading={loading}
+        loading={busy}
         onTrigger={handleTrigger}
       />,
     );
@@ -271,7 +279,7 @@ export function PipelineActions({
         pipelinePausedAt={pipelinePausedAt}
         pipelinePausedUrl={pipelinePausedUrl}
         status={status}
-        triggerLoading={loading}
+        triggerLoading={busy}
         onTrigger={handleTrigger}
         onSettled={() => router.refresh()}
       />,

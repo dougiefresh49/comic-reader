@@ -18,6 +18,7 @@ export function TriggerIngestButton({
   const [loading, setLoading] = useState(false);
   const [triggered, setTriggered] = useState(false);
   const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
 
   async function handleTrigger() {
@@ -51,7 +52,7 @@ export function TriggerIngestButton({
     <span className="inline-flex flex-col items-start gap-1">
       <button
         onClick={handleTrigger}
-        disabled={loading}
+        disabled={loading || cancelling}
         className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
       >
         {loading ? "..." : "Start Pipeline"}
@@ -65,6 +66,7 @@ export function TriggerIngestButton({
             setRefusal(null);
             router.refresh();
           }}
+          onCancellingChange={setCancelling}
         />
       )}
     </span>

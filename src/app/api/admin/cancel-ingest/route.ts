@@ -255,21 +255,36 @@ export async function POST(req: NextRequest) {
       "error")
     : null;
 
+  const warnings: string[] = [];
+
   if (failedStep !== null) {
-    const { error: issueError } = await updateIssue(
-      supabaseAdmin,
-      body.bookId,
-      body.issueId,
-      {
-        pipeline_step: `failed:${failedStep}`,
-        pipeline_paused: false,
-        pipeline_paused_at: null,
-        pipeline_paused_url: null,
-      },
-    );
+    // Compare-and-set on the state read above: once cancel() frees the gate
+    // hooks, a retrigger can start a new run and write its own state first.
+    let guarded = updateIssue(supabaseAdmin, body.bookId, body.issueId, {
+      pipeline_step: `failed:${failedStep}`,
+      pipeline_paused: false,
+      pipeline_paused_at: null,
+      pipeline_paused_url: null,
+    }).eq("pipeline_paused", issue.pipeline_paused);
+    guarded =
+      issue.pipeline_step === null
+        ? guarded.is("pipeline_step", null)
+        : guarded.eq("pipeline_step", issue.pipeline_step);
+    guarded =
+      issue.pipeline_paused_at === null
+        ? guarded.is("pipeline_paused_at", null)
+        : guarded.eq("pipeline_paused_at", issue.pipeline_paused_at);
+
+    const { data: updatedIssues, error: issueError } =
+      await guarded.select("id");
 
     if (issueError) {
       return Response.json({ error: issueError.message }, { status: 500 });
+    }
+    if (!updatedIssues || updatedIssues.length === 0) {
+      warnings.push(
+        "Issue pipeline state changed during the cancel; issues row left as is",
+      );
     }
   }
 
@@ -293,14 +308,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (runIdFromHook && (!updatedRuns || updatedRuns.length === 0)) {
-    return Response.json({
-      ok: true,
-      bookId: body.bookId,
-      issueId: body.issueId,
-      runId,
-      failedStep,
-      warning: "No pipeline_runs row carried this runId; none updated",
-    });
+    warnings.push("No pipeline_runs row carried this runId; none updated");
   }
 
   return Response.json({
@@ -309,5 +317,6 @@ export async function POST(req: NextRequest) {
     issueId: body.issueId,
     runId,
     failedStep,
+    ...(warnings.length > 0 && { warning: warnings.join("; ") }),
   });
 }
