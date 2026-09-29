@@ -146,6 +146,67 @@
           [[0.2, 0.3, 0.4, 0.05]]
         ]
       }
+    },
+    {
+      "bubbleId": "junk-between-words",
+      "text_with_cues": "[shouting] Stop that car!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.2, 0.04],
+            "words": [
+              { "t": "STOP", "box": [0.1, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "THAT", "box": [0.19, 0.1, 0.11, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.4, 0.12, 0.1, 0.06],
+            "words": [
+              { "t": "RACT", "box": [0.4, 0.12, 0.1, 0.06], "conf": 0.3 }
+            ]
+          },
+          {
+            "box": [0.1, 0.15, 0.1, 0.04],
+            "words": [{ "t": "CAR!", "box": [0.1, 0.15, 0.1, 0.04], "conf": 1 }]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.75,
+        "letteredWordCount": 4,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.08, 0.04]],
+          [[0.19, 0.1, 0.11, 0.04]],
+          [[0.1, 0.15, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "ocr-transposition",
+      "text_with_cues": "[dramatically] The end.",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.3, 0.8, 0.2, 0.04],
+            "words": [
+              { "t": "TEH", "box": [0.3, 0.8, 0.08, 0.04], "conf": 0.6 },
+              { "t": "END.", "box": [0.39, 0.8, 0.11, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 1,
+        "letteredWordCount": 2,
+        "boxesByTimingIndex": [
+          [[0.3, 0.8, 0.08, 0.04]],
+          [[0.39, 0.8, 0.11, 0.04]]
+        ]
+      }
     }
   ]
 }

@@ -32,44 +32,70 @@ function letterStream(tokens: string[]): { chars: string; owner: number[] } {
   return { chars, owner };
 }
 
+// Lexicographic cost packed into one exact float: fewest edits first (plain
+// Levenshtein), then fewest substitutions (so `TEH` keeps two matches against
+// `THE`), then fewest gap openings (so a junk word stays one contiguous gap
+// instead of lending letters to a neighbour). Exact for streams under 16k.
+const EDIT = 2 ** 30;
+const SUB = EDIT + 2 ** 14;
+const OPEN = 1;
+
 /**
- * Levenshtein alignment of two letter streams. Returns the `(i, j)` index
- * pairs where the aligned letters are equal; substitutions, insertions and
- * deletions are not matches.
+ * Minimum-edit alignment of two letter streams (three-state, so gap openings
+ * can break ties). Returns the `(i, j)` index pairs where the aligned letters
+ * are equal; substitutions, insertions and deletions are not matches.
  */
 function matchedLetters(a: string, b: string): [number, number][] {
   const n = a.length;
   const m = b.length;
-  const width = m + 1;
-  const d = new Int32Array((n + 1) * width);
-  for (let i = 0; i <= n; i++) d[i * width] = i;
-  for (let j = 0; j <= m; j++) d[j] = j;
+  const w = m + 1;
+  const size = (n + 1) * w;
+  // diag: ends pairing a[i-1] with b[j-1]; gapA: ends on a[i-1] alone;
+  // gapB: ends on b[j-1] alone.
+  const diag = new Float64Array(size).fill(Infinity);
+  const gapA = new Float64Array(size).fill(Infinity);
+  const gapB = new Float64Array(size).fill(Infinity);
+  diag[0] = 0;
+  for (let i = 1; i <= n; i++) gapA[i * w] = i * EDIT + OPEN;
+  for (let j = 1; j <= m; j++) gapB[j] = j * EDIT + OPEN;
+  const best = (k: number) => Math.min(diag[k]!, gapA[k]!, gapB[k]!);
+  const cost = (i: number, j: number) => (a[i - 1] === b[j - 1] ? 0 : SUB);
+
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const sub = d[(i - 1) * width + j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1);
-      const del = d[(i - 1) * width + j]! + 1;
-      const ins = d[i * width + j - 1]! + 1;
-      d[i * width + j] = Math.min(sub, del, ins);
+      const k = i * w + j;
+      const up = k - w;
+      const left = k - 1;
+      diag[k] = best(up - 1) + cost(i, j);
+      gapA[k] =
+        Math.min(gapA[up]!, Math.min(diag[up]!, gapB[up]!) + OPEN) + EDIT;
+      gapB[k] =
+        Math.min(gapB[left]!, Math.min(diag[left]!, gapA[left]!) + OPEN) + EDIT;
     }
   }
 
   const pairs: [number, number][] = [];
   let i = n;
   let j = m;
-  while (i > 0 && j > 0) {
-    const here = d[i * width + j]!;
-    const diag = d[(i - 1) * width + j - 1]!;
-    if (a[i - 1] === b[j - 1] && here === diag) {
-      pairs.push([i - 1, j - 1]);
+  let k = i * w + j;
+  let state = diag[k] === best(k) ? diag : gapA[k] === best(k) ? gapA : gapB;
+  while (i > 0 || j > 0) {
+    const here = state[k]!;
+    if (state === diag) {
+      if (a[i - 1] === b[j - 1]) pairs.push([i - 1, j - 1]);
       i--;
       j--;
-    } else if (here === diag + 1) {
-      i--;
-      j--;
-    } else if (here === d[(i - 1) * width + j]! + 1) {
-      i--;
+      k = i * w + j;
+      const prev = here - cost(i + 1, j + 1);
+      state = diag[k] === prev ? diag : gapA[k] === prev ? gapA : gapB;
     } else {
-      j--;
+      const same = state;
+      const other = state === gapA ? gapB : gapA;
+      if (state === gapA) i--;
+      else j--;
+      k = i * w + j;
+      const prev = here - EDIT;
+      state = same[k] === prev ? same : diag[k] === prev - OPEN ? diag : other;
     }
   }
   return pairs;

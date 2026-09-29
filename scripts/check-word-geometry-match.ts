@@ -40,6 +40,10 @@ const files = readdirSync(dir)
   .filter((f) => f.endsWith(".json"))
   .sort();
 
+// #62 acceptance: at least 170 real timing words boxed. Not every word must
+// be: a TTS-only insertion legitimately gets no box.
+const MIN_REAL_BOXED = 170;
+
 const evenAlignment = (text: string): CharacterAlignment => {
   const characters = [...text];
   return {
@@ -137,6 +141,10 @@ for (const file of files) {
 console.log(
   `\ntiming words boxed ${boxed}/${letteredTimings} across the real bubbles`,
 );
+if (boxed < MIN_REAL_BOXED) {
+  failures++;
+  console.log(`FAIL fewer than ${MIN_REAL_BOXED} real timing words boxed`);
+}
 if (failures) {
   console.log(`${failures} case(s) failed`);
   process.exit(1);
