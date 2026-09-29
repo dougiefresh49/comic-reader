@@ -92,12 +92,13 @@ function requireSwift() {
   }
 }
 
-/** Uppercase, ’ to ', and keep only A-Z, 0-9 and ' (anything else splits). */
+/** Split on whitespace; uppercase, ’ to ', drop all but A-Z, 0-9 and '. */
 function tokens(text: string): string[] {
   return text
     .toUpperCase()
     .replace(/’/g, "'")
-    .split(/[^A-Z0-9']+/)
+    .split(/\s+/)
+    .map((t) => t.replace(/[^A-Z0-9']/g, ""))
     .filter((t) => /[A-Z0-9]/.test(t));
 }
 
@@ -210,26 +211,23 @@ if (bubbleError) fail(`bubbles: ${bubbleError.message}`);
 const bubbles = bubbleRows as Bubble[];
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ocr-word-geometry-"));
-let geometries: TextGeometry[];
-try {
-  const files: string[] = [];
-  for (const p of pages) {
-    const { data, error } = await supabase.storage
-      .from("comic-pages")
-      .download(p.storage_path!);
-    if (error) fail(`download ${p.storage_path}: ${error.message}`);
-    const file = path.join(tmp, `page-${p.number}.webp`);
-    fs.writeFileSync(file, Buffer.from(await data.arrayBuffer()));
-    files.push(file);
-  }
-  const started = Date.now();
-  geometries = runVision(files);
-  log(
-    `Apple Vision: ${pages.length} page(s) in ${((Date.now() - started) / 1000).toFixed(1)} s`,
-  );
-} finally {
-  fs.rmSync(tmp, { recursive: true, force: true });
+// On exit, so the images go even when fail() exits mid-run.
+process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+const files: string[] = [];
+for (const p of pages) {
+  const { data, error } = await supabase.storage
+    .from("comic-pages")
+    .download(p.storage_path!);
+  if (error) fail(`download ${p.storage_path}: ${error.message}`);
+  const file = path.join(tmp, `page-${p.number}.webp`);
+  fs.writeFileSync(file, Buffer.from(await data.arrayBuffer()));
+  files.push(file);
 }
+const started = Date.now();
+const geometries = runVision(files);
+log(
+  `Apple Vision: ${pages.length} page(s) in ${((Date.now() - started) / 1000).toFixed(1)} s`,
+);
 
 const results: {
   bubbleId: string;
