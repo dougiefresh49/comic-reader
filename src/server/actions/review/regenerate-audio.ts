@@ -4,6 +4,7 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
+import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import type { AliasRow, CastRow } from "~/workflows/steps/audio-plan";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
@@ -202,10 +203,20 @@ export async function regenerateAudio(args: Args) {
     const client = new ElevenLabsClient({
       apiKey: process.env.ELEVENLABS_API_KEY,
     });
-    const response = await client.textToSpeech.convertWithTimestamps(voiceId, {
-      modelId: "eleven_v3",
-      text,
-    });
+    const response = await recordElevenLabsCall(
+      {
+        step: "review:regenerate-audio",
+        bookId: args.bookId,
+        issueId: args.issueId,
+        model: "eleven_v3",
+      },
+      text.length,
+      () =>
+        client.textToSpeech.convertWithTimestamps(voiceId, {
+          modelId: "eleven_v3",
+          text,
+        }),
+    );
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 
     const storagePath = b.audio_storage_path ?? `${b.id}.mp3`;

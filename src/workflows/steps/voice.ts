@@ -356,6 +356,7 @@ export async function generateVoiceDescriptions(
   if (!apiKey) throw new FatalError("GEMINI_API_KEY not set");
   const { getGeminiClient } = await import("~/lib/gemini-client");
   const gemini = getGeminiClient();
+  const { generateContentLogged } = await import("~/lib/llm-usage");
 
   let input: PlanVoiceDescriptionsInput;
   try {
@@ -400,10 +401,11 @@ ${list}
 Return ONLY the consolidated description as plain text — no JSON, no markdown.`;
 
     const textPart = createPartFromText(prompt);
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MEDIUM,
-      contents: [textPart],
-    });
+    const response = await generateContentLogged(
+      gemini,
+      { model: GEMINI_MEDIUM, contents: [textPart] },
+      { step: "generate-voice-descriptions", bookId, issueId },
+    );
 
     const text = response.text?.trim();
     if (!text) {

@@ -136,15 +136,22 @@ export async function generateVoiceModel(
   }
 
   const { elevenLabsFetch } = await import("~/lib/elevenlabs-client");
-  const designRes = await elevenLabsFetch("/v1/text-to-voice/design", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      voice_description: voiceDescription,
-      model_id: "eleven_ttv_v3",
-      auto_generate_text: true,
-    }),
-  });
+  const { recordElevenLabsCall } = await import("~/lib/llm-usage");
+  const llmMeta = { step: "generate-voice-models", bookId, issueId };
+  const designRes = await recordElevenLabsCall(
+    { ...llmMeta, model: "eleven_ttv_v3" },
+    null,
+    () =>
+      elevenLabsFetch("/v1/text-to-voice/design", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voice_description: voiceDescription,
+          model_id: "eleven_ttv_v3",
+          auto_generate_text: true,
+        }),
+      }),
+  );
 
   if (!designRes.ok) {
     const err = await designRes.text();
@@ -161,15 +168,20 @@ export async function generateVoiceModel(
     throw new FatalError(`No preview returned for ${characterId}`);
   }
 
-  const createRes = await elevenLabsFetch("/v1/text-to-voice", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      voice_name: characterId,
-      voice_description: voiceDescription,
-      generated_voice_id: generatedVoiceId,
-    }),
-  });
+  const createRes = await recordElevenLabsCall(
+    { ...llmMeta, model: "text-to-voice" },
+    null,
+    () =>
+      elevenLabsFetch("/v1/text-to-voice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          voice_name: characterId,
+          voice_description: voiceDescription,
+          generated_voice_id: generatedVoiceId,
+        }),
+      }),
+  );
 
   if (!createRes.ok) {
     const err = await createRes.text();
@@ -264,6 +276,7 @@ export async function generateAudioBatch(
   if (!apiKey) throw new FatalError("ELEVENLABS_API_KEY not set");
 
   const client = await getElevenLabsClient();
+  const { recordElevenLabsCall } = await import("~/lib/llm-usage");
 
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
@@ -322,15 +335,20 @@ export async function generateAudioBatch(
 
     let response;
     try {
-      response = await client.textToSpeech.convertWithTimestamps(voiceId, {
-        modelId: "eleven_v3",
-        text: ttsText,
-        voiceSettings: {
-          stability: settings.stability,
-          similarityBoost: settings.similarityBoost,
-          style: settings.style,
-        },
-      });
+      response = await recordElevenLabsCall(
+        { step: "generate-audio", bookId, issueId, model: "eleven_v3" },
+        ttsText.length,
+        () =>
+          client.textToSpeech.convertWithTimestamps(voiceId, {
+            modelId: "eleven_v3",
+            text: ttsText,
+            voiceSettings: {
+              stability: settings.stability,
+              similarityBoost: settings.similarityBoost,
+              style: settings.style,
+            },
+          }),
+      );
     } catch (e) {
       throw new FatalError(
         e instanceof Error ? e.message : `ElevenLabs error for ${bubble.id}`,

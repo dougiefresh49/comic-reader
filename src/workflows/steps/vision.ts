@@ -702,10 +702,17 @@ export async function characterLookaheadPage(
   const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
   const { identifyFace } = await import("~/lib/character-identification");
   const exemplarStore = await import("~/lib/exemplar-store");
+  const { withLlmMeta } = await import("~/lib/llm-usage");
 
   const gemini = getGeminiClient();
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
+  const llmMeta = {
+    step: "character-lookahead",
+    bookId,
+    issueId,
+    pageNumber,
+  };
 
   // 1. Load segmentation predictions from DB
   const { data: segRow, error: segErr } = await supabase
@@ -890,32 +897,36 @@ export async function characterLookaheadPage(
 
   for (const face of faceCrops) {
     // Retrieve similar exemplars from pgvector
-    const exemplarRefs = await exemplarRefsOrFatal(
-      exemplarStore,
-      supabase,
-      face.jpegBuffer.toString("base64"),
-      bookId,
-      pageLabel,
+    const exemplarRefs = await withLlmMeta(llmMeta, () =>
+      exemplarRefsOrFatal(
+        exemplarStore,
+        supabase,
+        face.jpegBuffer.toString("base64"),
+        bookId,
+        pageLabel,
+      ),
     );
 
     // Identify with exemplar context + key failover
     const faceBase64 = face.jpegBuffer.toString("base64");
-    const result = await identifyFaceOrFatal(
-      (client) =>
-        identifyFace(
-          client,
-          faceBase64,
-          "image/jpeg",
-          knownCharacters,
-          exemplarRefs,
-          pageBase64,
-          "image/webp",
-          wikiSummary,
-          { throwOnApiError: true },
-        ),
-      gemini,
-      getFallbackGeminiClient,
-      pageLabel,
+    const result = await withLlmMeta(llmMeta, () =>
+      identifyFaceOrFatal(
+        (client) =>
+          identifyFace(
+            client,
+            faceBase64,
+            "image/jpeg",
+            knownCharacters,
+            exemplarRefs,
+            pageBase64,
+            "image/webp",
+            wikiSummary,
+            { throwOnApiError: true },
+          ),
+        gemini,
+        getFallbackGeminiClient,
+        pageLabel,
+      ),
     );
 
     if (result.characterName && result.confidence >= 0.6) {
@@ -935,17 +946,20 @@ export async function characterLookaheadPage(
 
       // Store face as exemplar (confirmed if resolved + high confidence)
       if (result.confidence >= 0.7) {
+        const suggestedName = charId ? undefined : result.characterName;
         try {
-          await exemplarStore.storeExemplar(supabase, {
-            jpegBuffer: face.jpegBuffer,
-            characterId: charId,
-            suggestedName: charId ? undefined : result.characterName,
-            bookId,
-            sourceIssue: issueId,
-            pageNumber,
-            confidence: result.confidence,
-            isConfirmed: charId !== null && result.confidence >= 0.9,
-          });
+          await withLlmMeta(llmMeta, () =>
+            exemplarStore.storeExemplar(supabase, {
+              jpegBuffer: face.jpegBuffer,
+              characterId: charId,
+              suggestedName,
+              bookId,
+              sourceIssue: issueId,
+              pageNumber,
+              confidence: result.confidence,
+              isConfirmed: charId !== null && result.confidence >= 0.9,
+            }),
+          );
         } catch (e) {
           throw new FatalError(
             `character_face_exemplars write failed for ${pageLabel}: ${e instanceof Error ? e.message : String(e)}`,
@@ -1027,9 +1041,11 @@ export async function getContextPage(
   const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const gemini = getGemini();
   const { GEMINI_HIGH } = await import("~/lib/models");
+  const { generateContentLogged } = await import("~/lib/llm-usage");
 
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
+  const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
 
   // Load book + wiki context for richer prompts
   let bookContext: string | undefined;
@@ -1242,10 +1258,11 @@ export async function getContextPage(
         "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting.",
       );
 
-      const ocrResponse = await gemini.models.generateContent({
-        model: GEMINI_MEDIUM,
-        contents: [ocrImagePart, ocrPrompt],
-      });
+      const ocrResponse = await generateContentLogged(
+        gemini,
+        { model: GEMINI_MEDIUM, contents: [ocrImagePart, ocrPrompt] },
+        llmMeta,
+      );
 
       ocrText = ocrResponse.text?.trim() ?? "";
     } catch {
@@ -1275,10 +1292,11 @@ export async function getContextPage(
       const pageImagePart = cpb64(imgBuf.toString("base64"), "image/webp");
       const contextTextPart = cpt(contextPrompt);
 
-      const contextResponse = await gemini.models.generateContent({
-        model: GEMINI_HIGH,
-        contents: [pageImagePart, contextTextPart],
-      });
+      const contextResponse = await generateContentLogged(
+        gemini,
+        { model: GEMINI_HIGH, contents: [pageImagePart, contextTextPart] },
+        llmMeta,
+      );
 
       const responseText = contextResponse.text?.trim() ?? "";
 
