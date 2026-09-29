@@ -98,13 +98,16 @@ function requireSwift() {
   }
 }
 
-/** Split on whitespace; uppercase, ’ to ', drop all but A-Z, 0-9 and '. */
+/**
+ * Uppercase, ’ to ', then split on every character but A-Z, 0-9 and ', so a
+ * hyphen separates tokens (FLEET- / FOOTED still matches FLEET-FOOTED) and
+ * DON'T stays one token.
+ */
 function tokens(text: string): string[] {
   return text
     .toUpperCase()
     .replace(/’/g, "'")
-    .split(/\s+/)
-    .map((t) => t.replace(/[^A-Z0-9']/g, ""))
+    .split(/[^A-Z0-9']+/)
     .filter((t) => /[A-Z0-9]/.test(t));
 }
 
