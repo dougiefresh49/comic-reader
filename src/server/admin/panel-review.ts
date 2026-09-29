@@ -6,8 +6,9 @@ import type {
   PanelBoundingBox,
   PanelForegroundPolygons,
 } from "~/types/panels";
-import type { AudioTags } from "~/lib/panel-tags";
+import type { Json } from "~/types/database";
 import { selectIssue } from "~/lib/issue-queries";
+import { normalizePanelAudioTags } from "~/workflows/steps/vision-rows";
 
 export interface PanelReviewBubble {
   /** uuid */
@@ -49,7 +50,7 @@ interface PanelRow {
   cinematic_description: string | null;
   effect_tags: string[] | null;
   effect_positions: EffectPositions | null;
-  audio_tags: AudioTags | null;
+  audio_tags: Json;
   primary_speaker: string | null;
   estimated_duration_seconds: number | null;
   is_new_scene: boolean;
@@ -158,11 +159,7 @@ export async function getPanelReviewData(
       cinematicDescription: row.cinematic_description,
       effectTags: row.effect_tags ?? [],
       effectPositions: row.effect_positions ?? null,
-      audioTags: row.audio_tags ?? {
-        ambience: [],
-        sfx: [],
-        music_mood: "transition_neutral",
-      },
+      audioTags: normalizePanelAudioTags(row.audio_tags),
       primarySpeaker: row.primary_speaker,
       estimatedDurationSeconds: row.estimated_duration_seconds,
       isNewScene: row.is_new_scene,
