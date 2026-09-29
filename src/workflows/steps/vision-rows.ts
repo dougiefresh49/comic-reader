@@ -1,5 +1,10 @@
 import type { Json, TablesInsert, TablesUpdate } from "~/types/database";
-import type { PanelAudioTags } from "~/types/panels";
+import type {
+  PanelAudioTags,
+  PanelBoundingBox,
+  PanelForegroundPolygons,
+  PanelLocalPolygon,
+} from "~/types/panels";
 
 export type RoboflowBoxPrediction = {
   x: number;
@@ -213,6 +218,146 @@ export function mapSegmentationRow(
     image_height: imgDims.height,
     predictions: predictions as unknown as Json,
   };
+}
+
+/** The one thing the foreground mapping reads off a panel row. */
+export type ForegroundPanel = { bounding_box: PanelBoundingBox };
+
+/** A segmentation prediction, as `page_segmentation.predictions` stores it. */
+export type ForegroundPrediction = {
+  class: string;
+  points: Array<{ x: number; y: number }>;
+};
+
+/** At most this many vertices survive per polygon, so rows stay small. */
+const MAX_POLY_VERTS = 50;
+
+const CHARACTER_CLASSES = new Set([
+  "comic character",
+  "person",
+  "face",
+  "head",
+]);
+const BUBBLE_CLASSES = new Set(["speech bubble"]);
+
+/**
+ * Ramer-Douglas-Peucker, moved here from `shared.ts` with the foreground
+ * mapping (#219). It is pure, and this module is imported by the reader's
+ * server code, which must not pull `shared.ts`'s `workflow` and client
+ * imports in with it. `shared.ts` re-exports it for its other callers.
+ */
+export function rdpSimplify(
+  points: Array<{ x: number; y: number }>,
+  epsilon: number,
+): Array<{ x: number; y: number }> {
+  if (points.length <= 2) return points;
+
+  let maxDist = 0;
+  let maxIdx = 0;
+  const first = points[0]!;
+  const last = points[points.length - 1]!;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const pt = points[i]!;
+    const dist = perpendicularDist(pt, first, last);
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIdx = i;
+    }
+  }
+
+  if (maxDist > epsilon) {
+    const left = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
+    const right = rdpSimplify(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+
+  return [first, last];
+}
+
+function perpendicularDist(
+  pt: { x: number; y: number },
+  lineStart: { x: number; y: number },
+  lineEnd: { x: number; y: number },
+): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) {
+    const ex = pt.x - lineStart.x;
+    const ey = pt.y - lineStart.y;
+    return Math.sqrt(ex * ex + ey * ey);
+  }
+  const num = Math.abs(
+    dy * pt.x - dx * pt.y + lineEnd.x * lineStart.y - lineEnd.y * lineStart.x,
+  );
+  return num / Math.sqrt(lenSq);
+}
+
+/** Rasterised masks come back with hundreds of vertices; thin them out. */
+function simplifyPoly(points: PanelLocalPolygon): PanelLocalPolygon {
+  if (points.length <= MAX_POLY_VERTS) return points;
+  let simplified = points;
+  let eps = 0.005;
+  while (simplified.length > MAX_POLY_VERTS && eps < 0.1) {
+    simplified = rdpSimplify(points, eps);
+    eps *= 1.5;
+  }
+  return simplified;
+}
+
+/**
+ * Map SAM3 segmentation predictions to per-panel foreground polygons in
+ * panel-local 0..1 coordinates (#219). One polygon goes to the first panel
+ * holding its centroid, in the order `panels` is passed, and a panel with
+ * nothing in it gets empty lists: writing `foreground_polygons` is the
+ * caller's call, not this function's. Pure: no client, no fetch, no writes.
+ */
+export function mapForegroundPolygons(
+  panels: ForegroundPanel[],
+  image: { width: number; height: number },
+  predictions: ForegroundPrediction[],
+): PanelForegroundPolygons[] {
+  const { width: imgW, height: imgH } = image;
+  const panelsPx = panels.map((p) => ({
+    x: p.bounding_box.x * imgW,
+    y: p.bounding_box.y * imgH,
+    w: p.bounding_box.w * imgW,
+    h: p.bounding_box.h * imgH,
+  }));
+
+  const polys: PanelForegroundPolygons[] = panelsPx.map(() => ({
+    characters: [],
+    bubbles: [],
+  }));
+
+  for (const pred of predictions) {
+    const isChar = CHARACTER_CLASSES.has(pred.class);
+    const isBubble = BUBBLE_CLASSES.has(pred.class);
+    if (!isChar && !isBubble) continue;
+    if (pred.points.length < 3) continue;
+
+    const cx = pred.points.reduce((s, pt) => s + pt.x, 0) / pred.points.length;
+    const cy = pred.points.reduce((s, pt) => s + pt.y, 0) / pred.points.length;
+
+    const i = panelsPx.findIndex(
+      (panel) =>
+        cx >= panel.x &&
+        cx <= panel.x + panel.w &&
+        cy >= panel.y &&
+        cy <= panel.y + panel.h,
+    );
+    if (i < 0) continue;
+
+    const panel = panelsPx[i]!;
+    const local: PanelLocalPolygon = pred.points.map((pt) => ({
+      x: (pt.x - panel.x) / panel.w,
+      y: (pt.y - panel.y) / panel.h,
+    }));
+    polys[i]![isChar ? "characters" : "bubbles"].push(simplifyPoly(local));
+  }
+
+  return polys;
 }
 
 /** Fields used to decide whether a bubble already has reviewed/context data. */

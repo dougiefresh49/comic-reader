@@ -5,15 +5,16 @@ import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
-import { rdpSimplify } from "./shared";
 import {
   bubbleHasContext,
   buildContextUpdate,
   mapBubbleRows,
+  mapForegroundPolygons,
   mapPanelRows,
   mapSegmentationRow,
   parseRoboflowSam3Output,
   type ContextParsed,
+  type ForegroundPrediction,
   type ParsedRoboflowSam3,
   type RoboflowBoxPrediction,
   type RoboflowSam3Output,
@@ -530,28 +531,6 @@ export async function extractForegroundMasksBatch(
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
 
-  const CHARACTER_CLASSES = new Set([
-    "comic character",
-    "person",
-    "face",
-    "head",
-  ]);
-  const BUBBLE_CLASSES = new Set(["speech bubble"]);
-  const MAX_VERTS = 50;
-
-  type PolyPoint = { x: number; y: number };
-
-  function simplifyPoly(points: PolyPoint[]): PolyPoint[] {
-    if (points.length <= MAX_VERTS) return points;
-    let simplified = points;
-    let eps = 0.005;
-    while (simplified.length > MAX_VERTS && eps < 0.1) {
-      simplified = rdpSimplify(points, eps);
-      eps *= 1.5;
-    }
-    return simplified;
-  }
-
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
     const pageLabel = `page-${padded}`;
@@ -596,71 +575,20 @@ export async function extractForegroundMasksBatch(
 
     const imgW = segRow.image_width;
     const imgH = segRow.image_height;
-    const predictions = segRow.predictions as Array<{
-      class: string;
-      confidence: number;
-      points: Array<{ x: number; y: number }>;
-    }>;
+    const predictions = segRow.predictions as ForegroundPrediction[];
 
-    type PanelPx = { id: string; x: number; y: number; w: number; h: number };
-    const panelsPx: PanelPx[] = panels.map((p) => {
-      const bb = p.bounding_box as BoundingBoxJson;
-      return {
-        id: p.id,
-        x: bb.x * imgW,
-        y: bb.y * imgH,
-        w: bb.w * imgW,
-        h: bb.h * imgH,
-      };
-    });
+    const foreground = mapForegroundPolygons(
+      panels.map((p) => ({ bounding_box: p.bounding_box as BoundingBoxJson })),
+      { width: imgW, height: imgH },
+      predictions,
+    );
 
-    const panelCharPolys = new Map<string, PolyPoint[][]>();
-    const panelBubblePolys = new Map<string, PolyPoint[][]>();
-    for (const p of panelsPx) {
-      panelCharPolys.set(p.id, []);
-      panelBubblePolys.set(p.id, []);
-    }
-
-    for (const pred of predictions) {
-      const isChar = CHARACTER_CLASSES.has(pred.class);
-      const isBubble = BUBBLE_CLASSES.has(pred.class);
-      if (!isChar && !isBubble) continue;
-      if (pred.points.length < 3) continue;
-
-      let cx = 0;
-      let cy = 0;
-      for (const pt of pred.points) {
-        cx += pt.x;
-        cy += pt.y;
-      }
-      cx /= pred.points.length;
-      cy /= pred.points.length;
-
-      for (const panel of panelsPx) {
-        if (
-          cx >= panel.x &&
-          cx <= panel.x + panel.w &&
-          cy >= panel.y &&
-          cy <= panel.y + panel.h
-        ) {
-          const localPoly = pred.points.map((pt) => ({
-            x: (pt.x - panel.x) / panel.w,
-            y: (pt.y - panel.y) / panel.h,
-          }));
-
-          const simplified = simplifyPoly(localPoly);
-          const target = isChar
-            ? panelCharPolys.get(panel.id)!
-            : panelBubblePolys.get(panel.id)!;
-          target.push(simplified);
-          break;
-        }
-      }
-    }
-
-    for (const p of panelsPx) {
-      const characters = panelCharPolys.get(p.id)!;
-      const bubbles = panelBubblePolys.get(p.id)!;
+    let totalChars = 0;
+    let totalBubbles = 0;
+    for (const [i, p] of panels.entries()) {
+      const { characters, bubbles } = foreground[i]!;
+      totalChars += characters.length;
+      totalBubbles += bubbles.length;
       if (characters.length === 0 && bubbles.length === 0) continue;
       const { error: updateErr } = await supabase
         .from("panels")
@@ -673,14 +601,6 @@ export async function extractForegroundMasksBatch(
       }
     }
 
-    const totalChars = [...panelCharPolys.values()].reduce(
-      (s, a) => s + a.length,
-      0,
-    );
-    const totalBubbles = [...panelBubblePolys.values()].reduce(
-      (s, a) => s + a.length,
-      0,
-    );
     console.log(
       `[masks] ${bookId}/${issueId}: page-${padded} → ${totalChars} character + ${totalBubbles} bubble polygon(s) across ${panels.length} panel(s)`,
     );

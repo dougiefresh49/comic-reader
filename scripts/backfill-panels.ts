@@ -30,10 +30,10 @@ import type {
   PageDirectedPanel,
   PanelBoundingBox,
   PanelForegroundPolygons,
-  PanelLocalPolygon,
 } from "~/types/panels";
-import { queryPageList, rdpSimplify } from "~/workflows/steps/shared";
+import { queryPageList } from "~/workflows/steps/shared";
 import {
+  mapForegroundPolygons,
   mapPanelRows,
   mapSegmentationRow,
   parseRoboflowSam3Output,
@@ -137,50 +137,20 @@ function orderedPanels(
 }
 
 /**
- * Ported from extractForegroundMasksBatch (src/workflows/steps/vision.ts): a
- * polygon goes to the first panel in reading order that holds its centroid,
- * in panel-local 0..1 coordinates, simplified to at most 50 vertices.
+ * A polygon goes to the first panel in reading order that holds its
+ * centroid, in panel-local 0..1 coordinates, simplified to at most 50
+ * vertices. The mapping itself is `mapForegroundPolygons` (#219), the same
+ * one the workflow step calls.
  */
 function attachForegroundPolygons(
   panels: PanelRow[],
   parsed: ParsedRoboflowSam3,
 ): void {
-  const CHARACTER_CLASSES = new Set([
-    "comic character",
-    "person",
-    "face",
-    "head",
-  ]);
-  const MAX_VERTS = 50;
-  const { width: imgW, height: imgH } = parsed.image;
-  const polys = panels.map(() => ({
-    characters: [] as PanelLocalPolygon[],
-    bubbles: [] as PanelLocalPolygon[],
-  }));
-
-  for (const pred of parsed.segmentationPredictions) {
-    const isChar = CHARACTER_CLASSES.has(pred.class);
-    if (!isChar && pred.class !== "speech bubble") continue;
-    if (pred.points.length < 3) continue;
-    const cx = pred.points.reduce((s, p) => s + p.x, 0) / pred.points.length;
-    const cy = pred.points.reduce((s, p) => s + p.y, 0) / pred.points.length;
-    const i = panels.findIndex(({ bounding_box: b }) => {
-      const [x, y, w, h] = [b.x * imgW, b.y * imgH, b.w * imgW, b.h * imgH];
-      return cx >= x && cx <= x + w && cy >= y && cy <= y + h;
-    });
-    if (i < 0) continue;
-    const b = panels[i]!.bounding_box;
-    const local = pred.points.map((pt) => ({
-      x: (pt.x - b.x * imgW) / (b.w * imgW),
-      y: (pt.y - b.y * imgH) / (b.h * imgH),
-    }));
-    let simplified = local;
-    for (let eps = 0.005; simplified.length > MAX_VERTS && eps < 0.1; ) {
-      simplified = rdpSimplify(local, eps);
-      eps *= 1.5;
-    }
-    polys[i]![isChar ? "characters" : "bubbles"].push(simplified);
-  }
+  const polys = mapForegroundPolygons(
+    panels,
+    parsed.image,
+    parsed.segmentationPredictions,
+  );
 
   panels.forEach((p, i) => {
     const { characters, bubbles } = polys[i]!;
