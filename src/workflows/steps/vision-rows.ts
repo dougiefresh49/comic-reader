@@ -1,4 +1,5 @@
 import type { Json, TablesInsert, TablesUpdate } from "~/types/database";
+import type { PanelAudioTags } from "~/types/panels";
 
 export type RoboflowBoxPrediction = {
   x: number;
@@ -86,6 +87,41 @@ export function parseRoboflowSam3Output(
   };
 }
 
+/** Audio direction for a panel nobody has directed yet. */
+export const DEFAULT_PANEL_AUDIO_TAGS: PanelAudioTags = {
+  ambience: [],
+  sfx: [],
+  music_mood: "transition_neutral",
+};
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === "string");
+}
+
+/**
+ * Turn a stored `panels.audio_tags` value into a complete PanelAudioTags.
+ * The column default is `{}`, and a panel row holding it 500'd the reader
+ * (#222), so each field is checked on its own: a field with the right type
+ * is kept, a missing or wrong-typed one comes from the default. A fallback
+ * array is a copy, so callers never share the default's own arrays.
+ */
+export function normalizePanelAudioTags(value: unknown): PanelAudioTags {
+  const tags =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  return {
+    ambience: isStringArray(tags.ambience)
+      ? tags.ambience
+      : [...DEFAULT_PANEL_AUDIO_TAGS.ambience],
+    sfx: isStringArray(tags.sfx) ? tags.sfx : [...DEFAULT_PANEL_AUDIO_TAGS.sfx],
+    music_mood:
+      typeof tags.music_mood === "string"
+        ? tags.music_mood
+        : DEFAULT_PANEL_AUDIO_TAGS.music_mood,
+  };
+}
+
 /** Map Roboflow panel centre-pixel boxes to `panels` insert rows. */
 export function mapPanelRows(
   bookId: string,
@@ -108,6 +144,9 @@ export function mapPanelRows(
       w: p.width / imgDims.width,
       h: p.height / imgDims.height,
     },
+    // Write a complete value, not the column default `{}` (#222). The spread
+    // makes a plain object, which Json accepts and an interface is not.
+    audio_tags: { ...normalizePanelAudioTags(null) },
   }));
 }
 
