@@ -52,30 +52,36 @@ function fail(why: string): never {
   process.exit(1);
 }
 
+/** Strict: an unknown flag fails, so a typo never widens a --write. */
 function parseArgs() {
   const argv = process.argv.slice(2);
-  const value = (flag: string) => {
-    const i = argv.indexOf(flag);
-    const next = i >= 0 ? argv[i + 1] : undefined;
-    return next && !next.startsWith("--") ? next : undefined;
+  const opts = {
+    book: "",
+    issue: "",
+    pages: [] as number[],
+    write: false,
+    json: false,
   };
-  const book = value("--book");
-  const issue = value("--issue");
-  if (!book || !issue) fail(USAGE);
-  const pages: number[] = [];
-  argv.forEach((arg, i) => {
-    if (arg !== "--page") return;
-    const n = Number(argv[i + 1]);
-    if (!Number.isInteger(n) || n < 1) fail(`--page needs a page number`);
-    pages.push(n);
-  });
-  return {
-    book,
-    issue,
-    pages,
-    write: argv.includes("--write"),
-    json: argv.includes("--json"),
-  };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--write") opts.write = true;
+    else if (arg === "--json") opts.json = true;
+    else if (arg === "--book" || arg === "--issue" || arg === "--page") {
+      const next = argv[++i];
+      if (!next || next.startsWith("--"))
+        fail(`${arg} needs a value\n${USAGE}`);
+      if (arg === "--book") opts.book = next;
+      else if (arg === "--issue") opts.issue = next;
+      else {
+        const n = Number(next);
+        if (!Number.isInteger(n) || n < 1)
+          fail(`--page: "${next}" is not a page number`);
+        opts.pages.push(n);
+      }
+    } else fail(`unknown argument "${arg}"\n${USAGE}`);
+  }
+  if (!opts.book || !opts.issue) fail(USAGE);
+  return opts;
 }
 
 function requireSwift() {
@@ -211,8 +217,11 @@ if (bubbleError) fail(`bubbles: ${bubbleError.message}`);
 const bubbles = bubbleRows as Bubble[];
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ocr-word-geometry-"));
-// On exit, so the images go even when fail() exits mid-run.
+// On exit, so the images go even when fail() or Ctrl-C ends the run.
 process.on("exit", () => fs.rmSync(tmp, { recursive: true, force: true }));
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => process.exit(1));
+}
 const files: string[] = [];
 for (const p of pages) {
   const { data, error } = await supabase.storage
