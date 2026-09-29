@@ -1,11 +1,12 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
+import type { Json } from "~/types/database";
 import type {
   EffectPositions,
   PageDirectedPanel,
-  PanelAudioTags,
   PanelForegroundPolygons,
 } from "~/types/panels";
+import { normalizePanelAudioTags } from "~/workflows/steps/vision-rows";
 
 interface PanelRow {
   id: string;
@@ -16,7 +17,7 @@ interface PanelRow {
   cinematic_description: string | null;
   effect_tags: string[];
   effect_positions: EffectPositions | null;
-  audio_tags: PanelAudioTags | null;
+  audio_tags: Json;
   primary_speaker: string | null;
   estimated_duration_seconds: number | null;
   is_new_scene: boolean;
@@ -42,11 +43,7 @@ function rowToPanel(row: PanelRow): PageDirectedPanel {
     cinematicDescription: row.cinematic_description,
     effectTags: row.effect_tags ?? [],
     effectPositions: row.effect_positions ?? null,
-    audioTags: row.audio_tags ?? {
-      ambience: [],
-      sfx: [],
-      music_mood: "transition_neutral",
-    },
+    audioTags: normalizePanelAudioTags(row.audio_tags),
     primarySpeaker: row.primary_speaker,
     estimatedDurationSeconds: row.estimated_duration_seconds,
     isNewScene: row.is_new_scene,

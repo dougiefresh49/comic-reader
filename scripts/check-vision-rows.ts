@@ -1,6 +1,7 @@
 /**
- * Fixture-only acceptance for vision row mappers (#70) and for the vision
- * failures that must surface (#145). No DB calls and no network calls:
+ * Fixture-only acceptance for vision row mappers (#70), for the vision
+ * failures that must surface (#145), and for complete panel audio_tags
+ * (#222). No DB calls and no network calls:
  * `fetch` is stubbed before any case runs.
  *
  * Usage: pnpm tsx --env-file=.env scripts/check-vision-rows.ts
@@ -26,6 +27,7 @@ import {
   mapBubbleRows,
   mapPanelRows,
   mapSegmentationRow,
+  normalizePanelAudioTags,
   parseRoboflowSam3Output,
   type BubbleContextFields,
   type RoboflowBoxPrediction,
@@ -478,6 +480,33 @@ await check(
       "page-03",
     ),
   /threw FatalError: exemplar lookup failed for page-03: Gemini embedding failed/,
+);
+
+// #222: a panel row whose audio_tags is `{}` 500'd the reader. Every stored
+// value comes back with all three keys, and the mapper writes all three.
+const fullTags = String.raw`\{"ambience":\[\],"sfx":\[\],"music_mood":"transition_neutral"\}`;
+const tagCases: Record<string, unknown> = {
+  "{}": {},
+  null: null,
+  "a string": "oops",
+  "wrong-typed fields": { ambience: "rain", sfx: [1], music_mood: 3 },
+};
+for (const [name, stored] of Object.entries(tagCases)) {
+  await check(
+    `audio_tags ${name}`,
+    async () => normalizePanelAudioTags(stored),
+    new RegExp(`^returned ${fullTags}$`),
+  );
+}
+await check(
+  "audio_tags partial keeps sfx",
+  async () => normalizePanelAudioTags({ sfx: ["boom"] }),
+  /^returned \{"ambience":\[\],"sfx":\["boom"\],"music_mood":"transition_neutral"\}$/,
+);
+await check(
+  "mapPanelRows audio_tags",
+  async () => panelRows.map((r) => r.audio_tags),
+  new RegExp(String.raw`^returned \[(${fullTags},){5}${fullTags}\]$`),
 );
 
 if (failed > 0) {
