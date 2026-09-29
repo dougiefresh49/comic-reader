@@ -6,6 +6,7 @@ import {
 } from "@google/genai";
 import sharp from "sharp";
 import { FatalError } from "workflow";
+import type { LlmCallMeta } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
@@ -155,6 +156,7 @@ async function getSortPlanResponseFromGemini(
   imgH: number,
   panels: SortPanelRow[],
   bubbles: SortBubbleRow[],
+  llmMeta: LlmCallMeta,
 ): Promise<GenerateContentResponse> {
   const panelLines = panels
     .map((p) => {
@@ -207,10 +209,12 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
   );
   const textPart = createPartFromText(prompt);
 
-  return gemini.models.generateContent({
-    model: GEMINI_MEDIUM,
-    contents: [imagePart, textPart],
-  });
+  const { generateContentLogged } = await import("~/lib/llm-usage");
+  return generateContentLogged(
+    gemini,
+    { model: GEMINI_MEDIUM, contents: [imagePart, textPart] },
+    llmMeta,
+  );
 }
 
 function validateAndFlattenOrders(
@@ -388,6 +392,7 @@ export async function sortPageElements(
     imgH,
     panels,
     bubbles,
+    { step: "sort-page-elements", bookId, issueId, pageNumber },
   );
 
   // Past the paid call: a Workflow retry would pay for Gemini again, so every

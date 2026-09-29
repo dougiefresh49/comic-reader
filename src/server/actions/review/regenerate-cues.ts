@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
+import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -51,14 +52,22 @@ export async function regenerateCues(args: Args) {
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const result = await ai.models.generateContent({
-      model: GEMINI_FAST,
-      contents: buildPrompt(args.text, args.userFeedback),
-      // When the user supplies feedback, allow a touch of variability so we
-      // don't return the same output verbatim. Without feedback, stay
-      // deterministic.
-      config: { temperature: args.userFeedback?.trim() ? 0.3 : 0 },
-    });
+    const result = await generateContentLogged(
+      ai,
+      {
+        model: GEMINI_FAST,
+        contents: buildPrompt(args.text, args.userFeedback),
+        // When the user supplies feedback, allow a touch of variability so we
+        // don't return the same output verbatim. Without feedback, stay
+        // deterministic.
+        config: { temperature: args.userFeedback?.trim() ? 0.3 : 0 },
+      },
+      {
+        step: "review:regenerate-cues",
+        bookId: args.bookId,
+        issueId: args.issueId,
+      },
+    );
     const formatted = result.text?.trim() ?? "";
     if (!formatted) return { ok: false, error: "Empty Gemini response" };
 

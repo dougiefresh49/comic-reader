@@ -1,10 +1,11 @@
 import {
-  GoogleGenAI,
+  type GoogleGenAI,
   createPartFromBase64,
   createPartFromText,
   type Part,
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ambientLlmMeta, generateContentLogged } from "./llm-usage";
 import { GEMINI_MEDIUM } from "./models";
 
 export interface FaceIdentification {
@@ -143,10 +144,11 @@ export async function identifyFace(
 
   let response;
   try {
-    response = await gemini.models.generateContent({
-      model: GEMINI_MEDIUM,
-      contents: [{ role: "user", parts }],
-    });
+    response = await generateContentLogged(
+      gemini,
+      { model: GEMINI_MEDIUM, contents: [{ role: "user", parts }] },
+      ambientLlmMeta("identify-face"),
+    );
   } catch (err) {
     if (options?.throwOnApiError) throw err;
     return { characterName: null, confidence: 0 };
@@ -222,10 +224,11 @@ export async function matchFaceToClusters(
   }
 
   try {
-    const response = await gemini.models.generateContent({
-      model: GEMINI_MEDIUM,
-      contents: [{ role: "user", parts }],
-    });
+    const response = await generateContentLogged(
+      gemini,
+      { model: GEMINI_MEDIUM, contents: [{ role: "user", parts }] },
+      ambientLlmMeta("match-face-clusters"),
+    );
 
     const text = response.text?.trim() ?? "";
     const cleaned = text

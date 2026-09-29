@@ -8,6 +8,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
+import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -200,10 +201,16 @@ export async function rerunContext(args: Args): Promise<Result> {
     // Single-bubble vision with full neighbor context fits comfortably in
     // MEDIUM (Flash) — no need to spend Pro budget here. Switch to HIGH
     // only if quality drops below acceptable.
-    const response = await ai.models.generateContent({
-      model: GEMINI_MEDIUM,
-      contents: [pagePart, cropPart, textPart],
-    });
+    const response = await generateContentLogged(
+      ai,
+      { model: GEMINI_MEDIUM, contents: [pagePart, cropPart, textPart] },
+      {
+        step: "review:rerun-context",
+        bookId: args.bookId,
+        issueId: args.issueId,
+        pageNumber: t.page_number,
+      },
+    );
     const text = response.text?.trim();
     if (!text) return { ok: false, error: "Empty Gemini response" };
 
