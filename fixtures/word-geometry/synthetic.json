@@ -1,0 +1,264 @@
+{
+  "synthetic": true,
+  "bubbles": [
+    {
+      "bubbleId": "cross-reference-split",
+      "text_with_cues": "[curious] Can you cross-reference that?",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.3, 0.04],
+            "words": [
+              { "t": "CAN", "box": [0.1, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "YOU", "box": [0.19, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "CROSS-", "box": [0.28, 0.1, 0.12, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.15, 0.3, 0.04],
+            "words": [
+              { "t": "REFERENCE", "box": [0.1, 0.15, 0.2, 0.04], "conf": 1 },
+              { "t": "THAT?", "box": [0.31, 0.15, 0.09, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 1,
+        "letteredWordCount": 5,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.08, 0.04]],
+          [[0.19, 0.1, 0.08, 0.04]],
+          [
+            [0.28, 0.1, 0.12, 0.04],
+            [0.1, 0.15, 0.2, 0.04]
+          ],
+          [[0.31, 0.15, 0.09, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "speaker-labelled-merged-row",
+      "text_with_cues": "(Jason) Look out! (Kimberly) I see them!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.2, 0.04],
+            "words": [
+              { "t": "LOOK", "box": [0.1, 0.1, 0.1, 0.04], "conf": 1 },
+              { "t": "OUT!", "box": [0.21, 0.1, 0.09, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.6, 0.3, 0.25, 0.04],
+            "words": [
+              { "t": "I", "box": [0.6, 0.3, 0.02, 0.04], "conf": 1 },
+              { "t": "SEE", "box": [0.63, 0.3, 0.08, 0.04], "conf": 1 },
+              { "t": "THEM!", "box": [0.72, 0.3, 0.13, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 1,
+        "letteredWordCount": 5,
+        "boxesByTimingIndex": [
+          [],
+          [[0.1, 0.1, 0.1, 0.04]],
+          [[0.21, 0.1, 0.09, 0.04]],
+          [],
+          [[0.6, 0.3, 0.02, 0.04]],
+          [[0.63, 0.3, 0.08, 0.04]],
+          [[0.72, 0.3, 0.13, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "junk-line",
+      "text_with_cues": "[shouting] (Jason) Get down!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.4, 0.05, 0.1, 0.06],
+            "words": [
+              { "t": "RACT", "box": [0.4, 0.05, 0.1, 0.06], "conf": 0.3 }
+            ]
+          },
+          {
+            "box": [0.1, 0.1, 0.2, 0.04],
+            "words": [
+              { "t": "GET", "box": [0.1, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "DOWN!", "box": [0.19, 0.1, 0.11, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 3,
+        "boxesByTimingIndex": [
+          [],
+          [[0.1, 0.1, 0.08, 0.04]],
+          [[0.19, 0.1, 0.11, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "no-geometry",
+      "text_with_cues": "[whispering] Nobody lettered this one.",
+      "geometry": null,
+      "expect": {
+        "coverage": 0,
+        "letteredWordCount": 0,
+        "boxesByTimingIndex": [[], [], [], []]
+      }
+    },
+    {
+      "bubbleId": "line-without-word-boxes",
+      "text_with_cues": "[relieved] Alright, don't go!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.2, 0.3, 0.4, 0.05],
+            "words": [
+              { "t": "ALL", "box": [0.2, 0.3, 0.4, 0.05], "conf": 1 },
+              { "t": "RIGHT", "box": [0.2, 0.3, 0.4, 0.05], "conf": 1 },
+              { "t": "DON'T", "box": [0.2, 0.3, 0.4, 0.05], "conf": 1 },
+              { "t": "GO!", "box": [0.2, 0.3, 0.4, 0.05], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 1,
+        "letteredWordCount": 4,
+        "boxesByTimingIndex": [
+          [[0.2, 0.3, 0.4, 0.05]],
+          [[0.2, 0.3, 0.4, 0.05]],
+          [[0.2, 0.3, 0.4, 0.05]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "junk-between-words",
+      "text_with_cues": "[shouting] Stop that car!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.2, 0.04],
+            "words": [
+              { "t": "STOP", "box": [0.1, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "THAT", "box": [0.19, 0.1, 0.11, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.4, 0.12, 0.1, 0.06],
+            "words": [
+              { "t": "RACT", "box": [0.4, 0.12, 0.1, 0.06], "conf": 0.3 }
+            ]
+          },
+          {
+            "box": [0.1, 0.15, 0.1, 0.04],
+            "words": [{ "t": "CAR!", "box": [0.1, 0.15, 0.1, 0.04], "conf": 1 }]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.75,
+        "letteredWordCount": 4,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.08, 0.04]],
+          [[0.19, 0.1, 0.11, 0.04]],
+          [[0.1, 0.15, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "repeated-suffix-fragment",
+      "text_with_cues": "[yelling] Look out!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.3, 0.04],
+            "words": [
+              { "t": "LOOK", "box": [0.1, 0.1, 0.1, 0.04], "conf": 1 },
+              { "t": "OOK", "box": [0.21, 0.1, 0.08, 0.04], "conf": 0.3 },
+              { "t": "OUT!", "box": [0.3, 0.1, 0.1, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 3,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.1, 0.04]],
+          [[0.3, 0.1, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "repeated-prefix-fragment",
+      "text_with_cues": "[quietly] That one.",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.3, 0.04],
+            "words": [
+              { "t": "TH", "box": [0.1, 0.1, 0.05, 0.04], "conf": 0.3 },
+              { "t": "THAT", "box": [0.16, 0.1, 0.1, 0.04], "conf": 1 },
+              { "t": "ONE.", "box": [0.27, 0.1, 0.1, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 3,
+        "boxesByTimingIndex": [
+          [[0.16, 0.1, 0.1, 0.04]],
+          [[0.27, 0.1, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "ocr-transposition",
+      "text_with_cues": "[dramatically] The end.",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.3, 0.8, 0.2, 0.04],
+            "words": [
+              { "t": "TEH", "box": [0.3, 0.8, 0.08, 0.04], "conf": 0.6 },
+              { "t": "END.", "box": [0.39, 0.8, 0.11, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 1,
+        "letteredWordCount": 2,
+        "boxesByTimingIndex": [
+          [[0.3, 0.8, 0.08, 0.04]],
+          [[0.39, 0.8, 0.11, 0.04]]
+        ]
+      }
+    }
+  ]
+}
