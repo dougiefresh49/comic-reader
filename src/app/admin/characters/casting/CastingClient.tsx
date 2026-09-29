@@ -289,16 +289,22 @@ export function CastingClient({
       <BulkFailureList failures={bulkFailures} />
 
       {!completed && unresolvedSpeakers === null && (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
+        <div className="rounded border border-amber-800 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
           Could not check for unresolved speakers. See the server log.
         </div>
       )}
 
       {!completed && unresolvedSpeakers && unresolvedSpeakers.length > 0 && (
-        <div className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-xs text-neutral-400">
-          <strong className="text-neutral-300">Unresolved speakers:</strong>{" "}
-          {unresolvedSpeakers.join(", ")}. Their bubbles will have no audio if
-          you resume the pipeline.
+        <div className="rounded border border-amber-800 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
+          <p>
+            {unresolvedLabel(unresolvedSpeakers.length)}. Their bubbles will
+            have no audio if you resume the pipeline.
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {unresolvedSpeakers.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -402,22 +408,39 @@ export function CastingClient({
         </section>
       )}
 
-      {tasks.length === 0 && !completed && bookId && issueId && (
-        <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 p-6 text-center">
-          <p className="mb-3 text-sm text-emerald-200">
-            {unresolvedSpeakers?.length === 0
-              ? "All characters cast. Ready to resume the pipeline."
-              : "No casting tasks left."}
-          </p>
-          <button
-            onClick={handleCompleteCasting}
-            disabled={pending}
-            className="rounded bg-emerald-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
-          >
-            Complete Casting
-          </button>
-        </div>
-      )}
+      {tasks.length === 0 &&
+        !completed &&
+        bookId &&
+        issueId &&
+        (unresolvedSpeakers?.length === 0 ? (
+          <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 p-6 text-center">
+            <p className="mb-3 text-sm text-emerald-200">
+              All characters cast. Ready to resume the pipeline.
+            </p>
+            <button
+              onClick={handleCompleteCasting}
+              disabled={pending}
+              className="rounded bg-emerald-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-40"
+            >
+              Complete Casting
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-amber-800 bg-amber-950/40 p-6 text-center">
+            <p className="mb-3 text-sm text-amber-100">
+              {unresolvedSpeakers === null
+                ? "No casting tasks left. The check for unresolved speakers failed, so resuming leaves any unresolved speaker's bubbles with no audio. Reload to check again."
+                : `No casting tasks left. ${unresolvedLabel(unresolvedSpeakers.length)}. Resuming leaves their bubbles with no audio.`}
+            </p>
+            <button
+              onClick={handleCompleteCasting}
+              disabled={pending}
+              className="rounded bg-amber-700 px-6 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-40"
+            >
+              Complete Casting
+            </button>
+          </div>
+        ))}
 
       {completed && (
         <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 p-6 text-center">
@@ -438,6 +461,10 @@ export function CastingClient({
       )}
     </div>
   );
+}
+
+function unresolvedLabel(count: number): string {
+  return `${count} ${count === 1 ? "speaker" : "speakers"} unresolved`;
 }
 
 /** Each failed character from the last bulk Voice Design run, with its error and voice id. */
