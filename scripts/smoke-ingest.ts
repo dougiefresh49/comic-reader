@@ -99,6 +99,9 @@ let stopping = false;
 const checkStop = () => {
   if (stopping) fail(INTERRUPTED);
 };
+/** A child killed by a signal has exitCode null and signalCode set. */
+const running = (c: ChildProcess) =>
+  c.exitCode === null && c.signalCode === null;
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     console.log(
@@ -113,7 +116,7 @@ for (const sig of ["SIGINT", "SIGTERM"] as const) {
 // Synchronous last resort, so no exit path leaves the dev server's group up.
 process.on("exit", () => {
   const c = live.child;
-  if (c?.pid && c.exitCode === null && c.signalCode === null) {
+  if (c?.pid && running(c)) {
     try {
       process.kill(-c.pid, "SIGKILL");
     } catch {
@@ -506,7 +509,7 @@ async function startDevServer(tmp: string, dryScenario: string | null) {
 }
 
 async function stopDevServer(child: ChildProcess): Promise<void> {
-  if (!child.pid || child.exitCode !== null) return;
+  if (!child.pid || !running(child)) return;
   const exited = new Promise<void>((r) => child.once("exit", () => r()));
   const kill = (sig: NodeJS.Signals) => {
     try {
@@ -630,6 +633,8 @@ async function runPipeline(
   resumed: string[],
   run: { id?: string },
 ): Promise<void> {
+  // Under --real a trigger sent after a signal could start a paid step.
+  checkStop();
   const trig = await post("/api/admin/trigger-ingest", {
     bookId: BOOK,
     issueId: ISSUE,
