@@ -184,6 +184,58 @@
       }
     },
     {
+      "bubbleId": "repeated-suffix-fragment",
+      "text_with_cues": "[yelling] Look out!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.3, 0.04],
+            "words": [
+              { "t": "LOOK", "box": [0.1, 0.1, 0.1, 0.04], "conf": 1 },
+              { "t": "OOK", "box": [0.21, 0.1, 0.08, 0.04], "conf": 0.3 },
+              { "t": "OUT!", "box": [0.3, 0.1, 0.1, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 3,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.1, 0.04]],
+          [[0.3, 0.1, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "repeated-prefix-fragment",
+      "text_with_cues": "[quietly] That one.",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.3, 0.04],
+            "words": [
+              { "t": "TH", "box": [0.1, 0.1, 0.05, 0.04], "conf": 0.3 },
+              { "t": "THAT", "box": [0.16, 0.1, 0.1, 0.04], "conf": 1 },
+              { "t": "ONE.", "box": [0.27, 0.1, 0.1, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 3,
+        "boxesByTimingIndex": [
+          [[0.16, 0.1, 0.1, 0.04]],
+          [[0.27, 0.1, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
       "bubbleId": "ocr-transposition",
       "text_with_cues": "[dramatically] The end.",
       "geometry": {

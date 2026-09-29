@@ -19,8 +19,10 @@ const toLetters = (value: string): string =>
 
 const isLettered = (letters: string): boolean => /[A-Z0-9]/.test(letters);
 
+type Stream = { chars: string; owner: number[] };
+
 /** Flatten tokens into one letter stream, remembering each letter's token. */
-function letterStream(tokens: string[]): { chars: string; owner: number[] } {
+function letterStream(tokens: string[]): Stream {
   let chars = "";
   const owner: number[] = [];
   tokens.forEach((token, index) => {
@@ -34,31 +36,38 @@ function letterStream(tokens: string[]): { chars: string; owner: number[] } {
 
 // Lexicographic cost packed into one exact float: fewest edits first (plain
 // Levenshtein), then fewest substitutions (so `TEH` keeps two matches against
-// `THE`), then fewest gap openings (so a junk word stays one contiguous gap
-// instead of lending letters to a neighbour). Exact for streams under 16k.
+// `THE`), then fewest gap edges that fall inside a word (so a junk or
+// repeated word is skipped whole, `RACT` or the `OOK` in `LOOK OOK OUT`,
+// instead of lending letters to a neighbour). Exact for streams under 8k.
 const EDIT = 2 ** 30;
 const SUB = EDIT + 2 ** 14;
-const OPEN = 1;
 
 /**
- * Minimum-edit alignment of two letter streams (three-state, so gap openings
- * can break ties). Returns the `(i, j)` index pairs where the aligned letters
- * are equal; substitutions, insertions and deletions are not matches.
+ * Minimum-edit alignment of two letter streams, three-state so gap edges can
+ * break ties. Returns the `(i, j)` index pairs where the aligned letters are
+ * equal; substitutions, insertions and deletions are not matches.
  */
-function matchedLetters(a: string, b: string): [number, number][] {
+function matchedLetters(sa: Stream, sb: Stream): [number, number][] {
+  const a = sa.chars;
+  const b = sb.chars;
   const n = a.length;
   const m = b.length;
+  // 1 when a gap edge at position p (between letters p-1 and p) splits a word.
+  const edge = (s: Stream, p: number) =>
+    p > 0 && p < s.owner.length && s.owner[p - 1] === s.owner[p] ? 1 : 0;
+  const eA = (p: number) => edge(sa, p);
+  const eB = (p: number) => edge(sb, p);
   const w = m + 1;
   const size = (n + 1) * w;
   // diag: ends pairing a[i-1] with b[j-1]; gapA: ends on a[i-1] alone;
-  // gapB: ends on b[j-1] alone.
+  // gapB: ends on b[j-1] alone. A gap pays its opening edge when it starts
+  // and its closing edge when another state follows it.
   const diag = new Float64Array(size).fill(Infinity);
   const gapA = new Float64Array(size).fill(Infinity);
   const gapB = new Float64Array(size).fill(Infinity);
   diag[0] = 0;
-  for (let i = 1; i <= n; i++) gapA[i * w] = i * EDIT + OPEN;
-  for (let j = 1; j <= m; j++) gapB[j] = j * EDIT + OPEN;
-  const best = (k: number) => Math.min(diag[k]!, gapA[k]!, gapB[k]!);
+  for (let i = 1; i <= n; i++) gapA[i * w] = i * EDIT;
+  for (let j = 1; j <= m; j++) gapB[j] = j * EDIT;
   const cost = (i: number, j: number) => (a[i - 1] === b[j - 1] ? 0 : SUB);
 
   for (let i = 1; i <= n; i++) {
@@ -66,11 +75,22 @@ function matchedLetters(a: string, b: string): [number, number][] {
       const k = i * w + j;
       const up = k - w;
       const left = k - 1;
-      diag[k] = best(up - 1) + cost(i, j);
+      const p = up - 1;
+      diag[k] =
+        Math.min(diag[p]!, gapA[p]! + eA(i - 1), gapB[p]! + eB(j - 1)) +
+        cost(i, j);
       gapA[k] =
-        Math.min(gapA[up]!, Math.min(diag[up]!, gapB[up]!) + OPEN) + EDIT;
+        Math.min(
+          gapA[up]!,
+          diag[up]! + eA(i - 1),
+          gapB[up]! + eB(j) + eA(i - 1),
+        ) + EDIT;
       gapB[k] =
-        Math.min(gapB[left]!, Math.min(diag[left]!, gapA[left]!) + OPEN) + EDIT;
+        Math.min(
+          gapB[left]!,
+          diag[left]! + eB(j - 1),
+          gapA[left]! + eA(i) + eB(j - 1),
+        ) + EDIT;
     }
   }
 
@@ -78,24 +98,27 @@ function matchedLetters(a: string, b: string): [number, number][] {
   let i = n;
   let j = m;
   let k = i * w + j;
-  let state = diag[k] === best(k) ? diag : gapA[k] === best(k) ? gapA : gapB;
+  const end = Math.min(diag[k]!, gapA[k]!, gapB[k]!);
+  let state = diag[k] === end ? diag : gapA[k] === end ? gapA : gapB;
   while (i > 0 || j > 0) {
     const here = state[k]!;
     if (state === diag) {
       if (a[i - 1] === b[j - 1]) pairs.push([i - 1, j - 1]);
+      const prev = here - cost(i, j);
       i--;
       j--;
       k = i * w + j;
-      const prev = here - cost(i + 1, j + 1);
-      state = diag[k] === prev ? diag : gapA[k] === prev ? gapA : gapB;
-    } else {
-      const same = state;
-      const other = state === gapA ? gapB : gapA;
-      if (state === gapA) i--;
-      else j--;
-      k = i * w + j;
+      state = diag[k] === prev ? diag : gapA[k]! + eA(i) === prev ? gapA : gapB;
+    } else if (state === gapA) {
       const prev = here - EDIT;
-      state = same[k] === prev ? same : diag[k] === prev - OPEN ? diag : other;
+      i--;
+      k = i * w + j;
+      state = gapA[k] === prev ? gapA : diag[k]! + eA(i) === prev ? diag : gapB;
+    } else {
+      const prev = here - EDIT;
+      j--;
+      k = i * w + j;
+      state = gapB[k] === prev ? gapB : diag[k]! + eB(j) === prev ? diag : gapA;
     }
   }
   return pairs;
@@ -128,7 +151,7 @@ export function alignTimingsToGeometry(
 
   // shared[g] maps timing index -> matched letters for geometry word g.
   const shared = geoWords.map(() => new Map<number, number>());
-  for (const [ti, gi] of matchedLetters(timing.chars, lettered.chars)) {
+  for (const [ti, gi] of matchedLetters(timing, lettered)) {
     const counts = shared[lettered.owner[gi]!]!;
     const t = timing.owner[ti]!;
     counts.set(t, (counts.get(t) ?? 0) + 1);
