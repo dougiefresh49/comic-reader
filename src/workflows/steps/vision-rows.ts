@@ -30,16 +30,21 @@ export type ContextParsed = {
   textWithCues?: string;
 };
 
+/** A page with no panels reports a null panel image size (#221). */
+type RoboflowImageSize = { width: number | null; height: number | null };
+
 /** Shape of one SAM3 workflow `outputs[0]` entry before validation. */
 export type RoboflowSam3Output = {
   panel_predictions?: {
-    image?: { width: number; height: number };
+    image?: RoboflowImageSize;
     predictions?: RoboflowBoxPrediction[];
   };
   bubble_predictions?: {
+    image?: RoboflowImageSize;
     predictions?: RoboflowBoxPrediction[];
   };
   segmentation_predictions?: {
+    image?: RoboflowImageSize;
     predictions?: RoboflowSegPrediction[];
   };
 };
@@ -52,24 +57,31 @@ export type ParsedRoboflowSam3 = {
   segmentationPredictions: RoboflowSegPrediction[];
 };
 
+function imageSize(
+  image: RoboflowImageSize | undefined,
+): { width: number; height: number } | null {
+  return typeof image?.width === "number" && typeof image.height === "number"
+    ? { width: image.width, height: image.height }
+    : null;
+}
+
 /**
  * Parse a SAM3 workflow output. Returns null when any required
- * predictions object is missing or its predictions value is not an array.
- * Present empty arrays are valid.
+ * predictions object is missing, its predictions value is not an array, or
+ * no image size can be read. Present empty arrays are valid. The image size
+ * is the panel image's; only when there are no panel boxes, whose pixels it
+ * would measure, may it come from the bubble or segmentation image instead
+ * (#221: a page with no panels reports a null panel image size).
  */
 export function parseRoboflowSam3Output(
   out: RoboflowSam3Output | null | undefined,
 ): ParsedRoboflowSam3 | null {
   const panelPreds = out?.panel_predictions?.predictions;
-  const imgDims = out?.panel_predictions?.image;
   const bubblePreds = out?.bubble_predictions?.predictions;
   const segPreds = out?.segmentation_predictions?.predictions;
 
   if (
     !out?.panel_predictions ||
-    !imgDims ||
-    typeof imgDims.width !== "number" ||
-    typeof imgDims.height !== "number" ||
     !Array.isArray(panelPreds) ||
     !out.bubble_predictions ||
     !Array.isArray(bubblePreds) ||
@@ -79,9 +91,17 @@ export function parseRoboflowSam3Output(
     return null;
   }
 
+  const image =
+    imageSize(out.panel_predictions.image) ??
+    (panelPreds.length === 0
+      ? (imageSize(out.bubble_predictions.image) ??
+        imageSize(out.segmentation_predictions.image))
+      : null);
+  if (!image) return null;
+
   return {
     panelPredictions: panelPreds,
-    image: imgDims,
+    image,
     bubblePredictions: bubblePreds,
     segmentationPredictions: segPreds,
   };
