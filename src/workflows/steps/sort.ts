@@ -225,7 +225,7 @@ export function sortPrompt(
   const panelLines = panels
     .map((p) => {
       const bb = p.bounding_box;
-      return `- panelId: ${handles.panel.get(p.id)}\n  human_panel_id: ${p.panel_id}\n  current_sort_order: ${p.sort_order}\n  bbox_normalized: x=${bb.x}, y=${bb.y}, w=${bb.w}, h=${bb.h}`;
+      return `- panelId: ${handles.panel.get(p.id)}\n  current_sort_order: ${p.sort_order}\n  bbox_normalized: x=${bb.x}, y=${bb.y}, w=${bb.w}, h=${bb.h}`;
     })
     .join("\n");
 
@@ -248,6 +248,7 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
 **Rules:**
 - Use each panel's **panelId** exactly as given. It is a short handle such as \`p1\`.
 - Use each bubble's **bubbleId** exactly as given. It is a short handle such as \`b1\`.
+- The handle numbers (\`p1\`, \`b3\`) are labels only and say nothing about reading order. Take the order from the image and the bboxes.
 - Include EVERY panel id exactly once in your output.
 - Include EVERY bubble id exactly once inside the \`bubbles\` array of exactly one panel (the panel where the bubble visually belongs). If unsure, pick the panel whose bbox contains the bubble center.
 - Bubbles with ignored=true should still be listed in reading order (they remain in the narrative layout).
@@ -421,7 +422,9 @@ export async function sortPageElements(
     .select("id, panel_id, page_number, sort_order, bounding_box")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .eq("page_number", pageNumber);
+    .eq("page_number", pageNumber)
+    .order("sort_order")
+    .order("id");
 
   if (pErr) throw dbError("panels", pErr);
 
@@ -432,7 +435,9 @@ export async function sortPageElements(
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .eq("page_number", pageNumber);
+    .eq("page_number", pageNumber)
+    .order("sort_order")
+    .order("id");
 
   if (bErr) throw dbError("bubbles", bErr);
 

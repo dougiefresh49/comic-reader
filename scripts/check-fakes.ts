@@ -121,7 +121,15 @@ if (process.env.DRY_RUN_SCENARIO === "gates") {
 
 const sort = await ask(
   GEMINI_MEDIUM,
-  "You are analyzing a comic book page image.\n- panelId (uuid): P1\n- panelId (uuid): P2\n- bubbleId: B1\n  assigned_panel_uuid: P2\n- bubbleId: B2\n  assigned_panel_uuid: P1\n",
+  "You are analyzing a comic book page image.\n- panelId: p1\n- panelId: p2\n- bubbleId: b1\n  assigned_panelId: p2\n- bubbleId: b2\n  assigned_panelId: p1\n",
+);
+const sortPlan = JSON.parse(sort) as {
+  panels: Array<{ bubbles: unknown[] }>;
+};
+assert.equal(sortPlan.panels.length, 2);
+assert.equal(
+  sortPlan.panels.reduce((n, p) => n + p.bubbles.length, 0),
+  2,
 );
 console.log(`gemini sort: ${sort}`);
 
