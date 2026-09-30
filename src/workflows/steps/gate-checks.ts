@@ -127,7 +127,6 @@ export async function recordGateWait(
   const client = await createTypedStepClient();
   const at = new Date().toISOString();
 
-  let sawRecord = false;
   let changed = false;
   await updateRunSteps(
     client,
@@ -135,7 +134,6 @@ export async function recordGateWait(
     issueId,
     getWorkflowMetadata().workflowRunId,
     (steps) => {
-      sawRecord = true;
       const waits = Array.isArray(steps.gateWaits)
         ? (steps.gateWaits as GateWaitRecord[])
         : [];
@@ -165,10 +163,7 @@ export async function recordGateWait(
     },
     "gate-wait",
   );
-  // Only when the callback actually ran and left the record as it found it.
-  // updateRunSteps returns before calling it when there is no running row,
-  // and it logs that case itself.
-  if (sawRecord && !changed) {
+  if (!changed) {
     console.log(
       event === "open"
         ? `[gate-wait] ${gate} on ${bookId}/${issueId} already had an open record; second open dropped`
