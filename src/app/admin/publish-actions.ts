@@ -33,10 +33,18 @@ export async function setBookPublished(
   // pathname, and a typed call only matches the route pattern's tags.
   revalidatePath("/");
   revalidatePath(`/book/${bookId}`);
+
+  // The reader parses the page segment with parseInt, so `/01` and `/1` are
+  // the same page cached under two pathnames. The concrete loop below covers
+  // the canonical ones; this covers every other spelling of them, so
+  // unpublishing cannot leave a draft readable through a hand-typed URL for
+  // the reader's 24 hour revalidate.
+  revalidatePath(`/book/${bookId}/[issueId]/[pageNumber]`, "page");
+
   const book = (await getManifest()).books.find((b) => b.id === bookId);
   // The same count the reader uses, so an issue whose pages are uploaded but
   // not yet through the pipeline still has its cached reader pages dropped.
-  const stored = await getStoredPageCounts();
+  const stored = await getStoredPageCounts(bookId);
   for (const issue of book?.issues ?? []) {
     const count = stored[bookId]?.[issue.id] ?? 0;
     const pageCount = issue.pageCount > 0 ? issue.pageCount : count;

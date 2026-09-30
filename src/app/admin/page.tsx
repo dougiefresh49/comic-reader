@@ -146,10 +146,14 @@ function BookSection({
   // no pages 404s in the reader, so the book-level link skips those; every
   // issue that has pages gets its own link in the row. `issues` arrives
   // sorted by number.
-  const issuesWithPages = issues.filter(
-    (iss) => iss.pageCount > 0 || (storedPageCounts[iss.issueId] ?? 0) > 0,
+  const previewable = new Set(
+    issues
+      .filter(
+        (iss) => iss.pageCount > 0 || (storedPageCounts[iss.issueId] ?? 0) > 0,
+      )
+      .map((iss) => iss.issueId),
   );
-  const firstIssue = issuesWithPages[0];
+  const firstIssue = issues.find((iss) => previewable.has(iss.issueId));
 
   const issuesByPart = new Map<string | null, AdminIssueRow[]>();
   for (const iss of issues) {
@@ -226,6 +230,7 @@ function BookSection({
                     issues={partIssues}
                     skippedByIssue={skippedByIssue}
                     draft={!published}
+                    previewable={previewable}
                   />
                 ) : (
                   <p className="py-2 text-xs text-neutral-600">
@@ -244,6 +249,7 @@ function BookSection({
                 issues={issuesByPart.get(null)!}
                 skippedByIssue={skippedByIssue}
                 draft={!published}
+                previewable={previewable}
               />
             </div>
           )}
@@ -253,6 +259,7 @@ function BookSection({
           issues={issues}
           skippedByIssue={skippedByIssue}
           draft={!published}
+          previewable={previewable}
         />
       )}
     </section>
@@ -263,10 +270,12 @@ function IssueList({
   issues,
   skippedByIssue,
   draft,
+  previewable,
 }: {
   issues: AdminIssueRow[];
   skippedByIssue: Map<string, SkippedGate[]>;
   draft: boolean;
+  previewable: Set<string>;
 }) {
   return (
     <>
@@ -305,6 +314,7 @@ function IssueList({
                   <ActionButtons
                     issue={iss}
                     draft={draft}
+                    canPreview={previewable.has(iss.issueId)}
                     skippedGates={
                       skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
                     }
@@ -323,6 +333,7 @@ function IssueList({
             key={`${iss.bookId}/${iss.issueId}`}
             issue={iss}
             draft={draft}
+            canPreview={previewable.has(iss.issueId)}
             skippedGates={
               skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
             }
@@ -337,10 +348,12 @@ function IssueCard({
   issue,
   skippedGates,
   draft,
+  canPreview,
 }: {
   issue: AdminIssueRow;
   skippedGates: SkippedGate[];
   draft: boolean;
+  canPreview: boolean;
 }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
@@ -373,6 +386,7 @@ function IssueCard({
           issue={issue}
           skippedGates={skippedGates}
           draft={draft}
+          canPreview={canPreview}
         />
       </div>
     </div>
@@ -423,10 +437,12 @@ function ActionButtons({
   issue,
   skippedGates,
   draft,
+  canPreview,
 }: {
   issue: AdminIssueRow;
   skippedGates: SkippedGate[];
   draft: boolean;
+  canPreview: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -441,7 +457,7 @@ function ActionButtons({
         status={issue.status}
         skippedGates={skippedGates}
       />
-      {draft && (issue.pageCount > 0 || issue.hasWebP) && (
+      {draft && canPreview && (
         <Link
           href={`/admin/preview/${issue.bookId}/${issue.issueId}/1`}
           className="rounded bg-cyan-700/60 px-2 py-1 text-xs font-medium text-white hover:bg-cyan-600"

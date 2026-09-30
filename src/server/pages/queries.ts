@@ -263,32 +263,49 @@ export async function getBookPublishedFlags(): Promise<
  * book whose pages were uploaded but not yet processed reports zero and its
  * reader would 404 on page 1. The `pages` table carries one row per stored
  * image and the upload path writes it, so it is the honest count in that
- * window. One statement covers every book, and it reads numbers rather than
- * counting rows, so a sparse set of pages still reports the right highest
- * page. The service-role client is used because the anon key cannot read
- * `pages`.
+ * window.
+ *
+ * Asked for one book at a time, descending, one row per issue: PostgREST
+ * caps a response at the project's max-rows setting (1,000 here), and an
+ * unpaginated read of the whole table would silently drop pages past that
+ * and report a short issue as having none. Ascending by number means the
+ * first row seen for an issue is its highest, so one row per issue is
+ * enough and a truncated response can only under-report, never overstate.
+ * The service-role client is used because the anon key cannot read `pages`.
  */
-export async function getStoredPageCounts(): Promise<
-  Record<string, Record<string, number>>
-> {
-  const { data, error } = await supabaseAdmin
-    .from("pages")
-    .select("book_id, issue_id, number");
-  if (error) {
-    console.error("getStoredPageCounts:", error);
-    return {};
-  }
-
+export async function getStoredPageCounts(
+  bookId?: string,
+): Promise<Record<string, Record<string, number>>> {
   const byBook: Record<string, Record<string, number>> = {};
-  for (const row of (data ?? []) as Array<{
-    book_id: string;
-    issue_id: string;
-    number: number;
-  }>) {
-    const issues = (byBook[row.book_id] ??= {});
-    issues[row.issue_id] = Math.max(issues[row.issue_id] ?? 0, row.number);
+  let from = 0;
+  const pageSize = 1000;
+
+  for (;;) {
+    let query = supabaseAdmin
+      .from("pages")
+      .select("book_id, issue_id, number")
+      .order("number", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (bookId) query = query.eq("book_id", bookId);
+
+    const { data, error } = await query;
+    if (error) {
+      console.error("getStoredPageCounts:", error);
+      return byBook;
+    }
+
+    for (const row of (data ?? []) as Array<{
+      book_id: string;
+      issue_id: string;
+      number: number;
+    }>) {
+      const issues = (byBook[row.book_id] ??= {});
+      issues[row.issue_id] ??= row.number;
+    }
+
+    if (!data || data.length < pageSize) return byBook;
+    from += pageSize;
   }
-  return byBook;
 }
 
 /** The pages an issue has: its manifest count, or the stored count if that is 0. */
@@ -333,7 +350,7 @@ export async function getReaderPage({
     bookId,
     issueId,
     issue.pageCount,
-    await getStoredPageCounts(),
+    await getStoredPageCounts(bookId),
   );
 
   const pageNum = parseInt(pageNumber, 10);
