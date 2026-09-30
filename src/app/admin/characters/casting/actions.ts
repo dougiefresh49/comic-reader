@@ -11,7 +11,7 @@ import {
   type CastSaveFailure,
   castSaveFailureMessage,
   registerCastVoice,
-} from "./voice-registry";
+} from "~/lib/voices-registry";
 
 const SKIPPED_VOICE = "__SKIPPED__";
 

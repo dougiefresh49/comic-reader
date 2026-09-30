@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
+import { isDryRun } from "./fakes/dry-run";
 
 type VoiceInsert = Database["public"]["Tables"]["voices"]["Insert"];
 
@@ -50,6 +51,36 @@ export function buildVoiceRow(
 }
 
 /**
+ * The `voices` row this castlist character already points at, or null.
+ * Looks the row up by its id, never by `display_name` (row 153: an
+ * import candidate row can carry a live voice's name).
+ */
+export async function findRegisteredVoice(
+  client: SupabaseClient,
+  input: Pick<RegisterCastVoiceInput, "bookId" | "issueId" | "characterId">,
+): Promise<string | null> {
+  const db = client as SupabaseClient<Database>;
+  const { data: cast, error: castErr } = await db
+    .from("castlist")
+    .select("voice_uuid")
+    .eq("book_id", input.bookId)
+    .eq("issue_id", input.issueId)
+    .eq("character", input.characterId)
+    .maybeSingle();
+  if (castErr) throw new Error(castErr.message);
+  const voiceUuid = cast?.voice_uuid;
+  if (!voiceUuid) return null;
+
+  const { data: voice, error: voiceErr } = await db
+    .from("voices")
+    .select("id")
+    .eq("id", voiceUuid)
+    .maybeSingle();
+  if (voiceErr) throw new Error(voiceErr.message);
+  return voice?.id ?? null;
+}
+
+/**
  * Registers the voice and points castlist at it: finds the `voices` row
  * that owns this ElevenLabs id, or creates one, then upserts the castlist
  * row with both `voice_id` and `voice_uuid`. Takes the client as an
@@ -78,9 +109,13 @@ export async function registerCastVoice(
 
   let voiceUuid = existing?.id;
   if (!voiceUuid) {
+    const row = buildVoiceRow(input);
+    if (isDryRun()) {
+      console.log(`[voice-registry] voices insert ${JSON.stringify(row)}`);
+    }
     const { data: inserted, error: insertErr } = await db
       .from("voices")
-      .insert(buildVoiceRow(input))
+      .insert(row)
       .select("id")
       .single();
     if (insertErr) {

@@ -15,6 +15,11 @@ import {
   voiceDesignAppearanceId,
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
+import {
+  castSaveFailureMessage,
+  findRegisteredVoice,
+  registerCastVoice,
+} from "~/lib/voices-registry";
 
 export async function getCharactersNeedingVoices(
   bookId: string,
@@ -111,19 +116,38 @@ export async function generateVoiceModel(
 
   if (appErr) throw new FatalError(appErr.message);
 
-  if (appearance?.voice_status === "ready" && appearance.voice_id?.trim()) {
-    const { error } = await supabase.from("castlist").upsert(
-      {
-        book_id: bookId,
-        issue_id: issueId,
-        character: characterId,
-        voice_id: appearance.voice_id,
-      },
-      { onConflict: "book_id,issue_id,character" },
-    );
-    if (error) throw new FatalError(error.message);
+  // A retry must not design a second ElevenLabs voice for a character that
+  // already has a `voices` row (#119). Looked up by the castlist row's
+  // `voice_uuid`, never by display name (row 153).
+  const registeredVoiceUuid = await findRegisteredVoice(supabase, {
+    bookId,
+    issueId,
+    characterId,
+  }).catch((err: unknown) => {
+    throw new FatalError(err instanceof Error ? err.message : String(err));
+  });
+  if (registeredVoiceUuid) {
     console.log(
-      `[voice-model] ${characterId}: already ready, castlist upserted`,
+      `[voice-model] ${characterId}: already registered, skipping; voices row ${registeredVoiceUuid}`,
+    );
+    return;
+  }
+
+  if (appearance?.voice_status === "ready" && appearance.voice_id?.trim()) {
+    // The create landed on a run that died before registering (#119), so
+    // the castlist upsert goes through the registry too.
+    const saved = await registerCastVoice(supabase, {
+      bookId,
+      issueId,
+      characterId,
+      elevenLabsId: appearance.voice_id,
+      designPrompt: appearance.voice_description?.trim(),
+    });
+    if (!saved.ok) {
+      throw new FatalError(castSaveFailureMessage(appearance.voice_id, saved));
+    }
+    console.log(
+      `[voice-model] ${characterId}: already ready, registered as voices row ${saved.voiceUuid}`,
     );
     return;
   }
@@ -213,22 +237,20 @@ export async function generateVoiceModel(
     );
   }
 
-  const { error: castErr } = await supabase.from("castlist").upsert(
-    {
-      book_id: bookId,
-      issue_id: issueId,
-      character: characterId,
-      voice_id,
-    },
-    { onConflict: "book_id,issue_id,character" },
-  );
-  if (castErr) {
-    throw new FatalError(
-      `castlist upsert failed for ${characterId} voice_id=${voice_id}: ${castErr.message}`,
-    );
+  const registered = await registerCastVoice(supabase, {
+    bookId,
+    issueId,
+    characterId,
+    elevenLabsId: voice_id,
+    designPrompt: voiceDescription,
+  });
+  if (!registered.ok) {
+    throw new FatalError(castSaveFailureMessage(voice_id, registered));
   }
 
-  console.log(`[voice-model] ${characterId}: created voice ${voice_id}`);
+  console.log(
+    `[voice-model] ${characterId}: created voice ${voice_id}, voices row ${registered.voiceUuid}`,
+  );
 }
 generateVoiceModel.maxRetries = 0;
 
