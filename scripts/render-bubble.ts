@@ -84,7 +84,8 @@ Batch:
   --max <n>              Refuse to run more than this many lines (default 1).
 
 Other:
-  --execute          Render for real. Costs one ElevenLabs call. Writes only
+  --execute          Render for real. Costs one ElevenLabs call per render, so
+                     a batch costs one per line, up to --max. Writes only
                      under tmp/render-bubble/. Default is a free dry run.
 
   -h, --help         This text.
@@ -202,9 +203,11 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
  *
  * The castlist is per book (decisions row 28), but rows still carry an
  * `issue_id` until #118, so a row for another issue of the same book is a
- * usable answer and the one for this issue wins when both are there. A row
- * with no voice, or the `__SKIPPED__` sentinel that means "this character is
- * silent in this issue", is not a voice, and a miss asks for `--voice` instead.
+ * usable answer when this issue has no row for the speaker at all. A row for
+ * this issue that has no voice, or the `__SKIPPED__` sentinel that means "this
+ * character is silent in this issue", is an answer and it is "no voice": the
+ * lookup stops there rather than borrowing another issue's, because rendering
+ * a character the reader keeps silent would spend a call on audio nobody plays.
  */
 async function readCastlistVoice(
   bookId: string,
@@ -218,9 +221,15 @@ async function readCastlistVoice(
     .eq("character", speaker);
   if (error) fail(`Reading castlist for '${speaker}': ${error.message}`);
   const rows = (data ?? []) as { issue_id: string; voice_id: string | null }[];
-  const usable = rows.filter((r) => r.voice_id && r.voice_id !== SKIPPED_VOICE);
-  const forIssue = usable.find((r) => r.issue_id === issueId);
-  return forIssue?.voice_id ?? usable[0]?.voice_id ?? null;
+  const usable = (r: { voice_id: string | null }) =>
+    r.voice_id !== null && r.voice_id !== SKIPPED_VOICE ? r.voice_id : null;
+  const mine = rows.filter((r) => r.issue_id === issueId);
+  if (mine.length > 0) {
+    const voices = new Set(mine.map(usable));
+    if (voices.size === 1) return [...voices][0]!;
+    return null;
+  }
+  return usable(rows[0] ?? { voice_id: null });
 }
 
 /**
@@ -241,10 +250,12 @@ async function readNeighbours(
     .eq("page_number", bubble.page_number)
     .eq("ignored", false);
   if (error) fail(`Reading the page's bubbles: ${error.message}`);
-  const text = (r: {
-    ocr_text: string | null;
-    text_with_cues: string | null;
-  }) => (r.text_with_cues ?? r.ocr_text ?? "").trim();
+  const text = (
+    r: {
+      ocr_text: string | null;
+      text_with_cues: string | null;
+    } | null,
+  ) => (r ? (r.text_with_cues ?? r.ocr_text ?? "").trim() : "");
   const rows = (
     (data ?? []) as {
       id: string;
@@ -258,8 +269,9 @@ async function readNeighbours(
   const before = rows.filter((r) => r.sort_order < bubble.sort_order);
   const after = rows.filter((r) => r.sort_order > bubble.sort_order);
   return {
-    previousText: text(before[before.length - 1]!) || undefined,
-    nextText: text(after[0]!) || undefined,
+    // A first or last bubble on its page has one side and not the other.
+    previousText: text(before[before.length - 1] ?? null) || undefined,
+    nextText: text(after[0] ?? null) || undefined,
   };
 }
 
@@ -278,15 +290,28 @@ interface PlannedRender {
 }
 
 function defaultLabel(spec: LineSpec, index: number): string {
-  if (spec.label) return spec.label;
-  if (spec.bubble) return `bubble-${spec.bubble.slice(0, 8)}`;
-  const slug = (spec.text ?? "line")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 32);
-  const stem = slug || "line";
-  return index === 0 ? stem : `${stem}-${index + 1}`;
+  const stem = spec.bubble
+    ? `bubble-${spec.bubble.slice(0, 8)}`
+    : (spec.text ?? "line")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 32) || "line";
+  return spec.label ?? (index === 0 ? stem : `${stem}-${index + 1}`);
+}
+
+/** One mp3 and one json per label, so two renders may not share one. */
+function checkDistinctLabels(planned: PlannedRender[]): void {
+  const seen = new Set<string>();
+  for (const render of planned) {
+    if (seen.has(render.label)) {
+      fail(
+        `Two renders are labelled '${render.label}', so the second --execute would overwrite the first. ` +
+          `Give one of them a --label.`,
+      );
+    }
+    seen.add(render.label);
+  }
 }
 
 async function planRender(
@@ -453,30 +478,43 @@ async function executeRender(render: PlannedRender): Promise<void> {
     // No retry: a second call spends a second time. Say what was spent.
     fail(`The ElevenLabs call failed: ${(e as Error).message}`);
   }
-  const audio = Buffer.from(response.audioBase64, "base64");
-  const alignment = normalizeAlignment(response.alignment);
-  const normalizedAlignment = normalizeAlignment(response.normalizedAlignment);
-  await fs.ensureDir(OUT_DIR);
+  // The call is paid for from here on, so a throw below says the audio was
+  // already billed, and the mp3 is written before the json that describes it.
+  const spent = "The audio was generated and ElevenLabs was charged for it.";
   const mp3Path = join(OUT_DIR, `${render.label}.mp3`);
-  await fs.writeFile(mp3Path, audio);
   const jsonPath = join(OUT_DIR, `${render.label}.json`);
-  await fs.writeJSON(
-    jsonPath,
-    {
-      label: render.label,
-      source: render.source,
-      emotion: render.emotion,
-      voiceId: render.voiceId,
-      request: render.request,
-      overridden: render.overridden,
-      characterCount: render.characterCount,
-      alignment,
-      normalizedAlignment,
-      audioDurationSeconds: audioDurationSeconds(alignment),
-      audioBytes: audio.byteLength,
-    },
-    { spaces: 2 },
-  );
+  let audio: Buffer | null = null;
+  let alignment: ReturnType<typeof normalizeAlignment>;
+  let normalizedAlignment: ReturnType<typeof normalizeAlignment>;
+  try {
+    audio = Buffer.from(response.audioBase64, "base64");
+    alignment = normalizeAlignment(response.alignment);
+    normalizedAlignment = normalizeAlignment(response.normalizedAlignment);
+    await fs.ensureDir(OUT_DIR);
+    await fs.writeFile(mp3Path, audio);
+    await fs.writeJSON(
+      jsonPath,
+      {
+        label: render.label,
+        source: render.source,
+        emotion: render.emotion,
+        voiceId: render.voiceId,
+        request: render.request,
+        overridden: render.overridden,
+        characterCount: render.characterCount,
+        alignment,
+        normalizedAlignment,
+        audioDurationSeconds: audioDurationSeconds(alignment),
+        audioBytes: audio.byteLength,
+      },
+      { spaces: 2 },
+    );
+  } catch (e) {
+    fail(
+      `${spent} Writing the files under tmp/render-bubble/ then failed: ${(e as Error).message}` +
+        (audio ? ` The mp3 is at ${mp3Path}.` : ""),
+    );
+  }
   console.log(`\n   wrote ${mp3Path}`);
   console.log(`   wrote ${jsonPath}`);
 }
@@ -553,12 +591,37 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.batch) {
+    // A batch line carries every field itself, so a per-line flag beside
+    // --batch would read as "and it applies to all of them" and then be
+    // ignored. Say so rather than spend on lines nobody asked for.
+    const perLine = (
+      [
+        "bubble",
+        "book",
+        "issue",
+        "text",
+        "emotion",
+        "voice",
+        "stability",
+        "style",
+        "speed",
+        "context",
+        "label",
+      ] as const
+    ).filter((k) => args[k] !== undefined);
+    if (perLine.length > 0) {
+      fail(
+        `--batch reads every field from ${args.batch}, so ${perLine.map((k) => `--${k}`).join(", ")} would be ignored. ` +
+          `Put them on the lines instead.`,
+      );
+    }
     const specs = await readBatchFile(args.batch);
     if (specs.length === 0) fail(`${args.batch} has no lines.`);
     const planned: PlannedRender[] = [];
     for (const [i, spec] of specs.entries()) {
       planned.push(await planRender(spec, i, `${args.batch} line ${i + 1}`));
     }
+    checkDistinctLabels(planned);
     const total = planned.reduce((n, r) => n + r.characterCount, 0);
     console.log(
       `${args.batch}: ${planned.length} line(s), ${total} characters total.`,
