@@ -15,6 +15,12 @@ import {
   voiceDesignAppearanceId,
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
+import { isDryRun } from "~/lib/fakes/dry-run";
+import {
+  castSaveFailureMessage,
+  findRegisteredVoice,
+  registerCastVoice,
+} from "~/lib/voices-registry";
 
 export async function getCharactersNeedingVoices(
   bookId: string,
@@ -71,16 +77,19 @@ export async function getCharactersNeedingVoices(
   );
 
   for (const row of plan.reuse) {
-    const { error } = await supabase.from("castlist").upsert(
-      {
-        book_id: bookId,
-        issue_id: issueId,
-        character: row.character,
-        voice_id: row.voice_id,
-      },
-      { onConflict: "book_id,issue_id,character" },
+    const appearance = appearances.find(
+      (a) => a.character_id === row.character && a.voice_id === row.voice_id,
     );
-    if (error) throw new FatalError(error.message);
+    const saved = await registerCastVoice(supabase, {
+      bookId,
+      issueId,
+      characterId: row.character,
+      elevenLabsId: row.voice_id,
+      designPrompt: appearance?.voice_description?.trim(),
+    });
+    if (!saved.ok) {
+      throw new FatalError(castSaveFailureMessage(row.voice_id, saved));
+    }
   }
 
   console.log(
@@ -111,19 +120,59 @@ export async function generateVoiceModel(
 
   if (appErr) throw new FatalError(appErr.message);
 
-  if (appearance?.voice_status === "ready" && appearance.voice_id?.trim()) {
-    const { error } = await supabase.from("castlist").upsert(
-      {
-        book_id: bookId,
-        issue_id: issueId,
-        character: characterId,
-        voice_id: appearance.voice_id,
-      },
-      { onConflict: "book_id,issue_id,character" },
-    );
-    if (error) throw new FatalError(error.message);
+  const markAppearanceReady = async (voiceId: string | null) => {
+    if (isDryRun()) return;
+    const { error } = await supabase
+      .from("character_appearances")
+      .update({
+        voice_id: voiceId,
+        voice_type: "voice_design",
+        voice_status: "ready",
+        voice_created_at:
+          appearance?.voice_created_at ?? new Date().toISOString(),
+      })
+      .eq("id", appearanceId);
+    if (error) {
+      throw new FatalError(
+        `appearance ready update failed for ${characterId} voice_id=${voiceId}: ${error.message}`,
+      );
+    }
+  };
+
+  // A retry must not design a second ElevenLabs voice for a character that
+  // already has a `voices` row (#119). Looked up by the castlist row's
+  // `voice_uuid`, never by display name (row 153).
+  const registeredVoice = await findRegisteredVoice(supabase, {
+    bookId,
+    issueId,
+    characterId,
+  }).catch((err: unknown) => {
+    throw new FatalError(err instanceof Error ? err.message : String(err));
+  });
+  if (registeredVoice) {
+    await markAppearanceReady(registeredVoice.current_elevenlabs_id);
     console.log(
-      `[voice-model] ${characterId}: already ready, castlist upserted`,
+      `[voice-model] ${characterId}: already registered, skipping; voices row ${registeredVoice.id}`,
+    );
+    return;
+  }
+
+  if (appearance?.voice_id?.trim()) {
+    // A stored id means create already landed, even if registration or
+    // marking the appearance ready failed (#119).
+    const saved = await registerCastVoice(supabase, {
+      bookId,
+      issueId,
+      characterId,
+      elevenLabsId: appearance.voice_id,
+      designPrompt: appearance.voice_description?.trim(),
+    });
+    if (!saved.ok) {
+      throw new FatalError(castSaveFailureMessage(appearance.voice_id, saved));
+    }
+    await markAppearanceReady(appearance.voice_id);
+    console.log(
+      `[voice-model] ${characterId}: already created, registered as voices row ${saved.voiceUuid}`,
     );
     return;
   }
@@ -192,43 +241,44 @@ export async function generateVoiceModel(
   }
 
   const { voice_id } = (await createRes.json()) as { voice_id: string };
+  let appearanceWriteError: string | null = null;
+  if (!isDryRun()) {
+    // Keep the created id before registration, so a failed castlist save
+    // cannot send the next run through Voice Design again.
+    const { error } = await supabase
+      .from("character_appearances")
+      .update({ voice_id })
+      .eq("id", appearanceId);
+    if (error) {
+      appearanceWriteError = error.message;
+    }
+  }
   console.log(
     `[voice-model] ${characterId}: paid create returned voice_id=${voice_id}`,
   );
-  const voiceCreatedAt = new Date().toISOString();
+  const registered = await registerCastVoice(supabase, {
+    bookId,
+    issueId,
+    characterId,
+    elevenLabsId: voice_id,
+    designPrompt: voiceDescription,
+  });
+  // Retry storing the id even if the first appearance write or registry
+  // save failed, so either durable pointer can prevent a second create.
+  await markAppearanceReady(voice_id);
+  if (!registered.ok) {
+    throw new FatalError(castSaveFailureMessage(voice_id, registered));
+  }
 
-  const { error: upAppErr } = await supabase
-    .from("character_appearances")
-    .update({
-      voice_id,
-      voice_type: "voice_design",
-      voice_status: "ready",
-      voice_created_at: voiceCreatedAt,
-    })
-    .eq("id", appearanceId);
-
-  if (upAppErr) {
+  if (appearanceWriteError) {
     throw new FatalError(
-      `appearance update failed for ${characterId} voice_id=${voice_id}: ${upAppErr.message}`,
+      `appearance voice id update failed for ${characterId} voice_id=${voice_id}: ${appearanceWriteError}`,
     );
   }
 
-  const { error: castErr } = await supabase.from("castlist").upsert(
-    {
-      book_id: bookId,
-      issue_id: issueId,
-      character: characterId,
-      voice_id,
-    },
-    { onConflict: "book_id,issue_id,character" },
+  console.log(
+    `[voice-model] ${characterId}: created voice ${voice_id}, voices row ${registered.voiceUuid}`,
   );
-  if (castErr) {
-    throw new FatalError(
-      `castlist upsert failed for ${characterId} voice_id=${voice_id}: ${castErr.message}`,
-    );
-  }
-
-  console.log(`[voice-model] ${characterId}: created voice ${voice_id}`);
 }
 generateVoiceModel.maxRetries = 0;
 
