@@ -113,8 +113,13 @@ export async function recordGateSkip(
  *
  * Both halves are idempotent, because the SDK replays a step that already
  * committed. A retried open leaves the existing open record alone, and a
- * close releases every still-open record for the gate, so no row is ever
- * left open and the rest of the run never reads as gate wait.
+ * close releases every still-open record for the gate.
+ *
+ * A write that does not land is logged by updateRunSteps, logged again here
+ * with what it costs the query, and returns. It does not throw and does not
+ * fail the run: timings are best-effort telemetry, and a gate must never be
+ * blocked by a row that would not write. A dropped close leaves the wait
+ * open, which the SELECT in the PR body reports as a null release.
  */
 export async function recordGateWait(
   bookId: string,
@@ -127,8 +132,7 @@ export async function recordGateWait(
   const client = await createTypedStepClient();
   const at = new Date().toISOString();
 
-  let changed = false;
-  await updateRunSteps(
+  const landed = await updateRunSteps(
     client,
     bookId,
     issueId,
@@ -141,7 +145,6 @@ export async function recordGateWait(
         if (waits.some((w) => w.gate === gate && w.releasedAt === undefined)) {
           return steps;
         }
-        changed = true;
         return {
           ...steps,
           gateWaits: [...waits, { gate, waitedAt: at } as Json],
@@ -151,7 +154,6 @@ export async function recordGateWait(
         (w) => w.gate === gate && w.releasedAt === undefined,
       );
       if (!open) return steps;
-      changed = true;
       return {
         ...steps,
         gateWaits: waits.map((w) =>
@@ -163,11 +165,11 @@ export async function recordGateWait(
     },
     "gate-wait",
   );
-  if (!changed) {
+  if (!landed) {
     console.log(
       event === "open"
-        ? `[gate-wait] ${gate} on ${bookId}/${issueId} already had an open record; second open dropped`
-        : `[gate-wait] ${gate} on ${bookId}/${issueId} had no open record; close dropped`,
+        ? `[gate-wait] open of ${gate} on ${bookId}/${issueId} did not land; the pause reads as step work time`
+        : `[gate-wait] close of ${gate} on ${bookId}/${issueId} did not land; the wait reads as still open`,
     );
   }
 }

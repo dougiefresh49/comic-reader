@@ -129,7 +129,8 @@ export async function updatePipelineStep(
 /**
  * Read-modify-write of this run's timings for one step. Shared by
  * recordStepStart and recordStepEnd so the jsonb shape has one home.
- * updateRunSteps is the compare-and-swap writer and logs its own failures.
+ * updateRunSteps is the compare-and-swap writer and logs its own failures;
+ * this returns whether its write landed.
  */
 async function writeStepWindows(
   client: Parameters<typeof updateRunSteps>[0],
@@ -137,8 +138,8 @@ async function writeStepWindows(
   issueId: string,
   step: string,
   apply: (windows: StepWindow[]) => StepWindow[],
-): Promise<void> {
-  await updateRunSteps(
+): Promise<boolean> {
+  return await updateRunSteps(
     client,
     bookId,
     issueId,
@@ -182,13 +183,24 @@ export async function recordStepStart(
   const windowId = getStepMetadata().stepId;
   const startedAt = new Date().toISOString();
 
-  await writeStepWindows(client, bookId, issueId, step, (windows) => {
-    if (windows.some((w) => w.windowId === windowId)) return windows;
-    return [
-      ...windows,
-      { windowId, startedAt, ...(pages === undefined ? {} : { pages }) },
-    ];
-  });
+  const opened = await writeStepWindows(
+    client,
+    bookId,
+    issueId,
+    step,
+    (windows) => {
+      if (windows.some((w) => w.windowId === windowId)) return windows;
+      return [
+        ...windows,
+        { windowId, startedAt, ...(pages === undefined ? {} : { pages }) },
+      ];
+    },
+  );
+  if (!opened) {
+    console.log(
+      `[step-timing] open of window ${windowId} of ${step} on ${bookId}/${issueId} did not land; the step is unmeasured`,
+    );
+  }
 
   return windowId;
 }
@@ -197,9 +209,14 @@ export async function recordStepStart(
  * Close the window `recordStepStart` returned. A window that is already
  * closed, or one whose open write never landed, is left alone rather than
  * given a zero-length window, so the query never reports a step it cannot
- * measure. A failed write is logged by updateRunSteps and not thrown: a
- * timing write must not fail a run that is spending Gemini and ElevenLabs
- * credits.
+ * measure; both return quietly, because a replayed step is the normal case.
+ *
+ * Nothing here throws or fails a run. Timings are best-effort telemetry:
+ * updateRunSteps logs why a write did not land, this logs the consequence,
+ * and the run carries on, because a timing write must not fail a run that is
+ * spending Gemini and ElevenLabs credits. A dropped close leaves the window
+ * open in the jsonb, which the SELECT in the PR body reports as a null end
+ * rather than guessing one.
  */
 export async function recordStepEnd(
   bookId: string,
@@ -212,18 +229,22 @@ export async function recordStepEnd(
   const client = await createTypedStepClient();
   const endedAt = new Date().toISOString();
 
-  let closed = false;
-  await writeStepWindows(client, bookId, issueId, step, (windows) => {
-    const open = windows.find(
-      (w) => w.windowId === windowId && w.endedAt === undefined,
-    );
-    if (!open) return windows;
-    closed = true;
-    return windows.map((w) => (w === open ? { ...w, endedAt } : w));
-  });
+  const closed = await writeStepWindows(
+    client,
+    bookId,
+    issueId,
+    step,
+    (windows) => {
+      const open = windows.find(
+        (w) => w.windowId === windowId && w.endedAt === undefined,
+      );
+      if (!open) return windows;
+      return windows.map((w) => (w === open ? { ...w, endedAt } : w));
+    },
+  );
   if (!closed) {
     console.log(
-      `[step-timing] window ${windowId} of ${step} on ${bookId}/${issueId} was not open; close dropped`,
+      `[step-timing] close of window ${windowId} of ${step} on ${bookId}/${issueId} did not land; it reads open, or already closed`,
     );
   }
 }
