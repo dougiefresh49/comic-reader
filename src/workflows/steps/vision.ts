@@ -4,7 +4,7 @@ import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { filterDuplicatePanels, filterSliverPanels } from "~/lib/panel-filter";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
-import type { Database, Json } from "~/types/database";
+import type { Database, Json, TablesInsert } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
 import {
   bubbleHasContext,
@@ -13,6 +13,7 @@ import {
   mapForegroundPolygons,
   mapPanelRows,
   mapSegmentationRow,
+  normalizePanelAudioTags,
   parseRoboflowSam3Output,
   type ContextParsed,
   type ForegroundPrediction,
@@ -355,6 +356,28 @@ async function resolveCharacterIdOrFatal(
   return null;
 }
 
+/**
+ * Decisions row 124: a page where the model keeps no panel gets one panel
+ * covering the whole page, the shape issue-2 and issue-3 got by SQL. With a
+ * panel row present, the next run skips the Roboflow call (#237).
+ */
+function fullPagePanelRow(
+  bookId: string,
+  issueId: string,
+  pageNumber: number,
+): TablesInsert<"panels"> {
+  return {
+    book_id: bookId,
+    issue_id: issueId,
+    page_number: pageNumber,
+    panel_id: `p${String(pageNumber).padStart(2, "0")}-01`,
+    sort_order: 0,
+    source: "heuristic-fullpage",
+    bounding_box: { x: 0, y: 0, w: 1, h: 1 },
+    audio_tags: { ...normalizePanelAudioTags(null) },
+  };
+}
+
 export async function roboflowAnalyzeBatch(
   bookId: string,
   issueId: string,
@@ -488,19 +511,33 @@ export async function roboflowAnalyzeBatch(
       page.pageNumber,
       bubblePredictions,
     );
+    const fullPage = existingPanels === 0 && panelRows.length === 0;
+    if (fullPage) {
+      panelRows.push(fullPagePanelRow(bookId, issueId, page.pageNumber));
+    }
 
+    let fullPagePanelId: string | undefined;
     if (existingPanels > 0) {
       console.log(
         `[roboflow] ${pageLabel}: ${existingPanels} panels already present, skip panels write`,
       );
     } else if (panelRows.length > 0) {
-      const { error: pErr } = await supabase.from("panels").upsert(panelRows, {
-        onConflict: "book_id,issue_id,panel_id",
-        ignoreDuplicates: true,
-      });
+      const { data: written, error: pErr } = await supabase
+        .from("panels")
+        .upsert(panelRows, {
+          onConflict: "book_id,issue_id,panel_id",
+          ignoreDuplicates: true,
+        })
+        .select("id");
       if (pErr) {
         throw new FatalError(
           `panels upsert failed for ${pageLabel}: ${pErr.message}`,
+        );
+      }
+      fullPagePanelId = fullPage ? written[0]?.id : undefined;
+      if (fullPage && !fullPagePanelId) {
+        throw new FatalError(
+          `full-page panel for ${pageLabel} was not written, a row already holds its panel_id`,
         );
       }
     }
@@ -519,6 +556,22 @@ export async function roboflowAnalyzeBatch(
       if (bErr) {
         throw new FatalError(
           `bubbles upsert failed for ${pageLabel}: ${bErr.message}`,
+        );
+      }
+    }
+
+    if (fullPagePanelId) {
+      // Every bubble on the page sits inside the full-page panel.
+      const { error: lErr } = await supabase
+        .from("bubbles")
+        .update({ panel_id: fullPagePanelId })
+        .eq("book_id", bookId)
+        .eq("issue_id", issueId)
+        .eq("page_number", page.pageNumber)
+        .is("panel_id", null);
+      if (lErr) {
+        throw new FatalError(
+          `bubbles panel link failed for ${pageLabel}: ${lErr.message}`,
         );
       }
     }
@@ -543,7 +596,7 @@ export async function roboflowAnalyzeBatch(
     }
 
     console.log(
-      `[roboflow] ${bookId}/${issueId}: ${pageLabel} → ${panelRows.length} panels, ${bubbleRows.length} bubbles, ${segPreds.length} segments`,
+      `[roboflow] ${bookId}/${issueId}: ${pageLabel} → ${panelRows.length} panels${fullPage ? " (full-page)" : ""}, ${bubbleRows.length} bubbles, ${segPreds.length} segments`,
     );
 
     await new Promise((r) => setTimeout(r, 750));
