@@ -15,6 +15,7 @@ import {
   voiceDesignAppearanceId,
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
+import { isDryRun } from "~/lib/fakes/dry-run";
 import {
   castSaveFailureMessage,
   findRegisteredVoice,
@@ -76,16 +77,19 @@ export async function getCharactersNeedingVoices(
   );
 
   for (const row of plan.reuse) {
-    const { error } = await supabase.from("castlist").upsert(
-      {
-        book_id: bookId,
-        issue_id: issueId,
-        character: row.character,
-        voice_id: row.voice_id,
-      },
-      { onConflict: "book_id,issue_id,character" },
+    const appearance = appearances.find(
+      (a) => a.character_id === row.character && a.voice_id === row.voice_id,
     );
-    if (error) throw new FatalError(error.message);
+    const saved = await registerCastVoice(supabase, {
+      bookId,
+      issueId,
+      characterId: row.character,
+      elevenLabsId: row.voice_id,
+      designPrompt: appearance?.voice_description?.trim(),
+    });
+    if (!saved.ok) {
+      throw new FatalError(castSaveFailureMessage(row.voice_id, saved));
+    }
   }
 
   console.log(
@@ -219,24 +223,6 @@ export async function generateVoiceModel(
   console.log(
     `[voice-model] ${characterId}: paid create returned voice_id=${voice_id}`,
   );
-  const voiceCreatedAt = new Date().toISOString();
-
-  const { error: upAppErr } = await supabase
-    .from("character_appearances")
-    .update({
-      voice_id,
-      voice_type: "voice_design",
-      voice_status: "ready",
-      voice_created_at: voiceCreatedAt,
-    })
-    .eq("id", appearanceId);
-
-  if (upAppErr) {
-    throw new FatalError(
-      `appearance update failed for ${characterId} voice_id=${voice_id}: ${upAppErr.message}`,
-    );
-  }
-
   const registered = await registerCastVoice(supabase, {
     bookId,
     issueId,
@@ -246,6 +232,26 @@ export async function generateVoiceModel(
   });
   if (!registered.ok) {
     throw new FatalError(castSaveFailureMessage(voice_id, registered));
+  }
+
+  if (!isDryRun()) {
+    const voiceCreatedAt = new Date().toISOString();
+
+    const { error: upAppErr } = await supabase
+      .from("character_appearances")
+      .update({
+        voice_id,
+        voice_type: "voice_design",
+        voice_status: "ready",
+        voice_created_at: voiceCreatedAt,
+      })
+      .eq("id", appearanceId);
+
+    if (upAppErr) {
+      throw new FatalError(
+        `appearance update failed for ${characterId} voice_id=${voice_id}: ${upAppErr.message}`,
+      );
+    }
   }
 
   console.log(

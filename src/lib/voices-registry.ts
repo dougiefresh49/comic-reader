@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { isDryRun } from "./fakes/dry-run";
@@ -108,41 +109,49 @@ export async function registerCastVoice(
   if (findErr) return fail(findErr.message);
 
   let voiceUuid = existing?.id;
+  const dryRun = isDryRun();
   if (!voiceUuid) {
     const row = buildVoiceRow(input);
-    if (isDryRun()) {
+    if (dryRun) {
+      voiceUuid = randomUUID();
       console.log(`[voice-registry] voices insert ${JSON.stringify(row)}`);
-    }
-    const { data: inserted, error: insertErr } = await db
-      .from("voices")
-      .insert(row)
-      .select("id")
-      .single();
-    if (insertErr) {
-      // 23505: another write registered this id first (voices_current_el_id_uniq).
-      if (insertErr.code !== "23505") return fail(insertErr.message);
-      // A failed lookup leaves the winner's row unconfirmed but likely, so
-      // stage `voices`; a lookup that finds nothing confirms no row.
-      const { data: raced, error: raceErr } = await findVoice();
-      if (raceErr)
-        return { ok: false, error: raceErr.message, stage: "voices" };
-      if (!raced) return fail(insertErr.message);
-      voiceUuid = raced.id;
     } else {
-      voiceUuid = inserted.id;
+      const { data: inserted, error: insertErr } = await db
+        .from("voices")
+        .insert(row)
+        .select("id")
+        .single();
+      if (insertErr) {
+        // 23505: another write registered this id first (voices_current_el_id_uniq).
+        if (insertErr.code !== "23505") return fail(insertErr.message);
+        // A failed lookup leaves the winner's row unconfirmed but likely, so
+        // stage `voices`; a lookup that finds nothing confirms no row.
+        const { data: raced, error: raceErr } = await findVoice();
+        if (raceErr)
+          return { ok: false, error: raceErr.message, stage: "voices" };
+        if (!raced) return fail(insertErr.message);
+        voiceUuid = raced.id;
+      } else {
+        voiceUuid = inserted.id;
+      }
     }
   }
 
-  const { error: castErr } = await db.from("castlist").upsert(
-    {
-      book_id: input.bookId,
-      issue_id: input.issueId,
-      character: input.characterId,
-      voice_id: input.elevenLabsId,
-      voice_uuid: voiceUuid,
-    },
-    { onConflict: "book_id,issue_id,character" },
-  );
+  const castRow = {
+    book_id: input.bookId,
+    issue_id: input.issueId,
+    character: input.characterId,
+    voice_id: input.elevenLabsId,
+    voice_uuid: voiceUuid,
+  };
+  if (dryRun) {
+    console.log(`[voice-registry] castlist upsert ${JSON.stringify(castRow)}`);
+    return { ok: true, voiceUuid };
+  }
+
+  const { error: castErr } = await db
+    .from("castlist")
+    .upsert(castRow, { onConflict: "book_id,issue_id,character" });
   if (castErr) {
     return { ok: false, error: castErr.message, stage: "voices", voiceUuid };
   }
