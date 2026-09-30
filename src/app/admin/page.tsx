@@ -390,6 +390,13 @@ function ActionButtons({
       >
         Details
       </Link>
+      <Link
+        href={`/admin/${issue.bookId}/${issue.issueId}/cost`}
+        className="rounded bg-neutral-700 px-2 py-1 text-xs font-medium text-neutral-300 hover:bg-neutral-600"
+        title="Recorded call cost"
+      >
+        Cost
+      </Link>
     </div>
   );
 }

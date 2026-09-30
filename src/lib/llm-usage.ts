@@ -16,6 +16,7 @@ import type {
   GoogleGenAI,
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TablesInsert } from "~/types/database";
 import { isDryRun } from "./fakes/dry-run";
 import {
   ELEVENLABS_USD_PER_CHARACTER,
@@ -35,24 +36,8 @@ export type LlmCallMeta = {
   serviceTier?: string | null;
 };
 
-/** One `llm_calls` row. `src/types/database.ts` does not know the table yet. */
-export type LlmCallRow = {
-  provider: "gemini" | "elevenlabs";
-  step: string;
-  model: string | null;
-  service_tier: string | null;
-  book_id: string | null;
-  issue_id: string | null;
-  page_number: number | null;
-  tokens_in: number | null;
-  tokens_out: number | null;
-  tokens_thinking: number | null;
-  characters: number | null;
-  usd_est: number | null;
-  duration_ms: number | null;
-  ok: boolean;
-  error: string | null;
-};
+/** The insert payload for one `llm_calls` row. `id` and `created_at` are defaults. */
+type LlmCallInsert = TablesInsert<"llm_calls">;
 
 const ambient = new AsyncLocalStorage<LlmCallMeta>();
 
@@ -73,10 +58,10 @@ export function ambientLlmMeta(fallbackStep: string): LlmCallMeta {
 const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
 
 function baseRow(
-  provider: LlmCallRow["provider"],
+  provider: "gemini" | "elevenlabs",
   model: string | null,
   meta: LlmCallMeta,
-): LlmCallRow {
+): LlmCallInsert {
   return {
     provider,
     step: meta.step,
@@ -102,7 +87,7 @@ export function usageToRow(
   usage: GenerateContentResponseUsageMetadata | undefined,
   model: string,
   meta: LlmCallMeta,
-): LlmCallRow {
+): LlmCallInsert {
   const row = baseRow("gemini", model, meta);
   if (!usage) return row;
   const tokensIn = usage.promptTokenCount ?? 0;
@@ -133,7 +118,7 @@ let client: SupabaseClient | undefined;
 /** A stalled insert must not hold a step after the paid call returned. */
 const INSERT_TIMEOUT_MS = 5000;
 
-async function insertRow(row: LlmCallRow): Promise<void> {
+async function insertRow(row: LlmCallInsert): Promise<void> {
   if (!client) {
     const { createStepClient } = await import("~/workflows/step-utils");
     client = await createStepClient();
@@ -145,7 +130,7 @@ async function insertRow(row: LlmCallRow): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-async function record(row: LlmCallRow): Promise<void> {
+async function record(row: LlmCallInsert): Promise<void> {
   try {
     await insertRow(row);
   } catch (err) {
@@ -161,7 +146,7 @@ async function record(row: LlmCallRow): Promise<void> {
  */
 async function logged<T>(
   call: () => Promise<T>,
-  toRow: (result: T | undefined) => LlmCallRow,
+  toRow: (result: T | undefined) => LlmCallInsert,
 ): Promise<T> {
   if (isDryRun()) return call();
   const started = Date.now();

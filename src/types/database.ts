@@ -188,6 +188,7 @@ export type Database = {
           sort_order: number;
           speaker: string | null;
           style: Json | null;
+          text_geometry: Json | null;
           text_with_cues: string | null;
           type: string;
           updated_at: string | null;
@@ -216,6 +217,7 @@ export type Database = {
           sort_order: number;
           speaker?: string | null;
           style?: Json | null;
+          text_geometry?: Json | null;
           text_with_cues?: string | null;
           type?: string;
           updated_at?: string | null;
@@ -244,6 +246,7 @@ export type Database = {
           sort_order?: number;
           speaker?: string | null;
           style?: Json | null;
+          text_geometry?: Json | null;
           text_with_cues?: string | null;
           type?: string;
           updated_at?: string | null;
@@ -630,6 +633,66 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      llm_calls: {
+        Row: {
+          book_id: string | null;
+          characters: number | null;
+          created_at: string | null;
+          duration_ms: number | null;
+          error: string | null;
+          id: string;
+          issue_id: string | null;
+          model: string | null;
+          ok: boolean | null;
+          page_number: number | null;
+          provider: string | null;
+          service_tier: string | null;
+          step: string | null;
+          tokens_in: number | null;
+          tokens_out: number | null;
+          tokens_thinking: number | null;
+          usd_est: number | null;
+        };
+        Insert: {
+          book_id?: string | null;
+          characters?: number | null;
+          created_at?: string | null;
+          duration_ms?: number | null;
+          error?: string | null;
+          id?: string;
+          issue_id?: string | null;
+          model?: string | null;
+          ok?: boolean | null;
+          page_number?: number | null;
+          provider?: string | null;
+          service_tier?: string | null;
+          step?: string | null;
+          tokens_in?: number | null;
+          tokens_out?: number | null;
+          tokens_thinking?: number | null;
+          usd_est?: number | null;
+        };
+        Update: {
+          book_id?: string | null;
+          characters?: number | null;
+          created_at?: string | null;
+          duration_ms?: number | null;
+          error?: string | null;
+          id?: string;
+          issue_id?: string | null;
+          model?: string | null;
+          ok?: boolean | null;
+          page_number?: number | null;
+          provider?: string | null;
+          service_tier?: string | null;
+          step?: string | null;
+          tokens_in?: number | null;
+          tokens_out?: number | null;
+          tokens_thinking?: number | null;
+          usd_est?: number | null;
+        };
+        Relationships: [];
       };
       music_scenes: {
         Row: {
@@ -1103,39 +1166,54 @@ export type Database = {
       voices: {
         Row: {
           archived_at: string | null;
+          consumers: string[];
           created_at: string;
           current_elevenlabs_id: string | null;
+          description: string | null;
           design_prompt: string | null;
           display_name: string;
           id: string;
           keep_active: boolean;
+          lab_default: boolean | null;
+          labels: Json | null;
           series_id: string | null;
+          source_clip_md5: string | null;
           source_clip_path: string | null;
           status: string;
           voice_settings: Json | null;
         };
         Insert: {
           archived_at?: string | null;
+          consumers?: string[];
           created_at?: string;
           current_elevenlabs_id?: string | null;
+          description?: string | null;
           design_prompt?: string | null;
           display_name: string;
           id?: string;
           keep_active?: boolean;
+          lab_default?: boolean | null;
+          labels?: Json | null;
           series_id?: string | null;
+          source_clip_md5?: string | null;
           source_clip_path?: string | null;
           status: string;
           voice_settings?: Json | null;
         };
         Update: {
           archived_at?: string | null;
+          consumers?: string[];
           created_at?: string;
           current_elevenlabs_id?: string | null;
+          description?: string | null;
           design_prompt?: string | null;
           display_name?: string;
           id?: string;
           keep_active?: boolean;
+          lab_default?: boolean | null;
+          labels?: Json | null;
           series_id?: string | null;
+          source_clip_md5?: string | null;
           source_clip_path?: string | null;
           status?: string;
           voice_settings?: Json | null;
@@ -1161,6 +1239,17 @@ export type Database = {
           id: string;
           similarity: number;
         }[];
+      };
+      switch_bubble_audio_take: {
+        Args: {
+          p_alignment: Json;
+          p_audio_storage_path: string;
+          p_book_id: string;
+          p_bubble_id: string;
+          p_issue_id: string;
+          p_normalized_alignment: Json;
+        };
+        Returns: string;
       };
     };
     Enums: {
