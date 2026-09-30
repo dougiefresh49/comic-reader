@@ -47,32 +47,54 @@ function DimRects({
   y,
   w,
   h,
+  bleed = "0px",
 }: {
   x: string;
   y: string;
   w: string;
   h: string;
+  bleed?: string;
 }) {
   return (
     <>
       <div
         className={`pointer-events-auto absolute inset-x-0 top-0 ${PANEL_DIM_CLASS}`}
-        style={{ height: y }}
+        style={{
+          top: `calc(0px - ${bleed})`,
+          left: `calc(0px - ${bleed})`,
+          right: `calc(0px - ${bleed})`,
+          height: `calc(${y} + ${bleed})`,
+        }}
         aria-hidden
       />
       <div
         className={`pointer-events-auto absolute inset-x-0 bottom-0 ${PANEL_DIM_CLASS}`}
-        style={{ top: `calc(${y} + ${h})` }}
+        style={{
+          top: `calc(${y} + ${h})`,
+          left: `calc(0px - ${bleed})`,
+          right: `calc(0px - ${bleed})`,
+          bottom: `calc(0px - ${bleed})`,
+        }}
         aria-hidden
       />
       <div
         className={`pointer-events-auto absolute left-0 ${PANEL_DIM_CLASS}`}
-        style={{ top: y, width: x, height: h }}
+        style={{
+          top: y,
+          left: `calc(0px - ${bleed})`,
+          width: `calc(${x} + ${bleed})`,
+          height: h,
+        }}
         aria-hidden
       />
       <div
         className={`pointer-events-auto absolute right-0 ${PANEL_DIM_CLASS}`}
-        style={{ top: y, left: `calc(${x} + ${w})`, height: h }}
+        style={{
+          top: y,
+          left: `calc(${x} + ${w})`,
+          right: `calc(0px - ${bleed})`,
+          height: h,
+        }}
         aria-hidden
       />
     </>
@@ -160,6 +182,19 @@ export function PanelViewFrame({
     [containerSize, pageSize],
   );
 
+  // Re-keyed on panel.id so the selected camera animation restarts.
+  // Peak scales match the corresponding keyframes in globals.css.
+  const cameraEffect =
+    !panelViewMode || reducedMotion || !activePanel
+      ? { className: "", peakScale: 1 }
+      : cameraEffectFromTags(activePanel.effectTags);
+  const scaleCap = maxPanelScale(
+    imageRect.w,
+    pageSize.w,
+    devicePixelRatio,
+    cameraEffect.peakScale,
+  );
+
   const getTarget = useCallback((): PanelTransformResult => {
     if (
       !panelViewMode ||
@@ -174,41 +209,31 @@ export function PanelViewFrame({
       containerSize,
       imageRect,
       PANEL_VIEW_MARGIN,
-      maxPanelScale(imageRect.w, pageSize.w, devicePixelRatio),
+      scaleCap,
     );
-  }, [
-    panelViewMode,
-    focusRect,
-    containerSize,
-    imageRect,
-    pageSize.w,
-    devicePixelRatio,
-  ]);
+  }, [panelViewMode, focusRect, containerSize, imageRect, scaleCap]);
 
   const applyTransform = useCallback(
     (t: PanelTransformResult) => {
       const el = transformRef.current;
       if (!el) return;
-      el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.scale})`;
+      // A previous panel's spring scale may exceed the new effect's cap.
+      const scale = panelViewMode ? Math.min(t.scale, scaleCap) : t.scale;
+      el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${scale})`;
       el.style.transformOrigin = "0 0";
 
-      // The viewport mask reads these, so it tracks every spring frame.
+      // Cover the inverse spring viewport, plus one frame for camera motion.
+      // Pan is at most 2% of the frame; the largest shake offset is 12px.
       const viewport = viewportRef.current;
-      if (!viewport || !focusRect) return;
-      const x = t.tx + t.scale * (imageRect.x + focusRect.x * imageRect.w);
-      const y = t.ty + t.scale * (imageRect.y + focusRect.y * imageRect.h);
-      viewport.style.setProperty("--focus-x", `${x}px`);
-      viewport.style.setProperty("--focus-y", `${y}px`);
-      viewport.style.setProperty(
-        "--focus-w",
-        `${t.scale * focusRect.w * imageRect.w}px`,
-      );
-      viewport.style.setProperty(
-        "--focus-h",
-        `${t.scale * focusRect.h * imageRect.h}px`,
-      );
+      if (!viewport) return;
+      const frameExtent = Math.max(containerSize.w, containerSize.h);
+      const bleed =
+        (frameExtent + Math.max(Math.abs(t.tx), Math.abs(t.ty))) / scale +
+        frameExtent +
+        12;
+      viewport.style.setProperty("--mask-bleed", `${bleed}px`);
     },
-    [focusRect, imageRect],
+    [panelViewMode, scaleCap, containerSize],
   );
 
   useEffect(() => {
@@ -230,7 +255,7 @@ export function PanelViewFrame({
     springRef.current.vTx = 0;
     springRef.current.vTy = 0;
     springRef.current.vScale = 0;
-    // Move the mask to a new focus rect now, not one frame late.
+    // Apply the new effect's cap and mask coverage before the next frame.
     applyTransform(springRef.current);
 
     cancelAnimationFrame(rafRef.current);
@@ -244,15 +269,6 @@ export function PanelViewFrame({
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
   }, [getTarget, reducedMotion, applyTransform]);
-
-  // Camera-effect class derived from the active panel's effectTags. Runs
-  // forwards-once so the panel settles into a stable pose by the end of
-  // its display window. Re-keyed on panel.id so the animation restarts
-  // every time we navigate to a new panel.
-  const cameraEffectClass =
-    !panelViewMode || reducedMotion || !activePanel
-      ? ""
-      : cameraEffectClassFromTags(activePanel.effectTags);
 
   // Panel mode fills the measured reader area. Page mode keeps the 2:3
   // frame with 140px reserved for the bottom chrome.
@@ -268,7 +284,7 @@ export function PanelViewFrame({
       <div ref={transformRef} className="relative h-full w-full">
         <div
           key={activePanel?.id ?? "no-panel"}
-          className={`relative h-full w-full ${cameraEffectClass}`}
+          className={`relative h-full w-full ${cameraEffect.className}`}
           style={{ transformOrigin: "center center" }}
         >
           {/* Page plane: sized to the page's own aspect so object-contain
@@ -286,16 +302,17 @@ export function PanelViewFrame({
           >
             {children}
           </div>
+          {dimOutsideFocus && panelViewMode && focusRect ? (
+            <DimRects
+              x={`${imageRect.x + focusRect.x * imageRect.w}px`}
+              y={`${imageRect.y + focusRect.y * imageRect.h}px`}
+              w={`${focusRect.w * imageRect.w}px`}
+              h={`${focusRect.h * imageRect.h}px`}
+              bleed="var(--mask-bleed, 0px)"
+            />
+          ) : null}
         </div>
       </div>
-      {dimOutsideFocus && panelViewMode && focusRect ? (
-        <DimRects
-          x="var(--focus-x)"
-          y="var(--focus-y)"
-          w="var(--focus-w)"
-          h="var(--focus-h)"
-        />
-      ) : null}
     </div>
   );
 }
@@ -317,19 +334,26 @@ export function PanelViewFrame({
  * since panel-direction usually picks one camera tag per panel
  * (Gemini ranks them) we accept the simpler model for v1.
  */
-function cameraEffectClassFromTags(tags: string[]): string {
+function cameraEffectFromTags(tags: string[]): {
+  className: string;
+  peakScale: number;
+} {
   const classes: string[] = [];
+  let peakScale = 1;
   // Pick the first matching scale/pan tag; pick the first matching shake.
   for (const tag of tags) {
     switch (tag) {
       case "camera_push_in_slow":
         classes.push("animate-[cameraPushInSlow_6s_ease-out_forwards]");
+        peakScale = 1.06;
         break;
       case "camera_push_in_fast":
         classes.push("animate-[cameraPushInFast_0.6s_ease-out_forwards]");
+        peakScale = 1.15;
         break;
       case "camera_pull_back":
         classes.push("animate-[cameraPullBack_5s_ease-out_forwards]");
+        peakScale = 1.04;
         break;
       case "camera_pan_horizontal":
         classes.push(
@@ -345,7 +369,7 @@ function cameraEffectClassFromTags(tags: string[]): string {
     }
     if (classes.length > 0) break; // only one camera tag per panel
   }
-  return classes.join(" ");
+  return { className: classes.join(" "), peakScale };
 }
 
 interface PanelViewHudProps {

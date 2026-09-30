@@ -167,17 +167,22 @@ export function renderedImageRect(
 /**
  * Largest camera scale at which one source pixel spans at most
  * `PANEL_MAX_UPSCALE` device pixels. `renderedW` is the page plane's CSS
- * width at scale 1. Unbounded until the page's natural width is known.
+ * width at scale 1. Reserve room for the active effect's peak scale.
+ * Unbounded until the page's natural width is known.
  */
 export function maxPanelScale(
   renderedW: number,
   naturalW: number,
   devicePixelRatio: number,
+  cameraPeakScale = 1,
 ): number {
   if (renderedW <= 0 || naturalW <= 0 || devicePixelRatio <= 0) {
     return Infinity;
   }
-  return (PANEL_MAX_UPSCALE * naturalW) / (renderedW * devicePixelRatio);
+  return (
+    (PANEL_MAX_UPSCALE * naturalW) /
+    (renderedW * devicePixelRatio * cameraPeakScale)
+  );
 }
 
 /**
