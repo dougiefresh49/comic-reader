@@ -11,6 +11,7 @@ import { checkAdminAuth } from "~/lib/admin-auth";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 
 const PAGES_BUCKET = "comic-pages";
 
@@ -260,6 +261,9 @@ export async function rerunContext(args: Args): Promise<Result> {
       `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
       "page",
     );
+    // A changed speaker or type is what the reader labels the bubble with, so
+    // the reader page this bubble sits on is stale until it is revalidated.
+    await revalidateReaderPages(args.bookId, args.issueId, [t.page_number]);
     return {
       ok: true,
       speaker: parsed.speaker ?? null,

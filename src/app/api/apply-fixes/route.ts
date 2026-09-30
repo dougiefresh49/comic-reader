@@ -2,6 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { type NextRequest } from "next/server";
 import { adminAuthFailure, checkAdminAuth } from "~/lib/admin-auth";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 interface BubbleStyle {
@@ -317,10 +318,10 @@ export async function POST(req: NextRequest) {
   results.needsAudio = audioAffectedUuids.size;
 
   // Invalidate ISR cache
-  revalidatePath(`/book/${bookId}/${issueId}`, "page");
+  await revalidateReaderPages(bookId, issueId);
   revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
-  revalidatePath(`/book/${bookId}`, "page");
-  revalidatePath("/", "page");
+  revalidatePath(`/book/${bookId}`);
+  revalidatePath("/");
 
   return Response.json(results);
 }

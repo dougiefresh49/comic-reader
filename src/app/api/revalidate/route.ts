@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { type NextRequest } from "next/server";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-revalidate-secret");
@@ -10,9 +11,9 @@ export async function POST(req: NextRequest) {
     bookId: string;
     issueId: string;
   };
-  revalidatePath(`/book/${bookId}/${issueId}`, "page");
+  await revalidateReaderPages(bookId, issueId);
   revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
-  revalidatePath(`/book/${bookId}`, "page");
-  revalidatePath("/", "page");
+  revalidatePath(`/book/${bookId}`);
+  revalidatePath("/");
   return Response.json({ revalidated: true, bookId, issueId });
 }

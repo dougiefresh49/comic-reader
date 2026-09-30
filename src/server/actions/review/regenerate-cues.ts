@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 function buildPrompt(text: string, userFeedback?: string): string {
@@ -85,14 +86,21 @@ export async function regenerateCues(args: Args) {
       })
       .eq("book_id", args.bookId)
       .eq("issue_id", args.issueId);
-    const { error } = await (isUuid
-      ? query.eq("id", args.bubbleId)
-      : query.eq("legacy_id", args.bubbleId));
+    const { data, error } = await (
+      isUuid
+        ? query.eq("id", args.bubbleId)
+        : query.eq("legacy_id", args.bubbleId)
+    ).select("page_number");
     if (error) return { ok: false, error: error.message };
 
     revalidatePath(
       `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
       "page",
+    );
+    await revalidateReaderPages(
+      args.bookId,
+      args.issueId,
+      (data ?? []).map((row) => (row as { page_number: number }).page_number),
     );
     return { ok: true, textWithCues: formatted };
   } catch (e) {
