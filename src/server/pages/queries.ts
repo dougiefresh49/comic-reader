@@ -1,7 +1,12 @@
 import "server-only";
+import type { ComponentProps } from "react";
 import { supabase } from "~/lib/supabase";
+import { supabaseAdmin } from "~/lib/supabase-admin";
+import { pageImageUrl } from "~/lib/storage";
+import type ZenComicReader from "~/components/ZenComicReader";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { BookManifest, Manifest } from "~/types/manifest";
+import { getPanelsForPage } from "./panels";
 
 export interface PageData {
   bubbles: Bubble[];
@@ -183,13 +188,24 @@ export async function getIssueData(
   return { allBubbles, characters };
 }
 
-export async function getManifest(): Promise<Manifest> {
-  const { data, error } = await supabase
+/**
+ * Every book with its issues. Public routes pass `publishedOnly: true` so a
+ * draft book stays out of the library and 404s on `/book/...`. The default
+ * keeps drafts because the admin callers (the review editor, the preview
+ * route) need them.
+ */
+export async function getManifest({
+  publishedOnly = false,
+}: { publishedOnly?: boolean } = {}): Promise<Manifest> {
+  let query = supabase
     .from("books")
     .select(
       "id, name, issues(id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps)",
     )
     .order("number", { ascending: true, foreignTable: "issues" });
+  if (publishedOnly) query = query.eq("published", true);
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("getManifest:", error);
@@ -214,5 +230,104 @@ export async function getManifest(): Promise<Manifest> {
   return {
     books,
     generatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * `books.published` keyed by book id, for the admin book list. The list reads
+ * its books from `getAdminBooksWithParts`, which is a different shape, so
+ * this is a second small read rather than a change to that query.
+ */
+export async function getBookPublishedFlags(): Promise<
+  Record<string, boolean>
+> {
+  const { data, error } = await supabaseAdmin
+    .from("books")
+    .select("id, published");
+  if (error) {
+    console.error("getBookPublishedFlags:", error);
+    return {};
+  }
+  return Object.fromEntries(
+    ((data ?? []) as Array<{ id: string; published: boolean | null }>).map(
+      (row) => [row.id, row.published ?? false],
+    ),
+  );
+}
+
+/**
+ * How many page images the issue actually has. `issues.page_count` is written
+ * by the pipeline's publishing step, so a book whose pages were uploaded but
+ * not yet processed reads zero and the reader would 404 on page 1. Storage is
+ * the answer in that case. The service-role client is used because the
+ * anon key cannot list a bucket.
+ */
+async function countStoredPages(
+  bookId: string,
+  issueId: string,
+): Promise<number> {
+  const { data, error } = await supabaseAdmin.storage
+    .from("comic-pages")
+    .list(`${bookId}/${issueId}`);
+  if (error) {
+    console.error("countStoredPages:", error);
+    return 0;
+  }
+  return (data ?? []).filter((f) => f.name.endsWith(".webp")).length;
+}
+
+export type ReaderPageProps = ComponentProps<typeof ZenComicReader>;
+
+/**
+ * Everything the reader needs for one page, or null when the book, the
+ * issue or the page does not exist (or the book is a draft and
+ * `publishedOnly` is set). `basePath` roots the prev and next links, so the
+ * admin preview keeps its readers on `/admin/preview`.
+ */
+export async function getReaderPage({
+  bookId,
+  issueId,
+  pageNumber,
+  publishedOnly,
+  basePath,
+}: {
+  bookId: string;
+  issueId: string;
+  pageNumber: string;
+  publishedOnly: boolean;
+  basePath: "/book" | "/admin/preview";
+}): Promise<ReaderPageProps | null> {
+  const manifest = await getManifest({ publishedOnly });
+  const issue = manifest.books
+    .find((b) => b.id === bookId)
+    ?.issues.find((i) => i.id === issueId);
+  if (!issue) return null;
+
+  const pageCount =
+    issue.pageCount > 0
+      ? issue.pageCount
+      : await countStoredPages(bookId, issueId);
+
+  const pageNum = parseInt(pageNumber, 10);
+  if (isNaN(pageNum) || pageNum < 1 || pageNum > pageCount) return null;
+
+  const [{ bubbles, timestamps }, panels] = await Promise.all([
+    getPageData(bookId, issueId, pageNumber),
+    getPanelsForPage(bookId, issueId, pageNum),
+  ]);
+
+  const pageLink = (n: number) => `${basePath}/${bookId}/${issueId}/${n}`;
+
+  return {
+    pageImage: pageImageUrl(bookId, issueId, pageNum),
+    bubbles,
+    timestamps,
+    bookId,
+    issueId,
+    pageNumber: pageNum,
+    pageCount,
+    prevPageLink: pageNum > 1 ? pageLink(pageNum - 1) : null,
+    nextPageLink: pageNum < pageCount ? pageLink(pageNum + 1) : null,
+    panels,
   };
 }

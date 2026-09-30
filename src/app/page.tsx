@@ -22,7 +22,7 @@ function bookCover(book: BookManifest): string | null {
 }
 
 export default async function LibraryPage() {
-  const manifest = await getManifest();
+  const manifest = await getManifest({ publishedOnly: true });
   const books = manifest.books;
 
   return (

@@ -6,7 +6,9 @@ import {
   type AdminBookInfo,
 } from "~/server/admin/queries";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { getBookPublishedFlags } from "~/server";
 import { PipelineActions, type SkippedGate } from "./PipelineActions";
+import BookPublishToggle from "./BookPublishToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +48,11 @@ async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
 }
 
 export default async function AdminDashboardPage() {
-  const [issues, books, skippedByIssue] = await Promise.all([
+  const [issues, books, skippedByIssue, publishedByBook] = await Promise.all([
     getAdminIssues(),
     getAdminBooksWithParts(),
     getLatestSkippedByIssue(),
+    getBookPublishedFlags(),
   ]);
 
   const issuesByBook = new Map<string, AdminIssueRow[]>();
@@ -111,6 +114,7 @@ export default async function AdminDashboardPage() {
                 book={book}
                 issues={issuesByBook.get(book.id) ?? []}
                 skippedByIssue={skippedByIssue}
+                published={publishedByBook[book.id] ?? false}
               />
             ))}
           </div>
@@ -124,12 +128,18 @@ function BookSection({
   book,
   issues,
   skippedByIssue,
+  published,
 }: {
   book: AdminBookInfo;
   issues: AdminIssueRow[];
   skippedByIssue: Map<string, SkippedGate[]>;
+  published: boolean;
 }) {
   const hasParts = book.parts.length > 0;
+  // The owner's way in. A draft book has no public route, so the admin list
+  // links the first issue's first page under /admin/preview, which the
+  // basic-auth matcher covers. `issues` arrives sorted by number.
+  const firstIssue = [...issues].sort((a, b) => a.number - b.number)[0];
 
   const issuesByPart = new Map<string | null, AdminIssueRow[]>();
   for (const iss of issues) {
@@ -143,6 +153,15 @@ function BookSection({
     <section>
       <div className="mb-3 flex flex-wrap items-baseline gap-2 sm:gap-3">
         <h2 className="text-lg font-medium">{book.name}</h2>
+        {published ? (
+          <span className="rounded bg-emerald-700/30 px-2 py-0.5 text-xs font-medium text-emerald-300">
+            Published
+          </span>
+        ) : (
+          <span className="rounded bg-neutral-700/40 px-2 py-0.5 text-xs font-medium text-neutral-400">
+            Draft
+          </span>
+        )}
         <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
           {book.publisher && <span>{book.publisher}</span>}
           {book.franchises && book.franchises.length > 0 && (
@@ -159,12 +178,23 @@ function BookSection({
             </span>
           )}
         </div>
-        <Link
-          href={`/admin/add-issue?book=${book.id}`}
-          className="ml-auto rounded bg-indigo-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-600"
-        >
-          + Issue
-        </Link>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {!published && firstIssue && (
+            <Link
+              href={`/admin/preview/${book.id}/${firstIssue.issueId}/1`}
+              className="rounded bg-cyan-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-cyan-600"
+            >
+              Preview
+            </Link>
+          )}
+          <Link
+            href={`/admin/add-issue?book=${book.id}`}
+            className="rounded bg-indigo-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-600"
+          >
+            + Issue
+          </Link>
+          <BookPublishToggle bookId={book.id} published={published} />
+        </div>
       </div>
 
       {hasParts ? (
