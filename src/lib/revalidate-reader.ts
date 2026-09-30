@@ -14,8 +14,8 @@ const READER_PAGE_PATTERN = "/book/[bookId]/[issueId]/[pageNumber]";
  * renders and the reader kept serving the old page.
  *
  * Exactly two forms reach a cache tag the reader page carries, and the shape
- * is decided by how Next builds the tag (traced in
- * `/tmp/comic-reader-briefs/t1/acceptance-244.txt`):
+ * is decided by how Next builds the tag. Two tags matter here: the page's own
+ * pathname tag, and the one Next derives from the route definition.
  *
  * - a concrete route with no type argument. Its tag is the page's own
  *   pathname tag, `_N_T_/book/<bookId>/<issueId>/<pageNumber>`.
