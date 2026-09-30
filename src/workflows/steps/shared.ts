@@ -1,6 +1,5 @@
-import { getWorkflowMetadata } from "workflow";
+import { getWorkflowMetadata, FatalError } from "workflow";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { FatalError } from "workflow";
 import { pageStoragePath } from "~/lib/storage";
 import { updateIssue } from "~/lib/issue-queries";
 import { updateRunSteps } from "./pipeline-runs";
@@ -151,9 +150,9 @@ async function writeStepTiming(
 }
 
 /**
- * Open this step's timing window. A step: the clock inside the step, never
- * in the workflow body, because the body replays and its `Date` is seeded
- * (#255). `pages` is the page count for the page-looping steps.
+ * Open this step's timing window. The clock runs inside a step, never in the
+ * workflow body, because the body replays and its `Date` is seeded (#255).
+ * `pages` is the page count for the page-looping steps.
  */
 export async function recordStepStart(
   bookId: string,
