@@ -1,13 +1,34 @@
+import { getWorkflowMetadata, FatalError } from "workflow";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { FatalError } from "workflow";
 import { pageStoragePath } from "~/lib/storage";
 import { updateIssue } from "~/lib/issue-queries";
+import { updateRunSteps } from "./pipeline-runs";
 
 export interface PageMeta {
   pageNumber: number;
   width: number;
   height: number;
 }
+
+/**
+ * One stretch of a step's wall clock, on pipeline_runs.steps.timings under
+ * the step name. A step holds a list of these, not one: a step that works
+ * before a review gate and again after it (casting) is two windows, so the
+ * gate pause is not folded into the step's time. `endedAt` is absent while a
+ * window is still running, so a run that died mid-step shows which step it
+ * died in. `pages` is set on the page-looping steps so seconds per page falls
+ * out of the same query (#255).
+ *
+ * `windowId` is the opening step's `stepId`, which the SDK keeps stable
+ * across retries. It is what makes a replayed open a no-op while a second,
+ * genuine window for the same step still opens.
+ */
+export type StepWindow = {
+  windowId: string;
+  startedAt: string;
+  endedAt?: string;
+  pages?: number;
+};
 
 export type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
@@ -102,6 +123,129 @@ export async function updatePipelineStep(
 
   if (paused && pauseUrl) {
     await notifySlack(bookId, issueId, step, pauseUrl);
+  }
+}
+
+/**
+ * Read-modify-write of this run's timings for one step. Shared by
+ * recordStepStart and recordStepEnd so the jsonb shape has one home.
+ * updateRunSteps is the compare-and-swap writer and logs its own failures;
+ * this returns whether its write landed.
+ */
+async function writeStepWindows(
+  client: Parameters<typeof updateRunSteps>[0],
+  bookId: string,
+  issueId: string,
+  step: string,
+  apply: (windows: StepWindow[]) => StepWindow[],
+): Promise<boolean> {
+  return await updateRunSteps(
+    client,
+    bookId,
+    issueId,
+    getWorkflowMetadata().workflowRunId,
+    (steps) => {
+      const timings = { ...((steps.timings as object) ?? {}) } as Record<
+        string,
+        StepWindow[]
+      >;
+      return {
+        ...steps,
+        timings: { ...timings, [step]: apply(timings[step] ?? []) },
+      };
+    },
+    "step-timing",
+  );
+}
+
+/**
+ * Open a timing window for this step and return its id, which the caller
+ * passes back to recordStepEnd to close exactly that window. The clock runs
+ * inside a step, never in the workflow body, because the body replays and its
+ * `Date` is seeded (#255). `pages` is the page count for the page-looping
+ * steps.
+ *
+ * The id is this step's `stepId`, which the SDK keeps stable across retries,
+ * so a replayed open finds its own window and writes nothing. A genuinely
+ * second window for the same step, as casting opens after its gate, carries
+ * its own id and opens normally.
+ */
+export async function recordStepStart(
+  bookId: string,
+  issueId: string,
+  step: string,
+  pages?: number,
+): Promise<string> {
+  "use step";
+  const { getStepMetadata } = await import("workflow");
+  const { createTypedStepClient } = await import("../step-utils");
+  const client = await createTypedStepClient();
+  const windowId = getStepMetadata().stepId;
+  const startedAt = new Date().toISOString();
+
+  const opened = await writeStepWindows(
+    client,
+    bookId,
+    issueId,
+    step,
+    (windows) => {
+      if (windows.some((w) => w.windowId === windowId)) return windows;
+      return [
+        ...windows,
+        { windowId, startedAt, ...(pages === undefined ? {} : { pages }) },
+      ];
+    },
+  );
+  if (!opened) {
+    console.log(
+      `[step-timing] open of window ${windowId} of ${step} on ${bookId}/${issueId} did not land; the step is unmeasured`,
+    );
+  }
+
+  return windowId;
+}
+
+/**
+ * Close the window `recordStepStart` returned. A window that is already
+ * closed, or one whose open write never landed, is left alone rather than
+ * given a zero-length window, so the query never reports a step it cannot
+ * measure; both return quietly, because a replayed step is the normal case.
+ *
+ * Nothing here throws or fails a run. Timings are best-effort telemetry:
+ * updateRunSteps logs why a write did not land, this logs the consequence,
+ * and the run carries on, because a timing write must not fail a run that is
+ * spending Gemini and ElevenLabs credits. A dropped close leaves the window
+ * open in the jsonb, which the SELECT in the PR body reports as a null end
+ * rather than guessing one.
+ */
+export async function recordStepEnd(
+  bookId: string,
+  issueId: string,
+  step: string,
+  windowId: string,
+): Promise<void> {
+  "use step";
+  const { createTypedStepClient } = await import("../step-utils");
+  const client = await createTypedStepClient();
+  const endedAt = new Date().toISOString();
+
+  const closed = await writeStepWindows(
+    client,
+    bookId,
+    issueId,
+    step,
+    (windows) => {
+      const open = windows.find(
+        (w) => w.windowId === windowId && w.endedAt === undefined,
+      );
+      if (!open) return windows;
+      return windows.map((w) => (w === open ? { ...w, endedAt } : w));
+    },
+  );
+  if (!closed) {
+    console.log(
+      `[step-timing] close of window ${windowId} of ${step} on ${bookId}/${issueId} did not land; it reads open, or already closed`,
+    );
   }
 }
 
