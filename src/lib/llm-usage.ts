@@ -19,6 +19,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TablesInsert } from "~/types/database";
 import { isDryRun } from "./fakes/dry-run";
 import {
+  ELEVENLABS_CREDITS_PER_CHARACTER,
   ELEVENLABS_USD_PER_CHARACTER,
   GEMINI_EMBEDDING_USD_PER_IMAGE,
   GEMINI_USD_PER_1M_TOKENS,
@@ -36,8 +37,14 @@ export type LlmCallMeta = {
   serviceTier?: string | null;
 };
 
-/** The insert payload for one `llm_calls` row. `id` and `created_at` are defaults. */
-type LlmCallInsert = TablesInsert<"llm_calls">;
+/**
+ * The insert payload for one `llm_calls` row. `id` and `created_at` are defaults.
+ *
+ * `credits` is the one field wider than the generated type: it arrives with
+ * migration 20260930010000_llm_calls_credits.sql (#251) and `database.ts` is
+ * regenerated once the orchestrator applies it. Drop the extension then.
+ */
+type LlmCallInsert = TablesInsert<"llm_calls"> & { credits?: number | null };
 
 const ambient = new AsyncLocalStorage<LlmCallMeta>();
 
@@ -76,6 +83,7 @@ function baseRow(
     tokens_thinking: null,
     characters: null,
     usd_est: null,
+    credits: null,
     duration_ms: null,
     ok: true,
     error: null,
@@ -159,6 +167,8 @@ async function logged<T>(
     row.ok = false;
     row.error = errorText(err);
     row.usd_est = null;
+    // A failed call's charge is unknown.
+    row.credits = null;
     await record(row);
     throw err;
   }
@@ -167,7 +177,9 @@ async function logged<T>(
   if (result instanceof Response && !result.ok) {
     row.ok = false;
     row.error = `HTTP ${result.status}`;
+    // A rejected request has no usable charge recorded here.
     row.usd_est = null;
+    row.credits = null;
   }
   await record(row);
   return result;
@@ -222,20 +234,92 @@ export function embedContentLogged(
 }
 
 /**
- * One ElevenLabs request. `characters` is what the request bills on (the TTS
- * text), or null when the per-request charge is not known (Voice Design).
+ * Prefer the documented `character-cost` header (#251):
+ * https://elevenlabs.io/docs/api-reference/introduction
+ * Missing or invalid headers fall back to the model's character rate.
+ */
+function creditsFor(
+  headers: Headers | undefined,
+  characters: number | null,
+  model: string | null,
+): number | null {
+  const header = headers?.get("character-cost");
+  if (header?.trim()) {
+    const parsed = Number(header);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  if (characters === null) return null;
+  const rate = model ? ELEVENLABS_CREDITS_PER_CHARACTER[model] : undefined;
+  return rate ? round5(characters * rate) : null;
+}
+
+/** Pure: an ElevenLabs row from the result and the billed character count. */
+export function elevenLabsUsageToRow<T>(
+  result: T | undefined,
+  characters: number | null,
+  meta: LlmCallMeta,
+  headers = result instanceof Response ? result.headers : undefined,
+): LlmCallInsert {
+  const row = baseRow("elevenlabs", meta.model ?? null, meta);
+  row.characters = characters;
+  row.credits = creditsFor(headers, characters, meta.model ?? null);
+  if (characters !== null) {
+    row.usd_est = round5(characters * ELEVENLABS_USD_PER_CHARACTER);
+  }
+  return row;
+}
+
+/**
+ * One ElevenLabs request. Keep the parsed SDK result for audio callers, and
+ * use `.withRawResponse()` before awaiting so its charge header survives.
+ * Voice Design bills returned preview text once, not once per preview.
  */
 export function recordElevenLabsCall<T>(
   meta: LlmCallMeta,
   characters: number | null,
-  fn: () => Promise<T>,
+  fn: () => Promise<T> & {
+    withRawResponse?: () => Promise<{
+      data: T;
+      rawResponse: { headers: Headers };
+    }>;
+  },
 ): Promise<T> {
-  return logged(fn, () => {
-    const row = baseRow("elevenlabs", meta.model ?? null, meta);
-    row.characters = characters;
-    if (characters !== null) {
-      row.usd_est = round5(characters * ELEVENLABS_USD_PER_CHARACTER);
-    }
-    return row;
-  });
+  let responseHeaders: Headers | undefined;
+  let billedCharacters = characters;
+  return logged(
+    async () => {
+      const request = fn();
+      let result: T;
+      if (request.withRawResponse) {
+        const raw = await request.withRawResponse();
+        responseHeaders = raw.rawResponse.headers;
+        result = raw.data;
+      } else {
+        result = await request;
+      }
+      if (
+        result instanceof Response &&
+        result.ok &&
+        meta.model === "eleven_ttv_v3"
+      ) {
+        // Clone so the existing caller can still consume the response body.
+        try {
+          const data = (await result.clone().json()) as { text?: unknown };
+          if (typeof data.text === "string")
+            billedCharacters = data.text.length;
+        } catch {
+          // No usable preview text: the header still applies, else credits stay unknown.
+        }
+      }
+      return result;
+    },
+    (result) =>
+      elevenLabsUsageToRow(
+        result,
+        billedCharacters,
+        meta,
+        responseHeaders ??
+          (result instanceof Response ? result.headers : undefined),
+      ),
+  );
 }

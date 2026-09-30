@@ -43,3 +43,15 @@ export const GEMINI_EMBEDDING_USD_PER_IMAGE = 0.00012;
 // Assumption until the owner's invoice: Creator plan, $22 for 100k credits,
 // 1 credit per character on eleven_v3.
 export const ELEVENLABS_USD_PER_CHARACTER = 0.00022;
+
+// Fallback credits per character when `character-cost` is absent (#251).
+// TTS v3 keeps the existing 1-credit assumption pending the owner's usage check.
+// Voice Design v3 bills preview text once for all three samples. Its FAQ says
+// credits equal preview characters and calls this the single-credit rule:
+// https://elevenlabs.io/blog/voice-design-v3
+// https://help.elevenlabs.io/hc/en-us/articles/29315418701073-How-much-does-Voice-Design-cost
+// Models without a documented rate keep credits null.
+export const ELEVENLABS_CREDITS_PER_CHARACTER: Record<string, number> = {
+  eleven_v3: 1,
+  eleven_ttv_v3: 1,
+};

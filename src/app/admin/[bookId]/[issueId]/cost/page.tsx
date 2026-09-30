@@ -10,6 +10,7 @@ interface Params {
 }
 
 type CallRow = {
+  provider: string;
   step: string | null;
   model: string | null;
   ok: boolean | null;
@@ -17,6 +18,7 @@ type CallRow = {
   tokens_out: number | null;
   tokens_thinking: number | null;
   characters: number | null;
+  credits: number | string | null;
   usd_est: number | string | null;
 };
 
@@ -29,6 +31,11 @@ type Rollup = {
   tokensOut: number;
   tokensThinking: number;
   characters: number;
+  /** Sum of `credits`. Zero on a group where no row carries one (Gemini). */
+  credits: number;
+  /** Whether any row in the group has a credits figure at all (#251). */
+  hasCredits: boolean;
+  missingCredits: number;
   usd: number;
 };
 
@@ -41,7 +48,7 @@ async function loadCalls(bookId: string, issueId: string) {
     const { data, error } = await supabaseAdmin
       .from("llm_calls")
       .select(
-        "step, model, ok, tokens_in, tokens_out, tokens_thinking, characters, usd_est",
+        "provider, step, model, ok, tokens_in, tokens_out, tokens_thinking, characters, credits, usd_est",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
@@ -69,6 +76,9 @@ function rollUp(rows: CallRow[]): Rollup[] {
       tokensOut: 0,
       tokensThinking: 0,
       characters: 0,
+      credits: 0,
+      hasCredits: false,
+      missingCredits: 0,
       usd: 0,
     };
     g.calls++;
@@ -77,6 +87,13 @@ function rollUp(rows: CallRow[]): Rollup[] {
     g.tokensOut += r.tokens_out ?? 0;
     g.tokensThinking += r.tokens_thinking ?? 0;
     g.characters += r.characters ?? 0;
+    if (r.credits != null) {
+      g.credits += Number(r.credits);
+      g.hasCredits = true;
+    }
+    if (r.provider === "elevenlabs" && r.ok === true && r.credits == null) {
+      g.missingCredits++;
+    }
     g.usd += Number(r.usd_est ?? 0);
     groups.set(key, g);
   }
@@ -86,6 +103,12 @@ function rollUp(rows: CallRow[]): Rollup[] {
 }
 
 const num = (n: number) => n.toLocaleString("en-US");
+const creditsLabel = (credits: number, hasCredits: boolean, missing: number) =>
+  missing > 0
+    ? `${num(credits)} (partial; ${num(missing)} ${missing === 1 ? "call" : "calls"} missing credits)`
+    : hasCredits
+      ? num(credits)
+      : "n/a";
 const usd = (n: number) => `$${n.toFixed(n > 0 && n < 0.01 ? 5 : 2)}`;
 
 export default async function IssueCostPage({ params }: Params) {
@@ -102,6 +125,9 @@ export default async function IssueCostPage({ params }: Params) {
   const groups = rollUp(await loadCalls(bookId, issueId));
   const total = groups.reduce((s, g) => s + g.usd, 0);
   const totalCalls = groups.reduce((s, g) => s + g.calls, 0);
+  const totalCredits = groups.reduce((s, g) => s + g.credits, 0);
+  const missingCredits = groups.reduce((s, g) => s + g.missingCredits, 0);
+  const anyCredits = groups.some((g) => g.hasCredits);
 
   const cell = "px-4 py-2 text-neutral-300";
   const numCell = `${cell} text-right tabular-nums`;
@@ -124,8 +150,10 @@ export default async function IssueCostPage({ params }: Params) {
         <h1 className="mb-2 text-2xl font-semibold">Cost</h1>
         <p className="mb-6 text-sm text-neutral-400">
           {issue.number}. {issue.name}. Recorded Gemini and ElevenLabs calls by
-          step and model. Dollar figures are estimates from the rates in the
-          code, not the invoice.
+          step and model. Credits are what ElevenLabs charges on its
+          subscription, read from the response charge or estimated from
+          characters and a per-model rate. Dollar figures are estimates from the
+          rates in the code, not the invoice.
         </p>
 
         <div className="mb-6 rounded-lg border border-neutral-800 bg-neutral-900/60 px-4 py-3 text-sm">
@@ -134,6 +162,12 @@ export default async function IssueCostPage({ params }: Params) {
               <span className="text-neutral-500">Issue total </span>
               {usd(total)}
             </span>
+            {anyCredits || missingCredits > 0 ? (
+              <span>
+                <span className="text-neutral-500">Credits </span>
+                {creditsLabel(totalCredits, anyCredits, missingCredits)}
+              </span>
+            ) : null}
             <span>
               <span className="text-neutral-500">Calls </span>
               {num(totalCalls)}
@@ -153,13 +187,14 @@ export default async function IssueCostPage({ params }: Params) {
                 <th className="px-4 py-2 text-right font-medium">Tokens out</th>
                 <th className="px-4 py-2 text-right font-medium">Thinking</th>
                 <th className="px-4 py-2 text-right font-medium">Characters</th>
+                <th className="px-4 py-2 text-right font-medium">Credits</th>
                 <th className="px-4 py-2 text-right font-medium">Est. $</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-800 text-sm">
               {groups.length === 0 ? (
                 <tr>
-                  <td className={cell} colSpan={9}>
+                  <td className={cell} colSpan={10}>
                     0 calls
                   </td>
                 </tr>
@@ -174,6 +209,9 @@ export default async function IssueCostPage({ params }: Params) {
                     <td className={numCell}>{num(g.tokensOut)}</td>
                     <td className={numCell}>{num(g.tokensThinking)}</td>
                     <td className={numCell}>{num(g.characters)}</td>
+                    <td className={numCell}>
+                      {creditsLabel(g.credits, g.hasCredits, g.missingCredits)}
+                    </td>
                     <td className={numCell}>{usd(g.usd)}</td>
                   </tr>
                 ))
@@ -186,6 +224,9 @@ export default async function IssueCostPage({ params }: Params) {
                 </td>
                 <td className={numCell}>{num(totalCalls)}</td>
                 <td className={numCell} colSpan={5} />
+                <td className={numCell}>
+                  {creditsLabel(totalCredits, anyCredits, missingCredits)}
+                </td>
                 <td className={numCell}>{usd(total)}</td>
               </tr>
             </tfoot>
