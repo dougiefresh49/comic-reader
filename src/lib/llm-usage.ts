@@ -263,8 +263,9 @@ export function elevenLabsUsageToRow<T>(
   const row = baseRow("elevenlabs", meta.model ?? null, meta);
   row.characters = characters;
   row.credits = creditsFor(headers, characters, meta.model ?? null);
-  if (characters !== null) {
-    row.usd_est = round5(characters * ELEVENLABS_USD_PER_CHARACTER);
+  const billedCharacters = row.credits ?? characters;
+  if (billedCharacters !== null) {
+    row.usd_est = round5(billedCharacters * ELEVENLABS_USD_PER_CHARACTER);
   }
   return row;
 }
