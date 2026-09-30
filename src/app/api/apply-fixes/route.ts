@@ -41,6 +41,7 @@ type FixEntry =
         emotion?: string;
         type?: string;
         textWithCues?: string;
+        panelId?: string | null;
       };
     }
   | {
@@ -99,6 +100,50 @@ function pageNumFromIndex(idx: number): number {
   return idx;
 }
 
+/**
+ * Every added bubble must name a panel on its own page, unless that page has
+ * no panels. Runs before any write, since a 200 makes the editor drop its
+ * local edits and a refused bubble would vanish with them.
+ */
+async function findPanelProblems(
+  bookId: string,
+  issueId: string,
+  fixes: FixEntry[],
+): Promise<string[]> {
+  const panelIdsByPage = new Map<number, Set<string>>();
+  const problems: string[] = [];
+  for (const fix of fixes) {
+    if (fix.action !== "add") continue;
+    const pageNum = pageNumFromIndex(fix.pageIndex);
+    let panelIds = panelIdsByPage.get(pageNum);
+    if (!panelIds) {
+      const { data, error } = await supabaseAdmin
+        .from("panels")
+        .select("id")
+        .eq("book_id", bookId)
+        .eq("issue_id", issueId)
+        .eq("page_number", pageNum);
+      if (error) {
+        problems.push(`add:${fix.bubbleId} (panels read: ${error.message})`);
+        continue;
+      }
+      panelIds = new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
+      panelIdsByPage.set(pageNum, panelIds);
+    }
+    const { panelId } = fix.data;
+    if (panelId) {
+      if (!panelIds.has(panelId)) {
+        problems.push(
+          `add:${fix.bubbleId} (panel ${panelId} is not on page ${pageNum})`,
+        );
+      }
+    } else if (panelIds.size > 0) {
+      problems.push(`add:${fix.bubbleId} (no panel picked on page ${pageNum})`);
+    }
+  }
+  return problems;
+}
+
 export async function POST(req: NextRequest) {
   const auth = checkAdminAuth(req.headers.get("authorization"));
   if (!auth.ok) return adminAuthFailure(auth);
@@ -113,6 +158,14 @@ export async function POST(req: NextRequest) {
   const { bookId, issueId, fixes } = payload;
   if (!bookId || !issueId || !Array.isArray(fixes)) {
     return Response.json({ error: "Invalid fixes payload" }, { status: 400 });
+  }
+
+  const panelProblems = await findPanelProblems(bookId, issueId, fixes);
+  if (panelProblems.length > 0) {
+    return Response.json(
+      { error: "Added bubble panel check failed", skipped: panelProblems },
+      { status: 400 },
+    );
   }
 
   const results = {
@@ -211,6 +264,7 @@ export async function POST(req: NextRequest) {
           needs_ocr: !hasText,
           style: bounds ? boundsToStyle(bounds) : null,
           box_2d: null,
+          panel_id: rest.panelId ?? null,
         };
         const { data: ins, error } = await supabaseAdmin
           .from("bubbles")

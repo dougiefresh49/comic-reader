@@ -17,6 +17,8 @@ export type EditChanges = Partial<
   >
 > & {
   bounds?: BubbleBounds;
+  /** `panels.id` picked in the editor. Only bubbles added in the editor carry it. */
+  panelId?: string | null;
 };
 
 export type ReviewEdit = {
@@ -29,6 +31,7 @@ export type ReviewEdit = {
 
 export type LocalBubble = Bubble & {
   _status?: "modified" | "deleted" | "new" | "redo";
+  panelId?: string | null;
 };
 
 const DB_NAME = "comic-review-db";
@@ -89,7 +92,8 @@ export function mergeEdits(
           height: `${(bounds.height * 100).toFixed(2)}%`,
         };
       }
-      if (current._status !== "redo") updated._status = "modified";
+      if (current._status !== "redo" && current._status !== "new")
+        updated._status = "modified";
       map.set(edit.bubbleId, updated);
     } else if (edit.action === "delete") {
       const current = map.get(edit.bubbleId);
@@ -113,6 +117,7 @@ export function mergeEdits(
         emotion: rest.emotion ?? "",
         textWithCues: rest.textWithCues,
         style,
+        panelId: rest.panelId ?? null,
         _status: "new",
       });
     }

@@ -17,21 +17,23 @@ import {
 import { BubbleOverlay } from "./BubbleOverlay";
 import { BubbleSidebar } from "./BubbleSidebar";
 import { DrawMode } from "./DrawMode";
+import { PanelOutlines, panelAtCenter, type ReviewPanel } from "./PanelPicker";
 
 interface ReviewLayoutProps {
   bookId: string;
   issueId: string;
   issueData: IssueManifest;
   allBubbles: Record<string, Bubble[]>;
+  panelsByPage: Record<number, ReviewPanel[]>;
   characters: string[];
   initialPage: number;
   mode?: string;
 }
 
-let newBubbleCounter = 0;
+// The save stores this as legacy_id, unique per (book, issue), and saved
+// edits outlive a reload, so an id must never repeat.
 function nextTempId() {
-  newBubbleCounter += 1;
-  return `new-${String(newBubbleCounter).padStart(3, "0")}`;
+  return `new-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function pageKey(pageNum: number) {
@@ -43,6 +45,7 @@ export function ReviewLayout({
   issueId,
   issueData,
   allBubbles,
+  panelsByPage,
   characters,
   initialPage,
   mode,
@@ -75,6 +78,10 @@ export function ReviewLayout({
   const originalBubbles = useMemo(
     () => allBubbles[pageKey(currentPage)] ?? [],
     [allBubbles, currentPage],
+  );
+  const pagePanels = useMemo(
+    () => panelsByPage[currentPage] ?? [],
+    [panelsByPage, currentPage],
   );
 
   const localBubbles: LocalBubble[] = useMemo(() => {
@@ -225,6 +232,7 @@ export function ReviewLayout({
           speaker: null,
           emotion: "",
           ocr_text: "",
+          panelId: panelAtCenter(pagePanels, bounds),
         },
         pageIndex: currentPage,
         timestamp: Date.now(),
@@ -232,7 +240,7 @@ export function ReviewLayout({
       setDrawMode(false);
       setSelectedId(tempId);
     },
-    [applyEdit, currentPage],
+    [applyEdit, currentPage, pagePanels],
   );
 
   const handleSetPageOrder = useCallback(
@@ -255,6 +263,24 @@ export function ReviewLayout({
   const handleApplyToDb = useCallback(async () => {
     const json = buildFixesJson(bookId, issueId, edits, pageOrder, allBubbles);
     if (!json.fixes.length) return;
+    const unpicked = json.fixes.filter(
+      (f): f is Extract<typeof f, { action: "add" }> =>
+        f.action === "add" &&
+        !f.data.panelId &&
+        (panelsByPage[f.pageIndex]?.length ?? 0) > 0,
+    );
+    const firstUnpicked = unpicked[0];
+    if (firstUnpicked) {
+      setCurrentPage(firstUnpicked.pageIndex);
+      setSelectedId(firstUnpicked.bubbleId);
+      setApplyState("error");
+      setApplyMessage(
+        unpicked.length === 1
+          ? `Pick a panel for the new bubble on page ${firstUnpicked.pageIndex}`
+          : `Pick a panel for ${unpicked.length} new bubbles, starting on page ${firstUnpicked.pageIndex}`,
+      );
+      return;
+    }
     setApplyState("applying");
     setApplyMessage(null);
     try {
@@ -289,7 +315,7 @@ export function ReviewLayout({
       setApplyState("error");
       setApplyMessage((e as Error).message);
     }
-  }, [bookId, issueId, edits, pageOrder, allBubbles, clearAll]);
+  }, [bookId, issueId, edits, pageOrder, allBubbles, panelsByPage, clearAll]);
 
   const handleExport = useCallback(() => {
     const json = buildFixesJson(bookId, issueId, edits, pageOrder, allBubbles);
@@ -414,6 +440,13 @@ export function ReviewLayout({
               priority
             />
 
+            {selectedBubble?._status === "new" && pagePanels.length > 0 && (
+              <PanelOutlines
+                panels={pagePanels}
+                pickedId={selectedBubble.panelId ?? null}
+              />
+            )}
+
             <BubbleOverlay
               bubbles={localBubbles}
               selectedBubbleId={selectedId}
@@ -437,6 +470,7 @@ export function ReviewLayout({
           <BubbleSidebar
             bubble={selectedBubble}
             bubbles={localBubbles}
+            panels={pagePanels}
             characters={characters}
             redoSet={redoSet}
             selectedId={selectedId}

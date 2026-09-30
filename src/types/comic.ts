@@ -9,7 +9,6 @@ export interface Bubble {
     y?: number;
     width?: number;
     height?: number;
-    index?: number;
   };
   ocr_text: string;
   type: "SPEECH" | "NARRATION" | "CAPTION" | "SFX" | "BACKGROUND";
