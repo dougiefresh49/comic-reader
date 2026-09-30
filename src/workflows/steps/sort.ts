@@ -126,6 +126,56 @@ function extractJsonObject(text: string): string {
   return objectMatch?.[0] ?? jsonText;
 }
 
+/**
+ * Short per-page handles (`p1`, `b1`, ...) keyed by row UUID. The prompt names
+ * rows by handle, because a model copying 36-character UUIDs back drops a
+ * character now and then and the step fails (#307).
+ */
+export interface PageHandles {
+  panel: Map<string, string>;
+  bubble: Map<string, string>;
+}
+
+export function pageHandles(
+  panels: SortPanelRow[],
+  bubbles: SortBubbleRow[],
+): PageHandles {
+  return {
+    panel: new Map(panels.map((p, i) => [p.id, `p${i + 1}`])),
+    bubble: new Map(bubbles.map((b, i) => [b.id, `b${i + 1}`])),
+  };
+}
+
+/** Maps the response's handles back to UUIDs; an unknown handle throws. */
+export function planWithIds(
+  plan: GeminiSortResponse,
+  handles: PageHandles,
+): GeminiSortResponse {
+  const reverse = (m: Map<string, string>) =>
+    new Map([...m].map(([id, handle]) => [handle, id]));
+  const panelIds = reverse(handles.panel);
+  const bubbleIds = reverse(handles.bubble);
+  return {
+    panels: plan.panels.map((entry) => {
+      const panelId = panelIds.get(entry.panelId);
+      if (!panelId) {
+        throw new Error(`Unknown panelId in response: ${entry.panelId}`);
+      }
+      return {
+        ...entry,
+        panelId,
+        bubbles: (entry.bubbles ?? []).map((b) => {
+          const bubbleId = bubbleIds.get(b.bubbleId);
+          if (!bubbleId) {
+            throw new Error(`Unknown bubbleId in response: ${b.bubbleId}`);
+          }
+          return { ...b, bubbleId };
+        }),
+      };
+    }),
+  };
+}
+
 function bubbleSnippet(b: SortBubbleRow): string {
   const t = (b.text_with_cues ?? b.ocr_text ?? "").trim();
   return t.length > 120 ? `${t.slice(0, 117)}...` : t;
@@ -135,6 +185,7 @@ function bubbleLayoutLine(
   b: SortBubbleRow,
   imgW: number,
   imgH: number,
+  handles: PageHandles,
 ): string {
   let x = b.box_2d?.x ?? 0;
   let y = b.box_2d?.y ?? 0;
@@ -159,33 +210,30 @@ function bubbleLayoutLine(
   const ny = imgH > 0 ? y / imgH : 0;
   const nw = imgW > 0 ? w / imgW : 0;
   const nh = imgH > 0 ? h / imgH : 0;
-  const panelHint = b.panel_id ?? "none";
-  return `- bubbleId: ${b.id}\n  assigned_panel_uuid: ${panelHint}\n  bbox_normalized: x=${nx.toFixed(4)}, y=${ny.toFixed(4)}, w=${nw.toFixed(4)}, h=${nh.toFixed(4)}\n  text: "${bubbleSnippet(b).replace(/"/g, '\\"')}"\n  ignored: ${b.ignored}`;
+  const panelHint =
+    (b.panel_id ? handles.panel.get(b.panel_id) : undefined) ?? "none";
+  return `- bubbleId: ${handles.bubble.get(b.id)}\n  assigned_panelId: ${panelHint}\n  bbox_normalized: x=${nx.toFixed(4)}, y=${ny.toFixed(4)}, w=${nw.toFixed(4)}, h=${nh.toFixed(4)}\n  text: "${bubbleSnippet(b).replace(/"/g, '\\"')}"\n  ignored: ${b.ignored}`;
 }
 
-/**
- * The paid call only. The caller reads `.text` (an SDK getter that can throw)
- * and parses it inside its fail-fast block.
- */
-async function getSortPlanResponseFromGemini(
-  gemini: GoogleGenAI,
-  pageImage: Buffer,
+export function sortPrompt(
   imgW: number,
   imgH: number,
   panels: SortPanelRow[],
   bubbles: SortBubbleRow[],
-  llmMeta: LlmCallMeta,
-): Promise<GenerateContentResponse> {
+  handles: PageHandles,
+): string {
   const panelLines = panels
     .map((p) => {
       const bb = p.bounding_box;
-      return `- panelId (uuid): ${p.id}\n  human_panel_id: ${p.panel_id}\n  current_sort_order: ${p.sort_order}\n  bbox_normalized: x=${bb.x}, y=${bb.y}, w=${bb.w}, h=${bb.h}`;
+      return `- panelId: ${handles.panel.get(p.id)}\n  current_sort_order: ${p.sort_order}\n  bbox_normalized: x=${bb.x}, y=${bb.y}, w=${bb.w}, h=${bb.h}`;
     })
     .join("\n");
 
-  const bubbleLines = bubbles.map((b) => bubbleLayoutLine(b, imgW, imgH));
+  const bubbleLines = bubbles.map((b) =>
+    bubbleLayoutLine(b, imgW, imgH, handles),
+  );
 
-  const prompt = `You are analyzing a comic book page image.
+  return `You are analyzing a comic book page image.
 
 **Task:** Determine:
 1. The correct READING ORDER of **panels** on this page (Western comics: mostly top-to-bottom rows, left-to-right within a row; manga may use right-to-left columns — follow what the layout implies).
@@ -198,8 +246,9 @@ ${panelLines || "(no panels)"}
 ${bubbleLines.join("\n") || "(no bubbles)"}
 
 **Rules:**
-- Use each panel's **panelId** exactly as given — it is the database UUID string.
-- Use each bubble's **bubbleId** exactly as given — it is the database UUID string.
+- Use each panel's **panelId** exactly as given. It is a short handle such as \`p1\`.
+- Use each bubble's **bubbleId** exactly as given. It is a short handle such as \`b1\`.
+- The handle numbers (\`p1\`, \`b3\`) are labels only and say nothing about reading order. Take the order from the image and the bboxes.
 - Include EVERY panel id exactly once in your output.
 - Include EVERY bubble id exactly once inside the \`bubbles\` array of exactly one panel (the panel where the bubble visually belongs). If unsure, pick the panel whose bbox contains the bubble center.
 - Bubbles with ignored=true should still be listed in reading order (they remain in the narrative layout).
@@ -208,10 +257,10 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
 {
   "panels": [
     {
-      "panelId": "<panel uuid>",
+      "panelId": "<panelId>",
       "sortOrder": 0,
       "bubbles": [
-        { "bubbleId": "<bubble uuid>", "sortOrder": 0 }
+        { "bubbleId": "<bubbleId>", "sortOrder": 0 }
       ]
     }
   ]
@@ -220,7 +269,18 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
 - \`panels[].sortOrder\`: 0-based order for panels across the page.
 - \`bubbles[].sortOrder\`: 0-based order within that panel only.
 `;
+}
 
+/**
+ * The paid call only. The caller reads `.text` (an SDK getter that can throw)
+ * and parses it inside its fail-fast block.
+ */
+async function getSortPlanResponseFromGemini(
+  gemini: GoogleGenAI,
+  pageImage: Buffer,
+  prompt: string,
+  llmMeta: LlmCallMeta,
+): Promise<GenerateContentResponse> {
   const imagePart = createPartFromBase64(
     pageImage.toString("base64"),
     "image/webp",
@@ -362,7 +422,9 @@ export async function sortPageElements(
     .select("id, panel_id, page_number, sort_order, bounding_box")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .eq("page_number", pageNumber);
+    .eq("page_number", pageNumber)
+    .order("sort_order")
+    .order("id");
 
   if (pErr) throw dbError("panels", pErr);
 
@@ -373,7 +435,9 @@ export async function sortPageElements(
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .eq("page_number", pageNumber);
+    .eq("page_number", pageNumber)
+    .order("sort_order")
+    .order("id");
 
   if (bErr) throw dbError("bubbles", bErr);
 
@@ -408,13 +472,11 @@ export async function sortPageElements(
     return;
   }
 
+  const handles = pageHandles(panels, bubbles);
   const response = await getSortPlanResponseFromGemini(
     gemini,
     pageImage,
-    imgW,
-    imgH,
-    panels,
-    bubbles,
+    sortPrompt(imgW, imgH, panels, bubbles, handles),
     { step: "sort-page-elements", bookId, issueId, pageNumber },
   );
 
@@ -430,7 +492,7 @@ export async function sortPageElements(
     const { panelOrders, bubbleGlobalOrder } = validateAndFlattenOrders(
       panels,
       bubbles,
-      plan,
+      planWithIds(plan, handles),
     );
 
     await writeAfterPaidCall("panels/bubbles", [
