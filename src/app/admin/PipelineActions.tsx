@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
 
@@ -85,6 +85,89 @@ function nextStepAfter(pausedAt: string | null): string | null {
   return STEP_ORDER[idx + 1] ?? pausedAt;
 }
 
+export interface TriggerRefusal {
+  error: string;
+  runId?: string;
+}
+
+/** Reads a non-OK trigger-ingest response. A 409 names the live run that blocked it. */
+export async function readTriggerRefusal(
+  res: Response,
+): Promise<TriggerRefusal> {
+  const fallback = `Failed to start (HTTP ${res.status})`;
+  try {
+    const data = (await res.json()) as { error?: string; runId?: string };
+    return {
+      error: data.error ?? fallback,
+      runId: res.status === 409 ? data.runId : undefined,
+    };
+  } catch {
+    return { error: fallback };
+  }
+}
+
+export function TriggerRefusalNotice({
+  bookId,
+  issueId,
+  refusal,
+  onCancelled,
+  onCancellingChange,
+}: {
+  bookId: string;
+  issueId: string;
+  refusal: TriggerRefusal;
+  onCancelled: () => void;
+  /** Callers disable their trigger buttons while a cancel is in flight. */
+  onCancellingChange: (cancelling: boolean) => void;
+}) {
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCancel() {
+    setCancelling(true);
+    onCancellingChange(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/cancel-ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookId, issueId, runId: refusal.runId }),
+      });
+      if (res.ok) {
+        onCancelled();
+        return;
+      }
+      let message = "Failed to cancel";
+      try {
+        const data = (await res.json()) as { error?: string };
+        if (data.error) message = data.error;
+      } catch {
+        /* keep default */
+      }
+      setError(message);
+    } finally {
+      setCancelling(false);
+      onCancellingChange(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      <span className="max-w-xs text-xs text-red-400">{refusal.error}</span>
+      {refusal.runId && (
+        <button
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="rounded bg-red-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+        >
+          {cancelling ? "..." : `Cancel run ${refusal.runId}`}
+        </button>
+      )}
+      {error && <span className="max-w-xs text-xs text-red-400">{error}</span>}
+    </span>
+  );
+}
+
 export function PipelineActions({
   bookId,
   issueId,
@@ -98,7 +181,10 @@ export function PipelineActions({
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
   const [triggered, setTriggered] = useState(false);
+  const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
+  const busy = loading || cancelling;
 
   const isFailed = pipelineStep?.startsWith("failed:") ?? false;
   const failedStep = isFailed
@@ -119,17 +205,42 @@ export function PipelineActions({
 
   async function handleTrigger(fromStep?: string) {
     setLoading(true);
+    setRefusal(null);
     try {
       const res = await fetch("/api/admin/trigger-ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookId, issueId, fromStep }),
       });
-      if (res.ok) setTriggered(true);
+      if (res.ok) {
+        setTriggered(true);
+      } else {
+        setRefusal(await readTriggerRefusal(res));
+      }
     } finally {
       setLoading(false);
     }
   }
+
+  // The wrapper renders unconditionally so `actions` keeps its tree position
+  // and PausedActions' local state survives a refusal appearing.
+  const withRefusal = (actions: ReactNode) => (
+    <span className="inline-flex flex-col items-start gap-1">
+      {actions}
+      {refusal && (
+        <TriggerRefusalNotice
+          bookId={bookId}
+          issueId={issueId}
+          refusal={refusal}
+          onCancelled={() => {
+            setRefusal(null);
+            router.refresh();
+          }}
+          onCancellingChange={setCancelling}
+        />
+      )}
+    </span>
+  );
 
   if (triggered) {
     return (
@@ -140,39 +251,39 @@ export function PipelineActions({
   }
 
   if (canStart) {
-    return (
+    return withRefusal(
       <button
         onClick={() => handleTrigger()}
-        disabled={loading}
+        disabled={busy}
         className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
       >
         {loading ? "..." : "Start Pipeline"}
-      </button>
+      </button>,
     );
   }
 
   if (isFailed && failedStep) {
-    return (
+    return withRefusal(
       <FailedActions
         failedStep={failedStep}
-        loading={loading}
+        loading={busy}
         onTrigger={handleTrigger}
-      />
+      />,
     );
   }
 
   if (isPaused) {
-    return (
+    return withRefusal(
       <PausedActions
         bookId={bookId}
         issueId={issueId}
         pipelinePausedAt={pipelinePausedAt}
         pipelinePausedUrl={pipelinePausedUrl}
         status={status}
-        triggerLoading={loading}
+        triggerLoading={busy}
         onTrigger={handleTrigger}
         onSettled={() => router.refresh()}
-      />
+      />,
     );
   }
 
