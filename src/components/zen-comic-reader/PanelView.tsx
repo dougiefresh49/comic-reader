@@ -47,23 +47,18 @@ function DimRects({
   y,
   w,
   h,
-  bleed = "0px",
 }: {
   x: string;
   y: string;
   w: string;
   h: string;
-  bleed?: string;
 }) {
   return (
     <>
       <div
         className={`pointer-events-auto absolute inset-x-0 top-0 ${PANEL_DIM_CLASS}`}
         style={{
-          top: `calc(0px - ${bleed})`,
-          left: `calc(0px - ${bleed})`,
-          right: `calc(0px - ${bleed})`,
-          height: `calc(${y} + ${bleed})`,
+          height: y,
         }}
         aria-hidden
       />
@@ -71,9 +66,6 @@ function DimRects({
         className={`pointer-events-auto absolute inset-x-0 bottom-0 ${PANEL_DIM_CLASS}`}
         style={{
           top: `calc(${y} + ${h})`,
-          left: `calc(0px - ${bleed})`,
-          right: `calc(0px - ${bleed})`,
-          bottom: `calc(0px - ${bleed})`,
         }}
         aria-hidden
       />
@@ -81,8 +73,7 @@ function DimRects({
         className={`pointer-events-auto absolute left-0 ${PANEL_DIM_CLASS}`}
         style={{
           top: y,
-          left: `calc(0px - ${bleed})`,
-          width: `calc(${x} + ${bleed})`,
+          width: x,
           height: h,
         }}
         aria-hidden
@@ -92,7 +83,6 @@ function DimRects({
         style={{
           top: y,
           left: `calc(${x} + ${w})`,
-          right: `calc(0px - ${bleed})`,
           height: h,
         }}
         aria-hidden
@@ -156,7 +146,6 @@ export function PanelViewFrame({
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<HTMLDivElement | null>(null);
-  const cameraEffectRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 1, h: 1 });
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const springRef = useRef<SpringState | null>(null);
@@ -183,19 +172,6 @@ export function PanelViewFrame({
     [containerSize, pageSize],
   );
 
-  // Re-keyed on panel.id so the selected camera animation restarts.
-  // Peak scales match the corresponding keyframes in globals.css.
-  const cameraEffect =
-    !panelViewMode || reducedMotion || !activePanel
-      ? { className: "", peakScale: 1 }
-      : cameraEffectFromTags(activePanel.effectTags);
-  const scaleCap = maxPanelScale(
-    imageRect.w,
-    pageSize.w,
-    devicePixelRatio,
-    cameraEffect.peakScale,
-  );
-
   const getTarget = useCallback((): PanelTransformResult => {
     if (
       !panelViewMode ||
@@ -210,39 +186,44 @@ export function PanelViewFrame({
       containerSize,
       imageRect,
       PANEL_VIEW_MARGIN,
-      scaleCap,
+      maxPanelScale(imageRect.w, pageSize.w, devicePixelRatio),
     );
-  }, [panelViewMode, focusRect, containerSize, imageRect, scaleCap]);
+  }, [
+    panelViewMode,
+    focusRect,
+    containerSize,
+    imageRect,
+    pageSize.w,
+    devicePixelRatio,
+  ]);
 
   const applyTransform = useCallback(
     (t: PanelTransformResult) => {
       const el = transformRef.current;
       if (!el) return;
-      // Scale and translation move together toward the capped target.
-      const scale = t.scale;
-      el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${scale})`;
+      el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.scale})`;
       el.style.transformOrigin = "0 0";
 
-      // Let the spring reach the new effect's headroom before starting it.
-      // Until then, the previous panel's scale is safe without the effect.
-      const effectEl = cameraEffectRef.current;
-      if (effectEl) {
-        const className = `relative h-full w-full ${scale <= scaleCap ? cameraEffect.className : ""}`;
-        if (effectEl.className !== className) effectEl.className = className;
-      }
-
-      // Cover the inverse spring viewport, plus one frame for camera motion.
-      // Pan is at most 2% of the frame; the largest shake offset is 12px.
       const viewport = viewportRef.current;
-      if (!viewport) return;
-      const frameExtent = Math.max(containerSize.w, containerSize.h);
-      const bleed =
-        (frameExtent + Math.max(Math.abs(t.tx), Math.abs(t.ty))) / scale +
-        frameExtent +
-        12;
-      viewport.style.setProperty("--mask-bleed", `${bleed}px`);
+      if (!viewport || !focusRect) return;
+      viewport.style.setProperty(
+        "--focus-x",
+        `${t.tx + (imageRect.x + focusRect.x * imageRect.w) * t.scale}px`,
+      );
+      viewport.style.setProperty(
+        "--focus-y",
+        `${t.ty + (imageRect.y + focusRect.y * imageRect.h) * t.scale}px`,
+      );
+      viewport.style.setProperty(
+        "--focus-w",
+        `${focusRect.w * imageRect.w * t.scale}px`,
+      );
+      viewport.style.setProperty(
+        "--focus-h",
+        `${focusRect.h * imageRect.h * t.scale}px`,
+      );
     },
-    [scaleCap, cameraEffect.className, containerSize],
+    [focusRect, imageRect],
   );
 
   useLayoutEffect(() => {
@@ -264,7 +245,7 @@ export function PanelViewFrame({
     springRef.current.vTx = 0;
     springRef.current.vTy = 0;
     springRef.current.vScale = 0;
-    // Keep the current spring position and update effect readiness before paint.
+    // Reproject the current focus rect before paint when the page plane resizes.
     applyTransform(springRef.current);
 
     cancelAnimationFrame(rafRef.current);
@@ -291,95 +272,32 @@ export function PanelViewFrame({
       className={`relative overflow-hidden select-none ${frameSizeClass}`}
     >
       <div ref={transformRef} className="relative h-full w-full">
+        {/* Page plane: sized to the page's own aspect so object-contain
+            never letterboxes and every page-% overlay in `children`
+            lands on the art. Full frame until the natural size loads. */}
         <div
-          key={activePanel?.id ?? "no-panel"}
-          ref={cameraEffectRef}
-          className="relative h-full w-full"
-          style={{ transformOrigin: "center center" }}
+          data-page-plane
+          className="absolute"
+          style={{
+            left: imageRect.x,
+            top: imageRect.y,
+            width: imageRect.w,
+            height: imageRect.h,
+          }}
         >
-          {/* Page plane: sized to the page's own aspect so object-contain
-              never letterboxes and every page-% overlay in `children`
-              lands on the art. Full frame until the natural size loads. */}
-          <div
-            data-page-plane
-            className="absolute"
-            style={{
-              left: imageRect.x,
-              top: imageRect.y,
-              width: imageRect.w,
-              height: imageRect.h,
-            }}
-          >
-            {children}
-          </div>
-          {dimOutsideFocus && panelViewMode && focusRect ? (
-            <DimRects
-              x={`${imageRect.x + focusRect.x * imageRect.w}px`}
-              y={`${imageRect.y + focusRect.y * imageRect.h}px`}
-              w={`${focusRect.w * imageRect.w}px`}
-              h={`${focusRect.h * imageRect.h}px`}
-              bleed="var(--mask-bleed, 0px)"
-            />
-          ) : null}
+          {children}
         </div>
       </div>
+      {dimOutsideFocus && panelViewMode && focusRect ? (
+        <DimRects
+          x="var(--focus-x, 0px)"
+          y="var(--focus-y, 0px)"
+          w="var(--focus-w, 0px)"
+          h="var(--focus-h, 0px)"
+        />
+      ) : null}
     </div>
   );
-}
-
-/**
- * Map active panel effect tags to a camera-effect className. Tags
- * compose: a panel can both push-in AND shake. Tailwind's
- * `animate-[name_dur_easing_count_fill]` arbitrary-value syntax
- * references keyframes defined in globals.css.
- *
- * Multiple animations on a single element merge into one
- * `animation` shorthand list, which works here because each
- * keyframe sets a single transform-prop slice (scale OR translate)
- * — the browser composes them via the `animation-composition` default
- * (`replace`) and we get the last-set value. For simple single-
- * effect panels (the common case) this is fine.
- *
- * If a panel mixes scale + shake we'd want a layered structure, but
- * since panel-direction usually picks one camera tag per panel
- * (Gemini ranks them) we accept the simpler model for v1.
- */
-function cameraEffectFromTags(tags: string[]): {
-  className: string;
-  peakScale: number;
-} {
-  const classes: string[] = [];
-  let peakScale = 1;
-  // Pick the first matching scale/pan tag; pick the first matching shake.
-  for (const tag of tags) {
-    switch (tag) {
-      case "camera_push_in_slow":
-        classes.push("animate-[cameraPushInSlow_6s_ease-out_forwards]");
-        peakScale = 1.06;
-        break;
-      case "camera_push_in_fast":
-        classes.push("animate-[cameraPushInFast_0.6s_ease-out_forwards]");
-        peakScale = 1.15;
-        break;
-      case "camera_pull_back":
-        classes.push("animate-[cameraPullBack_5s_ease-out_forwards]");
-        peakScale = 1.04;
-        break;
-      case "camera_pan_horizontal":
-        classes.push(
-          "animate-[cameraPanHorizontal_8s_ease-in-out_infinite_alternate]",
-        );
-        break;
-      case "panel_shake_subtle":
-        classes.push("animate-[panelShakeSubtle_0.4s_steps(8)_1]");
-        break;
-      case "panel_shake_hard":
-        classes.push("animate-[panelShakeHard_0.6s_steps(12)_1]");
-        break;
-    }
-    if (classes.length > 0) break; // only one camera tag per panel
-  }
-  return { className: classes.join(" "), peakScale };
 }
 
 interface PanelViewHudProps {

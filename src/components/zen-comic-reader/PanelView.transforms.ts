@@ -3,7 +3,7 @@ import type { PanelBoundingBox } from "~/types/panels";
 export const PANEL_VIEW_TRANSITION_MS = 380;
 export const PANEL_VIEW_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 export const PANEL_VIEW_MARGIN = 0.02;
-/** Most device pixels one source pixel of the page may span in panel view. */
+/** Most device pixels one source pixel may span at the resting panel scale. */
 export const PANEL_MAX_UPSCALE = 2;
 
 const SPRING_STIFFNESS = 170;
@@ -165,24 +165,20 @@ export function renderedImageRect(
 }
 
 /**
- * Largest camera scale at which one source pixel spans at most
+ * Largest resting scale at which one source pixel spans at most
  * `PANEL_MAX_UPSCALE` device pixels. `renderedW` is the page plane's CSS
- * width at scale 1. Reserve room for the active effect's peak scale.
+ * width at scale 1. Spring transitions may temporarily exceed this cap.
  * Unbounded until the page's natural width is known.
  */
 export function maxPanelScale(
   renderedW: number,
   naturalW: number,
   devicePixelRatio: number,
-  cameraPeakScale = 1,
 ): number {
   if (renderedW <= 0 || naturalW <= 0 || devicePixelRatio <= 0) {
     return Infinity;
   }
-  return (
-    (PANEL_MAX_UPSCALE * naturalW) /
-    (renderedW * devicePixelRatio * cameraPeakScale)
-  );
+  return (PANEL_MAX_UPSCALE * naturalW) / (renderedW * devicePixelRatio);
 }
 
 /**
