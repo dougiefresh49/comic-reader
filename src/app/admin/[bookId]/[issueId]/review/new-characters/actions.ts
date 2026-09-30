@@ -62,7 +62,10 @@ export async function aliasNewCharacter(args: {
     `/admin/${args.bookId}/${args.issueId}/review/new-characters`,
     "page",
   );
-  revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
+  revalidatePath(
+    `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
+    "page",
+  );
   revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
 
   return { ok: true as const, bubblesUpdated: updated };

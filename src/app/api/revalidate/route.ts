@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     issueId: string;
   };
   revalidatePath(`/book/${bookId}/${issueId}`, "page");
-  revalidatePath(`/book/${bookId}/${issueId}/review`, "page");
+  revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/book/${bookId}`, "page");
   revalidatePath("/", "page");
   return Response.json({ revalidated: true, bookId, issueId });

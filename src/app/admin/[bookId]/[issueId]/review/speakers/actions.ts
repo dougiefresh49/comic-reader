@@ -112,7 +112,7 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
   }).eq("pipeline_paused_at", "review-speakers");
 
   revalidatePath(`/book/${bookId}/${issueId}`, "page");
-  revalidatePath(`/book/${bookId}/${issueId}/review`, "page");
+  revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/admin/${bookId}/${issueId}/review/speakers`, "page");
   revalidatePath("/admin", "page");
 

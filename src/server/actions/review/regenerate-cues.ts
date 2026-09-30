@@ -90,7 +90,10 @@ export async function regenerateCues(args: Args) {
       : query.eq("legacy_id", args.bubbleId));
     if (error) return { ok: false, error: error.message };
 
-    revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
+    revalidatePath(
+      `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
+      "page",
+    );
     return { ok: true, textWithCues: formatted };
   } catch (e) {
     return { ok: false, error: (e as Error).message };

@@ -256,7 +256,10 @@ export async function rerunContext(args: Args): Promise<Result> {
       .eq("id", t.id);
     if (uErr) return { ok: false, error: uErr.message };
 
-    revalidatePath(`/book/${args.bookId}/${args.issueId}/review`, "page");
+    revalidatePath(
+      `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
+      "page",
+    );
     return {
       ok: true,
       speaker: parsed.speaker ?? null,
