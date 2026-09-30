@@ -46,6 +46,7 @@ async function loadCalls(bookId: string, issueId: string) {
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .order("created_at")
+      .order("id")
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`llm_calls read failed: ${error.message}`);
     rows.push(...((data ?? []) as CallRow[]));
