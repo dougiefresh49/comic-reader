@@ -1234,6 +1234,8 @@ export type Database = {
           keep_active: boolean;
           lab_default: boolean | null;
           labels: Json | null;
+          operation_claim: string | null;
+          operation_claimed_at: string | null;
           series_id: string | null;
           source_clip_md5: string | null;
           source_clip_path: string | null;
@@ -1253,6 +1255,8 @@ export type Database = {
           keep_active?: boolean;
           lab_default?: boolean | null;
           labels?: Json | null;
+          operation_claim?: string | null;
+          operation_claimed_at?: string | null;
           series_id?: string | null;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
@@ -1272,6 +1276,8 @@ export type Database = {
           keep_active?: boolean;
           lab_default?: boolean | null;
           labels?: Json | null;
+          operation_claim?: string | null;
+          operation_claimed_at?: string | null;
           series_id?: string | null;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
