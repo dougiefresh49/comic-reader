@@ -47,21 +47,63 @@ block() {
 # because the outer segment would otherwise hide everything inside it. A
 # comment runs to the end of the line, so one is dropped before splitting: a
 # `# LIVE_API_OK=1` at the end of a line is not an assignment.
+#
+# Continued lines are joined first, and before the comment strip, because a
+# backslash-newline is not a separator: a shell reads
+#   cp replacement.ts \
+#     src/lib/models.ts
+# as one command, and a wrapped long argument is what a careful delegate
+# writes. Splitting first would read it as two harmless ones.
 segments() {
   local text
-  text=$(printf '%s\n' "$1" | sed -E 's/(^|[[:space:]])#.*$//')
+  text=$(printf '%s' "$1" | awk '
+    {
+      if (held) buf = buf " " $0; else { buf = $0; held = 1 }
+      if (buf ~ /\\[ \t]*$/) { sub(/[ \t]*\\[ \t]*$/, "", buf); next }
+      print buf
+      buf = ""
+      held = 0
+    }
+    END { if (held && buf != "") print buf }
+  ')
+  text=$(printf '%s\n' "$text" | sed -E 's/(^|[[:space:]])#.*$//')
   printf '%s\n' "$text" | sed -E 's/(;|&&|\|\||\||&|\n)/\n/g'
   printf '%s\n' "$text" |
     grep -oE "(^|[[:space:]])(ba|z|k|da)?sh[[:space:]]+-c[[:space:]]+[\"'][^\"']*[\"']" |
     sed -E "s/^.*-c[[:space:]]+[\"']//; s/[\"']\$//"
 }
 
+# The executable a segment runs, and whether the run of assignments in front
+# of it named the override. Two lines: the executable, then `override` or
+# `no-override`.
+#
+# `env` is a wrapper rather than a command, so the walk goes through it and
+# the assignments it carries: `env NODE_ENV=production pnpm generate-audio`
+# runs pnpm, and `env LIVE_API_OK=1 pnpm generate-audio` carries the override
+# the way a shell would. Its options are stepped over too, so `env -u NAME`
+# does not leave `-u` standing where the executable goes.
+command_shape() {
+  printf '%s' "$1" | tr -d "\"'<>" | awk '
+    { for (i = 1; i <= NF; i++) {
+        t = $i
+        if (t == "-u" || t == "--unset" || t == "-C" || t == "--chdir") { skips = 1; continue }
+        if (skips) { skips = 0; continue }
+        if (t ~ /^-/) continue
+        if (t == "env") continue
+        if (t ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
+          if (t == "LIVE_API_OK=1") override = 1
+          continue
+        }
+        exe = t
+        break
+      } }
+    END { print exe; print (override ? "override" : "no-override") }'
+}
+
 # A segment runs pnpm when pnpm is the command being run, after any leading
 # VAR=value assignments, not when the string merely mentions it.
 invokes_pnpm() {
-  local first
-  first=$(printf '%s' "$1" | tr -d "\"'<>" | awk '{ for (i = 1; i <= NF; i++) { if ($i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue; print $i; exit } }')
-  [ "$first" = "pnpm" ]
+  [ "$(command_shape "$1" | head -n1)" = "pnpm" ]
 }
 
 # The override the paid rules name: LIVE_API_OK=1 as an env assignment in
@@ -70,16 +112,12 @@ invokes_pnpm() {
 # below.
 #
 # So the token has to be an exact LIVE_API_OK=1, and it has to sit in the run
-# of leading assignments before the executable. `LIVE_API_OK=1.0` is a
-# different value, and `pnpm generate-audio -- LIVE_API_OK=1` is an argument
-# the command never reads as an assignment, so neither one counts.
+# of leading assignments before the executable, through an `env` wrapper as
+# well as in front of it. `LIVE_API_OK=1.0` is a different value, and
+# `pnpm generate-audio -- LIVE_API_OK=1` is an argument the command never
+# reads as an assignment, so neither one counts.
 has_override() {
-  printf '%s' "$1" | tr -d "\"'<>" | awk '
-    { for (i = 1; i <= NF; i++) {
-        if ($i !~ /^[A-Za-z_][A-Za-z0-9_]*=/) exit
-        if ($i == "LIVE_API_OK=1") { found = 1; exit }
-      } }
-    END { exit(found ? 0 : 1) }'
+  [ "$(command_shape "$1" | tail -n1)" = "override" ]
 }
 
 # src/lib//models.ts, src/lib/../lib/models.ts and ./src/lib/models.ts are one
