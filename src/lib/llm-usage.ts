@@ -167,7 +167,7 @@ async function logged<T>(
     row.ok = false;
     row.error = errorText(err);
     row.usd_est = null;
-    // A call that threw was never billed, so it spent no credits either.
+    // A failed call's charge is unknown.
     row.credits = null;
     await record(row);
     throw err;
@@ -177,7 +177,7 @@ async function logged<T>(
   if (result instanceof Response && !result.ok) {
     row.ok = false;
     row.error = `HTTP ${result.status}`;
-    // Same for a non-2xx response: the provider rejected it before generating.
+    // A rejected request has no usable charge recorded here.
     row.usd_est = null;
     row.credits = null;
   }
@@ -234,28 +234,19 @@ export function embedContentLogged(
 }
 
 /**
- * ElevenLabs bills a subscription in credits (#251). Nothing in the API
- * reference reports the credits one request used: neither create speech nor
- * stream speech documents a header or body field for it, read 2026-09-29 with
- * no call made, and the JS SDK hands the response headers to its logger rather
- * than to a caller. So a header read stays here, one line, for the day the API
- * grows one; until then credits come from the character count times the model's
- * rate in `models.ts`.
- *
- * Voice Design charges per request, not per character, and the docs give no
- * figure for it, so its `credits` stays null rather than carrying a guess.
+ * Prefer the documented `character-cost` header (#251):
+ * https://elevenlabs.io/docs/api-reference/introduction
+ * Missing or invalid headers fall back to the model's character rate.
  */
 function creditsFor(
-  result: unknown,
+  headers: Headers | undefined,
   characters: number | null,
   model: string | null,
 ): number | null {
-  const header = (result as Response | undefined)?.headers?.get?.(
-    "x-elevenlabs-credits",
-  );
-  if (header) {
+  const header = headers?.get("character-cost");
+  if (header?.trim()) {
     const parsed = Number(header);
-    if (Number.isFinite(parsed)) return parsed;
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
   }
   if (characters === null) return null;
   const rate = model ? ELEVENLABS_CREDITS_PER_CHARACTER[model] : undefined;
@@ -267,10 +258,11 @@ export function elevenLabsUsageToRow<T>(
   result: T | undefined,
   characters: number | null,
   meta: LlmCallMeta,
+  headers = result instanceof Response ? result.headers : undefined,
 ): LlmCallInsert {
   const row = baseRow("elevenlabs", meta.model ?? null, meta);
   row.characters = characters;
-  row.credits = creditsFor(result, characters, meta.model ?? null);
+  row.credits = creditsFor(headers, characters, meta.model ?? null);
   if (characters !== null) {
     row.usd_est = round5(characters * ELEVENLABS_USD_PER_CHARACTER);
   }
@@ -278,13 +270,56 @@ export function elevenLabsUsageToRow<T>(
 }
 
 /**
- * One ElevenLabs request. `characters` is what the request bills on (the TTS
- * text), or null when the per-request charge is not known (Voice Design).
+ * One ElevenLabs request. Keep the parsed SDK result for audio callers, and
+ * use `.withRawResponse()` before awaiting so its charge header survives.
+ * Voice Design bills returned preview text once, not once per preview.
  */
 export function recordElevenLabsCall<T>(
   meta: LlmCallMeta,
   characters: number | null,
-  fn: () => Promise<T>,
+  fn: () => Promise<T> & {
+    withRawResponse?: () => Promise<{
+      data: T;
+      rawResponse: { headers: Headers };
+    }>;
+  },
 ): Promise<T> {
-  return logged(fn, (result) => elevenLabsUsageToRow(result, characters, meta));
+  let responseHeaders: Headers | undefined;
+  let billedCharacters = characters;
+  return logged(
+    async () => {
+      const request = fn();
+      let result: T;
+      if (request.withRawResponse) {
+        const raw = await request.withRawResponse();
+        responseHeaders = raw.rawResponse.headers;
+        result = raw.data;
+      } else {
+        result = await request;
+      }
+      if (
+        result instanceof Response &&
+        result.ok &&
+        meta.model === "eleven_ttv_v3"
+      ) {
+        // Clone so the existing caller can still consume the response body.
+        try {
+          const data = (await result.clone().json()) as { text?: unknown };
+          if (typeof data.text === "string")
+            billedCharacters = data.text.length;
+        } catch {
+          // No usable preview text: the header still applies, else credits stay unknown.
+        }
+      }
+      return result;
+    },
+    (result) =>
+      elevenLabsUsageToRow(
+        result,
+        billedCharacters,
+        meta,
+        responseHeaders ??
+          (result instanceof Response ? result.headers : undefined),
+      ),
+  );
 }

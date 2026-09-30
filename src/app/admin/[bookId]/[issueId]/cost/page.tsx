@@ -10,6 +10,7 @@ interface Params {
 }
 
 type CallRow = {
+  provider: string;
   step: string | null;
   model: string | null;
   ok: boolean | null;
@@ -34,6 +35,7 @@ type Rollup = {
   credits: number;
   /** Whether any row in the group has a credits figure at all (#251). */
   hasCredits: boolean;
+  missingCredits: number;
   usd: number;
 };
 
@@ -46,7 +48,7 @@ async function loadCalls(bookId: string, issueId: string) {
     const { data, error } = await supabaseAdmin
       .from("llm_calls")
       .select(
-        "step, model, ok, tokens_in, tokens_out, tokens_thinking, characters, credits, usd_est",
+        "provider, step, model, ok, tokens_in, tokens_out, tokens_thinking, characters, credits, usd_est",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
@@ -76,6 +78,7 @@ function rollUp(rows: CallRow[]): Rollup[] {
       characters: 0,
       credits: 0,
       hasCredits: false,
+      missingCredits: 0,
       usd: 0,
     };
     g.calls++;
@@ -88,6 +91,9 @@ function rollUp(rows: CallRow[]): Rollup[] {
       g.credits += Number(r.credits);
       g.hasCredits = true;
     }
+    if (r.provider === "elevenlabs" && r.ok === true && r.credits == null) {
+      g.missingCredits++;
+    }
     g.usd += Number(r.usd_est ?? 0);
     groups.set(key, g);
   }
@@ -97,6 +103,12 @@ function rollUp(rows: CallRow[]): Rollup[] {
 }
 
 const num = (n: number) => n.toLocaleString("en-US");
+const creditsLabel = (credits: number, hasCredits: boolean, missing: number) =>
+  missing > 0
+    ? `${num(credits)} (partial; ${num(missing)} ${missing === 1 ? "call" : "calls"} missing credits)`
+    : hasCredits
+      ? num(credits)
+      : "n/a";
 const usd = (n: number) => `$${n.toFixed(n > 0 && n < 0.01 ? 5 : 2)}`;
 
 export default async function IssueCostPage({ params }: Params) {
@@ -114,6 +126,7 @@ export default async function IssueCostPage({ params }: Params) {
   const total = groups.reduce((s, g) => s + g.usd, 0);
   const totalCalls = groups.reduce((s, g) => s + g.calls, 0);
   const totalCredits = groups.reduce((s, g) => s + g.credits, 0);
+  const missingCredits = groups.reduce((s, g) => s + g.missingCredits, 0);
   const anyCredits = groups.some((g) => g.hasCredits);
 
   const cell = "px-4 py-2 text-neutral-300";
@@ -138,9 +151,9 @@ export default async function IssueCostPage({ params }: Params) {
         <p className="mb-6 text-sm text-neutral-400">
           {issue.number}. {issue.name}. Recorded Gemini and ElevenLabs calls by
           step and model. Credits are what ElevenLabs charges on its
-          subscription, computed from characters and a per-model rate in the
-          code. Dollar figures are estimates from the rates in the code, not the
-          invoice.
+          subscription, read from the response charge or estimated from
+          characters and a per-model rate. Dollar figures are estimates from the
+          rates in the code, not the invoice.
         </p>
 
         <div className="mb-6 rounded-lg border border-neutral-800 bg-neutral-900/60 px-4 py-3 text-sm">
@@ -149,10 +162,10 @@ export default async function IssueCostPage({ params }: Params) {
               <span className="text-neutral-500">Issue total </span>
               {usd(total)}
             </span>
-            {anyCredits ? (
+            {anyCredits || missingCredits > 0 ? (
               <span>
                 <span className="text-neutral-500">Credits </span>
-                {num(totalCredits)}
+                {creditsLabel(totalCredits, anyCredits, missingCredits)}
               </span>
             ) : null}
             <span>
@@ -197,7 +210,7 @@ export default async function IssueCostPage({ params }: Params) {
                     <td className={numCell}>{num(g.tokensThinking)}</td>
                     <td className={numCell}>{num(g.characters)}</td>
                     <td className={numCell}>
-                      {g.hasCredits ? num(g.credits) : "n/a"}
+                      {creditsLabel(g.credits, g.hasCredits, g.missingCredits)}
                     </td>
                     <td className={numCell}>{usd(g.usd)}</td>
                   </tr>
@@ -212,7 +225,7 @@ export default async function IssueCostPage({ params }: Params) {
                 <td className={numCell}>{num(totalCalls)}</td>
                 <td className={numCell} colSpan={5} />
                 <td className={numCell}>
-                  {anyCredits ? num(totalCredits) : "n/a"}
+                  {creditsLabel(totalCredits, anyCredits, missingCredits)}
                 </td>
                 <td className={numCell}>{usd(total)}</td>
               </tr>
