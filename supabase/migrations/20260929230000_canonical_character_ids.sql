@@ -84,6 +84,17 @@ where alias_norm = 'scientist'
 create unique index if not exists aliases_alias_norm_scope_scope_id_key
   on aliases (alias_norm, scope, scope_id) nulls not distinct;
 
+-- Owner call O1 = B (2026-09-30). The alias writers upsert on
+-- (alias, scope, scope_id). The old constraint treated a null scope_id as
+-- distinct, so a global re-upsert inserted a duplicate, which the index above
+-- now rejects. Treating nulls as equal here makes that upsert update in place.
+-- The dedupe above already removed every row this would reject.
+alter table aliases drop constraint aliases_alias_scope_scope_id_key;
+
+alter table aliases
+  add constraint aliases_alias_scope_scope_id_key
+    unique nulls not distinct (alias, scope, scope_id);
+
 -- castlist, voices, panels (filled in #100)
 
 alter table castlist
