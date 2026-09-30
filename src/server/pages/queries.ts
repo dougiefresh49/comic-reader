@@ -256,24 +256,50 @@ export async function getBookPublishedFlags(): Promise<
 }
 
 /**
- * How many page images the issue actually has. `issues.page_count` is written
- * by the pipeline's publishing step, so a book whose pages were uploaded but
- * not yet processed reads zero and the reader would 404 on page 1. Storage is
- * the answer in that case. The service-role client is used because the
- * anon key cannot list a bucket.
+ * The highest page number stored per issue, for every book, as
+ * `{ bookId: { issueId: pageCount } }`.
+ *
+ * `issues.page_count` is written only by the pipeline's publishing step, so a
+ * book whose pages were uploaded but not yet processed reports zero and its
+ * reader would 404 on page 1. The `pages` table carries one row per stored
+ * image and the upload path writes it, so it is the honest count in that
+ * window. One statement covers every book, and it reads numbers rather than
+ * counting rows, so a sparse set of pages still reports the right highest
+ * page. The service-role client is used because the anon key cannot read
+ * `pages`.
  */
-async function countStoredPages(
+export async function getStoredPageCounts(): Promise<
+  Record<string, Record<string, number>>
+> {
+  const { data, error } = await supabaseAdmin
+    .from("pages")
+    .select("book_id, issue_id, number");
+  if (error) {
+    console.error("getStoredPageCounts:", error);
+    return {};
+  }
+
+  const byBook: Record<string, Record<string, number>> = {};
+  for (const row of (data ?? []) as Array<{
+    book_id: string;
+    issue_id: string;
+    number: number;
+  }>) {
+    const issues = (byBook[row.book_id] ??= {});
+    issues[row.issue_id] = Math.max(issues[row.issue_id] ?? 0, row.number);
+  }
+  return byBook;
+}
+
+/** The pages an issue has: its manifest count, or the stored count if that is 0. */
+function pageCountFor(
   bookId: string,
   issueId: string,
-): Promise<number> {
-  const { data, error } = await supabaseAdmin.storage
-    .from("comic-pages")
-    .list(`${bookId}/${issueId}`);
-  if (error) {
-    console.error("countStoredPages:", error);
-    return 0;
-  }
-  return (data ?? []).filter((f) => f.name.endsWith(".webp")).length;
+  manifestCount: number,
+  stored: Record<string, Record<string, number>>,
+): number {
+  if (manifestCount > 0) return manifestCount;
+  return stored[bookId]?.[issueId] ?? 0;
 }
 
 export type ReaderPageProps = ComponentProps<typeof ZenComicReader>;
@@ -303,10 +329,12 @@ export async function getReaderPage({
     ?.issues.find((i) => i.id === issueId);
   if (!issue) return null;
 
-  const pageCount =
-    issue.pageCount > 0
-      ? issue.pageCount
-      : await countStoredPages(bookId, issueId);
+  const pageCount = pageCountFor(
+    bookId,
+    issueId,
+    issue.pageCount,
+    await getStoredPageCounts(),
+  );
 
   const pageNum = parseInt(pageNumber, 10);
   if (isNaN(pageNum) || pageNum < 1 || pageNum > pageCount) return null;

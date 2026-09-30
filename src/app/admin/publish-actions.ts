@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { getManifest } from "~/server";
+import { getManifest, getStoredPageCounts } from "~/server";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -34,8 +34,13 @@ export async function setBookPublished(
   revalidatePath("/");
   revalidatePath(`/book/${bookId}`);
   const book = (await getManifest()).books.find((b) => b.id === bookId);
+  // The same count the reader uses, so an issue whose pages are uploaded but
+  // not yet through the pipeline still has its cached reader pages dropped.
+  const stored = await getStoredPageCounts();
   for (const issue of book?.issues ?? []) {
-    for (let n = 1; n <= issue.pageCount; n++) {
+    const count = stored[bookId]?.[issue.id] ?? 0;
+    const pageCount = issue.pageCount > 0 ? issue.pageCount : count;
+    for (let n = 1; n <= pageCount; n++) {
       revalidatePath(`/book/${bookId}/${issue.id}/${n}`);
     }
   }

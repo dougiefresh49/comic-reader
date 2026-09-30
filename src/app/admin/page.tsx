@@ -6,7 +6,7 @@ import {
   type AdminBookInfo,
 } from "~/server/admin/queries";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { getBookPublishedFlags } from "~/server";
+import { getBookPublishedFlags, getStoredPageCounts } from "~/server";
 import { PipelineActions, type SkippedGate } from "./PipelineActions";
 import BookPublishToggle from "./BookPublishToggle";
 
@@ -48,12 +48,14 @@ async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
 }
 
 export default async function AdminDashboardPage() {
-  const [issues, books, skippedByIssue, publishedByBook] = await Promise.all([
-    getAdminIssues(),
-    getAdminBooksWithParts(),
-    getLatestSkippedByIssue(),
-    getBookPublishedFlags(),
-  ]);
+  const [issues, books, skippedByIssue, publishedByBook, storedPages] =
+    await Promise.all([
+      getAdminIssues(),
+      getAdminBooksWithParts(),
+      getLatestSkippedByIssue(),
+      getBookPublishedFlags(),
+      getStoredPageCounts(),
+    ]);
 
   const issuesByBook = new Map<string, AdminIssueRow[]>();
   for (const iss of issues) {
@@ -115,6 +117,7 @@ export default async function AdminDashboardPage() {
                 issues={issuesByBook.get(book.id) ?? []}
                 skippedByIssue={skippedByIssue}
                 published={publishedByBook[book.id] ?? false}
+                storedPageCounts={storedPages[book.id] ?? {}}
               />
             ))}
           </div>
@@ -129,17 +132,24 @@ function BookSection({
   issues,
   skippedByIssue,
   published,
+  storedPageCounts,
 }: {
   book: AdminBookInfo;
   issues: AdminIssueRow[];
   skippedByIssue: Map<string, SkippedGate[]>;
   published: boolean;
+  storedPageCounts: Record<string, number>;
 }) {
   const hasParts = book.parts.length > 0;
   // The owner's way in. A draft book has no public route, so the admin list
-  // links the first issue's first page under /admin/preview, which the
-  // basic-auth matcher covers. `issues` arrives sorted by number.
-  const firstIssue = [...issues].sort((a, b) => a.number - b.number)[0];
+  // links /admin/preview, which the basic-auth matcher covers. An issue with
+  // no pages 404s in the reader, so the book-level link skips those; every
+  // issue that has pages gets its own link in the row. `issues` arrives
+  // sorted by number.
+  const issuesWithPages = issues.filter(
+    (iss) => iss.pageCount > 0 || (storedPageCounts[iss.issueId] ?? 0) > 0,
+  );
+  const firstIssue = issuesWithPages[0];
 
   const issuesByPart = new Map<string | null, AdminIssueRow[]>();
   for (const iss of issues) {
@@ -215,6 +225,7 @@ function BookSection({
                   <IssueList
                     issues={partIssues}
                     skippedByIssue={skippedByIssue}
+                    draft={!published}
                   />
                 ) : (
                   <p className="py-2 text-xs text-neutral-600">
@@ -232,12 +243,17 @@ function BookSection({
               <IssueList
                 issues={issuesByPart.get(null)!}
                 skippedByIssue={skippedByIssue}
+                draft={!published}
               />
             </div>
           )}
         </div>
       ) : (
-        <IssueList issues={issues} skippedByIssue={skippedByIssue} />
+        <IssueList
+          issues={issues}
+          skippedByIssue={skippedByIssue}
+          draft={!published}
+        />
       )}
     </section>
   );
@@ -246,9 +262,11 @@ function BookSection({
 function IssueList({
   issues,
   skippedByIssue,
+  draft,
 }: {
   issues: AdminIssueRow[];
   skippedByIssue: Map<string, SkippedGate[]>;
+  draft: boolean;
 }) {
   return (
     <>
@@ -286,6 +304,7 @@ function IssueList({
                 <td className="px-4 py-2">
                   <ActionButtons
                     issue={iss}
+                    draft={draft}
                     skippedGates={
                       skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
                     }
@@ -303,6 +322,7 @@ function IssueList({
           <IssueCard
             key={`${iss.bookId}/${iss.issueId}`}
             issue={iss}
+            draft={draft}
             skippedGates={
               skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
             }
@@ -316,9 +336,11 @@ function IssueList({
 function IssueCard({
   issue,
   skippedGates,
+  draft,
 }: {
   issue: AdminIssueRow;
   skippedGates: SkippedGate[];
+  draft: boolean;
 }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
@@ -347,7 +369,11 @@ function IssueCard({
       </div>
 
       <div className="mt-2.5">
-        <ActionButtons issue={issue} skippedGates={skippedGates} />
+        <ActionButtons
+          issue={issue}
+          skippedGates={skippedGates}
+          draft={draft}
+        />
       </div>
     </div>
   );
@@ -396,9 +422,11 @@ function StatusBadge({ issue }: { issue: AdminIssueRow }) {
 function ActionButtons({
   issue,
   skippedGates,
+  draft,
 }: {
   issue: AdminIssueRow;
   skippedGates: SkippedGate[];
+  draft: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -413,6 +441,15 @@ function ActionButtons({
         status={issue.status}
         skippedGates={skippedGates}
       />
+      {draft && (issue.pageCount > 0 || issue.hasWebP) && (
+        <Link
+          href={`/admin/preview/${issue.bookId}/${issue.issueId}/1`}
+          className="rounded bg-cyan-700/60 px-2 py-1 text-xs font-medium text-white hover:bg-cyan-600"
+          title="Open the reader for this issue"
+        >
+          Preview
+        </Link>
+      )}
       <Link
         href={`/admin/${issue.bookId}/${issue.issueId}/review/pipeline`}
         className="rounded bg-neutral-700 px-2 py-1 text-xs font-medium text-neutral-300 hover:bg-neutral-600"
