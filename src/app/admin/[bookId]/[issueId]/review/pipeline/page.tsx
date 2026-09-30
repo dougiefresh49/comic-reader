@@ -156,7 +156,7 @@ export default async function PipelineReviewPage({ params }: Params) {
           <li>
             {issue.hasWebP ? (
               <Link
-                href={`/book/${bookId}/${issueId}/review?mode=pipeline`}
+                href={`/admin/${bookId}/${issueId}/review/bubbles?mode=pipeline`}
                 className="text-emerald-400 hover:text-emerald-300"
               >
                 Bubble review (reader)

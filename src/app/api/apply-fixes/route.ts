@@ -318,7 +318,7 @@ export async function POST(req: NextRequest) {
 
   // Invalidate ISR cache
   revalidatePath(`/book/${bookId}/${issueId}`, "page");
-  revalidatePath(`/book/${bookId}/${issueId}/review`, "page");
+  revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/book/${bookId}`, "page");
   revalidatePath("/", "page");
 
