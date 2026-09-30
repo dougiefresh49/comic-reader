@@ -22,6 +22,7 @@ import path from "path";
 import { supabase } from "./lib/supabase.js";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { selectIssue } from "~/lib/issue-queries";
+import { type BubbleCenter, filterDuplicatePanels } from "~/lib/panel-filter";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { runRoboflowWorkflow } from "~/lib/roboflow-client";
 import { pageImageUrl } from "~/lib/storage";
@@ -109,14 +110,23 @@ function orderedPanels(
   issue: string,
   pageNumber: number,
   parsed: ParsedRoboflowSam3,
+  bubbleCenters: BubbleCenter[],
 ): PanelRow[] {
-  const detected = mapPanelRows(
-    book,
-    issue,
-    pageNumber,
-    parsed.panelPredictions,
-    parsed.image,
-  ) as PanelRow[];
+  const { kept: detected, dropped } = filterDuplicatePanels(
+    mapPanelRows(
+      book,
+      issue,
+      pageNumber,
+      parsed.panelPredictions,
+      parsed.image,
+    ) as PanelRow[],
+    bubbleCenters,
+  );
+  for (const { bounding_box: b } of dropped) {
+    console.log(
+      `page ${pageNumber}: dropped duplicate panel x=${b.x.toFixed(3)} y=${b.y.toFixed(3)} w=${b.w.toFixed(3)} h=${b.h.toFixed(3)}`,
+    );
+  }
   // sortPanelsForReading reads only boundingBox, sortOrder and source.
   const sorted = sortPanelsForReading(
     detected.map(
@@ -356,11 +366,23 @@ async function main() {
         `page ${n}: response image ${parsed.image.width}x${parsed.image.height}, pages row ${page.width}x${page.height}. box_2d would not line up.`,
       );
     }
-    const panels = orderedPanels(book, issue, n, parsed);
+    const pageBubbles = (bubbles as Bubble[]).filter(
+      (b) => b.page_number === n,
+    );
+    const centers = pageBubbles.flatMap((b) => {
+      const box = b.box_2d as Record<string, unknown> | null;
+      const [x, y, w, h] = ["x", "y", "width", "height"].map((k) => box?.[k]);
+      if (![x, y, w, h].every((v) => typeof v === "number")) return [];
+      return [
+        {
+          x: ((x as number) + (w as number) / 2) / parsed.image.width,
+          y: ((y as number) + (h as number) / 2) / parsed.image.height,
+        },
+      ];
+    });
+    const panels = orderedPanels(book, issue, n, parsed, centers);
     attachForegroundPolygons(panels, parsed);
-    const links = (bubbles as Bubble[])
-      .filter((b) => b.page_number === n)
-      .map((b) => linkBubble(b, panels, parsed.image));
+    const links = pageBubbles.map((b) => linkBubble(b, panels, parsed.image));
     plans.push({ pageNumber: n, parsed, panels, links });
   }
 

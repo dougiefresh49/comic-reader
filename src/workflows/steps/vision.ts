@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
-import { filterSliverPanels } from "~/lib/panel-filter";
+import { filterDuplicatePanels, filterSliverPanels } from "~/lib/panel-filter";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
@@ -443,7 +443,11 @@ export async function roboflowAnalyzeBatch(
       segmentationPredictions: segPreds,
     } = read.parsed;
     // Filter before the final map so sort_order and panel_id stay contiguous.
-    const { kept, dropped } = filterSliverPanels(
+    const bubbleCenters = bubblePredictions.map((b) => ({
+      x: b.x / imgDims.width,
+      y: b.y / imgDims.height,
+    }));
+    const slivers = filterSliverPanels(
       mapPanelRows(
         bookId,
         issueId,
@@ -454,15 +458,21 @@ export async function roboflowAnalyzeBatch(
         idx,
         bounding_box: row.bounding_box as BoundingBoxJson,
       })),
-      bubblePredictions.map((b) => ({
-        x: b.x / imgDims.width,
-        y: b.y / imgDims.height,
-      })),
+      bubbleCenters,
     );
-    for (const { bounding_box: b } of dropped) {
-      console.log(
-        `[roboflow] ${pageLabel}: dropped sliver panel x ${b.x.toFixed(3)} y ${b.y.toFixed(3)} w ${b.w.toFixed(3)} h ${b.h.toFixed(3)}`,
-      );
+    const { kept, dropped: duplicates } = filterDuplicatePanels(
+      slivers.kept,
+      bubbleCenters,
+    );
+    for (const [kind, dropped] of [
+      ["sliver", slivers.dropped],
+      ["duplicate", duplicates],
+    ] as const) {
+      for (const { bounding_box: b } of dropped) {
+        console.log(
+          `[roboflow] ${pageLabel}: dropped ${kind} panel x ${b.x.toFixed(3)} y ${b.y.toFixed(3)} w ${b.w.toFixed(3)} h ${b.h.toFixed(3)}`,
+        );
+      }
     }
     const keptIdx = new Set(kept.map((c) => c.idx));
     const panelRows = mapPanelRows(
