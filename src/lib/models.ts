@@ -40,9 +40,8 @@ export const GEMINI_USD_PER_1M_TOKENS: Record<
 // gemini-embedding-2, per image embedded. Text embeddings have no rate yet.
 export const GEMINI_EMBEDDING_USD_PER_IMAGE = 0.00012;
 
-// Assumption until the owner's invoice: Creator plan, $22 for 100k credits,
-// 1 credit per character on eleven_v3.
-export const ELEVENLABS_USD_PER_CHARACTER = 0.00022;
+// owner's ElevenLabs pricing table, 2026-09-30: eleven_v3 $0.08 per 1K characters on Creator
+export const ELEVENLABS_USD_PER_CHARACTER = 0.00008;
 
 // Fallback credits per character when `character-cost` is absent (#251).
 // TTS v3 keeps the existing 1-credit assumption pending the owner's usage check.
