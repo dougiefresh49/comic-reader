@@ -184,7 +184,7 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     # rule 2: cmd:<ere> [&& <ere>]    , anything else, matched as written
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
-      '' | '#'* | file:* | @from-step:*) continue ;;
+      '' | '#'* | file:*) continue ;;
       esac
       spec=${line%% ::*}
       reason=${line#*:: }
@@ -200,11 +200,8 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
         esac
         target=$(printf '%s' "$target" | sed -E 's/[[:space:]]+$//')
         # A token in the segment, so quoting and pnpm options do not hide it.
-        # --from-step values come out first: they name a pipeline step rather
-        # than a script being run, and the block below is the rule for those.
         invokes_pnpm "$SEG" || continue
-        SCRIPTS=$(printf '%s' "$DEQUOTED" | sed -E 's/--from-step(=|[[:space:]]+)[a-z0-9-]+//g')
-        printf '%s' "$SCRIPTS" | grep -qE "(^|[[:space:]])$target([[:space:]]|$)" || continue
+        printf '%s' "$DEQUOTED" | grep -qE "(^|[[:space:]])$target([[:space:]]|$)" || continue
         if [ -n "$cond" ]; then
           printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || continue
         fi
@@ -230,50 +227,6 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
         ;;
       esac
     done <"$LIST"
-  fi
-
-  # --- ingest resumed at or after a paid step ----------------------------
-  #
-  # `pnpm ingest -- --from-step <step>` re-runs that step and every step after
-  # it. The order comes from scripts/ingest.ts at run time, not from a second
-  # copy of the list, so the two cannot drift apart. The last --from-step wins,
-  # which is what ingest's own parseArgs does with a repeated flag, and it is
-  # read from the same dequoted text the script rules read, so a quoted flag
-  # cannot hide it.
-
-  LAST=$(printf '%s' "$DEQUOTED" | grep -oE -- "--from-step(=|[[:space:]]*)[a-z0-9][a-z0-9-]*" | tail -n1)
-  FROM_STEP=$(printf '%s' "$LAST" | sed -E 's/^--from-step(=|[[:space:]]*)+//')
-
-  if [ -n "$FROM_STEP" ] && ! has_override "$SEG" && invokes_pnpm "$SEG" && printf '%s' "$DEQUOTED" | grep -qE '(^|[[:space:]])ingest([[:space:]]|$)'; then
-    INGEST_TS="$REPO_ROOT/scripts/ingest.ts"
-    THRESHOLD=$(grep -m1 '^@from-step:' "$LIST" | sed -E 's/^@from-step:([a-z0-9-]+).*/\1/')
-    ORDER=$(awk '/^const PIPELINE_STEPS/,/^\];/' "$INGEST_TS" 2>/dev/null |
-      grep -oE 'id: "[a-z0-9-]+"' | sed -E 's/id: "//; s/"$//' | tr '\n' ' ')
-
-    index_of() {
-      local want=$1 i=0
-      for id in $ORDER; do
-        if [ "$id" = "$want" ]; then
-          printf '%s' "$i"
-          return 0
-        fi
-        i=$((i + 1))
-      done
-      printf '%s' "-1"
-    }
-
-    from_index=$(index_of "$FROM_STEP")
-    threshold_index=$(index_of "$THRESHOLD")
-
-    # Fail closed. If the order is unreadable, or the step is in neither list,
-    # nothing here shows that resuming is free, so it does not run.
-    if [ -z "$ORDER" ] || [ "$from_index" = "-1" ] || [ "$threshold_index" = "-1" ]; then
-      block "could not read the ingest step order from scripts/ingest.ts, so the cost of --from-step $FROM_STEP is unknown. Run it yourself as LIVE_API_OK=1 pnpm ingest -- ... --from-step $FROM_STEP."
-    fi
-
-    if [ "$from_index" -ge "$threshold_index" ]; then
-      block "resuming ingest at $FROM_STEP re-runs $THRESHOLD and every step after it, which spends ElevenLabs credits and voice slots. Re-run it as LIVE_API_OK=1 pnpm ingest -- ... --from-step $FROM_STEP only if the task named that spend."
-    fi
   fi
 
   # --- a shell write onto a guarded credit source ------------------------
