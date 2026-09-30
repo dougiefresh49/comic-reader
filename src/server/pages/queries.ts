@@ -285,6 +285,8 @@ export async function getStoredPageCounts(
       .from("pages")
       .select("book_id, issue_id, number")
       .order("number", { ascending: false })
+      .order("book_id", { ascending: true })
+      .order("issue_id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (bookId) query = query.eq("book_id", bookId);
 
