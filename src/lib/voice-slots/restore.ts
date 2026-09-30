@@ -1,15 +1,17 @@
 import {
-  checkClip,
+  checkSnapshot,
   clipContentType,
   clipFileName,
   clipObjectPath,
   downloadClip,
 } from "./bucket";
 import {
+  ElevenLabsHeadroomError,
   addVoice,
   buildAddVoiceForm,
   describeForm,
   md5Hex,
+  metadataRefusals,
   type AddVoiceInput,
   type SampleFile,
 } from "./elevenlabs";
@@ -27,8 +29,13 @@ import type {
  * Brings an archived voice back from its hash-checked bucket copy as a
  * cloned IVC, carrying the row's description and labels (voice-lab's
  * standing rules), then writes #66's rows. No local path is read (row 24).
- * A row without a description or labels restores with a warning: the 59
- * import candidates have neither, and the fields change nothing a kid hears.
+ *
+ * Every sample goes into the add when the voice has more than one: a
+ * snapshot writes the first to `source_clip_path` and the rest to a manifest
+ * beside it, and all of them are hash-checked again here. A row without a
+ * description or labels is refused in the plan and
+ * before the request: both fields are on every clone, and a request that
+ * drops them is the payload defect this issue exists to close.
  */
 export async function restoreVoice(
   deps: VoiceSlotsDeps,
@@ -42,12 +49,7 @@ export async function restoreVoice(
   const base = { voice, refusals, warnings: [] as string[], executed: false };
   if (refusals.length > 0) return { ...base, ok: false };
 
-  const objectPath = clipObjectPath(voice.source_clip_path!);
-  const stored = await checkClip(
-    deps.supabase,
-    objectPath,
-    voice.source_clip_md5!,
-  );
+  const stored = await checkSnapshot(deps.supabase, voice);
   if (stored.status === "missing") refusals.push("bucket copy missing");
   if (stored.status === "mismatch") refusals.push("md5 mismatch");
   if (stored.status !== "ok") return { ...base, ok: false };
@@ -56,21 +58,28 @@ export async function restoreVoice(
   if (!voice.description) warnings.push("no description on the row");
   if (!voice.labels || Object.keys(voice.labels).length === 0)
     warnings.push("no labels on the row");
+  refusals.push(...metadataRefusals(voice));
+  if (refusals.length > 0) return { ...base, ok: false, warnings };
   if (!opts.execute) return { ...base, ok: true, warnings };
 
-  const fileName = clipFileName(objectPath);
-  const created = await addVoice(deps, {
-    name: voice.display_name,
-    files: [
-      {
-        filename: fileName,
-        mimeType: clipContentType(fileName),
-        bytes: stored.bytes,
-      },
-    ],
-    description: voice.description,
-    labels: voice.labels,
-  });
+  let created: { voice_id: string };
+  try {
+    created = await addVoice(deps, {
+      name: voice.display_name,
+      files: stored.files,
+      description: voice.description,
+      labels: voice.labels,
+    });
+  } catch (err) {
+    if (err instanceof ElevenLabsHeadroomError)
+      return {
+        ...base,
+        ok: false,
+        warnings,
+        refusals: [...refusals, ...err.refusals],
+      };
+    throw err;
+  }
   await markRestored(deps.supabase, voice, created.voice_id);
   return {
     ...base,
@@ -111,6 +120,11 @@ export async function createVoiceFromSamples(
   const payload = await describeForm(buildAddVoiceForm(input));
   if (!opts.execute) return { executed: false, payload };
 
+  const refused = metadataRefusals(meta);
+  if (refused.length > 0)
+    throw new Error(
+      `createVoiceFromSamples refused before POST /v1/voices/add: ${refused.join(", ")}`,
+    );
   const created = await addVoice(deps, input);
   let registeredId: string | undefined;
   if (opts.register) {

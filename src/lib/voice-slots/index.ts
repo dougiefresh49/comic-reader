@@ -10,15 +10,30 @@
  */
 export { archiveRefusals, archiveVoice, ROOM_CONSUMER } from "./archive";
 export type { ArchiveGuardOptions, ArchiveOptions } from "./archive";
-export { VOICE_CLIPS_BUCKET, clipObjectPath } from "./bucket";
 export {
+  VOICE_CLIPS_BUCKET,
+  clipObjectPath,
+  manifestObjectPath,
+  readManifest,
+} from "./bucket";
+export {
+  ElevenLabsHeadroomError,
   ElevenLabsTimeoutError,
   buildAddVoiceForm,
   describeForm,
+  describeHeadroom,
   getSlotStatus as slotStatus,
+  headroomRefusals,
   md5Hex,
+  metadataRefusals,
+  requireHeadroom,
 } from "./elevenlabs";
-export type { ElevenLabsSample, ElevenLabsVoice } from "./elevenlabs";
+export type {
+  ElevenLabsSample,
+  ElevenLabsVoice,
+  HeadroomRefusal,
+  MetadataRefusal,
+} from "./elevenlabs";
 export { orderCandidates, planFreeSlots } from "./plan";
 export type { PlanFreeSlotsOptions } from "./plan";
 export {

@@ -86,7 +86,7 @@ export async function getSlotStatus(deps: VoiceSlotsDeps): Promise<SlotStatus> {
   const body = (await r.json()) as Partial<SlotStatus>;
   const pick = (k: keyof SlotStatus): number => {
     const v = body[k];
-    if (typeof v !== "number")
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 0)
       throw new Error(`GET /v1/user/subscription: no numeric ${k}`);
     return v;
   };
@@ -145,10 +145,39 @@ export interface AddVoiceInput {
   labels?: Record<string, string> | null;
 }
 
+export type MetadataRefusal = "no description" | "no labels";
+
+/**
+ * What a voice's row is missing for the add payload. Both fields go on
+ * every clone, so a row with neither is refused before the request rather
+ * than sent without them: a silent drop changes what the clone is for.
+ */
+export function metadataRefusals(meta: {
+  description?: string | null;
+  labels?: Record<string, string> | null;
+}): MetadataRefusal[] {
+  const out: MetadataRefusal[] = [];
+  if (typeof meta.description !== "string" || !meta.description.trim())
+    out.push("no description");
+  if (
+    !meta.labels ||
+    Array.isArray(meta.labels) ||
+    typeof meta.labels !== "object" ||
+    Object.keys(meta.labels).length === 0 ||
+    Object.entries(meta.labels).some(
+      ([k, v]) => !k.trim() || typeof v !== "string" || !v.trim(),
+    )
+  )
+    out.push("no labels");
+  return out;
+}
+
 /**
  * The `/v1/voices/add` multipart body, voice-lab's standing shape: `name`,
  * `files`, `description`, `labels` as a JSON string, and
- * `remove_background_noise=false` (clones come from the raw reel).
+ * `remove_background_noise=false` (clones come from the raw reel). Both
+ * metadata fields are always present, so the payload shape does not change
+ * with the row.
  */
 export function buildAddVoiceForm(input: AddVoiceInput): FormData {
   const form = new FormData();
@@ -160,9 +189,8 @@ export function buildAddVoiceForm(input: AddVoiceInput): FormData {
       f.filename,
     );
   }
-  if (input.description) form.append("description", input.description);
-  if (input.labels && Object.keys(input.labels).length > 0)
-    form.append("labels", JSON.stringify(input.labels));
+  form.append("description", input.description ?? "");
+  form.append("labels", JSON.stringify(input.labels ?? {}));
   form.append("remove_background_noise", "false");
   return form;
 }
@@ -183,10 +211,69 @@ export async function describeForm(form: FormData): Promise<string[]> {
   return lines;
 }
 
+export type HeadroomRefusal = "no free slot" | "no add/edit headroom";
+
+/** Why the account cannot take `n` more adds, from `slotStatus()` numbers. */
+export function headroomRefusals(
+  status: SlotStatus,
+  n: number,
+): HeadroomRefusal[] {
+  const out: HeadroomRefusal[] = [];
+  if (status.voice_limit - status.voice_slots_used < n)
+    out.push("no free slot");
+  if (status.max_voice_add_edits - status.voice_add_edit_counter < n)
+    out.push("no add/edit headroom");
+  return out;
+}
+
+export function describeHeadroom(status: SlotStatus, n: number): string {
+  return `${status.voice_limit - status.voice_slots_used} free slot(s) of ${status.voice_limit}, ${status.max_voice_add_edits - status.voice_add_edit_counter} add/edit(s) left of ${status.max_voice_add_edits}, ${n} add(s) planned`;
+}
+
+/** Thrown before a POST when the account cannot take the adds planned. */
+export class ElevenLabsHeadroomError extends Error {
+  constructor(
+    public readonly refusals: HeadroomRefusal[],
+    public readonly status: SlotStatus,
+    public readonly planned: number,
+  ) {
+    super(
+      `/v1/voices/add refused before sending: ${refusals.join(", ")} (${describeHeadroom(status, planned)})`,
+    );
+    this.name = "ElevenLabsHeadroomError";
+  }
+}
+
+/**
+ * Throws `ElevenLabsHeadroomError` unless the account can take `n` adds. A
+ * batch calls this once with its whole size before it starts, so a batch
+ * that cannot fit does not restore half its voices before it runs out.
+ */
+export async function requireHeadroom(
+  deps: VoiceSlotsDeps,
+  n: number,
+): Promise<SlotStatus> {
+  const status = await getSlotStatus(deps);
+  const refused = headroomRefusals(status, n);
+  if (refused.length > 0) throw new ElevenLabsHeadroomError(refused, status, n);
+  return status;
+}
+
+/**
+ * The one add path. Reads `slotStatus()` first and throws
+ * `ElevenLabsHeadroomError` when there is no slot or no add/edit left, so
+ * no caller can reach the POST without the check.
+ */
 export async function addVoice(
   deps: VoiceSlotsDeps,
   input: AddVoiceInput,
 ): Promise<{ voice_id: string }> {
+  const refused = metadataRefusals(input);
+  if (refused.length > 0)
+    throw new Error(
+      `/v1/voices/add refused before sending: ${refused.join(", ")}`,
+    );
+  await requireHeadroom(deps, 1);
   const r = await el(deps, "/v1/voices/add", {
     method: "POST",
     body: buildAddVoiceForm(input),

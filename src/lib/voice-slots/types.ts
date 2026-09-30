@@ -78,7 +78,11 @@ export type RestoreRefusal =
   | "not archived"
   | "no snapshot"
   | "bucket copy missing"
-  | "md5 mismatch";
+  | "md5 mismatch"
+  | "no description"
+  | "no labels"
+  | "no free slot"
+  | "no add/edit headroom";
 
 export interface ArchiveResult {
   voice: VoiceRow;
@@ -117,6 +121,30 @@ export interface SnapshotResult {
   refusals: string[];
   samples: SnapshotSampleReport[];
   executed: boolean;
+  /** True after the complete sample manifest was written. */
+  manifestWritten?: boolean;
+}
+
+export interface SnapshotManifestSample {
+  fileName: string;
+  objectPath: string;
+  /** md5 of the bytes stored in the bucket. */
+  md5: string;
+  /** md5 ElevenLabs reported for the uploaded file, for the record. */
+  elevenLabsHash: string;
+  bytes: number;
+}
+
+/**
+ * What a snapshot leaves beside the clips, at
+ * `<voices.id>/snapshot.json`. `voices.source_clip_path` holds one path, so
+ * a voice with several ElevenLabs samples needs the rest named somewhere
+ * hash-checked; restore reads every sample in the manifest.
+ */
+export interface SnapshotManifest {
+  voiceId: string;
+  formerElevenLabsId: string;
+  samples: SnapshotManifestSample[];
 }
 
 export interface FreeSlotsPlan {

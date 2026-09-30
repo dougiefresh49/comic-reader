@@ -1,4 +1,4 @@
-import { checkClip, clipObjectPath } from "./bucket";
+import { checkSnapshot } from "./bucket";
 import { deleteVoice } from "./elevenlabs";
 import {
   booksUsingVoice,
@@ -64,11 +64,7 @@ export async function archiveRefusals(
 ): Promise<ArchiveRefusal[]> {
   const cheap = archiveRefusalsCheap(voice, opts);
   if (cheap.length > 0) return cheap;
-  const stored = await checkClip(
-    deps.supabase,
-    clipObjectPath(voice.source_clip_path!),
-    voice.source_clip_md5!,
-  );
+  const stored = await checkSnapshot(deps.supabase, voice);
   if (stored.status === "missing") return ["bucket copy missing"];
   if (stored.status === "mismatch") return ["md5 mismatch"];
   return [];

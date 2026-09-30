@@ -31,6 +31,8 @@ import { supabase } from "./lib/supabase.js";
 import {
   archiveVoice,
   booksUsingVoice,
+  describeHeadroom,
+  headroomRefusals,
   issueNeeds,
   planFreeSlots,
   readCastlist,
@@ -161,20 +163,32 @@ function parseExcludeIds(raw: string | undefined): Set<string> | undefined {
   return new Set(ids);
 }
 
-/** By voices.id or ElevenLabs id; a display_name is refused (row 153). */
+/**
+ * By voices.id or ElevenLabs id; a display_name is refused (row 153). One
+ * row per `voices.id`: the same voice named twice (by uuid and by ElevenLabs
+ * id, or twice over) is one candidate, since a second add would spend
+ * another slot and orphan the first voice.
+ */
 function selectVoices(voices: VoiceRow[], selectors: string[]): VoiceRow[] {
-  return selectors.map((sel) => {
+  const out: VoiceRow[] = [];
+  const seen = new Set<string>();
+  for (const sel of selectors) {
     const hit = voices.find(
       (v) => v.id === sel || v.current_elevenlabs_id === sel,
     );
-    if (hit) return hit;
-    const byName = voices.filter((v) => v.display_name === sel);
-    if (byName.length > 0)
-      die(
-        `--voice ${sel} is a display_name; pass its voices.id instead (${byName.map((v) => v.id).join(", ")}).`,
-      );
-    return die(`--voice ${sel}: no voice has this id or ElevenLabs id.`);
-  });
+    if (!hit) {
+      const byName = voices.filter((v) => v.display_name === sel);
+      if (byName.length > 0)
+        die(
+          `--voice ${sel} is a display_name; pass its voices.id instead (${byName.map((v) => v.id).join(", ")}).`,
+        );
+      die(`--voice ${sel}: no voice has this id or ElevenLabs id.`);
+    }
+    if (seen.has(hit.id)) continue;
+    seen.add(hit.id);
+    out.push(hit);
+  }
+  return out;
 }
 
 const short = (v: VoiceRow) =>
@@ -368,6 +382,16 @@ async function runRestore(deps: VoiceSlotsDeps, args: Args) {
   if (!args.execute) return;
   if (restorable.length === 0) {
     console.log(`   Nothing restorable, not touching EL or DB.\n`);
+    return;
+  }
+  // The whole batch's allowance, before the first add: a partial restore
+  // that runs the account out of slots is worse than none.
+  const status = await slotStatus(deps);
+  const noRoom = headroomRefusals(status, restorable.length);
+  if (noRoom.length > 0) {
+    console.log(
+      `\n❌ Refusing to restore ${restorable.length} voice(s): ${noRoom.join(", ")} (${describeHeadroom(status, restorable.length)}).\n`,
+    );
     return;
   }
   let restored = 0;
