@@ -25,7 +25,7 @@ import {
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import { buildSpeechContent } from "./zen-comic-reader/text-utils";
-import { PanelDimOverlay, PanelViewFrame } from "./zen-comic-reader/PanelView";
+import { PanelViewFrame } from "./zen-comic-reader/PanelView";
 import {
   styleToNormRect,
   unionPanelFocusBounds,
@@ -201,8 +201,8 @@ export default function ZenComicReader({
    * Camera/dim target: panel bbox unioned with its bubble rects so speech
    * bubbles that overflow the panel stay lit and in frame. Bubble rects come
    * from the always-present render `style` percentages (`box_2d` is
-   * pixel-space with optional fields). Consumed ONLY by PanelDimOverlay and
-   * PanelViewFrame's camera — LayeredPanel and PanelEffectsOverlay keep the
+   * pixel-space with optional fields). Consumed ONLY by PanelViewFrame's
+   * camera and dim mask. LayeredPanel and PanelEffectsOverlay keep the
    * original `panel.boundingBox` for mask/effect positioning.
    */
   const focusBounds = useMemo(() => {
@@ -506,6 +506,8 @@ export default function ZenComicReader({
               reducedMotion={cameraOff}
               pageSize={pageNaturalSize}
               focusBounds={focusBounds}
+              dimOutsideFocus
+              cameraEffects={false}
             >
               {panelViewMode && activePanel?.foregroundPolygons ? (
                 <LayeredPanel
@@ -536,11 +538,6 @@ export default function ZenComicReader({
                   />
                 </>
               )}
-              {panelViewMode && activePanel ? (
-                <PanelDimOverlay
-                  bbox={focusBounds ?? activePanel.boundingBox}
-                />
-              ) : null}
               <PanelAudioLayer
                 panel={activePanel}
                 active={panelViewMode && panelAutoPlay}

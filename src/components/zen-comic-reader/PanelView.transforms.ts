@@ -2,7 +2,9 @@ import type { PanelBoundingBox } from "~/types/panels";
 
 export const PANEL_VIEW_TRANSITION_MS = 380;
 export const PANEL_VIEW_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
-export const PANEL_VIEW_MARGIN = 0.05;
+export const PANEL_VIEW_MARGIN = 0.02;
+/** Most device pixels one source pixel may span at the resting panel scale. */
+export const PANEL_MAX_UPSCALE = 2;
 
 const SPRING_STIFFNESS = 170;
 const SPRING_DAMPING = 26;
@@ -163,24 +165,44 @@ export function renderedImageRect(
 }
 
 /**
+ * Largest resting scale at which one source pixel spans at most
+ * `PANEL_MAX_UPSCALE` device pixels. `renderedW` is the page plane's CSS
+ * width at scale 1. Spring transitions may temporarily exceed this cap.
+ * Unbounded until the page's natural width is known.
+ */
+export function maxPanelScale(
+  renderedW: number,
+  naturalW: number,
+  devicePixelRatio: number,
+): number {
+  if (renderedW <= 0 || naturalW <= 0 || devicePixelRatio <= 0) {
+    return Infinity;
+  }
+  return (PANEL_MAX_UPSCALE * naturalW) / (renderedW * devicePixelRatio);
+}
+
+/**
  * Compute CSS transform (translate + scale, origin 0 0) so the panel bbox
  * fills the container (with margin) and its center aligns with the container center.
  *
  * `imageRect` is where the image actually renders within the container
- * (accounting for object-contain letterboxing/pillarboxing).
+ * (accounting for object-contain letterboxing/pillarboxing). `maxScale`
+ * wins over the fit, so a capped panel stays centered with more mask around it.
  */
 export function panelTransform(
   panel: PanelBoundingBox,
   container: { w: number; h: number },
   imageRect: { x: number; y: number; w: number; h: number },
   margin = PANEL_VIEW_MARGIN,
+  maxScale = Infinity,
 ): PanelTransformResult {
   const panelW = panel.w * imageRect.w;
   const panelH = panel.h * imageRect.h;
   const targetW = container.w * (1 - margin * 2);
   const targetH = container.h * (1 - margin * 2);
-  const scale =
+  const fitScale =
     panelW > 0 && panelH > 0 ? Math.min(targetW / panelW, targetH / panelH) : 1;
+  const scale = Math.min(fitScale, maxScale);
 
   const panelCenterX = imageRect.x + (panel.x + panel.w / 2) * imageRect.w;
   const panelCenterY = imageRect.y + (panel.y + panel.h / 2) * imageRect.h;

@@ -10,9 +10,11 @@ import {
 } from "react";
 import type { PageDirectedPanel } from "~/types/panels";
 import {
+  PANEL_VIEW_MARGIN,
   type PanelTransformResult,
   type SpringState,
   createSpringState,
+  maxPanelScale,
   panelTransform,
   renderedImageRect,
   stepSpring,
@@ -39,49 +41,69 @@ export function usePrefersReducedMotion(): boolean {
  */
 const PANEL_DIM_CLASS = "bg-black/85";
 
-export function PanelDimOverlay({
-  bbox,
+/** Four rects covering everything in the containing block outside x/y/w/h (CSS lengths). */
+function DimRects({
+  x,
+  y,
+  w,
+  h,
 }: {
-  bbox: PageDirectedPanel["boundingBox"];
+  x: string;
+  y: string;
+  w: string;
+  h: string;
 }) {
-  const { x, y, w, h } = bbox;
-  const topPct = y * 100;
-  const leftPct = x * 100;
-  const bhPct = h * 100;
-  const innerBottom = (y + h) * 100;
-  const innerRight = (x + w) * 100;
-
   return (
     <>
       <div
         className={`pointer-events-auto absolute inset-x-0 top-0 ${PANEL_DIM_CLASS}`}
-        style={{ height: `${topPct}%` }}
+        style={{
+          height: y,
+        }}
         aria-hidden
       />
       <div
         className={`pointer-events-auto absolute inset-x-0 bottom-0 ${PANEL_DIM_CLASS}`}
-        style={{ top: `${innerBottom}%` }}
+        style={{
+          top: `calc(${y} + ${h})`,
+        }}
         aria-hidden
       />
       <div
         className={`pointer-events-auto absolute left-0 ${PANEL_DIM_CLASS}`}
         style={{
-          top: `${topPct}%`,
-          width: `${leftPct}%`,
-          height: `${bhPct}%`,
+          top: y,
+          width: x,
+          height: h,
         }}
         aria-hidden
       />
       <div
         className={`pointer-events-auto absolute right-0 ${PANEL_DIM_CLASS}`}
         style={{
-          top: `${topPct}%`,
-          width: `${100 - innerRight}%`,
-          height: `${bhPct}%`,
+          top: y,
+          left: `calc(${x} + ${w})`,
+          height: h,
         }}
         aria-hidden
       />
     </>
+  );
+}
+
+/** Page-space dim, for a page plane child. It stops at the page edges. */
+export function PanelDimOverlay({
+  bbox,
+}: {
+  bbox: PageDirectedPanel["boundingBox"];
+}) {
+  return (
+    <DimRects
+      x={`${bbox.x * 100}%`}
+      y={`${bbox.y * 100}%`}
+      w={`${bbox.w * 100}%`}
+      h={`${bbox.h * 100}%`}
+    />
   );
 }
 
@@ -98,6 +120,14 @@ interface PanelViewFrameProps {
    * effects overlay still consume for mask/effect positioning.
    */
   focusBounds?: PageDirectedPanel["boundingBox"] | null;
+  /**
+   * Dim everything outside the focus rect in viewport space, letterbox
+   * strips beyond the page edges included. Callers that render a
+   * page-space `PanelDimOverlay` child leave this off.
+   */
+  dimOutsideFocus?: boolean;
+  /** Animate the page plane from panel camera tags. Reader callers disable this. */
+  cameraEffects?: boolean;
   children: React.ReactNode;
 }
 
@@ -113,19 +143,24 @@ export function PanelViewFrame({
   reducedMotion,
   pageSize,
   focusBounds,
+  dimOutsideFocus = false,
+  cameraEffects = true,
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 1, h: 1 });
+  const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const springRef = useRef<SpringState | null>(null);
   const rafRef = useRef<number>(0);
 
   useLayoutEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
-    const measure = () =>
+    const measure = () => {
       setContainerSize({ w: el.clientWidth, h: el.clientHeight });
+      setDevicePixelRatio(window.devicePixelRatio || 1);
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -133,6 +168,7 @@ export function PanelViewFrame({
   }, []);
 
   const activePanel = panels[panelIndex];
+  const focusRect = focusBounds ?? activePanel?.boundingBox;
 
   const imageRect = useMemo(
     () => renderedImageRect(containerSize, pageSize),
@@ -142,27 +178,58 @@ export function PanelViewFrame({
   const getTarget = useCallback((): PanelTransformResult => {
     if (
       !panelViewMode ||
-      !activePanel ||
+      !focusRect ||
       containerSize.w <= 0 ||
       containerSize.h <= 0
     ) {
       return { tx: 0, ty: 0, scale: 1 };
     }
     return panelTransform(
-      focusBounds ?? activePanel.boundingBox,
+      focusRect,
       containerSize,
       imageRect,
+      PANEL_VIEW_MARGIN,
+      maxPanelScale(imageRect.w, pageSize.w, devicePixelRatio),
     );
-  }, [panelViewMode, activePanel, focusBounds, containerSize, imageRect]);
+  }, [
+    panelViewMode,
+    focusRect,
+    containerSize,
+    imageRect,
+    pageSize.w,
+    devicePixelRatio,
+  ]);
 
-  const applyTransform = useCallback((t: PanelTransformResult) => {
-    const el = transformRef.current;
-    if (!el) return;
-    el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.scale})`;
-    el.style.transformOrigin = "0 0";
-  }, []);
+  const applyTransform = useCallback(
+    (t: PanelTransformResult) => {
+      const el = transformRef.current;
+      if (!el) return;
+      el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${t.scale})`;
+      el.style.transformOrigin = "0 0";
 
-  useEffect(() => {
+      const viewport = viewportRef.current;
+      if (!viewport || !focusRect) return;
+      viewport.style.setProperty(
+        "--focus-x",
+        `${t.tx + (imageRect.x + focusRect.x * imageRect.w) * t.scale}px`,
+      );
+      viewport.style.setProperty(
+        "--focus-y",
+        `${t.ty + (imageRect.y + focusRect.y * imageRect.h) * t.scale}px`,
+      );
+      viewport.style.setProperty(
+        "--focus-w",
+        `${focusRect.w * imageRect.w * t.scale}px`,
+      );
+      viewport.style.setProperty(
+        "--focus-h",
+        `${focusRect.h * imageRect.h * t.scale}px`,
+      );
+    },
+    [focusRect, imageRect],
+  );
+
+  useLayoutEffect(() => {
     const target = getTarget();
 
     if (reducedMotion) {
@@ -181,6 +248,8 @@ export function PanelViewFrame({
     springRef.current.vTx = 0;
     springRef.current.vTy = 0;
     springRef.current.vScale = 0;
+    // Reproject the current focus rect before paint when the page plane resizes.
+    applyTransform(springRef.current);
 
     cancelAnimationFrame(rafRef.current);
     const animate = () => {
@@ -192,30 +261,23 @@ export function PanelViewFrame({
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [getTarget, reducedMotion, applyTransform]);
+  }, [getTarget, reducedMotion, applyTransform, activePanel?.id]);
 
-  // Camera-effect class derived from the active panel's effectTags. Runs
-  // forwards-once so the panel settles into a stable pose by the end of
-  // its display window. Re-keyed on panel.id so the animation restarts
-  // every time we navigate to a new panel.
   const cameraEffectClass =
-    !panelViewMode || reducedMotion || !activePanel
+    !cameraEffects || !panelViewMode || reducedMotion || !activePanel
       ? ""
       : cameraEffectClassFromTags(activePanel.effectTags);
 
-  // Reserve room for the bottom chrome. Panel mode: single chrome row
-  // (44px play pill) + gap (8) + caption (min 78) + gap (8) + panel
-  // progress (4) + ControlBar py-2/border (17) + page p-4 (32) ≈ 191px,
-  // plus ~45px caption-growth headroom → 236px. Regular mode keeps the
-  // slimmer 140px reservation.
+  // Panel mode fills the measured reader area. Page mode keeps the 2:3
+  // frame with 140px reserved for the bottom chrome.
   const frameSizeClass = panelViewMode
-    ? "max-h-[calc(100vh-236px)] max-w-[min(100%,calc((100vh-236px)*0.667))]"
-    : "max-h-[calc(100vh-140px)] max-w-[min(100%,calc((100vh-140px)*0.667))]";
+    ? "h-full w-full"
+    : "mx-auto aspect-[2/3] w-full max-h-[calc(100vh-140px)] max-w-[min(100%,calc((100vh-140px)*0.667))]";
 
   return (
     <div
       ref={viewportRef}
-      className={`relative mx-auto aspect-[2/3] w-full overflow-hidden select-none ${frameSizeClass}`}
+      className={`relative overflow-hidden select-none ${frameSizeClass}`}
     >
       <div ref={transformRef} className="relative h-full w-full">
         <div
@@ -240,27 +302,19 @@ export function PanelViewFrame({
           </div>
         </div>
       </div>
+      {dimOutsideFocus && panelViewMode && focusRect ? (
+        <DimRects
+          x="var(--focus-x, 0px)"
+          y="var(--focus-y, 0px)"
+          w="var(--focus-w, 0px)"
+          h="var(--focus-h, 0px)"
+        />
+      ) : null}
     </div>
   );
 }
 
-/**
- * Map active panel effect tags to a camera-effect className. Tags
- * compose: a panel can both push-in AND shake. Tailwind's
- * `animate-[name_dur_easing_count_fill]` arbitrary-value syntax
- * references keyframes defined in globals.css.
- *
- * Multiple animations on a single element merge into one
- * `animation` shorthand list, which works here because each
- * keyframe sets a single transform-prop slice (scale OR translate)
- * — the browser composes them via the `animation-composition` default
- * (`replace`) and we get the last-set value. For simple single-
- * effect panels (the common case) this is fine.
- *
- * If a panel mixes scale + shake we'd want a layered structure, but
- * since panel-direction usually picks one camera tag per panel
- * (Gemini ranks them) we accept the simpler model for v1.
- */
+/** Map the first supported camera tag to its existing page-plane animation. */
 function cameraEffectClassFromTags(tags: string[]): string {
   const classes: string[] = [];
   // Pick the first matching scale/pan tag; pick the first matching shake.
