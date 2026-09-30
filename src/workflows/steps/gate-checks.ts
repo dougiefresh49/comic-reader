@@ -165,7 +165,9 @@ export async function recordGateWait(
   );
   if (!changed) {
     console.log(
-      `[gate-wait] ${event} for ${gate} on ${bookId}/${issueId} matched no ${event === "open" ? "closed" : "open"} record; no write`,
+      event === "open"
+        ? `[gate-wait] ${gate} on ${bookId}/${issueId} already had an open record; second open dropped`
+        : `[gate-wait] ${gate} on ${bookId}/${issueId} had no open record; close dropped`,
     );
   }
 }

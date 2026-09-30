@@ -14,12 +14,17 @@ export interface PageMeta {
  * One stretch of a step's wall clock, on pipeline_runs.steps.timings under
  * the step name. A step holds a list of these, not one: a step that works
  * before a review gate and again after it (casting) is two windows, so the
- * gate pause is not folded into the step's time. At most one window per step
- * is open at a time. `endedAt` is absent while a window is still running, so
- * a run that died mid-step shows which step it died in. `pages` is set on the
- * page-looping steps so seconds per page falls out of the same query (#255).
+ * gate pause is not folded into the step's time. `endedAt` is absent while a
+ * window is still running, so a run that died mid-step shows which step it
+ * died in. `pages` is set on the page-looping steps so seconds per page falls
+ * out of the same query (#255).
+ *
+ * `windowId` is the opening step's `stepId`, which the SDK keeps stable
+ * across retries. It is what makes a replayed open a no-op while a second,
+ * genuine window for the same step still opens.
  */
 export type StepWindow = {
+  windowId: string;
   startedAt: string;
   endedAt?: string;
   pages?: number;
@@ -153,43 +158,54 @@ async function writeStepWindows(
 }
 
 /**
- * Open a timing window for this step. The clock runs inside a step, never in
- * the workflow body, because the body replays and its `Date` is seeded
- * (#255). `pages` is the page count for the page-looping steps.
+ * Open a timing window for this step and return its id, which the caller
+ * passes back to recordStepEnd to close exactly that window. The clock runs
+ * inside a step, never in the workflow body, because the body replays and its
+ * `Date` is seeded (#255). `pages` is the page count for the page-looping
+ * steps.
  *
- * A retried start does not open a second window. The Workflow SDK replays a
- * step that already committed, and a duplicate open window would never be
- * closed, so the run's remaining time would read as this step's.
+ * The id is this step's `stepId`, which the SDK keeps stable across retries,
+ * so a replayed open finds its own window and writes nothing. A genuinely
+ * second window for the same step, as casting opens after its gate, carries
+ * its own id and opens normally.
  */
 export async function recordStepStart(
   bookId: string,
   issueId: string,
   step: string,
   pages?: number,
-): Promise<void> {
+): Promise<string> {
   "use step";
+  const { getStepMetadata } = await import("workflow");
   const { createTypedStepClient } = await import("../step-utils");
   const client = await createTypedStepClient();
+  const windowId = getStepMetadata().stepId;
   const startedAt = new Date().toISOString();
 
   await writeStepWindows(client, bookId, issueId, step, (windows) => {
-    if (windows.some((w) => w.endedAt === undefined)) return windows;
+    if (windows.some((w) => w.windowId === windowId)) return windows;
     return [
       ...windows,
-      { startedAt, ...(pages === undefined ? {} : { pages }) },
+      { windowId, startedAt, ...(pages === undefined ? {} : { pages }) },
     ];
   });
+
+  return windowId;
 }
 
 /**
- * Close this step's open window. A step with no open window (a retried close,
- * or a start whose write never landed) is left alone rather than given a
- * zero-length window, so the query never reports a step it cannot measure.
+ * Close the window `recordStepStart` returned. A window that is already
+ * closed, or one whose open write never landed, is left alone rather than
+ * given a zero-length window, so the query never reports a step it cannot
+ * measure. A failed write is logged by updateRunSteps and not thrown: a
+ * timing write must not fail a run that is spending Gemini and ElevenLabs
+ * credits.
  */
 export async function recordStepEnd(
   bookId: string,
   issueId: string,
   step: string,
+  windowId: string,
 ): Promise<void> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
@@ -198,20 +214,16 @@ export async function recordStepEnd(
 
   let closed = false;
   await writeStepWindows(client, bookId, issueId, step, (windows) => {
-    let open: StepWindow | undefined;
-    for (let i = windows.length - 1; i >= 0; i--) {
-      if (windows[i]?.endedAt === undefined) {
-        open = windows[i];
-        break;
-      }
-    }
+    const open = windows.find(
+      (w) => w.windowId === windowId && w.endedAt === undefined,
+    );
     if (!open) return windows;
     closed = true;
     return windows.map((w) => (w === open ? { ...w, endedAt } : w));
   });
   if (!closed) {
     console.log(
-      `[step-timing] no open window for ${step} on ${bookId}/${issueId}; close dropped`,
+      `[step-timing] window ${windowId} of ${step} on ${bookId}/${issueId} was not open; close dropped`,
     );
   }
 }
