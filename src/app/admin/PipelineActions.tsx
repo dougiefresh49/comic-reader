@@ -222,10 +222,12 @@ export function PipelineActions({
     }
   }
 
-  const withRefusal = (actions: ReactNode) =>
-    refusal ? (
-      <span className="inline-flex flex-col items-start gap-1">
-        {actions}
+  // The wrapper renders unconditionally so `actions` keeps its tree position
+  // and PausedActions' local state survives a refusal appearing.
+  const withRefusal = (actions: ReactNode) => (
+    <span className="inline-flex flex-col items-start gap-1">
+      {actions}
+      {refusal && (
         <TriggerRefusalNotice
           bookId={bookId}
           issueId={issueId}
@@ -236,10 +238,9 @@ export function PipelineActions({
           }}
           onCancellingChange={setCancelling}
         />
-      </span>
-    ) : (
-      actions
-    );
+      )}
+    </span>
+  );
 
   if (triggered) {
     return (
