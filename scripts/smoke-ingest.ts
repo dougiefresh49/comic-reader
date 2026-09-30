@@ -72,8 +72,14 @@ const LOG_FAILURES = [
   /DRY_RUN: no Gemini fixture/,
   /step will be retried/,
 ];
+// Poll limits for the fake scenarios. --real gets its own (#280): in the #97
+// run get-context held one pipeline_step for 302 s over two pages and
+// character-lookahead for 292 s, so 5 and 20 minutes failed a working run.
+// The real limits are about 3x those, and a stalled real run still ends.
 const GATE_TIMEOUT_MS = 5 * 60_000;
 const RUN_TIMEOUT_MS = 20 * 60_000;
+const REAL_GATE_TIMEOUT_MS = 15 * 60_000;
+const REAL_RUN_TIMEOUT_MS = 60 * 60_000;
 const RESUME_RETRY_MS = 60_000;
 const SKIPPED_VOICE = "__SKIPPED__";
 
@@ -648,6 +654,8 @@ async function runPipeline(
   run.id = (JSON.parse(trig.text) as { runId?: string }).runId;
 
   const pauses = scenario.gates.filter((g) => g.expect === "pause");
+  const gateTimeoutMs = real ? REAL_GATE_TIMEOUT_MS : GATE_TIMEOUT_MS;
+  const runTimeoutMs = real ? REAL_RUN_TIMEOUT_MS : RUN_TIMEOUT_MS;
   const started = Date.now();
   let lastKey = "";
   let lastChange = Date.now();
@@ -685,14 +693,14 @@ async function runPipeline(
       resumed.push(gate);
       console.log(`  ${gate}: paused→resumed`);
     }
-    if (Date.now() - lastChange > GATE_TIMEOUT_MS) {
+    if (Date.now() - lastChange > gateTimeoutMs) {
       fail(
-        `per-gate timeout (${GATE_TIMEOUT_MS / 60_000} min) with no step change; last pipeline_step = ${step}`,
+        `per-gate timeout (${gateTimeoutMs / 60_000} min) with no step change; last pipeline_step = ${step}`,
       );
     }
-    if (Date.now() - started > RUN_TIMEOUT_MS) {
+    if (Date.now() - started > runTimeoutMs) {
       fail(
-        `whole-run timeout (${RUN_TIMEOUT_MS / 60_000} min); last pipeline_step = ${step}`,
+        `whole-run timeout (${runTimeoutMs / 60_000} min); last pipeline_step = ${step}`,
       );
     }
     await sleep(3000);
