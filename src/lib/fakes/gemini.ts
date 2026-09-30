@@ -83,16 +83,14 @@ function identifyFace(): string {
 
 /** Keeps the ids from the prompt, in the order the prompt lists them. */
 function sortPlan(prompt: string): string {
-  const panelIds = [...prompt.matchAll(/panelId \(uuid\): (\S+)/g)].map(
-    (m) => m[1]!,
-  );
+  const panelIds = [...prompt.matchAll(/- panelId: (\S+)/g)].map((m) => m[1]!);
   const panels = panelIds.map((panelId, sortOrder) => ({
     panelId,
     sortOrder,
     bubbles: [] as Array<{ bubbleId: string; sortOrder: number }>,
   }));
   for (const m of prompt.matchAll(
-    /bubbleId: (\S+)\n\s*assigned_panel_uuid: (\S+)/g,
+    /bubbleId: (\S+)\n\s*assigned_panelId: (\S+)/g,
   )) {
     const panel = panels.find((p) => p.panelId === m[2]) ?? panels[0];
     panel?.bubbles.push({ bubbleId: m[1]!, sortOrder: panel.bubbles.length });
