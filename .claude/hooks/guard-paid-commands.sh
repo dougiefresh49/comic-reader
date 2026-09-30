@@ -5,10 +5,16 @@
 # Block contract (#85 decision 3): exit 2 with a one-line reason on stderr.
 # It only ever reads the command string, never runs it.
 #
-# The command is walked one segment at a time (split on ; && || | and newlines,
-# plus the inside of an `sh -c "..."`), because the override and the thing it
-# overrides have to be in the same segment. Without that, `echo LIVE_API_OK=1;
-# pnpm generate-audio` would pass, and so would `rg "pnpm generate-audio"`.
+# The command is walked one segment at a time (split on ; & && || | and
+# newlines, plus the inside of an `sh -c "..."`), because the override and the
+# thing it overrides have to be in the same segment. Without that,
+# `echo LIVE_API_OK=1; pnpm generate-audio` would pass, and so would
+# `rg "pnpm generate-audio"`.
+#
+# LIMIT: this matches shell text with patterns, it does not run a shell parser.
+# It reads the ordinary ways a command is written. A deliberately mangled
+# invocation (a variable holding the command name, an eval) can still get
+# through, and that is a known boundary rather than an oversight.
 
 PAYLOAD=$(cat)
 COMMAND=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
@@ -38,21 +44,29 @@ block() {
 # --- segment splitting ----------------------------------------------------
 
 # Print one command segment per line. Also unwraps one level of `sh -c "..."`,
-# because the outer segment would otherwise hide everything inside it.
+# because the outer segment would otherwise hide everything inside it. A
+# comment runs to the end of the line, so one is dropped before splitting: a
+# `# LIVE_API_OK=1` at the end of a line is not an assignment.
 segments() {
-  # The trailing \n matters: sed keeps a missing final newline, which would
-  # weld the last segment onto the next line.
-  printf '%s\n' "$1" | sed -E 's/(;|&&|\|\||\||\n)/\n/g'
-  printf '%s\n' "$1" | grep -oE "(^|[[:space:]])(ba|z|k|da)?sh[[:space:]]+-c[[:space:]]+[\"'][^\"']*[\"']" |
-    sed -E "s/^.*-c[[:space:]]+[\"']//; s/[\"']$//"
+  local text
+  text=$(printf '%s\n' "$1" | sed -E 's/(^|[[:space:]])#.*$//')
+  printf '%s\n' "$text" | sed -E 's/(;|&&|\|\||\||&|\n)/\n/g'
+  printf '%s\n' "$text" |
+    grep -oE "(^|[[:space:]])(ba|z|k|da)?sh[[:space:]]+-c[[:space:]]+[\"'][^\"']*[\"']" |
+    sed -E "s/^.*-c[[:space:]]+[\"']//; s/[\"']\$//"
 }
 
-# A segment invokes pnpm (rather than merely mentioning it in an argument).
+# A segment runs pnpm when pnpm is the command being run, after any leading
+# VAR=value assignments, not when the string merely mentions it.
 invokes_pnpm() {
-  printf '%s' "$1" | grep -qE "(^|[[:space:];|&(){}])pnpm[[:space:]]"
+  local first
+  first=$(printf '%s' "$1" | tr -d "\"'<>" | awk '{ for (i = 1; i <= NF; i++) { if ($i ~ /^[A-Za-z_][A-Za-z0-9_]*=/) continue; print $i; exit } }')
+  [ "$first" = "pnpm" ]
 }
 
-# The override the reason names: LIVE_API_OK=1 in front of the command.
+# The override the paid rules name: LIVE_API_OK=1 in front of the command.
+# Only those rules take it; it is not a release from the .env or the
+# guarded-file rules below.
 has_override() {
   printf '%s' "$1" | grep -qE '(^|[^[:alnum:]_])LIVE_API_OK=1([^[:alnum:]_]|$)'
 }
@@ -93,78 +107,93 @@ guarded_reason() {
   return 1
 }
 
+# Does this segment write a file? -i is an in-place flag wherever it sits in
+# sed's options, and a redirect operator attaches to what follows it, so both
+# are looked for anywhere in the segment rather than in one position.
+is_write_segment() {
+  printf '%s' "$1" | grep -qE '(^|[[:space:];|&(){}])(sed|perl)([[:space:]]|$)' &&
+    printf '%s' "$1" | grep -qE '(^|[[:space:]])-[a-zA-Z]*i([=[:space:]]|$)' && return 0
+  printf '%s' "$1" | grep -qE '(^|[[:space:];|&(){}])(tee|truncate|patch|dd|install|cp|mv)([[:space:]]|$)|[<>]'
+}
+
 # --- per segment ----------------------------------------------------------
 
 while IFS= read -r SEG || [ -n "$SEG" ]; do
   [ -z "$SEG" ] && continue
-  if has_override "$SEG"; then
-    continue
+
+  # Quoting removed and redirect operators turned into separators, so a token
+  # is what a shell would hand to the program: `pnpm "generate-audio"` and
+  # `printf x >src/lib/models.ts` both read plainly here.
+  DEQUOTED=$(printf '%s' "$SEG" | tr -d "\"'<>" | tr '><' '  ')
+
+  # --- paid commands, unless this segment carries the override -----------
+
+  if ! has_override "$SEG"; then
+    # rule 1: script:<name> [&& <ere>] , a pnpm run of a named script
+    # rule 2: cmd:<ere> [&& <ere>]    , anything else, matched as written
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+      '' | '#'* | file:* | @from-step:*) continue ;;
+      esac
+      spec=${line%% ::*}
+      reason=${line#*:: }
+      case "$spec" in
+      script:*)
+        target=${spec#script:}
+        cond=
+        case "$target" in
+        *'&&'*)
+          cond=${target#*&&}
+          target=${target%%&&*}
+          ;;
+        esac
+        target=$(printf '%s' "$target" | sed -E 's/[[:space:]]+$//')
+        # A token in the segment, so quoting and pnpm options do not hide it.
+        # --from-step values come out first: they name a pipeline step rather
+        # than a script being run, and the block below is the rule for those.
+        invokes_pnpm "$SEG" || continue
+        SCRIPTS=$(printf '%s' "$DEQUOTED" | sed -E 's/--from-step(=|[[:space:]]+)[a-z0-9-]+//g')
+        printf '%s' "$SCRIPTS" | grep -qE "(^|[[:space:]])$target([[:space:]]|$)" || continue
+        if [ -n "$cond" ]; then
+          printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || continue
+        fi
+        block "$reason"
+        ;;
+      cmd:*)
+        target=${spec#cmd:}
+        cond=
+        case "$target" in
+        *'&&'*)
+          cond=${target#*&&}
+          target=${target%%&&*}
+          ;;
+        esac
+        ok=1
+        for PART in ${target//&&/$'\n'}; do
+          printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$PART" | sed -E 's/^[[:space:]]+//')" || ok=0
+        done
+        if [ -n "$cond" ]; then
+          printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || ok=0
+        fi
+        [ "$ok" = "1" ] && block "$reason"
+        ;;
+      esac
+    done <"$LIST"
   fi
-
-  DEQUOTED=$(printf '%s' "$SEG" | tr -d "\"'")
-
-  # rule 1: script:<name> [&& <ere>] , a pnpm run of a named script
-  # rule 2: cmd:<ere> [&& <ere>]    , anything else, matched as written
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-    '' | '#'* | file:* | @from-step:*) continue ;;
-    esac
-    spec=${line%% ::*}
-    reason=${line#*:: }
-    case "$spec" in
-    script:*)
-      target=${spec#script:}
-      cond=
-      case "$target" in
-      *'&&'*)
-        cond=${target#*&&}
-        target=${target%%&&*}
-        ;;
-      esac
-      target=$(printf '%s' "$target" | sed -E 's/[[:space:]]+$//')
-      # A token in the segment, so quoting and pnpm options do not hide it.
-      # --from-step values come out first: they name a pipeline step rather
-      # than a script being run, and the block below is the rule for those.
-      invokes_pnpm "$SEG" || continue
-      SCRIPTS=$(printf '%s' "$DEQUOTED" | sed -E 's/--from-step(=|[[:space:]]+)[a-z0-9-]+//g')
-      printf '%s' "$SCRIPTS" | grep -qE "(^|[[:space:]])$target([[:space:]]|$)" || continue
-      if [ -n "$cond" ]; then
-        printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || continue
-      fi
-      block "$reason"
-      ;;
-    cmd:*)
-      target=${spec#cmd:}
-      cond=
-      case "$target" in
-      *'&&'*)
-        cond=${target#*&&}
-        target=${target%%&&*}
-        ;;
-      esac
-      ok=1
-      for PART in ${target//&&/$'\n'}; do
-        printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$PART" | sed -E 's/^[[:space:]]+//')" || ok=0
-      done
-      if [ -n "$cond" ]; then
-        printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || ok=0
-      fi
-      [ "$ok" = "1" ] && block "$reason"
-      ;;
-    esac
-  done <"$LIST"
 
   # --- ingest resumed at or after a paid step ----------------------------
   #
   # `pnpm ingest -- --from-step <step>` re-runs that step and every step after
   # it. The order comes from scripts/ingest.ts at run time, not from a second
   # copy of the list, so the two cannot drift apart. The last --from-step wins,
-  # which is what ingest's own parseArgs does with a repeated flag.
+  # which is what ingest's own parseArgs does with a repeated flag, and it is
+  # read from the same dequoted text the script rules read, so a quoted flag
+  # cannot hide it.
 
-  LAST=$(printf '%s' "$SEG" | grep -oE -- "--from-step(=|[[:space:]]*)[\"']?[a-z0-9][a-z0-9-]*" | tail -n1)
-  FROM_STEP=$(printf '%s' "$LAST" | sed -E "s/^--from-step(=|[[:space:]]*)+//; s/^[\"']//; s/[\"']\$//")
+  LAST=$(printf '%s' "$DEQUOTED" | grep -oE -- "--from-step(=|[[:space:]]*)[a-z0-9][a-z0-9-]*" | tail -n1)
+  FROM_STEP=$(printf '%s' "$LAST" | sed -E 's/^--from-step(=|[[:space:]]*)+//')
 
-  if [ -n "$FROM_STEP" ] && invokes_pnpm "$SEG" && printf '%s' "$DEQUOTED" | grep -qE '(^|[[:space:]])ingest([[:space:]]|$)'; then
+  if [ -n "$FROM_STEP" ] && ! has_override "$SEG" && invokes_pnpm "$SEG" && printf '%s' "$DEQUOTED" | grep -qE '(^|[[:space:]])ingest([[:space:]]|$)'; then
     INGEST_TS="$REPO_ROOT/scripts/ingest.ts"
     THRESHOLD=$(grep -m1 '^@from-step:' "$LIST" | sed -E 's/^@from-step:([a-z0-9-]+).*/\1/')
     ORDER=$(awk '/^const PIPELINE_STEPS/,/^\];/' "$INGEST_TS" 2>/dev/null |
@@ -198,8 +227,7 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
 
   # --- a shell write onto a guarded credit source ------------------------
 
-  if [ "${CREDIT_OVERRIDE:-}" != "1" ] &&
-    printf '%s' "$SEG" | grep -qE "(sed|perl)[[:space:]]+-[a-zA-Z]*i|(^|[[:space:]])(tee|truncate|patch|dd|install)([[:space:]]|$)|(^|[[:space:]])(cp|mv)([[:space:]]|$)|>" ; then
+  if [ "${CREDIT_OVERRIDE:-}" != "1" ] && is_write_segment "$SEG"; then
     for TOKEN in $DEQUOTED; do
       if REASON=$(guarded_reason "$TOKEN"); then
         block "$REASON That command writes the file from a shell; edit it with the Edit tool, or start the session with CREDIT_OVERRIDE=1."
@@ -210,11 +238,12 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   # --- .env reads in a delegate session ----------------------------------
   #
   # Copying .env into a worktree is pre-approved and every worktree needs one.
-  # Reading it is how a key lands in a transcript.
+  # Reading it is how a key lands in a transcript. LIVE_API_OK=1 does not
+  # release this one; it names paid spend, not key access.
 
   if [ "${DELEGATE:-}" = "1" ]; then
-    READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdump|base64|nl|tac|sort|uniq|tr|rev|wc|cut|paste|column|split|grep|egrep|fgrep|rg|ag|awk|sed|jq|python3?|node|perl|ruby|php|source|open|security)($|[[:space:]/.])'
-    if printf '%s' "$SEG" | grep -qE "$READER" && printf '%s' "$DEQUOTED" | grep -qE '(^|[[:space:]])[^[:space:]]*\.env([[:space:]]|$)'; then
+    READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdump|base64|nl|tac|sort|uniq|tr|rev|wc|cut|paste|column|split|grep|egrep|fgrep|rg|ag|awk|sed|jq|python3?|node|perl|ruby|php|source|open|security)($|[[:space:]/.<>])'
+    if printf '%s' "$DEQUOTED" | grep -qE "$READER" && printf '%s' "$DEQUOTED" | grep -qE '(^|[[:space:]])[^[:space:]]*\.env([[:space:]]|$)'; then
       block "a DELEGATE=1 session may copy .env into a worktree but not read it, so keys stay out of the transcript. Run the check against the admin UI, or ask the owner for the value you need."
     fi
   fi

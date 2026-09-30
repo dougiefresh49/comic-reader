@@ -76,11 +76,19 @@ while IFS= read -r line || [ -n "$line" ]; do
     exit 2
   fi
 
-  # No file_path in the payload: a patch names the file in its text. Over-
-  # blocking on a mention is the safe direction for a credit guard.
-  if [ -z "$FILE_PATH" ] && printf '%s' "$PAYLOAD" | grep -qF "$target"; then
-    printf 'Blocked: %s\n' "$reason" >&2
-    exit 2
+  # No file_path in the payload: a codex apply_patch names the file in its
+  # text. Those paths get the same normalization, so src/lib/../lib/models.ts
+  # in a patch reaches the rule. Over-blocking on a mention is the safe
+  # direction for a credit guard.
+  if [ -z "$FILE_PATH" ]; then
+    # JSON braces and redirect operators become separators, so a path is a
+    # token rather than a path welded to the payload's closing braces.
+    for TOKEN in $(printf '%s' "$PAYLOAD" | tr -d "\"'" | tr '{}<>' '    '); do
+      if [ "$(normalize_path "$TOKEN")" = "$target" ] || [ "$(normalize_path "$TOKEN")" = "${REPO_ROOT}/$target" ]; then
+        printf 'Blocked: %s\n' "$reason" >&2
+        exit 2
+      fi
+    done
   fi
 done <"$LIST"
 

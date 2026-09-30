@@ -31,7 +31,7 @@ script:voice-rotation && --(archive|restore|execute)([^[:alnum:]_-]|$) :: Paid: 
 # and the method is not GET. The method is spelled out in character classes
 # because macOS grep has no case-insensitive mode, and it allows -X, --request,
 # an = separator, a quoted method and an attached value.
-cmd:curl.*api\.elevenlabs\.io && .*(-[Xx][[:space:]]*=*[[:space:]]*[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|--request(=|[[:space:]]+)[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|(-[dFT][[:space:]\"']|--data|--form|--upload-file)) :: Paid: that is a write against the ElevenLabs API, not a GET. Re-run it as LIVE_API_OK=1 curl ... only if the task named that spend.
+cmd:curl.*api\.elevenlabs\.io && .*(-[Xx][[:space:]]*=*[[:space:]]*[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|--request(=|[[:space:]]+)[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|(-[dFT][[:space:]\"']|-[dFT][^[:space:]]|--data|--form|--upload-file)) :: Paid: that is a write against the ElevenLabs API, not a GET. Re-run it as LIVE_API_OK=1 curl ... only if the task named that spend.
 
 @from-step:generate-voice-models :: Paid: resuming ingest at or after this step re-spends ElevenLabs credits and voice slots. Re-run it as LIVE_API_OK=1 pnpm ingest -- ... --from-step <step> only if the task named that spend.
 file:src/lib/models.ts :: Paid: this file holds the Gemini model ids and caps. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
