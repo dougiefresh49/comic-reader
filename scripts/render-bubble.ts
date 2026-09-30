@@ -22,7 +22,10 @@ import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
+import { isDryRun } from "~/lib/fakes/dry-run";
 import { buildTtsRequest, type TtsRequest } from "~/lib/tts-request";
+import { SKIPPED_VOICE } from "~/lib/voice-settings";
+import { normalizeAlignment } from "~/workflows/steps/audio-plan";
 import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -70,8 +73,11 @@ Overrides:
   --stability <n>    0 to 1
   --style <n>        0 to 1
   --speed <n>        0.7 to 1.2. Inert on eleven_v3, which ignores it.
-  --context          Send previous_text and next_text.
+  --context          Send the adjacent bubbles as previous_text and next_text.
+                     Reads the page's other bubbles in reading order, so it
+                     needs a --bubble source, not --text.
   --label <name>     Output name under tmp/render-bubble/ (default: derived).
+                     Letters, digits, dot, dash and underscore only.
 
 Batch:
   --batch <file.jsonl>   One JSON object per line, holding the same fields.
@@ -84,6 +90,13 @@ Other:
   -h, --help         This text.
 `;
 
+/** What the ElevenLabs API accepts, so a bad override fails before the call. */
+const RANGES = {
+  stability: [0, 1],
+  style: [0, 1],
+  speed: [0.7, 1.2],
+} as const;
+
 function fail(message: string): never {
   console.error(`❌ ${message}`);
   process.exit(1);
@@ -95,11 +108,29 @@ function takeValue(argv: string[], i: number, flag: string): string {
   return v;
 }
 
-function takeNumber(argv: string[], i: number, flag: string): number {
+function takeNumber(
+  argv: string[],
+  i: number,
+  flag: string,
+  range?: readonly [number, number],
+): number {
   const raw = takeValue(argv, i, flag);
   const n = Number(raw);
   if (!Number.isFinite(n)) fail(`${flag} needs a number, got '${raw}'`);
+  if (range && (n < range[0] || n > range[1])) {
+    fail(`${flag} must be between ${range[0]} and ${range[1]}, got ${n}`);
+  }
   return n;
+}
+
+/** A label becomes a file name under `tmp/render-bubble/`, so one segment. */
+function checkLabel(label: string): string {
+  if (!/^[A-Za-z0-9._-]+$/.test(label)) {
+    fail(
+      `--label must be letters, digits, dot, dash or underscore only, got '${label}'`,
+    );
+  }
+  return label;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -118,10 +149,13 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--text") args.text = takeValue(argv, i++, a);
     else if (a === "--emotion") args.emotion = takeValue(argv, i++, a);
     else if (a === "--voice") args.voice = takeValue(argv, i++, a);
-    else if (a === "--stability") args.stability = takeNumber(argv, i++, a);
-    else if (a === "--style") args.style = takeNumber(argv, i++, a);
-    else if (a === "--speed") args.speed = takeNumber(argv, i++, a);
-    else if (a === "--label") args.label = takeValue(argv, i++, a);
+    else if (a === "--stability")
+      args.stability = takeNumber(argv, i++, a, RANGES.stability);
+    else if (a === "--style")
+      args.style = takeNumber(argv, i++, a, RANGES.style);
+    else if (a === "--speed")
+      args.speed = takeNumber(argv, i++, a, RANGES.speed);
+    else if (a === "--label") args.label = checkLabel(takeValue(argv, i++, a));
     else if (a === "--batch") args.batch = takeValue(argv, i++, a);
     else if (a === "--max") args.max = takeNumber(argv, i++, a);
     else if (a === "--context") args.context = true;
@@ -139,6 +173,7 @@ interface BubbleRow {
   ocr_text: string | null;
   text_with_cues: string | null;
   page_number: number;
+  sort_order: number;
 }
 
 async function readBubble(spec: LineSpec): Promise<BubbleRow> {
@@ -146,7 +181,9 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
   if (!spec.book || !spec.issue) fail("--bubble needs --book and --issue");
   const { data, error } = await supabase
     .from("bubbles")
-    .select("id, speaker, emotion, ocr_text, text_with_cues, page_number")
+    .select(
+      "id, speaker, emotion, ocr_text, text_with_cues, page_number, sort_order",
+    )
     .eq("book_id", spec.book)
     .eq("issue_id", spec.issue)
     .eq("id", spec.bubble)
@@ -165,7 +202,9 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
  *
  * The castlist is per book (decisions row 28), but rows still carry an
  * `issue_id` until #118, so a row for another issue of the same book is a
- * usable answer and the one for this issue wins when both are there.
+ * usable answer and the one for this issue wins when both are there. A row
+ * with no voice, or the `__SKIPPED__` sentinel that means "this character is
+ * silent in this issue", is not a voice, and a miss asks for `--voice` instead.
  */
 async function readCastlistVoice(
   bookId: string,
@@ -179,9 +218,49 @@ async function readCastlistVoice(
     .eq("character", speaker);
   if (error) fail(`Reading castlist for '${speaker}': ${error.message}`);
   const rows = (data ?? []) as { issue_id: string; voice_id: string | null }[];
-  const forIssue = rows.find((r) => r.issue_id === issueId);
-  const first = rows.find((r) => r.voice_id);
-  return (forIssue?.voice_id ?? first?.voice_id ?? null) as string | null;
+  const usable = rows.filter((r) => r.voice_id && r.voice_id !== SKIPPED_VOICE);
+  const forIssue = usable.find((r) => r.issue_id === issueId);
+  return forIssue?.voice_id ?? usable[0]?.voice_id ?? null;
+}
+
+/**
+ * The bubbles either side of this one on its page, in reading order, which is
+ * what `previous_text` and `next_text` carry. `sort_order` is the play order
+ * (#206), so it is the reading order within a page.
+ */
+async function readNeighbours(
+  bubble: BubbleRow,
+  bookId: string,
+  issueId: string,
+): Promise<{ previousText?: string; nextText?: string }> {
+  const { data, error } = await supabase
+    .from("bubbles")
+    .select("id, sort_order, ocr_text, text_with_cues")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("page_number", bubble.page_number)
+    .eq("ignored", false);
+  if (error) fail(`Reading the page's bubbles: ${error.message}`);
+  const text = (r: {
+    ocr_text: string | null;
+    text_with_cues: string | null;
+  }) => (r.text_with_cues ?? r.ocr_text ?? "").trim();
+  const rows = (
+    (data ?? []) as {
+      id: string;
+      sort_order: number;
+      ocr_text: string | null;
+      text_with_cues: string | null;
+    }[]
+  )
+    .filter((r) => r.id !== bubble.id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  const before = rows.filter((r) => r.sort_order < bubble.sort_order);
+  const after = rows.filter((r) => r.sort_order > bubble.sort_order);
+  return {
+    previousText: text(before[before.length - 1]!) || undefined,
+    nextText: text(after[0]!) || undefined,
+  };
 }
 
 /** One render, before any money is spent. */
@@ -213,13 +292,20 @@ function defaultLabel(spec: LineSpec, index: number): string {
 async function planRender(
   spec: LineSpec,
   index: number,
+  where: string,
 ): Promise<PlannedRender> {
+  if (spec.bubble && spec.text !== undefined) {
+    fail(`${where} sets both --bubble and --text. Pick one source.`);
+  }
   let text = spec.text ?? "";
   let emotion = spec.emotion ?? null;
   let speaker: string | null = null;
   let source: string;
   let bookId = spec.book ?? null;
   let issueId = spec.issue ?? null;
+  let previousText: string | undefined;
+  let nextText: string | undefined;
+  const overridden: string[] = [];
 
   if (spec.bubble) {
     const bubble = await readBubble(spec);
@@ -229,11 +315,29 @@ async function planRender(
     bookId = bookId ?? "";
     issueId = issueId ?? "";
     source = `bubble ${bubble.id} (${spec.book}/${spec.issue} page ${bubble.page_number})`;
+    if (spec.emotion !== undefined) overridden.push("emotion");
+    if (spec.context) {
+      ({ previousText, nextText } = await readNeighbours(
+        bubble,
+        bookId,
+        issueId,
+      ));
+    }
   } else if (spec.text !== undefined) {
+    if (spec.emotion === undefined) {
+      fail(
+        `${where} uses --text with no --emotion. The settings come from the emotion, so say which one.`,
+      );
+    }
     source = "--text";
+    if (spec.context) {
+      fail(
+        `${where} sets --context with --text. The adjacent text comes from a page, so --context needs a --bubble source.`,
+      );
+    }
   } else {
     fail(
-      'Nothing to render. Pass --bubble <uuid> --book <id> --issue <id>, or --text "<line>".',
+      'Nothing to render. Pass --bubble <uuid> --book <id> --issue <id>, or --text "<line>" --emotion <word>.',
     );
   }
 
@@ -257,9 +361,13 @@ async function planRender(
     text,
     emotion,
     voiceId,
+    previousText,
+    nextText,
     withContext: spec.context ?? false,
   });
-  const overridden: string[] = [];
+  if (spec.context) {
+    overridden.push("previousText", "nextText");
+  }
   if (spec.stability !== undefined) {
     request.voiceSettings.stability = spec.stability;
     overridden.push("voiceSettings.stability");
@@ -315,22 +423,25 @@ function printPlan(render: PlannedRender): void {
 }
 
 /**
- * The seconds the audio runs for, read off the alignment ElevenLabs returns
- * with the timestamps. `normalizeAlignment` in
- * `src/server/actions/review/regenerate-audio.ts` is the pipeline's version of
- * this and is not exported, so this reads both spellings of the field names.
+ * The seconds the audio runs for, read off the last character's end time. The
+ * alignment is `normalizeAlignment`'s, the same shape the audio step stores.
  */
-function audioDurationSeconds(alignment: unknown): number | null {
-  if (!alignment || typeof alignment !== "object") return null;
-  const ends =
-    (alignment as Record<string, unknown>).character_end_times_seconds ??
-    (alignment as Record<string, unknown>).characterEndTimesSeconds;
-  if (!Array.isArray(ends) || ends.length === 0) return null;
-  const last = ends[ends.length - 1];
-  return typeof last === "number" ? Number(last.toFixed(3)) : null;
+function audioDurationSeconds(
+  alignment: ReturnType<typeof normalizeAlignment>,
+) {
+  const ends = alignment?.character_end_times_seconds ?? [];
+  if (ends.length === 0) return null;
+  return Number(ends[ends.length - 1]!.toFixed(3));
 }
 
 async function executeRender(render: PlannedRender): Promise<void> {
+  // Under DRY_RUN the client hands back a silent mp3, so `--execute` would
+  // write a file that is not a render and still print "wrote". Stop instead.
+  if (isDryRun()) {
+    fail(
+      "DRY_RUN is set, so the client would return silent audio. Unset it to --execute for real.",
+    );
+  }
   const client = await getElevenLabsClient();
   let response;
   try {
@@ -343,6 +454,8 @@ async function executeRender(render: PlannedRender): Promise<void> {
     fail(`The ElevenLabs call failed: ${(e as Error).message}`);
   }
   const audio = Buffer.from(response.audioBase64, "base64");
+  const alignment = normalizeAlignment(response.alignment);
+  const normalizedAlignment = normalizeAlignment(response.normalizedAlignment);
   await fs.ensureDir(OUT_DIR);
   const mp3Path = join(OUT_DIR, `${render.label}.mp3`);
   await fs.writeFile(mp3Path, audio);
@@ -357,15 +470,62 @@ async function executeRender(render: PlannedRender): Promise<void> {
       request: render.request,
       overridden: render.overridden,
       characterCount: render.characterCount,
-      alignment: response.alignment ?? null,
-      normalizedAlignment: response.normalizedAlignment ?? null,
-      audioDurationSeconds: audioDurationSeconds(response.alignment),
+      alignment,
+      normalizedAlignment,
+      audioDurationSeconds: audioDurationSeconds(alignment),
       audioBytes: audio.byteLength,
     },
     { spaces: 2 },
   );
   console.log(`\n   wrote ${mp3Path}`);
   console.log(`   wrote ${jsonPath}`);
+}
+
+/**
+ * One batch line, held to the same rules as the flags. A jsonl line is not
+ * typed, so `stability: null` and `context: "false"` would otherwise reach the
+ * request; each is checked before anything is spent.
+ */
+function checkBatchLine(spec: LineSpec, where: string): LineSpec {
+  const out: LineSpec = { ...spec };
+  for (const [key, range] of [
+    ["stability", RANGES.stability],
+    ["style", RANGES.style],
+    ["speed", RANGES.speed],
+  ] as const) {
+    const v = out[key];
+    if (v === undefined) continue;
+    if (
+      typeof v !== "number" ||
+      !Number.isFinite(v) ||
+      v < range[0] ||
+      v > range[1]
+    ) {
+      fail(
+        `${where} has ${key}: ${JSON.stringify(v)}. It must be a number between ${range[0]} and ${range[1]}.`,
+      );
+    }
+  }
+  if (out.context !== undefined && typeof out.context !== "boolean") {
+    fail(
+      `${where} has context: ${JSON.stringify(out.context)}. It must be true or false.`,
+    );
+  }
+  if (out.label !== undefined) checkLabel(out.label);
+  for (const key of [
+    "bubble",
+    "book",
+    "issue",
+    "text",
+    "emotion",
+    "voice",
+  ] as const) {
+    const v = out[key];
+    if (v !== undefined && typeof v !== "string") {
+      fail(`${where} has ${key}: ${JSON.stringify(v)}. It must be a string.`);
+    }
+  }
+  return out;
 }
 
 async function readBatchFile(path: string): Promise<LineSpec[]> {
@@ -385,7 +545,7 @@ async function readBatchFile(path: string): Promise<LineSpec[]> {
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       fail(`${path} line ${i + 1} is not a JSON object.`);
     }
-    return parsed as LineSpec;
+    return checkBatchLine(parsed as LineSpec, `${path} line ${i + 1}`);
   });
 }
 
@@ -397,7 +557,7 @@ async function main(): Promise<void> {
     if (specs.length === 0) fail(`${args.batch} has no lines.`);
     const planned: PlannedRender[] = [];
     for (const [i, spec] of specs.entries()) {
-      planned.push(await planRender(spec, i));
+      planned.push(await planRender(spec, i, `${args.batch} line ${i + 1}`));
     }
     const total = planned.reduce((n, r) => n + r.characterCount, 0);
     console.log(
@@ -419,7 +579,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const render = await planRender(args, 0);
+  const render = await planRender(args, 0, "Flags");
   printPlan(render);
   if (args.execute) {
     await executeRender(render);
