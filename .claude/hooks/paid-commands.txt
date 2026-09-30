@@ -7,10 +7,6 @@
 #                                       there too
 #   cmd:<ere> :: <reason>                anything else, matched as written
 #   cmd:<ere> && <ere> :: <reason>       several conditions, all must hold
-#   @from-step:<step-id> :: <reason>     paid only when ingest resumes at or
-#                                       after <step-id>. The step order is
-#                                       read from scripts/ingest.ts at run
-#                                       time, never copied here
 #   file:<path> :: <reason>              an Edit, Write or shell write to that
 #                                       path is guarded
 #
@@ -19,6 +15,9 @@
 # hide it, and it has to be a real script name from package.json, which is what
 # decision 1 asks for.
 
+# ingest comes first, so a --from-step value that is also a script name
+# (--from-step generate-audio) gets the ingest reason and not that script's.
+script:ingest :: Paid: ingest resumes whatever steps are unfinished, and any of them can spend on Gemini, ElevenLabs credits or voice slots. Re-run it as LIVE_API_OK=1 pnpm ingest ... only if the task named that spend.
 script:generate-audio :: Paid: generate-audio synthesizes the whole issue with ElevenLabs. Re-run it as LIVE_API_OK=1 pnpm generate-audio ... only if the task named that spend.
 script:generate-voice-models :: Paid: Voice Design takes real ElevenLabs voice slots, and the account is at its cap. Re-run it as LIVE_API_OK=1 pnpm generate-voice-models ... only if the task named that spend.
 script:regenerate-timestamps :: Paid: regenerating timestamps re-calls ElevenLabs for every cue. Re-run it as LIVE_API_OK=1 pnpm regenerate-timestamps ... only if the task named that spend.
@@ -26,6 +25,9 @@ script:get-context :: Paid: get-context runs a Gemini call per issue. Re-run it 
 script:motion-comic :: Paid: motion-comic calls Gemini for the motion plan. Re-run it as LIVE_API_OK=1 pnpm motion-comic ... only if the task named that spend.
 script:split-voice :: Paid: split-voice builds a new voice, which takes a voice slot. Re-run it as LIVE_API_OK=1 pnpm split-voice ... only if the task named that spend.
 script:voice-rotation && --(archive|restore|execute)([^[:alnum:]_-]|$) :: Paid: that flag renames or deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation ... only if the task named that spend.
+script:voice-rotation-archive :: Paid: voice-rotation-archive renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-archive ... only if the task named that spend.
+script:voice-rotation-checkout :: Paid: voice-rotation-checkout renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-checkout ... only if the task named that spend.
+script:apply-fixes :: Paid: apply-fixes writes production rows. Re-run it as LIVE_API_OK=1 pnpm apply-fixes ... only if the task named that write.
 
 # A GET is free, so this asks for two things at once: the host is ElevenLabs,
 # and the method is not GET. The method is spelled out in character classes
@@ -33,7 +35,10 @@ script:voice-rotation && --(archive|restore|execute)([^[:alnum:]_-]|$) :: Paid: 
 # an = separator, a quoted method and an attached value.
 cmd:curl.*api\.elevenlabs\.io && .*(-[Xx][[:space:]]*=*[[:space:]]*[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|--request(=|[[:space:]]+)[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|(-[dFT][[:space:]\"']|-[dFT][^[:space:]]|--data|--form|--upload-file)) :: Paid: that is a write against the ElevenLabs API, not a GET. Re-run it as LIVE_API_OK=1 curl ... only if the task named that spend.
 
-@from-step:generate-voice-models :: Paid: resuming ingest at or after this step re-spends ElevenLabs credits and voice slots. Re-run it as LIVE_API_OK=1 pnpm ingest -- ... --from-step <step> only if the task named that spend.
+# The smoke run has no package script; it runs through pnpm exec tsx, and only
+# --real makes it spend.
+cmd:smoke-ingest\.ts && --real([^[:alnum:]_-]|$) :: Paid: smoke-ingest --real runs the pipeline with real Gemini, ElevenLabs and Roboflow calls. Re-run it as LIVE_API_OK=1 pnpm exec tsx scripts/smoke-ingest.ts --real ... only if the task named that spend.
+
 file:src/lib/models.ts :: Paid: this file holds the Gemini model ids and caps. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
 file:src/lib/voice-settings.ts :: Paid: this file holds the voice settings for paid synthesis. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
 file:src/lib/tts-request.ts :: Paid: this file builds the ElevenLabs TTS request. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
