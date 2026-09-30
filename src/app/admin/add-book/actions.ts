@@ -126,6 +126,9 @@ export async function createBook(
     publisher,
     franchises,
     total_issues: totalIssues,
+    // #131: a book is a draft until the owner publishes it from /admin, so a
+    // book added ahead of the pipeline never shows kids an empty cover.
+    published: false,
   });
 
   if (bookError) return { ok: false, error: bookError.message };

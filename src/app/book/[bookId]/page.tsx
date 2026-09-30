@@ -34,7 +34,7 @@ function issueMonogram(issue: IssueManifest): string {
 export default async function BookDetailPage({ params }: BookDetailProps) {
   const { bookId } = await params;
 
-  const manifest = await getManifest();
+  const manifest = await getManifest({ publishedOnly: true });
 
   // Find the book
   const book = manifest.books.find((b) => b.id === bookId);

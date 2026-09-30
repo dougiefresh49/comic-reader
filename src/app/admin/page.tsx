@@ -6,7 +6,9 @@ import {
   type AdminBookInfo,
 } from "~/server/admin/queries";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { getBookPublishedFlags, getStoredPageCounts } from "~/server";
 import { PipelineActions, type SkippedGate } from "./PipelineActions";
+import BookPublishToggle from "./BookPublishToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -46,11 +48,14 @@ async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
 }
 
 export default async function AdminDashboardPage() {
-  const [issues, books, skippedByIssue] = await Promise.all([
-    getAdminIssues(),
-    getAdminBooksWithParts(),
-    getLatestSkippedByIssue(),
-  ]);
+  const [issues, books, skippedByIssue, publishedByBook, storedPages] =
+    await Promise.all([
+      getAdminIssues(),
+      getAdminBooksWithParts(),
+      getLatestSkippedByIssue(),
+      getBookPublishedFlags(),
+      getStoredPageCounts(),
+    ]);
 
   const issuesByBook = new Map<string, AdminIssueRow[]>();
   for (const iss of issues) {
@@ -111,6 +116,8 @@ export default async function AdminDashboardPage() {
                 book={book}
                 issues={issuesByBook.get(book.id) ?? []}
                 skippedByIssue={skippedByIssue}
+                published={publishedByBook[book.id] ?? false}
+                storedPageCounts={storedPages[book.id] ?? {}}
               />
             ))}
           </div>
@@ -124,12 +131,29 @@ function BookSection({
   book,
   issues,
   skippedByIssue,
+  published,
+  storedPageCounts,
 }: {
   book: AdminBookInfo;
   issues: AdminIssueRow[];
   skippedByIssue: Map<string, SkippedGate[]>;
+  published: boolean;
+  storedPageCounts: Record<string, number>;
 }) {
   const hasParts = book.parts.length > 0;
+  // The owner's way in. A draft book has no public route, so the admin list
+  // links /admin/preview, which the basic-auth matcher covers. An issue with
+  // no pages 404s in the reader, so the book-level link skips those; every
+  // issue that has pages gets its own link in the row. `issues` arrives
+  // sorted by number.
+  const previewable = new Set(
+    issues
+      .filter(
+        (iss) => iss.pageCount > 0 || (storedPageCounts[iss.issueId] ?? 0) > 0,
+      )
+      .map((iss) => iss.issueId),
+  );
+  const firstIssue = issues.find((iss) => previewable.has(iss.issueId));
 
   const issuesByPart = new Map<string | null, AdminIssueRow[]>();
   for (const iss of issues) {
@@ -143,6 +167,15 @@ function BookSection({
     <section>
       <div className="mb-3 flex flex-wrap items-baseline gap-2 sm:gap-3">
         <h2 className="text-lg font-medium">{book.name}</h2>
+        {published ? (
+          <span className="rounded bg-emerald-700/30 px-2 py-0.5 text-xs font-medium text-emerald-300">
+            Published
+          </span>
+        ) : (
+          <span className="rounded bg-neutral-700/40 px-2 py-0.5 text-xs font-medium text-neutral-400">
+            Draft
+          </span>
+        )}
         <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
           {book.publisher && <span>{book.publisher}</span>}
           {book.franchises && book.franchises.length > 0 && (
@@ -159,12 +192,23 @@ function BookSection({
             </span>
           )}
         </div>
-        <Link
-          href={`/admin/add-issue?book=${book.id}`}
-          className="ml-auto rounded bg-indigo-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-600"
-        >
-          + Issue
-        </Link>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {!published && firstIssue && (
+            <Link
+              href={`/admin/preview/${book.id}/${firstIssue.issueId}/1`}
+              className="rounded bg-cyan-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-cyan-600"
+            >
+              Preview
+            </Link>
+          )}
+          <Link
+            href={`/admin/add-issue?book=${book.id}`}
+            className="rounded bg-indigo-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-600"
+          >
+            + Issue
+          </Link>
+          <BookPublishToggle bookId={book.id} published={published} />
+        </div>
       </div>
 
       {hasParts ? (
@@ -185,6 +229,8 @@ function BookSection({
                   <IssueList
                     issues={partIssues}
                     skippedByIssue={skippedByIssue}
+                    draft={!published}
+                    previewable={previewable}
                   />
                 ) : (
                   <p className="py-2 text-xs text-neutral-600">
@@ -202,12 +248,19 @@ function BookSection({
               <IssueList
                 issues={issuesByPart.get(null)!}
                 skippedByIssue={skippedByIssue}
+                draft={!published}
+                previewable={previewable}
               />
             </div>
           )}
         </div>
       ) : (
-        <IssueList issues={issues} skippedByIssue={skippedByIssue} />
+        <IssueList
+          issues={issues}
+          skippedByIssue={skippedByIssue}
+          draft={!published}
+          previewable={previewable}
+        />
       )}
     </section>
   );
@@ -216,9 +269,13 @@ function BookSection({
 function IssueList({
   issues,
   skippedByIssue,
+  draft,
+  previewable,
 }: {
   issues: AdminIssueRow[];
   skippedByIssue: Map<string, SkippedGate[]>;
+  draft: boolean;
+  previewable: Set<string>;
 }) {
   return (
     <>
@@ -256,6 +313,8 @@ function IssueList({
                 <td className="px-4 py-2">
                   <ActionButtons
                     issue={iss}
+                    draft={draft}
+                    canPreview={previewable.has(iss.issueId)}
                     skippedGates={
                       skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
                     }
@@ -273,6 +332,8 @@ function IssueList({
           <IssueCard
             key={`${iss.bookId}/${iss.issueId}`}
             issue={iss}
+            draft={draft}
+            canPreview={previewable.has(iss.issueId)}
             skippedGates={
               skippedByIssue.get(`${iss.bookId}/${iss.issueId}`) ?? []
             }
@@ -286,9 +347,13 @@ function IssueList({
 function IssueCard({
   issue,
   skippedGates,
+  draft,
+  canPreview,
 }: {
   issue: AdminIssueRow;
   skippedGates: SkippedGate[];
+  draft: boolean;
+  canPreview: boolean;
 }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
@@ -317,7 +382,12 @@ function IssueCard({
       </div>
 
       <div className="mt-2.5">
-        <ActionButtons issue={issue} skippedGates={skippedGates} />
+        <ActionButtons
+          issue={issue}
+          skippedGates={skippedGates}
+          draft={draft}
+          canPreview={canPreview}
+        />
       </div>
     </div>
   );
@@ -366,9 +436,13 @@ function StatusBadge({ issue }: { issue: AdminIssueRow }) {
 function ActionButtons({
   issue,
   skippedGates,
+  draft,
+  canPreview,
 }: {
   issue: AdminIssueRow;
   skippedGates: SkippedGate[];
+  draft: boolean;
+  canPreview: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -383,6 +457,15 @@ function ActionButtons({
         status={issue.status}
         skippedGates={skippedGates}
       />
+      {draft && canPreview && (
+        <Link
+          href={`/admin/preview/${issue.bookId}/${issue.issueId}/1`}
+          className="rounded bg-cyan-700/60 px-2 py-1 text-xs font-medium text-white hover:bg-cyan-600"
+          title="Open the reader for this issue"
+        >
+          Preview
+        </Link>
+      )}
       <Link
         href={`/admin/${issue.bookId}/${issue.issueId}/review/pipeline`}
         className="rounded bg-neutral-700 px-2 py-1 text-xs font-medium text-neutral-300 hover:bg-neutral-600"

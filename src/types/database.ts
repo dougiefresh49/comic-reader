@@ -123,6 +123,7 @@ export type Database = {
           franchises: string[] | null;
           id: string;
           name: string;
+          published: boolean;
           publisher: string | null;
           series_id: string | null;
           slug: string;
@@ -135,6 +136,7 @@ export type Database = {
           franchises?: string[] | null;
           id: string;
           name: string;
+          published?: boolean;
           publisher?: string | null;
           series_id?: string | null;
           slug: string;
@@ -147,6 +149,7 @@ export type Database = {
           franchises?: string[] | null;
           id?: string;
           name?: string;
+          published?: boolean;
           publisher?: string | null;
           series_id?: string | null;
           slug?: string;

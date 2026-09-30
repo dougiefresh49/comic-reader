@@ -2,9 +2,12 @@ import { notFound } from "next/navigation";
 import { getReaderPage } from "~/server";
 import ZenComicReader from "~/components/ZenComicReader";
 
-export const revalidate = 86400;
+// The owner's view of any book, draft or published. It sits under /admin so
+// the basic-auth matcher covers it: browsers send the admin credentials only
+// under the path that asked for them, so /book/... never sees them.
+export const dynamic = "force-dynamic";
 
-interface BookPageProps {
+interface PreviewPageProps {
   params: Promise<{
     bookId: string;
     issueId: string;
@@ -12,15 +15,15 @@ interface BookPageProps {
   }>;
 }
 
-export default async function BookPage({ params }: BookPageProps) {
+export default async function PreviewPage({ params }: PreviewPageProps) {
   const { bookId, issueId, pageNumber } = await params;
 
   const reader = await getReaderPage({
     bookId,
     issueId,
     pageNumber,
-    publishedOnly: true,
-    basePath: "/book",
+    publishedOnly: false,
+    basePath: "/admin/preview",
   });
   if (!reader) notFound();
 
