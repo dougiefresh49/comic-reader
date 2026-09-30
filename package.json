@@ -24,6 +24,7 @@
     "extract-foreground-masks": "tsx --env-file=.env scripts/extract-foreground-masks.ts",
     "character-lookahead": "tsx --env-file=.env scripts/character-lookahead.ts",
     "test-ivc-fidelity": "tsx --env-file=.env scripts/test-ivc-fidelity.ts",
+    "render-bubble": "tsx --env-file=.env scripts/render-bubble.ts",
     "voice-rotation": "tsx --env-file=.env scripts/voice-rotation.ts",
     "voice-rotation-checkout": "tsx --env-file=.env scripts/voice-rotation-checkout.ts",
     "voice-rotation-archive": "tsx --env-file=.env scripts/voice-rotation-archive.ts",
