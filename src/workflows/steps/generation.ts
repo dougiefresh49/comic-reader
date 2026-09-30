@@ -120,11 +120,12 @@ export async function generateVoiceModel(
 
   if (appErr) throw new FatalError(appErr.message);
 
-  const markAppearanceReady = async () => {
+  const markAppearanceReady = async (voiceId: string | null) => {
     if (isDryRun()) return;
     const { error } = await supabase
       .from("character_appearances")
       .update({
+        voice_id: voiceId,
         voice_type: "voice_design",
         voice_status: "ready",
         voice_created_at:
@@ -133,7 +134,7 @@ export async function generateVoiceModel(
       .eq("id", appearanceId);
     if (error) {
       throw new FatalError(
-        `appearance ready update failed for ${characterId}: ${error.message}`,
+        `appearance ready update failed for ${characterId} voice_id=${voiceId}: ${error.message}`,
       );
     }
   };
@@ -141,17 +142,17 @@ export async function generateVoiceModel(
   // A retry must not design a second ElevenLabs voice for a character that
   // already has a `voices` row (#119). Looked up by the castlist row's
   // `voice_uuid`, never by display name (row 153).
-  const registeredVoiceUuid = await findRegisteredVoice(supabase, {
+  const registeredVoice = await findRegisteredVoice(supabase, {
     bookId,
     issueId,
     characterId,
   }).catch((err: unknown) => {
     throw new FatalError(err instanceof Error ? err.message : String(err));
   });
-  if (registeredVoiceUuid) {
-    await markAppearanceReady();
+  if (registeredVoice) {
+    await markAppearanceReady(registeredVoice.current_elevenlabs_id);
     console.log(
-      `[voice-model] ${characterId}: already registered, skipping; voices row ${registeredVoiceUuid}`,
+      `[voice-model] ${characterId}: already registered, skipping; voices row ${registeredVoice.id}`,
     );
     return;
   }
@@ -169,7 +170,7 @@ export async function generateVoiceModel(
     if (!saved.ok) {
       throw new FatalError(castSaveFailureMessage(appearance.voice_id, saved));
     }
-    await markAppearanceReady();
+    await markAppearanceReady(appearance.voice_id);
     console.log(
       `[voice-model] ${characterId}: already created, registered as voices row ${saved.voiceUuid}`,
     );
@@ -240,6 +241,7 @@ export async function generateVoiceModel(
   }
 
   const { voice_id } = (await createRes.json()) as { voice_id: string };
+  let appearanceWriteError: string | null = null;
   if (!isDryRun()) {
     // Keep the created id before registration, so a failed castlist save
     // cannot send the next run through Voice Design again.
@@ -248,9 +250,7 @@ export async function generateVoiceModel(
       .update({ voice_id })
       .eq("id", appearanceId);
     if (error) {
-      throw new FatalError(
-        `appearance voice id update failed for ${characterId} voice_id=${voice_id}: ${error.message}`,
-      );
+      appearanceWriteError = error.message;
     }
   }
   console.log(
@@ -263,11 +263,18 @@ export async function generateVoiceModel(
     elevenLabsId: voice_id,
     designPrompt: voiceDescription,
   });
+  // Retry storing the id even if the first appearance write or registry
+  // save failed, so either durable pointer can prevent a second create.
+  await markAppearanceReady(voice_id);
   if (!registered.ok) {
     throw new FatalError(castSaveFailureMessage(voice_id, registered));
   }
 
-  await markAppearanceReady();
+  if (appearanceWriteError) {
+    throw new FatalError(
+      `appearance voice id update failed for ${characterId} voice_id=${voice_id}: ${appearanceWriteError}`,
+    );
+  }
 
   console.log(
     `[voice-model] ${characterId}: created voice ${voice_id}, voices row ${registered.voiceUuid}`,

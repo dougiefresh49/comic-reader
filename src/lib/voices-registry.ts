@@ -58,7 +58,10 @@ export function buildVoiceRow(
 export async function findRegisteredVoice(
   client: SupabaseClient,
   input: Pick<RegisterCastVoiceInput, "bookId" | "issueId" | "characterId">,
-): Promise<string | null> {
+): Promise<{
+  id: string;
+  current_elevenlabs_id: string | null;
+} | null> {
   const db = client as SupabaseClient<Database>;
   const { data: cast, error: castErr } = await db
     .from("castlist")
@@ -73,11 +76,11 @@ export async function findRegisteredVoice(
 
   const { data: voice, error: voiceErr } = await db
     .from("voices")
-    .select("id")
+    .select("id, current_elevenlabs_id")
     .eq("id", voiceUuid)
     .maybeSingle();
   if (voiceErr) throw new Error(voiceErr.message);
-  return voice?.id ?? null;
+  return voice ?? null;
 }
 
 /**
