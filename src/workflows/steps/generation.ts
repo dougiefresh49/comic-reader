@@ -14,6 +14,7 @@ import {
   type AlignmentRaw,
   voiceDesignAppearanceId,
 } from "./audio-plan";
+import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 
 export async function getCharactersNeedingVoices(
   bookId: string,
@@ -315,8 +316,6 @@ export async function generateAudioBatch(
     );
   }
 
-  const { getVoiceSettingsFromEmotion } = await import("~/lib/voice-settings");
-
   const sendPlan = planBubblesToSend(bubbles, aliasMap, cast);
   for (const { bubble, reason } of sendPlan.skipped) {
     const rawSpeaker = bubble.speaker?.trim() ?? "";
@@ -331,23 +330,20 @@ export async function generateAudioBatch(
   for (const { bubble, voiceId } of sendPlan.toSend) {
     const ttsText = (bubble.text_with_cues ?? bubble.ocr_text)!;
 
-    const settings = getVoiceSettingsFromEmotion(bubble.emotion ?? "neutral");
-
     let response;
     try {
       response = await recordElevenLabsCall(
-        { step: "generate-audio", bookId, issueId, model: "eleven_v3" },
+        { step: "generate-audio", bookId, issueId, model: TTS_MODEL },
         ttsText.length,
         () =>
-          client.textToSpeech.convertWithTimestamps(voiceId, {
-            modelId: "eleven_v3",
-            text: ttsText,
-            voiceSettings: {
-              stability: settings.stability,
-              similarityBoost: settings.similarityBoost,
-              style: settings.style,
-            },
-          }),
+          client.textToSpeech.convertWithTimestamps(
+            voiceId,
+            buildTtsRequest({
+              text: ttsText,
+              emotion: bubble.emotion,
+              voiceId,
+            }),
+          ),
       );
     } catch (e) {
       throw new FatalError(

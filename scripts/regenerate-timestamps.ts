@@ -15,6 +15,7 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { env } from "~/env.mjs";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
+import { buildTtsRequest } from "~/lib/tts-request.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -344,12 +345,15 @@ async function main() {
         try {
           console.log(`   [${processed + 1}] Regenerating ${bubble.id}...`);
 
-          // Call API to get timestamps (without saving audio)
+          // Call API to get timestamps (without saving audio). The request is
+          // the one the audio was made with, so the model and settings match.
           const response = await client.textToSpeech.convertWithTimestamps(
             voiceId,
-            {
+            buildTtsRequest({
               text: textToUse,
-            },
+              emotion: bubble.emotion,
+              voiceId,
+            }),
           );
 
           // Extract timestamps - handle both snake_case and camelCase

@@ -21,10 +21,8 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { env } from "~/env.mjs";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
-import {
-  getVoiceSettingsFromEmotion,
-  SKIPPED_VOICE,
-} from "~/lib/voice-settings.js";
+import { SKIPPED_VOICE } from "~/lib/voice-settings.js";
+import { buildTtsRequest } from "~/lib/tts-request.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -414,11 +412,6 @@ async function main() {
             `   [${processed + 1}/${totalBubbles - skipped}] ${bubble.id} - ${matchedName}${isFuzzy ? " (fuzzy)" : ""}`,
           );
 
-          // Map emotion to voice settings for overall tone
-          // Lower stability = more expressive/emotional
-          // Higher style = more expressive
-          const voiceSettings = getVoiceSettingsFromEmotion(bubble.emotion);
-
           // Get previous and next bubble text for continuity
           // Bubbles are assumed to be in correct reading order
           const previousBubble = i > 0 ? bubbles[i - 1] : null;
@@ -434,17 +427,17 @@ async function main() {
             ? nextBubble.textWithCues || nextBubble.ocr_text || undefined
             : undefined;
 
-          // Use text-to-speech endpoint with timestamps
-          // previousText and nextText help improve continuity between adjacent bubbles
+          // Same request as the pipeline and the review regenerate. The
+          // adjacent-bubble text is off until withContext turns on.
           const response = await client.textToSpeech.convertWithTimestamps(
             voiceId,
-            {
-              modelId: "eleven_v3",
-              // previousText: previousText,
-              // nextText: nextText,
+            buildTtsRequest({
               text: textToUse,
-              voiceSettings: voiceSettings,
-            },
+              emotion: bubble.emotion,
+              voiceId,
+              previousText,
+              nextText,
+            }),
           );
 
           // Decode base64 audio
