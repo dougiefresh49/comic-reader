@@ -43,3 +43,30 @@ export const GEMINI_EMBEDDING_USD_PER_IMAGE = 0.00012;
 // Assumption until the owner's invoice: Creator plan, $22 for 100k credits,
 // 1 credit per character on eleven_v3.
 export const ELEVENLABS_USD_PER_CHARACTER = 0.00022;
+
+// ─── ElevenLabs credits for llm_calls.credits (#251) ──────────────────────────
+// ElevenLabs bills a subscription in credits, so credits are what an issue
+// really spends and the dollar figure above is our own estimate.
+//
+// No response header or body field reports the credits a single TTS request
+// used. The API reference for create speech and stream speech documents no
+// such header (read 2026-09-29, no call made), and the JS SDK's fetcher
+// exposes the response headers only to its logger, not to a caller. So the
+// figure is computed from the character count, which is what the request
+// bills on.
+//
+// Rates per character, from https://elevenlabs.io/pricing (read 2026-09-29,
+// no call made):
+//
+//   - "1 text character equals 1 credit" for V2 Multilingual.
+//   - Flash and Turbo run "between 0.5 and 1 credit per character".
+//   - v3 is priced on the same page at $0.08 per 1,000 characters as
+//     Multilingual v2, and the docs give no separate credit rate for it, so
+//     it takes the v2 figure of 1 credit per character. The owner's usage
+//     page is the check (#251 runs it); this constant is the thing to correct
+//     when it disagrees.
+//
+// A model with no entry here records credits null rather than a guess.
+export const ELEVENLABS_CREDITS_PER_CHARACTER: Record<string, number> = {
+  eleven_v3: 1,
+};
