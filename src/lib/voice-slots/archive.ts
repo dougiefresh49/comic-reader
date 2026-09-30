@@ -1,5 +1,5 @@
 import { checkSnapshot } from "./bucket";
-import { deleteVoice } from "./elevenlabs";
+import { deleteVoice, metadataRefusals } from "./elevenlabs";
 import {
   booksUsingVoice,
   issueNeeds,
@@ -48,6 +48,7 @@ export function archiveRefusalsCheap(
     refusals.push("excluded");
   if (!voice.source_clip_path || !voice.source_clip_md5)
     refusals.push("no snapshot");
+  refusals.push(...metadataRefusals(voice));
   if (opts.needs?.has(voice.id)) refusals.push("needed by issue");
   return refusals;
 }

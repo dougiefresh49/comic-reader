@@ -72,6 +72,8 @@ export type ArchiveRefusal =
   | "no snapshot"
   | "bucket copy missing"
   | "md5 mismatch"
+  | "no description"
+  | "no labels"
   | "needed by issue";
 
 export type RestoreRefusal =
