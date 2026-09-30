@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   clearNewCharactersPauseIfComplete,
@@ -66,7 +67,7 @@ export async function aliasNewCharacter(args: {
     `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
     "page",
   );
-  revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
+  revalidateReaderPages(args.bookId, args.issueId);
 
   return { ok: true as const, bubblesUpdated: updated };
 }
@@ -107,7 +108,7 @@ export async function undoAliasNewCharacter(args: {
     `/admin/${args.bookId}/${args.issueId}/review/new-characters`,
     "page",
   );
-  revalidatePath(`/book/${args.bookId}/${args.issueId}`, "page");
+  revalidateReaderPages(args.bookId, args.issueId);
 
   return { ok: true as const };
 }

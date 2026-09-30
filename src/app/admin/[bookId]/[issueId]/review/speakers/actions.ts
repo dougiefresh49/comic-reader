@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { updateIssue } from "~/lib/issue-queries";
 
@@ -111,7 +112,7 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
     pipeline_paused_url: null,
   }).eq("pipeline_paused_at", "review-speakers");
 
-  revalidatePath(`/book/${bookId}/${issueId}`, "page");
+  revalidateReaderPages(bookId, issueId);
   revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/admin/${bookId}/${issueId}/review/speakers`, "page");
   revalidatePath("/admin", "page");

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 export interface SceneSaveEntry {
@@ -77,7 +78,7 @@ export async function saveScenes(
 
   revalidatePath(`/admin/${bookId}/${issueId}/review/scenes`, "page");
   revalidatePath(`/admin/${bookId}/${issueId}/review/panels`, "page");
-  revalidatePath(`/book/${bookId}/${issueId}`, "page");
+  revalidateReaderPages(bookId, issueId);
 
   return { ok: true, sceneCount: inserted };
 }

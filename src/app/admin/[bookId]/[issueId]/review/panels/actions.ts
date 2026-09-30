@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import type {
   EffectPositions,
@@ -166,6 +167,6 @@ export async function applyPanelFixes(
     `/admin/${payload.bookId}/${payload.issueId}/review/panels`,
     "page",
   );
-  revalidatePath(`/book/${payload.bookId}/${payload.issueId}`, "page");
+  revalidateReaderPages(payload.bookId, payload.issueId);
   return result;
 }
