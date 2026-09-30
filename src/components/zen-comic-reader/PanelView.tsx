@@ -156,6 +156,7 @@ export function PanelViewFrame({
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const transformRef = useRef<HTMLDivElement | null>(null);
+  const cameraEffectRef = useRef<HTMLDivElement | null>(null);
   const [containerSize, setContainerSize] = useState({ w: 1, h: 1 });
   const [devicePixelRatio, setDevicePixelRatio] = useState(1);
   const springRef = useRef<SpringState | null>(null);
@@ -217,10 +218,18 @@ export function PanelViewFrame({
     (t: PanelTransformResult) => {
       const el = transformRef.current;
       if (!el) return;
-      // A previous panel's spring scale may exceed the new effect's cap.
-      const scale = panelViewMode ? Math.min(t.scale, scaleCap) : t.scale;
+      // Scale and translation move together toward the capped target.
+      const scale = t.scale;
       el.style.transform = `translate(${t.tx}px, ${t.ty}px) scale(${scale})`;
       el.style.transformOrigin = "0 0";
+
+      // Let the spring reach the new effect's headroom before starting it.
+      // Until then, the previous panel's scale is safe without the effect.
+      const effectEl = cameraEffectRef.current;
+      if (effectEl) {
+        const className = `relative h-full w-full ${scale <= scaleCap ? cameraEffect.className : ""}`;
+        if (effectEl.className !== className) effectEl.className = className;
+      }
 
       // Cover the inverse spring viewport, plus one frame for camera motion.
       // Pan is at most 2% of the frame; the largest shake offset is 12px.
@@ -233,10 +242,10 @@ export function PanelViewFrame({
         12;
       viewport.style.setProperty("--mask-bleed", `${bleed}px`);
     },
-    [panelViewMode, scaleCap, containerSize],
+    [scaleCap, cameraEffect.className, containerSize],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const target = getTarget();
 
     if (reducedMotion) {
@@ -255,7 +264,7 @@ export function PanelViewFrame({
     springRef.current.vTx = 0;
     springRef.current.vTy = 0;
     springRef.current.vScale = 0;
-    // Apply the new effect's cap and mask coverage before the next frame.
+    // Keep the current spring position and update effect readiness before paint.
     applyTransform(springRef.current);
 
     cancelAnimationFrame(rafRef.current);
@@ -268,7 +277,7 @@ export function PanelViewFrame({
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [getTarget, reducedMotion, applyTransform]);
+  }, [getTarget, reducedMotion, applyTransform, activePanel?.id]);
 
   // Panel mode fills the measured reader area. Page mode keeps the 2:3
   // frame with 140px reserved for the bottom chrome.
@@ -284,7 +293,8 @@ export function PanelViewFrame({
       <div ref={transformRef} className="relative h-full w-full">
         <div
           key={activePanel?.id ?? "no-panel"}
-          className={`relative h-full w-full ${cameraEffect.className}`}
+          ref={cameraEffectRef}
+          className="relative h-full w-full"
           style={{ transformOrigin: "center center" }}
         >
           {/* Page plane: sized to the page's own aspect so object-contain
