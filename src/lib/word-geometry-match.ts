@@ -38,9 +38,13 @@ function letterStream(tokens: string[]): Stream {
 // Levenshtein), then fewest substitutions (so `TEH` keeps two matches against
 // `THE`), then fewest gap edges that fall inside a word (so a junk or
 // repeated word is skipped whole, `RACT` or the `OOK` in `LOOK OOK OUT`,
-// instead of lending letters to a neighbour). Exact for streams under 8k.
-const EDIT = 2 ** 30;
-const SUB = EDIT + 2 ** 14;
+// instead of lending letters to a neighbour), then fewest turns where one
+// stream sits between words and the other inside one (so `TH THAT AT` gives
+// "that" to `THAT`, not to the scraps around it, and a joined token beats its
+// split pieces in either order). Exact for streams under 2k letters each.
+const EDGE = 2 ** 13;
+const EDIT = 2 ** 39;
+const SUB = EDIT + 2 ** 27;
 
 /**
  * Minimum-edit alignment of two letter streams, three-state so gap edges can
@@ -57,6 +61,9 @@ function matchedLetters(sa: Stream, sb: Stream): [number, number][] {
     p > 0 && p < s.owner.length && s.owner[p - 1] === s.owner[p] ? 1 : 0;
   const eA = (p: number) => edge(sa, p);
   const eB = (p: number) => edge(sb, p);
+  // 1 when lattice point (i, j) is a word boundary in one stream only. Paid
+  // wherever the path turns or runs diagonally, not inside a straight gap.
+  const turn = (i: number, j: number) => eA(i) ^ eB(j);
   const w = m + 1;
   const size = (n + 1) * w;
   // diag: ends pairing a[i-1] with b[j-1]; gapA: ends on a[i-1] alone;
@@ -77,19 +84,28 @@ function matchedLetters(sa: Stream, sb: Stream): [number, number][] {
       const left = k - 1;
       const p = up - 1;
       diag[k] =
-        Math.min(diag[p]!, gapA[p]! + eA(i - 1), gapB[p]! + eB(j - 1)) +
+        Math.min(
+          diag[p]!,
+          gapA[p]! + EDGE * eA(i - 1),
+          gapB[p]! + EDGE * eB(j - 1),
+        ) +
+        turn(i - 1, j - 1) +
         cost(i, j);
       gapA[k] =
         Math.min(
           gapA[up]!,
-          diag[up]! + eA(i - 1),
-          gapB[up]! + eB(j) + eA(i - 1),
+          Math.min(
+            diag[up]! + EDGE * eA(i - 1),
+            gapB[up]! + EDGE * (eB(j) + eA(i - 1)),
+          ) + turn(i - 1, j),
         ) + EDIT;
       gapB[k] =
         Math.min(
           gapB[left]!,
-          diag[left]! + eB(j - 1),
-          gapA[left]! + eA(i) + eB(j - 1),
+          Math.min(
+            diag[left]! + EDGE * eB(j - 1),
+            gapA[left]! + EDGE * (eA(i) + eB(j - 1)),
+          ) + turn(i, j - 1),
         ) + EDIT;
     }
   }
@@ -104,21 +120,36 @@ function matchedLetters(sa: Stream, sb: Stream): [number, number][] {
     const here = state[k]!;
     if (state === diag) {
       if (a[i - 1] === b[j - 1]) pairs.push([i - 1, j - 1]);
-      const prev = here - cost(i, j);
+      const prev = here - cost(i, j) - turn(i - 1, j - 1);
       i--;
       j--;
       k = i * w + j;
-      state = diag[k] === prev ? diag : gapA[k]! + eA(i) === prev ? gapA : gapB;
+      state =
+        diag[k] === prev
+          ? diag
+          : gapA[k]! + EDGE * eA(i) === prev
+            ? gapA
+            : gapB;
     } else if (state === gapA) {
       const prev = here - EDIT;
       i--;
       k = i * w + j;
-      state = gapA[k] === prev ? gapA : diag[k]! + eA(i) === prev ? diag : gapB;
+      state =
+        gapA[k] === prev
+          ? gapA
+          : diag[k]! + EDGE * eA(i) + turn(i, j) === prev
+            ? diag
+            : gapB;
     } else {
       const prev = here - EDIT;
       j--;
       k = i * w + j;
-      state = gapB[k] === prev ? gapB : diag[k]! + eB(j) === prev ? diag : gapA;
+      state =
+        gapB[k] === prev
+          ? gapB
+          : diag[k]! + EDGE * eB(j) + turn(i, j) === prev
+            ? diag
+            : gapA;
     }
   }
   return pairs;

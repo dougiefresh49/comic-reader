@@ -236,6 +236,155 @@
       }
     },
     {
+      "bubbleId": "scraps-around-full-word",
+      "text_with_cues": "[shouting] Please stop that car!",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.26, 0.04],
+            "words": [
+              { "t": "PLEASE", "box": [0.1, 0.1, 0.15, 0.04], "conf": 1 },
+              { "t": "STOP", "box": [0.26, 0.1, 0.1, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.15, 0.22, 0.04],
+            "words": [
+              { "t": "TH", "box": [0.1, 0.15, 0.05, 0.04], "conf": 0.3 },
+              { "t": "THAT", "box": [0.16, 0.15, 0.1, 0.04], "conf": 1 },
+              { "t": "AT", "box": [0.27, 0.15, 0.05, 0.04], "conf": 0.3 }
+            ]
+          },
+          {
+            "box": [0.1, 0.2, 0.1, 0.04],
+            "words": [{ "t": "CAR!", "box": [0.1, 0.2, 0.1, 0.04], "conf": 1 }]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 6,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.15, 0.04]],
+          [[0.26, 0.1, 0.1, 0.04]],
+          [[0.16, 0.15, 0.1, 0.04]],
+          [[0.1, 0.2, 0.1, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "split-pieces-then-joined",
+      "text_with_cues": "[curious] Can you cross-reference that?",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.17, 0.04],
+            "words": [
+              { "t": "CAN", "box": [0.1, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "YOU", "box": [0.19, 0.1, 0.08, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.15, 0.12, 0.04],
+            "words": [
+              { "t": "CROSS-", "box": [0.1, 0.15, 0.12, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.2, 0.2, 0.04],
+            "words": [
+              { "t": "REFERENCE", "box": [0.1, 0.2, 0.2, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.25, 0.3, 0.04],
+            "words": [
+              {
+                "t": "CROSSREFERENCE",
+                "box": [0.1, 0.25, 0.3, 0.04],
+                "conf": 0.4
+              }
+            ]
+          },
+          {
+            "box": [0.1, 0.3, 0.09, 0.04],
+            "words": [
+              { "t": "THAT?", "box": [0.1, 0.3, 0.09, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 6,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.08, 0.04]],
+          [[0.19, 0.1, 0.08, 0.04]],
+          [[0.1, 0.25, 0.3, 0.04]],
+          [[0.1, 0.3, 0.09, 0.04]]
+        ]
+      }
+    },
+    {
+      "bubbleId": "joined-then-split-pieces",
+      "text_with_cues": "[curious] Can you cross-reference that?",
+      "geometry": {
+        "engine": "synthetic",
+        "image": { "w": 1000, "h": 1500, "sha": "synthetic" },
+        "lines": [
+          {
+            "box": [0.1, 0.1, 0.17, 0.04],
+            "words": [
+              { "t": "CAN", "box": [0.1, 0.1, 0.08, 0.04], "conf": 1 },
+              { "t": "YOU", "box": [0.19, 0.1, 0.08, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.25, 0.3, 0.04],
+            "words": [
+              {
+                "t": "CROSSREFERENCE",
+                "box": [0.1, 0.25, 0.3, 0.04],
+                "conf": 0.4
+              }
+            ]
+          },
+          {
+            "box": [0.1, 0.15, 0.12, 0.04],
+            "words": [
+              { "t": "CROSS-", "box": [0.1, 0.15, 0.12, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.2, 0.2, 0.04],
+            "words": [
+              { "t": "REFERENCE", "box": [0.1, 0.2, 0.2, 0.04], "conf": 1 }
+            ]
+          },
+          {
+            "box": [0.1, 0.3, 0.09, 0.04],
+            "words": [
+              { "t": "THAT?", "box": [0.1, 0.3, 0.09, 0.04], "conf": 1 }
+            ]
+          }
+        ]
+      },
+      "expect": {
+        "coverage": 0.6667,
+        "letteredWordCount": 6,
+        "boxesByTimingIndex": [
+          [[0.1, 0.1, 0.08, 0.04]],
+          [[0.19, 0.1, 0.08, 0.04]],
+          [[0.1, 0.25, 0.3, 0.04]],
+          [[0.1, 0.3, 0.09, 0.04]]
+        ]
+      }
+    },
+    {
       "bubbleId": "ocr-transposition",
       "text_with_cues": "[dramatically] The end.",
       "geometry": {
