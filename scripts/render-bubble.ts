@@ -67,8 +67,9 @@ Context for a --bubble read (both required with it):
 
 Overrides:
   --voice <el id>    ElevenLabs voice id. Required when the castlist lookup
-                     misses, which it does today: bubble speakers are slugs
-                     like "soldier" while castlist.character is "Soldier" (#90).
+                     misses, which it does today: the lookup reads this book
+                     and this issue only, and bubble speakers are slugs like
+                     "soldier" while castlist.character is "Soldier" (#90).
   --emotion <word>   Emotion, with --text or to replace the bubble's own.
   --stability <n>    0 to 1
   --style <n>        0 to 1
@@ -198,38 +199,48 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
   return data as BubbleRow;
 }
 
+/** Why the castlist gave no voice, so the message names the case it is. */
+type VoiceMiss = "no-row" | "skipped" | "no-voice" | "conflict";
+
 /**
- * The voice for a speaker, from the castlist of that book.
+ * The voice for a speaker, from the castlist of this book and this issue.
  *
  * The castlist is per book (decisions row 28), but rows still carry an
- * `issue_id` until #118, so a row for another issue of the same book is a
- * usable answer when this issue has no row for the speaker at all. A row for
- * this issue that has no voice, or the `__SKIPPED__` sentinel that means "this
- * character is silent in this issue", is an answer and it is "no voice": the
- * lookup stops there rather than borrowing another issue's, because rendering
- * a character the reader keeps silent would spend a call on audio nobody plays.
+ * `issue_id` until #118, and the audio step loads one `issue_id`
+ * (`src/workflows/steps/generation.ts:296`). So the lookup is this book, this
+ * issue, this speaker and nothing else: a row for another issue of the same
+ * book is not an answer here, because a render that spent on it would be
+ * audio the pipeline would never play (decisions row 173).
+ *
+ * A row for this issue that carries the `__SKIPPED__` sentinel, a null
+ * `voice_id`, or a `voice_id` another row of the same issue disagrees with is
+ * a miss too, and each is reported as itself rather than as a slug mismatch.
  */
 async function readCastlistVoice(
   bookId: string,
   issueId: string,
   speaker: string,
-): Promise<string | null> {
+): Promise<{ voiceId: string | null; miss: VoiceMiss | null }> {
   const { data, error } = await supabase
     .from("castlist")
-    .select("issue_id, voice_id")
+    .select("voice_id")
     .eq("book_id", bookId)
+    .eq("issue_id", issueId)
     .eq("character", speaker);
   if (error) fail(`Reading castlist for '${speaker}': ${error.message}`);
-  const rows = (data ?? []) as { issue_id: string; voice_id: string | null }[];
+  const rows = (data ?? []) as { voice_id: string | null }[];
   const usable = (r: { voice_id: string | null }) =>
     r.voice_id !== null && r.voice_id !== SKIPPED_VOICE ? r.voice_id : null;
-  const mine = rows.filter((r) => r.issue_id === issueId);
-  if (mine.length > 0) {
-    const voices = new Set(mine.map(usable));
-    if (voices.size === 1) return [...voices][0]!;
-    return null;
+  const voices = new Set(rows.map(usable));
+  if (voices.size === 1 && rows.every((r) => usable(r) !== null)) {
+    return { voiceId: [...voices][0]!, miss: null };
   }
-  return usable(rows[0] ?? { voice_id: null });
+  if (rows.length === 0) return { voiceId: null, miss: "no-row" };
+  if (voices.size > 1) return { voiceId: null, miss: "conflict" };
+  if (rows.some((r) => r.voice_id === SKIPPED_VOICE)) {
+    return { voiceId: null, miss: "skipped" };
+  }
+  return { voiceId: null, miss: "no-voice" };
 }
 
 /**
@@ -275,6 +286,54 @@ async function readNeighbours(
   };
 }
 
+/**
+ * Why there is no voice, naming the case, because the fix is not the same for
+ * each: a missing row is fixed by `--voice` and by #90, a silent character and
+ * a conflicting pair are castlist data problems that `--voice` would only
+ * paper over for this one render.
+ */
+function noVoiceMessage(
+  speaker: string | null,
+  bookId: string | null,
+  issueId: string | null,
+  miss: VoiceMiss | "no-speaker",
+): string {
+  const who = `speaker '${speaker ?? "(none)"}'`;
+  const where = `${bookId ?? "the book"}/${issueId ?? "the issue"}`;
+  switch (miss) {
+    case "skipped":
+      return (
+        `The castlist row for ${who} in ${where} is the __SKIPPED__ sentinel, so this ` +
+        `character is silent in this issue and the audio step renders no audio for it. ` +
+        `This script will not spend a call on audio the pipeline never plays.`
+      );
+    case "conflict":
+      return (
+        `The castlist rows for ${who} in ${where} carry different voice_id values, so no ` +
+        `single voice is the cast. Decide which one is right (decisions row 54, #90) ` +
+        `rather than picking one here.`
+      );
+    case "no-voice":
+      return (
+        `The castlist row for ${who} in ${where} has a null voice_id, so the character is ` +
+        `cast without a voice yet. Cast it first, or pass --voice <elevenlabs voice id> ` +
+        `for this one render.`
+      );
+    case "no-speaker":
+      return (
+        `Nothing to look up: this line has no speaker, so the castlist cannot answer. ` +
+        `Pass --voice <elevenlabs voice id>.`
+      );
+    default:
+      return (
+        `No castlist row for ${who} in ${where}. The castlist is read for this book and ` +
+        `this issue only (decisions row 173), and bubble speakers are slugs like ` +
+        `"soldier" while castlist.character is title case, which #90 fixes. ` +
+        `Pass --voice <elevenlabs voice id>.`
+      );
+  }
+}
+
 /** One render, before any money is spent. */
 interface PlannedRender {
   label: string;
@@ -282,6 +341,13 @@ interface PlannedRender {
   request: TtsRequest;
   /** Dotted paths the flags replaced, e.g. `voiceSettings.speed`. */
   overridden: string[];
+  /**
+   * Whether the adjacent bubbles ride along. On its own, never in
+   * `overridden`: that list reads as "the flags replaced this", and the
+   * context fields are not settings, so a `--context` run would otherwise
+   * hide that stability, style and speed all came from the emotion table.
+   */
+  withContext: boolean;
   characterCount: number;
   /** The emotion the settings came from, for the print. */
   emotion: string;
@@ -370,16 +436,13 @@ async function planRender(
 
   let voiceId = spec.voice ?? null;
   if (!voiceId) {
+    let miss: VoiceMiss | "no-speaker" = "no-speaker";
     if (speaker && bookId && issueId) {
-      voiceId = await readCastlistVoice(bookId, issueId, speaker);
+      const found = await readCastlistVoice(bookId, issueId, speaker);
+      voiceId = found.voiceId;
+      miss = found.miss ?? "no-speaker";
     }
-    if (!voiceId) {
-      fail(
-        `No voice for speaker '${speaker ?? "(none)"}' in the castlist of ${bookId ?? "the book"}. ` +
-          `Bubble speakers are slugs and castlist.character is title case, which #90 fixes. ` +
-          `Pass --voice <elevenlabs voice id>.`,
-      );
-    }
+    if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));
   }
 
   const request = buildTtsRequest({
@@ -390,9 +453,6 @@ async function planRender(
     nextText,
     withContext: spec.context ?? false,
   });
-  if (spec.context) {
-    overridden.push("previousText", "nextText");
-  }
   if (spec.stability !== undefined) {
     request.voiceSettings.stability = spec.stability;
     overridden.push("voiceSettings.stability");
@@ -412,6 +472,7 @@ async function planRender(
     voiceId,
     request,
     overridden,
+    withContext: spec.context ?? false,
     characterCount: text.length,
     emotion: emotion ?? "neutral",
     source,
@@ -424,6 +485,7 @@ function printableJson(render: PlannedRender): string {
     {
       ...render.request,
       overridden: render.overridden,
+      withContext: render.withContext,
       characterCount: render.characterCount,
     },
     null,
@@ -442,8 +504,21 @@ function printPlan(render: PlannedRender): void {
       `similarityBoost ${render.request.voiceSettings.similarityBoost}, ` +
       `style ${render.request.voiceSettings.style}, ` +
       `speed ${render.request.voiceSettings.speed}` +
-      (render.overridden.length ? "" : " (all from the emotion table)"),
+      (render.overridden.some((o) => o.startsWith("voiceSettings."))
+        ? ""
+        : " (all from the emotion table)"),
   );
+  if (render.withContext) {
+    const absent: string[] = [];
+    if (render.request.previousText === undefined) absent.push("previousText");
+    if (render.request.nextText === undefined) absent.push("nextText");
+    console.log(
+      `   context:  withContext, sending` +
+        (absent.length
+          ? ` nothing on this side of the bubble (${absent.join(", ")})`
+          : " the adjacent bubbles"),
+    );
+  }
   console.log(printableJson(render));
 }
 
@@ -501,6 +576,7 @@ async function executeRender(render: PlannedRender): Promise<void> {
         voiceId: render.voiceId,
         request: render.request,
         overridden: render.overridden,
+        withContext: render.withContext,
         characterCount: render.characterCount,
         alignment,
         normalizedAlignment,
