@@ -639,6 +639,7 @@ export type Database = {
           book_id: string | null;
           characters: number | null;
           created_at: string | null;
+          credits: number | null;
           duration_ms: number | null;
           error: string | null;
           id: string;
@@ -658,6 +659,7 @@ export type Database = {
           book_id?: string | null;
           characters?: number | null;
           created_at?: string | null;
+          credits?: number | null;
           duration_ms?: number | null;
           error?: string | null;
           id?: string;
@@ -677,6 +679,7 @@ export type Database = {
           book_id?: string | null;
           characters?: number | null;
           created_at?: string | null;
+          credits?: number | null;
           duration_ms?: number | null;
           error?: string | null;
           id?: string;
