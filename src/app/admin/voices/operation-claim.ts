@@ -9,6 +9,11 @@ interface VoiceClaimRow {
   operation_claimed_at: string | null;
 }
 
+export function noActiveVoiceClaimFilter(): string {
+  const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  return `operation_claim.is.null,operation_claimed_at.lt.${staleBefore}`;
+}
+
 export async function withVoiceOperationClaim<T>(
   supabase: SupabaseClient,
   voice: VoiceRow,
@@ -16,35 +21,34 @@ export async function withVoiceOperationClaim<T>(
   run: () => Promise<T>,
 ): Promise<T> {
   const claim = `${operation}:${randomUUID()}`;
-  const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-  let query = supabase
-    .from("voices")
-    .update({
-      operation_claim: claim,
-      // PostgreSQL timestamp input "now" uses the transaction's start time.
-      operation_claimed_at: "now",
-    })
-    .eq("id", voice.id)
-    .eq("status", voice.status);
-  // Match every nullable row field covered by the plan token in the same UPDATE.
-  for (const field of [
-    "current_elevenlabs_id",
-    "archived_at",
-    "source_clip_md5",
-  ] as const) {
-    query =
-      voice[field] === null
-        ? query.is(field, null)
-        : query.eq(field, voice[field]);
-  }
-  const { data, error } = await query
-    .or(`operation_claim.is.null,operation_claimed_at.lt.${staleBefore}`)
-    .select("operation_claim, operation_claimed_at");
-  if (error) throw new Error(`Claim voice: ${error.message}`);
-  const claimed = (data ?? []) as VoiceClaimRow[];
-  if (!claimed.some((row) => row.operation_claim === claim))
-    throw new Error("another operation holds this voice");
   try {
+    let query = supabase
+      .from("voices")
+      .update({
+        operation_claim: claim,
+        // PostgreSQL timestamp input "now" uses the transaction's start time.
+        operation_claimed_at: "now",
+      })
+      .eq("id", voice.id)
+      .eq("status", voice.status);
+    // Match every nullable row field covered by the plan token in the same UPDATE.
+    for (const field of [
+      "current_elevenlabs_id",
+      "archived_at",
+      "source_clip_md5",
+    ] as const) {
+      query =
+        voice[field] === null
+          ? query.is(field, null)
+          : query.eq(field, voice[field]);
+    }
+    const { data, error } = await query
+      .or(noActiveVoiceClaimFilter())
+      .select("operation_claim, operation_claimed_at");
+    if (error) throw new Error(`Claim voice: ${error.message}`);
+    const claimed = (data ?? []) as VoiceClaimRow[];
+    if (!claimed.some((row) => row.operation_claim === claim))
+      throw new Error("another operation holds this voice");
     return await run();
   } finally {
     const released = await supabase

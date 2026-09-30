@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { withVoiceOperationClaim } from "./operation-claim";
+import {
+  noActiveVoiceClaimFilter,
+  withVoiceOperationClaim,
+} from "./operation-claim";
 import {
   archiveVoice,
   restoreVoice,
@@ -25,11 +28,15 @@ async function requireAdmin() {
 
 export async function toggleKeepActive(voiceId: string, keepActive: boolean) {
   await requireAdmin();
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("voices")
     .update({ keep_active: keepActive })
-    .eq("id", voiceId);
+    .eq("id", voiceId)
+    .or(noActiveVoiceClaimFilter())
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (!data?.length)
+    return { ok: false, error: "Refused: another operation holds this voice" };
   revalidatePath("/admin/voices", "page");
   return { ok: true };
 }
