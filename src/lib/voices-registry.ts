@@ -38,8 +38,6 @@ export function buildVoiceRow(
     "characterId" | "elevenLabsId" | "designPrompt"
   >,
 ): VoiceInsert {
-  // #91 adds `consumers` ({comic}), `character_id` and `description`
-  // (the design prompt). Write them here once its migration is applied.
   // No character display-name column exists, so display_name is the
   // castlist character string, as in the backfilled rows.
   return {
@@ -47,6 +45,7 @@ export function buildVoiceRow(
     status: "active",
     current_elevenlabs_id: input.elevenLabsId,
     keep_active: false,
+    consumers: ["comic"],
     design_prompt: input.designPrompt ?? null,
   };
 }
