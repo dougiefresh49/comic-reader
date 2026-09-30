@@ -11,12 +11,15 @@ export interface PageMeta {
 }
 
 /**
- * One step's wall-clock window on pipeline_runs.steps.timings, keyed by the
- * step name. `endedAt` is absent while the step is still running, so a run
- * that died mid-step shows which step it died in. `pages` is set on the
+ * One stretch of a step's wall clock, on pipeline_runs.steps.timings under
+ * the step name. A step holds a list of these, not one: a step that works
+ * before a review gate and again after it (casting) is two windows, so the
+ * gate pause is not folded into the step's time. At most one window per step
+ * is open at a time. `endedAt` is absent while a window is still running, so
+ * a run that died mid-step shows which step it died in. `pages` is set on the
  * page-looping steps so seconds per page falls out of the same query (#255).
  */
-export type StepTiming = {
+export type StepWindow = {
   startedAt: string;
   endedAt?: string;
   pages?: number;
@@ -119,16 +122,16 @@ export async function updatePipelineStep(
 }
 
 /**
- * Read-modify-write of this run's timings. Shared by recordStepStart and
- * recordStepEnd so the jsonb shape has one home. updateRunSteps is the
- * compare-and-swap writer and logs its own failures.
+ * Read-modify-write of this run's timings for one step. Shared by
+ * recordStepStart and recordStepEnd so the jsonb shape has one home.
+ * updateRunSteps is the compare-and-swap writer and logs its own failures.
  */
-async function writeStepTiming(
+async function writeStepWindows(
   client: Parameters<typeof updateRunSteps>[0],
   bookId: string,
   issueId: string,
   step: string,
-  apply: (previous: StepTiming | undefined) => StepTiming,
+  apply: (windows: StepWindow[]) => StepWindow[],
 ): Promise<void> {
   await updateRunSteps(
     client,
@@ -138,11 +141,11 @@ async function writeStepTiming(
     (steps) => {
       const timings = { ...((steps.timings as object) ?? {}) } as Record<
         string,
-        StepTiming
+        StepWindow[]
       >;
       return {
         ...steps,
-        timings: { ...timings, [step]: apply(timings[step]) },
+        timings: { ...timings, [step]: apply(timings[step] ?? []) },
       };
     },
     "step-timing",
@@ -150,9 +153,13 @@ async function writeStepTiming(
 }
 
 /**
- * Open this step's timing window. The clock runs inside a step, never in the
- * workflow body, because the body replays and its `Date` is seeded (#255).
- * `pages` is the page count for the page-looping steps.
+ * Open a timing window for this step. The clock runs inside a step, never in
+ * the workflow body, because the body replays and its `Date` is seeded
+ * (#255). `pages` is the page count for the page-looping steps.
+ *
+ * A retried start does not open a second window. The Workflow SDK replays a
+ * step that already committed, and a duplicate open window would never be
+ * closed, so the run's remaining time would read as this step's.
  */
 export async function recordStepStart(
   bookId: string,
@@ -165,14 +172,20 @@ export async function recordStepStart(
   const client = await createTypedStepClient();
   const startedAt = new Date().toISOString();
 
-  await writeStepTiming(client, bookId, issueId, step, (previous) => ({
-    ...previous,
-    startedAt,
-    ...(pages === undefined ? {} : { pages }),
-  }));
+  await writeStepWindows(client, bookId, issueId, step, (windows) => {
+    if (windows.some((w) => w.endedAt === undefined)) return windows;
+    return [
+      ...windows,
+      { startedAt, ...(pages === undefined ? {} : { pages }) },
+    ];
+  });
 }
 
-/** Close this step's timing window. Keeps the start and page count. */
+/**
+ * Close this step's open window. A step with no open window (a retried close,
+ * or a start whose write never landed) is left alone rather than given a
+ * zero-length window, so the query never reports a step it cannot measure.
+ */
 export async function recordStepEnd(
   bookId: string,
   issueId: string,
@@ -183,11 +196,24 @@ export async function recordStepEnd(
   const client = await createTypedStepClient();
   const endedAt = new Date().toISOString();
 
-  await writeStepTiming(client, bookId, issueId, step, (previous) => ({
-    ...previous,
-    startedAt: previous?.startedAt ?? endedAt,
-    endedAt,
-  }));
+  let closed = false;
+  await writeStepWindows(client, bookId, issueId, step, (windows) => {
+    let open: StepWindow | undefined;
+    for (let i = windows.length - 1; i >= 0; i--) {
+      if (windows[i]?.endedAt === undefined) {
+        open = windows[i];
+        break;
+      }
+    }
+    if (!open) return windows;
+    closed = true;
+    return windows.map((w) => (w === open ? { ...w, endedAt } : w));
+  });
+  if (!closed) {
+    console.log(
+      `[step-timing] no open window for ${step} on ${bookId}/${issueId}; close dropped`,
+    );
+  }
 }
 
 export async function markPipelineFailed(

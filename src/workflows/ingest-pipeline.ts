@@ -141,9 +141,9 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 2: Human Review, Character Clusters ─────────────────────
     if (run("review-clusters")) {
       currentStep = "review-clusters";
+      await recordStepStart(bookId, issueId, currentStep);
       const faces = await countUnresolvedFaces(bookId, issueId);
       if (faces.total === 0) {
-        await recordStepStart(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(
           bookId,
@@ -160,9 +160,9 @@ export async function ingestPipeline(input: IngestInput) {
         );
         await recordStepEnd(bookId, issueId, currentStep);
       } else {
-        // No work between the gate opening and closing, so this step gets no
-        // window of its own: the pause is the gate wait's row, not a step's
-        // time (#255).
+        // The window closes before the gate opens, so the pause is the gate
+        // wait's row and never this step's time (#255).
+        await recordStepEnd(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using clusterHook = createHook<{ approved: boolean }>({
@@ -211,9 +211,9 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 5: New characters, then voice descriptions ──────────────
     if (run("review-new-characters")) {
       currentStep = "review-new-characters";
+      await recordStepStart(bookId, issueId, currentStep);
       const pendingCount = await countPendingNewCharacters(bookId, issueId);
       if (pendingCount === 0) {
-        await recordStepStart(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(
           bookId,
@@ -227,7 +227,8 @@ export async function ingestPipeline(input: IngestInput) {
         );
         await recordStepEnd(bookId, issueId, currentStep);
       } else {
-        // Gate only, same shape as review-clusters.
+        // Closes before the gate opens, same shape as review-clusters.
+        await recordStepEnd(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using characterHook = createHook<{ approved: boolean }>({
@@ -249,6 +250,10 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 6: Casting ──────────────────────────────────────────────
     if (run("casting")) {
       currentStep = "casting";
+      // Two windows when the gate pauses: one for createCastingTasks, one for
+      // acceptUnresolvedAsSilent after Doug's cast. The pause between them is
+      // the gate wait's row, so it lands on neither window (#255).
+      await recordStepStart(bookId, issueId, currentStep);
       const casting = await createCastingTasks(bookId, issueId);
       const unresolved = casting.unresolved.length;
       // Unresolved speakers pause the gate too. Resuming it accepts them as
@@ -259,7 +264,6 @@ export async function ingestPipeline(input: IngestInput) {
           casting.cast === casting.speakers
             ? "all speakers cast"
             : "no speakers pending or unresolved";
-        await recordStepStart(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(bookId, issueId, "casting", reason, {
           speakers: casting.speakers,
@@ -275,6 +279,7 @@ export async function ingestPipeline(input: IngestInput) {
         console.log(
           `[casting] paused: ${casting.cast} of ${casting.speakers} cast, ${casting.pending} pending, ${unresolved} unresolved${unresolved > 0 ? `: ${casting.unresolved.join(", ")}` : ""}`,
         );
+        await recordStepEnd(bookId, issueId, currentStep);
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using castingHook = createHook<{ approved: boolean }>({
@@ -282,8 +287,6 @@ export async function ingestPipeline(input: IngestInput) {
         });
         await castingHook;
         await recordGateWait(bookId, issueId, currentStep, "close");
-        // The only work here is after the gate, so the window opens once the
-        // pause is recorded and the wait is out of it.
         await recordStepStart(bookId, issueId, currentStep);
         const silenced = await acceptUnresolvedAsSilent(bookId, issueId);
         if (silenced.length > 0) {

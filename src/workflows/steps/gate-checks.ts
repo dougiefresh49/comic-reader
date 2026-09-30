@@ -53,17 +53,15 @@ export async function countPendingNewCharacters(
 }
 
 /**
- * Append one record to an array key on pipeline_runs.steps for this run
+ * Append a skip record to pipeline_runs.steps.skipped on this run's row
  * (updateRunSteps matches it by runId). A missing row or a failed write is
- * logged by updateRunSteps; the record is returned either way.
+ * logged; the record is returned either way.
  */
-async function appendGateRecord<K extends "skipped" | "gateWaits">(
+async function appendSkipRecord(
   client: Parameters<typeof updateRunSteps>[0],
   bookId: string,
   issueId: string,
-  key: K,
   record: Json,
-  logTag: string,
 ): Promise<void> {
   await updateRunSteps(
     client,
@@ -72,9 +70,9 @@ async function appendGateRecord<K extends "skipped" | "gateWaits">(
     getWorkflowMetadata().workflowRunId,
     (steps) => ({
       ...steps,
-      [key]: [...(Array.isArray(steps[key]) ? steps[key] : []), record],
+      skipped: [...(Array.isArray(steps.skipped) ? steps.skipped : []), record],
     }),
-    logTag,
+    "gate-skip",
   );
 }
 
@@ -101,14 +99,7 @@ export async function recordGateSkip(
     at: new Date().toISOString(),
   };
 
-  await appendGateRecord(
-    client,
-    bookId,
-    issueId,
-    "skipped",
-    record as Json,
-    "gate-skip",
-  );
+  await appendSkipRecord(client, bookId, issueId, record as Json);
 
   return record;
 }
@@ -119,6 +110,11 @@ export async function recordGateSkip(
  * the gate's hook and "close" just after, so the window covers exactly the
  * paused time and nothing else. Both calls are steps, so both timestamps
  * are wall clock, not the workflow body's seeded Date (#255).
+ *
+ * Both halves are idempotent, because the SDK replays a step that already
+ * committed. A retried open leaves the existing open record alone, and a
+ * close releases every still-open record for the gate, so no row is ever
+ * left open and the rest of the run never reads as gate wait.
  */
 export async function recordGateWait(
   bookId: string,
@@ -131,24 +127,7 @@ export async function recordGateWait(
   const client = await createTypedStepClient();
   const at = new Date().toISOString();
 
-  const record: GateWaitRecord = { gate, waitedAt: at };
-
-  if (event === "open") {
-    await appendGateRecord(
-      client,
-      bookId,
-      issueId,
-      "gateWaits",
-      record as Json,
-      "gate-wait",
-    );
-    return;
-  }
-
-  // Close the gate's open record in place rather than appending a second
-  // one, so a gate that Doug visits twice reads as two windows and a gate
-  // with no open record is logged, not silently given a zero-length wait.
-  let closed = false;
+  let changed = false;
   await updateRunSteps(
     client,
     bookId,
@@ -158,20 +137,35 @@ export async function recordGateWait(
       const waits = Array.isArray(steps.gateWaits)
         ? (steps.gateWaits as GateWaitRecord[])
         : [];
-      const index = waits.findIndex(
+      if (event === "open") {
+        if (waits.some((w) => w.gate === gate && w.releasedAt === undefined)) {
+          return steps;
+        }
+        changed = true;
+        return {
+          ...steps,
+          gateWaits: [...waits, { gate, waitedAt: at } as Json],
+        };
+      }
+      const open = waits.some(
         (w) => w.gate === gate && w.releasedAt === undefined,
       );
-      if (index === -1) return steps;
-      closed = true;
-      const next = [...waits];
-      next[index] = { ...next[index], releasedAt: at } as GateWaitRecord;
-      return { ...steps, gateWaits: next as Json[] };
+      if (!open) return steps;
+      changed = true;
+      return {
+        ...steps,
+        gateWaits: waits.map((w) =>
+          w.gate === gate && w.releasedAt === undefined
+            ? ({ ...w, releasedAt: at } as Json)
+            : (w as Json),
+        ),
+      };
     },
     "gate-wait",
   );
-  if (!closed) {
+  if (!changed) {
     console.log(
-      `[gate-wait] no open wait recorded for ${gate} on ${bookId}/${issueId}; close dropped`,
+      `[gate-wait] ${event} for ${gate} on ${bookId}/${issueId} matched no ${event === "open" ? "closed" : "open"} record; no write`,
     );
   }
 }
