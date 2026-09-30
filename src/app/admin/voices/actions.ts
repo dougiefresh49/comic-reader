@@ -1,5 +1,6 @@
 "use server";
 
+import { createHmac } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
@@ -61,6 +62,7 @@ export type VoiceOperation = "archive" | "restore" | "snapshot";
 
 export interface VoicePlan {
   voiceId: string;
+  token: string;
   voiceName: string;
   operation: VoiceOperation;
   eligible: boolean;
@@ -68,6 +70,21 @@ export interface VoicePlan {
   warnings: string[];
   status: SlotStatus;
   sampleCount?: number;
+}
+
+function planToken(voice: SlotVoiceRow, operation: VoiceOperation): string {
+  return createHmac("sha256", process.env.SUPABASE_SECRET_KEY!)
+    .update(
+      JSON.stringify([
+        operation,
+        voice.id,
+        voice.status,
+        voice.current_elevenlabs_id,
+        voice.archived_at,
+        voice.source_clip_md5,
+      ]),
+    )
+    .digest("hex");
 }
 
 function runOperation(
@@ -89,9 +106,9 @@ function runOperation(
 }
 
 async function buildPlan(voiceId: string, operation: VoiceOperation) {
+  const status = await slotStatus({ supabase: supabaseAdmin });
   const voice = await readVoice(supabaseAdmin, voiceId);
   if (!voice) throw new Error("Voice not found");
-  const status = await slotStatus({ supabase: supabaseAdmin });
   const result = await runOperation(voice, operation);
   const refusals = [
     ...result.refusals,
@@ -99,6 +116,7 @@ async function buildPlan(voiceId: string, operation: VoiceOperation) {
   ];
   const plan: VoicePlan = {
     voiceId: voice.id,
+    token: planToken(voice, operation),
     voiceName: voice.display_name,
     operation,
     eligible: result.ok && refusals.length === 0,
@@ -110,10 +128,16 @@ async function buildPlan(voiceId: string, operation: VoiceOperation) {
   return { voice, plan };
 }
 
-function operationError(error: unknown): string {
-  if (error instanceof ElevenLabsTimeoutError)
-    return "ElevenLabs request timed out. The first request may have landed. Nothing was retried. Check ElevenLabs before running again.";
-  return error instanceof Error ? error.message : "Voice operation failed";
+function operationError(error: unknown, uncertain = false): string {
+  const message =
+    error instanceof ElevenLabsTimeoutError
+      ? "ElevenLabs request timed out."
+      : error instanceof Error
+        ? error.message
+        : "Voice operation failed";
+  return uncertain
+    ? `${message} The change may have landed. Nothing was retried. Check ElevenLabs before repeating the operation.`
+    : message;
 }
 
 export async function planVoiceOperation(
@@ -132,12 +156,27 @@ export async function planVoiceOperation(
 export async function executeVoiceOperation(
   voiceId: string,
   operation: VoiceOperation,
+  token: string,
 ): Promise<{ ok: boolean; message: string }> {
+  let uncertain = false;
   try {
     await requireAdmin();
-    const { voice, plan } = await buildPlan(voiceId, operation);
+    const { plan } = await buildPlan(voiceId, operation);
+    if (token !== plan.token)
+      return {
+        ok: false,
+        message: "Voice changed since this preview. Request a new preview.",
+      };
     if (!plan.eligible)
       return { ok: false, message: `Refused: ${plan.refusals.join("; ")}` };
+    const voice = await readVoice(supabaseAdmin, voiceId);
+    if (!voice || token !== planToken(voice, operation))
+      return {
+        ok: false,
+        message: "Voice changed since this preview. Request a new preview.",
+      };
+    // The module checks eligibility again using this freshly read row.
+    uncertain = true;
     const result = await runOperation(voice, operation, true);
     if (!result.executed)
       return { ok: false, message: `Refused: ${result.refusals.join("; ")}` };
@@ -152,6 +191,6 @@ export async function executeVoiceOperation(
             : "Snapshot saved and hash-checked in the private bucket.",
     };
   } catch (error) {
-    return { ok: false, message: operationError(error) };
+    return { ok: false, message: operationError(error, uncertain) };
   }
 }

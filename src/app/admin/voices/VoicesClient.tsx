@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useMemo } from "react";
+import { Fragment, useState, useMemo, useRef } from "react";
 import {
   toggleKeepActive,
   planVoiceOperation,
@@ -19,6 +19,7 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
   const [seriesFilter, setSeriesFilter] = useState<string>("all");
   const [updating, setUpdating] = useState<string | null>(null);
   const [plan, setPlan] = useState<VoicePlan | null>(null);
+  const confirming = useRef(false);
   const [results, setResults] = useState<
     Record<string, { ok: boolean; message: string }>
   >({});
@@ -88,12 +89,12 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
   }
 
   async function handleConfirm() {
-    if (!plan?.eligible || updating) return;
-    const { voiceId, operation } = plan;
+    if (!plan?.eligible || updating || confirming.current) return;
+    confirming.current = true;
+    const { voiceId, operation, token } = plan;
     setUpdating(voiceId);
-    setPlan(null);
     try {
-      const result = await executeVoiceOperation(voiceId, operation);
+      const result = await executeVoiceOperation(voiceId, operation, token);
       showResult(voiceId, result);
       if (result.ok) {
         try {
@@ -108,9 +109,11 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
     } catch (error) {
       showResult(voiceId, {
         ok: false,
-        message: `${errorMessage(error)} The first request may have landed. Nothing was retried. Check ElevenLabs before running again.`,
+        message: `${errorMessage(error)} The change may have landed. Nothing was retried. Check ElevenLabs before repeating the operation.`,
       });
     } finally {
+      confirming.current = false;
+      setPlan(null);
       setUpdating(null);
     }
   }
@@ -148,6 +151,20 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
           </select>
         )}
       </div>
+
+      {Object.entries(results)
+        .filter(([id]) => !filtered.some((voice) => voice.id === id))
+        .map(([id, result]) => (
+          <p
+            key={id}
+            role="status"
+            className={`mb-3 text-xs ${result.ok ? "text-emerald-300" : "text-amber-400"}`}
+          >
+            {voices.find((voice) => voice.id === id)?.display_name ?? id}:{" "}
+            {result.ok ? "Success: " : "Failed: "}
+            {result.message}
+          </p>
+        ))}
 
       <div className="overflow-x-auto rounded-lg border border-neutral-800">
         <table className="w-full text-left text-sm">
@@ -292,11 +309,14 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
                             disabled={!plan.eligible || updating !== null}
                             className="rounded bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-100 hover:bg-neutral-700 disabled:opacity-40"
                           >
-                            Confirm {plan.operation}
+                            {updating === plan.voiceId
+                              ? "Confirming..."
+                              : `Confirm ${plan.operation}`}
                           </button>
                           <button
                             onClick={() => setPlan(null)}
-                            className="rounded bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-400 hover:bg-neutral-700"
+                            disabled={updating !== null}
+                            className="rounded bg-neutral-800 px-2.5 py-1 text-xs font-medium text-neutral-400 hover:bg-neutral-700 disabled:opacity-40"
                           >
                             Cancel
                           </button>
