@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { withVoiceOperationClaim } from "./operation-claim";
 import {
   archiveVoice,
   restoreVoice,
@@ -161,35 +162,58 @@ export async function executeVoiceOperation(
   let uncertain = false;
   try {
     await requireAdmin();
-    const { plan } = await buildPlan(voiceId, operation);
-    if (token !== plan.token)
+    // Read without voice-slots so Confirm claims before any module call.
+    const voiceResult = await supabaseAdmin
+      .from("voices")
+      .select("*")
+      .eq("id", voiceId)
+      .single();
+    if (voiceResult.error) throw new Error(voiceResult.error.message);
+    const previewVoice = voiceResult.data as SlotVoiceRow;
+    if (token !== planToken(previewVoice, operation))
       return {
         ok: false,
         message: "Voice changed since this preview. Request a new preview.",
       };
-    if (!plan.eligible)
-      return { ok: false, message: `Refused: ${plan.refusals.join("; ")}` };
-    const voice = await readVoice(supabaseAdmin, voiceId);
-    if (!voice || token !== planToken(voice, operation))
-      return {
-        ok: false,
-        message: "Voice changed since this preview. Request a new preview.",
-      };
-    // The module checks eligibility again using this freshly read row.
-    uncertain = true;
-    const result = await runOperation(voice, operation, true);
-    if (!result.executed)
-      return { ok: false, message: `Refused: ${result.refusals.join("; ")}` };
-    revalidatePath("/admin/voices", "page");
-    return {
-      ok: true,
-      message:
-        operation === "archive"
-          ? "Archived. The ElevenLabs slot is free."
-          : operation === "restore"
-            ? "Restored. The new ElevenLabs ID is saved."
-            : "Snapshot saved and hash-checked in the private bucket.",
-    };
+    return await withVoiceOperationClaim(
+      supabaseAdmin,
+      previewVoice,
+      operation,
+      async () => {
+        // Re-read eligibility only after acquiring the cross-instance claim.
+        const { plan } = await buildPlan(voiceId, operation);
+        if (token !== plan.token)
+          return {
+            ok: false,
+            message: "Voice changed since this preview. Request a new preview.",
+          };
+        if (!plan.eligible)
+          return { ok: false, message: `Refused: ${plan.refusals.join("; ")}` };
+        const freshVoice = await readVoice(supabaseAdmin, voiceId);
+        if (!freshVoice || token !== planToken(freshVoice, operation))
+          return {
+            ok: false,
+            message: "Voice changed since this preview. Request a new preview.",
+          };
+        uncertain = true;
+        const result = await runOperation(freshVoice, operation, true);
+        if (!result.executed)
+          return {
+            ok: false,
+            message: `Refused: ${result.refusals.join("; ")}`,
+          };
+        revalidatePath("/admin/voices", "page");
+        return {
+          ok: true,
+          message:
+            operation === "archive"
+              ? "Archived. The ElevenLabs slot is free."
+              : operation === "restore"
+                ? "Restored. The new ElevenLabs ID is saved."
+                : "Snapshot saved and hash-checked in the private bucket.",
+        };
+      },
+    );
   } catch (error) {
     return { ok: false, message: operationError(error, uncertain) };
   }
