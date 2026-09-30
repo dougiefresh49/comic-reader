@@ -126,6 +126,8 @@ interface PanelViewFrameProps {
    * page-space `PanelDimOverlay` child leave this off.
    */
   dimOutsideFocus?: boolean;
+  /** Animate the page plane from panel camera tags. Reader callers disable this. */
+  cameraEffects?: boolean;
   children: React.ReactNode;
 }
 
@@ -142,6 +144,7 @@ export function PanelViewFrame({
   pageSize,
   focusBounds,
   dimOutsideFocus = false,
+  cameraEffects = true,
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -260,6 +263,11 @@ export function PanelViewFrame({
     return () => cancelAnimationFrame(rafRef.current);
   }, [getTarget, reducedMotion, applyTransform, activePanel?.id]);
 
+  const cameraEffectClass =
+    !cameraEffects || !panelViewMode || reducedMotion || !activePanel
+      ? ""
+      : cameraEffectClassFromTags(activePanel.effectTags);
+
   // Panel mode fills the measured reader area. Page mode keeps the 2:3
   // frame with 140px reserved for the bottom chrome.
   const frameSizeClass = panelViewMode
@@ -272,20 +280,26 @@ export function PanelViewFrame({
       className={`relative overflow-hidden select-none ${frameSizeClass}`}
     >
       <div ref={transformRef} className="relative h-full w-full">
-        {/* Page plane: sized to the page's own aspect so object-contain
-            never letterboxes and every page-% overlay in `children`
-            lands on the art. Full frame until the natural size loads. */}
         <div
-          data-page-plane
-          className="absolute"
-          style={{
-            left: imageRect.x,
-            top: imageRect.y,
-            width: imageRect.w,
-            height: imageRect.h,
-          }}
+          key={activePanel?.id ?? "no-panel"}
+          className={`relative h-full w-full ${cameraEffectClass}`}
+          style={{ transformOrigin: "center center" }}
         >
-          {children}
+          {/* Page plane: sized to the page's own aspect so object-contain
+              never letterboxes and every page-% overlay in `children`
+              lands on the art. Full frame until the natural size loads. */}
+          <div
+            data-page-plane
+            className="absolute"
+            style={{
+              left: imageRect.x,
+              top: imageRect.y,
+              width: imageRect.w,
+              height: imageRect.h,
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
       {dimOutsideFocus && panelViewMode && focusRect ? (
@@ -298,6 +312,38 @@ export function PanelViewFrame({
       ) : null}
     </div>
   );
+}
+
+/** Map the first supported camera tag to its existing page-plane animation. */
+function cameraEffectClassFromTags(tags: string[]): string {
+  const classes: string[] = [];
+  // Pick the first matching scale/pan tag; pick the first matching shake.
+  for (const tag of tags) {
+    switch (tag) {
+      case "camera_push_in_slow":
+        classes.push("animate-[cameraPushInSlow_6s_ease-out_forwards]");
+        break;
+      case "camera_push_in_fast":
+        classes.push("animate-[cameraPushInFast_0.6s_ease-out_forwards]");
+        break;
+      case "camera_pull_back":
+        classes.push("animate-[cameraPullBack_5s_ease-out_forwards]");
+        break;
+      case "camera_pan_horizontal":
+        classes.push(
+          "animate-[cameraPanHorizontal_8s_ease-in-out_infinite_alternate]",
+        );
+        break;
+      case "panel_shake_subtle":
+        classes.push("animate-[panelShakeSubtle_0.4s_steps(8)_1]");
+        break;
+      case "panel_shake_hard":
+        classes.push("animate-[panelShakeHard_0.6s_steps(12)_1]");
+        break;
+    }
+    if (classes.length > 0) break; // only one camera tag per panel
+  }
+  return classes.join(" ");
 }
 
 interface PanelViewHudProps {

@@ -507,6 +507,7 @@ export default function ZenComicReader({
               pageSize={pageNaturalSize}
               focusBounds={focusBounds}
               dimOutsideFocus
+              cameraEffects={false}
             >
               {panelViewMode && activePanel?.foregroundPolygons ? (
                 <LayeredPanel
