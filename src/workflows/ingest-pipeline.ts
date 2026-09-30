@@ -177,7 +177,9 @@ export async function ingestPipeline(input: IngestInput) {
       } else {
         // The window closes before the gate opens, so the pause is the gate
         // wait's row and never this step's time (#255).
-        await recordStepEnd(bookId, issueId, currentStep, timing);
+        await recordStepEnd(bookId, issueId, currentStep, timing, {
+          beforeGate: true,
+        });
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using clusterHook = createHook<{ approved: boolean }>({
@@ -227,7 +229,9 @@ export async function ingestPipeline(input: IngestInput) {
       // so the review time lands on the gate wait and not on this step.
       const timing = await recordStepStart(bookId, issueId, currentStep);
       await updatePipelineStep(bookId, issueId, currentStep, true);
-      await recordStepEnd(bookId, issueId, currentStep, timing);
+      await recordStepEnd(bookId, issueId, currentStep, timing, {
+        beforeGate: true,
+      });
       await recordGateWait(bookId, issueId, currentStep, "open");
       using pageReviewHook = createHook<{ approved: boolean }>({
         token: `ingest:${bookId}/${issueId}/page-review`,
@@ -256,7 +260,9 @@ export async function ingestPipeline(input: IngestInput) {
         await recordStepEnd(bookId, issueId, currentStep, timing);
       } else {
         // Closes before the gate opens, same shape as review-clusters.
-        await recordStepEnd(bookId, issueId, currentStep, timing);
+        await recordStepEnd(bookId, issueId, currentStep, timing, {
+          beforeGate: true,
+        });
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using characterHook = createHook<{ approved: boolean }>({
@@ -307,7 +313,9 @@ export async function ingestPipeline(input: IngestInput) {
         console.log(
           `[casting] paused: ${casting.cast} of ${casting.speakers} cast, ${casting.pending} pending, ${unresolved} unresolved${unresolved > 0 ? `: ${casting.unresolved.join(", ")}` : ""}`,
         );
-        await recordStepEnd(bookId, issueId, currentStep, timing);
+        await recordStepEnd(bookId, issueId, currentStep, timing, {
+          beforeGate: true,
+        });
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using castingHook = createHook<{ approved: boolean }>({

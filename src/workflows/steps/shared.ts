@@ -129,7 +129,8 @@ export async function updatePipelineStep(
 /**
  * Read-modify-write of this run's timings for one step. Shared by
  * recordStepStart and recordStepEnd so the jsonb shape has one home.
- * updateRunSteps is the compare-and-swap writer and logs its own failures.
+ * updateRunSteps is the compare-and-swap writer and logs its own failures;
+ * its return says whether the write landed.
  */
 async function writeStepWindows(
   client: Parameters<typeof updateRunSteps>[0],
@@ -137,8 +138,8 @@ async function writeStepWindows(
   issueId: string,
   step: string,
   apply: (windows: StepWindow[]) => StepWindow[],
-): Promise<void> {
-  await updateRunSteps(
+): Promise<boolean> {
+  return updateRunSteps(
     client,
     bookId,
     issueId,
@@ -182,13 +183,24 @@ export async function recordStepStart(
   const windowId = getStepMetadata().stepId;
   const startedAt = new Date().toISOString();
 
-  await writeStepWindows(client, bookId, issueId, step, (windows) => {
-    if (windows.some((w) => w.windowId === windowId)) return windows;
-    return [
-      ...windows,
-      { windowId, startedAt, ...(pages === undefined ? {} : { pages }) },
-    ];
-  });
+  const landed = await writeStepWindows(
+    client,
+    bookId,
+    issueId,
+    step,
+    (windows) => {
+      if (windows.some((w) => w.windowId === windowId)) return windows;
+      return [
+        ...windows,
+        { windowId, startedAt, ...(pages === undefined ? {} : { pages }) },
+      ];
+    },
+  );
+  if (!landed) {
+    console.log(
+      `[step-timing] start of ${step} on ${bookId}/${issueId} did not land; no window for ${windowId}`,
+    );
+  }
 
   return windowId;
 }
@@ -197,15 +209,23 @@ export async function recordStepStart(
  * Close the window `recordStepStart` returned. A window that is already
  * closed, or one whose open write never landed, is left alone rather than
  * given a zero-length window, so the query never reports a step it cannot
- * measure. A failed write is logged by updateRunSteps and not thrown: a
- * timing write must not fail a run that is spending Gemini and ElevenLabs
- * credits.
+ * measure. An open window is never stamped by another window's close, so
+ * `casting`'s second window can never charge Doug's pause to the first.
+ *
+ * `beforeGate` marks the closes that run immediately before
+ * `recordGateWait(..., "open")`. One of those that does not land leaves the
+ * window open across the pause, and the query measures an open window to
+ * `completed_at`, so the gate wait would read as this step's work. The
+ * window is only wrong, but it is wrong about the number the issue is for,
+ * so that close fails the step. Every other close only logs: a lost timing
+ * write must not fail a run that is spending Gemini and ElevenLabs credits.
  */
 export async function recordStepEnd(
   bookId: string,
   issueId: string,
   step: string,
   windowId: string,
+  options: { beforeGate?: boolean } = {},
 ): Promise<void> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
@@ -213,19 +233,31 @@ export async function recordStepEnd(
   const endedAt = new Date().toISOString();
 
   let closed = false;
-  await writeStepWindows(client, bookId, issueId, step, (windows) => {
-    const open = windows.find(
-      (w) => w.windowId === windowId && w.endedAt === undefined,
-    );
-    if (!open) return windows;
-    closed = true;
-    return windows.map((w) => (w === open ? { ...w, endedAt } : w));
-  });
-  if (!closed) {
-    console.log(
-      `[step-timing] window ${windowId} of ${step} on ${bookId}/${issueId} was not open; close dropped`,
+  const landed = await writeStepWindows(
+    client,
+    bookId,
+    issueId,
+    step,
+    (windows) => {
+      const open = windows.find(
+        (w) => w.windowId === windowId && w.endedAt === undefined,
+      );
+      if (!open) return windows;
+      closed = true;
+      return windows.map((w) => (w === open ? { ...w, endedAt } : w));
+    },
+  );
+  if (closed) return;
+
+  const why = landed ? "that window was not open" : "the write did not land";
+  if (options.beforeGate) {
+    throw new Error(
+      `[step-timing] ${step} on ${bookId}/${issueId} closes before a review gate but ${why}; the pause would be charged to this step`,
     );
   }
+  console.log(
+    `[step-timing] window ${windowId} of ${step} on ${bookId}/${issueId}: ${why}; close dropped`,
+  );
 }
 
 export async function markPipelineFailed(

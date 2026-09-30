@@ -15,7 +15,9 @@ const STEPS_WRITE_ATTEMPTS = 5;
  * compare-and-swap: it also filters on steps being equal (jsonb equality)
  * to what was read, so a concurrent writer makes it match zero rows and it
  * reads again and reapplies `next`, up to STEPS_WRITE_ATTEMPTS times. Every
- * failure is logged, not thrown.
+ * failure is logged, not thrown. The return says whether the update landed,
+ * so a caller that cannot carry on with a wrong record (a timing window
+ * closing on the edge of a review gate) can fail the step instead.
  */
 export async function updateRunSteps(
   client: StepClient,
@@ -24,7 +26,7 @@ export async function updateRunSteps(
   runId: string,
   next: (steps: RunSteps) => RunSteps,
   logTag: string,
-): Promise<void> {
+): Promise<boolean> {
   const where = `${bookId}/${issueId} run ${runId}`;
   for (let attempt = 1; attempt <= STEPS_WRITE_ATTEMPTS; attempt++) {
     const { data: rows, error: readErr } = await client
@@ -39,14 +41,14 @@ export async function updateRunSteps(
       console.log(
         `[${logTag}] pipeline_runs read failed for ${where}: ${readErr.message}`,
       );
-      return;
+      return false;
     }
     const row = rows?.[0];
     if (!row) {
       console.log(
         `[${logTag}] no running pipeline_runs row for ${where}; steps not written`,
       );
-      return;
+      return false;
     }
 
     const current = row.steps as RunSteps;
@@ -61,13 +63,14 @@ export async function updateRunSteps(
       console.log(
         `[${logTag}] pipeline_runs write failed for ${where}: ${writeErr.message}`,
       );
-      return;
+      return false;
     }
-    if (written && written.length > 0) return;
+    if (written && written.length > 0) return true;
   }
   console.log(
     `[${logTag}] steps changed under every one of ${STEPS_WRITE_ATTEMPTS} writes for ${where}; gave up`,
   );
+  return false;
 }
 
 /**
