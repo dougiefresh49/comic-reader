@@ -64,11 +64,22 @@ invokes_pnpm() {
   [ "$first" = "pnpm" ]
 }
 
-# The override the paid rules name: LIVE_API_OK=1 in front of the command.
-# Only those rules take it; it is not a release from the .env or the
-# guarded-file rules below.
+# The override the paid rules name: LIVE_API_OK=1 as an env assignment in
+# front of the executable, which is where a shell would read it. Only those
+# rules take it; it is not a release from the .env or the guarded-file rules
+# below.
+#
+# So the token has to be an exact LIVE_API_OK=1, and it has to sit in the run
+# of leading assignments before the executable. `LIVE_API_OK=1.0` is a
+# different value, and `pnpm generate-audio -- LIVE_API_OK=1` is an argument
+# the command never reads as an assignment, so neither one counts.
 has_override() {
-  printf '%s' "$1" | grep -qE '(^|[^[:alnum:]_])LIVE_API_OK=1([^[:alnum:]_]|$)'
+  printf '%s' "$1" | tr -d "\"'<>" | awk '
+    { for (i = 1; i <= NF; i++) {
+        if ($i !~ /^[A-Za-z_][A-Za-z0-9_]*=/) exit
+        if ($i == "LIVE_API_OK=1") { found = 1; exit }
+      } }
+    END { exit(found ? 0 : 1) }'
 }
 
 # src/lib//models.ts, src/lib/../lib/models.ts and ./src/lib/models.ts are one
@@ -123,8 +134,10 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
 
   # Quoting removed and redirect operators turned into separators, so a token
   # is what a shell would hand to the program: `pnpm "generate-audio"` and
-  # `printf x >src/lib/models.ts` both read plainly here.
-  DEQUOTED=$(printf '%s' "$SEG" | tr -d "\"'<>" | tr '><' '  ')
+  # `printf x >src/lib/models.ts` both read plainly here. The operators go
+  # first and the quotes come off after, because deleting the operator out of
+  # `x>src/lib/models.ts` would weld the argument to the destination.
+  DEQUOTED=$(printf '%s' "$SEG" | tr '><' '  ' | tr -d "\"'" | tr -s ' ')
 
   # --- paid commands, unless this segment carries the override -----------
 

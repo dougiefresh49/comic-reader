@@ -60,6 +60,24 @@ case "$REL_PATH" in
 esac
 REL_PATH=$(normalize_path "$REL_PATH")
 
+# No file_path in the payload means a codex apply_patch, which names the file
+# in its patch text. That text arrives as a JSON string, so its line breaks are
+# the two characters \n and a path sits welded to the next patch header.
+# Decoding the payload with jq first gives real line breaks, and each header
+# becomes a line of its own. `.. | strings` rather than a named field: the
+# field name is codex's to choose and this guard should not depend on it.
+# The *** header marker comes off each line, then the line is split on
+# whitespace, so a path is a token rather than a path welded to a brace.
+PATCH_LINES=
+if [ -z "$FILE_PATH" ]; then
+  PATCH_LINES=$(printf '%s' "$PAYLOAD" | jq -r '.. | strings' 2>/dev/null)
+  if [ "$?" -ne 0 ]; then
+    printf 'Blocked: the apply_patch payload could not be decoded, so the guarded paths in it could not be checked.\n' >&2
+    exit 2
+  fi
+  PATCH_LINES=$(printf '%s' "$PATCH_LINES" | sed -E 's/^\*\*\*[[:space:]]*//')
+fi
+
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
   file:*) ;;
@@ -76,20 +94,17 @@ while IFS= read -r line || [ -n "$line" ]; do
     exit 2
   fi
 
-  # No file_path in the payload: a codex apply_patch names the file in its
-  # text. Those paths get the same normalization, so src/lib/../lib/models.ts
-  # in a patch reaches the rule. Over-blocking on a mention is the safe
-  # direction for a credit guard.
-  if [ -z "$FILE_PATH" ]; then
-    # JSON braces and redirect operators become separators, so a path is a
-    # token rather than a path welded to the payload's closing braces.
-    for TOKEN in $(printf '%s' "$PAYLOAD" | tr -d "\"'" | tr '{}<>' '    '); do
+  # Those paths get the same normalization, so src/lib/../lib/models.ts in a
+  # patch reaches the rule. Over-blocking on a mention is the safe direction
+  # for a credit guard.
+  while IFS= read -r text || [ -n "$text" ]; do
+    for TOKEN in $text; do
       if [ "$(normalize_path "$TOKEN")" = "$target" ] || [ "$(normalize_path "$TOKEN")" = "${REPO_ROOT}/$target" ]; then
         printf 'Blocked: %s\n' "$reason" >&2
         exit 2
       fi
     done
-  fi
+  done <<<"$PATCH_LINES"
 done <"$LIST"
 
 exit 0
