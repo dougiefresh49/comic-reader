@@ -444,7 +444,7 @@ No test suite. The gate for a code change is `pnpm format:write`, then `pnpm typ
 
 ## Things that bit here (config unless cited)
 
-- Delegates make no Gemini, ElevenLabs or Roboflow call unless the task is pipeline processing and names the spend. ElevenLabs credits are real money.
+- Delegates make no Gemini, ElevenLabs or Roboflow call unless the task is pipeline processing and names the spend. ElevenLabs credits are real money. A PreToolUse hook enforces this for the known paid commands: it blocks them without `LIVE_API_OK=1` in front of the command, and blocks `.env` reads in a `DELEGATE=1` session. The list is `.claude/hooks/paid-commands.txt`.
 - Review editor and admin saves are prod writes, local dev server included.
 - The Gemini prompts (speaker ID, voice descriptions, reading order) decide what a kid hears and reads. Editing one is kid-facing taste work, not a refactor.
 - Every query on `issues` filters by `book_id` AND `id`. The primary key is `(book_id, id)`, and `issue-1` exists in more than one book.
