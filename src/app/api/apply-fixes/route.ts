@@ -318,7 +318,7 @@ export async function POST(req: NextRequest) {
   results.needsAudio = audioAffectedUuids.size;
 
   // Invalidate ISR cache
-  revalidateReaderPages(bookId, issueId);
+  await revalidateReaderPages(bookId, issueId);
   revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/book/${bookId}`);
   revalidatePath("/");

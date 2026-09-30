@@ -167,6 +167,6 @@ export async function applyPanelFixes(
     `/admin/${payload.bookId}/${payload.issueId}/review/panels`,
     "page",
   );
-  revalidateReaderPages(payload.bookId, payload.issueId);
+  await revalidateReaderPages(payload.bookId, payload.issueId);
   return result;
 }

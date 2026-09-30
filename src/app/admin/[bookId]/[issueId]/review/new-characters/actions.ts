@@ -42,6 +42,7 @@ export async function aliasNewCharacter(args: {
   if (aErr) return { ok: false as const, error: aErr.message };
 
   let updated = 0;
+  const touchedPages = new Set<number>();
   for (const raw of args.speakerVariants) {
     const { data: rows, error: bErr } = await supabaseAdmin
       .from("bubbles")
@@ -53,8 +54,13 @@ export async function aliasNewCharacter(args: {
       .eq("book_id", args.bookId)
       .eq("issue_id", args.issueId)
       .eq("speaker", raw)
-      .select("id");
-    if (!bErr) updated += (rows ?? []).length;
+      .select("id, page_number");
+    if (!bErr) {
+      updated += (rows ?? []).length;
+      for (const row of rows ?? []) {
+        touchedPages.add((row as { page_number: number }).page_number);
+      }
+    }
   }
 
   await clearNewCharactersPauseIfComplete(args.bookId, args.issueId);
@@ -67,7 +73,7 @@ export async function aliasNewCharacter(args: {
     `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
     "page",
   );
-  revalidateReaderPages(args.bookId, args.issueId);
+  await revalidateReaderPages(args.bookId, args.issueId, [...touchedPages]);
 
   return { ok: true as const, bubblesUpdated: updated };
 }
@@ -91,7 +97,7 @@ export async function undoAliasNewCharacter(args: {
   const { error: delErr } = await q;
   if (delErr) return { ok: false as const, error: delErr.message };
 
-  const { error: bErr } = await supabaseAdmin
+  const { data, error: bErr } = await supabaseAdmin
     .from("bubbles")
     .update({
       speaker: args.originalName,
@@ -100,7 +106,8 @@ export async function undoAliasNewCharacter(args: {
     })
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId)
-    .eq("speaker", args.canonicalName);
+    .eq("speaker", args.canonicalName)
+    .select("page_number");
 
   if (bErr) return { ok: false as const, error: bErr.message };
 
@@ -108,7 +115,11 @@ export async function undoAliasNewCharacter(args: {
     `/admin/${args.bookId}/${args.issueId}/review/new-characters`,
     "page",
   );
-  revalidateReaderPages(args.bookId, args.issueId);
+  await revalidateReaderPages(
+    args.bookId,
+    args.issueId,
+    (data ?? []).map((row) => (row as { page_number: number }).page_number),
+  );
 
   return { ok: true as const };
 }

@@ -74,6 +74,7 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
 
   let bubblesUpdated = 0;
   let aliasesAdded = 0;
+  const touchedPages = new Set<number>();
   for (const r of reviewRows) {
     if (!r.resolved_name) continue;
     if (r.status === "renamed" && r.resolved_name !== r.original_name) {
@@ -87,8 +88,13 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
         .eq("book_id", bookId)
         .eq("issue_id", issueId)
         .eq("speaker", r.original_name)
-        .select("id");
-      if (!bErr) bubblesUpdated += (updatedRows ?? []).length;
+        .select("id, page_number");
+      if (!bErr) {
+        bubblesUpdated += (updatedRows ?? []).length;
+        for (const row of updatedRows ?? []) {
+          touchedPages.add((row as { page_number: number }).page_number);
+        }
+      }
 
       if (r.save_as_alias && r.alias_scope) {
         const { error: aErr } = await supabaseAdmin.from("aliases").upsert(
@@ -112,7 +118,7 @@ export async function completeSpeakerReview(bookId: string, issueId: string) {
     pipeline_paused_url: null,
   }).eq("pipeline_paused_at", "review-speakers");
 
-  revalidateReaderPages(bookId, issueId);
+  await revalidateReaderPages(bookId, issueId, [...touchedPages]);
   revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/admin/${bookId}/${issueId}/review/speakers`, "page");
   revalidatePath("/admin", "page");

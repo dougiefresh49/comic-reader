@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     bookId: string;
     issueId: string;
   };
-  revalidateReaderPages(bookId, issueId);
+  await revalidateReaderPages(bookId, issueId);
   revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
   revalidatePath(`/book/${bookId}`);
   revalidatePath("/");

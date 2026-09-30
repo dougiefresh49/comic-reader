@@ -78,7 +78,7 @@ export async function saveScenes(
 
   revalidatePath(`/admin/${bookId}/${issueId}/review/scenes`, "page");
   revalidatePath(`/admin/${bookId}/${issueId}/review/panels`, "page");
-  revalidateReaderPages(bookId, issueId);
+  await revalidateReaderPages(bookId, issueId);
 
   return { ok: true, sceneCount: inserted };
 }
