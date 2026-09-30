@@ -17,7 +17,9 @@ export type Database = {
       aliases: {
         Row: {
           alias: string;
+          alias_norm: string | null;
           canonical: string;
+          character_id: string | null;
           created_at: string | null;
           id: number;
           scope: Database["public"]["Enums"]["alias_scope"];
@@ -25,7 +27,9 @@ export type Database = {
         };
         Insert: {
           alias: string;
+          alias_norm?: string | null;
           canonical: string;
+          character_id?: string | null;
           created_at?: string | null;
           id?: number;
           scope?: Database["public"]["Enums"]["alias_scope"];
@@ -33,13 +37,23 @@ export type Database = {
         };
         Update: {
           alias?: string;
+          alias_norm?: string | null;
           canonical?: string;
+          character_id?: string | null;
           created_at?: string | null;
           id?: number;
           scope?: Database["public"]["Enums"]["alias_scope"];
           scope_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "aliases_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       audio_timestamps: {
         Row: {
@@ -361,6 +375,7 @@ export type Database = {
         Row: {
           book_id: string;
           character: string;
+          character_id: string | null;
           issue_id: string;
           voice_id: string | null;
           voice_uuid: string | null;
@@ -368,6 +383,7 @@ export type Database = {
         Insert: {
           book_id: string;
           character: string;
+          character_id?: string | null;
           issue_id: string;
           voice_id?: string | null;
           voice_uuid?: string | null;
@@ -375,6 +391,7 @@ export type Database = {
         Update: {
           book_id?: string;
           character?: string;
+          character_id?: string | null;
           issue_id?: string;
           voice_id?: string | null;
           voice_uuid?: string | null;
@@ -386,6 +403,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "issues";
             referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "castlist_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
           },
           {
             foreignKeyName: "castlist_voice_uuid_fkey";
@@ -527,25 +551,42 @@ export type Database = {
         Row: {
           aliases: string[];
           created_at: string | null;
+          display_name: string | null;
           franchise: string | null;
           id: string;
           updated_at: string | null;
+          voice_mode: string | null;
+          voice_of: string | null;
         };
         Insert: {
           aliases?: string[];
           created_at?: string | null;
+          display_name?: string | null;
           franchise?: string | null;
           id: string;
           updated_at?: string | null;
+          voice_mode?: string | null;
+          voice_of?: string | null;
         };
         Update: {
           aliases?: string[];
           created_at?: string | null;
+          display_name?: string | null;
           franchise?: string | null;
           id?: string;
           updated_at?: string | null;
+          voice_mode?: string | null;
+          voice_of?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "characters_voice_of_fkey";
+            columns: ["voice_of"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       issues: {
         Row: {
@@ -957,6 +998,7 @@ export type Database = {
           issue_id: string;
           page_number: number;
           panel_id: string;
+          primary_character_id: string | null;
           primary_speaker: string | null;
           scene_id: string | null;
           sort_order: number;
@@ -978,6 +1020,7 @@ export type Database = {
           issue_id: string;
           page_number: number;
           panel_id: string;
+          primary_character_id?: string | null;
           primary_speaker?: string | null;
           scene_id?: string | null;
           sort_order: number;
@@ -999,6 +1042,7 @@ export type Database = {
           issue_id?: string;
           page_number?: number;
           panel_id?: string;
+          primary_character_id?: string | null;
           primary_speaker?: string | null;
           scene_id?: string | null;
           sort_order?: number;
@@ -1012,6 +1056,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "issues";
             referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "panels_primary_character_id_fkey";
+            columns: ["primary_character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
           },
           {
             foreignKeyName: "panels_scene_id_fkey";
@@ -1172,6 +1223,7 @@ export type Database = {
       voices: {
         Row: {
           archived_at: string | null;
+          character_id: string | null;
           consumers: string[];
           created_at: string;
           current_elevenlabs_id: string | null;
@@ -1190,6 +1242,7 @@ export type Database = {
         };
         Insert: {
           archived_at?: string | null;
+          character_id?: string | null;
           consumers?: string[];
           created_at?: string;
           current_elevenlabs_id?: string | null;
@@ -1208,6 +1261,7 @@ export type Database = {
         };
         Update: {
           archived_at?: string | null;
+          character_id?: string | null;
           consumers?: string[];
           created_at?: string;
           current_elevenlabs_id?: string | null;
@@ -1224,7 +1278,15 @@ export type Database = {
           status?: string;
           voice_settings?: Json | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "voices_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: {
