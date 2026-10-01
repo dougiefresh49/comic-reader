@@ -3,20 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { slugify } from "~/lib/character-id";
 import {
   clearNewCharactersPauseIfComplete,
   resumeCharacterReviewAndClearPause,
 } from "~/server/admin/new-characters-resume";
-
-/** Local copy of scripts/utils/registry.ts slugify. Do not import that module. */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
 
 export async function aliasNewCharacter(args: {
   bookId: string;

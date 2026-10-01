@@ -6,6 +6,7 @@
 import fs from "fs-extra";
 import { join } from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { slugify } from "~/lib/character-id";
 
 export const NEW_CHARACTER_SPEECH_TYPES = [
   "SPEECH",
@@ -44,16 +45,6 @@ type BubbleRow = {
   type: string;
   ignored: boolean | null;
 };
-
-/** Local copy of scripts/utils/registry.ts slugify. Do not import that module. */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
 
 function resolveAlias(raw: string, aliasMap: Map<string, string>): string {
   const key = raw.toLowerCase().trim();

@@ -1,9 +1,9 @@
+import { slugify } from "~/lib/character-id";
 import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import {
   buildAliasMap,
   buildCastIndex,
   formatCastConflicts,
-  slugify,
   speakerKey,
   type AliasRow,
   type CastRow,

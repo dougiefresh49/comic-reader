@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildCastIndex, slugify as castSlug, speakerKey } from "./audio-plan";
+import { slugify as castSlug } from "~/lib/character-id";
+import { buildCastIndex, speakerKey } from "./audio-plan";
 
 const SPEECH_TYPES = ["SPEECH", "NARRATION", "CAPTION"] as const;
 const SKIPPED_VOICE = "__SKIPPED__";

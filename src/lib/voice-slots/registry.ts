@@ -1,10 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { slugify } from "~/lib/character-id";
 import { listAllIssues } from "~/lib/issue-queries";
-import {
-  buildAliasMap,
-  slugify,
-  speakerKey,
-} from "~/workflows/steps/audio-plan";
+import { buildAliasMap, speakerKey } from "~/workflows/steps/audio-plan";
 import type { CastlistRow, CharacterRow, IssueTarget, VoiceRow } from "./types";
 
 const PAGE = 1000;

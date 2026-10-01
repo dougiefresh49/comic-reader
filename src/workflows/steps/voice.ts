@@ -1,17 +1,8 @@
 import { createPartFromText } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { slugify } from "~/lib/character-id";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import type { Database } from "~/types/database";
-
-/** Copied from scripts/utils/registry.ts slugify. Do not import that module. */
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
-}
 
 function speakerMatchKey(speaker: string): string {
   return speaker.toLowerCase().trim().replace(/-/g, " ");
