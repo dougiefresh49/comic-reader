@@ -1,0 +1,308 @@
+// Editor state: the document, where the owner is, an undo stack of snapshots, and how it all packs into localStorage.
+import {
+  applyDocPatch,
+  diffDoc,
+  reconcile,
+  type Doc,
+  type DocPatch,
+  type Sel,
+} from "./model";
+
+interface HistoryEntry {
+  doc: Doc;
+  page: number;
+  sel: Sel | null;
+  label: string;
+}
+
+export interface EditorState {
+  doc: Doc;
+  /** The document as loaded from the database: what the pending edits are measured against. */
+  base: Doc;
+  past: HistoryEntry[];
+  future: HistoryEntry[];
+  page: number;
+  sel: Sel | null;
+  /** Each page remembers what was selected on it. */
+  selByPage: Record<number, Sel | null>;
+  coalesce: string | null;
+  /** The label of the last undo or redo, for the note. */
+  lastHistory: { n: number; text: string } | null;
+}
+
+export type EditorAction =
+  | {
+      type: "apply";
+      label: string;
+      recipe: (doc: Doc) => Doc;
+      /** Consecutive edits with the same key fold into one undo step. */
+      coalesce?: string;
+      select?: Sel | null;
+      page?: number;
+    }
+  | { type: "undo" }
+  | { type: "redo" }
+  | { type: "select"; sel: Sel | null }
+  | { type: "page"; page: number; sel?: Sel | null }
+  | { type: "discard" };
+
+const LIMIT = 60;
+
+function exists(doc: Doc, sel: Sel | null): Sel | null {
+  if (!sel) return null;
+  if (sel.kind === "bubble") {
+    const b = doc.bubbles[sel.id];
+    return b && !b.deleted ? sel : null;
+  }
+  return doc.panels[sel.id] ? sel : null;
+}
+
+export function initState(doc: Doc, page: number): EditorState {
+  return {
+    doc,
+    base: doc,
+    past: [],
+    future: [],
+    page,
+    sel: null,
+    selByPage: {},
+    coalesce: null,
+    lastHistory: null,
+  };
+}
+
+export function reducer(state: EditorState, action: EditorAction): EditorState {
+  switch (action.type) {
+    case "apply": {
+      const doc = action.recipe(state.doc);
+      const page = action.page ?? state.page;
+      const sel =
+        action.select !== undefined
+          ? exists(doc, action.select)
+          : exists(doc, state.sel);
+      if (doc === state.doc) {
+        return sel === state.sel && page === state.page
+          ? state
+          : { ...state, sel, page };
+      }
+      const folds =
+        action.coalesce !== undefined &&
+        action.coalesce === state.coalesce &&
+        state.past.length > 0;
+      const past = folds
+        ? state.past
+        : [
+            ...state.past,
+            {
+              doc: state.doc,
+              page: state.page,
+              sel: state.sel,
+              label: action.label,
+            },
+          ].slice(-LIMIT);
+      return {
+        ...state,
+        doc,
+        past,
+        future: [],
+        page,
+        sel,
+        selByPage: { ...state.selByPage, [page]: sel },
+        coalesce: action.coalesce ?? null,
+      };
+    }
+    case "undo": {
+      const entry = state.past[state.past.length - 1];
+      if (!entry) return state;
+      return {
+        ...state,
+        doc: entry.doc,
+        page: entry.page,
+        sel: exists(entry.doc, entry.sel),
+        past: state.past.slice(0, -1),
+        future: [
+          ...state.future,
+          {
+            doc: state.doc,
+            page: state.page,
+            sel: state.sel,
+            label: entry.label,
+          },
+        ],
+        coalesce: null,
+        lastHistory: {
+          n: (state.lastHistory?.n ?? 0) + 1,
+          text: `Undid: ${entry.label}`,
+        },
+      };
+    }
+    case "redo": {
+      const entry = state.future[state.future.length - 1];
+      if (!entry) return state;
+      return {
+        ...state,
+        doc: entry.doc,
+        page: entry.page,
+        sel: exists(entry.doc, entry.sel),
+        future: state.future.slice(0, -1),
+        past: [
+          ...state.past,
+          {
+            doc: state.doc,
+            page: state.page,
+            sel: state.sel,
+            label: entry.label,
+          },
+        ],
+        coalesce: null,
+        lastHistory: {
+          n: (state.lastHistory?.n ?? 0) + 1,
+          text: `Redid: ${entry.label}`,
+        },
+      };
+    }
+    case "select": {
+      const sel = exists(state.doc, action.sel);
+      return {
+        ...state,
+        sel,
+        selByPage: { ...state.selByPage, [state.page]: sel },
+        coalesce: null,
+      };
+    }
+    case "page": {
+      if (!state.doc.pages[action.page]) return state;
+      const sel = exists(
+        state.doc,
+        action.sel !== undefined
+          ? action.sel
+          : (state.selByPage[action.page] ?? null),
+      );
+      return {
+        ...state,
+        page: action.page,
+        sel,
+        selByPage: {
+          ...state.selByPage,
+          [state.page]: state.sel,
+          [action.page]: sel,
+        },
+        coalesce: null,
+      };
+    }
+    case "discard":
+      return {
+        ...initState(state.base, state.page),
+        lastHistory: state.lastHistory,
+      };
+  }
+}
+
+// ------------------------------------------------------- stored in the browser
+
+interface StoredEntry {
+  /** Turns the neighbouring newer document into this entry's document. */
+  patch: DocPatch | null;
+  page: number;
+  sel: Sel | null;
+  label: string;
+}
+
+/**
+ * What localStorage holds for one issue. Patches, not snapshots: sixty whole
+ * copies of a 300-bubble issue would not fit, and would be slow to write.
+ */
+export interface StoredState {
+  v: 1;
+  /** The pending edits: turns the loaded rows into the document. */
+  edits: DocPatch | null;
+  /** Undo stack, oldest first. Each patch steps back from the entry after it. */
+  past: StoredEntry[];
+  /** Redo stack, next redo last. Each patch steps on from the entry after it. */
+  future: StoredEntry[];
+  page: number;
+  selByPage: Record<number, Sel | null>;
+}
+
+function packStack(doc: Doc, stack: HistoryEntry[]): StoredEntry[] {
+  const out: StoredEntry[] = [];
+  let newer = doc;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const entry = stack[i];
+    if (!entry) continue;
+    out.unshift({
+      patch: diffDoc(newer, entry.doc),
+      page: entry.page,
+      sel: entry.sel,
+      label: entry.label,
+    });
+    newer = entry.doc;
+  }
+  return out;
+}
+
+function unpackStack(doc: Doc, stored: StoredEntry[]): HistoryEntry[] {
+  const out: HistoryEntry[] = [];
+  let newer = doc;
+  for (let i = stored.length - 1; i >= 0; i--) {
+    const entry = stored[i];
+    if (!entry) continue;
+    newer = applyDocPatch(newer, entry.patch);
+    out.unshift({
+      doc: newer,
+      page: entry.page,
+      sel: entry.sel,
+      label: entry.label,
+    });
+  }
+  return out;
+}
+
+export function packState(state: EditorState): StoredState {
+  return {
+    v: 1,
+    edits: diffDoc(state.base, state.doc),
+    past: packStack(state.doc, state.past),
+    future: packStack(state.doc, state.future),
+    page: state.page,
+    selByPage: { ...state.selByPage, [state.page]: state.sel },
+  };
+}
+
+function isStored(value: unknown): value is StoredState {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<StoredState>;
+  return v.v === 1 && Array.isArray(v.past) && Array.isArray(v.future);
+}
+
+/**
+ * The state a reload starts from: the loaded rows with the stored edits and
+ * history laid back over them. `page` (from the URL) wins over the stored one.
+ */
+export function restoreState(
+  base: Doc,
+  stored: unknown,
+  page: number | null,
+  firstPage: number,
+): EditorState {
+  const valid = (n: number | null | undefined) =>
+    typeof n === "number" && base.pages[n] ? n : null;
+  if (!isStored(stored)) return initState(base, valid(page) ?? firstPage);
+  try {
+    const doc = stored.edits
+      ? reconcile(applyDocPatch(base, stored.edits))
+      : base;
+    const at = valid(page) ?? valid(stored.page) ?? firstPage;
+    const selByPage = stored.selByPage ?? {};
+    return {
+      ...initState(base, at),
+      doc,
+      past: unpackStack(doc, stored.past),
+      future: unpackStack(doc, stored.future),
+      selByPage,
+      sel: exists(doc, selByPage[at] ?? null),
+    };
+  } catch {
+    return initState(base, valid(page) ?? firstPage);
+  }
+}
