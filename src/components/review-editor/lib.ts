@@ -1,11 +1,23 @@
 // Small pure helpers shared by the review editor's loader and its client components.
-import type { CastMember, KnownCharacter } from "./types";
+import type { CastMember, KnownCharacter, VoiceOption } from "./types";
 
+/**
+ * A name to a character id. The rule is `slugify` in
+ * src/workflows/steps/audio-plan.ts, copied because that file cannot enter a
+ * client bundle. The one difference: the name is trimmed first.
+ */
 export function slug(value: string): string {
   return value
+    .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+/** "1 bubble", "2 bubbles". */
+export function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }
 
 export function titleCase(id: string): string {
@@ -49,6 +61,42 @@ export function resolveSpeaker(
     }
   }
   return null;
+}
+
+/** "1 needs you", "3 need you". */
+export function needYou(count: number): string {
+  return `${count} ${count === 1 ? "needs" : "need"} you`;
+}
+
+/** The cast entry a typed name already names: its id, display name or a full alias. */
+export function findCast(name: string, cast: CastMember[]): CastMember | null {
+  const key = slug(name);
+  if (!key) return null;
+  return (
+    cast.find((c) => c.id === key || slug(c.name) === key) ??
+    cast.find((c) => c.aliases.some((a) => slug(a) === key)) ??
+    null
+  );
+}
+
+/** What to show for a cast member's voice, or null when it has none. */
+export function voiceLabel(member: CastMember): string | null {
+  return member.voice?.name ?? (member.newVoice ? "New voice" : null);
+}
+
+/**
+ * The voice a typed name already has: its `characters` row's voice, and only
+ * when no row matches, an active voice of the same name.
+ */
+export function ownVoice(
+  name: string,
+  known: KnownCharacter[],
+  voices: VoiceOption[],
+): VoiceOption | null {
+  const row = matchKnown(name, known);
+  if (row) return row.voice;
+  const key = slug(name);
+  return key ? (voices.find((v) => slug(v.name) === key) ?? null) : null;
 }
 
 /** The `characters` row a typed name means: its id, display name or a full alias. */

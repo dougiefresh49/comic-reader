@@ -4,6 +4,7 @@ import type {
   BubbleType,
   CastMember,
   EditorData,
+  Face,
   Rect,
   SrcBubble,
 } from "./types";
@@ -49,11 +50,12 @@ export interface PageDoc {
 
 /**
  * The voice an added character takes: its own active voice, another
- * character's, or a new one to be made later.
+ * character's, or a new one to be made later. `voiceId` is `voices.id`; a
+ * voice is never picked by its display name (decisions row 153).
  */
 export type VoiceChoice =
-  | { kind: "own"; voice: string }
-  | { kind: "borrow"; voice: string }
+  | { kind: "own"; voiceId: string }
+  | { kind: "borrow"; voiceId: string }
   | { kind: "new" };
 
 export interface AddedCast {
@@ -123,6 +125,21 @@ export function bestPanel(rect: Rect, panels: PanelDoc[]): string | null {
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * The faces whose centre sits inside a panel's box as it is now, so a drawn
+ * or resized panel offers the faces it covers.
+ */
+export function facesIn(faces: Face[], panel: PanelDoc): Face[] {
+  const { x, y, w, h } = panel.rect;
+  return faces.filter((f) => {
+    const cx = f.rect.x + f.rect.w / 2;
+    const cy = f.rect.y + f.rect.h / 2;
+    return (
+      f.page === panel.page && cx >= x && cx <= x + w && cy >= y && cy <= y + h
+    );
+  });
 }
 
 /** Reading order by top-left corner: same row reads left to right. */
@@ -587,14 +604,21 @@ export function addCast(doc: Doc, member: AddedCast, alsoMatch?: string): Doc {
 // ------------------------------------------------------------ pending edits
 
 /**
- * The difference between two documents: each changed row whole, null for a
- * row that is gone. The pending edits are the patch from the loaded rows to
- * the document; undo history is stored as patches between neighbours.
+ * One row's change: a row the other side lacks, the fields that differ, or
+ * null for a row that is gone. Only the changed fields are held, so a stored
+ * speaker edit laid over a fresh row leaves a text fix made elsewhere alone.
+ */
+type RowPatch<T> = { add: T } | { set: Partial<T> } | null;
+
+/**
+ * The difference between two documents. The pending edits are the patch from
+ * the loaded rows to the document; undo history is stored as patches between
+ * neighbours.
  */
 export interface DocPatch {
-  bubbles?: Record<string, BubbleDoc | null>;
-  panels?: Record<string, PanelDoc | null>;
-  pages?: Record<string, PageDoc | null>;
+  bubbles?: Record<string, RowPatch<BubbleDoc>>;
+  panels?: Record<string, RowPatch<PanelDoc>>;
+  pages?: Record<string, RowPatch<PageDoc>>;
   addedCast?: AddedCast[];
 }
 
@@ -602,13 +626,23 @@ function same(a: unknown, b: unknown): boolean {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
-function diffRecord<T>(
+function diffRecord<T extends object>(
   from: Record<string, T>,
   to: Record<string, T>,
-): Record<string, T | null> | undefined {
-  let out: Record<string, T | null> | undefined;
-  for (const [key, value] of Object.entries(to)) {
-    if (!same(from[key], value)) (out ??= {})[key] = value;
+): Record<string, RowPatch<T>> | undefined {
+  let out: Record<string, RowPatch<T>> | undefined;
+  for (const [key, row] of Object.entries(to)) {
+    const before = from[key];
+    if (before === row) continue;
+    if (!before) {
+      (out ??= {})[key] = { add: row };
+      continue;
+    }
+    const set: Partial<T> = {};
+    for (const field of Object.keys(row) as (keyof T)[]) {
+      if (!same(before[field], row[field])) set[field] = row[field];
+    }
+    if (Object.keys(set).length > 0) (out ??= {})[key] = { set };
   }
   for (const key of Object.keys(from)) {
     if (!(key in to)) (out ??= {})[key] = null;
@@ -616,15 +650,18 @@ function diffRecord<T>(
   return out;
 }
 
-function patchRecord<T>(
+function patchRecord<T extends object>(
   record: Record<string, T>,
-  patch: Record<string, T | null> | undefined,
+  patch: Record<string, RowPatch<T>> | undefined,
 ): Record<string, T> {
   if (!patch) return record;
   const next = { ...record };
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null) delete next[key];
-    else next[key] = value;
+  for (const [key, change] of Object.entries(patch)) {
+    const row = next[key];
+    if (change === null) delete next[key];
+    else if ("add" in change) next[key] = change.add;
+    // Fields for a row that is gone have nothing to land on.
+    else if (row) next[key] = { ...row, ...change.set };
   }
   return next;
 }
@@ -654,28 +691,66 @@ export function applyDocPatch(doc: Doc, patch: DocPatch | null): Doc {
 }
 
 /**
- * Stored edits meet rows that may have changed since: a bubble or panel the
- * stored lists do not mention is put back by its box, so no row goes missing.
+ * Stored edits meet rows that may have changed since. Ids with no row are
+ * dropped from every list, a bubble stays in the first list that names it and
+ * no other, and a bubble or panel no list names is put back by its box.
+ * Returns the same document when there was nothing to repair.
  */
 export function reconcile(doc: Doc): Doc {
-  let next = doc;
-  for (const panel of Object.values(doc.panels)) {
-    const page = next.pages[panel.page];
-    if (page && !page.panelIds.includes(panel.id)) {
-      next = {
-        ...next,
-        pages: {
-          ...next.pages,
-          [page.number]: { ...page, panelIds: [...page.panelIds, panel.id] },
-        },
-      };
+  let changed = false;
+  const seenPanels = new Set<string>();
+  const seenBubbles = new Set<string>();
+  const panels: Record<string, PanelDoc> = {};
+  const pages: Record<number, PageDoc> = {};
+
+  const keepBubbles = (ids: string[], page: number): string[] => {
+    const kept = ids.filter((id) => {
+      if (doc.bubbles[id]?.page !== page || seenBubbles.has(id)) return false;
+      seenBubbles.add(id);
+      return true;
+    });
+    if (kept.length === ids.length) return ids;
+    changed = true;
+    return kept;
+  };
+
+  for (const page of Object.values(doc.pages)) {
+    const panelIds = page.panelIds.filter((id) => {
+      if (doc.panels[id]?.page !== page.number || seenPanels.has(id))
+        return false;
+      seenPanels.add(id);
+      return true;
+    });
+    for (const panel of Object.values(doc.panels)) {
+      if (panel.page !== page.number || seenPanels.has(panel.id)) continue;
+      seenPanels.add(panel.id);
+      panelIds.push(panel.id);
     }
+    const listSame =
+      panelIds.length === page.panelIds.length &&
+      panelIds.every((id, i) => id === page.panelIds[i]);
+    if (!listSame) changed = true;
+    for (const id of panelIds) {
+      const panel = doc.panels[id];
+      if (!panel) continue;
+      const bubbleIds = keepBubbles(panel.bubbleIds, page.number);
+      panels[id] =
+        bubbleIds === panel.bubbleIds ? panel : { ...panel, bubbleIds };
+    }
+    const looseIds = keepBubbles(page.looseIds, page.number);
+    pages[page.number] =
+      listSame && looseIds === page.looseIds
+        ? page
+        : { ...page, panelIds, looseIds };
   }
-  const listed = new Set(
-    Object.values(next.pages).flatMap((p) => pageBubbleIds(next, p.number)),
-  );
+  // A panel on a page that no longer exists has nowhere to show.
+  if (Object.keys(panels).length !== Object.keys(doc.panels).length)
+    changed = true;
+
+  let next: Doc = changed ? { ...doc, panels, pages } : doc;
   for (const bubble of Object.values(doc.bubbles)) {
-    if (!listed.has(bubble.id)) next = placeByBox(next, bubble.id);
+    if (!seenBubbles.has(bubble.id) && next.pages[bubble.page])
+      next = placeByBox(next, bubble.id);
   }
   return next;
 }

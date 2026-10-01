@@ -2,8 +2,17 @@
 "use client";
 
 import type { RefObject } from "react";
-import { resolveSpeaker, slug, tintFor, titleCase } from "./lib";
 import {
+  needYou,
+  plural,
+  resolveSpeaker,
+  slug,
+  tintFor,
+  titleCase,
+  voiceLabel,
+} from "./lib";
+import {
+  facesIn,
   panelOf,
   SPOKEN,
   visibleBubbles,
@@ -193,8 +202,7 @@ function BubbleInspector(
   const cy = b.rect.y + b.rect.h / 2;
   const nearby = Array.from(
     new Set(
-      data.faces
-        .filter((face) => panel && face.panelId === panel.id)
+      (panel ? facesIn(data.faces, panel) : [])
         .map((face) => ({
           id: face.characterId,
           d: Math.hypot(
@@ -291,6 +299,7 @@ function BubbleInspector(
           Text <Key>E</Key>
         </Label>
         <textarea
+          key={b.id}
           ref={textRef}
           value={b.text}
           rows={Math.min(8, Math.max(3, b.text.split("\n").length))}
@@ -351,7 +360,9 @@ function BubbleInspector(
                   {member.name}
                 </span>
                 <span className="truncate text-[11px] text-neutral-500">
-                  {member.voice ? `voice: ${member.voice}` : "no voice yet"}
+                  {voiceLabel(member)
+                    ? `voice: ${voiceLabel(member)}`
+                    : "no voice yet"}
                 </span>
               </>
             ) : (
@@ -409,6 +420,7 @@ function BubbleInspector(
           Emotion <Key>M</Key>
         </Label>
         <input
+          key={b.id}
           ref={emotionRef}
           value={b.emotion}
           onChange={(e) =>
@@ -444,17 +456,17 @@ function BubbleInspector(
         <Label>
           Type <Key>1</Key>-<Key>5</Key>
         </Label>
-        <div className="flex overflow-hidden rounded-sm border border-neutral-800">
+        <div className="flex flex-wrap gap-px overflow-hidden rounded-sm border border-neutral-800 bg-neutral-800">
           {TYPES.map((t) => (
             <button
               key={t.id}
               type="button"
               aria-pressed={b.type === t.id}
               onClick={() => actions.patch(b.id, { type: t.id }, "type change")}
-              className={`h-7 flex-auto border-l border-neutral-800 px-1.5 text-[11px] first:border-l-0 ${
+              className={`h-7 flex-auto px-1.5 text-[11px] ${
                 b.type === t.id
                   ? "bg-neutral-200 font-medium text-neutral-950"
-                  : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+                  : "bg-neutral-950 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
               }`}
             >
               {t.label}
@@ -474,7 +486,7 @@ function BubbleInspector(
               b.silent ? "unmark silent" : "mark silent",
             )
           }
-          className={`flex h-8 items-center justify-between rounded-sm border px-2 ${
+          className={`flex min-h-8 items-center justify-between gap-1 rounded-sm border px-2 py-1 text-left ${
             b.silent
               ? "border-neutral-300 bg-neutral-200 text-neutral-950"
               : "border-neutral-800 text-neutral-300 hover:border-neutral-600"
@@ -493,7 +505,7 @@ function BubbleInspector(
               b.ignored ? "unmark ignored" : "mark ignored",
             )
           }
-          className={`flex h-8 items-center justify-between rounded-sm border px-2 ${
+          className={`flex min-h-8 items-center justify-between gap-1 rounded-sm border px-2 py-1 text-left ${
             b.ignored
               ? "border-neutral-300 bg-neutral-200 text-neutral-950"
               : "border-neutral-800 text-neutral-300 hover:border-neutral-600"
@@ -573,11 +585,7 @@ function PanelInspector(props: InspectorProps & { panel: PanelDoc }) {
   const rows = visibleBubbles(doc, panel.bubbleIds);
   const flagged = rows.filter((b) => flags.has(b.id)).length;
   const faceIds = Array.from(
-    new Set(
-      data.faces
-        .filter((f) => f.panelId === panel.id)
-        .flatMap((f) => f.characterId ?? []),
-    ),
+    new Set(facesIn(data.faces, panel).flatMap((f) => f.characterId ?? [])),
   );
   return (
     <div className="space-y-3 p-3">
@@ -586,8 +594,8 @@ function PanelInspector(props: InspectorProps & { panel: PanelDoc }) {
           Panel {index + 1}
         </h2>
         <span className="text-neutral-500">
-          of {panels.length}, {rows.length} bubbles
-          {flagged > 0 ? `, ${flagged} need you` : ""}
+          of {panels.length}, {plural(rows.length, "bubble")}
+          {flagged > 0 ? `, ${needYou(flagged)}` : ""}
         </span>
       </div>
 
@@ -723,7 +731,7 @@ function PageInspector(props: InspectorProps) {
         .filter((b) => !b.deleted && !b.ignored && !b.silent && b.speakerId)
         .flatMap((b) => {
           const m = b.speakerId ? castById.get(b.speakerId) : undefined;
-          return m && !m.voice && !newVoices.includes(m.name) ? [m.name] : [];
+          return m && !voiceLabel(m) ? [m.name] : [];
         }),
     ),
   );
@@ -819,7 +827,7 @@ function PageInspector(props: InspectorProps) {
           </ol>
         )}
         <p className="text-[11px] text-neutral-600">
-          {numbers.size} bubbles, {flags.size} flagged.
+          {plural(numbers.size, "bubble")}, {flags.size} flagged.
         </p>
       </section>
 

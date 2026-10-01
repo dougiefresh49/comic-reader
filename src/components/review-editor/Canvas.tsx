@@ -93,6 +93,9 @@ const HANDLES: { id: Handle; className: string }[] = [
 ];
 
 const MARGIN = 28;
+/** Zoom never goes below this, however small the pane gets. */
+const MIN_ZOOM = 0.05;
+const MAX_ZOOM = 3;
 
 function box(rect: Rect) {
   return {
@@ -157,9 +160,9 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     if (!el) return;
     const cw = el.clientWidth;
     const ch = el.clientHeight;
-    const zoom = Math.min(
-      (cw - MARGIN * 2) / page.width,
-      (ch - MARGIN * 2) / page.height,
+    const zoom = Math.max(
+      MIN_ZOOM,
+      Math.min((cw - MARGIN * 2) / page.width, (ch - MARGIN * 2) / page.height),
     );
     fitted.current = true;
     apply({
@@ -173,7 +176,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     (factor: number, cx: number, cy: number) => {
       const v = viewRef.current;
       if (!v) return;
-      const zoom = Math.min(3, Math.max(0.05, v.zoom * factor));
+      const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom * factor));
       const k = zoom / v.zoom;
       fitted.current = false;
       apply({ zoom, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k });
@@ -253,10 +256,13 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
         if (!el) return;
         const cw = el.clientWidth;
         const ch = el.clientHeight;
-        const zoom = Math.min(
-          3,
-          (cw - MARGIN * 2) / (rect.w * page.width),
-          (ch - MARGIN * 2) / (rect.h * page.height),
+        const zoom = Math.max(
+          MIN_ZOOM,
+          Math.min(
+            MAX_ZOOM,
+            (cw - MARGIN * 2) / (rect.w * page.width),
+            (ch - MARGIN * 2) / (rect.h * page.height),
+          ),
         );
         fitted.current = false;
         apply({

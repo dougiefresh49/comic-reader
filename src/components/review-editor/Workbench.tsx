@@ -13,12 +13,13 @@ import {
 } from "react";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
 import { Inspector, Key, type Actions } from "./Inspector";
-import { newId, slug } from "./lib";
+import { findCast, needYou, newId, ownVoice, plural, slug } from "./lib";
 import {
   addBubble,
   addCast,
   addPanel,
   diffDoc,
+  facesIn,
   initDoc,
   issueFlags,
   moveBubbleTo,
@@ -42,13 +43,16 @@ import {
   type Sel,
 } from "./model";
 import {
+  backupKey,
   clearLocal,
   editsKey,
   LAYOUT_KEY,
   readLocal,
+  readRaw,
   writeLocal,
+  writeRaw,
 } from "./storage";
-import { packState, reducer, restoreState } from "./store";
+import { packState, reducer, restoreState, storedRev } from "./store";
 import { Tree } from "./Tree";
 import type { CastMember, EditorData, Rect, SrcPage } from "./types";
 
@@ -78,22 +82,25 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
     rows: [
       ["↓ / J", "Next panel or bubble, runs on into the next page"],
       ["↑ / K", "Previous panel or bubble"],
-      ["→ / ]", "Next page"],
-      ["← / [", "Previous page"],
+      ["→ / ] / PgDn", "Next page"],
+      ["← / [ / PgUp", "Previous page"],
       ["N", "Next bubble that needs you, on any page"],
       ["Shift N", "Previous bubble that needs you"],
-      ["Esc", "Leave a field, then clear the selection"],
+      ["Esc", "Leave a field or a draw tool, then clear the selection"],
     ],
   },
   {
     title: "Edit the selected bubble",
     rows: [
       ["E / Enter", "Edit the text"],
-      ["S", "Pick the speaker, Enter takes the nearest face"],
+      [
+        "S",
+        "Pick the speaker. Enter takes the highlighted name: the nearest face, or the first match once you type",
+      ],
       ["M", "Edit the emotion"],
       ["1 to 5", "Speech, narration, caption, SFX, background"],
       ["X", "Silent: shown, no audio"],
-      ["I", "Ignored: not a bubble"],
+      ["I", "Ignored: not read"],
       ["D", "Dismiss a duplicate"],
       ["Y", "Keep both: not a duplicate"],
     ],
@@ -104,6 +111,7 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
       ["Alt ↑ / ↓", "Earlier or later in play order, crosses panels"],
       ["Shift arrows", "Move the box"],
       ["Alt Shift arrows", "Resize the box"],
+      ["V", "Back to the select tool"],
       ["B", "Draw a bubble with the mouse"],
       ["Shift B", "Drop a bubble in the current panel"],
       ["P", "Draw a panel with the mouse"],
@@ -113,15 +121,17 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
   {
     title: "History",
     rows: [
-      ["Cmd Z", "Undo"],
+      ["Cmd Z", "Undo. Ctrl works in place of Cmd"],
       ["Shift Cmd Z", "Redo"],
+      ["Cmd S", "Saves nothing yet: shows where the edits are kept"],
     ],
   },
   {
     title: "View",
     rows: [
       ["Space drag", "Pan. The wheel pans too"],
-      ["Cmd wheel", "Zoom at the cursor. Also + and -"],
+      ["Cmd wheel", "Zoom at the cursor"],
+      ["+ / = / -", "Zoom in and out"],
       ["Z", "Zoom to the selected panel"],
       ["0", "Fit the page"],
       ["F", "Show only what needs you"],
@@ -163,11 +173,20 @@ interface Widths {
 }
 const LEFT = { min: 220, max: 560, initial: 304 };
 const RIGHT = { min: 260, max: 600, initial: 328 };
+const RAIL_WIDTH = 40;
+/** The drawers never squeeze the canvas below this. */
+const CANVAS_MIN = 320;
 
-function clampWidth(value: unknown, limits: typeof LEFT): number {
+/** How edits made here stand with localStorage. */
+type Kept = "kept" | "no-history" | "failed" | "stale";
+
+function clampWidth(
+  value: unknown,
+  limits: { min: number; max: number; initial?: number },
+): number {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.min(limits.max, Math.max(limits.min, Math.round(value)))
-    : limits.initial;
+    : (limits.initial ?? limits.min);
 }
 
 function readWidths(): Widths {
@@ -200,7 +219,7 @@ function ResizeHandle({
 }: {
   drawer: "left" | "right";
   width: number;
-  limits: typeof LEFT;
+  limits: { min: number; max: number };
   onResize: (width: number) => void;
 }) {
   const start = useRef<{ x: number; width: number } | null>(null);
@@ -262,10 +281,32 @@ export function Workbench(props: WorkbenchProps) {
 function Editor({ data, initialPage }: WorkbenchProps) {
   const firstPage = data.pages[0]?.number ?? 1;
   const storeKey = editsKey(data.bookId, data.issueId);
-  const [state, dispatch] = useReducer(reducer, undefined, () =>
-    restoreState(initDoc(data), readLocal(storeKey), initialPage, firstPage),
-  );
+  // What the browser held when the editor opened. A stored value that cannot
+  // be restored is copied aside here, before anything can write over it.
+  const [boot] = useState(() => {
+    const raw = readRaw(storeKey);
+    const restored = restoreState(initDoc(data), raw, initialPage, firstPage);
+    const notices: string[] = [];
+    if (restored.unreadable && raw !== null) {
+      const copyKey = backupKey(data.bookId, data.issueId);
+      notices.push(
+        writeRaw(copyKey, raw)
+          ? `The edits this browser held for this issue could not be read, so the editor started from the rows as loaded. The stored value was copied to "${copyKey}" in this browser's local storage.`
+          : "The edits this browser held for this issue could not be read, and could not be copied aside. The editor started from the rows as loaded; the next edit replaces what was stored.",
+      );
+    }
+    if (restored.rowsChanged)
+      notices.push(
+        "This issue's rows changed since these edits were made. The edits were laid over the rows as they are now, and the undo history was cleared.",
+      );
+    return { ...restored, notices };
+  });
+  const [state, dispatch] = useReducer(reducer, boot.state);
   const { doc, page: pageNumber, sel } = state;
+  const [kept, setKept] = useState<Kept>("kept");
+  const [notices, setNotices] = useState(boot.notices);
+  const [flash, setFlash] = useState(false);
+  const [viewport, setViewport] = useState(() => window.innerWidth);
 
   const [tool, setTool] = useState<Tool>("select");
   const [hover, setHover] = useState<Sel | null>(null);
@@ -300,6 +341,10 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   );
   const page = pagesByNumber.get(pageNumber) ?? data.pages[0];
 
+  const voiceById = useMemo(
+    () => new Map(data.voices.map((v) => [v.id, v])),
+    [data.voices],
+  );
   const cast = useMemo<CastMember[]>(() => {
     const added: CastMember[] = doc.addedCast.map((c, i) => ({
       id: c.id,
@@ -307,9 +352,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       aliases: [],
       kind: "character",
       tint: data.cast.length + i,
-      voice: c.voice.kind === "new" ? "New voice" : c.voice.voice,
-      faceCount: 0,
-      pages: [],
+      voice:
+        c.voice.kind === "new"
+          ? null
+          : (voiceById.get(c.voice.voiceId) ?? null),
+      newVoice: c.voice.kind === "new",
       portrait: null,
     }));
     return [
@@ -318,7 +365,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       ),
       ...data.cast.filter((c) => c.kind === "role"),
     ];
-  }, [data.cast, doc.addedCast]);
+  }, [data.cast, doc.addedCast, voiceById]);
   const castById = useMemo(() => new Map(cast.map((c) => [c.id, c])), [cast]);
 
   const panels = useMemo(() => pagePanels(doc, pageNumber), [doc, pageNumber]);
@@ -360,13 +407,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const selBubble = sel?.kind === "bubble" ? doc.bubbles[sel.id] : undefined;
   const selPanel = sel?.kind === "panel" ? doc.panels[sel.id] : undefined;
   const focusPanel = selPanel ?? (selBubble ? panelOf(doc, selBubble) : null);
-  const focusPanelId = focusPanel?.id ?? null;
   const faces = useMemo(
-    () =>
-      selBubble && focusPanelId
-        ? data.faces.filter((f) => f.panelId === focusPanelId)
-        : [],
-    [data.faces, focusPanelId, selBubble],
+    () => (selBubble && focusPanel ? facesIn(data.faces, focusPanel) : []),
+    [data.faces, focusPanel, selBubble],
   );
 
   const emotions = useMemo(() => {
@@ -384,15 +427,47 @@ function Editor({ data, initialPage }: WorkbenchProps) {
 
   // ------------------------------------------------------------- effects
 
-  // Pending edits, undo history and the place go to localStorage a moment
-  // after the last change, so typing never waits on a write.
+  // Pending edits and undo history go to localStorage a moment after the
+  // last change, so typing never waits on a write. A write happens only when
+  // the document or the history changed, and only over the revision this tab
+  // last read or wrote: another tab's write since then makes this tab stale,
+  // and a stale tab never writes again.
   const stateRef = useRef(state);
+  const revRef = useRef(boot.rev);
+  const writtenRef = useRef(boot.state);
+  const staleRef = useRef(false);
+  const goStale = useCallback(() => {
+    staleRef.current = true;
+    setKept("stale");
+  }, []);
   const store = useCallback(() => {
-    const packed = packState(stateRef.current);
+    const current = stateRef.current;
+    const written = writtenRef.current;
+    if (staleRef.current) return;
+    if (
+      written.doc === current.doc &&
+      written.past === current.past &&
+      written.future === current.future
+    )
+      return;
+    if (storedRev(readRaw(storeKey)) !== revRef.current) {
+      goStale();
+      return;
+    }
+    const rev = newId();
+    const packed = packState(current, rev);
     // A full store keeps the edits and lets the history go.
-    if (!writeLocal(storeKey, packed))
-      writeLocal(storeKey, { ...packed, past: [], future: [] });
-  }, [storeKey]);
+    const result: Kept = writeLocal(storeKey, packed)
+      ? "kept"
+      : writeLocal(storeKey, { ...packed, past: [], future: [] })
+        ? "no-history"
+        : "failed";
+    if (result !== "failed") {
+      revRef.current = rev;
+      writtenRef.current = current;
+    }
+    setKept(result);
+  }, [storeKey, goStale]);
   useEffect(() => {
     stateRef.current = state;
     const timer = window.setTimeout(store, 250);
@@ -411,9 +486,31 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     };
   }, [store]);
 
+  // Another tab wrote this issue's edits: say so at once.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== window.localStorage) return;
+      if (e.key === storeKey || e.key === null) goStale();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [storeKey, goStale]);
+
   useEffect(() => {
     writeLocal(LAYOUT_KEY, widths);
   }, [widths]);
+
+  useEffect(() => {
+    const onResize = () => setViewport(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timer = window.setTimeout(() => setFlash(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
 
   // The page lives in the URL too, so a link lands on it.
   useEffect(() => {
@@ -543,14 +640,12 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       apply("add panel", (d) => addPanel(d, id, pageNumber, rect), {
         select: { kind: "panel", id },
       });
-      const moved =
-        addPanel(doc, id, pageNumber, rect).panels[id]?.bubbleIds.length ?? 0;
+      const after = addPanel(doc, id, pageNumber, rect);
+      const moved = visibleBubbles(after, after.panels[id]?.bubbleIds ?? []);
       say(
-        moved === 0
+        moved.length === 0
           ? "New panel. No bubble sits in it."
-          : `New panel. ${moved} ${
-              moved === 1 ? "bubble" : "bubbles"
-            } moved into it.`,
+          : `New panel. ${plural(moved.length, "bubble")} moved into it.`,
       );
     } else {
       apply("add bubble", (d) => addBubble(d, id, pageNumber, rect), {
@@ -640,17 +735,22 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     apply("delete panel", (d) => removePanel(d, id), { select: null });
     say(
       count > 0
-        ? `Deleted panel ${number}. Its ${count} ${
-            count === 1 ? "bubble" : "bubbles"
-          } moved to the panel each overlaps most, or outside every panel.`
+        ? `Deleted panel ${number}. Its ${plural(count, "bubble")} moved to the panel each overlaps most, or outside every panel.`
         : `Deleted panel ${number}.`,
     );
   };
 
   const discard = () => {
-    clearLocal(storeKey);
-    dispatch({ type: "discard" });
     setConfirmDiscard(false);
+    // A stale tab must not clear what another tab stored.
+    if (staleRef.current) return;
+    if (storedRev(readRaw(storeKey)) !== revRef.current) {
+      goStale();
+      return;
+    }
+    clearLocal(storeKey);
+    revRef.current = null;
+    dispatch({ type: "discard" });
     say("Edits discarded. Back to the rows as loaded.");
   };
 
@@ -692,16 +792,23 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     addCast: (name, voice, knownId, bubbleId, raw) => {
       const row = knownId ? data.known.find((k) => k.id === knownId) : null;
       setPicker({ open: false, addName: null });
-      if (row && castById.has(row.id)) {
-        // The typed name is another name for someone already in the cast.
-        apply("speaker change", (d) => setSpeaker(d, bubbleId, row.id));
-        say(`${row.name} is already in the cast.`);
+      // A name that already names someone in the cast picks that entry; it
+      // never becomes a second one.
+      const existing =
+        (row ? castById.get(row.id) : undefined) ?? findCast(name, cast);
+      if (existing) {
+        apply("speaker change", (d) => setSpeaker(d, bubbleId, existing.id));
+        say(`${existing.name} is already in the cast.`);
         return;
       }
       // A known character keeps its `characters` id and display name.
-      let id = row?.id ?? (slug(name) || "character");
-      while (castById.has(id)) id = `${id}-2`;
+      const id = row?.id ?? (slug(name) || "character");
       const display = row?.name ?? name;
+      const voiceName =
+        voice.kind === "new" ? "" : (voiceById.get(voice.voiceId)?.name ?? "");
+      // The form says "Another voice" when the character has its own, and
+      // "Borrow" when it has none.
+      const hasOwn = ownVoice(name, data.known, data.voices) !== null;
       const single = raw && !/,|&|\/|\band\b/i.test(raw) ? raw : undefined;
       apply("add character", (d) =>
         setSpeaker(
@@ -714,8 +821,10 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         voice.kind === "new"
           ? `${display} joins the cast with a new voice, made in a later step.`
           : voice.kind === "own"
-            ? `${display} joins the cast with the voice ${voice.voice}.`
-            : `${display} joins the cast, borrowing the voice ${voice.voice}.`,
+            ? `${display} joins the cast with the voice ${voiceName}.`
+            : hasOwn
+              ? `${display} joins the cast with another voice, ${voiceName}.`
+              : `${display} joins the cast, borrowing the voice ${voiceName}.`,
       );
     },
     openPicker: (addName) => openField("speaker", addName),
@@ -762,6 +871,13 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         if (key === "Escape") setConfirmDiscard(false);
         return;
       }
+      if (mod && key === "s") {
+        // Nothing to save yet. Keep the browser's save dialog shut and point
+        // at where the edits are.
+        e.preventDefault();
+        setFlash(true);
+        return;
+      }
       if (mod && key === "z") {
         e.preventDefault();
         dispatch({ type: e.shiftKey ? "redo" : "undo" });
@@ -772,6 +888,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         if (key === "Escape" || key === "?") setSheet(false);
         return;
       }
+      // Inside the picker, the add form or any other popover, single keys
+      // belong to it, on a focused button there as much as in a field.
+      if (t?.closest("[data-popover]")) return;
       // A text field keeps every key but Escape, Delete and Backspace included.
       if (typing) {
         if (key === "Escape") t.blur();
@@ -942,6 +1061,22 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     );
   }
 
+  const notKept = kept === "failed" || kept === "stale";
+  // The drawers give way before the canvas drops under its minimum.
+  const room = viewport - RAIL_WIDTH - CANVAS_MIN;
+  const rightWidth = rightOpen
+    ? clampWidth(widths.right, {
+        min: RIGHT.min,
+        max: Math.max(RIGHT.min, room - (leftOpen ? LEFT.min : 0)),
+      })
+    : 0;
+  const leftWidth = leftOpen
+    ? clampWidth(widths.left, {
+        min: LEFT.min,
+        max: Math.max(LEFT.min, room - rightWidth),
+      })
+    : 0;
+
   const duplicateSelected =
     !!selBubble &&
     !!flags.get(selBubble.id)?.some((f) => f.kind === "duplicate");
@@ -1026,7 +1161,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         >
           {allFlags.length > 0 ? (
             <>
-              {allFlags.length} need you
+              {needYou(allFlags.length)}
               <span className="text-amber-200/60">
                 {flags.size} on this page
               </span>
@@ -1059,19 +1194,32 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         >
           Redo
         </button>
-        {edited && (
-          <>
-            <span className="shrink-0 text-neutral-500">
-              Edits are kept in this browser
-            </span>
-            <button
-              type="button"
-              onClick={() => setConfirmDiscard(true)}
-              className={BAR_BUTTON}
-            >
-              Discard edits
-            </button>
-          </>
+        {(edited || flash || notKept) && (
+          <span
+            role="status"
+            className={`shrink-0 rounded-sm px-1 ${
+              notKept
+                ? "text-amber-300"
+                : flash
+                  ? "bg-neutral-100 text-neutral-950"
+                  : "text-neutral-500"
+            }`}
+          >
+            {notKept
+              ? "Edits are not being kept"
+              : kept === "no-history"
+                ? "Edits are kept in this browser, the undo history is not"
+                : "Edits are kept in this browser"}
+          </span>
+        )}
+        {edited && kept !== "stale" && (
+          <button
+            type="button"
+            onClick={() => setConfirmDiscard(true)}
+            className={BAR_BUTTON}
+          >
+            Discard edits
+          </button>
         )}
         <button
           type="button"
@@ -1081,6 +1229,56 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           Keys <span className="text-neutral-500">?</span>
         </button>
       </header>
+
+      {(kept !== "kept" || notices.length > 0) && (
+        <div className="shrink-0 border-b border-amber-400/40 bg-amber-400/10 text-amber-200">
+          {kept === "stale" && (
+            <div role="alert" className="flex items-center gap-3 px-3 py-1.5">
+              <span className="flex-1">
+                This issue was edited in another tab. Nothing done here is being
+                kept. Reload to pick up the edits from the other tab.
+              </span>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="h-6 shrink-0 rounded-sm bg-amber-300 px-2 font-medium text-neutral-950 hover:bg-amber-200"
+              >
+                Reload
+              </button>
+            </div>
+          )}
+          {kept === "failed" && (
+            <div role="alert" className="px-3 py-1.5">
+              This browser refused to store the edits (its storage is full or
+              blocked). They are lost when this tab closes or reloads.
+            </div>
+          )}
+          {kept === "no-history" && (
+            <div role="status" className="px-3 py-1.5">
+              The undo history no longer fits in this browser&apos;s storage.
+              The edits are kept; undo will not survive a reload.
+            </div>
+          )}
+          {notices.map((text) => (
+            <div
+              key={text}
+              role="status"
+              className="flex items-center gap-3 px-3 py-1.5"
+            >
+              <span className="flex-1">{text}</span>
+              <button
+                type="button"
+                onClick={() =>
+                  setNotices((list) => list.filter((n) => n !== text))
+                }
+                className="h-6 shrink-0 rounded-sm border border-amber-400/50 px-2 hover:bg-amber-400/20"
+              >
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <nav
@@ -1121,12 +1319,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         {leftOpen && (
           <aside
             className="relative flex shrink-0 flex-col border-r border-neutral-800"
-            style={{ width: widths.left }}
+            style={{ width: leftWidth }}
           >
             <ResizeHandle
               drawer="left"
-              width={widths.left}
-              limits={LEFT}
+              width={leftWidth}
+              limits={{
+                min: LEFT.min,
+                max: Math.max(LEFT.min, Math.min(LEFT.max, room - rightWidth)),
+              }}
               onResize={(left) => setWidths((w) => ({ ...w, left }))}
             />
             {leftView === "order" && (
@@ -1165,7 +1366,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                             onClick={() => goto(p.number)}
                             title={
                               count > 0
-                                ? `Page ${p.number}: ${count} need you`
+                                ? `Page ${p.number}: ${needYou(count)}`
                                 : `Page ${p.number}`
                             }
                             className={`relative h-6 w-6 rounded-sm border text-[11px] tabular-nums ${
@@ -1340,12 +1541,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         {rightOpen && (
           <aside
             className="relative shrink-0 border-l border-neutral-800"
-            style={{ width: widths.right }}
+            style={{ width: rightWidth }}
           >
             <ResizeHandle
               drawer="right"
-              width={widths.right}
-              limits={RIGHT}
+              width={rightWidth}
+              limits={{
+                min: RIGHT.min,
+                max: Math.max(RIGHT.min, Math.min(RIGHT.max, room - leftWidth)),
+              }}
               onResize={(right) => setWidths((w) => ({ ...w, right }))}
             />
             <div className="h-full overflow-y-auto">
@@ -1385,6 +1589,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       {confirmDiscard && (
         <div
           role="alertdialog"
+          data-popover
           aria-label="Discard edits"
           className="absolute inset-0 z-50 flex items-center justify-center bg-neutral-950/80"
           onClick={() => setConfirmDiscard(false)}
@@ -1425,6 +1630,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       {sheet && (
         <div
           role="dialog"
+          data-popover
           aria-label="Keyboard shortcuts"
           className="absolute inset-0 z-50 flex items-center justify-center bg-neutral-950/80"
           onClick={() => setSheet(false)}

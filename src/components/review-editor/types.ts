@@ -45,7 +45,6 @@ export interface Face {
   id: string;
   characterId: string | null;
   page: number;
-  panelId: string;
   rect: Rect;
   confidence: number;
 }
@@ -55,6 +54,12 @@ export interface Portrait {
   rect: Rect;
 }
 
+/** An active `voices` row. The id picks the voice; the name is only shown. */
+export interface VoiceOption {
+  id: string;
+  name: string;
+}
+
 export interface CastMember {
   id: string;
   name: string;
@@ -62,10 +67,10 @@ export interface CastMember {
   kind: "character" | "role";
   /** Index into the speaker tints. */
   tint: number;
-  /** Display name of the active voice it uses today, or null when it has none. */
-  voice: string | null;
-  faceCount: number;
-  pages: number[];
+  /** The active voice it uses today, or null when it has none. */
+  voice: VoiceOption | null;
+  /** Added in the browser with a new voice still to be made. */
+  newVoice?: boolean;
   portrait: Portrait | null;
 }
 
@@ -74,13 +79,8 @@ export interface KnownCharacter {
   id: string;
   name: string;
   aliases: string[];
-  /** Display name of its active voice, or null. */
-  voice: string | null;
-}
-
-export interface VoiceOption {
-  id: string;
-  name: string;
+  /** Its active voice, or null. */
+  voice: VoiceOption | null;
 }
 
 export interface EditorData {

@@ -213,7 +213,12 @@ interface StoredEntry {
  * copies of a 300-bubble issue would not fit, and would be slow to write.
  */
 export interface StoredState {
-  v: 1;
+  v: 2;
+  /**
+   * Changes on every write. A tab writes only over the revision it last read
+   * or wrote, so a stale tab cannot overwrite another tab's edits.
+   */
+  rev: string;
   /** The pending edits: turns the loaded rows into the document. */
   edits: DocPatch | null;
   /** Undo stack, oldest first. Each patch steps back from the entry after it. */
@@ -258,9 +263,10 @@ function unpackStack(doc: Doc, stored: StoredEntry[]): HistoryEntry[] {
   return out;
 }
 
-export function packState(state: EditorState): StoredState {
+export function packState(state: EditorState, rev: string): StoredState {
   return {
-    v: 1,
+    v: 2,
+    rev,
     edits: diffDoc(state.base, state.doc),
     past: packStack(state.doc, state.past),
     future: packStack(state.doc, state.future),
@@ -269,10 +275,45 @@ export function packState(state: EditorState): StoredState {
   };
 }
 
+function parse(raw: string | null): unknown {
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** The revision of whatever the key holds, or null when it holds none. */
+export function storedRev(raw: string | null): string | null {
+  const value = parse(raw);
+  if (!value || typeof value !== "object") return null;
+  const { rev } = value as { rev?: unknown };
+  return typeof rev === "string" ? rev : null;
+}
+
 function isStored(value: unknown): value is StoredState {
   if (!value || typeof value !== "object") return false;
   const v = value as Partial<StoredState>;
-  return v.v === 1 && Array.isArray(v.past) && Array.isArray(v.future);
+  return (
+    v.v === 2 &&
+    typeof v.rev === "string" &&
+    Array.isArray(v.past) &&
+    Array.isArray(v.future)
+  );
+}
+
+export interface Restored {
+  state: EditorState;
+  /** The revision that was read, for the first write to check against. */
+  rev: string | null;
+  /** A value was stored and could not be restored. The state starts clean. */
+  unreadable: boolean;
+  /**
+   * The rows changed since the edits were stored: the edits were laid over
+   * the new rows and the undo history, which no longer fits them, was dropped.
+   */
+  rowsChanged: boolean;
 }
 
 /**
@@ -281,28 +322,49 @@ function isStored(value: unknown): value is StoredState {
  */
 export function restoreState(
   base: Doc,
-  stored: unknown,
+  raw: string | null,
   page: number | null,
   firstPage: number,
-): EditorState {
+): Restored {
   const valid = (n: number | null | undefined) =>
     typeof n === "number" && base.pages[n] ? n : null;
-  if (!isStored(stored)) return initState(base, valid(page) ?? firstPage);
+  const clean = (unreadable: boolean): Restored => ({
+    state: initState(base, valid(page) ?? firstPage),
+    rev: storedRev(raw),
+    unreadable,
+    rowsChanged: false,
+  });
+  if (raw === null) return clean(false);
+  const stored = parse(raw);
+  if (!isStored(stored)) return clean(true);
   try {
-    const doc = stored.edits
-      ? reconcile(applyDocPatch(base, stored.edits))
-      : base;
+    const patched = applyDocPatch(base, stored.edits);
+    const doc = reconcile(patched);
+    let past = doc === patched ? unpackStack(doc, stored.past) : [];
+    let future = doc === patched ? unpackStack(doc, stored.future) : [];
+    const rowsChanged =
+      doc !== patched ||
+      [...past, ...future].some((entry) => reconcile(entry.doc) !== entry.doc);
+    if (rowsChanged) {
+      past = [];
+      future = [];
+    }
     const at = valid(page) ?? valid(stored.page) ?? firstPage;
     const selByPage = stored.selByPage ?? {};
     return {
-      ...initState(base, at),
-      doc,
-      past: unpackStack(doc, stored.past),
-      future: unpackStack(doc, stored.future),
-      selByPage,
-      sel: exists(doc, selByPage[at] ?? null),
+      state: {
+        ...initState(base, at),
+        doc,
+        past,
+        future,
+        selByPage,
+        sel: exists(doc, selByPage[at] ?? null),
+      },
+      rev: stored.rev,
+      unreadable: false,
+      rowsChanged,
     };
   } catch {
-    return initState(base, valid(page) ?? firstPage);
+    return clean(true);
   }
 }

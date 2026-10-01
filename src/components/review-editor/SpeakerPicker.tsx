@@ -2,7 +2,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { matchKnown, slug, tintFor, titleCase } from "./lib";
+import {
+  findCast,
+  matchKnown,
+  ownVoice,
+  slug,
+  tintFor,
+  titleCase,
+  voiceLabel,
+} from "./lib";
 import type { VoiceChoice } from "./model";
 import { PageCrop } from "./PageCrop";
 import type { CastMember, KnownCharacter, SrcPage, VoiceOption } from "./types";
@@ -76,26 +84,30 @@ type VoiceMode = "own" | "other" | "new";
 
 function AddCharacterForm({
   initialName,
+  cast,
   voices,
   known,
   slotsUsed,
   slotsTotal,
   newVoices,
+  onPick,
   onAdd,
   onCancel,
 }: {
   initialName: string;
+  cast: CastMember[];
   voices: VoiceOption[];
   known: KnownCharacter[];
   slotsUsed: number;
   slotsTotal: number;
   newVoices: number;
+  onPick: (castId: string) => void;
   onAdd: AddCharacter;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initialName);
   const [picked, setPicked] = useState<VoiceMode | null>(null);
-  const [voice, setVoice] = useState(voices[0]?.name ?? "");
+  const [voiceId, setVoiceId] = useState(voices[0]?.id ?? "");
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -103,13 +115,13 @@ function AddCharacterForm({
     nameRef.current?.select();
   }, []);
 
+  // A name that is already in the cast is picked, never added a second time.
+  const existing = findCast(name, cast);
   // A typed name that is a known character with an active voice takes that
   // voice. It is the character's own, so nothing here calls it borrowing.
   const match = matchKnown(name, known);
-  const own =
-    match?.voice ??
-    voices.find((v) => slug(v.name) === slug(name))?.name ??
-    null;
+  const own = ownVoice(name, known, voices);
+  const who = match?.name ?? name.trim();
   const slotsLeft = slotsTotal - slotsUsed - newVoices;
   const fallback: VoiceMode = slotsLeft <= 0 ? "other" : "new";
   const mode: VoiceMode = own
@@ -119,29 +131,35 @@ function AddCharacterForm({
       : picked;
 
   // The second choice is every voice but the character's own.
-  const others = voices.filter((v) => v.name !== own);
-  const other = others.some((v) => v.name === voice)
-    ? voice
-    : (others[0]?.name ?? "");
+  const others = voices.filter((v) => v.id !== own?.id);
+  const otherId = others.some((v) => v.id === voiceId)
+    ? voiceId
+    : (others[0]?.id ?? "");
 
   const valid =
     name.trim().length > 0 &&
-    (mode === "new" ? slotsLeft > 0 : mode === "own" || other.length > 0);
+    (existing !== null ||
+      (mode === "new" ? slotsLeft > 0 : mode === "own" || otherId.length > 0));
   const submit = () => {
     if (!valid) return;
+    if (existing) {
+      onPick(existing.id);
+      return;
+    }
     onAdd(
       name.trim(),
       mode === "own" && own
-        ? { kind: "own", voice: own }
+        ? { kind: "own", voiceId: own.id }
         : mode === "new"
           ? { kind: "new" }
-          : { kind: "borrow", voice: other },
+          : { kind: "borrow", voiceId: otherId },
       match?.id ?? null,
     );
   };
 
   return (
     <form
+      data-popover
       onSubmit={(e) => {
         e.preventDefault();
         submit();
@@ -164,87 +182,93 @@ function AddCharacterForm({
         aria-label="Character name"
         className="h-7 w-full rounded-sm border border-neutral-700 bg-neutral-950 px-2 text-[12px] text-neutral-100 outline-none focus:border-neutral-400"
       />
-      <fieldset className="space-y-1.5">
-        <legend className="mb-1 text-[11px] text-neutral-500">Voice</legend>
-        {own && (
+      {existing ? (
+        <p className="text-[11px] text-neutral-400">
+          {existing.name} is already in the cast.
+        </p>
+      ) : (
+        <fieldset className="space-y-1.5">
+          <legend className="mb-1 text-[11px] text-neutral-500">Voice</legend>
+          {own && (
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                name="voice-mode"
+                checked={mode === "own"}
+                onChange={() => setPicked("own")}
+                className="accent-neutral-200"
+              />
+              <span className="min-w-0 truncate">
+                {who}&apos;s voice
+                {slug(own.name) !== slug(who) && (
+                  <span className="text-neutral-500">, {own.name}</span>
+                )}
+              </span>
+            </label>
+          )}
           <label className="flex items-center gap-2">
             <input
               type="radio"
               name="voice-mode"
-              checked={mode === "own"}
-              onChange={() => setPicked("own")}
+              checked={mode === "other"}
+              onChange={() => setPicked("other")}
               className="accent-neutral-200"
             />
-            <span className="min-w-0 truncate">
-              {own}
-              <span className="text-neutral-500">
-                , {match?.name ?? name.trim()}&apos;s voice
-              </span>
-            </span>
+            <span className="shrink-0">{own ? "Another voice" : "Borrow"}</span>
+            <select
+              value={otherId}
+              onChange={(e) => {
+                setVoiceId(e.target.value);
+                setPicked("other");
+              }}
+              aria-label={own ? "Another voice" : "Voice to borrow"}
+              className="h-6 min-w-0 flex-1 rounded-sm border border-neutral-700 bg-neutral-950 px-1 text-[12px] text-neutral-100"
+            >
+              {others.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
           </label>
-        )}
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="voice-mode"
-            checked={mode === "other"}
-            onChange={() => setPicked("other")}
-            className="accent-neutral-200"
-          />
-          <span className="shrink-0">{own ? "Another voice" : "Borrow"}</span>
-          <select
-            value={other}
-            onChange={(e) => {
-              setVoice(e.target.value);
-              setPicked("other");
-            }}
-            aria-label={own ? "Another voice" : "Voice to borrow"}
-            className="h-6 min-w-0 flex-1 rounded-sm border border-neutral-700 bg-neutral-950 px-1 text-[12px] text-neutral-100"
+          <label
+            className={`flex items-center gap-2 ${
+              slotsLeft <= 0 ? "text-neutral-600" : ""
+            }`}
           >
-            {others.map((v) => (
-              <option key={v.id} value={v.name}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label
-          className={`flex items-center gap-2 ${
-            slotsLeft <= 0 ? "text-neutral-600" : ""
-          }`}
-        >
-          <input
-            type="radio"
-            name="voice-mode"
-            checked={mode === "new"}
-            disabled={slotsLeft <= 0}
-            onChange={() => setPicked("new")}
-            className="accent-neutral-200"
-          />
-          <span>New voice, made in a later step</span>
-        </label>
-        <p
-          className={`pl-5 text-[11px] ${
-            slotsLeft <= 1 ? "text-amber-300" : "text-neutral-500"
-          }`}
-        >
-          {slotsUsed + newVoices} of {slotsTotal} voice slots used.{" "}
-          {slotsLeft <= 0
-            ? own
-              ? "None left for a new voice."
-              : "None left: borrow a voice."
-            : slotsLeft === 1
-              ? "A new voice takes the last one."
-              : `${slotsLeft} left.`}
-        </p>
-      </fieldset>
+            <input
+              type="radio"
+              name="voice-mode"
+              checked={mode === "new"}
+              disabled={slotsLeft <= 0}
+              onChange={() => setPicked("new")}
+              className="accent-neutral-200"
+            />
+            <span>New voice, made in a later step</span>
+          </label>
+          <p
+            className={`pl-5 text-[11px] ${
+              slotsLeft <= 1 ? "text-amber-300" : "text-neutral-500"
+            }`}
+          >
+            {slotsUsed + newVoices} of {slotsTotal} voice slots used.{" "}
+            {slotsLeft <= 0
+              ? own
+                ? "None left for a new voice."
+                : "None left: borrow a voice."
+              : slotsLeft === 1
+                ? "A new voice takes the last one."
+                : `${slotsLeft} left.`}
+          </p>
+        </fieldset>
+      )}
       <div className="flex items-center gap-2">
         <button
           type="submit"
           disabled={!valid}
           className="h-6 rounded-sm bg-neutral-100 px-2 text-[12px] font-medium text-neutral-950 hover:bg-white disabled:bg-neutral-700 disabled:text-neutral-500"
         >
-          Add to cast
+          {existing ? `Use ${existing.name}` : "Add to cast"}
         </button>
         <button
           type="button"
@@ -274,7 +298,8 @@ export function SpeakerPicker({
   onClose,
 }: SpeakerPickerProps) {
   const [query, setQuery] = useState("");
-  const [active, setActive] = useState(0);
+  /** The highlighted row, or null for the default the list picks itself. */
+  const [active, setActive] = useState<number | null>(null);
   const [adding, setAdding] = useState<string | null>(addName);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -303,10 +328,16 @@ export function SpeakerPicker({
     ];
   }, [cast, nearby, query]);
 
-  const exact = cast.some((c) => slug(c.name) === slug(query));
-  const canAdd = query.trim().length > 0 && !exact;
+  const typed = query.trim();
+  const canAdd = typed.length > 0 && !findCast(typed, cast);
+  // A name the `characters` table knows is added under that name, and is not new.
+  const knownName = canAdd ? matchKnown(typed, known)?.name : undefined;
   const count = items.length + 1; // the last row is always "add a character"
-  const index = Math.min(active, count - 1);
+  // With nothing typed, only a face in this panel is offered for Enter. No
+  // face means no highlight, so Enter cannot take the first name by accident.
+  const byDefault =
+    typed.length > 0 || items[0]?.group === "In this panel" ? 0 : -1;
+  const index = Math.min(active ?? byDefault, count - 1);
 
   useEffect(() => {
     listRef.current
@@ -318,11 +349,13 @@ export function SpeakerPicker({
     return (
       <AddCharacterForm
         initialName={adding}
+        cast={cast}
         voices={voices}
         known={known}
         slotsUsed={slotsUsed}
         slotsTotal={slotsTotal}
         newVoices={newVoices}
+        onPick={onPick}
         onAdd={onAdd}
         onCancel={() => (addName !== null ? onClose() : setAdding(null))}
       />
@@ -332,11 +365,14 @@ export function SpeakerPicker({
   const choose = (i: number) => {
     const item = items[i];
     if (item) onPick(item.member.id);
-    else setAdding(canAdd ? titleCase(query.trim()) : "");
+    else setAdding(canAdd ? (knownName ?? titleCase(typed)) : "");
   };
 
   return (
-    <div className="rounded border border-neutral-700 bg-neutral-900">
+    <div
+      data-popover
+      className="rounded border border-neutral-700 bg-neutral-900"
+    >
       <input
         ref={inputRef}
         value={query}
@@ -344,7 +380,7 @@ export function SpeakerPicker({
         aria-label="Search the cast"
         onChange={(e) => {
           setQuery(e.target.value);
-          setActive(0);
+          setActive(null);
         }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown") {
@@ -352,10 +388,10 @@ export function SpeakerPicker({
             setActive((index + 1) % count);
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
-            setActive((index - 1 + count) % count);
+            setActive((index <= 0 ? count : index) - 1);
           } else if (e.key === "Enter") {
             e.preventDefault();
-            choose(index);
+            if (index >= 0) choose(index);
           } else if (e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
@@ -398,7 +434,7 @@ export function SpeakerPicker({
                   <span className="text-[10px] text-neutral-500">current</span>
                 )}
                 <span className="max-w-[84px] truncate text-[11px] text-neutral-500">
-                  {item.member.voice ?? "no voice yet"}
+                  {voiceLabel(item.member) ?? "no voice yet"}
                 </span>
               </div>
             </div>
@@ -415,9 +451,11 @@ export function SpeakerPicker({
             index === items.length ? "bg-neutral-700/70 text-white" : ""
           }`}
         >
-          {canAdd
-            ? `Add "${titleCase(query.trim())}" as a new character`
-            : "Add a character"}
+          {!canAdd
+            ? "Add a character"
+            : knownName
+              ? `Add ${knownName} to the cast`
+              : `Add "${titleCase(typed)}" as a new character`}
         </div>
       </div>
     </div>

@@ -1,7 +1,5 @@
 // Loads one issue for the review editor: pages, panels, bubbles, face detections and the cast. SELECTs only.
 import "server-only";
-import { getIssueData } from "~/server";
-import { getPanelsForIssue } from "~/server/pages/panels";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
@@ -35,6 +33,36 @@ interface PageRow {
   height: number;
 }
 
+interface BubbleRow {
+  id: string;
+  page_number: number;
+  panel_id: string | null;
+  ocr_text: string | null;
+  type: string;
+  speaker: string | null;
+  emotion: string | null;
+  ignored: boolean | null;
+  box_2d: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    confidence?: unknown;
+  } | null;
+  style: {
+    left?: string;
+    top?: string;
+    width?: string;
+    height?: string;
+  } | null;
+}
+
+interface PanelRow {
+  id: string;
+  page_number: number;
+  bounding_box: Rect;
+}
+
 interface DetectionRow {
   id: string;
   panel_id: string;
@@ -53,11 +81,13 @@ interface VoiceRow {
   id: string;
   display_name: string;
   status: string;
+  character_id: string | null;
 }
 
 interface CastRow {
   issue_id: string;
   character: string;
+  character_id: string | null;
   voice_uuid: string | null;
 }
 
@@ -68,13 +98,13 @@ interface CastEntry {
   faces: Face[];
 }
 
-const TYPES: BubbleType[] = [
+const TYPES: string[] = [
   "SPEECH",
   "NARRATION",
   "CAPTION",
   "SFX",
   "BACKGROUND",
-];
+] satisfies BubbleType[];
 
 function pct(value: string | undefined): number | null {
   if (!value) return null;
@@ -93,8 +123,26 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-function report(what: string, error: unknown): void {
-  if (error) console.error(`review editor loader, ${what}:`, error);
+/**
+ * The rows of one read, or a throw. The editor stores edits against what it
+ * loaded, so a failed or cut-short read must fail the page (Next shows its
+ * error page) and never render with rows missing.
+ */
+function rows<T>(
+  what: string,
+  result: { data: unknown; error: unknown; count?: number | null },
+): T[] {
+  if (result.error) {
+    console.error(`review editor loader, ${what}:`, result.error);
+    throw new Error(`The review editor could not read ${what}.`);
+  }
+  const data = (result.data ?? []) as T[];
+  if (typeof result.count === "number" && result.count > data.length) {
+    throw new Error(
+      `The review editor read ${data.length} of ${result.count} ${what}.`,
+    );
+  }
+  return data;
 }
 
 /** `issues.wiki_appearances` as name and qualifier pairs, whatever the JSON holds. */
@@ -120,82 +168,115 @@ export async function loadEditor(
   bookId: string,
   issueId: string,
 ): Promise<EditorData | null> {
-  const { data: issueData, error: issueError } = await selectIssue(
+  const issueResult = await selectIssue(
     supabaseAdmin,
     bookId,
     issueId,
     "name, wiki_appearances, books(name)",
   ).maybeSingle();
-  report("issue", issueError);
-  const issue = issueData as unknown as IssueRow | null;
+  if (issueResult.error) {
+    console.error("review editor loader, the issue:", issueResult.error);
+    throw new Error("The review editor could not read the issue.");
+  }
+  const issue = issueResult.data as unknown as IssueRow | null;
   if (!issue) return null;
 
-  const [{ allBubbles }, panelRows, pageResult, charResult, voiceResult, cast] =
-    await Promise.all([
-      getIssueData(bookId, issueId),
-      getPanelsForIssue(bookId, issueId),
-      supabaseAdmin
-        .from("pages")
-        .select("number, width, height")
-        .eq("book_id", bookId)
-        .eq("issue_id", issueId)
-        .order("number"),
-      supabaseAdmin.from("characters").select("id, display_name, aliases"),
-      supabaseAdmin.from("voices").select("id, display_name, status"),
-      // The whole book's rows: a character cast in any issue is in the list.
-      supabaseAdmin
-        .from("castlist")
-        .select("issue_id, character, voice_uuid")
-        .eq("book_id", bookId),
-    ]);
-  report("pages", pageResult.error);
-  report("characters", charResult.error);
-  report("voices", voiceResult.error);
-  report("castlist", cast.error);
+  // Bubbles and panels are read here, not through `getIssueData` and
+  // `getPanelsForIssue`: those log a failed read and return nothing.
+  const [
+    bubbleResult,
+    panelResult,
+    pageResult,
+    charResult,
+    voiceResult,
+    castResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("bubbles")
+      .select(
+        "id, page_number, panel_id, ocr_text, type, speaker, emotion, ignored, box_2d, style",
+        { count: "exact" },
+      )
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .order("page_number")
+      .order("sort_order"),
+    supabaseAdmin
+      .from("panels")
+      .select("id, page_number, bounding_box", { count: "exact" })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .order("page_number")
+      .order("sort_order"),
+    supabaseAdmin
+      .from("pages")
+      .select("number, width, height")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .order("number"),
+    supabaseAdmin.from("characters").select("id, display_name, aliases"),
+    supabaseAdmin
+      .from("voices")
+      .select("id, display_name, status, character_id"),
+    // The whole book's rows: a character cast in any issue is in the list.
+    supabaseAdmin
+      .from("castlist")
+      .select("issue_id, character, character_id, voice_uuid")
+      .eq("book_id", bookId),
+  ]);
+  const bubbleRows = rows<BubbleRow>("bubbles", bubbleResult);
+  const panelRows = rows<PanelRow>("panels", panelResult);
+  const pageRows = rows<PageRow>("pages", pageResult);
+  const charRows = rows<CharacterRow>("characters", charResult);
+  const voiceRows = rows<VoiceRow>("voices", voiceResult);
+  const castRows = rows<CastRow>("the cast list", castResult)
+    .slice()
+    .sort(
+      (a, b) => Number(b.issue_id === issueId) - Number(a.issue_id === issueId),
+    );
 
-  const pageRows = (pageResult.data ?? []) as PageRow[];
   const dims = new Map(pageRows.map((p) => [p.number, p]));
 
-  // Bubbles: `style` already holds page percents; `box_2d` is page pixels.
-  const bubbles: SrcBubble[] = [];
-  for (const [key, list] of Object.entries(allBubbles)) {
-    const page = parseInt(key.replace(/\D+/g, ""), 10);
-    if (Number.isNaN(page)) continue;
-    const d = dims.get(page) ?? DEFAULT_PAGE;
-    for (const b of list) {
-      const left = pct(b.style?.left);
-      const top = pct(b.style?.top);
-      const width = pct(b.style?.width);
-      const height = pct(b.style?.height);
-      const rect: Rect =
-        left !== null && top !== null && width !== null && height !== null
-          ? { x: left, y: top, w: width, h: height }
-          : {
-              x: clamp01((b.box_2d.x ?? 0) / d.width),
-              y: clamp01((b.box_2d.y ?? 0) / d.height),
-              w: clamp01((b.box_2d.width ?? d.width * 0.1) / d.width),
-              h: clamp01((b.box_2d.height ?? d.height * 0.04) / d.height),
-            };
-      const confidence = (b.box_2d as { confidence?: unknown }).confidence;
-      bubbles.push({
-        id: b.id,
-        page,
-        rect,
-        text: b.ocr_text,
-        type: TYPES.includes(b.type) ? b.type : "SPEECH",
-        speaker: b.speaker,
-        emotion: b.emotion,
-        ignored: b.ignored ?? false,
-        confidence: typeof confidence === "number" ? confidence : null,
-      });
-    }
-  }
+  // Bubbles arrive in play order. `style` holds page percents; `box_2d` is page pixels.
+  const bubbles: SrcBubble[] = bubbleRows.map((b) => {
+    const d = dims.get(b.page_number) ?? DEFAULT_PAGE;
+    const left = pct(b.style?.left);
+    const top = pct(b.style?.top);
+    const width = pct(b.style?.width);
+    const height = pct(b.style?.height);
+    const box = b.box_2d ?? {};
+    const rect: Rect =
+      left !== null && top !== null && width !== null && height !== null
+        ? { x: left, y: top, w: width, h: height }
+        : {
+            x: clamp01((box.x ?? 0) / d.width),
+            y: clamp01((box.y ?? 0) / d.height),
+            w: clamp01((box.width ?? d.width * 0.1) / d.width),
+            h: clamp01((box.height ?? d.height * 0.04) / d.height),
+          };
+    return {
+      id: b.id,
+      page: b.page_number,
+      rect,
+      text: b.ocr_text ?? "",
+      type: TYPES.includes(b.type) ? (b.type as BubbleType) : "SPEECH",
+      speaker: b.speaker,
+      emotion: b.emotion ?? "",
+      ignored: b.ignored ?? false,
+      confidence: typeof box.confidence === "number" ? box.confidence : null,
+    };
+  });
 
+  const linked = new Map<string, string[]>();
+  for (const b of bubbleRows) {
+    if (b.panel_id)
+      linked.set(b.panel_id, [...(linked.get(b.panel_id) ?? []), b.id]);
+  }
   const panels: SrcPanel[] = panelRows.map((p) => ({
     id: p.id,
-    page: p.pageNumber,
-    rect: p.boundingBox,
-    bubbleIds: p.bubbleIds,
+    page: p.page_number,
+    rect: p.bounding_box,
+    bubbleIds: linked.get(p.id) ?? [],
   }));
   const panelById = new Map(panels.map((p) => [p.id, p]));
 
@@ -221,14 +302,13 @@ export async function loadEditor(
     panels.map((p) => p.id),
     60,
   )) {
-    const { data, error } = await supabaseAdmin
+    const result = await supabaseAdmin
       .from("panel_character_detections")
       .select(
         "id, panel_id, character_id, identification_confidence, face_bbox",
       )
       .in("panel_id", ids);
-    report("face detections", error);
-    detectionRows.push(...((data ?? []) as DetectionRow[]));
+    detectionRows.push(...rows<DetectionRow>("face detections", result));
   }
 
   const faces: Face[] = [];
@@ -240,7 +320,6 @@ export async function loadEditor(
       id: d.id,
       characterId: d.character_id,
       page: panel.page,
-      panelId: panel.id,
       confidence: d.identification_confidence,
       rect: {
         x: panel.rect.x + (f.x ?? 0) * panel.rect.w,
@@ -251,35 +330,40 @@ export async function loadEditor(
     });
   }
 
-  // Voices: an active voice of the same name first, then the book's castlist
-  // with this issue's rows ahead of the other issues'.
-  const voiceRows = (voiceResult.data ?? []) as VoiceRow[];
+  // A character's voice, always an active `voices` row picked by id
+  // (decisions row 153). In order: this book's castlist `voice_uuid`, which is
+  // the book's voice for the character (row 28), this issue's rows ahead of
+  // the other issues'; then `voices.character_id`; a voice of the same name
+  // only when neither says.
   const active = voiceRows.filter((v) => v.status === "active");
-  const voiceBySlug = new Map(active.map((v) => [slug(v.display_name), v]));
   const activeById = new Map(active.map((v) => [v.id, v]));
-  const castRows = ((cast.data ?? []) as CastRow[])
-    .slice()
-    .sort(
-      (a, b) => Number(b.issue_id === issueId) - Number(a.issue_id === issueId),
-    );
-  const castVoice = new Map<string, string>();
+  const castVoice = new Map<string, VoiceRow>();
   for (const row of castRows) {
     const voice = row.voice_uuid ? activeById.get(row.voice_uuid) : undefined;
-    const key = slug(row.character);
-    if (voice && !castVoice.has(key)) castVoice.set(key, voice.display_name);
+    if (!voice) continue;
+    for (const key of [row.character_id, slug(row.character)]) {
+      if (key && !castVoice.has(key)) castVoice.set(key, voice);
+    }
   }
-  const ownVoice = (id: string, name: string): string | null =>
-    voiceBySlug.get(id)?.display_name ??
-    voiceBySlug.get(slug(name))?.display_name ??
-    null;
-  const voiceFor = (id: string, name: string): string | null =>
-    ownVoice(id, name) ??
-    castVoice.get(id) ??
-    castVoice.get(slug(name)) ??
-    null;
+  const voiceByCharacter = new Map<string, VoiceRow>();
+  const voiceByName = new Map<string, VoiceRow>();
+  for (const v of active) {
+    if (v.character_id && !voiceByCharacter.has(v.character_id))
+      voiceByCharacter.set(v.character_id, v);
+    const key = slug(v.display_name);
+    if (key && !voiceByName.has(key)) voiceByName.set(key, v);
+  }
+  const voiceFor = (id: string, name: string): VoiceOption | null => {
+    const voice =
+      castVoice.get(id) ??
+      castVoice.get(slug(name)) ??
+      voiceByCharacter.get(id) ??
+      voiceByName.get(id) ??
+      voiceByName.get(slug(name));
+    return voice ? { id: voice.id, name: voice.display_name } : null;
+  };
 
   // A name means a `characters` row when it is the row's id, display name or alias.
-  const charRows = (charResult.data ?? []) as CharacterRow[];
   const rowByKey = new Map<string, CharacterRow>();
   const index = (key: string, row: CharacterRow) => {
     if (key && !rowByKey.has(key)) rowByKey.set(key, row);
@@ -322,7 +406,7 @@ export async function loadEditor(
   for (const f of faces) {
     if (f.characterId) ensure(f.characterId)?.faces.push(f);
   }
-  for (const row of castRows) ensure(row.character);
+  for (const row of castRows) ensure(row.character_id ?? row.character);
   for (const { name, qualifier } of wikiNames(issue.wiki_appearances)) {
     // "Kimberly Hart (Pink Ranger)": a name no row knows joins the row its
     // qualifier names, as an alias, and does not become a second entry.
@@ -354,10 +438,6 @@ export async function loadEditor(
       kind: "character",
       tint: 0,
       voice: voiceFor(entry.id, entry.name),
-      faceCount: entry.faces.length,
-      pages: Array.from(new Set(entry.faces.map((f) => f.page))).sort(
-        (a, b) => a - b,
-      ),
       portrait: best ? { page: best.f.page, rect: best.f.rect } : null,
     });
   }
@@ -371,8 +451,6 @@ export async function loadEditor(
       kind: "role",
       tint: 0,
       voice: voiceFor(role.id, role.name),
-      faceCount: 0,
-      pages: [],
       portrait: null,
     });
   }
@@ -383,7 +461,7 @@ export async function loadEditor(
       id: row.id,
       name,
       aliases: row.aliases ?? [],
-      voice: ownVoice(row.id, name),
+      voice: voiceFor(row.id, name),
     };
   });
 

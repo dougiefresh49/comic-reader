@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { tintFor } from "./lib";
+import { needYou, plural, tintFor } from "./lib";
 import {
   SPOKEN,
   visibleBubbles,
@@ -271,7 +271,7 @@ export function Tree({
       >
         <span className="font-medium text-neutral-100">Page {pageNumber}</span>
         <span className="text-neutral-500">
-          {panels.length} panels, {numbers.size} bubbles
+          {plural(panels.length, "panel")}, {plural(numbers.size, "bubble")}
         </span>
       </div>
 
@@ -349,7 +349,7 @@ export function Tree({
               <span className="flex-1" />
               {flagged > 0 && (
                 <span className="rounded-sm bg-amber-400/15 px-1 text-[10px] leading-4 text-amber-300">
-                  {flagged} need you
+                  {needYou(flagged)}
                 </span>
               )}
             </div>
