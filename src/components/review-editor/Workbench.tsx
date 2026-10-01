@@ -486,11 +486,13 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     };
   }, [store]);
 
-  // Another tab wrote this issue's edits: say so at once.
+  // Another tab wrote this issue's edits: say so at once. The event can
+  // arrive after this tab's own later write, so what is stored now decides.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.storageArea !== window.localStorage) return;
-      if (e.key === storeKey || e.key === null) goStale();
+      if (e.key !== storeKey && e.key !== null) return;
+      if (storedRev(readRaw(storeKey)) !== revRef.current) goStale();
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
@@ -867,15 +869,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       const mod = e.metaKey || e.ctrlKey;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 
-      if (confirmDiscard) {
-        if (key === "Escape") setConfirmDiscard(false);
-        return;
-      }
       if (mod && key === "s") {
         // Nothing to save yet. Keep the browser's save dialog shut and point
         // at where the edits are.
         e.preventDefault();
         setFlash(true);
+        return;
+      }
+      if (confirmDiscard) {
+        if (key === "Escape") setConfirmDiscard(false);
         return;
       }
       if (mod && key === "z") {

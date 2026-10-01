@@ -210,18 +210,22 @@ export async function loadEditor(
       .order("sort_order"),
     supabaseAdmin
       .from("pages")
-      .select("number, width, height")
+      .select("number, width, height", { count: "exact" })
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .order("number"),
-    supabaseAdmin.from("characters").select("id, display_name, aliases"),
+    supabaseAdmin
+      .from("characters")
+      .select("id, display_name, aliases", { count: "exact" }),
     supabaseAdmin
       .from("voices")
-      .select("id, display_name, status, character_id"),
+      .select("id, display_name, status, character_id", { count: "exact" }),
     // The whole book's rows: a character cast in any issue is in the list.
     supabaseAdmin
       .from("castlist")
-      .select("issue_id, character, character_id, voice_uuid")
+      .select("issue_id, character, character_id, voice_uuid", {
+        count: "exact",
+      })
       .eq("book_id", bookId),
   ]);
   const bubbleRows = rows<BubbleRow>("bubbles", bubbleResult);
@@ -306,6 +310,7 @@ export async function loadEditor(
       .from("panel_character_detections")
       .select(
         "id, panel_id, character_id, identification_confidence, face_bbox",
+        { count: "exact" },
       )
       .in("panel_id", ids);
     detectionRows.push(...rows<DetectionRow>("face detections", result));

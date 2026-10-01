@@ -224,11 +224,13 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
   }, [apply, zoomAt]);
 
   useEffect(() => {
+    // A field keeps its spaces, and so does a focused button in a popover.
     const typing = (t: EventTarget | null) =>
       t instanceof HTMLElement &&
       (t.tagName === "INPUT" ||
         t.tagName === "TEXTAREA" ||
-        t.tagName === "SELECT");
+        t.tagName === "SELECT" ||
+        t.closest("[data-popover]") !== null);
     const down = (e: KeyboardEvent) => {
       if (e.code === "Space" && !typing(e.target)) setSpace(true);
     };
