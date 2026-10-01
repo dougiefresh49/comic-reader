@@ -40,7 +40,7 @@ li.side{border-color:var(--side);background:var(--side-bg);border-style:dashed}
 table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:.9rem}
 th,td{text-align:left;vertical-align:top;padding:9px 12px;border-top:1px solid var(--line)}
 tr:first-child th{border-top:0;font:600 .72rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-td:first-child{font-weight:600;white-space:nowrap}
+td:first-child{font-weight:600}
 .calls{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .call{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 .call .id{font:700 .8rem var(--mono);color:var(--gate)}
@@ -128,15 +128,22 @@ td:first-child{font-weight:600;white-space:nowrap}
   <div class="screen"><h3>2. Characters</h3><div class="route">one version</div><p>A card per character in the style of your voice-lab reels grid: portrait, name, voice, status. Unknown clusters first.</p></div>
   <div class="screen"><h3>3. Page editor</h3><div class="route">three variants: A, B, C</div><p>Tree on the left, page in the middle, the selected element's fields on the right. The variants differ in how you move through 300 bubbles fast.</p></div>
 </div>
-<p class="note">Code, not Figma: a siloed route fed by a fixture exported from the two smoke pages. Clicks work, nothing writes to production, nothing is paid.</p>
+<p class="note">Code, not Figma: a siloed route that reads the smoke issue read-only and keeps every edit in the browser. Clicks work, nothing writes to production, nothing is paid.</p>
 
-<h2>Calls that are yours</h2>
+<h2>Decided, 2026-09-30</h2>
 <div class="calls">
-  <div class="call"><div class="id">O1</div><p><b>A bubble with no speaker at the pages stop.</b> A: approval is blocked until every spoken bubble has a speaker or is marked silent by you. B: approval goes through and those bubbles stay silent, as casting does today.</p><p class="rec">Recommend A. A silent bubble in a kid's book should be a choice, not a leftover.</p></div>
-  <div class="call"><div class="id">O2</div><p><b>Generic roles in the closed list.</b> A: narrator, off-panel and crowd, each with one shared voice per book. B: no generic roles; anything without a confirmed character arrives unassigned.</p><p class="rec">Recommend A. It keeps captions and radio chatter out of your queue.</p></div>
-  <div class="call"><div class="id">O3</div><p><b>Prototype scope.</b> A: all three screens, the editor in three variants. B: the editor only.</p><p class="rec">Recommend A. The hub and the characters stop are one cheap screen each, and they are where the current flow confuses most.</p></div>
-  <div class="call"><div class="id">O4</div><p><b>Start the prototype.</b> A: on your answers to O1 to O3, a fable lane builds it. B: hold until the Gemma bench (#321) reports.</p><p class="rec">Recommend A. The bench changes which model runs get-context, not what you review.</p></div>
+  <div class="call"><div class="id">O1 · A</div><p><b>A bubble with no speaker blocks approval.</b> The pages stop cannot be approved until every spoken bubble has a speaker or you have marked it silent.</p></div>
+  <div class="call"><div class="id">O2 · A</div><p><b>Generic roles are in the closed list.</b> Narrator, off-panel and crowd, each with one shared voice per book.</p></div>
+  <div class="call"><div class="id">O3 · A</div><p><b>The prototype covers all three screens.</b> The hub and the characters stop in one version, the page editor in three.</p></div>
+  <div class="call"><div class="id">O4 · A</div><p><b>The prototype starts now.</b> Three models build one editor variant each: fable-5.1, opus-5.5 and gpt-6.1 Sol. It does not wait for the model bench (#321).</p></div>
 </div>
+<h2>What the new editor must not repeat</h2>
+<table>
+  <tr><th>Today</th><th>In the new editor</th></tr>
+  <tr><td>Saving loses your place</td><td>A save keeps the page, the selection and the values you typed. No refresh, no arrowing back.</td></tr>
+  <tr><td>A new bubble sorts by hand</td><td>It lands in its panel's run of bubbles, placed by its box's top-left corner.</td></tr>
+  <tr><td>A new bubble takes eight steps</td><td>One analyze action fills text, speaker, emotion and cues once the box is placed. Audio stays a separate step, because it spends credits.</td></tr>
+</table>
 <p class="note">Sources: the pipeline map (<code>docs/pipeline/index.html</code>, built for #315) for today's column, and your calls of 2026-09-30 for the target. Model and cost work stays in #313 and #321.</p>
 </main>
 </body>
