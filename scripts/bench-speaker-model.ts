@@ -266,10 +266,14 @@ async function loadPanels(
       h: number;
     } | null;
     if (!bb) return [];
+    // Clamp both edges, so a box that starts off the page shrinks instead of
+    // sliding onto the pixels beside it.
     const x = clamp(Math.round(bb.x * imgW), 0, imgW - 1);
     const y = clamp(Math.round(bb.y * imgH), 0, imgH - 1);
-    const width = clamp(Math.round(bb.w * imgW), 1, imgW - x);
-    const height = clamp(Math.round(bb.h * imgH), 1, imgH - y);
+    const right = clamp(Math.round((bb.x + bb.w) * imgW), x + 1, imgW);
+    const bottom = clamp(Math.round((bb.y + bb.h) * imgH), y + 1, imgH);
+    const width = right - x;
+    const height = bottom - y;
     return [{ id: p.id, label: p.panel_id, rect: { x, y, width, height } }];
   });
 }
