@@ -587,6 +587,12 @@ async function callModel(
 ): Promise<CallResult> {
   let first: Attempt | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt === 1) {
+      log(`  HTTP ${first!.status}, retrying in 20 s`);
+      await sleep(RETRY_WAIT_MS);
+    }
+    // Check and count with no await between them: another page may have
+    // sent during the retry wait, and the ceiling has to hold across pages.
     if (calls >= maxCalls) {
       return {
         kind: "stop-run",
@@ -594,10 +600,6 @@ async function callModel(
           `--max-calls ${maxCalls} reached` +
           (first ? ` after HTTP ${first.status}: ${first.detail}` : ""),
       };
-    }
-    if (attempt === 1) {
-      log(`  HTTP ${first!.status}, retrying in 20 s`);
-      await sleep(RETRY_WAIT_MS);
     }
     calls++;
     const r =
