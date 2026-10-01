@@ -28,9 +28,11 @@ export function titleCase(id: string): string {
     .join(" ");
 }
 
+export const NARRATOR_ID = "narrator";
+
 /** The three generic roles of the closed speaker list. */
 export const ROLES = [
-  { id: "narrator", name: "Narrator", aliases: ["Narration"] },
+  { id: NARRATOR_ID, name: "Narrator", aliases: ["Narration"] },
   {
     id: "off-panel",
     name: "Off-panel",

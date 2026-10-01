@@ -1,5 +1,5 @@
 // The editor's document: plain data plus pure operations, so undo is a stack of snapshots.
-import { resolveSpeaker, slug } from "./lib";
+import { NARRATOR_ID, resolveSpeaker, slug } from "./lib";
 import type {
   BubbleType,
   CastMember,
@@ -309,6 +309,11 @@ export function patchBubble(
   id: string,
   patch: Partial<BubbleDoc>,
 ): Doc {
+  // A bubble with no speaker yet that becomes narration is the Narrator's.
+  const b = doc.bubbles[id];
+  if (patch.type === "NARRATION" && b && !b.speakerId && !b.rawSpeaker) {
+    return withBubble(doc, id, { ...patch, speakerId: NARRATOR_ID });
+  }
   return withBubble(doc, id, patch);
 }
 
