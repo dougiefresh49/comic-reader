@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comic Reader: pipeline v2 target flow</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--ink:#1c1b19;--muted:#6b675f;--line:#dedad0;--gate:#b4530a;--gate-bg:#fdf1e2;--gone:#9a958a;--keep:#1f6f5c;--keep-bg:#e6f3ef;--side:#5b5bd6;--side-bg:#ececfb;--body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#141412;--card:#1d1d1a;--ink:#ecebe6;--muted:#a09c92;--line:#33322d;--gate:#f0a35a;--gate-bg:#33240f;--gone:#77736a;--keep:#6fd0b6;--keep-bg:#132a25;--side:#a3a3f5;--side-bg:#1f1f3a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+main{max-width:1040px;margin:0 auto;padding:28px 20px 56px}
+.eyebrow{font:600 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:1.9rem;line-height:1.15;margin:.3rem 0 .6rem}
+h2{font-size:1.15rem;margin:2.2rem 0 .7rem}
+p{margin:.4rem 0}
+.lede{max-width:62ch;color:var(--muted)}
+a{color:inherit}
+code{font:.86em var(--mono)}
+.lanes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:1.2rem}
+.lane{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 14px 10px}
+.lane h3{margin:0 0 .1rem;font-size:1rem}
+.lane .sub{font:.74rem var(--mono);color:var(--muted);margin-bottom:.7rem}
+ol.flow{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+ol.flow li{border:1px solid var(--line);border-radius:8px;padding:6px 10px;display:flex;gap:10px;align-items:baseline;justify-content:space-between}
+ol.flow .n{font:600 .82rem var(--mono)}
+ol.flow .w{font-size:.8rem;color:var(--muted);text-align:right}
+li.gate{border-color:var(--gate);background:var(--gate-bg)}
+li.gate .n{color:var(--gate)}
+li.gone .n{color:var(--gone);text-decoration:line-through}
+li.gone{border-style:dashed}
+li.keep{border-color:var(--keep);background:var(--keep-bg)}
+li.side{border-color:var(--side);background:var(--side-bg);border-style:dashed}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.8rem;color:var(--muted);margin-top:.8rem}
+.legend b{display:inline-block;width:.8rem;height:.8rem;border-radius:3px;border:1px solid var(--line);vertical-align:-1px;margin-right:5px}
+.legend .g{background:var(--gate-bg);border-color:var(--gate)}
+.legend .k{background:var(--keep-bg);border-color:var(--keep)}
+.legend .s{background:var(--side-bg);border-color:var(--side);border-style:dashed}
+.legend .x{border-style:dashed}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:.9rem}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-top:1px solid var(--line)}
+tr:first-child th{border-top:0;font:600 .72rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td:first-child{font-weight:600}
+.calls{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.call{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.call .id{font:700 .8rem var(--mono);color:var(--gate)}
+.call p{font-size:.9rem}
+.call .rec{font-size:.84rem;color:var(--muted)}
+.screens{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.screen{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:.9rem}
+.screen h3{margin:0 0 .3rem;font-size:.95rem}
+.screen .route{font:.72rem var(--mono);color:var(--muted)}
+.note{font-size:.84rem;color:var(--muted);margin-top:.6rem}
+@media (max-width:760px){.lanes,.calls,.screens{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">comic-reader · issue #322 · 2026-09-30</div>
+<h1>Pipeline v2: the target flow</h1>
+<p class="lede">The goal is one sentence: an issue plays in the reader, in page view and panel view, with the right voice on every bubble. You stop twice, once for the characters and once for the pages. Every ElevenLabs credit is spent after the second stop.</p>
+
+<div class="lanes">
+  <section class="lane">
+    <h3>Today</h3>
+    <div class="sub">16 steps · 4 gates</div>
+    <ol class="flow">
+      <li><span class="n">roboflow-page-analyze</span><span class="w">panels, bubbles</span></li>
+      <li><span class="n">extract-foreground-masks</span><span class="w">in line, the run waits</span></li>
+      <li><span class="n">fetch-wiki-context</span><span class="w">synopsis, names</span></li>
+      <li><span class="n">character-lookahead</span><span class="w">who is each face</span></li>
+      <li class="gate"><span class="n">⏸ review-clusters</span><span class="w">fix the faces</span></li>
+      <li><span class="n">get-context</span><span class="w">2 calls per bubble, free to invent names</span></li>
+      <li><span class="n">sort-page-elements</span><span class="w">play order</span></li>
+      <li class="gate"><span class="n">⏸ review-pages</span><span class="w">three pages edit the same rows</span></li>
+      <li class="gate"><span class="n">⏸ review-new-characters</span><span class="w">after you already reviewed the pages</span></li>
+      <li><span class="n">generate-voice-descriptions</span><span class="w">one per character</span></li>
+      <li class="gate"><span class="n">⏸ casting</span><span class="w">assign voices</span></li>
+      <li><span class="n">generate-voice-models</span><span class="w">takes slots</span></li>
+      <li><span class="n">generate-audio</span><span class="w">ElevenLabs</span></li>
+      <li><span class="n">upload-audio</span><span class="w">only recounts</span></li>
+      <li><span class="n">consolidate-music-scenes</span><span class="w">always one scene</span></li>
+      <li><span class="n">generate-manifest</span><span class="w">counts, ready</span></li>
+    </ol>
+  </section>
+  <section class="lane">
+    <h3>Target</h3>
+    <div class="sub">12 steps · 2 gates</div>
+    <ol class="flow">
+      <li><span class="n">roboflow-page-analyze</span><span class="w">same</span></li>
+      <li class="side"><span class="n">extract-foreground-masks</span><span class="w">kept, nothing waits on it</span></li>
+      <li><span class="n">fetch-wiki-context</span><span class="w">same</span></li>
+      <li><span class="n">character-lookahead</span><span class="w">same</span></li>
+      <li class="gate"><span class="n">⏸ characters</span><span class="w">faces, names, and each one's voice</span></li>
+      <li class="keep"><span class="n">get-context</span><span class="w">picks from the confirmed cast only</span></li>
+      <li><span class="n">sort-page-elements</span><span class="w">same</span></li>
+      <li class="gate"><span class="n">⏸ pages</span><span class="w">one editor, unassigned bubbles flagged</span></li>
+      <li class="gone"><span class="n">review-new-characters</span><span class="w">folded into the editor</span></li>
+      <li class="keep"><span class="n">generate-voice-descriptions</span><span class="w">new characters only</span></li>
+      <li class="gone"><span class="n">casting</span><span class="w">folded into characters</span></li>
+      <li class="keep"><span class="n">generate-voice-models</span><span class="w">new characters only</span></li>
+      <li><span class="n">generate-audio</span><span class="w">same</span></li>
+      <li class="gone"><span class="n">upload-audio</span><span class="w">deleted</span></li>
+      <li class="gone"><span class="n">consolidate-music-scenes</span><span class="w">returns with music</span></li>
+      <li><span class="n">generate-manifest</span><span class="w">same</span></li>
+    </ol>
+  </section>
+</div>
+<div class="legend">
+  <span><b class="g"></b>gate: the run waits for you</span>
+  <span><b class="k"></b>changed</span>
+  <span><b class="s"></b>off the critical path</span>
+  <span><b class="x"></b>gone from the run</span>
+</div>
+
+<h2>What you do at each stop</h2>
+<table>
+  <tr><th>Stop</th><th>You decide</th><th>Already filled in</th><th>What it unlocks</th></tr>
+  <tr><td>Characters</td><td>Who each face cluster is. Which voice each character uses. For a character with no voice: borrow one, or mark it for a new one.</td><td>Names from face ID. Voices from the castlist when the universe is one you have done, so a repeat universe is a glance.</td><td>get-context runs against this list and cannot add to it.</td></tr>
+  <tr><td>Pages</td><td>Panels and their order, bubble boxes, text, speaker, emotion. Bubbles the model could not place arrive flagged. A missing character is added here, with its voice choice.</td><td>Everything the model wrote, in one editor.</td><td>New voices for the characters you marked, then audio. All ElevenLabs spend is here.</td></tr>
+</table>
+<p class="note">A voice is a field on the character, set at whichever stop confirms the character. The approve bar on the pages stop lists the new voices it will create and the slot count, because the account sits at 29 of 30.</p>
+
+<h2>The prototype</h2>
+<p>Your question was whether starting at the editor misses things. The owner-facing flow is only three screens, so the prototype covers all three, shallow first, and goes deep on the editor. The machine steps between them have no screen to prototype.</p>
+<div class="screens">
+  <div class="screen"><h3>1. Issue hub</h3><div class="route">one version</div><p>Where the run is, what is waiting for you, one button for the next thing. Replaces the colored links and the two start rules.</p></div>
+  <div class="screen"><h3>2. Characters</h3><div class="route">one version</div><p>A card per character in the style of your voice-lab reels grid: portrait, name, voice, status. Unknown clusters first.</p></div>
+  <div class="screen"><h3>3. Page editor</h3><div class="route">three variants: A, B, C</div><p>Tree on the left, page in the middle, the selected element's fields on the right. The variants differ in how you move through 300 bubbles fast.</p></div>
+</div>
+<p class="note">Code, not Figma: a siloed route that reads the smoke issue read-only and keeps every edit in the browser. Clicks work, nothing writes to production, nothing is paid.</p>
+
+<h2>Decided, 2026-09-30</h2>
+<div class="calls">
+  <div class="call"><div class="id">O1 · A</div><p><b>A bubble with no speaker blocks approval.</b> The pages stop cannot be approved until every spoken bubble has a speaker or you have marked it silent.</p></div>
+  <div class="call"><div class="id">O2 · A</div><p><b>Generic roles are in the closed list.</b> Narrator, off-panel and crowd, each with one shared voice per book.</p></div>
+  <div class="call"><div class="id">O3 · A</div><p><b>The prototype covers all three screens.</b> The hub and the characters stop in one version, the page editor in three.</p></div>
+  <div class="call"><div class="id">O4 · A</div><p><b>The prototype starts now.</b> Three models build one editor variant each: fable-5.1, opus-5.5 and gpt-6.1 Sol. It does not wait for the model bench (#321).</p></div>
+</div>
+<h2>What the new editor must not repeat</h2>
+<table>
+  <tr><th>Today</th><th>In the new editor</th></tr>
+  <tr><td>Saving loses your place</td><td>A save keeps the page, the selection and the values you typed. No refresh, no arrowing back.</td></tr>
+  <tr><td>A new bubble sorts by hand</td><td>It lands in its panel's run of bubbles, placed by its box's top-left corner.</td></tr>
+  <tr><td>A new bubble takes eight steps</td><td>One analyze action fills text, speaker, emotion and cues once the box is placed. Audio stays a separate step, because it spends credits.</td></tr>
+</table>
+<p class="note">Sources: the pipeline map (<code>docs/pipeline/index.html</code>, built for #315) for today's column, and your calls of 2026-09-30 for the target. Model and cost work stays in #313 and #321.</p>
+</main>
+</body>
+</html>
