@@ -9,16 +9,23 @@
  * `issue-1` page 7 or 8 (matched by text) and against what GEMINI_HIGH wrote
  * on the smoke row.
  *
+ * `--variant` picks the images: `page` (what the step sends today),
+ * `panel-page` (the page, then the bubble's panel cropped from it) or `panel`
+ * (the panel crop alone). Panels are the reviewed ones on the truth page.
+ *
  * Read-only on Supabase (select and Storage download). The only network
- * call besides Supabase is OpenRouter, and only for model ids ending in `:free`.
+ * call besides Supabase is OpenRouter, and only for model ids ending in
+ * `:free` or listed in PAID_OK.
  *
  * Usage:
  *   pnpm tsx --env-file=.env scripts/bench-speaker-model.ts \
- *     [--model google/gemma-4-31b-it:free] [--pages 1,2] [--limit n] \
- *     [--max-calls 40] [--out /tmp/comic-reader-briefs/bench-out]
+ *     [--model google/gemma-4-31b-it:free] [--variant page|panel-page|panel] \
+ *     [--pages 1,2] [--limit n] [--max-calls 40] \
+ *     [--out /tmp/comic-reader-briefs/bench-out]
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import sharp from "sharp";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
@@ -38,6 +45,25 @@ const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const BETWEEN_CALLS_MS = 4_000;
 const RETRY_WAIT_MS = 20_000;
 const MATCH_CHARS = 40;
+const VARIANTS = ["page", "panel-page", "panel"] as const;
+type Variant = (typeof VARIANTS)[number];
+const PANEL_PAGE_PREFACE =
+  "Two images follow. Image 1 is the full comic page. Image 2 is the one panel that contains the speech bubble, cropped from that page. The bounding box below is in Image 1's pixels. Use Image 2 to trace the bubble's tail to the speaker, and Image 1 to see who else is on the page.";
+const PANEL_PREFACE =
+  "The image is one panel cropped from a comic page. The bounding box below is in this image's pixels.";
+/**
+ * Names that are one character, for the alias-aware count. Covers the two
+ * smoke pages only (tmnt-mmpr-iii issue-1 pages 7 and 8); keys and values are
+ * already in `plain` form.
+ */
+const SAME_CHARACTER: Record<string, string> = {
+  trini: "yellowranger",
+  kimberly: "pinkranger",
+  tommy: "greenranger",
+  jason: "redranger",
+  billy: "blueranger",
+  zack: "blackranger",
+};
 
 // ── Args ────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
@@ -62,9 +88,13 @@ const pages = (opt("--pages") ?? "1,2").split(",").map((p) => Number(p));
 const limit = intOpt("--limit", undefined);
 const maxCalls = intOpt("--max-calls", 40)!;
 const outDir = opt("--out") ?? "/tmp/comic-reader-briefs/bench-out";
+const variant = (opt("--variant") ?? "page") as Variant;
+if (!VARIANTS.includes(variant)) {
+  die(`--variant takes ${VARIANTS.join(", ")}, got "${variant}"`);
+}
 
 // Paid ids the owner has named a spend for (#321). Anything else must be free.
-const PAID_OK = ["google/gemma-4-31b-it"];
+const PAID_OK = ["google/gemma-4-31b-it", "google/gemini-3.8-flash"];
 if (!model.endsWith(":free") && !PAID_OK.includes(model)) {
   die(
     `refusing model "${model}": only ids ending in ":free" or listed in PAID_OK are allowed`,
@@ -84,7 +114,10 @@ type Triple = {
   type: string | null;
 };
 type Row = {
+  variant: Variant;
   page: number;
+  /** The reviewed panel's label (`p07-02`), or null when none was sent. */
+  panel: string | null;
   sortOrder: number | null;
   bubbleId: string;
   text: string;
@@ -115,6 +148,11 @@ const textKey = (s: string | null) =>
 /** Plain speaker comparison: lowercase, strip non-alphanumerics. */
 const plain = (s: string | null | undefined) =>
   (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+/** `plain`, then SAME_CHARACTER folds a name onto its ranger color. */
+const aliased = (s: string | null | undefined) => {
+  const p = plain(s);
+  return SAME_CHARACTER[p] ?? p;
+};
 
 // ── Book context, as getContextPage builds it ───────────────────────────
 async function loadBookContext(): Promise<string> {
@@ -187,7 +225,7 @@ async function loadTruth(page: number) {
   const rows = must(
     await supabase
       .from("bubbles")
-      .select("ocr_text, text_with_cues, speaker, emotion, type")
+      .select("ocr_text, text_with_cues, speaker, emotion, type, panel_id")
       .eq("book_id", TRUTH_BOOK)
       .eq("issue_id", TRUTH_ISSUE)
       .eq("page_number", TRUTH_PAGE[page]!)
@@ -196,8 +234,63 @@ async function loadTruth(page: number) {
   );
   return (rows ?? []).map((r) => ({
     key: textKey(r.ocr_text ?? r.text_with_cues),
+    panelId: r.panel_id,
     triple: { speaker: r.speaker, emotion: r.emotion, type: r.type },
   }));
+}
+
+type Panel = { id: string; label: string; rect: Box };
+
+/** Reviewed panels of the truth page, as pixel rects clamped to the image. */
+async function loadPanels(
+  page: number,
+  imgW: number,
+  imgH: number,
+): Promise<Panel[]> {
+  const rows = must(
+    await supabase
+      .from("panels")
+      .select("id, panel_id, bounding_box")
+      .eq("book_id", TRUTH_BOOK)
+      .eq("issue_id", TRUTH_ISSUE)
+      .eq("page_number", TRUTH_PAGE[page]!),
+    "truth panels read",
+  );
+  const clamp = (n: number, lo: number, hi: number) =>
+    Math.min(Math.max(n, lo), hi);
+  return (rows ?? []).flatMap((p) => {
+    const bb = p.bounding_box as {
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    } | null;
+    if (!bb) return [];
+    const x = clamp(Math.round(bb.x * imgW), 0, imgW - 1);
+    const y = clamp(Math.round(bb.y * imgH), 0, imgH - 1);
+    const width = clamp(Math.round(bb.w * imgW), 1, imgW - x);
+    const height = clamp(Math.round(bb.h * imgH), 1, imgH - y);
+    return [{ id: p.id, label: p.panel_id, rect: { x, y, width, height } }];
+  });
+}
+
+/** Area of `a` and `b` in common, in pixels. */
+const overlap = (a: Box, b: Box) =>
+  Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
+  Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+
+/** The bubble box in the crop's pixels, clamped to the crop. */
+function boxInCrop(box: Box, crop: Box): Box {
+  const cx = (n: number) => Math.min(Math.max(n - crop.x, 0), crop.width);
+  const cy = (n: number) => Math.min(Math.max(n - crop.y, 0), crop.height);
+  const x = cx(box.x);
+  const y = cy(box.y);
+  return {
+    x,
+    y,
+    width: cx(box.x + box.width) - x,
+    height: cy(box.y + box.height) - y,
+  };
 }
 
 // ── OpenRouter ──────────────────────────────────────────────────────────
@@ -211,7 +304,7 @@ type OpenRouterBody = {
   usage?: unknown;
 };
 
-async function postOnce(imageUrl: string, prompt: string) {
+async function postOnce(imageUrls: string[], prompt: string) {
   calls++;
   const started = Date.now();
   try {
@@ -229,7 +322,10 @@ async function postOnce(imageUrl: string, prompt: string) {
           {
             role: "user",
             content: [
-              { type: "image_url", image_url: { url: imageUrl } },
+              ...imageUrls.map((url) => ({
+                type: "image_url",
+                image_url: { url },
+              })),
               { type: "text", text: prompt },
             ],
           },
@@ -248,7 +344,7 @@ const retryable = (status: number) =>
   status === 0 || status === 429 || status >= 500;
 
 /** One request, one retry after 20 s on 429/5xx, never past --max-calls. */
-async function callModel(imageUrl: string, prompt: string) {
+async function callModel(imageUrls: string[], prompt: string) {
   let first: Awaited<ReturnType<typeof postOnce>> | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (calls >= maxCalls) {
@@ -263,7 +359,7 @@ async function callModel(imageUrl: string, prompt: string) {
       console.log(`  HTTP ${first!.status}, retrying in 20 s`);
       await sleep(RETRY_WAIT_MS);
     }
-    const r = await postOnce(imageUrl, prompt);
+    const r = await postOnce(imageUrls, prompt);
     if (r.status >= 200 && r.status < 300) {
       try {
         const body = JSON.parse(r.text) as OpenRouterBody;
@@ -303,26 +399,46 @@ const cell = (s: string | number | boolean | null | undefined) =>
     .replace(/\s+/g, " ")
     .trim();
 
-function speakerVerdict(row: Row, t: Triple | null): string {
+function speakerVerdict(
+  row: Row,
+  t: Triple | null,
+  norm: (s: string | null | undefined) => string = plain,
+): string {
   if (!row.truth) return "no truth";
   if (!t) return "no answer";
-  return plain(t.speaker) === plain(row.truth.speaker) ? "match" : "differs";
+  return norm(t.speaker) === norm(row.truth.speaker) ? "match" : "differs";
 }
 
 function writeOutputs(rows: Row[], stopReason: string | null) {
   mkdirSync(outDir, { recursive: true });
   const slug = model.replace(/[^a-zA-Z0-9]+/g, "-");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const base = join(outDir, `${slug}-${stamp}`);
+  const base = join(outDir, `${slug}-${variant}-${stamp}`);
   writeFileSync(`${base}.json`, JSON.stringify(rows, null, 2));
 
   const withTruth = rows.filter((r) => r.truth);
-  const gemMatches = withTruth.filter(
-    (r) => speakerVerdict(r, r.geminiHigh) === "match",
-  ).length;
-  const benchMatches = withTruth.filter(
-    (r) => speakerVerdict(r, r.bench) === "match",
-  ).length;
+  const count = (pick: (r: Row) => Triple | null, norm = plain) =>
+    withTruth.filter((r) => speakerVerdict(r, pick(r), norm) === "match")
+      .length;
+  const gemMatches = count((r) => r.geminiHigh);
+  const gemAliased = count((r) => r.geminiHigh, aliased);
+  const benchMatches = count((r) => r.bench);
+  const benchAliased = count((r) => r.bench, aliased);
+  const costUsd = rows.reduce((sum, r) => {
+    const c = (r.usage as { cost?: unknown } | null)?.cost;
+    return typeof c === "number" ? sum + c : sum;
+  }, 0);
+  const latencies = rows
+    .map((r) => r.latencyMs)
+    .filter((ms): ms is number => ms != null)
+    .sort((a, b) => a - b);
+  const mid = Math.floor(latencies.length / 2);
+  const medianMs =
+    latencies.length === 0
+      ? null
+      : latencies.length % 2
+        ? latencies[mid]!
+        : Math.round((latencies[mid - 1]! + latencies[mid]!) / 2);
   const tokens = (u: unknown) => {
     const x = u as {
       prompt_tokens?: number;
@@ -333,6 +449,7 @@ function writeOutputs(rows: Row[], stopReason: string | null) {
 
   const header = [
     "page",
+    "panel",
     "sort",
     "bubble",
     "text",
@@ -351,15 +468,19 @@ function writeOutputs(rows: Row[], stopReason: string | null) {
     "tokens in/out",
     "GEMINI_HIGH vs truth",
     "bench vs truth",
+    "GEMINI_HIGH vs truth (aliases)",
+    "bench vs truth (aliases)",
   ];
+  const n = withTruth.length;
   const lines = [
-    `# Speaker bench: ${model}`,
+    `# Speaker bench: ${model}, variant ${variant}`,
     "",
     `Smoke pages ${pages.join(", ")} (\`${BOOK}\` / \`${ISSUE}\`), truth from \`${TRUTH_BOOK}\` / \`${TRUTH_ISSUE}\`.`,
     "",
     `Totals: ${rows.length} bubbles sent, ${rows.filter((r) => r.parsed).length} replies parsed, ` +
-      `speaker matches against truth: GEMINI_HIGH ${gemMatches}/${withTruth.length}, ` +
-      `${model} ${benchMatches}/${withTruth.length}. OpenRouter requests: ${calls}.`,
+      `speaker matches against truth (plain / with aliases): GEMINI_HIGH ${gemMatches}/${n} / ${gemAliased}/${n}, ` +
+      `${model} ${benchMatches}/${n} / ${benchAliased}/${n}. ` +
+      `Cost $${costUsd.toFixed(6)}, median latency ${medianMs ?? "n/a"} ms. OpenRouter requests: ${calls}.`,
     ...(stopReason ? ["", `Stopped early: ${stopReason}`] : []),
     "",
     `| ${header.join(" | ")} |`,
@@ -368,6 +489,7 @@ function writeOutputs(rows: Row[], stopReason: string | null) {
       (r) =>
         `| ${[
           r.page,
+          r.panel,
           r.sortOrder,
           r.bubbleId.slice(0, 8),
           cell(r.text),
@@ -386,6 +508,8 @@ function writeOutputs(rows: Row[], stopReason: string | null) {
           tokens(r.usage),
           speakerVerdict(r, r.geminiHigh),
           speakerVerdict(r, r.bench),
+          speakerVerdict(r, r.geminiHigh, aliased),
+          speakerVerdict(r, r.bench, aliased),
         ]
           .map(cell)
           .join(" | ")} |`,
@@ -409,9 +533,35 @@ pageLoop: for (const page of pages) {
       .download(pageStoragePath(BOOK, ISSUE, page)),
     `comic-pages download for page ${page}`,
   );
-  const imageUrl = `data:image/webp;base64,${Buffer.from(await blob.arrayBuffer()).toString("base64")}`;
+  const pageBuf = Buffer.from(await blob.arrayBuffer());
+  const imageUrl = `data:image/webp;base64,${pageBuf.toString("base64")}`;
   const pageCharNames = await loadPageCharNames(page);
   const truth = await loadTruth(page);
+  let panels: Panel[] = [];
+  const cropUrls = new Map<string, string>();
+  if (variant !== "page") {
+    const meta = await sharp(pageBuf).metadata();
+    if (!meta.width || !meta.height) die(`page ${page}: no image size`);
+    panels = await loadPanels(page, meta.width!, meta.height!);
+  }
+  /** The panel crop as a webp data URL, cut once per panel. */
+  const cropUrl = async (p: Panel) => {
+    let url = cropUrls.get(p.id);
+    if (!url) {
+      const buf = await sharp(pageBuf)
+        .extract({
+          left: p.rect.x,
+          top: p.rect.y,
+          width: p.rect.width,
+          height: p.rect.height,
+        })
+        .webp()
+        .toBuffer();
+      url = `data:image/webp;base64,${buf.toString("base64")}`;
+      cropUrls.set(p.id, url);
+    }
+    return url;
+  };
 
   // The step selects with no ORDER BY, so rows came back in insertion
   // order, which is legacy_id order (mapBubbleRows numbers them b01, b02...).
@@ -444,14 +594,42 @@ pageLoop: for (const page of pages) {
     const allCharacters = [...pageCharNames, ...uniqueSpeakers].filter(
       (name, i, arr) => arr.indexOf(name) === i,
     );
-    const prompt = buildContextPrompt(ocrText, box, allCharacters, bookContext);
     const key = textKey(ocrText);
+    const truthRow = truth.find((t) => t.key === key);
+
+    // The bubble's panel: the matched truth bubble's, else the reviewed
+    // panel covering the largest share of the box, else none.
+    let panel: Panel | null = null;
+    if (variant !== "page") {
+      panel = panels.find((p) => p.id === truthRow?.panelId) ?? null;
+      if (!panel) {
+        let best = 0;
+        for (const p of panels) {
+          const area = overlap(box, p.rect);
+          if (area > best) [best, panel] = [area, p];
+        }
+      }
+    }
+
+    let images = [imageUrl];
+    let prompt = buildContextPrompt(ocrText, box, allCharacters, bookContext);
+    if (panel && variant === "panel-page") {
+      images = [imageUrl, await cropUrl(panel)];
+      prompt = `${PANEL_PAGE_PREFACE}\n\n${prompt}`;
+    } else if (panel && variant === "panel") {
+      images = [await cropUrl(panel)];
+      const cropBox = boxInCrop(box, panel.rect);
+      prompt = `${PANEL_PREFACE}\n\n${buildContextPrompt(ocrText, cropBox, allCharacters, bookContext)}`;
+    }
+
     const row: Row = {
+      variant,
       page,
+      panel: panel?.label ?? null,
       sortOrder: b.sort_order,
       bubbleId: b.id,
       text: ocrText,
-      truth: truth.find((t) => t.key === key)?.triple ?? null,
+      truth: truthRow?.triple ?? null,
       geminiHigh: { speaker: b.speaker, emotion: b.emotion, type: b.type },
       bench: null,
       parsed: false,
@@ -461,10 +639,10 @@ pageLoop: for (const page of pages) {
     };
 
     console.log(
-      `  ${b.legacy_id}: ${ocrText.slice(0, 60).replace(/\s+/g, " ")}`,
+      `  ${b.legacy_id}${panel ? ` (${panel.label})` : ""}: ${ocrText.slice(0, 60).replace(/\s+/g, " ")}`,
     );
     const callsBefore = calls;
-    const result = await callModel(imageUrl, prompt);
+    const result = await callModel(images, prompt);
     if (result.kind === "stop") {
       stopReason = result.detail;
       console.error(`  stopping: ${result.detail}`);
