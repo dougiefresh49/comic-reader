@@ -63,8 +63,12 @@ const limit = intOpt("--limit", undefined);
 const maxCalls = intOpt("--max-calls", 40)!;
 const outDir = opt("--out") ?? "/tmp/comic-reader-briefs/bench-out";
 
-if (!model.endsWith(":free")) {
-  die(`refusing model "${model}": only ids ending in ":free" are allowed`);
+// Paid ids the owner has named a spend for (#321). Anything else must be free.
+const PAID_OK = ["google/gemma-4-31b-it"];
+if (!model.endsWith(":free") && !PAID_OK.includes(model)) {
+  die(
+    `refusing model "${model}": only ids ending in ":free" or listed in PAID_OK are allowed`,
+  );
 }
 const apiKey = process.env.OPENROUTER_API_KEY;
 if (!apiKey) die("OPENROUTER_API_KEY is not set in .env");
@@ -219,6 +223,8 @@ async function postOnce(imageUrl: string, prompt: string) {
       },
       body: JSON.stringify({
         model,
+        // Asks OpenRouter to return the billed cost in `usage`.
+        usage: { include: true },
         messages: [
           {
             role: "user",
