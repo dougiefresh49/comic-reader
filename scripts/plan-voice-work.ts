@@ -609,7 +609,7 @@ async function check301() {
 
 const CLIPS = "comic-voice-clips";
 const md5 = (b: Uint8Array) => createHash("md5").update(b).digest("hex");
-type AddMode = "ok" | "refuse" | "timeout-lands" | "timeout-lost";
+type AddMode = "ok" | "refuse" | "timeout-lands" | "timeout-lost" | "5xx-lands";
 
 /** The ElevenLabs account behind `deps.fetch`: slots, voices, counters. */
 function fakeAccount(limit: number) {
@@ -679,6 +679,8 @@ function fakeAccount(limit: number) {
       if (acct.addMode !== "timeout-lost")
         acct.voices.push({ voice_id, name, labels });
       if (acct.addMode.startsWith("timeout")) throw timeout();
+      if (acct.addMode === "5xx-lands")
+        return json({ detail: "upstream error" }, 502);
       return json({ voice_id });
     }) as typeof fetch,
   };
@@ -1085,6 +1087,193 @@ async function checkCarryOut() {
         `outgoing: ${plan.items.map((i, n) => `${i.characterId} -> ${out[n]}`).join(", ")}`,
       ],
       out.length === 2 && out[0] !== out[1],
+    );
+  }
+
+  // ── round 2 ──
+
+  {
+    const w = world({
+      characters: ["ann"],
+      voices: [
+        { id: "ann-voice", name: "Ann", status: "archived", castAs: ["ann"] },
+      ],
+    });
+    const item = await itemOf(w.deps, "ann");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    report(
+      "round 2, finding 2: a restore into a free slot for a character with no task row",
+      [
+        `plan: ${item.action} (${item.source}), outgoing ${item.outgoing?.kind}`,
+        `carryOut: ${short(r)}`,
+        `castlist ann: ${cast(w.db, "ann")}; task: ${task(w.db, "ann")}; adds: ${w.acct.adds}`,
+      ],
+      (r as { status?: string }).status === "done" &&
+        cast(w.db, "ann") === "el-new-1/ann-voice" &&
+        task(w.db, "ann") === "in_progress" &&
+        w.acct.adds === 1,
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["rex"],
+      voices: [{ id: "rex-old", name: "Rex", status: "active" }],
+      limit: 2,
+    });
+    // The DELETE landed; neither registry write did.
+    w.acct.voices = w.acct.voices.filter((v) => v.voice_id !== "el-rex-old");
+    w.db.rows("casting_tasks").push({
+      id: randomUUID(),
+      book_id: BOOK,
+      issue_id: "issue-1",
+      character_id: "rex",
+      action: "design",
+      target_voice_uuid: null,
+      status: `op:${JSON.stringify({ token: "t0", phase: "archived", archived: "rex-old", archivedElevenLabsId: "el-rex-old" })}`,
+      completed_at: null,
+    });
+    const key = {
+      bookId: BOOK,
+      issueId: "issue-1",
+      characterId: "rex",
+      action: "design" as const,
+      target: null,
+    };
+    const both = reconcile
+      ? await Promise.all([
+          attempt(() => reconcile(w.deps, key)),
+          attempt(() => reconcile(w.deps, key)),
+        ])
+      : ["reconcile does not exist"];
+    const row = w.db.rows("voices").find((v) => v.id === "rex-old")!;
+    report(
+      "round 2, findings 3a and 3c: two concurrent reconcile calls at `archived` give one paid add",
+      [
+        `the record says rex-old was archived (its DELETE landed, its row still says active)`,
+        `results: ${both.map(short).join(" | ")}`,
+        `rex-old: ${String(row.status)} ${String(row.current_elevenlabs_id)}; task: ${task(w.db, "rex")}; paid adds: ${w.acct.adds} (want 1)`,
+      ],
+      w.acct.adds === 1 &&
+        row.status === "active" &&
+        row.current_elevenlabs_id === "el-new-1" &&
+        task(w.db, "rex") === "pending",
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["zed"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+      ],
+    });
+    request(w.db, "zed", "clone", "zed-1993");
+    w.acct.addMode = "5xx-lands";
+    const item = await itemOf(w.deps, "zed");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    report(
+      "round 2, finding 6: a 5xx on the add is uncertain, and the landed voice is matched",
+      [
+        `the add answers 502 but the voice exists`,
+        `carryOut: ${short(r)}`,
+        `castlist zed: ${cast(w.db, "zed")}; adds: ${w.acct.adds} (want 1)`,
+      ],
+      (r as { status?: string }).status === "done" &&
+        cast(w.db, "zed") === "el-new-1/zed-1993" &&
+        w.acct.adds === 1,
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["rex"],
+      voices: [
+        { id: "rex-old", name: "Rex", status: "active", castAs: ["rex"] },
+        {
+          id: "rex-1993",
+          name: "Rex (1993)",
+          status: "archived",
+          character: "rex",
+        },
+      ],
+    });
+    request(w.db, "rex", "clone", "rex-1993");
+    w.db.failNext(
+      "voices",
+      "update",
+      (p) => p.status === "archived",
+      "voices down",
+    );
+    const item = await itemOf(w.deps, "rex");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: "rex-old" }),
+    );
+    const phase = lib.decodeOp(
+      String(
+        w.db.rows("casting_tasks").find((t) => t.character_id === "rex")
+          ?.status,
+      ),
+    )?.phase;
+    const fixed = reconcile
+      ? await attempt(() => reconcile(w.deps, item))
+      : "reconcile does not exist";
+    const old = w.db.rows("voices").find((v) => v.id === "rex-old")!;
+    report(
+      "round 2, finding 3b: the archive after the add records a confirmed DELETE whose write failed",
+      [
+        `add first, then archive rex-old; its DELETE lands and the voices update fails`,
+        `carryOut: ${short(r)}`,
+        `record after: ${String(phase)}; reconcile: ${short(fixed)}`,
+        `rex-old after reconcile: ${String(old.status)}; task: ${task(w.db, "rex")}; deletes: ${w.acct.deletes}`,
+      ],
+      (r as { status?: string }).status === "needs attention" &&
+        phase === "retired" &&
+        (fixed as { status?: string }).status === "done" &&
+        old.status === "archived" &&
+        task(w.db, "rex") === "in_progress",
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["zed"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+      ],
+    });
+    request(w.db, "zed", "clone", "zed-1993");
+    const item = await itemOf(w.deps, "zed");
+    await attempt(() => lib.carryOut(w.deps, item, { archiveVoiceId: null }));
+    const made = task(w.db, "zed");
+    const r = await attempt(() =>
+      lib.settle(w.db.client(), item, { kind: "rerun" }),
+    );
+    const row = w.db.rows("voices").find((v) => v.id === "zed-1993")!;
+    report(
+      'round 2, finding 7: "rerun" puts a made item back to pending and keeps its voice',
+      [
+        `task after carryOut: ${made}; settle rerun: ${r === undefined ? "ok" : short(r)}`,
+        `task: ${task(w.db, "zed")}; zed-1993: ${String(row.status)}; deletes: ${w.acct.deletes}`,
+      ],
+      made === "in_progress" &&
+        task(w.db, "zed") === "pending" &&
+        row.status === "active" &&
+        w.acct.deletes === 0,
     );
   }
 

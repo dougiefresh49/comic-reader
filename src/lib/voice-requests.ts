@@ -34,6 +34,7 @@ import {
   archiveVoice,
   designVoice,
   findOpVoices,
+  finishArchive,
   issueNeeds,
   listVoices,
   markRestored,
@@ -245,13 +246,27 @@ async function readDescriptions(
  * new column): the claim's token, the last phase reached, and what
  * `reconcile` needs. Phases: `claimed` (nothing spent on ElevenLabs),
  * `archiving` (DELETE sent), `archived` (DELETE confirmed), `adding` (add
- * sent, `before` and `name` recorded), `added` (ElevenLabs id known).
+ * sent, `before` and `name` recorded), `added` (ElevenLabs id known),
+ * `retiring` (the item's voice is recorded; the outgoing voice's DELETE is
+ * sent) and `retired` (that DELETE confirmed, its registry write failed).
+ * `back` marks an add that restores the archived voice instead of making
+ * the item's voice.
  */
 export interface OpRecord {
   token: string;
-  phase: "claimed" | "archiving" | "archived" | "adding" | "added";
+  phase:
+    | "claimed"
+    | "archiving"
+    | "archived"
+    | "adding"
+    | "added"
+    | "retiring"
+    | "retired";
+  back?: boolean;
   /** `voices.id` archived for the item. */
   archived?: string;
+  /** Its ElevenLabs id before the DELETE. */
+  archivedElevenLabsId?: string;
   /** ElevenLabs ids on the account before the add. */
   before?: string[];
   /** The name the add used. */
@@ -498,6 +513,15 @@ export async function planVoiceWork(
   for (const item of replacing) {
     const old = item.replaces!;
     if (collided.includes(item)) {
+      // As for the items that replace nothing: a free slot first, then a pick.
+      if (freeLeft > 0) {
+        item.outgoing = { kind: "free slot" };
+        freeLeft--;
+        item.warnings.push(
+          `${old.display_name} is already the outgoing voice of another item; this item takes the free slot`,
+        );
+        continue;
+      }
       const voice = await nextPick();
       item.outgoing = voice ? archiveFirst(voice, item) : null;
       item.warnings.push(
@@ -596,9 +620,10 @@ type Added =
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
+/** A 4xx or a pre-send refusal added nothing; a 5xx, a timeout or an unread reply may have. */
 function classify(err: unknown): Added {
   if (
-    err instanceof ElevenLabsRefusedError ||
+    (err instanceof ElevenLabsRefusedError && (err.status ?? 0) < 500) ||
     err instanceof ElevenLabsHeadroomError
   )
     return { kind: "refused", reason: message(err) };
@@ -728,8 +753,8 @@ async function castVoice(
 /**
  * Records a voice that exists on ElevenLabs: its `voices` row (found by the
  * ElevenLabs id first, so a rerun never inserts a second), the replaced
- * voice's metadata, the castlist in every issue, and the task `in_progress`.
- * Every write is safe to repeat.
+ * voice's metadata, and the castlist in every issue. Every write is safe to
+ * repeat; the caller ends the item's record.
  */
 async function recordVoice(
   deps: VoiceSlotsDeps,
@@ -792,7 +817,6 @@ async function recordVoice(
     characterId,
     voiceUuid,
   );
-  await markTask(sb, item, "in_progress");
   return { voiceUuid, castlistRows };
 }
 
@@ -820,26 +844,17 @@ export async function carryOut(
   const op: OpRecord = { token: randomUUID(), phase: "claimed" };
   const claim = await claimTask(sb, item, op);
   if (!claim.ok) return { status: "refused", reasons: [claim.reason] };
-
-  let status = encodeOp(op);
-  /** Records the next phase; the row must still hold the previous one. */
-  const record = async (next: Partial<OpRecord>) => {
-    Object.assign(op, next);
-    const to = encodeOp(op);
-    if (!(await moveTask(sb, item, status, to)))
-      throw new Error("the item's operation record changed under this run");
-    status = to;
-  };
+  const rec = recorder(sb, item, op, encodeOp(op));
 
   try {
-    const result = await carryOutClaimed(deps, item, opts, op, record);
+    const result = await carryOutClaimed(deps, item, opts, rec);
     // Refused or failed: nothing of the operation remains, give the item back.
     if (result.status === "refused" || result.status === "failed")
-      await releaseTaskAt(sb, item, status, claim.inserted);
+      await releaseTaskAt(sb, item, rec.status(), claim.inserted);
     return result;
   } catch (err) {
     if (op.phase === "claimed") {
-      await releaseTaskAt(sb, item, status, claim.inserted).catch(
+      await releaseTaskAt(sb, item, rec.status(), claim.inserted).catch(
         () => undefined,
       );
       throw err;
@@ -852,6 +867,108 @@ export async function carryOut(
       ],
     };
   }
+}
+
+/**
+ * The item's operation record and its compare-and-swap writes: each write
+ * needs the row to hold the last status this run wrote, so a second run
+ * that took the row stops this one before it spends.
+ */
+interface Recorder {
+  op: OpRecord;
+  status: () => string;
+  /** Records the next phase. */
+  record: (next: Partial<OpRecord>) => Promise<void>;
+  /** Ends the record: moves the row to a plain status. */
+  end: (to: "in_progress" | "pending") => Promise<boolean>;
+}
+
+function recorder(
+  sb: SupabaseClient,
+  item: ItemKey,
+  op: OpRecord,
+  from: string,
+): Recorder {
+  let status = from;
+  return {
+    op,
+    status: () => status,
+    record: async (next) => {
+      Object.assign(op, next);
+      const to = encodeOp(op);
+      if (!(await moveTask(sb, item, status, to)))
+        throw new Error("the item's operation record changed under this run");
+      status = to;
+    },
+    end: async (to) => {
+      const ok = await moveTask(sb, item, status, to);
+      if (ok) status = to;
+      return ok;
+    },
+  };
+}
+
+/**
+ * Restores the voice archived for the item, as a recorded add: an `adding`
+ * record with `back`, a fresh token and the inventory, so a lost reply is
+ * matched like any add and reconcile can finish it. A refusal puts the
+ * record back at `archived`. The caller holds the item's record.
+ */
+async function bringBack(
+  deps: VoiceSlotsDeps,
+  rec: Recorder,
+  voice: VoiceRow,
+  deleteConfirmed: boolean,
+): Promise<{ ok: true } | { ok: false; why: string }> {
+  let before: string[];
+  try {
+    before = (await listVoices(deps)).map((v) => v.voice_id);
+  } catch (err) {
+    return {
+      ok: false,
+      why: `could not list the account's voices before restoring ${voice.display_name}: ${message(err)}`,
+    };
+  }
+  await rec.record({
+    phase: "adding",
+    back: true,
+    token: randomUUID(),
+    before,
+    name: voice.display_name,
+    archived: voice.id,
+  });
+  const row = await readVoice(deps.supabase, voice.id);
+  if (!row) return { ok: false, why: `${voice.display_name}: row not found` };
+  let added: Added;
+  try {
+    const r = await restoreVoice(deps, row, {
+      execute: true,
+      deleteConfirmed,
+      opToken: rec.op.token,
+    });
+    added =
+      r.executed && r.newElevenLabsId
+        ? { kind: "added", elevenLabsId: r.newElevenLabsId, recorded: true }
+        : { kind: "refused", reason: r.refusals.join(", ") };
+  } catch (err) {
+    added = classify(err);
+  }
+  if (added.kind === "added") return { ok: true };
+  if (added.kind === "refused") {
+    await rec.record({ phase: "archived", back: undefined });
+    return {
+      ok: false,
+      why: `restoring ${voice.display_name} was refused: ${added.reason}`,
+    };
+  }
+  const found = await matchLostAdd(deps, rec.op);
+  if (!found.ok)
+    return {
+      ok: false,
+      why: `restoring ${voice.display_name}: the reply was lost (${added.reason}); ${found.why}`,
+    };
+  await markRestored(deps.supabase, row, found.id);
+  return { ok: true };
 }
 
 /** Gives the item back when nothing of the operation remains. */
@@ -879,10 +996,10 @@ async function carryOutClaimed(
   deps: VoiceSlotsDeps,
   item: ItemKey,
   opts: { archiveVoiceId: string | null },
-  op: OpRecord,
-  record: (next: Partial<OpRecord>) => Promise<void>,
+  rec: Recorder,
 ): Promise<CarryOutResult> {
   const sb = deps.supabase;
+  const { op, record } = rec;
   const refuse = (...reasons: string[]): CarryOutResult => ({
     status: "refused",
     reasons,
@@ -893,8 +1010,10 @@ async function carryOutClaimed(
   const plan = await planVoiceWork(deps, bookId, issueId);
   const fresh = plan.items.find((i) => i.characterId === characterId);
   if (!fresh) return refuse(`${characterId} is no longer voice work here`);
+  // By character and target: a restore claimed without a task row reads
+  // back as a clone of the same voice, which is the same work.
   if (
-    fresh.action !== item.action ||
+    (fresh.action === "design") !== (item.action === "design") ||
     (fresh.target?.id ?? null) !== (item.target?.id ?? null)
   )
     return refuse("the item changed since its plan; plan again");
@@ -990,7 +1109,11 @@ async function carryOutClaimed(
     };
 
     if (!addFirst && archiveRow) {
-      await record({ phase: "archiving", archived: archiveRow.id });
+      await record({
+        phase: "archiving",
+        archived: archiveRow.id,
+        archivedElevenLabsId: archiveRow.current_elevenlabs_id ?? undefined,
+      });
       let r;
       try {
         r = await archive();
@@ -1043,7 +1166,7 @@ async function carryOutClaimed(
 
     if (added.kind === "refused") {
       if (!didArchive) return { status: "failed", reasons: [added.reason] };
-      const back = await restoreArchived(deps, archiveRow!, deleteConfirmed);
+      const back = await bringBack(deps, rec, archiveRow!, deleteConfirmed);
       return back.ok
         ? {
             status: "failed",
@@ -1098,19 +1221,47 @@ async function carryOutClaimed(
     }
 
     if (addFirst && archiveRow) {
+      await record({
+        phase: "retiring",
+        archived: archiveRow.id,
+        archivedElevenLabsId: archiveRow.current_elevenlabs_id ?? undefined,
+      });
+      let r;
       try {
-        const r = await archive();
-        if (r.ok) didArchive = true;
-        else
-          warnings.push(
-            `${archiveRow.display_name} was not archived: ${r.why}`,
-          );
+        r = await archive();
       } catch (err) {
-        warnings.push(
-          `archiving ${archiveRow.display_name} did not finish (${message(err)}); it may have landed, check ElevenLabs before archiving it again`,
-        );
+        return {
+          status: "needs attention",
+          reasons: [
+            `the voice ${elevenLabsId} is recorded, but archiving ${archiveRow.display_name} did not finish: ${message(err)}`,
+            "the DELETE may have landed; check ElevenLabs, then reconcile",
+          ],
+          archived,
+          newElevenLabsId: elevenLabsId,
+        };
       }
+      if (deleteConfirmed) {
+        await record({ phase: "retired" });
+        return {
+          status: "needs attention",
+          reasons: [
+            ...warnings,
+            "the DELETE landed but its registry write failed; reconcile finishes it, and Restore in /admin/voices brings the voice back from its recorded DELETE",
+          ],
+          archived,
+          newElevenLabsId: elevenLabsId,
+        };
+      }
+      if (r.ok) didArchive = true;
+      else
+        warnings.push(`${archiveRow.display_name} was not archived: ${r.why}`);
     }
+    if (!(await rec.end("in_progress")))
+      return {
+        status: "needs attention",
+        reasons: ["the voice is recorded, but the item's record changed"],
+        newElevenLabsId: elevenLabsId,
+      };
     return {
       status: "done",
       voiceUuid: saved.voiceUuid,
@@ -1133,34 +1284,6 @@ async function carryOutClaimed(
   return archiveRow
     ? withVoiceOperationClaim(sb, archiveRow, "archive", holdTarget)
     : holdTarget();
-}
-
-/** Brings an archived voice back after a refused add. */
-async function restoreArchived(
-  deps: VoiceSlotsDeps,
-  voice: VoiceRow,
-  deleteConfirmed: boolean,
-): Promise<{ ok: true } | { ok: false; why: string }> {
-  try {
-    const back = await readVoice(deps.supabase, voice.id);
-    if (!back)
-      return { ok: false, why: `${voice.display_name}: row not found` };
-    const r = await restoreVoice(deps, back, {
-      execute: true,
-      deleteConfirmed,
-    });
-    return r.executed
-      ? { ok: true }
-      : {
-          ok: false,
-          why: `restoring ${voice.display_name} was refused: ${r.refusals.join(", ")}`,
-        };
-  } catch (err) {
-    return {
-      ok: false,
-      why: `restoring ${voice.display_name} did not finish: ${message(err)}`,
-    };
-  }
 }
 
 /** The one voice a lost add made, by its token, name and the inventory before it. */
@@ -1191,11 +1314,17 @@ async function matchLostAdd(
 
 /**
  * Settles an item that `carryOut` left "needs attention", from the record on
- * its task row; it makes no new voice. `added`: finishes the rows. `adding`:
- * adopts the voice carrying the add's token, or, with `notAdded` (the owner
- * checked ElevenLabs), restores what was archived and gives the item back.
- * `claimed` and `archived`: restores what was archived and gives it back.
- * `archiving`: can't tell whether the DELETE landed, so it stops.
+ * its task row; it never makes a new voice for the item. Every paid step it
+ * takes (restoring the archived voice) first moves the row from the status
+ * it read to a new `adding` record, so of two concurrent calls only one
+ * spends.
+ *
+ * `added`: finishes the rows. `adding`: adopts the voice carrying the add's
+ * token, or, with `notAdded` (the owner checked ElevenLabs), restores what
+ * was archived and gives the item back. `claimed` and `archived`: restores
+ * what was archived (its DELETE is proven) and gives the item back.
+ * `retired`: finishes the outgoing voice's registry writes. `archiving` and
+ * `retiring`: can't tell whether the DELETE landed, so it stops.
  */
 export async function reconcile(
   deps: VoiceSlotsDeps,
@@ -1212,84 +1341,101 @@ export async function reconcile(
       status: "refused",
       reasons: [`nothing to reconcile: the item is ${stateOf(status)}`],
     };
-  const plan = await planVoiceWork(deps, item.bookId, item.issueId);
-  const fresh = plan.items.find((i) => i.characterId === item.characterId);
-  if (!fresh) return { status: "refused", reasons: ["the item is gone"] };
+  const rec = recorder(sb, item, op, status);
   const archivedRow = op.archived ? await readVoice(sb, op.archived) : null;
   const archived = archivedRow
     ? { id: archivedRow.id, name: archivedRow.display_name }
     : undefined;
+  const attention = (...reasons: string[]): CarryOutResult => ({
+    status: "needs attention",
+    reasons,
+    archived,
+    newElevenLabsId: op.elevenLabsId,
+  });
   const giveBack = async (): Promise<CarryOutResult> => {
     if (archivedRow) {
-      const back = await restoreArchived(deps, archivedRow, false);
-      if (!back.ok)
-        return { status: "needs attention", reasons: [back.why], archived };
+      const back = await bringBack(deps, rec, archivedRow, true);
+      if (!back.ok) return attention(back.why);
     }
-    if (!(await moveTask(sb, item, status, "pending")))
-      return {
-        status: "needs attention",
-        reasons: ["the item's record changed during reconcile"],
-      };
+    if (!(await rec.end("pending")))
+      return attention("the item's record changed during reconcile");
     return {
       status: "failed",
       reasons: ["no voice was made; the item is pending again"],
       restored: archived?.name,
     };
   };
-
-  let elevenLabsId = op.elevenLabsId;
-  if (op.phase === "archiving")
-    return {
-      status: "needs attention",
-      reasons: [
-        "the archive's DELETE may or may not have landed; check ElevenLabs, then Restore the voice from /admin/voices if it is gone",
-      ],
-      archived,
-    };
-  if (op.phase === "claimed" || op.phase === "archived") return giveBack();
-  if (op.phase === "adding") {
-    const found = await matchLostAdd(deps, op);
-    if (!found.ok) {
-      if (opts.notAdded) return giveBack();
-      return { status: "needs attention", reasons: [found.why], archived };
-    }
-    elevenLabsId = found.id;
-    Object.assign(op, { phase: "added", elevenLabsId });
-    if (!(await moveTask(sb, item, status, encodeOp(op))))
-      return {
-        status: "needs attention",
-        reasons: ["the item's record changed during reconcile"],
-      };
-  }
-  const description =
-    fresh.action === "design"
-      ? ((await readDescriptions(sb, [item.characterId])).get(
-          voiceDesignAppearanceId(item.characterId),
-        ) ?? null)
-      : null;
-  try {
+  const finish = async (elevenLabsId: string): Promise<CarryOutResult> => {
+    const plan = await planVoiceWork(deps, item.bookId, item.issueId);
+    const fresh = plan.items.find((i) => i.characterId === item.characterId);
+    if (!fresh) return attention("the item is gone from the plan");
+    const description =
+      fresh.action === "design"
+        ? ((await readDescriptions(sb, [item.characterId])).get(
+            voiceDesignAppearanceId(item.characterId),
+          ) ?? null)
+        : null;
     const saved = await recordVoice(
       deps,
       fresh,
-      elevenLabsId!,
+      elevenLabsId,
       description,
       false,
     );
+    if (!(await rec.end("in_progress")))
+      return attention("the item's record changed during reconcile");
     return {
       status: "done",
       voiceUuid: saved.voiceUuid,
-      elevenLabsId: elevenLabsId!,
+      elevenLabsId,
       castlistRows: saved.castlistRows,
       archived: archived ?? null,
       warnings: ["reconciled from the recorded operation"],
     };
+  };
+
+  try {
+    switch (op.phase) {
+      case "archiving":
+        return attention(
+          "the archive's DELETE may or may not have landed; check ElevenLabs, then Restore the voice from /admin/voices if it is gone",
+        );
+      case "retiring":
+        return attention(
+          `the item's voice is made, but the outgoing voice's DELETE may or may not have landed; check ElevenLabs before archiving ${archived?.name ?? "it"} again`,
+        );
+      case "retired":
+        if (archivedRow && op.archivedElevenLabsId)
+          await finishArchive(sb, archivedRow, op.archivedElevenLabsId);
+        return await finish(op.elevenLabsId!);
+      case "claimed":
+      case "archived":
+        return await giveBack();
+      case "added":
+        return await finish(op.elevenLabsId!);
+      case "adding": {
+        const found = await matchLostAdd(deps, op);
+        if (op.back) {
+          if (found.ok) {
+            if (archivedRow) await markRestored(sb, archivedRow, found.id);
+            if (!(await rec.end("pending")))
+              return attention("the item's record changed during reconcile");
+            return {
+              status: "failed",
+              reasons: ["no voice was made; the item is pending again"],
+              restored: archived?.name,
+            };
+          }
+          return opts.notAdded ? await giveBack() : attention(found.why);
+        }
+        if (!found.ok)
+          return opts.notAdded ? await giveBack() : attention(found.why);
+        await rec.record({ phase: "added", elevenLabsId: found.id });
+        return await finish(found.id);
+      }
+    }
   } catch (err) {
-    return {
-      status: "needs attention",
-      reasons: [`recording ${elevenLabsId} failed again: ${message(err)}`],
-      archived,
-      newElevenLabsId: elevenLabsId,
-    };
+    return attention(`reconcile stopped: ${message(err)}`);
   }
 }
 
@@ -1299,7 +1445,12 @@ export type SettleOutcome =
   /** He picks an active voice instead; no slot. */
   | { kind: "pick"; voiceUuid: string }
   /** No audio for this character this run. */
-  | { kind: "no audio" };
+  | { kind: "no audio" }
+  /**
+   * Runs the item again: a made item goes back to pending, so `carryOut`
+   * can make another voice. The made voice stays as it is; nothing is archived.
+   */
+  | { kind: "rerun" };
 
 /**
  * Writes the skip sentinel on the character's castlist rows in this issue
@@ -1337,7 +1488,7 @@ async function skipInIssue(
   }
 }
 
-/** Settles one item: points the cast at a picked voice or skips the character, then marks its `casting_tasks` row complete. */
+/** Settles one item: points the cast at a picked voice or skips the character, then marks its `casting_tasks` row complete; or puts a made item back to pending (`rerun`). */
 export async function settle(
   client: SupabaseClient,
   item: ItemKey,
@@ -1350,10 +1501,18 @@ export async function settle(
     throw new Error(
       `voice work: ${item.characterId} has an operation to reconcile first`,
     );
-  if (outcome.kind === "accept" && status !== "in_progress")
+  if (
+    (outcome.kind === "accept" || outcome.kind === "rerun") &&
+    status !== "in_progress"
+  )
     throw new Error(
-      `voice work: ${item.characterId} has no voice made to accept`,
+      `voice work: ${item.characterId} has no voice made to ${outcome.kind}`,
     );
+  if (outcome.kind === "rerun") {
+    if (!(await moveTask(client, item, "in_progress", "pending")))
+      throw new Error(`voice work: ${item.characterId} changed; plan again`);
+    return;
+  }
   if (outcome.kind === "pick") {
     const voice = await readVoice(client, outcome.voiceUuid);
     if (voice?.status !== "active")

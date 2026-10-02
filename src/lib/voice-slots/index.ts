@@ -52,6 +52,7 @@ export type { PlanFreeSlotsOptions } from "./plan";
 export {
   booksUsingVoice,
   deleteRecorded,
+  finishArchive,
   issueNeeds,
   markRestored,
   readCastlist,

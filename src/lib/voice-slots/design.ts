@@ -81,6 +81,7 @@ export async function designVoice(
   if (!created.ok)
     throw new ElevenLabsRefusedError(
       (await failure(created, "POST /v1/text-to-voice")).message,
+      created.status,
     );
   const body = (await created.json()) as { voice_id?: string };
   if (!body.voice_id) throw new Error("POST /v1/text-to-voice: no voice_id");

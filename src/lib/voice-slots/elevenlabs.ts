@@ -47,7 +47,11 @@ export class ElevenLabsTimeoutError extends Error {
  * unreadable reply, after which the add may have landed.
  */
 export class ElevenLabsRefusedError extends Error {
-  constructor(message: string) {
+  /** The reply's HTTP status, when there was a reply. A 5xx may still have added. */
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
     super(message);
     this.name = "ElevenLabsRefusedError";
   }
@@ -293,6 +297,7 @@ export async function addVoice(
   if (!r.ok)
     throw new ElevenLabsRefusedError(
       (await failure(r, "POST /v1/voices/add")).message,
+      r.status,
     );
   const body = (await r.json()) as { voice_id?: string };
   if (!body.voice_id) throw new Error("POST /v1/voices/add: no voice_id");

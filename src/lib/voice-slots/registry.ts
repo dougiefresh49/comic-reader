@@ -225,6 +225,37 @@ export async function markArchived(
 }
 
 /**
+ * Finishes the registry writes for a DELETE that is known to have landed
+ * (`ArchiveRecordError`): the `voice_archives` row unless it is there, then
+ * the `voices` and castlist updates. A row already moved on is left alone.
+ */
+export async function finishArchive(
+  supabase: SupabaseClient,
+  voice: VoiceRow,
+  formerElevenLabsId: string,
+): Promise<void> {
+  if (voice.current_elevenlabs_id !== formerElevenLabsId) return;
+  if (await deleteRecorded(supabase, voice)) {
+    const upd = await supabase
+      .from("voices")
+      .update({
+        status: "archived",
+        current_elevenlabs_id: null,
+        archived_at: new Date().toISOString(),
+      })
+      .eq("id", voice.id);
+    if (upd.error) fail("update voices", upd.error);
+    const cast = await supabase
+      .from("castlist")
+      .update({ voice_id: null })
+      .eq("voice_uuid", voice.id);
+    if (cast.error) fail("update castlist", cast.error);
+    return;
+  }
+  await markArchived(supabase, voice, formerElevenLabsId, null);
+}
+
+/**
  * True when `voice_archives` records a DELETE of the row's current
  * ElevenLabs id: the slot is gone even though the `voices` update failed.
  */
