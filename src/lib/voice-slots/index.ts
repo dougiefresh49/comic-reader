@@ -15,7 +15,11 @@ export {
   ROOM_CONSUMER,
 } from "./archive";
 export type { ArchiveGuardOptions, ArchiveOptions } from "./archive";
-export { noActiveVoiceClaimFilter, withVoiceOperationClaim } from "./claim";
+export {
+  claimHeld,
+  noActiveVoiceClaimFilter,
+  withVoiceOperationClaim,
+} from "./claim";
 export type { VoiceClaimOperation } from "./claim";
 export { designVoice } from "./design";
 export type { DesignVoiceInput } from "./design";

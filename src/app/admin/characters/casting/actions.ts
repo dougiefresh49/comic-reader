@@ -17,6 +17,19 @@ const SKIPPED_VOICE = "__SKIPPED__";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
+/** A voice-stop operation is open on the task (#351): the row is not this page's to change. */
+async function operationOpen(taskId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("casting_tasks")
+    .select("operation")
+    .eq("id", taskId)
+    .maybeSingle();
+  if (error) return error.message;
+  return (data as { operation: unknown } | null)?.operation != null
+    ? "A voice operation is open on this task; finish it on the voices stop."
+    : null;
+}
+
 type CompleteCastingResult =
   | { ok: true; resumed: boolean }
   | { ok: false; error: string };
@@ -92,6 +105,8 @@ export async function saveVoiceId(
   if (!args.voiceId.trim()) {
     return { ok: false, error: "Voice ID required" };
   }
+  const open = await operationOpen(args.taskId);
+  if (open) return { ok: false, error: open };
   const res = await saveCastVoice(args);
   if (res.ok) return res;
   return {
@@ -113,6 +128,8 @@ interface SkipArgs {
  * is marked skipped so the dashboard hides it but it can be revisited.
  */
 export async function skipAndAddLater(args: SkipArgs): Promise<ActionResult> {
+  const open = await operationOpen(args.taskId);
+  if (open) return { ok: false, error: open };
   // voice_uuid is cleared so voice rotation never restores a voice over the skip.
   const { error: castErr } = await supabaseAdmin.from("castlist").upsert(
     {
@@ -259,6 +276,8 @@ export async function createVoiceDesign(
   if (!args.voiceDescription.trim()) {
     return { ok: false, error: "Voice description required" };
   }
+  const open = await operationOpen(args.taskId);
+  if (open) return { ok: false, error: open };
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return { ok: false, error: "ELEVENLABS_API_KEY not configured" };

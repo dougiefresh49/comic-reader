@@ -16,9 +16,20 @@ interface VoiceClaimRow {
 }
 
 /** A claim older than ten minutes is stale and can be taken over. */
+const CLAIM_STALE_MS = 10 * 60 * 1000;
+
 export function noActiveVoiceClaimFilter(): string {
-  const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const staleBefore = new Date(Date.now() - CLAIM_STALE_MS).toISOString();
   return `operation_claim.is.null,operation_claimed_at.lt.${staleBefore}`;
+}
+
+/** The same test in code: a claim is held while it is younger than the window. */
+export function claimHeld(row: {
+  operation_claim: string | null;
+  operation_claimed_at: string | null;
+}): boolean {
+  if (!row.operation_claim || !row.operation_claimed_at) return false;
+  return Date.parse(row.operation_claimed_at) >= Date.now() - CLAIM_STALE_MS;
 }
 
 /**

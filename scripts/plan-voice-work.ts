@@ -263,19 +263,20 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.returning = this.op !== "select";
     return this;
   }
+  // Payloads are copied, as a real write serializes them.
   insert(row: Row) {
     this.op = "insert";
-    this.payload = row;
+    this.payload = structuredClone(row);
     return this;
   }
   update(patch: Row) {
     this.op = "update";
-    this.payload = patch;
+    this.payload = structuredClone(patch);
     return this;
   }
   upsert(row: Row, opts?: { onConflict?: string }) {
     this.op = "upsert";
-    this.payload = row;
+    this.payload = structuredClone(row);
     this.conflict = (opts?.onConflict ?? "id").split(",");
     return this;
   }
@@ -283,8 +284,14 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.op = "delete";
     return this;
   }
+  /** `col->>key` reads a key of a JSON column as text, as PostgREST does. */
   eq(col: string, v: unknown) {
-    this.filters.push((r) => r[col] === v);
+    const [c, key] = col.split("->>");
+    this.filters.push((r) =>
+      key === undefined
+        ? r[c!] === v
+        : (r[c!] as Record<string, unknown> | null)?.[key] === v,
+    );
     return this;
   }
   is(col: string, v: null) {
@@ -383,7 +390,9 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
       }
       if (!this.returning) return { data: null, error: null };
     }
-    out = out.slice(this.skip, this.skip + this.max).map((r) => ({ ...r }));
+    out = out
+      .slice(this.skip, this.skip + this.max)
+      .map((r) => structuredClone(r));
     if (this.mode === "many") return { data: out, error: null };
     if (this.mode === "single" && out.length !== 1)
       return { data: null, error: { message: "not exactly one row" } };
@@ -818,11 +827,13 @@ async function checkCarryOut() {
     if (!item) throw new Error(`no item for ${character}`);
     return item;
   };
-  const task = (db: FakeDb, c: string) =>
-    String(
-      db.rows("casting_tasks").find((r) => r.character_id === c)?.status ??
-        "none",
-    ).slice(0, 40);
+  /** The task's status, and the phase of an open operation. */
+  const task = (db: FakeDb, c: string) => {
+    const row = db.rows("casting_tasks").find((r) => r.character_id === c);
+    if (!row) return "none";
+    const op = row.operation as { phase?: string } | null | undefined;
+    return `${String(row.status)}${op ? ` (open at ${op.phase})` : ""}`;
+  };
   const cast = (db: FakeDb, c: string) =>
     db
       .rows("castlist")
@@ -1132,7 +1143,14 @@ async function checkCarryOut() {
       character_id: "rex",
       action: "design",
       target_voice_uuid: null,
-      status: `op:${JSON.stringify({ token: "t0", phase: "archived", archived: "rex-old", archivedElevenLabsId: "el-rex-old" })}`,
+      status: "pending",
+      operation: {
+        token: "t0",
+        rev: "r0",
+        phase: "archived",
+        archived: "rex-old",
+        archivedElevenLabsId: "el-rex-old",
+      },
       completed_at: null,
     });
     const key = {
@@ -1218,11 +1236,9 @@ async function checkCarryOut() {
     const r = await attempt(() =>
       lib.carryOut(w.deps, item, { archiveVoiceId: "rex-old" }),
     );
-    const phase = lib.decodeOp(
-      String(
-        w.db.rows("casting_tasks").find((t) => t.character_id === "rex")
-          ?.status,
-      ),
+    const phase = (
+      w.db.rows("casting_tasks").find((t) => t.character_id === "rex")
+        ?.operation as { phase?: string } | null
     )?.phase;
     const fixed = reconcile
       ? await attempt(() => reconcile(w.deps, item))
@@ -1288,7 +1304,8 @@ async function checkCarryOut() {
       character_id: character,
       action: target ? "clone" : "design",
       target_voice_uuid: target,
-      status: `op:${JSON.stringify({ token: "t0", ...op })}`,
+      status: "pending",
+      operation: { token: "t0", rev: "r0", ...op },
       completed_at: null,
     });
   const rexKey = {
@@ -1483,6 +1500,90 @@ async function checkCarryOut() {
       ],
       (fixed as { status?: string }).status === "done" &&
         made.description === "Rex, a test voice.",
+    );
+  }
+
+  // ── round 4 ──
+
+  for (const lost of [false, true]) {
+    const w = world({
+      characters: ["rex"],
+      voices: [
+        { id: "rex-old", name: "Rex", status: "active", castAs: ["rex"] },
+        {
+          id: "rex-1993",
+          name: "Rex (1993)",
+          status: "archived",
+          character: "rex",
+        },
+      ],
+      limit: 1,
+    });
+    request(w.db, "rex", "clone", "rex-1993");
+    // The DELETE lands; the voices update after it fails once.
+    w.db.failNext(
+      "voices",
+      "update",
+      (p) => p.status === "archived",
+      "voices down",
+    );
+    if (lost) {
+      w.acct.addMode = "timeout-lands";
+      w.acct.lists = ["ok", "fail"]; // the inventory, then the lookup
+    }
+    const item = await itemOf(w.deps, "rex");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: "rex-old" }),
+    );
+    const fixed = lost
+      ? reconcile
+        ? await attempt(() => reconcile(w.deps, item))
+        : "reconcile does not exist"
+      : null;
+    const old = w.db.rows("voices").find((v) => v.id === "rex-old")!;
+    report(
+      `round 4, finding 1 (${lost ? "reconcile" : "carryOut"}): a half-recorded archive-first DELETE is finished`,
+      [
+        `archive rex-old first; its DELETE lands and the voices update fails${lost ? "; the add's reply is lost" : ""}`,
+        `carryOut: ${short(r)}`,
+        ...(lost ? [`reconcile: ${short(fixed)}`] : []),
+        `rex-old: ${String(old.status)} ${String(old.current_elevenlabs_id)}; task: ${task(w.db, "rex")}`,
+      ],
+      ((lost ? fixed : r) as { status?: string }).status === "done" &&
+        old.status === "archived" &&
+        old.current_elevenlabs_id === null &&
+        task(w.db, "rex") === "in_progress",
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["rex"],
+      voices: [{ id: "rex-old", name: "Rex", status: "active" }],
+      limit: 2,
+    });
+    const row = w.db.rows("voices").find((v) => v.id === "rex-old")!;
+    row.operation_claim = "archive:live";
+    row.operation_claimed_at = new Date().toISOString();
+    seedOp(w.db, "rex", {
+      phase: "adding",
+      archived: "rex-old",
+      archivedElevenLabsId: "el-rex-old",
+      before: [],
+      name: "Rex (1993)",
+    });
+    const r = await recon(w.deps);
+    report(
+      "round 4, finding 2: reconcile waits while a run holds the voice's claim",
+      [
+        `rex-old is claimed by a live run (claimed just now)`,
+        `reconcile: ${short(r)}`,
+        `rex-old: ${String(row.status)}; task: ${task(w.db, "rex")}; adds ${w.acct.adds}`,
+      ],
+      short(r).includes("a run is still in progress") &&
+        row.status === "active" &&
+        task(w.db, "rex") === "pending (open at adding)" &&
+        w.acct.adds === 0,
     );
   }
 
