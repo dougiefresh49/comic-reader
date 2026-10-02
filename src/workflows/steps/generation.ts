@@ -6,13 +6,13 @@ import {
   bubbleNeedsAudio,
   formatCastConflicts,
   normalizeAlignment,
-  planBubblesToSend,
+  planBubbleVoices,
   planCharactersNeedingVoices,
   readPlanningAppearances,
-  speakerKey,
   speakerKeys,
   type AlignmentRaw,
   voiceDesignAppearanceId,
+  voiceLookupContext,
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { isDryRun } from "~/lib/fakes/dry-run";
@@ -334,52 +334,56 @@ export async function generateAudioBatch(
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, emotion, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
+      "id, speaker, character_id, emotion, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
     )
     .in("id", bubbleIds);
 
   if (bubErr) throw new FatalError(bubErr.message);
   if (!bubbles || bubbles.length === 0) return;
 
-  const [
-    { data: castRows, error: castErr },
-    { data: aliasRows, error: aliasErr },
-  ] = await Promise.all([
-    supabase
-      .from("castlist")
-      .select("character, voice_id")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId),
+  const { loadBookCast } = await import("~/lib/cast");
+  const [book, { data: aliasRows, error: aliasErr }] = await Promise.all([
+    loadBookCast(supabase, bookId).catch((e: Error) => {
+      throw new FatalError(e.message);
+    }),
     supabase
       .from("aliases")
       .select("alias, canonical, scope, scope_id")
       .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
   ]);
-
-  if (castErr) throw new FatalError(castErr.message);
   if (aliasErr) throw new FatalError(aliasErr.message);
 
-  const aliasMap = buildAliasMap(aliasRows ?? []);
-  const cast = buildCastIndex(castRows ?? []);
-
-  if (cast.conflicts.length > 0) {
+  const lookup = voiceLookupContext(book, issueId, aliasRows ?? []);
+  if (lookup.cast.conflicts.length > 0) {
     throw new FatalError(
-      `castlist slug conflicts before audio: ${formatCastConflicts(cast.conflicts)}`,
+      `castlist slug conflicts before audio: ${formatCastConflicts(lookup.cast.conflicts)}`,
     );
   }
 
-  const sendPlan = planBubblesToSend(bubbles, aliasMap, cast);
-  for (const { bubble, reason } of sendPlan.skipped) {
-    const rawSpeaker = bubble.speaker?.trim() ?? "";
-    const slug = rawSpeaker ? speakerKey(rawSpeaker, aliasMap) : "";
+  const sendPlan = planBubbleVoices(bubbles, lookup);
+  const conflicts = sendPlan.skipped.flatMap((s) =>
+    s.lookup && !s.lookup.ok && s.reason === "castlist conflict"
+      ? [`${s.bubble.id}: ${s.lookup.detail}`]
+      : [],
+  );
+  if (conflicts.length > 0) {
+    throw new FatalError(
+      `castlist conflicts before audio: ${conflicts.join("; ")}`,
+    );
+  }
+  for (const { bubble, reason, lookup: found } of sendPlan.skipped) {
+    const speaker = bubble.speaker?.trim() ?? "";
     console.log(
-      `[audio] skip ${bubble.id} speaker=${rawSpeaker || "(none)"} slug=${slug || "(none)"}: ${reason}`,
+      `[audio] skip ${bubble.id} speaker=${speaker === "" ? "(none)" : speaker}: ${reason}${found && !found.ok ? ` (${found.detail})` : ""}`,
     );
   }
 
   let generated = 0;
 
-  for (const { bubble, voiceId } of sendPlan.toSend) {
+  for (const {
+    bubble,
+    lookup: { voiceId },
+  } of sendPlan.toSend) {
     const ttsText = (bubble.text_with_cues ?? bubble.ocr_text)!;
 
     let response;
