@@ -1,6 +1,8 @@
 import { createHook } from "workflow";
 import { FatalError } from "workflow";
 
+import { STEP_ORDER } from "~/lib/pipeline-steps";
+
 import {
   updatePipelineStep,
   recordStepStart,
@@ -49,25 +51,6 @@ interface IngestInput {
   fromStep?: string;
 }
 
-const STEP_ORDER = [
-  "roboflow-page-analyze",
-  "extract-foreground-masks",
-  "fetch-wiki-context",
-  "character-lookahead",
-  "review-clusters",
-  "get-context",
-  "sort-page-elements",
-  "review-pages",
-  "review-new-characters",
-  "generate-voice-descriptions",
-  "casting",
-  "generate-voice-models",
-  "generate-audio",
-  "upload-audio",
-  "consolidate-music-scenes",
-  "generate-manifest",
-] as const;
-
 function shouldRun(step: string, fromStep?: string): boolean {
   if (!fromStep) return true;
   const fromIdx = STEP_ORDER.indexOf(fromStep as (typeof STEP_ORDER)[number]);
@@ -75,8 +58,6 @@ function shouldRun(step: string, fromStep?: string): boolean {
   if (fromIdx === -1) return true;
   return stepIdx >= fromIdx;
 }
-
-export { STEP_ORDER };
 
 export async function ingestPipeline(input: IngestInput) {
   "use workflow";

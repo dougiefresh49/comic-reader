@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
+import { STEP_ORDER } from "~/lib/pipeline-steps";
 
 export interface SkippedGate {
   gate?: string;
@@ -51,25 +52,6 @@ const STEP_LABELS: Record<string, string> = {
   complete: "Complete",
 };
 
-const STEP_ORDER = [
-  "roboflow-page-analyze",
-  "extract-foreground-masks",
-  "fetch-wiki-context",
-  "character-lookahead",
-  "review-clusters",
-  "get-context",
-  "sort-page-elements",
-  "review-pages",
-  "review-new-characters",
-  "generate-voice-descriptions",
-  "casting",
-  "generate-voice-models",
-  "generate-audio",
-  "upload-audio",
-  "consolidate-music-scenes",
-  "generate-manifest",
-];
-
 function toRelativePath(url: string): string {
   try {
     return new URL(url).pathname;
@@ -80,7 +62,7 @@ function toRelativePath(url: string): string {
 
 function nextStepAfter(pausedAt: string | null): string | null {
   if (!pausedAt) return null;
-  const idx = STEP_ORDER.indexOf(pausedAt);
+  const idx = (STEP_ORDER as readonly string[]).indexOf(pausedAt);
   if (idx < 0) return pausedAt;
   return STEP_ORDER[idx + 1] ?? pausedAt;
 }
@@ -505,7 +487,7 @@ function FailedActions({
   }, [menuOpen]);
 
   const failedLabel = STEP_LABELS[failedStep] ?? failedStep;
-  const failedIdx = STEP_ORDER.indexOf(failedStep);
+  const failedIdx = (STEP_ORDER as readonly string[]).indexOf(failedStep);
 
   return (
     <div className="relative" ref={menuRef}>
