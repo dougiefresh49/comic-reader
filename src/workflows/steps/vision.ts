@@ -172,9 +172,11 @@ export async function identifyFaceOrFatal<C, T>(
  * `panel_character_detections` row. That insert is one statement, a failed
  * face is fatal before it (`identifyFaceOrFatal`), and an exemplar write
  * that throws after it deletes it again (`storeLookaheadFacesOrFatal`), so
- * such a page has no detections and runs again. A hard stop (step timeout,
- * process kill) between the insert and the last exemplar is not undone: the
- * page keeps its detections, misses exemplars, and is skipped from then on.
+ * such a page has no detections and runs again. Two ways leave a page
+ * half-stored, keeping its detections, missing exemplars, and skipped from
+ * then on: a hard stop (step timeout, process kill) between the insert and
+ * the last exemplar, and an undo whose exemplar row delete or detection
+ * delete fails.
  */
 export async function hasStoredFaceDetections(
   supabase: TypedClient,
@@ -1225,7 +1227,10 @@ const NAMED_EXEMPLAR_MIN_CONFIDENCE = 0.7;
  * Detections first, in one insert, then the exemplars that carry their
  * `detection_id` (#348). A failed exemplar undoes this call's detections and
  * the exemplars cut from them, so the page has no detections and a rerun does
- * it again (`hasStoredFaceDetections`).
+ * it again (`hasStoredFaceDetections`). When the undo cannot delete those
+ * exemplar rows it keeps the detections too, and when the detection delete
+ * fails they stay; either way the page stays half-stored. A failed Storage
+ * remove alone does not stop the undo; the FatalError names the orphaned crops.
  */
 async function storeLookaheadFacesOrFatal(
   { exemplarStore }: LookaheadDeps,
@@ -1330,23 +1335,30 @@ async function storeLookaheadFacesOrFatal(
     // call created: delete those first. The detections go only after that
     // succeeds, since their delete would null a surviving exemplar's
     // detection_id and leave it for the rerun's dedupe.
-    let undo = "";
+    const undo: string[] = [];
+    let rowsDeleted = false;
     try {
-      await deleteExemplars(supabase, newIds);
-      if (newIds.length > 0) {
-        const { error } = await supabase
-          .from("panel_character_detections")
-          .delete()
-          .in("id", newIds);
-        if (error) {
-          undo = `; undo failed, detections delete: ${error.message}`;
-        }
-      }
+      const storageErr = await deleteExemplars(supabase, newIds);
+      rowsDeleted = true;
+      if (storageErr) undo.push(storageErr);
     } catch (undoErr: unknown) {
-      undo = `; undo failed, exemplars and detections left as stored: ${errorText(undoErr)}`;
+      undo.push(
+        `exemplar rows not deleted, so exemplars and detections are left as stored and the page is skipped from now on: ${errorText(undoErr)}`,
+      );
+    }
+    if (rowsDeleted && newIds.length > 0) {
+      const { error } = await supabase
+        .from("panel_character_detections")
+        .delete()
+        .in("id", newIds);
+      if (error) {
+        undo.push(
+          `detections not deleted, so the page is skipped from now on: ${error.message}`,
+        );
+      }
     }
     throw new FatalError(
-      `character_face_exemplars write failed for ${pageLabel}: ${errorText(e)}${undo}`,
+      `character_face_exemplars write failed for ${pageLabel}: ${errorText(e)}${undo.length > 0 ? `; undo: ${undo.join("; ")}` : ""}`,
     );
   }
 

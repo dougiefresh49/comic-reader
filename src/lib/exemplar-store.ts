@@ -124,13 +124,14 @@ export async function storeExemplar(
 
 /**
  * Deletes the exemplars cut from these detections, rows and their crops in
- * Storage. Throws on any failure.
+ * Storage. Throws only when the row delete fails. A failed Storage remove
+ * comes back as a message naming the crops left behind; null means all gone.
  */
 export async function deleteExemplars(
   supabase: SupabaseClient,
   detectionIds: string[],
-): Promise<void> {
-  if (detectionIds.length === 0) return;
+): Promise<string | null> {
+  if (detectionIds.length === 0) return null;
   const { data, error } = await supabase
     .from("character_face_exemplars")
     .delete()
@@ -140,13 +141,13 @@ export async function deleteExemplars(
     throw new Error(`character_face_exemplars delete failed: ${error.message}`);
   }
   const paths = (data ?? []).map((r) => r.crop_path as string);
-  if (paths.length === 0) return;
+  if (paths.length === 0) return null;
   const { error: removeErr } = await supabase.storage
     .from(STORAGE_BUCKET)
     .remove(paths);
-  if (removeErr) {
-    throw new Error(`${STORAGE_BUCKET} remove failed: ${removeErr.message}`);
-  }
+  return removeErr
+    ? `${STORAGE_BUCKET} remove failed (${removeErr.message}), orphaned crops: ${paths.join(", ")}`
+    : null;
 }
 
 /** `face` is a JPEG as base64, or its embedding from `embedFace`. */
