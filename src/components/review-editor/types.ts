@@ -34,6 +34,8 @@ export interface SrcBubble {
   page: number;
   rect: Rect;
   text: string;
+  /** `text_with_cues`: the text as the audio step reads it, emotion cues and all. */
+  textWithCues: string | null;
   type: BubbleType;
   speaker: string | null;
   emotion: string;

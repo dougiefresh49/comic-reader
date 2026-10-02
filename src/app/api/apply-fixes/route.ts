@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
             ? [f.data.speaker]
             : [],
       ),
-      boxBubbleIds: boxIds,
+      bubbleIds: boxIds,
     });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 500 });

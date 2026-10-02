@@ -94,7 +94,13 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
           sortOrder: i,
           panelId,
           box: b.rect,
+          confidence: b.confidence,
           text: b.text,
+          // A row restored by an undo keeps its cues while its text is the
+          // text they were written for. Stored edits from before this field
+          // existed have no `cues`.
+          textWithCues:
+            b.cues && b.cues.forText === b.text ? b.cues.value : null,
           type: b.type,
           speaker: speakerOf(b),
           emotion: b.emotion,

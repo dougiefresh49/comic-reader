@@ -294,7 +294,7 @@ export async function getBubbleIdsForAudio(
   const { data: bubbles, error } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
+      "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
@@ -334,7 +334,7 @@ export async function generateAudioBatch(
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, emotion, text_with_cues, ocr_text, audio_storage_path, ignored",
+      "id, speaker, emotion, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
     )
     .in("id", bubbleIds);
 

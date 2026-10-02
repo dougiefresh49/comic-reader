@@ -38,6 +38,7 @@ interface BubbleRow {
   page_number: number;
   panel_id: string | null;
   ocr_text: string | null;
+  text_with_cues: string | null;
   type: string;
   speaker: string | null;
   emotion: string | null;
@@ -195,7 +196,7 @@ export async function loadEditor(
     supabaseAdmin
       .from("bubbles")
       .select(
-        "id, page_number, panel_id, ocr_text, type, speaker, emotion, ignored, silent, box_2d, style",
+        "id, page_number, panel_id, ocr_text, text_with_cues, type, speaker, emotion, ignored, silent, box_2d, style",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -264,6 +265,7 @@ export async function loadEditor(
       page: b.page_number,
       rect,
       text: b.ocr_text ?? "",
+      textWithCues: b.text_with_cues,
       type: TYPES.includes(b.type) ? (b.type as BubbleType) : "SPEECH",
       speaker: b.speaker,
       emotion: b.emotion ?? "",

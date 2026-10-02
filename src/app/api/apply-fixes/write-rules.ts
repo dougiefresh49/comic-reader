@@ -44,9 +44,9 @@ export interface WriteContext {
   pageSize: (page: number) => { width: number; height: number };
   /** The `characters` ids among the speakers being written. */
   characterIds: Set<string>;
-  /** The detection confidence each box-edited bubble's `box_2d` holds now. */
+  /** The detection confidence each named bubble's `box_2d` holds now. */
   confidence: Map<string, number>;
-  /** The page of each box-edited bubble, as stored. */
+  /** The page of each named bubble, as stored. */
   bubblePage: Map<string, number>;
 }
 
@@ -61,7 +61,11 @@ function chunk<T>(items: T[], size: number): T[][] {
 export async function loadWriteContext(
   bookId: string,
   issueId: string,
-  need: { speakers: (string | null | undefined)[]; boxBubbleIds: string[] },
+  need: {
+    speakers: (string | null | undefined)[];
+    /** Existing bubbles whose stored page and confidence the caller needs. */
+    bubbleIds: string[];
+  },
 ): Promise<WriteContext> {
   const slugs = Array.from(
     new Set(need.speakers.flatMap((s) => (s ? [slugify(s)] : []))),
@@ -98,7 +102,7 @@ export async function loadWriteContext(
 
   const confidence = new Map<string, number>();
   const bubblePage = new Map<string, number>();
-  for (const ids of chunk(Array.from(new Set(need.boxBubbleIds)), 100)) {
+  for (const ids of chunk(Array.from(new Set(need.bubbleIds)), 100)) {
     const { data, error } = await supabaseAdmin
       .from("bubbles")
       .select("id, page_number, box_2d")
@@ -192,6 +196,14 @@ export function bubbleUpdate(
     Object.assign(row, boxColumns(edit.box, page, ctx, ctx.confidence.get(id)));
   const affectsAudio = AUDIO_FIELDS.some((f) => edit[f] !== undefined);
   if (affectsAudio && edit.ignored !== true) row.needs_audio = true;
+  // A silent bubble plays nothing: its take is dropped and no new one is
+  // wanted. Turned back on, it needs audio again.
+  if (edit.silent === true) {
+    row.audio_storage_path = null;
+    row.needs_audio = false;
+  } else if (edit.silent === false && edit.ignored !== true) {
+    row.needs_audio = true;
+  }
   return row;
 }
 
@@ -208,6 +220,8 @@ export function bubbleInsert(
     /** A v4 UUID made in the browser. Left out, the database makes one. */
     id?: string;
     legacyId?: string;
+    /** The detection confidence a restored row's `box_2d` held. */
+    confidence?: number | null;
   },
   ctx: WriteContext,
 ): Row {
@@ -232,7 +246,7 @@ export function bubbleInsert(
     audio_storage_path: null,
     panel_id: bubble.panelId ?? null,
     ...(bubble.box
-      ? boxColumns(bubble.box, bubble.page, ctx, undefined)
+      ? boxColumns(bubble.box, bubble.page, ctx, bubble.confidence ?? undefined)
       : { style: null, box_2d: null }),
   };
 }
@@ -329,7 +343,15 @@ export const saveRequestSchema = z.object({
   issueId: z.string().min(1),
   bubbles: z.object({
     add: z.array(
-      bubbleEdit.extend({ id: uuid, page, sortOrder: order, box }).strict(),
+      bubbleEdit
+        .extend({
+          id: uuid,
+          page,
+          sortOrder: order,
+          box,
+          confidence: z.number().finite().nullable().optional(),
+        })
+        .strict(),
     ),
     update: z.array(z.object({ id: uuid, page, set: bubbleEdit })),
     remove: z.array(z.object({ id: uuid, page })),

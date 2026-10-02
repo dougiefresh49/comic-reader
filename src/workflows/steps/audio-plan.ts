@@ -32,7 +32,7 @@ export interface BubbleAudioRow {
   id: string;
   speaker: string | null;
   ignored: boolean;
-  silent?: boolean;
+  silent: boolean;
   audio_storage_path: string | null;
   text_with_cues: string | null;
   ocr_text: string | null;

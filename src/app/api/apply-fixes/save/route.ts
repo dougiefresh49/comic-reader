@@ -16,6 +16,7 @@ import {
   panelUpdate,
   saveRequestSchema,
   type SaveResult,
+  type WriteContext,
 } from "../write-rules";
 
 type Op =
@@ -56,6 +57,30 @@ export async function POST(req: NextRequest) {
   }
   const { bookId, issueId, bubbles, panels } = parsed.data;
 
+  let ctx: WriteContext;
+  try {
+    ctx = await loadWriteContext(bookId, issueId, {
+      speakers: [
+        ...bubbles.add.map((b) => b.speaker),
+        ...bubbles.update.map((b) => b.set.speaker),
+      ],
+      bubbleIds: [...bubbles.update, ...bubbles.remove].map((b) => b.id),
+    });
+  } catch (e) {
+    return fail(`Nothing was saved: ${(e as Error).message}`, 500);
+  }
+  // An existing bubble is on the page its row says, whatever the request
+  // says. One the read did not find is left to save_review_edits, which
+  // fails the whole Save on it.
+  for (const b of [...bubbles.update, ...bubbles.remove]) {
+    const stored = ctx.bubblePage.get(b.id);
+    if (stored !== undefined && stored !== b.page)
+      return fail(
+        `Nothing was saved: bubble ${b.id} is on page ${stored}, not page ${b.page}.`,
+        400,
+      );
+  }
+
   // Every panel a bubble names must be one of this issue's panels on the
   // bubble's own page, after this Save's adds and removals.
   const { data: panelRows, error: panelError } = await supabaseAdmin
@@ -95,13 +120,6 @@ export async function POST(req: NextRequest) {
 
   let ops: Op[];
   try {
-    const ctx = await loadWriteContext(bookId, issueId, {
-      speakers: [
-        ...bubbles.add.map((b) => b.speaker),
-        ...bubbles.update.map((b) => b.set.speaker),
-      ],
-      boxBubbleIds: bubbles.update.filter((b) => b.set.box).map((b) => b.id),
-    });
     const labels = newPanelLabels(
       existingPanels.map((p) => p.panel_id),
       panels.add.map((p) => p.page),
