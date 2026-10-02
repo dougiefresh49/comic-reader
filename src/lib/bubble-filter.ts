@@ -1,4 +1,5 @@
 import { area, intersectArea, type FilterablePanel } from "~/lib/panel-filter";
+import type { PanelBoundingBox } from "~/types/panels";
 
 /** Anything carrying a bubble box and its detection confidence. */
 export type FilterableBubble = FilterablePanel & { confidence: number };
@@ -20,12 +21,13 @@ const HOLD_COVER = 0.9;
 const HOLD_GROWTH = 1.2;
 
 /**
- * Share of the larger box's width or height the smaller box must span for
- * the larger to hold it, the #225 strip rule's test. A loose box hugs its
- * balloon on at least one axis; a big balloon with a separate small one
- * inside its box ("DUDES…" around "EXACTLY!" on the smoke page, 0.36 wide)
- * does not. On the smoke page the tightest drop needs 0.76 (a twin
- * container over the "LET THE FIRE…" lobe, on height).
+ * Share of a box's width or height that the boxes it holds must span
+ * together, measured as the extent of their union along that axis, for it
+ * to be a duplicate container. The #225 strip rule's test, judged on
+ * everything held at once: a loose box or a box over a split balloon's
+ * lobes is filled edge to edge on some axis (0.99 across "LET THE FIRE…"
+ * and "…ENGULF…" on the smoke page), while a big balloon with a separate
+ * small one inside its box ("DUDES…" around "EXACTLY!", 0.36 wide) is not.
  */
 const HOLD_SPAN = 0.75;
 
@@ -42,19 +44,30 @@ const iou = (a: FilterablePanel, b: FilterablePanel) => {
   return union > 0 ? inter / union : 0;
 };
 
-/** True when `big` is the looser detection of the balloon in `small`. */
+/** True when 0.9 of `small` lies inside `big` and `big` is 1.2 times its area. */
 function holds(big: FilterablePanel, small: FilterablePanel): boolean {
   const smallArea = area(small.bounding_box);
   if (smallArea <= 0) return false;
   if (area(big.bounding_box) < HOLD_GROWTH * smallArea) return false;
-  const { w, h } = big.bounding_box;
-  const spans =
-    small.bounding_box.w >= HOLD_SPAN * w ||
-    small.bounding_box.h >= HOLD_SPAN * h;
   return (
-    spans &&
     intersectArea(big.bounding_box, small.bounding_box) >=
-      HOLD_COVER * smallArea
+    HOLD_COVER * smallArea
+  );
+}
+
+/**
+ * True when the `held` boxes together span 0.75 of `big`'s width or height:
+ * from the leftmost (topmost) held edge to the rightmost (bottommost),
+ * clipped to `big`.
+ */
+function spansTogether(big: PanelBoundingBox, held: PanelBoundingBox[]) {
+  if (held.length === 0) return false;
+  const extent = (k: "x" | "y", s: "w" | "h") =>
+    Math.min(big[k] + big[s], Math.max(...held.map((b) => b[k] + b[s]))) -
+    Math.max(big[k], Math.min(...held.map((b) => b[k])));
+  return (
+    extent("x", "w") >= HOLD_SPAN * big.w ||
+    extent("y", "h") >= HOLD_SPAN * big.h
   );
 }
 
@@ -62,13 +75,13 @@ function holds(big: FilterablePanel, small: FilterablePanel): boolean {
  * Split bubble detections into kept and dropped, one box per balloon (#311).
  * A box is dropped when either:
  *
- * - it holds a smaller kept box: 0.9 or more of that box lies inside it,
- *   that box spans 0.75 or more of its width or height, and it is at least
- *   1.2 times that box's area. A loose box around one balloon drops for the
- *   tight one, and a box spanning the lobes of a split balloon drops for the
- *   lobes, which stay separate bubbles. A small balloon sitting inside a big
- *   one's box without spanning it is a separate balloon, and both stay (the
- *   #225 inset rule); or
+ * - it is a container: the smaller kept boxes it holds (0.9 or more of each
+ *   inside it, and it at least 1.2 times each one's area) together span 0.75
+ *   or more of its width or height. A loose box around one balloon drops for
+ *   the tight one, and a box over the lobes of a split balloon drops for the
+ *   lobes, which stay separate bubbles. A small balloon inside a big one's
+ *   box without spanning it is a separate balloon, and both stay (the #225
+ *   inset rule); or
  * - it has a kept twin, IoU 0.6 or more, with higher confidence (on a tie,
  *   the earlier box wins).
  *
@@ -85,16 +98,21 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
   );
   for (const bubble of bySize) {
     const i = bubbles.indexOf(bubble);
-    const isDuplicate = bubbles.some((other, j) => {
-      if (j === i || dropped.has(other)) return false;
-      if (holds(bubble, other)) return true;
+    const live = bubbles.filter((o, j) => j !== i && !dropped.has(o));
+    const held = live.filter((o) => holds(bubble, o));
+    const isContainer = spansTogether(
+      bubble.bounding_box,
+      held.map((o) => o.bounding_box),
+    );
+    const isTwinLoser = live.some((other) => {
+      const j = bubbles.indexOf(other);
       if (iou(bubble, other) < TWIN_IOU) return false;
       return (
         other.confidence > bubble.confidence ||
         (other.confidence === bubble.confidence && j < i)
       );
     });
-    if (isDuplicate) dropped.add(bubble);
+    if (isContainer || isTwinLoser) dropped.add(bubble);
   }
   return {
     kept: bubbles.filter((b) => !dropped.has(b)),
