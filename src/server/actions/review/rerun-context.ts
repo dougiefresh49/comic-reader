@@ -258,7 +258,7 @@ export async function rerunContext(args: Args): Promise<Result> {
     if (uErr) return { ok: false, error: uErr.message };
 
     revalidatePath(
-      `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
+      `/admin/${args.bookId}/${args.issueId}/review/editor`,
       "page",
     );
     // A changed speaker or type is what the reader labels the bubble with, so

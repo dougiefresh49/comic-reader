@@ -88,6 +88,34 @@ export type Flag =
 
 export const SPOKEN: BubbleType[] = ["SPEECH", "NARRATION", "CAPTION"];
 
+/**
+ * A bubble that keeps its page from being approved (decisions row 228): a
+ * spoken type, read aloud (not ignored, not silent), and no speaker at all.
+ * A speaker string outside the cast still counts as a speaker here; the
+ * casting gate deals with those. The editor and the approval action both ask
+ * this, so the rule has one home.
+ */
+export function needsSpeaker(b: {
+  type: string;
+  speaker: string | null;
+  silent: boolean;
+  ignored: boolean;
+}): boolean {
+  return (
+    (SPOKEN as string[]).includes(b.type) &&
+    !b.silent &&
+    !b.ignored &&
+    !b.speaker?.trim()
+  );
+}
+
+/** The page's live bubbles that keep it from being approved, in play order. */
+export function unvoicedBubbles(doc: Doc, pageNumber: number): BubbleDoc[] {
+  return visibleBubbles(doc, pageBubbleIds(doc, pageNumber)).filter((b) =>
+    needsSpeaker({ ...b, speaker: b.speakerId ?? b.rawSpeaker }),
+  );
+}
+
 // ---------------------------------------------------------------- geometry
 
 export function area(r: Rect): number {
@@ -174,7 +202,7 @@ function toBubble(src: SrcBubble, cast: CastMember[]): BubbleDoc {
     silent: src.silent,
     ignored: src.ignored,
     deleted: false,
-    kept: false,
+    kept: src.kept,
     auto: false,
     confidence: src.confidence,
   };

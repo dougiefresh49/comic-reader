@@ -19,6 +19,8 @@ export interface SrcPage {
   width: number;
   height: number;
   imageUrl: string;
+  /** `pages.reviewed_at`: when the owner approved the page, or null. */
+  reviewedAt: string | null;
 }
 
 export interface SrcPanel {
@@ -42,6 +44,8 @@ export interface SrcBubble {
   ignored: boolean;
   /** Shown, no audio: `bubbles.silent`. */
   silent: boolean;
+  /** The owner said an overlap is not a duplicate: `bubbles.kept`. */
+  kept: boolean;
   confidence: number | null;
   /** `audio_storage_path`: the current take in the `comic-audio` bucket, or null when it has none. */
   audioPath: string | null;
@@ -103,4 +107,6 @@ export interface EditorData {
   voices: VoiceOption[];
   slotsUsed: number;
   slotsTotal: number;
+  /** The issue's run is paused at the pages gate (`review-pages`), so "Approve issue" shows. */
+  atPagesGate: boolean;
 }
