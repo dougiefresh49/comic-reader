@@ -331,6 +331,7 @@ export type Database = {
       };
       casting_tasks: {
         Row: {
+          action: string | null;
           book_id: string;
           character_id: string;
           completed_at: string | null;
@@ -338,8 +339,10 @@ export type Database = {
           id: string;
           issue_id: string;
           status: string;
+          target_voice_uuid: string | null;
         };
         Insert: {
+          action?: string | null;
           book_id: string;
           character_id: string;
           completed_at?: string | null;
@@ -347,8 +350,10 @@ export type Database = {
           id?: string;
           issue_id: string;
           status?: string;
+          target_voice_uuid?: string | null;
         };
         Update: {
+          action?: string | null;
           book_id?: string;
           character_id?: string;
           completed_at?: string | null;
@@ -356,6 +361,7 @@ export type Database = {
           id?: string;
           issue_id?: string;
           status?: string;
+          target_voice_uuid?: string | null;
         };
         Relationships: [
           {
@@ -372,6 +378,13 @@ export type Database = {
             referencedRelation: "characters";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "casting_tasks_target_voice_uuid_fkey";
+            columns: ["target_voice_uuid"];
+            isOneToOne: false;
+            referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
         ];
       };
       castlist: {
@@ -379,6 +392,7 @@ export type Database = {
           book_id: string;
           character: string;
           character_id: string | null;
+          in_issue: boolean;
           issue_id: string;
           voice_id: string | null;
           voice_uuid: string | null;
@@ -387,6 +401,7 @@ export type Database = {
           book_id: string;
           character: string;
           character_id?: string | null;
+          in_issue?: boolean;
           issue_id: string;
           voice_id?: string | null;
           voice_uuid?: string | null;
@@ -395,6 +410,7 @@ export type Database = {
           book_id?: string;
           character?: string;
           character_id?: string | null;
+          in_issue?: boolean;
           issue_id?: string;
           voice_id?: string | null;
           voice_uuid?: string | null;
@@ -507,6 +523,7 @@ export type Database = {
           confidence: number;
           created_at: string | null;
           crop_path: string;
+          detection_id: string | null;
           embedding: string | null;
           id: string;
           is_confirmed: boolean | null;
@@ -520,6 +537,7 @@ export type Database = {
           confidence?: number;
           created_at?: string | null;
           crop_path: string;
+          detection_id?: string | null;
           embedding?: string | null;
           id?: string;
           is_confirmed?: boolean | null;
@@ -533,6 +551,7 @@ export type Database = {
           confidence?: number;
           created_at?: string | null;
           crop_path?: string;
+          detection_id?: string | null;
           embedding?: string | null;
           id?: string;
           is_confirmed?: boolean | null;
@@ -546,6 +565,13 @@ export type Database = {
             columns: ["character_id"];
             isOneToOne: false;
             referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "character_face_exemplars_detection_id_fkey";
+            columns: ["detection_id"];
+            isOneToOne: false;
+            referencedRelation: "panel_character_detections";
             referencedColumns: ["id"];
           },
         ];
@@ -1316,6 +1342,10 @@ export type Database = {
           id: string;
           similarity: number;
         }[];
+      };
+      save_review_edits: {
+        Args: { p_book_id: string; p_issue_id: string; p_ops: Json };
+        Returns: number;
       };
       switch_bubble_audio_take: {
         Args: {
