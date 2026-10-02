@@ -14,8 +14,9 @@ import {
 import type { AnalyzeProposal } from "~/server/actions/review/analyze-bubble";
 import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
-import { Inspector, Key, type Actions } from "./Inspector";
+import { Inspector, Key, type Actions, type ListenView } from "./Inspector";
 import { findCast, needYou, newId, ownVoice, plural, slug } from "./lib";
+import { useListen, type SavedRow } from "./listen";
 import {
   addBubble,
   addCast,
@@ -101,6 +102,7 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
         "R",
         "While a proposal shows: try again, analyzing the bubble once more with its hint",
       ],
+      ["L", "Play the bubble's audio. L again stops it"],
       [
         "S",
         "Pick the speaker. Enter takes the highlighted name: the nearest face, or the first match once you type",
@@ -413,11 +415,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     () => diffDoc(state.base, doc) !== null,
     [state.base, doc],
   );
-  /** The rows a Save would write now. */
-  const toWrite = useMemo(
-    () => saveCount(buildSave(state.base, doc)),
-    [state.base, doc],
-  );
+  /** What a Save would write now, and how many rows. */
+  const pending = useMemo(() => buildSave(state.base, doc), [state.base, doc]);
+  const toWrite = useMemo(() => saveCount(pending), [pending]);
 
   const selBubble = sel?.kind === "bubble" ? doc.bubbles[sel.id] : undefined;
   const selPanel = sel?.kind === "panel" ? doc.panels[sel.id] : undefined;
@@ -806,16 +806,23 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    * Write every pending edit in one request. The editor stays as it is: on
    * success the document that was sent becomes the baseline, and nothing
    * else changes; on failure the edits stay pending and the error shows.
+   * Resolves to the document that is now saved, or why nothing was.
    */
   const savingRef = useRef(false);
-  const save = async () => {
-    if (savingRef.current) return;
+  const save = async (): Promise<
+    { ok: true; sent: Doc } | { ok: false; error: string }
+  > => {
+    if (savingRef.current)
+      return {
+        ok: false,
+        error: "A Save is already running. Try again once it finishes.",
+      };
     const sent = state.doc;
     const edits = buildSave(state.base, sent);
     const count = saveCount(edits);
     if (count === 0) {
       say("Nothing to save.");
-      return;
+      return { ok: true, sent };
     }
     savingRef.current = true;
     setSaving(true);
@@ -836,11 +843,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         | (Partial<SaveResult> & { error?: string })
         | null;
       if (!res.ok) {
-        setSaveError(
+        const error =
           body?.error ??
-            `Nothing was saved: the server answered ${res.status}.`,
-        );
-        return;
+          `Nothing was saved: the server answered ${res.status}.`;
+        setSaveError(error);
+        return { ok: false, error };
       }
       dispatch({ type: "saved", base: sent });
       const audio = body?.needsAudio ?? 0;
@@ -849,16 +856,61 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           ? `Saved ${plural(count, "change")}. ${plural(audio, "bubble")} now need${audio === 1 ? "s" : ""} audio.`
           : `Saved ${plural(count, "change")}.`,
       );
+      return { ok: true, sent };
     } catch (e) {
       // No answer: the request may or may not have reached the database.
-      setSaveError(
-        `The save may or may not have landed (${(e as Error).message}). Your edits are still here; reload the editor to see the rows as they are now.`,
-      );
+      const error = `The save may or may not have landed (${(e as Error).message}). Your edits are still here; reload the editor to see the rows as they are now.`;
+      setSaveError(error);
+      return { ok: false, error };
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
+
+  /** The bubble's row is in the database: the baseline holds it, not deleted. */
+  const saved = (id: string) => {
+    const row = state.base.bubbles[id];
+    return !!row && !row.deleted;
+  };
+  /** A Save would write this bubble's row. */
+  const hasPending = (id: string) =>
+    [...pending.bubbles.add, ...pending.bubbles.update].some(
+      (row) => row.id === id,
+    );
+
+  /**
+   * Before a regenerate: when the bubble has a pending edit, part 2's Save
+   * writes every pending edit, and the regenerate runs only once it lands.
+   */
+  const saveFirst = async (id: string): Promise<SavedRow> => {
+    const row = state.base.bubbles[id];
+    if (!row || row.deleted)
+      return { ok: false, error: "This bubble has no saved row yet." };
+    if (!hasPending(id)) return { ok: true, text: row.text };
+    const res = await save();
+    if (!res.ok) return res;
+    return { ok: true, text: res.sent.bubbles[id]?.text ?? row.text };
+  };
+  const listen = useListen({
+    bookId: data.bookId,
+    issueId: data.issueId,
+    bubbles: data.bubbles,
+    selectedId: sel?.id ?? null,
+    saveFirst,
+    onCues: (id, forText, value) =>
+      dispatch({ type: "cuesWritten", id, cues: { forText, value } }),
+  });
+  // A bubble with a saved row that is spoken aloud gets the audio controls.
+  const listenView: ListenView | null =
+    selBubble && saved(selBubble.id) && !selBubble.silent && !selBubble.ignored
+      ? {
+          hasAudio: !!listen.paths[selBubble.id],
+          playing: listen.playing === selBubble.id,
+          run: listen.runs[selBubble.id],
+          saveFirst: hasPending(selBubble.id) ? toWrite : 0,
+        }
+      : null;
 
   const discard = () => {
     setConfirmDiscard(false);
@@ -967,6 +1019,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     analyze: analyzer.analyze,
     accept: analyzer.accept,
     setHint: analyzer.setHint,
+    play: listen.play,
+    regenerate: (id, job) => void listen.regenerate(id, job),
   };
 
   const toggleRail = (view: LeftView) => {
@@ -1133,6 +1187,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         case "r":
           if (proposed) analyzer.analyze(b.id);
           return done();
+        case "l":
+          if (listenView?.hasAudio) listen.play(b.id);
+          return done();
         case "e":
           openField("text");
           return done();
@@ -1218,6 +1275,12 @@ function Editor({ data, initialPage }: WorkbenchProps) {
               ["Enter", "accept"],
               ["R", "try again"],
             ] as [string, string][])
+          : []),
+        ...(listenView?.hasAudio
+          ? ([["L", listenView.playing ? "stop" : "play"]] as [
+              string,
+              string,
+            ][])
           : []),
         ["↑↓", "step"],
         ["S", "speaker"],
@@ -1734,6 +1797,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                 emotionRef={emotionRef}
                 analysis={analyzer.runs}
                 hints={analyzer.hints}
+                listen={listenView}
                 actions={actions}
               />
             </div>
