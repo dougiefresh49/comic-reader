@@ -214,6 +214,26 @@ async function main(): Promise<void> {
           : `${found.reason} via ${found.source} (${found.detail})`),
     );
   }
+
+  // The donor's own rows disagree: the form's lookup must refuse (#380 review).
+  const split: BookCast = {
+    ...synthetic,
+    rows: [
+      ...synthetic.rows,
+      {
+        ...donorRow,
+        character: donorRow.character.toUpperCase(),
+        voice_id: "synthetic-other-voice",
+      },
+    ],
+  };
+  const refused = lookupVoice(voiceLookupContext(split, issueId, aliasRows), {
+    speaker: null,
+    character_id: "synthetic-form",
+  });
+  console.log(
+    `  donor rows disagree: ${refused.ok ? `voice ${refused.voiceId} (WRONG, should refuse)` : `${refused.reason} (${refused.detail})`}`,
+  );
 }
 
 main().catch((e) => {

@@ -380,20 +380,13 @@ export type VoiceLookup =
       detail: string;
     };
 
-/**
- * The speaker's slug group: an exact `castlist.character` match keeps its own
- * slug, any other speaker goes through the aliases and then the slug.
- */
-function nameKey(raw: string, ctx: VoiceLookupContext): string {
-  const exact = ctx.book.rows.some(
-    (r) => r.issue_id === ctx.issueId && r.character === raw,
-  );
-  return exact ? slugify(raw) : speakerKey(raw, ctx.aliasMap);
-}
-
-/** The issue's castlist rows for a character: by `character_id`, else the null-id rows whose text resolves to it (how `voiceFor` matches). */
-function issueRowsFor(ctx: VoiceLookupContext, characterId: string) {
-  const here = ctx.book.rows.filter((r) => r.issue_id === ctx.issueId);
+/** One issue's castlist rows for a character: by `character_id`, else the null-id rows whose text resolves to it (how `voiceFor` matches). */
+function issueRowsFor(
+  ctx: VoiceLookupContext,
+  characterId: string,
+  issueId = ctx.issueId,
+) {
+  const here = ctx.book.rows.filter((r) => r.issue_id === issueId);
   const byId = here.filter((r) => r.character_id === characterId);
   if (byId.length > 0) return byId;
   return here.filter(
@@ -402,6 +395,36 @@ function issueRowsFor(ctx: VoiceLookupContext, characterId: string) {
       (ctx.book.resolve(r.character)?.id ?? slugify(r.character)) ===
         characterId,
   );
+}
+
+/**
+ * The rows `voiceFor` takes a character's own voice from: this issue's rows
+ * when one is voiced, else the latest issue's with a voiced row.
+ */
+function supplyingRows(ctx: VoiceLookupContext, characterId: string) {
+  const voiced = (r: { voice_id: string | null; voice_uuid: string | null }) =>
+    r.voice_id !== SKIPPED_VOICE &&
+    (r.voice_id !== null || r.voice_uuid !== null);
+  const issues = [...new Set(ctx.book.rows.map((r) => r.issue_id))]
+    .map((issueId) => ({
+      issueId,
+      rows: issueRowsFor(ctx, characterId, issueId),
+    }))
+    .filter((x) => x.rows.some(voiced));
+  const latest = (i: string) => ctx.book.issueNumber.get(i) ?? 0;
+  return (
+    issues.find((x) => x.issueId === ctx.issueId) ??
+    issues.sort((a, b) => latest(b.issueId) - latest(a.issueId))[0]
+  );
+}
+
+/** A conflict detail when the rows disagree on `voice_id`, else null. */
+function rowConflict(
+  label: string,
+  rows: { character: string; voice_id: string | null }[],
+): string | null {
+  if (new Set(rows.map((r) => r.voice_id)).size <= 1) return null;
+  return `castlist rows for ${label} disagree on voice_id: ${rows.map((r) => `${r.character}=${r.voice_id ?? "null"}`).join(", ")}`;
 }
 
 /**
@@ -422,7 +445,7 @@ export function lookupVoice(
   bubble: { speaker: string | null; character_id: string | null },
 ): VoiceLookup {
   const raw = bubble.speaker?.trim() ?? "";
-  const key = raw ? nameKey(raw, ctx) : "";
+  const key = raw ? speakerKey(raw, ctx.aliasMap) : "";
   const fail = (
     reason: Extract<VoiceLookup, { ok: false }>["reason"],
     source: VoiceSource | null,
@@ -466,15 +489,20 @@ export function lookupVoice(
 
   if (characterId) {
     const rows = issueRowsFor(ctx, characterId);
-    if (new Set(rows.map((r) => r.voice_id)).size > 1) {
-      return fail(
-        "castlist conflict",
-        source,
-        characterId,
-        `castlist rows for ${characterId} disagree on voice_id: ${rows.map((r) => `${r.character}=${r.voice_id ?? "null"}`).join(", ")}`,
-      );
-    }
+    const own = rowConflict(characterId, rows);
+    if (own) return fail("castlist conflict", source, characterId, own);
     const voice = voiceFor(ctx.book, characterId, ctx.issueId);
+    if (voice) {
+      // The rows the voice came from: the donor's for a `voice_of` form, or
+      // an earlier issue's when this issue has no voiced row.
+      const supplier = supplyingRows(ctx, voice.from);
+      const inherited =
+        supplier &&
+        rowConflict(`${voice.from} in ${supplier.issueId}`, supplier.rows);
+      if (inherited) {
+        return fail("castlist conflict", source, characterId, inherited);
+      }
+    }
     if (voice?.voiceId) {
       return {
         ok: true,

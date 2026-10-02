@@ -73,7 +73,8 @@ Context for a --bubble read (both required with it):
 Overrides:
   --voice <el id>    ElevenLabs voice id. Required when the audio step's voice
                      lookup finds no voice for the bubble (no castlist row,
-                     or a row with no voice yet). Skips the lookup.
+                     or a row with no voice yet). With --bubble the lookup
+                     still runs, and a castlist conflict is still refused.
   --emotion <word>   Emotion, with --text or to replace the bubble's own.
   --stability <n>    0 to 1
   --style <n>        0 to 1
@@ -420,19 +421,23 @@ async function planRender(
 
   if (!text.trim()) fail(`No text to render (${source}).`);
 
-  let voiceId = spec.voice ?? null;
-  if (!voiceId) {
-    let miss: (VoiceLookup & { ok: false }) | null = null;
-    if ((speaker || characterId) && bookId && issueId) {
-      const found = await readBubbleVoice(bookId, issueId, {
-        speaker,
-        character_id: characterId,
-      });
-      if (found.ok) voiceId = found.voiceId;
-      else miss = found;
-    }
-    if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));
+  // A --bubble render always runs the lookup, so a castlist conflict is
+  // refused even with --voice; --voice then replaces the voice it found.
+  let miss: (VoiceLookup & { ok: false }) | null = null;
+  let voiceId: string | null = null;
+  if ((speaker || characterId) && bookId && issueId) {
+    const found = await readBubbleVoice(bookId, issueId, {
+      speaker,
+      character_id: characterId,
+    });
+    if (found.ok) voiceId = found.voiceId;
+    else miss = found;
   }
+  if (miss?.reason === "castlist conflict") {
+    fail(noVoiceMessage(speaker, bookId, issueId, miss));
+  }
+  voiceId = spec.voice ?? voiceId;
+  if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));
 
   const request = buildTtsRequest({
     text,
