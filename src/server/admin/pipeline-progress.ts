@@ -29,11 +29,9 @@ export interface GateWait {
 }
 
 export interface PipelineRun {
-  id: string;
   status: string;
   startedAt: string | null;
   completedAt: string | null;
-  runId: string | null;
   fromStep: string | null;
   timings: Record<string, StepWindow[]>;
   skipped: GateSkip[];
@@ -70,7 +68,6 @@ export interface PipelineProgress {
 }
 
 type RawSteps = {
-  runId?: string;
   fromStep?: string | null;
   timings?: Record<string, StepWindow[]>;
   skipped?: GateSkip[];
@@ -89,14 +86,13 @@ async function getLatestRun(
 ): Promise<PipelineRun | null> {
   const { data, error } = (await supabaseAdmin
     .from("pipeline_runs")
-    .select("id, status, started_at, completed_at, steps")
+    .select("status, started_at, completed_at, steps")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .order("started_at", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle()) as {
     data: {
-      id: string;
       status: string;
       started_at: string | null;
       completed_at: string | null;
@@ -113,11 +109,9 @@ async function getLatestRun(
 
   const steps = data.steps ?? {};
   return {
-    id: data.id,
     status: data.status,
     startedAt: data.started_at,
     completedAt: data.completed_at,
-    runId: steps.runId ?? null,
     fromStep: steps.fromStep ?? null,
     timings:
       steps.timings && typeof steps.timings === "object" ? steps.timings : {},
@@ -185,8 +179,12 @@ async function getCounts(
     scoped("bubbles").not("speaker", "is", null),
     // ... and speaker is not null and ignored = false
     scoped("bubbles").not("speaker", "is", null).eq("ignored", false),
-    // ... and audio_storage_path is not null
-    scoped("bubbles").not("audio_storage_path", "is", null),
+    // ... and speaker is not null and ignored = false and audio_storage_path is not null
+    // (the same filters as spokenBubbles, so the ratio can never exceed 1)
+    scoped("bubbles")
+      .not("speaker", "is", null)
+      .eq("ignored", false)
+      .not("audio_storage_path", "is", null),
     // select count(*) from character_face_exemplars
     //   where book_id = $1 and source_issue = $2
     supabaseAdmin

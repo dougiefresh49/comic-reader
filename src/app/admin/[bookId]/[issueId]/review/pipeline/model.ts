@@ -13,6 +13,7 @@ import {
   GATE_STEPS,
   PIPELINE_STEPS,
   STAGES,
+  STAGE_BLURBS,
   STAGE_LABELS,
   STEP_LABELS,
   isPipelineStep,
@@ -25,6 +26,7 @@ export type RunState =
   | "running"
   | "waiting"
   | "failed"
+  | "cancelled"
   | "ready"
   | "not-started";
 
@@ -32,8 +34,29 @@ export const STATE_LABELS: Record<RunState, string> = {
   running: "Running",
   waiting: "Waiting on you",
   failed: "Failed",
+  cancelled: "Cancelled",
   ready: "Ready",
   "not-started": "Not started",
+};
+
+/** The Run fact: one word that agrees with the headline, never the raw DB status. */
+export const RUN_WORDS: Record<RunState, string> = {
+  running: "Running",
+  waiting: "Paused",
+  failed: "Failed",
+  cancelled: "Cancelled",
+  ready: "Completed",
+  "not-started": "Not started",
+};
+
+/** Poll interval per state: fast while a step works, slow while the hub waits for a button or a person, none when done. */
+const REFRESH_MS: Record<RunState, number | null> = {
+  running: 5000,
+  waiting: 15000,
+  failed: 15000,
+  cancelled: 15000,
+  "not-started": 15000,
+  ready: null,
 };
 
 export type RowStatus =
@@ -42,6 +65,7 @@ export type RowStatus =
   | "running"
   | "waiting"
   | "failed"
+  | "cancelled"
   | "pending";
 
 export interface StepView {
@@ -66,8 +90,7 @@ export interface StageView {
 
 export interface HubView {
   state: RunState;
-  /** The step the run is on, failed at, or paused at. Raw when unknown. */
-  currentStep: string | null;
+  /** Label of the step the run is on, failed at, or paused at. */
   currentLabel: string | null;
   /** The headline's second line: what the run is doing right now. */
   summary: string;
@@ -77,14 +100,27 @@ export interface HubView {
   /** How long the owner has had the open gate. */
   waitingMs: number | null;
   stages: StageView[];
-  live: boolean;
+  /** How often the page re-fetches itself; null once the run is done. */
+  refreshMs: number | null;
 }
 
-export function runState(issue: PipelineReviewIssue): RunState {
+/**
+ * Live states win over `issues.status`, because nothing resets `status` when
+ * a ready issue re-runs: a re-run from casting is "waiting", not "ready".
+ * A cancel leaves `pipeline_step` at `failed:<step>`; the run row tells the
+ * two apart.
+ */
+export function runState(
+  issue: PipelineReviewIssue,
+  run: PipelineRun | null,
+): RunState {
   const step = issue.pipelineStep;
-  if (step?.startsWith("failed:")) return "failed";
-  if (step === "complete" || issue.status === "ready") return "ready";
+  if (step?.startsWith("failed:")) {
+    return run?.status === "cancelled" ? "cancelled" : "failed";
+  }
   if (issue.pipelinePaused && issue.pipelinePausedAt) return "waiting";
+  if (step && isPipelineStep(step)) return "running";
+  if (step === "complete" || issue.status === "ready") return "ready";
   if (!step || step === "pages-downloaded") return "not-started";
   return "running";
 }
@@ -95,6 +131,7 @@ function currentStepOf(
 ): string | null {
   switch (state) {
     case "failed":
+    case "cancelled":
       return (issue.pipelineStep ?? "").replace(/^failed:/, "") || null;
     case "waiting":
       return issue.pipelinePausedAt;
@@ -210,6 +247,7 @@ function stageResult(
 
 function stageStatus(steps: StepView[]): RowStatus {
   if (steps.some((s) => s.status === "failed")) return "failed";
+  if (steps.some((s) => s.status === "cancelled")) return "cancelled";
   if (steps.some((s) => s.status === "waiting")) return "waiting";
   if (steps.some((s) => s.status === "running")) return "running";
   if (steps.every((s) => s.status === "skipped")) return "skipped";
@@ -225,7 +263,7 @@ export function buildHubView(
   counts: ProgressCounts,
   now: number,
 ): HubView {
-  const state = runState(issue);
+  const state = runState(issue, run);
   const currentStep = currentStepOf(issue, state);
   const cursor = cursorOf(state, currentStep);
   const currentLabel = currentStep
@@ -255,13 +293,12 @@ export function buildHubView(
         status = skipReasons.has(step) ? "skipped" : "done";
       } else if (index === cursor) {
         status =
-          state === "failed"
-            ? "failed"
-            : state === "waiting"
-              ? "waiting"
-              : state === "running"
-                ? "running"
-                : "pending";
+          state === "failed" ||
+          state === "cancelled" ||
+          state === "waiting" ||
+          state === "running"
+            ? state
+            : "pending";
       } else {
         status = "pending";
       }
@@ -311,7 +348,7 @@ export function buildHubView(
           : null,
       result:
         status === "pending"
-          ? null
+          ? STAGE_BLURBS[stage]
           : stageResult(
               stage,
               counts,
@@ -357,28 +394,28 @@ export function buildHubView(
     case "failed":
       summary = `Failed at ${currentLabel}. Earlier steps keep their rows; a retry starts from this step.`;
       break;
+    case "cancelled":
+      summary = `Cancelled at ${currentLabel}. Earlier steps keep their rows; a retry starts from this step.`;
+      break;
     case "ready":
-      summary = run?.completedAt
-        ? `All ${PIPELINE_STEPS.length} steps done${durationMs !== null ? ` in ${formatDuration(durationMs)}` : ""}. The issue plays in the reader.`
-        : `All ${PIPELINE_STEPS.length} steps done. The issue plays in the reader.`;
+      summary = `The issue plays in the reader${run?.completedAt && durationMs !== null ? `; the last run took ${formatDuration(durationMs)}` : ""}.`;
       break;
     case "not-started":
       summary =
         counts.pages > 0
-          ? `${counts.pages} ${plural(counts.pages, "page")} uploaded. Starting finds the panels, text and faces, then stops for you at Characters.`
+          ? `${counts.pages} ${plural(counts.pages, "page")} uploaded. Starting finds the panels, text and faces.`
           : "No pages uploaded yet.";
       break;
   }
 
   return {
     state,
-    currentStep,
     currentLabel,
     summary,
     startedAt,
     durationMs,
     waitingMs,
     stages,
-    live: state === "running",
+    refreshMs: REFRESH_MS[state],
   };
 }

@@ -7,12 +7,10 @@ import { LiveRefresh } from "./LiveRefresh";
 import { LocalTime } from "./LocalTime";
 import { Stages } from "./StageList";
 import { formatAgo, formatDuration } from "./format";
-import { buildHubView, STATE_LABELS, type RunState } from "./model";
+import { buildHubView, RUN_WORDS, STATE_LABELS, type RunState } from "./model";
 import { stepLabel } from "./stages";
 
 export const dynamic = "force-dynamic";
-
-const REFRESH_MS = 5000;
 
 interface Params {
   params: Promise<{ bookId: string; issueId: string }>;
@@ -39,7 +37,7 @@ export default async function PipelineReviewPage({ params }: Params) {
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-neutral-100">
-      <LiveRefresh live={view.live} intervalMs={REFRESH_MS} />
+      <LiveRefresh intervalMs={view.refreshMs} />
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex items-center justify-between text-sm">
           <Link
@@ -86,9 +84,9 @@ export default async function PipelineReviewPage({ params }: Params) {
                 status={issue.status}
                 skippedGates={run?.status === "running" ? run.skipped : []}
               />
-              {view.live && (
-                <span className="text-xs text-neutral-500">
-                  refreshes every {REFRESH_MS / 1000} s
+              {view.refreshMs !== null && (
+                <span className="text-sm text-neutral-500">
+                  refreshes every {view.refreshMs / 1000} s
                 </span>
               )}
             </div>
@@ -124,7 +122,7 @@ export default async function PipelineReviewPage({ params }: Params) {
             <Fact label="Run">
               {run ? (
                 <>
-                  {run.status}
+                  {RUN_WORDS[view.state]}
                   {run.fromStep && (
                     <span className="ml-2 text-neutral-500">
                       from {stepLabel(run.fromStep)}
@@ -247,6 +245,7 @@ const STATE_DOT: Record<RunState, string> = {
   running: "bg-cyan-400",
   waiting: "bg-amber-400",
   failed: "bg-red-500",
+  cancelled: "bg-neutral-400",
   ready: "bg-emerald-400",
   "not-started": "bg-neutral-600",
 };

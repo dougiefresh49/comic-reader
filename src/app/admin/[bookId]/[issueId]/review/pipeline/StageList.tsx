@@ -84,6 +84,7 @@ const STATUS_WORDS: Record<RowStatus, string | null> = {
   running: "running",
   waiting: "waiting on you",
   failed: "failed",
+  cancelled: "cancelled",
   pending: null,
 };
 
@@ -93,6 +94,7 @@ const STATUS_WORD_COLORS: Record<RowStatus, string> = {
   running: "text-cyan-300",
   waiting: "text-amber-300",
   failed: "text-red-300",
+  cancelled: "text-neutral-400",
   pending: "",
 };
 
@@ -148,6 +150,12 @@ export function Marker({
     case "failed":
       return (
         <span className={`${base} bg-red-500 text-neutral-950`}>
+          <Cross size={size} />
+        </span>
+      );
+    case "cancelled":
+      return (
+        <span className={`${base} bg-neutral-500 text-neutral-950`}>
           <Cross size={size} />
         </span>
       );
