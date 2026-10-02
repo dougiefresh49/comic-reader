@@ -12,6 +12,10 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { AnalyzeProposal } from "~/server/actions/review/analyze-bubble";
+import {
+  checkIssueReady,
+  setPageApproval,
+} from "~/app/admin/[bookId]/[issueId]/review/editor/actions";
 import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
 import { Inspector, Key, type Actions, type ListenView } from "./Inspector";
@@ -40,6 +44,7 @@ import {
   setSpeaker,
   shiftBubble,
   shiftPanel,
+  unvoicedBubbles,
   visibleBubbles,
   type BubbleDoc,
   type Doc,
@@ -134,6 +139,16 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
       ["Cmd Z", "Undo. Ctrl works in place of Cmd"],
       ["Shift Cmd Z", "Redo"],
       ["Cmd S", "Save every pending edit. Ctrl works in place of Cmd"],
+    ],
+  },
+  {
+    title: "Approve",
+    rows: [
+      [
+        "A",
+        "Approve this page. Refused while a spoken bubble has no speaker and is not silent",
+      ],
+      ["Shift A", "Take this page's approval back"],
     ],
   },
   {
@@ -336,6 +351,23 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const [sheet, setSheet] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** `pages.reviewed_at` by page number, as last read or written. */
+  const [approvals, setApprovals] = useState(
+    () => new Map(data.pages.map((p) => [p.number, p.reviewedAt])),
+  );
+  /**
+   * A page approval, a take-back or Approve issue in flight. While one runs
+   * the editor is locked: no edit, Save, undo or second approval, so what the
+   * server checks is what the owner sees.
+   */
+  const [approvalJob, setApprovalJob] = useState<"page" | "issue" | null>(null);
+  const approvalRef = useRef<"page" | "issue" | null>(null);
+  const holdApproval = useCallback((job: "page" | "issue" | null) => {
+    approvalRef.current = job;
+    setApprovalJob(job);
+  }, []);
+  const [resumed, setResumed] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
 
   const canvasRef = useRef<CanvasHandle>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -576,8 +608,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       label: string,
       recipe: (d: Doc) => Doc,
       opts?: { coalesce?: string; select?: Sel | null; page?: number },
-    ) => dispatch({ type: "apply", label, recipe, ...opts }),
-    [],
+    ) => {
+      // No edit lands while an approval is in flight. The warning is queued
+      // so it shows over whatever note the caller says next.
+      if (approvalRef.current) {
+        queueMicrotask(() =>
+          say("Not changed: waiting for the approval to finish.", "warn"),
+        );
+        return;
+      }
+      dispatch({ type: "apply", label, recipe, ...opts });
+    },
+    [say],
   );
 
   /** An accepted proposal: every offered field becomes a pending edit, one undo step. */
@@ -919,12 +961,17 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    */
   const lockReason = listen.active
     ? `Waiting for Regenerate ${listen.active.job}...`
-    : saving
-      ? "Waiting for Save..."
-      : null;
+    : approvalJob === "issue"
+      ? "Waiting for Approve issue..."
+      : saving
+        ? "Waiting for Save..."
+        : approvalJob === "page"
+          ? "Waiting for the page approval..."
+          : null;
   /** True and said when locked, read at the moment of the action. */
   const refuse = () => {
-    if (!savingRef.current && !listen.isActive()) return false;
+    if (!savingRef.current && !listen.isActive() && !approvalRef.current)
+      return false;
     say(lockReason ?? "Waiting for Save or a regenerate to finish.", "warn");
     return true;
   };
@@ -958,6 +1005,175 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     revRef.current = null;
     dispatch({ type: "discard" });
     say("Edits discarded. Back to the rows as loaded.");
+  };
+
+  // ------------------------------------------------------------ approval
+
+  const approvedCount = data.pages.filter((p) =>
+    approvals.get(p.number),
+  ).length;
+  const allApproved =
+    data.pages.length > 0 && approvedCount === data.pages.length;
+  const pageApproved = !!approvals.get(pageNumber);
+
+  /** A Save would write a row of this page. */
+  const pagePending = (n: number) =>
+    [
+      ...pending.bubbles.add,
+      ...pending.bubbles.update,
+      ...pending.bubbles.remove,
+      ...pending.panels.add,
+      ...pending.panels.update,
+      ...pending.panels.remove,
+    ].some((row) => row.page === n);
+
+  /** Write `pages.reviewed_at` for one page; says what happened. */
+  const writeApproval = async (n: number, approved: boolean) => {
+    try {
+      const res = await setPageApproval({
+        bookId: data.bookId,
+        issueId: data.issueId,
+        page: n,
+        approved,
+      });
+      if (!res.ok) {
+        say(res.error, "warn");
+        return;
+      }
+      setApprovals((prev) => new Map(prev).set(n, res.reviewedAt));
+      say(
+        approved ? `Page ${n} approved.` : `Page ${n} is no longer approved.`,
+      );
+    } catch (e) {
+      say(
+        `The approval of page ${n} may or may not have been stored (${(e as Error).message}). Reload to see it as it is now.`,
+        "warn",
+      );
+    }
+  };
+
+  /**
+   * A: approve the page. Refused while a spoken bubble on it has no speaker
+   * and is not silent (decisions row 228); the first one is selected. The
+   * server checks the saved rows, so pending edits are saved first when any
+   * touch this page, the way a regenerate saves first.
+   */
+  const approvePage = async () => {
+    if (refuse()) return;
+    const n = pageNumber;
+    if (approvals.get(n)) {
+      say(`Page ${n} is already approved. Shift A takes it back.`);
+      return;
+    }
+    const missing = unvoicedBubbles(doc, n);
+    const first = missing[0];
+    if (first) {
+      select({ kind: "bubble", id: first.id });
+      const one = missing.length === 1;
+      say(
+        `Not approved: ${plural(missing.length, "spoken bubble")} on this page ${one ? "has" : "have"} no speaker and ${one ? "is" : "are"} not marked silent. S picks a speaker, X marks it silent.`,
+        "warn",
+      );
+      return;
+    }
+    holdApproval("page");
+    try {
+      if (pagePending(n)) {
+        const saved = await writeSave();
+        if (!saved.ok) {
+          say(`Page ${n} is not approved: its edits did not save.`, "warn");
+          return;
+        }
+      }
+      await writeApproval(n, true);
+    } finally {
+      holdApproval(null);
+    }
+  };
+
+  /** Shift A: take the page's approval back. */
+  const takeBack = async () => {
+    if (refuse()) return;
+    if (!approvals.get(pageNumber)) {
+      say(`Page ${pageNumber} is not approved.`);
+      return;
+    }
+    holdApproval("page");
+    try {
+      await writeApproval(pageNumber, false);
+    } finally {
+      holdApproval(null);
+    }
+  };
+
+  /**
+   * Approve issue, with the editor locked throughout: save the pending edits
+   * (a failed Save stops here, its error showing), have the server check the
+   * saved rows are ready to leave the gate (`checkIssueReady`), then resume
+   * the run's `page-review` hook through the resume route.
+   */
+  const approveIssue = async () => {
+    if (resumed || !allApproved || refuse()) return;
+    holdApproval("issue");
+    setResumeError(null);
+    try {
+      if (toWrite > 0) {
+        const saved = await writeSave();
+        if (!saved.ok) {
+          setResumeError("The run was not resumed, because Save failed.");
+          return;
+        }
+      }
+      const ready = await checkIssueReady({
+        bookId: data.bookId,
+        issueId: data.issueId,
+      });
+      if (!ready.ok) {
+        setResumeError(ready.error);
+        if (ready.unapproved) {
+          const stale = new Set(ready.unapproved);
+          setApprovals(
+            (prev) =>
+              new Map(
+                Array.from(prev, ([n, at]) => [n, stale.has(n) ? null : at]),
+              ),
+          );
+        }
+        // Edits are locked and saved, so `doc` is the rows the server read.
+        if (ready.page !== undefined) {
+          const first = unvoicedBubbles(doc, ready.page)[0];
+          goto(ready.page, first ? { kind: "bubble", id: first.id } : null);
+        }
+        return;
+      }
+      const res = await fetch("/api/admin/resume-hook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // The hook `ingest:<book>/<issue>/page-review` the pages gate waits on.
+        body: JSON.stringify({
+          bookId: data.bookId,
+          issueId: data.issueId,
+          step: "page-review",
+        }),
+      });
+      if (res.ok) {
+        setResumed(true);
+        say("Issue approved. The run carries on past the pages gate.");
+        return;
+      }
+      const body = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      setResumeError(
+        `The run was not resumed: ${body?.error ?? `the server answered ${res.status}`}.`,
+      );
+    } catch (e) {
+      setResumeError(
+        `The run may or may not have resumed (${(e as Error).message}). Check the pipeline page before trying again.`,
+      );
+    } finally {
+      holdApproval(null);
+    }
   };
 
   const openField = (
@@ -1189,6 +1405,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         case "f":
           setOnlyFlagged((v) => !v);
           return done();
+        case "a":
+          void (e.shiftKey ? takeBack() : approvePage());
+          return done();
         case ",":
           setLeftOpen((v) => !v);
           return done();
@@ -1347,6 +1566,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       : [
           ["↓", "first panel"],
           ["N", "next flag"],
+          pageApproved ? ["Shift A", "take back"] : ["A", "approve page"],
           ["B", "draw a bubble"],
           ["P", "draw a panel"],
           ["← →", "pages"],
@@ -1479,6 +1699,59 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         </button>
         <button
           type="button"
+          disabled={!!lockReason}
+          onClick={() => void (pageApproved ? takeBack() : approvePage())}
+          title={
+            pageApproved
+              ? (lockReason ?? "Take this page's approval back (Shift A)")
+              : (lockReason ?? "Approve this page (A)")
+          }
+          className={
+            pageApproved
+              ? "flex h-6 shrink-0 items-center gap-1.5 rounded-sm border border-emerald-500/50 bg-emerald-500/10 px-2 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
+              : BAR_BUTTON
+          }
+        >
+          {pageApproved ? (
+            <>
+              Page approved
+              <span className="text-emerald-300/60">Shift A</span>
+            </>
+          ) : (
+            <>
+              {approvalJob === "page" ? "Approving" : "Approve page"}
+              <span className="text-neutral-500">A</span>
+            </>
+          )}
+        </button>
+        {data.atPagesGate &&
+          (resumed ? (
+            <span
+              role="status"
+              className="flex h-6 shrink-0 items-center rounded-sm bg-emerald-700/30 px-2 font-medium text-emerald-300"
+            >
+              Run resumed
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={!allApproved || !!lockReason}
+              onClick={() => void approveIssue()}
+              title={
+                allApproved
+                  ? "Save pending edits, then resume the run past the pages gate"
+                  : `Every page must be approved first: ${approvedCount} of ${data.pages.length} are`
+              }
+              className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-emerald-600 px-2 font-medium text-white hover:bg-emerald-500 disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
+            >
+              {approvalJob === "issue" ? "Resuming" : "Approve issue"}
+              <span className="tabular-nums opacity-60">
+                {approvedCount}/{data.pages.length}
+              </span>
+            </button>
+          ))}
+        <button
+          type="button"
           onClick={() => setSheet(true)}
           className={BAR_BUTTON}
         >
@@ -1495,6 +1768,22 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           <button
             type="button"
             onClick={() => setSaveError(null)}
+            className="h-6 shrink-0 rounded-sm border border-red-400/50 px-2 hover:bg-red-500/20"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {resumeError && (
+        <div
+          role="alert"
+          className="flex shrink-0 items-center gap-3 border-b border-red-400/40 bg-red-500/10 px-3 py-1.5 text-red-200"
+        >
+          <span className="flex-1">{resumeError}</span>
+          <button
+            type="button"
+            onClick={() => setResumeError(null)}
             className="h-6 shrink-0 rounded-sm border border-red-400/50 px-2 hover:bg-red-500/20"
           >
             Dismiss
@@ -1621,7 +1910,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                     <span>Pages</span>
                     <span className="flex-1" />
                     <span className="tabular-nums">
-                      Page {pageNumber} of {data.pages.length}
+                      Page {pageNumber} of {data.pages.length}, {approvedCount}{" "}
+                      approved
                     </span>
                   </button>
                   {pagesOpen && (
@@ -1629,6 +1919,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                       {data.pages.map((p) => {
                         const count = flagsByPage.get(p.number) ?? 0;
                         const current = p.number === pageNumber;
+                        const approved = !!approvals.get(p.number);
                         return (
                           <button
                             key={p.number}
@@ -1636,17 +1927,23 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                             tabIndex={-1}
                             aria-current={current ? "page" : undefined}
                             onClick={() => goto(p.number)}
-                            title={
-                              count > 0
-                                ? `Page ${p.number}: ${needYou(count)}`
-                                : `Page ${p.number}`
-                            }
+                            title={[
+                              `Page ${p.number}`,
+                              approved ? "approved" : null,
+                              count > 0 ? needYou(count) : null,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
                             className={`relative h-6 w-6 rounded-sm border text-[11px] tabular-nums ${
                               current
-                                ? "border-neutral-100 bg-neutral-100 font-medium text-neutral-950"
-                                : count > 0
-                                  ? "border-amber-400/50 text-amber-200 hover:border-amber-300"
-                                  : "border-neutral-800 text-neutral-400 hover:border-neutral-500"
+                                ? approved
+                                  ? "border-emerald-300 bg-emerald-300 font-medium text-neutral-950"
+                                  : "border-neutral-100 bg-neutral-100 font-medium text-neutral-950"
+                                : approved
+                                  ? "border-emerald-500/60 text-emerald-300 hover:border-emerald-300"
+                                  : count > 0
+                                    ? "border-amber-400/50 text-amber-200 hover:border-amber-300"
+                                    : "border-neutral-800 text-neutral-400 hover:border-neutral-500"
                             }`}
                           >
                             {p.number}

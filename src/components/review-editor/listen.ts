@@ -162,11 +162,14 @@ export function useListen({
             return;
           }
           if (job === "cues") {
+            const row = bubbles.find((b) => b.id === id);
             const res = await regenerateCues({
               bookId,
               issueId,
               bubbleId: id,
               text: saved.text,
+              emotion: row?.emotion ?? null,
+              speaker: row?.speaker ?? null,
             });
             if (res.ok && res.textWithCues) {
               onCuesRef.current(id, saved.text, res.textWithCues);
@@ -211,7 +214,7 @@ export function useListen({
       })();
       return true;
     },
-    [bookId, issueId, note, stop],
+    [bookId, issueId, bubbles, note, stop],
   );
 
   /**

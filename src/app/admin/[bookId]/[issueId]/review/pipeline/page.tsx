@@ -288,7 +288,7 @@ function reviewPages(bookId: string, issueId: string, hasWebP: boolean) {
     },
     {
       label: "Speakers",
-      href: `${base}/speakers`,
+      href: `${base}/editor`,
       note: "Fix unknown speakers after Get context.",
     },
     {
@@ -298,7 +298,7 @@ function reviewPages(bookId: string, issueId: string, hasWebP: boolean) {
     },
     {
       label: "Pages in the reader",
-      href: hasWebP ? `${base}/bubbles?mode=pipeline` : null,
+      href: hasWebP ? `${base}/editor` : null,
       note: hasWebP
         ? "Karaoke-style text review. The Pages gate."
         : "Karaoke-style text review. Opens once the WebP pages are published.",

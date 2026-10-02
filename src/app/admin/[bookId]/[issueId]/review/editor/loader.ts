@@ -23,6 +23,8 @@ const SLOTS_TOTAL = 30;
 
 interface IssueRow {
   name: string;
+  pipeline_step: string | null;
+  pipeline_paused: boolean | null;
   wiki_appearances: unknown;
   books: { name: string } | null;
 }
@@ -31,6 +33,7 @@ interface PageRow {
   number: number;
   width: number;
   height: number;
+  reviewed_at: string | null;
 }
 
 interface BubbleRow {
@@ -44,6 +47,7 @@ interface BubbleRow {
   emotion: string | null;
   ignored: boolean | null;
   silent: boolean | null;
+  kept: boolean | null;
   audio_storage_path: string | null;
   box_2d: {
     x?: number;
@@ -175,7 +179,7 @@ export async function loadEditor(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, wiki_appearances, books(name)",
+    "name, pipeline_step, pipeline_paused, wiki_appearances, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("review editor loader, the issue:", issueResult.error);
@@ -197,7 +201,7 @@ export async function loadEditor(
     supabaseAdmin
       .from("bubbles")
       .select(
-        "id, page_number, panel_id, ocr_text, text_with_cues, type, speaker, emotion, ignored, silent, audio_storage_path, box_2d, style",
+        "id, page_number, panel_id, ocr_text, text_with_cues, type, speaker, emotion, ignored, silent, kept, audio_storage_path, box_2d, style",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -213,7 +217,7 @@ export async function loadEditor(
       .order("sort_order"),
     supabaseAdmin
       .from("pages")
-      .select("number, width, height", { count: "exact" })
+      .select("number, width, height, reviewed_at", { count: "exact" })
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .order("number"),
@@ -272,6 +276,7 @@ export async function loadEditor(
       emotion: b.emotion ?? "",
       ignored: b.ignored ?? false,
       silent: b.silent ?? false,
+      kept: b.kept ?? false,
       confidence: typeof box.confidence === "number" ? box.confidence : null,
       audioPath: b.audio_storage_path,
     };
@@ -303,6 +308,7 @@ export async function loadEditor(
         width: d.width,
         height: d.height,
         imageUrl: pageImageUrl(bookId, issueId, number),
+        reviewedAt: dims.get(number)?.reviewed_at ?? null,
       };
     });
 
@@ -494,5 +500,7 @@ export async function loadEditor(
     voices,
     slotsUsed: active.length,
     slotsTotal: SLOTS_TOTAL,
+    atPagesGate:
+      issue.pipeline_step === "review-pages" && issue.pipeline_paused === true,
   };
 }

@@ -44,7 +44,7 @@ function playOrder(doc: Doc, page: number) {
  * them, an accepted analyze proposal writes its own, an undo of that accept
  * writes back what was there, and a text edit undone back to the original
  * words writes the original cues again.
- * `kept`, `auto` and the added cast have no column and are not written.
+ * `auto` and the added cast have no column and are not written.
  */
 export function buildSave(base: Doc, doc: Doc): SaveEdits {
   const out: SaveEdits = {
@@ -114,6 +114,7 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
           emotion: b.emotion,
           ignored: b.ignored,
           silent: b.silent,
+          kept: b.kept,
         });
         return;
       }
@@ -128,6 +129,7 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
       if (was.emotion !== b.emotion) set.emotion = b.emotion;
       if (was.ignored !== b.ignored) set.ignored = b.ignored;
       if (was.silent !== b.silent) set.silent = b.silent;
+      if (was.kept !== b.kept) set.kept = b.kept;
       if (!sameRect(was.rect, b.rect)) set.box = b.rect;
       if ((then.panelOf.get(id) ?? null) !== panelId) set.panelId = panelId;
       if (orderChanged) set.sortOrder = i;
