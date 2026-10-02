@@ -743,7 +743,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           : setBubbleRect(d, target.id, rect),
       { coalesce },
     );
-    if (target.kind === "bubble") analyzer.moved(target.id);
+    if (target.kind === "bubble") analyzer.moved(target.id, rect);
   };
 
   /**

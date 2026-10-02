@@ -38,9 +38,12 @@ function playOrder(doc: Doc, page: number) {
  * insert under its own id. Play order is written as `sort_order` for every
  * live bubble of a page whose order changed, and `panel_id` wherever a
  * bubble's panel changed; the same for panels and their order on the page.
- * A text edit clears `text_with_cues`: cues written for the old words would
- * have the audio step read them. An accepted analyze proposal brings cues for
- * its own text, and those are written.
+ * `text_with_cues` is written as `cuesOf` the bubble whenever its text or
+ * its cues differ from the baseline: the cues it holds while its text is the
+ * exact text they were written for, and null otherwise. So a text edit clears
+ * them, an accepted analyze proposal writes its own, an undo of that accept
+ * writes back what was there, and a text edit undone back to the original
+ * words writes the original cues again.
  * `kept`, `auto` and the added cast have no column and are not written.
  */
 export function buildSave(base: Doc, doc: Doc): SaveEdits {
@@ -118,12 +121,9 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
       if (!was) return;
       const set: SaveEdits["bubbles"]["update"][number]["set"] = {};
       if (speakerOf(was) !== speakerOf(b)) set.speaker = speakerOf(b);
-      if (was.text !== b.text) {
-        set.text = b.text;
+      if (was.text !== b.text) set.text = b.text;
+      if (was.text !== b.text || cuesOf(was) !== cuesOf(b))
         set.textWithCues = cuesOf(b);
-      } else if (cuesOf(b) !== null && cuesOf(b) !== cuesOf(was)) {
-        set.textWithCues = cuesOf(b);
-      }
       if (was.type !== b.type) set.type = b.type;
       if (was.emotion !== b.emotion) set.emotion = b.emotion;
       if (was.ignored !== b.ignored) set.ignored = b.ignored;

@@ -5,7 +5,7 @@ import {
   type AnalyzeProposal,
   type AnalyzeResult,
 } from "~/server/actions/review/analyze-bubble";
-import type { Doc } from "./model";
+import { clampRect, type Doc } from "./model";
 import type { CastMember, Rect, SrcPage } from "./types";
 
 export type AnalyzePhase = "waiting" | "running" | "ready" | "failed";
@@ -129,28 +129,57 @@ export function useAnalyze({
     setRuns(next);
   }, []);
 
-  const finish = useCallback(
-    (id: string, token: number, sent: string, result: AnalyzeResult) => {
+  // A box dragged while its request is out: the drag's rect lives in the
+  // canvas until pointer-up, so the committed rect alone cannot show it.
+  // Holds the token of the request each such box had out.
+  const busyRef = useRef(busyId);
+  const draggedRef = useRef(new Map<string, number>());
+  useEffect(() => {
+    busyRef.current = busyId;
+    if (!busyId) return;
+    const run = runsRef.current[busyId];
+    if (run?.phase === "running") draggedRef.current.set(busyId, run.token);
+  }, [busyId]);
+
+  /**
+   * The running run a request belongs to, while that request still stands
+   * for the box as it is. Otherwise null, with the run put where it belongs:
+   * gone with its bubble, or, for a box that moved, back to waiting (drawn)
+   * or dropped with a note (Analyze again).
+   */
+  const current = useCallback(
+    (id: string, token: number, sent: string): AnalyzeRun | null => {
       const run = runsRef.current[id];
-      if (run?.phase !== "running" || run.token !== token) return;
+      if (run?.phase !== "running" || run.token !== token) return null;
       const bubble = docRef.current.bubbles[id];
       if (!bubble || bubble.deleted) {
         put(id, null);
-        return;
+        return null;
       }
-      if (rectKey(bubble.rect) !== sent) {
-        // The answer is for a box that is no longer there.
-        if (run.auto) {
-          put(id, { ...run, phase: "waiting", proposal: null, error: null });
-        } else {
-          put(id, null);
-          sayRef.current(
-            "The box moved while it was being analyzed, so that answer was dropped. Analyze again asks about the box as it is now.",
-            "warn",
-          );
-        }
-        return;
+      const moved =
+        rectKey(bubble.rect) !== sent ||
+        busyRef.current === id ||
+        draggedRef.current.get(id) === token;
+      if (!moved) return run;
+      draggedRef.current.delete(id);
+      if (run.auto) {
+        put(id, { ...run, phase: "waiting", proposal: null, error: null });
+      } else {
+        put(id, null);
+        sayRef.current(
+          "The box moved while it was being analyzed, so that answer was dropped. Analyze again asks about the box as it is now.",
+          "warn",
+        );
       }
+      return null;
+    },
+    [put],
+  );
+
+  const finish = useCallback(
+    (id: string, token: number, sent: string, result: AnalyzeResult) => {
+      const run = current(id, token, sent);
+      if (!run) return;
       if (result.ok) {
         put(id, { ...run, phase: "ready", proposal: result.proposal });
       } else {
@@ -158,7 +187,7 @@ export function useAnalyze({
         sayRef.current(`Analyze failed: ${result.error}`, "warn");
       }
     },
-    [put],
+    [current, put],
   );
 
   const start = useCallback(
@@ -169,6 +198,7 @@ export function useAnalyze({
       tokenRef.current += 1;
       const token = tokenRef.current;
       const sent = rectKey(bubble.rect);
+      draggedRef.current.delete(id);
       put(id, {
         phase: "running",
         auto: runsRef.current[id]?.auto ?? false,
@@ -180,6 +210,9 @@ export function useAnalyze({
       let result: AnalyzeResult;
       try {
         const cut = await cutBox(page.imageUrl, bubble.rect);
+        // The image load takes time: an undo, a move or a drag since then
+        // means this crop no longer stands for the box, so nothing is sent.
+        if (!current(id, token, sent)) return;
         result = await analyzeBubble({
           bookId,
           issueId,
@@ -200,7 +233,7 @@ export function useAnalyze({
       }
       finish(id, token, sent, result);
     },
-    [bookId, issueId, put, finish],
+    [bookId, issueId, put, current, finish],
   );
 
   // One timer per waiting box, restarted whenever the box changes and held
@@ -253,12 +286,15 @@ export function useAnalyze({
    * A bubble's box changed. A drawn box whose call is out goes back to
    * waiting: that answer is stale and is dropped. A waiting box's timer
    * restarts on its own. A proposal or an error already showing stays.
+   * `rect` is the box as asked for; clamped to the page it may be the box
+   * the request was cut from (a nudge out past the edge), which is no move.
    */
   const moved = useCallback(
-    (id: string) => {
+    (id: string, rect: Rect) => {
       const run = runsRef.current[id];
-      if (run?.auto && run.phase === "running")
-        put(id, { ...run, phase: "waiting", proposal: null, error: null });
+      if (!run?.auto || run.phase !== "running") return;
+      if (rectKey(clampRect(rect)) === run.sent) return;
+      put(id, { ...run, phase: "waiting", proposal: null, error: null });
     },
     [put],
   );
