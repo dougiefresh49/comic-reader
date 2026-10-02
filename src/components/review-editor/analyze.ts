@@ -24,6 +24,12 @@ export interface AnalyzeRun {
   sent: string | null;
   proposal: AnalyzeProposal | null;
   error: string | null;
+  /**
+   * An answer that came back while the box was being dragged. The drag's box
+   * lives in the canvas until pointer-up, so the answer waits there: it shows
+   * if the box ends where it was, and is dropped if the box moved.
+   */
+  held?: AnalyzeResult;
 }
 
 /** How long a drawn box stays still before it is analyzed. */
@@ -129,17 +135,10 @@ export function useAnalyze({
     setRuns(next);
   }, []);
 
-  // A box dragged while its request is out: the drag's rect lives in the
-  // canvas until pointer-up, so the committed rect alone cannot show it.
-  // Holds the token of the request each such box had out.
   const busyRef = useRef(busyId);
-  const draggedRef = useRef(new Map<string, number>());
-  useEffect(() => {
-    busyRef.current = busyId;
-    if (!busyId) return;
-    const run = runsRef.current[busyId];
-    if (run?.phase === "running") draggedRef.current.set(busyId, run.token);
-  }, [busyId]);
+  // False once the editor is gone: a crop that finishes loading after that
+  // sends nothing.
+  const aliveRef = useRef(true);
 
   /**
    * The running run a request belongs to, while that request still stands
@@ -150,20 +149,23 @@ export function useAnalyze({
   const current = useCallback(
     (id: string, token: number, sent: string): AnalyzeRun | null => {
       const run = runsRef.current[id];
+      if (!aliveRef.current) return null;
       if (run?.phase !== "running" || run.token !== token) return null;
       const bubble = docRef.current.bubbles[id];
       if (!bubble || bubble.deleted) {
         put(id, null);
         return null;
       }
-      const moved =
-        rectKey(bubble.rect) !== sent ||
-        busyRef.current === id ||
-        draggedRef.current.get(id) === token;
-      if (!moved) return run;
-      draggedRef.current.delete(id);
+      // Doc rects are clamped, so this compares the box as it really is.
+      if (rectKey(bubble.rect) === sent) return run;
       if (run.auto) {
-        put(id, { ...run, phase: "waiting", proposal: null, error: null });
+        put(id, {
+          ...run,
+          phase: "waiting",
+          proposal: null,
+          error: null,
+          held: undefined,
+        });
       } else {
         put(id, null);
         sayRef.current(
@@ -180,15 +182,42 @@ export function useAnalyze({
     (id: string, token: number, sent: string, result: AnalyzeResult) => {
       const run = current(id, token, sent);
       if (!run) return;
+      if (busyRef.current === id) {
+        put(id, { ...run, held: result });
+        return;
+      }
       if (result.ok) {
-        put(id, { ...run, phase: "ready", proposal: result.proposal });
+        put(id, {
+          ...run,
+          phase: "ready",
+          proposal: result.proposal,
+          held: undefined,
+        });
       } else {
-        put(id, { ...run, phase: "failed", error: result.error });
+        put(id, {
+          ...run,
+          phase: "failed",
+          error: result.error,
+          held: undefined,
+        });
         sayRef.current(`Analyze failed: ${result.error}`, "warn");
       }
     },
     [current, put],
   );
+
+  // A drag ended. Pressing a handle and letting go, or dragging against the
+  // page edge, leaves the box as it was: the request stands, and an answer
+  // held through the drag shows now. A box that did move was re-armed by
+  // `moved` before this runs, and the held answer went with it.
+  useEffect(() => {
+    const was = busyRef.current;
+    busyRef.current = busyId;
+    if (!was || was === busyId) return;
+    const run = runsRef.current[was];
+    if (run?.phase === "running" && run.held && run.sent)
+      finish(was, run.token, run.sent, run.held);
+  }, [busyId, finish]);
 
   const start = useCallback(
     async (id: string) => {
@@ -198,7 +227,6 @@ export function useAnalyze({
       tokenRef.current += 1;
       const token = tokenRef.current;
       const sent = rectKey(bubble.rect);
-      draggedRef.current.delete(id);
       put(id, {
         phase: "running",
         auto: runsRef.current[id]?.auto ?? false,
@@ -210,8 +238,9 @@ export function useAnalyze({
       let result: AnalyzeResult;
       try {
         const cut = await cutBox(page.imageUrl, bubble.rect);
-        // The image load takes time: an undo, a move or a drag since then
-        // means this crop no longer stands for the box, so nothing is sent.
+        // The image load takes time: an undo, a move, or leaving the editor
+        // since then means this crop no longer stands for the box, so
+        // nothing is sent.
         if (!current(id, token, sent)) return;
         result = await analyzeBubble({
           bookId,
@@ -262,7 +291,9 @@ export function useAnalyze({
   }, [runs, doc, busyId, start]);
   useEffect(() => {
     const all = timers.current;
+    aliveRef.current = true;
     return () => {
+      aliveRef.current = false;
       for (const t of all.values()) window.clearTimeout(t.timer);
       all.clear();
     };
@@ -294,7 +325,13 @@ export function useAnalyze({
       const run = runsRef.current[id];
       if (!run?.auto || run.phase !== "running") return;
       if (rectKey(clampRect(rect)) === run.sent) return;
-      put(id, { ...run, phase: "waiting", proposal: null, error: null });
+      put(id, {
+        ...run,
+        phase: "waiting",
+        proposal: null,
+        error: null,
+        held: undefined,
+      });
     },
     [put],
   );
