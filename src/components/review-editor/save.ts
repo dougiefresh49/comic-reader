@@ -13,6 +13,11 @@ function speakerOf(b: BubbleDoc): string | null {
   return b.speakerId ?? b.rawSpeaker;
 }
 
+/** The cues a bubble stores: its `cues` while its text is the text they were written for. */
+function cuesOf(b: BubbleDoc): string | null {
+  return b.cues && b.cues.forText === b.text ? b.cues.value : null;
+}
+
 function sameRect(a: BubbleDoc["rect"], b: BubbleDoc["rect"]): boolean {
   return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 }
@@ -33,8 +38,9 @@ function playOrder(doc: Doc, page: number) {
  * insert under its own id. Play order is written as `sort_order` for every
  * live bubble of a page whose order changed, and `panel_id` wherever a
  * bubble's panel changed; the same for panels and their order on the page.
- * A text edit clears `text_with_cues`: the editor shows only the plain text,
- * and cues written for the old words would have the audio step read them.
+ * A text edit clears `text_with_cues`: cues written for the old words would
+ * have the audio step read them. An accepted analyze proposal brings cues for
+ * its own text, and those are written.
  * `kept`, `auto` and the added cast have no column and are not written.
  */
 export function buildSave(base: Doc, doc: Doc): SaveEdits {
@@ -96,11 +102,10 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
           box: b.rect,
           confidence: b.confidence,
           text: b.text,
-          // A row restored by an undo keeps its cues while its text is the
-          // text they were written for. Stored edits from before this field
+          // A row restored by an undo, or a drawn one with an accepted
+          // proposal, keeps its cues. Stored edits from before this field
           // existed have no `cues`.
-          textWithCues:
-            b.cues && b.cues.forText === b.text ? b.cues.value : null,
+          textWithCues: cuesOf(b),
           type: b.type,
           speaker: speakerOf(b),
           emotion: b.emotion,
@@ -115,7 +120,9 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
       if (speakerOf(was) !== speakerOf(b)) set.speaker = speakerOf(b);
       if (was.text !== b.text) {
         set.text = b.text;
-        set.textWithCues = null;
+        set.textWithCues = cuesOf(b);
+      } else if (cuesOf(b) !== null && cuesOf(b) !== cuesOf(was)) {
+        set.textWithCues = cuesOf(b);
       }
       if (was.type !== b.type) set.type = b.type;
       if (was.emotion !== b.emotion) set.emotion = b.emotion;

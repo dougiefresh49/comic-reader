@@ -1,0 +1,202 @@
+"use server";
+
+// The review editor's analyze: one Gemini call that proposes a bubble's text,
+// cues, speaker, emotion and type. It writes no bubble; the editor shows the
+// proposal and the owner accepts it into the pending edits.
+import {
+  GoogleGenAI,
+  createPartFromBase64,
+  createPartFromText,
+} from "@google/genai";
+import { headers } from "next/headers";
+import { resolveSpeaker } from "~/components/review-editor/lib";
+import type { BubbleType } from "~/components/review-editor/types";
+import { checkAdminAuth } from "~/lib/admin-auth";
+import { buildContextPrompt } from "~/lib/gemini-prompts";
+import { generateContentLogged } from "~/lib/llm-usage";
+import { GEMINI_MEDIUM } from "~/lib/models";
+import { pageStoragePath } from "~/lib/storage";
+import { supabaseAdmin } from "~/lib/supabase-admin";
+
+const PAGES_BUCKET = "comic-pages";
+const TYPES: BubbleType[] = [
+  "SPEECH",
+  "NARRATION",
+  "CAPTION",
+  "SFX",
+  "BACKGROUND",
+];
+/** Server actions take 1 MB; the editor scales the crop well under this. */
+const MAX_CROP_CHARS = 900_000;
+const MAX_HINT_CHARS = 500;
+
+/** One entry of the editor's closed speaker list. */
+export interface AnalyzeCastEntry {
+  id: string;
+  name: string;
+  aliases: string[];
+}
+
+export interface AnalyzeArgs {
+  bookId: string;
+  issueId: string;
+  pageNumber: number;
+  /** The box in pixels of the page image, the shape the pipeline's prompt takes. */
+  box: { x: number; y: number; width: number; height: number };
+  /** The bubble's text now. Empty asks the model to read it from the page. */
+  text: string;
+  /** JPEG or PNG of the box, cut in the browser, with or without a data: prefix. */
+  cropBase64: string;
+  /** The editor's closed list: the cast plus narrator, off-panel and crowd. */
+  cast: AnalyzeCastEntry[];
+  /** "it's the Yellow Ranger, she is angry". */
+  hint?: string;
+}
+
+export interface AnalyzeProposal {
+  text: string;
+  textWithCues: string;
+  /** A cast id from the list that was sent, or "" when the model named none on it. */
+  speaker: string;
+  emotion: string;
+  type: BubbleType;
+}
+
+export type AnalyzeResult =
+  | { ok: true; proposal: AnalyzeProposal }
+  | { ok: false; error: string };
+
+interface Parsed {
+  type?: unknown;
+  speaker?: unknown;
+  emotion?: unknown;
+  text?: unknown;
+  textWithCues?: unknown;
+  text_with_cues?: unknown;
+}
+
+function stripDataPrefix(s: string): { mime: string; data: string } {
+  const m = /^data:([^;]+);base64,(.+)$/.exec(s);
+  if (m?.[1] && m?.[2]) return { mime: m[1], data: m[2] };
+  return { mime: "image/jpeg", data: s };
+}
+
+function str(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function invalid(args: AnalyzeArgs): string | null {
+  if (!args.bookId || !args.issueId) return "Missing book or issue";
+  if (!Number.isInteger(args.pageNumber) || args.pageNumber < 1)
+    return "Bad page number";
+  const { x, y, width, height } = args.box ?? {};
+  if (![x, y, width, height].every((n) => Number.isFinite(n))) return "Bad box";
+  if (width <= 0 || height <= 0) return "Empty box";
+  if (!args.cropBase64) return "Missing crop image";
+  if (args.cropBase64.length > MAX_CROP_CHARS) return "Crop image too large";
+  if (!Array.isArray(args.cast)) return "Missing cast list";
+  return null;
+}
+
+export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
+  const auth = checkAdminAuth((await headers()).get("authorization"));
+  if (!auth.ok) return { ok: false, error: auth.message };
+  if (!process.env.GEMINI_API_KEY) {
+    return { ok: false, error: "GEMINI_API_KEY not configured" };
+  }
+  const bad = invalid(args);
+  if (bad) return { ok: false, error: bad };
+
+  const { data: pageBlob, error: pErr } = await supabaseAdmin.storage
+    .from(PAGES_BUCKET)
+    .download(pageStoragePath(args.bookId, args.issueId, args.pageNumber));
+  if (pErr || !pageBlob) {
+    return {
+      ok: false,
+      error: `page fetch failed: ${pErr?.message ?? "no blob"}`,
+    };
+  }
+  const pageBase64 = Buffer.from(await pageBlob.arrayBuffer()).toString(
+    "base64",
+  );
+
+  const current = args.text.trim();
+  const transcribe = current === "";
+  const hint = args.hint?.trim().slice(0, MAX_HINT_CHARS);
+  const prompt = buildContextPrompt(
+    current,
+    {
+      x: Math.round(args.box.x),
+      y: Math.round(args.box.y),
+      width: Math.round(args.box.width),
+      height: Math.round(args.box.height),
+    },
+    args.cast.map((c) => c.name),
+    hint
+      ? `Reviewer's hint for this bubble, from the person checking the book. Follow it: "${hint}"`
+      : undefined,
+    { closedList: true, transcribe, crop: true },
+  );
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const { mime, data } = stripDataPrefix(args.cropBase64);
+    const response = await generateContentLogged(
+      ai,
+      {
+        model: GEMINI_MEDIUM,
+        contents: [
+          createPartFromBase64(pageBase64, "image/webp"),
+          createPartFromBase64(data, mime),
+          createPartFromText(prompt),
+        ],
+      },
+      {
+        step: "review:analyze-bubble",
+        bookId: args.bookId,
+        issueId: args.issueId,
+        pageNumber: args.pageNumber,
+      },
+    );
+    const reply = response.text?.trim();
+    if (!reply) return { ok: false, error: "Empty Gemini response" };
+
+    // The JSON sits after the scratchpad, in a fence or bare.
+    let jsonText = reply.replace(/<scratchpad>[\s\S]*?<\/scratchpad>/i, "");
+    const fence = /```json\s*([\s\S]*?)\s*```/.exec(jsonText);
+    if (fence) jsonText = fence[1] ?? jsonText;
+    const braceStart = jsonText.indexOf("{");
+    const braceEnd = jsonText.lastIndexOf("}");
+    if (braceStart === -1 || braceEnd === -1) {
+      return { ok: false, error: "No JSON in Gemini response" };
+    }
+    let parsed: Parsed;
+    try {
+      parsed = JSON.parse(jsonText.slice(braceStart, braceEnd + 1)) as Parsed;
+    } catch {
+      return { ok: false, error: "Failed to parse Gemini JSON" };
+    }
+
+    const cues = str(parsed.textWithCues) || str(parsed.text_with_cues);
+    // A model that put the words only in the cues still read them.
+    const text = transcribe
+      ? str(parsed.text) || cues.replace(/\[[^\]]*\]\s*/g, "").trim()
+      : current;
+    const type = TYPES.find((t) => t === str(parsed.type).toUpperCase());
+    // The closed list, enforced: a name not on it never reaches the editor.
+    const speaker = resolveSpeaker(str(parsed.speaker) || null, args.cast);
+
+    return {
+      ok: true,
+      proposal: {
+        text,
+        textWithCues: cues || text,
+        speaker: speaker ?? "",
+        emotion: str(parsed.emotion) || "neutral",
+        type: type ?? "SPEECH",
+      },
+    };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
