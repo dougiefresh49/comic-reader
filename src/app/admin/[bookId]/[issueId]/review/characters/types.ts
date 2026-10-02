@@ -46,8 +46,6 @@ export interface CharacterCard {
   /** The `characters.id`, or the castlist text's slug when no row exists. */
   id: string;
   name: string;
-  /** False for a castlist text that matches no `characters` row. */
-  hasRow: boolean;
   group: CardGroup;
   sources: CastSource[];
   wikiNames: string[];
@@ -65,9 +63,11 @@ export interface UnknownGroupView {
   looseExemplars: LooseExemplar[];
 }
 
-export interface WikiSuggestion {
+/** A name no `characters` row knows: from the wiki, or a castlist text of this book. Never blocks Approve. */
+export interface Suggestion {
   name: string;
   qualifier: string;
+  source: "wiki" | "cast before";
 }
 
 /** Every `characters` row, for naming and adding. */
@@ -85,7 +85,7 @@ export interface CharactersData {
   franchise: string | null;
   pages: PageView[];
   unknown: UnknownGroupView[];
-  suggestions: WikiSuggestion[];
+  suggestions: Suggestion[];
   cards: CharacterCard[];
   known: KnownCharacter[];
   /** Why Approve would be refused right now, or null when it would pass. */

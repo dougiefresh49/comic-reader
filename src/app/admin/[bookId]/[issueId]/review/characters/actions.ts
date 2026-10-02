@@ -17,7 +17,11 @@ import {
   seedCast,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
-import { canApproveCharacters } from "~/server/admin/characters-gate";
+import { deleteExemplars } from "~/lib/exemplar-store";
+import {
+  canApproveCharacters,
+  readUnknownDetections,
+} from "~/server/admin/characters-gate";
 
 export type ActionResult =
   | { ok: true; message: string }
@@ -97,26 +101,98 @@ async function readDetection(scope: Scope, detectionId: string) {
   };
 }
 
+/** Removes exemplar crops from Storage; a failure is a message naming what is left behind, never a throw. */
+async function removeCrops(paths: string[]): Promise<string | null> {
+  if (paths.length === 0) return null;
+  const { error } = await supabaseAdmin.storage
+    .from("face-exemplars")
+    .remove(paths);
+  return error
+    ? `face-exemplars remove failed (${error.message}), orphaned crops: ${paths.join(", ")}`
+    : null;
+}
+
+/** The ids of the character's detections in this issue, by page. */
+async function detectionsOf(
+  scope: Scope,
+  characterId: string,
+): Promise<{ id: string; page: number }[]> {
+  const { data, error } = await supabaseAdmin
+    .from("panel_character_detections")
+    .select("id, panels!inner(book_id, issue_id, page_number)")
+    .eq("character_id", characterId)
+    .eq("panels.book_id", scope.bookId)
+    .eq("panels.issue_id", scope.issueId);
+  must("reading the character's faces", error);
+  return (
+    (data ?? []) as unknown as {
+      id: string;
+      panels: { page_number: number } | null;
+    }[]
+  ).map((d) => ({ id: d.id, page: d.panels?.page_number ?? 0 }));
+}
+
 /**
- * The exemplar rule's second half: an exemplar with no `detection_id` on the
- * page a face just left stays with its character and is set unconfirmed,
- * because nothing says which face it was.
+ * The exemplar rule's second half, for the exemplars with no `detection_id`
+ * on the page a face just left (the face's row is already written). When the
+ * old character has no other face left on that page, the loose exemplar is
+ * that face: it moves and is confirmed for the new character, or is deleted
+ * on reject. Otherwise it stays in place, unconfirmed, because nothing says
+ * which face it was.
  */
-async function unconfirmLooseExemplars(
+async function settleLooseExemplars(
   scope: Scope,
   characterId: string | null,
   page: number,
-): Promise<void> {
-  if (!characterId) return;
-  const { error } = await supabaseAdmin
+  outcome: { kind: "move"; to: string } | { kind: "reject" },
+): Promise<string | null> {
+  if (!characterId) return null;
+  const otherFaces = (await detectionsOf(scope, characterId)).some(
+    (d) => d.page === page,
+  );
+  const patch = otherFaces
+    ? { is_confirmed: false }
+    : outcome.kind === "move"
+      ? { character_id: outcome.to, suggested_name: null, is_confirmed: true }
+      : null;
+  if (patch) {
+    const { error } = await supabaseAdmin
+      .from("character_face_exemplars")
+      .update(patch)
+      .eq("book_id", scope.bookId)
+      .eq("source_issue", scope.issueId)
+      .eq("character_id", characterId)
+      .eq("page_number", page)
+      .is("detection_id", null);
+    must("settling the page's exemplars", error);
+    return null;
+  }
+  const { data, error } = await supabaseAdmin
     .from("character_face_exemplars")
-    .update({ is_confirmed: false })
+    .delete()
     .eq("book_id", scope.bookId)
     .eq("source_issue", scope.issueId)
     .eq("character_id", characterId)
     .eq("page_number", page)
-    .is("detection_id", null);
-  must("unconfirming the page's exemplars", error);
+    .is("detection_id", null)
+    .select("crop_path");
+  must("dropping the page's exemplar", error);
+  return removeCrops(
+    ((data ?? []) as { crop_path: string }[]).map((r) => r.crop_path),
+  );
+}
+
+/** The client's ids that are still unnamed detections of this issue; anything else is stale or not ours. */
+async function unnamedHere(scope: Scope, ids: string[]): Promise<string[]> {
+  const here = new Set(
+    (await readUnknownDetections(scope.bookId, scope.issueId)).map((d) => d.id),
+  );
+  return ids.filter((id) => here.has(id));
+}
+
+/** The success line, with a crop warning appended when Storage kept a file. */
+function done(message: string, warning: string | null): ActionResult {
+  return { ok: true, message: warning ? `${message} ${warning}` : message };
 }
 
 /** Names an unknown face group: `character_id` on its detections and exemplars, the exemplars confirmed, the character in the cast. */
@@ -128,7 +204,8 @@ export async function nameGroup(args: {
   franchise: string | null;
 }): Promise<ActionResult> {
   try {
-    const { scope, detectionIds, suggestedNames } = args;
+    const { scope, suggestedNames } = args;
+    const detectionIds = await unnamedHere(scope, args.detectionIds);
     const who = await resolveTarget(scope.bookId, args.target, args.franchise);
     if (detectionIds.length > 0) {
       const { error } = await supabaseAdmin
@@ -176,33 +253,32 @@ export async function nameGroup(args: {
   }
 }
 
-/** "Not a character": the group's detections and exemplars are deleted. */
+/** "Not a character": the group's detections and exemplars are deleted, crops included. */
 export async function rejectGroup(args: {
   scope: Scope;
   detectionIds: string[];
   suggestedNames: string[];
 }): Promise<ActionResult> {
   try {
-    const { scope, detectionIds, suggestedNames } = args;
-    if (detectionIds.length > 0) {
-      const { error } = await supabaseAdmin
-        .from("character_face_exemplars")
-        .delete()
-        .eq("book_id", scope.bookId)
-        .eq("source_issue", scope.issueId)
-        .is("character_id", null)
-        .in("detection_id", detectionIds);
-      must("dropping the faces' exemplars", error);
-    }
+    const { scope, suggestedNames } = args;
+    const detectionIds = await unnamedHere(scope, args.detectionIds);
+    const warnings: string[] = [];
+    const byDetection = await deleteExemplars(supabaseAdmin, detectionIds);
+    if (byDetection) warnings.push(byDetection);
     if (suggestedNames.length > 0) {
-      const { error } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from("character_face_exemplars")
         .delete()
         .eq("book_id", scope.bookId)
         .eq("source_issue", scope.issueId)
         .is("character_id", null)
-        .in("suggested_name", suggestedNames);
+        .in("suggested_name", suggestedNames)
+        .select("crop_path");
       must("dropping the group's exemplars", error);
+      const byName = await removeCrops(
+        ((data ?? []) as { crop_path: string }[]).map((r) => r.crop_path),
+      );
+      if (byName) warnings.push(byName);
     }
     if (detectionIds.length > 0) {
       const { error } = await supabaseAdmin
@@ -214,19 +290,20 @@ export async function rejectGroup(args: {
     }
     revalidate(scope);
     const n = detectionIds.length;
-    return {
-      ok: true,
-      message: `Dropped ${n} ${n === 1 ? "face" : "faces"}: not a character.`,
-    };
+    return done(
+      `Dropped ${n} ${n === 1 ? "face" : "faces"}: not a character.`,
+      warnings.length > 0 ? warnings.join(" ") : null,
+    );
   } catch (err) {
     return fail("rejecting a group", err);
   }
 }
 
 /**
- * Moves the clicked face to another character. Its exemplar follows only when
- * its `detection_id` is this face, and is confirmed for the new character;
- * a loose exemplar on that page stays and is set unconfirmed.
+ * Moves the clicked face to another character. Its exemplar follows when its
+ * `detection_id` is this face, or when it is loose and this was the old
+ * character's only face on the page; either way it is confirmed for the new
+ * character. Any other loose exemplar on that page stays, unconfirmed.
  */
 export async function moveFace(args: {
   scope: Scope;
@@ -260,7 +337,10 @@ export async function moveFace(args: {
       .eq("source_issue", scope.issueId)
       .eq("detection_id", detectionId);
     must("moving the face's exemplar", exemplar.error);
-    await unconfirmLooseExemplars(scope, face.characterId, face.page);
+    await settleLooseExemplars(scope, face.characterId, face.page, {
+      kind: "move",
+      to: who.id,
+    });
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
     return {
@@ -272,7 +352,11 @@ export async function moveFace(args: {
   }
 }
 
-/** Rejects the clicked face: its exemplar (by `detection_id`) and the detection are deleted; a loose exemplar on that page stays, unconfirmed. */
+/**
+ * Rejects the clicked face: its exemplar (by `detection_id`, crop included)
+ * and the detection are deleted. A loose exemplar on that page goes too when
+ * this was the character's only face there; otherwise it stays, unconfirmed.
+ */
 export async function rejectFace(args: {
   scope: Scope;
   detectionId: string;
@@ -280,64 +364,94 @@ export async function rejectFace(args: {
   try {
     const { scope, detectionId } = args;
     const face = await readDetection(scope, detectionId);
-    const exemplar = await supabaseAdmin
-      .from("character_face_exemplars")
-      .delete()
-      .eq("book_id", scope.bookId)
-      .eq("source_issue", scope.issueId)
-      .eq("detection_id", detectionId);
-    must("dropping the face's exemplar", exemplar.error);
+    const warnings: string[] = [];
+    const byDetection = await deleteExemplars(supabaseAdmin, [detectionId]);
+    if (byDetection) warnings.push(byDetection);
     const dropped = await supabaseAdmin
       .from("panel_character_detections")
       .delete()
       .eq("id", detectionId);
     must("dropping the face", dropped.error);
-    await unconfirmLooseExemplars(scope, face.characterId, face.page);
+    const loose = await settleLooseExemplars(
+      scope,
+      face.characterId,
+      face.page,
+      { kind: "reject" },
+    );
+    if (loose) warnings.push(loose);
     revalidate(scope);
-    return { ok: true, message: `Dropped the page ${face.page} face.` };
+    return done(
+      `Dropped the page ${face.page} face.`,
+      warnings.length > 0 ? warnings.join(" ") : null,
+    );
   } catch (err) {
     return fail("rejecting a face", err);
   }
 }
 
-/** "Faces are right": confirms the character's exemplars in this issue, and marks its detections here as human-verified. */
+/**
+ * "Faces are right": confirms the character's exemplars in this issue whose
+ * face is known, meaning those with a `detection_id` of the character's and
+ * the loose ones on pages where it has exactly one face. A loose exemplar on
+ * a page with two or more of its faces stays as it is: a move or reject there
+ * left it unconfirmed on purpose. Its detections here become human-verified.
+ */
 export async function confirmFaces(args: {
   scope: Scope;
   characterId: string;
 }): Promise<ActionResult> {
   try {
     const { scope, characterId } = args;
-    const exemplars = await supabaseAdmin
-      .from("character_face_exemplars")
-      .update({ is_confirmed: true })
-      .eq("book_id", scope.bookId)
-      .eq("source_issue", scope.issueId)
-      .eq("character_id", characterId)
-      .select("id");
-    must("confirming the exemplars", exemplars.error);
-    const panels = await supabaseAdmin
-      .from("panels")
-      .select("id")
-      .eq("book_id", scope.bookId)
-      .eq("issue_id", scope.issueId);
-    must("reading the panels", panels.error);
-    const panelIds = ((panels.data ?? []) as { id: string }[]).map((p) => p.id);
-    if (panelIds.length > 0) {
+    const faces = await detectionsOf(scope, characterId);
+    const perPage = new Map<number, number>();
+    for (const f of faces) perPage.set(f.page, (perPage.get(f.page) ?? 0) + 1);
+    const singlePages = [...perPage].filter(([, n]) => n === 1).map(([p]) => p);
+    let confirmed = 0;
+    if (faces.length > 0) {
+      const { data, error } = await supabaseAdmin
+        .from("character_face_exemplars")
+        .update({ is_confirmed: true })
+        .eq("book_id", scope.bookId)
+        .eq("source_issue", scope.issueId)
+        .eq("character_id", characterId)
+        .in(
+          "detection_id",
+          faces.map((f) => f.id),
+        )
+        .select("id");
+      must("confirming the faces' exemplars", error);
+      confirmed += data?.length ?? 0;
+    }
+    if (singlePages.length > 0) {
+      const { data, error } = await supabaseAdmin
+        .from("character_face_exemplars")
+        .update({ is_confirmed: true })
+        .eq("book_id", scope.bookId)
+        .eq("source_issue", scope.issueId)
+        .eq("character_id", characterId)
+        .is("detection_id", null)
+        .in("page_number", singlePages)
+        .select("id");
+      must("confirming the pages' exemplars", error);
+      confirmed += data?.length ?? 0;
+    }
+    if (faces.length > 0) {
       const { error } = await supabaseAdmin
         .from("panel_character_detections")
         .update({ human_verified: true })
-        .eq("character_id", characterId)
-        .in("panel_id", panelIds);
+        .in(
+          "id",
+          faces.map((f) => f.id),
+        );
       must("verifying the faces", error);
     }
     revalidate(scope);
-    const n = exemplars.data?.length ?? 0;
     return {
       ok: true,
       message:
-        n === 0
+        confirmed === 0
           ? "Faces marked right; no exemplar here to confirm."
-          : `Confirmed ${n} ${n === 1 ? "exemplar" : "exemplars"} for later issues.`,
+          : `Confirmed ${confirmed} ${confirmed === 1 ? "exemplar" : "exemplars"} for later issues.`,
     };
   } catch (err) {
     return fail("confirming faces", err);
@@ -405,11 +519,12 @@ export async function renameCharacter(args: {
 }
 
 /**
- * A wiki name with no `characters` row becomes one (a new character) or
- * joins an existing one as an alias, so the next read resolves it; either
- * way the character is in the cast.
+ * A name no `characters` row knows (a wiki name, or a castlist text) becomes
+ * a character or joins one as an alias, so the next read resolves it and the
+ * suggestion clears; either way the character is in the cast. The alias is
+ * written whenever the row's name is not this name, a fresh row included.
  */
-export async function nameWikiSuggestion(args: {
+export async function nameSuggestion(args: {
   scope: Scope;
   name: string;
   target: NameTarget;
@@ -419,7 +534,7 @@ export async function nameWikiSuggestion(args: {
     const { scope } = args;
     const wikiName = args.name.trim();
     const who = await resolveTarget(scope.bookId, args.target, args.franchise);
-    if (!who.created && slugify(who.name) !== slugify(wikiName)) {
+    if (slugify(who.name) !== slugify(wikiName)) {
       const { data, error } = await supabaseAdmin
         .from("characters")
         .select("aliases")
@@ -444,7 +559,7 @@ export async function nameWikiSuggestion(args: {
         : `${wikiName} now means ${who.name}, in the cast.`,
     };
   } catch (err) {
-    return fail("naming a wiki name", err);
+    return fail("naming a suggestion", err);
   }
 }
 

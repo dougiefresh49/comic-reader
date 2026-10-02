@@ -342,7 +342,6 @@ export async function loadCharacters(
     cards.push({
       id: m.id,
       name: m.name,
-      hasRow: true,
       group,
       sources: m.sources,
       wikiNames: m.wikiNames,
@@ -352,27 +351,6 @@ export async function loadCharacters(
       voice: voiceView(m.id),
     });
   }
-  // Castlist texts in this issue that no `characters` row knows: in the cast
-  // by the issue's own rule (`in_issue` true), with no row to hang faces on.
-  for (const r of issueRows) {
-    if (r.character_id !== null || !r.in_issue) continue;
-    if (book.resolve(r.character)) continue;
-    const id = slugify(r.character);
-    if (cards.some((c) => c.id === id)) continue;
-    cards.push({
-      id,
-      name: r.character,
-      hasRow: false,
-      group: "before",
-      sources: ["cast before"],
-      wikiNames: [],
-      removed: false,
-      faces: [],
-      looseExemplars: [],
-      voice: voiceView(id),
-    });
-  }
-
   // Group order first, so the comparator is one consistent order; then names
   // A to Z, and the roles in their fixed order.
   const rank: Record<CharacterCard["group"], number> = {
@@ -412,9 +390,13 @@ export async function loadCharacters(
     franchise: issue.books?.franchises?.[0] ?? null,
     pages,
     unknown,
-    suggestions: proposal.suggestions
-      .filter((s) => s.source === "wiki")
-      .map((s) => ({ name: s.name, qualifier: s.qualifier })),
+    // Wiki names and castlist texts no `characters` row knows, as
+    // `proposeCast` reports them: suggestions, never cards.
+    suggestions: proposal.suggestions.map((s) => ({
+      name: s.name,
+      qualifier: s.qualifier,
+      source: s.source,
+    })),
     cards,
     known,
     blocker,

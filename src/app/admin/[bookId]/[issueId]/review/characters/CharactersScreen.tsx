@@ -19,7 +19,7 @@ import {
   confirmFaces,
   moveFace,
   nameGroup,
-  nameWikiSuggestion,
+  nameSuggestion,
   rejectFace,
   rejectGroup,
   removeCharacter,
@@ -35,7 +35,7 @@ import type {
   LooseExemplar,
   PageView,
   UnknownGroupView,
-  WikiSuggestion,
+  Suggestion,
 } from "./types";
 
 const BUTTON =
@@ -120,6 +120,8 @@ function NameField({
   placeholder,
   initial = "",
   autoFocus = false,
+  submitLabel,
+  busy = false,
   onPick,
   onCancel,
 }: {
@@ -127,6 +129,9 @@ function NameField({
   placeholder: string;
   initial?: string;
   autoFocus?: boolean;
+  /** Shows a button that takes the highlighted row, for a box that arrives filled in. */
+  submitLabel?: string;
+  busy?: boolean;
   onPick: (target: NameTarget, label: string) => void;
   onCancel?: () => void;
 }) {
@@ -176,9 +181,16 @@ function NameField({
       : []),
   ];
   const index = Math.min(active, Math.max(0, rows.length - 1));
+  const take = () => {
+    const row = rows[index];
+    if (!row) return;
+    onPick(row.target, row.name);
+    setValue("");
+    setOpen(false);
+  };
 
   return (
-    <div className="relative min-w-0 flex-1">
+    <div className="relative flex min-w-0 flex-1 items-center gap-2">
       <input
         ref={ref}
         value={value}
@@ -200,12 +212,7 @@ function NameField({
             setActive((index - 1 + rows.length) % Math.max(1, rows.length));
           } else if (e.key === "Enter") {
             e.preventDefault();
-            const row = rows[index];
-            if (row) {
-              onPick(row.target, row.name);
-              setValue("");
-              setOpen(false);
-            }
+            take();
           } else if (e.key === "Escape") {
             e.stopPropagation();
             setValue("");
@@ -215,6 +222,23 @@ function NameField({
         }}
         className={INPUT}
       />
+      {submitLabel && (
+        <button
+          type="button"
+          disabled={busy || rows.length === 0}
+          onClick={take}
+          title={
+            rows[index]
+              ? rows[index].target.kind === "existing"
+                ? `Name as ${rows[index].name}`
+                : `Make a new character, ${rows[index].name}`
+              : "Type a name first"
+          }
+          className={PRIMARY}
+        >
+          {submitLabel}
+        </button>
+      )}
       {open && rows.length > 0 && (
         <div className="absolute top-full right-0 left-0 z-20 mt-1 overflow-hidden rounded-sm border border-neutral-700 bg-neutral-900 py-1 shadow-lg">
           {rows.map((row, i) => (
@@ -344,12 +368,12 @@ function FaceTile({
                 ? "Its exemplar is confirmed: the matcher uses it"
                 : "Its exemplar is not confirmed yet"
             }
-            className={`text-[13px] ${face.exemplar.confirmed ? "text-emerald-300" : "text-amber-300"}`}
+            className={`text-[14px] ${face.exemplar.confirmed ? "text-emerald-300" : "text-amber-300"}`}
           >
             {face.exemplar.confirmed ? "exemplar ✓" : "exemplar"}
           </span>
         ) : (
-          <span className="text-[13px] text-neutral-600">no exemplar</span>
+          <span className="text-[14px] text-neutral-600">no exemplar</span>
         )}
       </div>
       {moving ? (
@@ -404,8 +428,10 @@ function LooseStrip({ items }: { items: LooseExemplar[] }) {
     <div className="mt-4">
       <div className="mb-2 text-[14px] text-neutral-400">
         {items.length === 1 ? "An exemplar" : `${items.length} exemplars`} tied
-        to a page, not a face. A move or reject on that page leaves{" "}
-        {items.length === 1 ? "it" : "them"} here, unconfirmed.
+        to a page, not a face. When the page has one face of this character, a
+        move or reject takes {items.length === 1 ? "it" : "them"} along; with
+        more faces there, {items.length === 1 ? "it stays" : "they stay"} here,
+        unconfirmed.
       </div>
       <div className="flex flex-wrap gap-2">
         {items.map((e) => (
@@ -416,7 +442,7 @@ function LooseStrip({ items }: { items: LooseExemplar[] }) {
               alt={`Exemplar from page ${e.page}`}
               className="aspect-square w-full rounded-sm bg-neutral-800 object-cover"
             />
-            <figcaption className="mt-1 flex justify-between text-[13px]">
+            <figcaption className="mt-1 flex justify-between text-[14px]">
               <span className="text-neutral-400">Page {e.page}</span>
               <span
                 className={e.confirmed ? "text-emerald-300" : "text-amber-300"}
@@ -499,7 +525,6 @@ function CharacterCardView({
   onRemove,
   onAddBack,
   onConfirm,
-  onMakeRow,
   onMove,
   onReject,
 }: {
@@ -514,7 +539,6 @@ function CharacterCardView({
   onRemove: () => void;
   onAddBack: () => void;
   onConfirm: () => void;
-  onMakeRow: () => void;
   onMove: (face: FaceView, target: NameTarget, name: string) => void;
   onReject: (face: FaceView) => void;
 }) {
@@ -640,18 +664,16 @@ function CharacterCardView({
                 {card.name}
               </h3>
               <span className="text-neutral-500">{card.id}</span>
-              {card.hasRow && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraft(card.name);
-                    setRenaming(true);
-                  }}
-                  className={`${QUIET} h-7`}
-                >
-                  Rename
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(card.name);
+                  setRenaming(true);
+                }}
+                className={`${QUIET} h-7`}
+              >
+                Rename
+              </button>
             </div>
           )}
           <div className="mt-1 text-neutral-400">
@@ -676,12 +698,6 @@ function CharacterCardView({
               Wiki: {card.wikiNames.join(", ")}
             </div>
           )}
-          {!card.hasRow && (
-            <div className="mt-1 text-amber-300">
-              A castlist name with no character row. Make the row to give it
-              faces and a voice.
-            </div>
-          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {card.faces.length > 0 && (
@@ -695,16 +711,7 @@ function CharacterCardView({
               Faces are right
             </button>
           )}
-          {!card.hasRow ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={onMakeRow}
-              className={BUTTON}
-            >
-              Make the character row
-            </button>
-          ) : card.removed ? (
+          {card.removed ? (
             <button
               type="button"
               disabled={busy}
@@ -777,6 +784,10 @@ function UnknownCardView({
   const hint = group.suggestedNames.join(", ");
   const label = hint ? `Unknown, maybe ${hint}` : "Unknown";
   const strip = group.faces.slice(0, open ? 0 : 3);
+  const portrait = useMemo(
+    () => bestFace(group.faces, pages),
+    [group.faces, pages],
+  );
   return (
     <section
       className={`rounded-md border p-4 ${
@@ -789,7 +800,7 @@ function UnknownCardView({
       <div className="flex flex-wrap items-start gap-4">
         {open ? (
           <FaceCrop
-            face={group.faces[0] ?? null}
+            face={portrait}
             pages={pages}
             alt={label}
             className="size-24 shrink-0 rounded-md"
@@ -828,6 +839,8 @@ function UnknownCardView({
               known={known}
               placeholder="Name this group, or type a new name"
               initial={group.suggestedNames[0] ?? ""}
+              submitLabel="Name"
+              busy={busy}
               onPick={onName}
             />
           </div>
@@ -872,7 +885,7 @@ function SuggestionRow({
   busy,
   onName,
 }: {
-  suggestion: WikiSuggestion;
+  suggestion: Suggestion;
   known: KnownCharacter[];
   busy: boolean;
   onName: (target: NameTarget, name: string) => void;
@@ -887,7 +900,9 @@ function SuggestionRow({
         <span className="text-neutral-100">{label}</span>
         <span className="text-neutral-500">
           {" "}
-          · named on the wiki, no character row
+          {suggestion.source === "wiki"
+            ? "· named on the wiki, no character yet"
+            : "· in this book's cast list, no character yet"}
         </span>
       </span>
       {naming ? (
@@ -999,6 +1014,13 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  // A finished note clears itself after a few seconds; the next action replaces it sooner.
+  useEffect(() => {
+    if (!note || pending) return;
+    const timer = setTimeout(() => setNote(null), 6000);
+    return () => clearTimeout(timer);
+  }, [note, pending]);
+
   const here = data.cards.filter((c) => c.group === "here");
   const before = data.cards.filter((c) => c.group === "before");
   const roles = data.cards.filter((c) => c.group === "role");
@@ -1038,14 +1060,6 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     onConfirm: () =>
       run("Confirming the faces", () =>
         confirmFaces({ scope, characterId: card.id }),
-      ),
-    onMakeRow: () =>
-      run(`Making ${card.name}`, () =>
-        addCharacter({
-          scope,
-          target: { kind: "new", name: card.name },
-          franchise: data.franchise,
-        }),
       ),
     onMove: (face: FaceView, target: NameTarget, name: string) =>
       run(`Moving the page ${face.page} face to ${name}`, () =>
@@ -1192,7 +1206,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
                       busy={pending}
                       onName={(target, name) =>
                         run(`Naming ${s.name} as ${name}`, () =>
-                          nameWikiSuggestion({
+                          nameSuggestion({
                             scope,
                             name: s.name,
                             target,

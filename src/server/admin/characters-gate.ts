@@ -20,7 +20,7 @@ export interface UnknownDetection {
 }
 
 export interface UnknownGroup<T extends UnknownDetection> {
-  /** Stable within one read: the first detection's id. */
+  /** Stable across reads while the group exists: its lowest cluster id, else its first suggested name, else its lowest detection id. */
   key: string;
   clusterIds: number[];
   /** Distinct `suggested_name` texts, as stored. */
@@ -75,7 +75,15 @@ export function unknownFaceGroups<T extends UnknownDetection>(
     if (text && !g.suggestedNames.some((n) => slugify(n) === slugify(text)))
       g.suggestedNames.push(text);
   });
-  return [...groups.values()];
+  return [...groups.values()].map((g) => ({
+    ...g,
+    key:
+      g.clusterIds.length > 0
+        ? `cluster:${Math.min(...g.clusterIds)}`
+        : g.suggestedNames.length > 0
+          ? `name:${slugify(g.suggestedNames[0]!)}`
+          : `face:${[...g.detections.map((d) => d.id)].sort()[0]}`,
+  }));
 }
 
 /** The issue's detections with no `character_id`, each with its panel's page. */
