@@ -339,8 +339,11 @@ function FaceTile({
 }) {
   const [moving, setMoving] = useState(false);
   return (
+    // 176px wide: a 160px crop, the caption on two lines, and three buttons in
+    // three equal cells, so the longest labels ("Reject", "Shown", "no
+    // exemplar") each stay inside their own tile at every width.
     <div
-      className={`w-36 shrink-0 rounded-md border p-2 ${
+      className={`w-44 shrink-0 rounded-md border p-2 ${
         shown
           ? "border-amber-300/70 bg-neutral-900"
           : "border-neutral-800 bg-neutral-900/50"
@@ -359,21 +362,23 @@ function FaceTile({
           className="w-full"
         />
       </button>
-      <div className="mt-2 flex items-center justify-between text-[14px]">
-        <span className="text-neutral-300">Page {face.page}</span>
+      <div className="mt-2 text-[14px] leading-5">
+        <div className="text-neutral-300">Page {face.page}</div>
         {face.exemplar ? (
-          <span
+          <div
             title={
               face.exemplar.confirmed
                 ? "Its exemplar is confirmed: the matcher uses it"
                 : "Its exemplar is not confirmed yet"
             }
-            className={`text-[14px] ${face.exemplar.confirmed ? "text-emerald-300" : "text-amber-300"}`}
+            className={
+              face.exemplar.confirmed ? "text-emerald-300" : "text-amber-300"
+            }
           >
-            {face.exemplar.confirmed ? "exemplar ✓" : "exemplar"}
-          </span>
+            {face.exemplar.confirmed ? "Exemplar ✓" : "Exemplar, unconfirmed"}
+          </div>
         ) : (
-          <span className="text-[14px] text-neutral-600">no exemplar</span>
+          <div className="text-neutral-600">No exemplar</div>
         )}
       </div>
       {moving ? (
@@ -390,12 +395,12 @@ function FaceTile({
           />
         </div>
       ) : (
-        <div className="mt-2 flex items-center gap-1">
+        <div className="mt-2 grid grid-cols-3 gap-1">
           <button
             type="button"
             disabled={busy}
             onClick={() => setMoving(true)}
-            className={`${QUIET} px-1.5`}
+            className={`${QUIET} justify-center px-0`}
           >
             Move
           </button>
@@ -403,15 +408,14 @@ function FaceTile({
             type="button"
             disabled={busy}
             onClick={onReject}
-            className={`${QUIET} px-1.5 hover:text-red-200`}
+            className={`${QUIET} justify-center px-0 hover:text-red-200`}
           >
             Reject
           </button>
-          <span className="flex-1" />
           <button
             type="button"
             onClick={onShow}
-            className={`${QUIET} px-1.5`}
+            className={`${QUIET} justify-center px-0`}
             aria-pressed={shown}
           >
             {shown ? "Shown" : "Show"}
@@ -692,7 +696,6 @@ function CharacterCardView({
           <div className="mt-1">
             <span className="text-neutral-500">Voice: </span>
             {voice}
-            <span className="text-neutral-600"> · set at the voices stop</span>
           </div>
           {card.wikiNames.length > 0 && (
             <div className="mt-1 text-neutral-500">
