@@ -947,6 +947,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
 
   const discard = () => {
     setConfirmDiscard(false);
+    if (refuse()) return;
     // A stale tab must not clear what another tab stored.
     if (staleRef.current) return;
     if (storedRev(readRaw(storeKey)) !== revRef.current) {
@@ -1456,8 +1457,10 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         {edited && kept !== "stale" && (
           <button
             type="button"
+            disabled={!!lockReason}
             onClick={() => setConfirmDiscard(true)}
             className={BAR_BUTTON}
+            title={lockReason ?? undefined}
           >
             Discard edits
           </button>

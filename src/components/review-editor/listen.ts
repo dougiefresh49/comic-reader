@@ -128,6 +128,18 @@ export function useListen({
   }, [selectedId, stop]);
   useEffect(() => stop, [stop]);
 
+  // A reload mid-regenerate drops the lock while the paid call runs on, and
+  // invites a second paid click: the browser asks before leaving.
+  useEffect(() => {
+    if (!active) return;
+    const hold = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", hold);
+    return () => window.removeEventListener("beforeunload", hold);
+  }, [active]);
+
   /**
    * Regenerate the bubble's cues or audio: Save first when it has pending
    * edits, and call the action only once that Save has landed. Refused, and
