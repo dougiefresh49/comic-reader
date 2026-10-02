@@ -12,7 +12,10 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { AnalyzeProposal } from "~/server/actions/review/analyze-bubble";
-import { setPageApproval } from "~/app/admin/[bookId]/[issueId]/review/editor/actions";
+import {
+  checkIssueReady,
+  setPageApproval,
+} from "~/app/admin/[bookId]/[issueId]/review/editor/actions";
 import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
 import { Inspector, Key, type Actions, type ListenView } from "./Inspector";
@@ -352,8 +355,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const [approvals, setApprovals] = useState(
     () => new Map(data.pages.map((p) => [p.number, p.reviewedAt])),
   );
-  const [approving, setApproving] = useState(false);
-  const [resume, setResume] = useState<"idle" | "running" | "done">("idle");
+  /**
+   * A page approval, a take-back or Approve issue in flight. While one runs
+   * the editor is locked: no edit, Save, undo or second approval, so what the
+   * server checks is what the owner sees.
+   */
+  const [approvalJob, setApprovalJob] = useState<"page" | "issue" | null>(null);
+  const approvalRef = useRef<"page" | "issue" | null>(null);
+  const holdApproval = useCallback((job: "page" | "issue" | null) => {
+    approvalRef.current = job;
+    setApprovalJob(job);
+  }, []);
+  const [resumed, setResumed] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
 
   const canvasRef = useRef<CanvasHandle>(null);
@@ -595,8 +608,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       label: string,
       recipe: (d: Doc) => Doc,
       opts?: { coalesce?: string; select?: Sel | null; page?: number },
-    ) => dispatch({ type: "apply", label, recipe, ...opts }),
-    [],
+    ) => {
+      // No edit lands while an approval is in flight. The warning is queued
+      // so it shows over whatever note the caller says next.
+      if (approvalRef.current) {
+        queueMicrotask(() =>
+          say("Not changed: waiting for the approval to finish.", "warn"),
+        );
+        return;
+      }
+      dispatch({ type: "apply", label, recipe, ...opts });
+    },
+    [say],
   );
 
   /** An accepted proposal: every offered field becomes a pending edit, one undo step. */
@@ -938,12 +961,17 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    */
   const lockReason = listen.active
     ? `Waiting for Regenerate ${listen.active.job}...`
-    : saving
-      ? "Waiting for Save..."
-      : null;
+    : approvalJob === "issue"
+      ? "Waiting for Approve issue..."
+      : saving
+        ? "Waiting for Save..."
+        : approvalJob === "page"
+          ? "Waiting for the page approval..."
+          : null;
   /** True and said when locked, read at the moment of the action. */
   const refuse = () => {
-    if (!savingRef.current && !listen.isActive()) return false;
+    if (!savingRef.current && !listen.isActive() && !approvalRef.current)
+      return false;
     say(lockReason ?? "Waiting for Save or a regenerate to finish.", "warn");
     return true;
   };
@@ -1001,7 +1029,6 @@ function Editor({ data, initialPage }: WorkbenchProps) {
 
   /** Write `pages.reviewed_at` for one page; says what happened. */
   const writeApproval = async (n: number, approved: boolean) => {
-    setApproving(true);
     try {
       const res = await setPageApproval({
         bookId: data.bookId,
@@ -1022,8 +1049,6 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         `The approval of page ${n} may or may not have been stored (${(e as Error).message}). Reload to see it as it is now.`,
         "warn",
       );
-    } finally {
-      setApproving(false);
     }
   };
 
@@ -1034,7 +1059,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    * touch this page, the way a regenerate saves first.
    */
   const approvePage = async () => {
-    if (approving || refuse()) return;
+    if (refuse()) return;
     const n = pageNumber;
     if (approvals.get(n)) {
       say(`Page ${n} is already approved. Shift A takes it back.`);
@@ -1051,43 +1076,75 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       );
       return;
     }
-    if (pagePending(n)) {
-      const saved = await writeSave();
-      if (!saved.ok) {
-        say(`Page ${n} is not approved: its edits did not save.`, "warn");
-        return;
+    holdApproval("page");
+    try {
+      if (pagePending(n)) {
+        const saved = await writeSave();
+        if (!saved.ok) {
+          say(`Page ${n} is not approved: its edits did not save.`, "warn");
+          return;
+        }
       }
+      await writeApproval(n, true);
+    } finally {
+      holdApproval(null);
     }
-    await writeApproval(n, true);
   };
 
   /** Shift A: take the page's approval back. */
   const takeBack = async () => {
-    if (approving) return;
+    if (refuse()) return;
     if (!approvals.get(pageNumber)) {
       say(`Page ${pageNumber} is not approved.`);
       return;
     }
-    await writeApproval(pageNumber, false);
+    holdApproval("page");
+    try {
+      await writeApproval(pageNumber, false);
+    } finally {
+      holdApproval(null);
+    }
   };
 
   /**
-   * Approve issue: with every page approved, save the pending edits (a failed
-   * Save stops here, its error showing), then resume the run's `page-review`
-   * hook through the resume route.
+   * Approve issue, with the editor locked throughout: save the pending edits
+   * (a failed Save stops here, its error showing), have the server check the
+   * saved rows are ready to leave the gate (`checkIssueReady`), then resume
+   * the run's `page-review` hook through the resume route.
    */
   const approveIssue = async () => {
-    if (resume !== "idle" || !allApproved || refuse()) return;
-    setResume("running");
+    if (resumed || !allApproved || refuse()) return;
+    holdApproval("issue");
     setResumeError(null);
     try {
       if (toWrite > 0) {
         const saved = await writeSave();
         if (!saved.ok) {
           setResumeError("The run was not resumed, because Save failed.");
-          setResume("idle");
           return;
         }
+      }
+      const ready = await checkIssueReady({
+        bookId: data.bookId,
+        issueId: data.issueId,
+      });
+      if (!ready.ok) {
+        setResumeError(ready.error);
+        if (ready.unapproved) {
+          const stale = new Set(ready.unapproved);
+          setApprovals(
+            (prev) =>
+              new Map(
+                Array.from(prev, ([n, at]) => [n, stale.has(n) ? null : at]),
+              ),
+          );
+        }
+        // Edits are locked and saved, so `doc` is the rows the server read.
+        if (ready.page !== undefined) {
+          const first = unvoicedBubbles(doc, ready.page)[0];
+          goto(ready.page, first ? { kind: "bubble", id: first.id } : null);
+        }
+        return;
       }
       const res = await fetch("/api/admin/resume-hook", {
         method: "POST",
@@ -1100,7 +1157,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         }),
       });
       if (res.ok) {
-        setResume("done");
+        setResumed(true);
         say("Issue approved. The run carries on past the pages gate.");
         return;
       }
@@ -1110,12 +1167,12 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       setResumeError(
         `The run was not resumed: ${body?.error ?? `the server answered ${res.status}`}.`,
       );
-      setResume("idle");
     } catch (e) {
       setResumeError(
         `The run may or may not have resumed (${(e as Error).message}). Check the pipeline page before trying again.`,
       );
-      setResume("idle");
+    } finally {
+      holdApproval(null);
     }
   };
 
@@ -1642,11 +1699,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         </button>
         <button
           type="button"
-          disabled={approving || (!pageApproved && !!lockReason)}
+          disabled={!!lockReason}
           onClick={() => void (pageApproved ? takeBack() : approvePage())}
           title={
             pageApproved
-              ? "Take this page's approval back (Shift A)"
+              ? (lockReason ?? "Take this page's approval back (Shift A)")
               : (lockReason ?? "Approve this page (A)")
           }
           className={
@@ -1662,13 +1719,13 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             </>
           ) : (
             <>
-              {approving ? "Approving" : "Approve page"}
+              {approvalJob === "page" ? "Approving" : "Approve page"}
               <span className="text-neutral-500">A</span>
             </>
           )}
         </button>
         {data.atPagesGate &&
-          (resume === "done" ? (
+          (resumed ? (
             <span
               role="status"
               className="flex h-6 shrink-0 items-center rounded-sm bg-emerald-700/30 px-2 font-medium text-emerald-300"
@@ -1678,7 +1735,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           ) : (
             <button
               type="button"
-              disabled={!allApproved || resume === "running" || !!lockReason}
+              disabled={!allApproved || !!lockReason}
               onClick={() => void approveIssue()}
               title={
                 allApproved
@@ -1687,7 +1744,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
               }
               className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-emerald-600 px-2 font-medium text-white hover:bg-emerald-500 disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
             >
-              {resume === "running" ? "Resuming" : "Approve issue"}
+              {approvalJob === "issue" ? "Resuming" : "Approve issue"}
               <span className="tabular-nums opacity-60">
                 {approvedCount}/{data.pages.length}
               </span>
