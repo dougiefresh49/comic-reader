@@ -33,8 +33,8 @@ const HOLD_SPAN = 0.75;
 
 /**
  * Intersection over union at which two boxes of similar size are one
- * detection twice. The review prototype's value. The smoke page's one twin
- * pair sits at 0.97, and both of it drop as containers anyway.
+ * detection twice. The review prototype's value. The smoke page has two twin
+ * pairs, both loose containers: 0.97 ("LET THE FIRE…") and 0.66 ("DUDES…").
  */
 const TWIN_IOU = 0.6;
 
@@ -72,47 +72,51 @@ function spansTogether(big: PanelBoundingBox, held: PanelBoundingBox[]) {
 }
 
 /**
- * Split bubble detections into kept and dropped, one box per balloon (#311).
- * A box is dropped when either:
+ * Split bubble detections into kept and dropped, one box per balloon (#311),
+ * in two passes:
  *
- * - it is a container: the smaller kept boxes it holds (0.9 or more of each
- *   inside it, and it at least 1.2 times each one's area) together span 0.75
- *   or more of its width or height. A loose box around one balloon drops for
- *   the tight one, and a box over the lobes of a split balloon drops for the
- *   lobes, which stay separate bubbles. A small balloon inside a big one's
- *   box without spanning it is a separate balloon, and both stay (the #225
- *   inset rule); or
- * - it has a kept twin, IoU 0.6 or more, with higher confidence (on a tie,
- *   the earlier box wins).
+ * 1. Twins: of two boxes at IoU 0.6 or more, the lower confidence drops (on
+ *    a tie, the later box). Boxes are judged highest confidence first
+ *    against the ones still kept.
+ * 2. Containers, over the twin survivors only, so a dropped twin never adds
+ *    to what a container holds: a box drops when the smaller kept boxes it
+ *    holds (0.9 or more of each inside it, and it at least 1.2 times each
+ *    one's area) together span 0.75 or more of its width or height. A loose
+ *    box around one balloon drops for the tight one, and a box over the
+ *    lobes of a split balloon drops for the lobes, which stay separate
+ *    bubbles. A small balloon inside a big one's box without spanning it is
+ *    a separate balloon, and both stay (the #225 inset rule). Boxes are
+ *    judged largest first against the ones still kept.
  *
- * Boxes are judged largest first against the ones still kept, so every
- * dropped box leaves a kept box over the same text. The box units only need
- * to agree with each other. Order is preserved in both lists.
+ * A dropped box leaves its text to its twin or to the boxes it holds. The
+ * box units only need to agree with each other. Order is preserved in both
+ * lists.
  */
 export function filterDuplicateBubbles<T extends FilterableBubble>(
   bubbles: T[],
 ): { kept: T[]; dropped: T[] } {
   const dropped = new Set<T>();
+  const live = (self: T) =>
+    bubbles.filter((o) => o !== self && !dropped.has(o));
+
+  const byConfidence = [...bubbles].sort((a, b) => b.confidence - a.confidence);
+  for (const bubble of byConfidence) {
+    // Higher-ranked boxes are judged first, so a twin still kept outranks it.
+    const rank = byConfidence.indexOf(bubble);
+    const isTwinLoser = live(bubble).some(
+      (o) => byConfidence.indexOf(o) < rank && iou(bubble, o) >= TWIN_IOU,
+    );
+    if (isTwinLoser) dropped.add(bubble);
+  }
+
   const bySize = [...bubbles].sort(
     (a, b) => area(b.bounding_box) - area(a.bounding_box),
   );
   for (const bubble of bySize) {
-    const i = bubbles.indexOf(bubble);
-    const live = bubbles.filter((o, j) => j !== i && !dropped.has(o));
-    const held = live.filter((o) => holds(bubble, o));
-    const isContainer = spansTogether(
-      bubble.bounding_box,
-      held.map((o) => o.bounding_box),
-    );
-    const isTwinLoser = live.some((other) => {
-      const j = bubbles.indexOf(other);
-      if (iou(bubble, other) < TWIN_IOU) return false;
-      return (
-        other.confidence > bubble.confidence ||
-        (other.confidence === bubble.confidence && j < i)
-      );
-    });
-    if (isContainer || isTwinLoser) dropped.add(bubble);
+    if (dropped.has(bubble)) continue;
+    const held = live(bubble).filter((o) => holds(bubble, o));
+    const heldBoxes = held.map((o) => o.bounding_box);
+    if (spansTogether(bubble.bounding_box, heldBoxes)) dropped.add(bubble);
   }
   return {
     kept: bubbles.filter((b) => !dropped.has(b)),
