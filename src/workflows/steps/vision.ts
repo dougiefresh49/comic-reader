@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
+import { filterDuplicateBubbles } from "~/lib/bubble-filter";
 import { filterDuplicatePanels, filterSliverPanels } from "~/lib/panel-filter";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json, TablesInsert } from "~/types/database";
@@ -530,9 +531,31 @@ export async function roboflowAnalyzeBatch(
     const {
       panelPredictions,
       image: imgDims,
-      bubblePredictions,
+      bubblePredictions: rawBubbles,
       segmentationPredictions: segPreds,
     } = read.parsed;
+    // One box per balloon (#311), before the panel filters see the centers.
+    const bubbleFilter = filterDuplicateBubbles(
+      rawBubbles.map((b, idx) => ({
+        idx,
+        confidence: b.confidence,
+        bounding_box: {
+          x: b.x - b.width / 2,
+          y: b.y - b.height / 2,
+          w: b.width,
+          h: b.height,
+        },
+      })),
+    );
+    for (const { bounding_box: b, confidence } of bubbleFilter.dropped) {
+      console.log(
+        `[roboflow] ${pageLabel}: dropped duplicate bubble x ${Math.round(b.x)} y ${Math.round(b.y)} w ${Math.round(b.w)} h ${Math.round(b.h)} conf ${confidence.toFixed(3)}`,
+      );
+    }
+    const keptBubbleIdx = new Set(bubbleFilter.kept.map((c) => c.idx));
+    const bubblePredictions = rawBubbles.filter((_, idx) =>
+      keptBubbleIdx.has(idx),
+    );
     // Filter before the final map so sort_order and panel_id stay contiguous.
     const bubbleCenters = bubblePredictions.map((b) => ({
       x: b.x / imgDims.width,

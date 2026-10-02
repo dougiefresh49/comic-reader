@@ -39,9 +39,12 @@ export function filterSliverPanels<T extends FilterablePanel>(
 
 const DUPLICATE_COVER = 0.9;
 
-const area = (b: PanelBoundingBox) => b.w * b.h;
+export const area = (b: PanelBoundingBox) => b.w * b.h;
 
-function intersectArea(a: PanelBoundingBox, b: PanelBoundingBox): number {
+export function intersectArea(
+  a: PanelBoundingBox,
+  b: PanelBoundingBox,
+): number {
   const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
   const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
   return w > 0 && h > 0 ? w * h : 0;
