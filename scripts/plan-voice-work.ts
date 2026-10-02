@@ -11,26 +11,27 @@
  *     LIVE_API_OK=1 is set, the plan shows a free slot, and the item is a
  *     clone or a restore that the plan lets run.
  *
- *   DRY_RUN=1 pnpm exec tsx --conditions=react-server --env-file=.env scripts/plan-voice-work.ts --check-301
- *     The three #301 double-failure cases against an in-memory Supabase fake
- *     whose writes can be made to fail and a fake ElevenLabs transport that
- *     counts paid creates. Touches no network and no production row.
+ *   DRY_RUN=1 pnpm exec tsx --conditions=react-server --env-file=.env scripts/plan-voice-work.ts --check
+ *     The three #301 double-failure cases, then `carryOut` and `settle` end
+ *     to end (one case per #351 review finding plus the happy path), against
+ *     an in-memory Supabase fake whose writes can be made to fail and a fake
+ *     ElevenLabs account. Touches no network and no production row.
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Args = {
   book: string;
   issue: string;
   carryOut?: string;
-  check301: boolean;
+  check: boolean;
 };
 
 function parseArgs(argv: string[]): Args {
   const args: Args = {
     book: "tmnt-mmpr-iii",
     issue: "issue-1",
-    check301: false,
+    check: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -42,7 +43,7 @@ function parseArgs(argv: string[]): Args {
     if (a === "--book") args.book = value();
     else if (a === "--issue") args.issue = value();
     else if (a === "--carry-out") args.carryOut = value();
-    else if (a === "--check-301") args.check301 = true;
+    else if (a === "--check" || a === "--check-301") args.check = true;
     else if (a !== "--") throw new Error(`unknown argument ${a}`);
   }
   return args;
@@ -117,6 +118,10 @@ async function planOrCarryOut() {
             `      leaves without a voice: ${c.bookId}/${c.issueId} ${c.character}`,
           );
       }
+      if (item.operation)
+        console.log(
+          `    operation in flight: ${item.operation.phase}; reconcile it before anything else`,
+        );
       for (const r of item.refusals) console.log(`    refused: ${r}`);
       for (const w of item.warnings) console.log(`    note: ${w}`);
     }
@@ -168,7 +173,7 @@ async function planOrCarryOut() {
 // ── #301 check: in-memory Supabase and a counting ElevenLabs transport ─────
 
 type Row = Record<string, unknown>;
-type Op = "select" | "insert" | "update" | "upsert";
+type Op = "select" | "insert" | "update" | "upsert" | "delete";
 type Filter = (row: Row) => boolean;
 interface Fault {
   table: string;
@@ -182,6 +187,12 @@ class FakeDb {
   tables = new Map<string, Row[]>();
   faults: Fault[] = [];
   log: string[] = [];
+  /** Unique keys per table; an insert that repeats one fails with 23505. */
+  unique = new Map<string, string[]>([
+    ["casting_tasks", ["book_id", "issue_id", "character_id"]],
+  ]);
+  /** Storage objects by `<bucket>/<path>`. */
+  objects = new Map<string, Uint8Array>();
 
   rows(table: string): Row[] {
     let t = this.tables.get(table);
@@ -214,7 +225,22 @@ class FakeDb {
   }
 
   client(): SupabaseClient {
-    return { from: (table: string) => new FakeQuery(this, table) } as never;
+    const storage = {
+      from: (bucket: string) => ({
+        download: (path: string) => {
+          const bytes = this.objects.get(`${bucket}/${path}`);
+          return Promise.resolve(
+            bytes
+              ? { data: new Blob([bytes as BlobPart]), error: null }
+              : { data: null, error: { message: "Object not found" } },
+          );
+        },
+      }),
+    };
+    return {
+      from: (table: string) => new FakeQuery(this, table),
+      storage,
+    } as never;
   }
 }
 
@@ -226,6 +252,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
   private returning = false;
   private conflict: string[] = [];
   private max = Infinity;
+  private skip = 0;
 
   constructor(
     private db: FakeDb,
@@ -252,6 +279,10 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.conflict = (opts?.onConflict ?? "id").split(",");
     return this;
   }
+  delete() {
+    this.op = "delete";
+    return this;
+  }
   eq(col: string, v: unknown) {
     this.filters.push((r) => r[col] === v);
     return this;
@@ -268,11 +299,24 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.filters.push((r) => vs.includes(r[col]));
     return this;
   }
-  /** `a.eq.x,b.eq.y` only; a nested group (the alias scope) filters nothing. */
+  /** `col.eq.x`, `col.is.null` and `col.lt.x` terms; a nested group (the alias scope) filters nothing. */
   or(expr: string) {
     if (expr.includes("(")) return this;
-    const terms = expr.split(",").map((t) => t.split(".eq."));
-    this.filters.push((r) => terms.some(([c, v]) => r[c!] === v));
+    const terms = expr.split(",").map((t) => {
+      const [col, op, ...rest] = t.split(".");
+      return { col: col!, op, v: rest.join(".") };
+    });
+    this.filters.push((r) =>
+      terms.some(({ col, op, v }) =>
+        op === "eq"
+          ? r[col] === v
+          : op === "is"
+            ? (r[col] ?? null) === null
+            : op === "lt"
+              ? typeof r[col] === "string" && (r[col] as string) < v
+              : false,
+      ),
+    );
     return this;
   }
   order() {
@@ -282,7 +326,9 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.max = n;
     return this;
   }
-  range() {
+  range(from: number, to: number) {
+    this.skip = from;
+    this.max = to - from + 1;
     return this;
   }
   single() {
@@ -306,7 +352,19 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
         return { data: null, error: { message: err } };
       }
       this.db.log.push(`${what} -> ok`);
-      if (this.op === "insert") {
+      const keys = this.db.unique.get(this.table);
+      if (
+        this.op === "insert" &&
+        keys &&
+        rows.some((r) => keys.every((k) => r[k] === this.payload[k]))
+      )
+        return {
+          data: null,
+          error: { code: "23505", message: "duplicate key" },
+        };
+      if (this.op === "delete") {
+        for (const r of matched) rows.splice(rows.indexOf(r), 1);
+      } else if (this.op === "insert") {
         const row = {
           id: randomUUID(),
           created_at: new Date().toISOString(),
@@ -325,7 +383,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
       }
       if (!this.returning) return { data: null, error: null };
     }
-    out = out.slice(0, this.max).map((r) => ({ ...r }));
+    out = out.slice(this.skip, this.skip + this.max).map((r) => ({ ...r }));
     if (this.mode === "many") return { data: out, error: null };
     if (this.mode === "single" && out.length !== 1)
       return { data: null, error: { message: "not exactly one row" } };
@@ -547,5 +605,497 @@ async function check301() {
   if (failed.length > 0) process.exitCode = 1;
 }
 
-if (args.check301) await check301();
-else await planOrCarryOut();
+// ── carryOut check: a fake world, a fake ElevenLabs account ───────────────
+
+const CLIPS = "comic-voice-clips";
+const md5 = (b: Uint8Array) => createHash("md5").update(b).digest("hex");
+type AddMode = "ok" | "refuse" | "timeout-lands" | "timeout-lost";
+
+/** The ElevenLabs account behind `deps.fetch`: slots, voices, counters. */
+function fakeAccount(limit: number) {
+  const timeout = () =>
+    Object.assign(new Error("The operation timed out."), {
+      name: "TimeoutError",
+    });
+  const acct = {
+    voices: [] as {
+      voice_id: string;
+      name: string;
+      labels: Record<string, string>;
+    }[],
+    adds: 0,
+    deletes: 0,
+    addMode: "ok" as AddMode,
+    /** One entry per coming `GET /v1/voices`: "fail" answers 503. */
+    lists: [] as ("ok" | "fail")[],
+    fetch: (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const path = url.pathname;
+      const method = init?.method ?? "GET";
+      const json = (body: unknown, status = 200) =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        });
+      if (path === "/v1/user/subscription")
+        return json({
+          voice_slots_used: acct.voices.length,
+          voice_limit: limit,
+          voice_add_edit_counter: acct.adds,
+          max_voice_add_edits: 95,
+        });
+      if (path === "/v1/voices" && method === "GET") {
+        if (acct.lists.shift() === "fail")
+          return json({ detail: "list unavailable" }, 503);
+        return json({ voices: acct.voices });
+      }
+      if (method === "DELETE") {
+        const id = path.split("/").pop()!;
+        acct.deletes++;
+        acct.voices = acct.voices.filter((v) => v.voice_id !== id);
+        return json({ status: "ok" });
+      }
+      if (path === "/v1/text-to-voice/design")
+        return json({ previews: [{ generated_voice_id: "preview-1" }] });
+      let name = "";
+      let labels: Record<string, string> = {};
+      if (path === "/v1/voices/add") {
+        const form = init!.body as FormData;
+        name = String(form.get("name"));
+        labels = JSON.parse(String(form.get("labels"))) as typeof labels;
+      } else if (path === "/v1/text-to-voice") {
+        const body = JSON.parse(String(init!.body)) as {
+          voice_name: string;
+          labels?: typeof labels;
+        };
+        name = body.voice_name;
+        labels = body.labels ?? {};
+      } else throw new Error(`fake account: no answer for ${method} ${path}`);
+      acct.adds++;
+      if (acct.addMode === "refuse")
+        return json({ detail: "voice_limit_reached" }, 400);
+      if (acct.voices.length >= limit) return json({ detail: "full" }, 400);
+      const voice_id = `el-new-${acct.adds}`;
+      if (acct.addMode !== "timeout-lost")
+        acct.voices.push({ voice_id, name, labels });
+      if (acct.addMode.startsWith("timeout")) throw timeout();
+      return json({ voice_id });
+    }) as typeof fetch,
+  };
+  return acct;
+}
+
+interface WorldVoice {
+  id: string;
+  name: string;
+  status: "active" | "archived";
+  character?: string;
+  castAs?: string[];
+}
+
+/** One book, one issue, the characters, and voices with verified bucket copies. */
+function world(opts: {
+  characters: string[];
+  voices: WorldVoice[];
+  limit?: number;
+  unrelated?: string[];
+}) {
+  const db = new FakeDb();
+  db.rows("issues").push({
+    book_id: BOOK,
+    id: "issue-1",
+    number: 1,
+    created_at: "2026-10-01T00:00:00Z",
+  });
+  for (const c of opts.characters) {
+    const name = c[0]!.toUpperCase() + c.slice(1);
+    db.rows("characters").push({
+      id: c,
+      display_name: name,
+      aliases: [],
+      voice_of: null,
+    });
+    db.rows("bubbles").push({
+      id: `b-${c}`,
+      book_id: BOOK,
+      issue_id: "issue-1",
+      character_id: c,
+      speaker: name,
+      voice_description: `${name} sounds like a test.`,
+      ignored: false,
+      silent: false,
+    });
+  }
+  const acct = fakeAccount(
+    opts.limit ??
+      opts.voices.filter((v) => v.status === "active").length +
+        (opts.unrelated?.length ?? 0) +
+        1,
+  );
+  for (const v of opts.voices) {
+    const clip = new TextEncoder().encode(`clip of ${v.id}`);
+    db.objects.set(`${CLIPS}/${v.id}/sample.mp3`, clip);
+    const elId = v.status === "active" ? `el-${v.id}` : null;
+    db.rows("voices").push({
+      id: v.id,
+      display_name: v.name,
+      status: v.status,
+      current_elevenlabs_id: elId,
+      source_clip_path: `${v.id}/sample.mp3`,
+      source_clip_md5: md5(clip),
+      design_prompt: null,
+      description: `${v.name}, a test voice.`,
+      labels: { accent: "american" },
+      consumers: ["comic"],
+      keep_active: false,
+      character_id: v.character ?? null,
+      lab_default: true,
+      created_at: "2026-10-01T00:00:00Z",
+      archived_at: v.status === "archived" ? "2026-10-01T00:00:00Z" : null,
+      operation_claim: null,
+      operation_claimed_at: null,
+    });
+    if (elId) acct.voices.push({ voice_id: elId, name: v.name, labels: {} });
+    for (const c of v.castAs ?? [])
+      db.rows("castlist").push({
+        book_id: BOOK,
+        issue_id: "issue-1",
+        character: c[0]!.toUpperCase() + c.slice(1),
+        character_id: c,
+        voice_id: elId,
+        voice_uuid: v.id,
+        in_issue: true,
+      });
+  }
+  for (const name of opts.unrelated ?? [])
+    acct.voices.push({ voice_id: `el-unrelated-${name}`, name, labels: {} });
+  return { db, acct, deps: { supabase: db.client(), fetch: acct.fetch } };
+}
+
+const request = (
+  db: FakeDb,
+  character: string,
+  action: "clone" | "design",
+  target: string | null = null,
+) =>
+  db.rows("casting_tasks").push({
+    id: randomUUID(),
+    book_id: BOOK,
+    issue_id: "issue-1",
+    character_id: character,
+    action,
+    target_voice_uuid: target,
+    status: "pending",
+    completed_at: null,
+  });
+
+async function checkCarryOut() {
+  const { isDryRun } = await import("~/lib/fakes/dry-run");
+  if (!isDryRun()) throw new Error("--check runs only under DRY_RUN=1");
+  const lib = (await import(
+    "~/lib/voice-requests"
+  )) as typeof import("~/lib/voice-requests");
+  const slots = await import("~/lib/voice-slots");
+  const reconcile = (lib as Partial<typeof lib>).reconcile;
+  const results: { name: string; pass: boolean }[] = [];
+  const report = (name: string, lines: string[], pass: boolean) => {
+    console.log(`\n${name}: ${pass ? "PASS" : "FAIL"}`);
+    for (const l of lines) console.log(`  ${l}`);
+    results.push({ name, pass });
+  };
+  const short = (r: unknown) =>
+    JSON.stringify(r, (k, v: unknown) =>
+      k === "voice" || k === "target" || k === "replaces" ? undefined : v,
+    ).slice(0, 260);
+  const itemOf = async (
+    deps: { supabase: SupabaseClient; fetch: typeof fetch },
+    character: string,
+  ) => {
+    const plan = await lib.planVoiceWork(deps, BOOK, "issue-1");
+    const item = plan.items.find((i) => i.characterId === character);
+    if (!item) throw new Error(`no item for ${character}`);
+    return item;
+  };
+  const task = (db: FakeDb, c: string) =>
+    String(
+      db.rows("casting_tasks").find((r) => r.character_id === c)?.status ??
+        "none",
+    ).slice(0, 40);
+  const cast = (db: FakeDb, c: string) =>
+    db
+      .rows("castlist")
+      .filter((r) => r.character_id === c)
+      .map((r) => `${String(r.voice_id)}/${String(r.voice_uuid)}`)
+      .join(", ") || "none";
+  const attempt = async <T>(f: () => Promise<T>) => {
+    try {
+      return await f();
+    } catch (err) {
+      return { threw: err instanceof Error ? err.message : String(err) };
+    }
+  };
+
+  {
+    const w = world({
+      characters: ["zed"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+      ],
+    });
+    request(w.db, "zed", "clone", "zed-1993");
+    const item = await itemOf(w.deps, "zed");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    const afterCarry = task(w.db, "zed");
+    const settled = await attempt(() =>
+      lib.settle(w.db.client(), item, { kind: "accept" }),
+    );
+    const row = w.db.rows("voices").find((v) => v.id === "zed-1993")!;
+    report(
+      "happy path: a clone into the free slot, then accept",
+      [
+        `plan: ${item.action} ${item.target?.display_name}, outgoing ${item.outgoing?.kind}`,
+        `carryOut: ${short(r)}`,
+        `voices row: ${String(row.status)} ${String(row.current_elevenlabs_id)}; castlist zed: ${cast(w.db, "zed")}`,
+        `task after carryOut: ${afterCarry}; settle accept: ${settled === undefined ? "ok" : short(settled)}; task: ${task(w.db, "zed")}`,
+        `ElevenLabs: ${w.acct.adds} add(s), ${w.acct.deletes} delete(s)`,
+      ],
+      (r as { status?: string }).status === "done" &&
+        row.status === "active" &&
+        cast(w.db, "zed") === `${String(row.current_elevenlabs_id)}/zed-1993` &&
+        afterCarry === "in_progress" &&
+        task(w.db, "zed") === "complete" &&
+        w.acct.adds === 1 &&
+        w.acct.deletes === 0,
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["rex"],
+      voices: [
+        { id: "rex-old", name: "Rex", status: "active", castAs: ["rex"] },
+        {
+          id: "rex-1993",
+          name: "Rex (1993)",
+          status: "archived",
+          character: "rex",
+        },
+      ],
+      unrelated: ["Rex (1993)"],
+    });
+    request(w.db, "rex", "clone", "rex-1993");
+    w.acct.addMode = "timeout-lost";
+    const item = await itemOf(w.deps, "rex");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: "rex-old" }),
+    );
+    report(
+      "finding 1: a lost add reply never adopts an unrelated voice with the same name",
+      [
+        `the account already holds an unregistered voice named "Rex (1993)"; the add times out and makes nothing`,
+        `carryOut (add first, archive rex-old after): ${short(r)}`,
+        `castlist rex: ${cast(w.db, "rex")}; ElevenLabs deletes: ${w.acct.deletes} (want 0)`,
+      ],
+      (r as { status?: string }).status === "needs attention" &&
+        w.acct.deletes === 0 &&
+        cast(w.db, "rex") === "el-rex-old/rex-old",
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["zed", "kit"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+      ],
+      limit: 3,
+    });
+    request(w.db, "zed", "clone", "zed-1993");
+    w.db.rows("character_appearances").push({
+      id: "kit-voice-design",
+      character_id: "kit",
+      voice_description: "Kit sounds bright.",
+    });
+    const zed = await itemOf(w.deps, "zed");
+    w.acct.addMode = "timeout-lands";
+    w.acct.lists = ["ok", "fail"]; // the inventory, then the lookup
+    const first = await attempt(() =>
+      lib.carryOut(w.deps, zed, { archiveVoiceId: null }),
+    );
+    w.acct.addMode = "ok";
+    const zedNow = await itemOf(w.deps, "zed");
+    const second = await attempt(() =>
+      lib.carryOut(w.deps, zedNow, { archiveVoiceId: null }),
+    );
+    const fixed = reconcile
+      ? await attempt(() => reconcile(w.deps, zedNow))
+      : "reconcile does not exist";
+    const zedAdds = w.acct.adds;
+
+    const kit = await itemOf(w.deps, "kit");
+    w.db.failNext("castlist", "insert", () => true, "castlist down");
+    const k1 = await attempt(() =>
+      lib.carryOut(w.deps, kit, { archiveVoiceId: null }),
+    );
+    const kitNow = await itemOf(w.deps, "kit");
+    const k2 = await attempt(() =>
+      lib.carryOut(w.deps, kitNow, { archiveVoiceId: null }),
+    );
+    const kFixed = reconcile
+      ? await attempt(() => reconcile(w.deps, kitNow))
+      : "reconcile does not exist";
+    const kitRows = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit").length;
+    report(
+      "finding 2: an uncertain item is recorded and refuses a second paid create",
+      [
+        `zed clone: the add times out but lands, and the lookup fails: ${short(first)}`,
+        `zed after: state ${zedNow.state}; second carryOut: ${short(second)}`,
+        `zed reconcile: ${short(fixed)}; adds for zed: ${zedAdds} (want 1)`,
+        `kit design: the voices row lands, the castlist write fails: ${short(k1)}`,
+        `kit after: state ${kitNow.state}; second carryOut: ${short(k2)}`,
+        `kit reconcile: ${short(kFixed)}; kit voices rows: ${kitRows} (want 1); paid adds in all: ${w.acct.adds} (want 2)`,
+      ],
+      zedAdds === 1 &&
+        (second as { status?: string }).status === "refused" &&
+        (fixed as { status?: string }).status === "done" &&
+        (k2 as { status?: string }).status === "refused" &&
+        (kFixed as { status?: string }).status === "done" &&
+        kitRows === 1 &&
+        w.acct.adds === 2,
+    );
+  }
+
+  {
+    const w = world({ characters: ["max"], voices: [], limit: 2 });
+    const item = await itemOf(w.deps, "max");
+    let gemini = 0;
+    const log = console.log;
+    console.log = (...a: unknown[]) => {
+      if (String(a[0]).includes("would spend: gemini")) gemini++;
+      log(...a);
+    };
+    const both = await Promise.all([
+      attempt(() => lib.carryOut(w.deps, item, { archiveVoiceId: null })),
+      attempt(() => lib.carryOut(w.deps, item, { archiveVoiceId: null })),
+    ]);
+    console.log = log;
+    const statuses = both.map((r) => (r as { status?: string }).status);
+    report(
+      "finding 3: two concurrent designs for a new character make one voice",
+      [
+        `max has no voice and no stored description; two carryOut calls at once`,
+        `results: ${both.map(short).join(" | ")}`,
+        `Gemini descriptions: ${gemini} (want 1); paid creates: ${w.acct.adds} (want 1)`,
+      ],
+      w.acct.adds === 1 &&
+        gemini === 1 &&
+        statuses.includes("done") &&
+        statuses.includes("refused"),
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["rex"],
+      voices: [{ id: "rex-old", name: "Rex", status: "active" }],
+    });
+    const voice = (await slots.readVoice(w.db.client(), "rex-old"))!;
+    w.db.failNext(
+      "voices",
+      "update",
+      (p) => p.status === "archived",
+      "voices down",
+    );
+    const archived = await attempt(() =>
+      slots.archiveVoice(w.deps, voice, { needs: new Set(), execute: true }),
+    );
+    const row = (await slots.readVoice(w.db.client(), "rex-old"))!;
+    const restored = await attempt(() =>
+      slots.restoreVoice(w.deps, row, { execute: true }),
+    );
+    report(
+      "finding 4: a confirmed DELETE with a failed registry write can still be restored",
+      [
+        `archive: ${short(archived)}`,
+        `row after: ${String(row.status)} ${String(row.current_elevenlabs_id)}; ElevenLabs deletes: ${w.acct.deletes}`,
+        `restore: ${short(restored)}`,
+      ],
+      w.acct.deletes === 1 &&
+        (restored as { executed?: boolean }).executed === true,
+    );
+  }
+
+  {
+    const w = world({ characters: ["kit"], voices: [] });
+    const item = await itemOf(w.deps, "kit");
+    const r = await attempt(() =>
+      lib.settle(w.db.client(), item, { kind: "no audio" }),
+    );
+    report(
+      'finding 5: "no audio this run" writes the skip sentinel',
+      [
+        `settle: ${r === undefined ? "ok" : short(r)}`,
+        `castlist kit: ${cast(w.db, "kit")}; task: ${task(w.db, "kit")}`,
+      ],
+      cast(w.db, "kit") === "__SKIPPED__/null" &&
+        task(w.db, "kit") === "complete",
+    );
+  }
+
+  {
+    const w = world({
+      characters: ["rex", "zed"],
+      voices: [
+        {
+          id: "shared",
+          name: "Shared",
+          status: "active",
+          castAs: ["rex", "zed"],
+        },
+        { id: "parked", name: "Parked", status: "active" },
+      ],
+      limit: 2,
+    });
+    request(w.db, "rex", "design");
+    request(w.db, "zed", "design");
+    const plan = await lib.planVoiceWork(w.deps, BOOK, "issue-1");
+    const out = plan.items.map((i) =>
+      i.outgoing?.kind === "archive"
+        ? i.outgoing.voice.id
+        : String(i.outgoing?.kind ?? null),
+    );
+    report(
+      "finding 6: two items never share an outgoing voice",
+      [
+        `rex and zed both replace "Shared"; no free slot`,
+        `outgoing: ${plan.items.map((i, n) => `${i.characterId} -> ${out[n]}`).join(", ")}`,
+      ],
+      out.length === 2 && out[0] !== out[1],
+    );
+  }
+
+  const failed = results.filter((r) => !r.pass);
+  console.log(
+    `\ncarryOut cases: ${results.length - failed.length} of ${results.length} pass; fakes only, no network, no production row`,
+  );
+  if (failed.length > 0) process.exitCode = 1;
+}
+
+if (args.check) {
+  await check301();
+  await checkCarryOut();
+} else await planOrCarryOut();

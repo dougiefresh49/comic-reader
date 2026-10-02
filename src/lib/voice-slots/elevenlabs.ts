@@ -299,22 +299,48 @@ export async function addVoice(
   return { voice_id: body.voice_id };
 }
 
-/**
- * The account's voices named `name` whose id is not in `knownIds`: after an
- * add that timed out or whose reply could not be read, the voice it may have
- * made. One free GET; the caller decides what one, none or several mean.
- */
-export async function findUnknownVoicesNamed(
-  deps: VoiceSlotsDeps,
-  name: string,
-  knownIds: Set<string>,
-): Promise<string[]> {
+/** The label key an add carries its per-operation token under (#351). */
+export const OP_LABEL = "comic_reader_op";
+
+export interface ListedVoice {
+  voice_id: string;
+  name: string;
+  labels: Record<string, string> | null;
+}
+
+/** Every voice on the account. One free GET. */
+export async function listVoices(deps: VoiceSlotsDeps): Promise<ListedVoice[]> {
   const r = await el(deps, "/v1/voices");
   if (!r.ok) throw await failure(r, "GET /v1/voices");
-  const body = (await r.json()) as {
-    voices?: { voice_id?: string; name?: string }[];
-  };
+  const body = (await r.json()) as { voices?: Partial<ListedVoice>[] };
   return (body.voices ?? [])
-    .filter((v) => v.name === name && v.voice_id && !knownIds.has(v.voice_id))
-    .map((v) => v.voice_id!);
+    .filter((v): v is Partial<ListedVoice> & { voice_id: string } =>
+      Boolean(v.voice_id),
+    )
+    .map((v) => ({
+      voice_id: v.voice_id,
+      name: v.name ?? "",
+      labels: v.labels ?? null,
+    }));
+}
+
+/**
+ * After an add whose reply was lost: the voices that add made. A voice
+ * counts only when it was not in `before` (the inventory taken before the
+ * add), has the add's `name`, and carries its `OP_LABEL` token. The caller
+ * adopts exactly one and stops on none or several.
+ */
+export async function findOpVoices(
+  deps: VoiceSlotsDeps,
+  op: { token: string; name: string; before: string[] },
+): Promise<string[]> {
+  const before = new Set(op.before);
+  return (await listVoices(deps))
+    .filter(
+      (v) =>
+        !before.has(v.voice_id) &&
+        v.name === op.name &&
+        v.labels?.[OP_LABEL] === op.token,
+    )
+    .map((v) => v.voice_id);
 }

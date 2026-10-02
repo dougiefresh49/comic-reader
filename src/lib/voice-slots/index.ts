@@ -8,7 +8,12 @@
  * Every function takes `VoiceSlotsDeps` first: the Supabase client to use
  * and, for a scratch run, a fake `fetch`.
  */
-export { archiveRefusals, archiveVoice, ROOM_CONSUMER } from "./archive";
+export {
+  ArchiveRecordError,
+  archiveRefusals,
+  archiveVoice,
+  ROOM_CONSUMER,
+} from "./archive";
 export type { ArchiveGuardOptions, ArchiveOptions } from "./archive";
 export { noActiveVoiceClaimFilter, withVoiceOperationClaim } from "./claim";
 export type { VoiceClaimOperation } from "./claim";
@@ -27,7 +32,9 @@ export {
   buildAddVoiceForm,
   describeForm,
   describeHeadroom,
-  findUnknownVoicesNamed,
+  OP_LABEL,
+  findOpVoices,
+  listVoices,
   getSlotStatus as slotStatus,
   headroomRefusals,
   md5Hex,
@@ -44,6 +51,7 @@ export { orderCandidates, planFreeSlots } from "./plan";
 export type { PlanFreeSlotsOptions } from "./plan";
 export {
   booksUsingVoice,
+  deleteRecorded,
   issueNeeds,
   markRestored,
   readCastlist,

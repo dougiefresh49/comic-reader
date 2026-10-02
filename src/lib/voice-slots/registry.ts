@@ -192,7 +192,9 @@ export async function lastUsedByVoice(
   return last;
 }
 
-// The writes below are #66's `runArchive` and `runRestore` rows, unchanged.
+// The writes below are #66's `runArchive` and `runRestore` rows. The
+// `voice_archives` row goes first: it records the confirmed DELETE, so a
+// failed `voices` update still leaves Restore a way back (#351).
 
 export async function markArchived(
   supabase: SupabaseClient,
@@ -200,6 +202,12 @@ export async function markArchived(
   formerElevenLabsId: string,
   archivedForBookId: string | null,
 ): Promise<void> {
+  const log = await supabase.from("voice_archives").insert({
+    voice_id: voice.id,
+    former_elevenlabs_id: formerElevenLabsId,
+    archived_for_book_id: archivedForBookId,
+  });
+  if (log.error) fail("insert voice_archives", log.error);
   const upd = await supabase
     .from("voices")
     .update({
@@ -214,12 +222,25 @@ export async function markArchived(
     .update({ voice_id: null })
     .eq("voice_uuid", voice.id);
   if (cast.error) fail("update castlist", cast.error);
-  const log = await supabase.from("voice_archives").insert({
-    voice_id: voice.id,
-    former_elevenlabs_id: formerElevenLabsId,
-    archived_for_book_id: archivedForBookId,
-  });
-  if (log.error) fail("insert voice_archives", log.error);
+}
+
+/**
+ * True when `voice_archives` records a DELETE of the row's current
+ * ElevenLabs id: the slot is gone even though the `voices` update failed.
+ */
+export async function deleteRecorded(
+  supabase: SupabaseClient,
+  voice: VoiceRow,
+): Promise<boolean> {
+  if (!voice.current_elevenlabs_id) return false;
+  const { data, error } = await supabase
+    .from("voice_archives")
+    .select("voice_id")
+    .eq("voice_id", voice.id)
+    .eq("former_elevenlabs_id", voice.current_elevenlabs_id)
+    .limit(1);
+  if (error) fail("read voice_archives", error);
+  return (data ?? []).length > 0;
 }
 
 export async function markRestored(

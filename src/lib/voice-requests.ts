@@ -13,6 +13,7 @@
  * write goes through `src/lib/cast.ts`. Functions take `VoiceSlotsDeps`
  * (the Supabase client, and a fake `fetch` for a scratch run) or the client.
  */
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   addToCast,
@@ -24,14 +25,17 @@ import {
   type CastRow,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
+import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import {
+  ArchiveRecordError,
   ElevenLabsHeadroomError,
   ElevenLabsRefusedError,
   archiveRefusals,
   archiveVoice,
   designVoice,
-  findUnknownVoicesNamed,
+  findOpVoices,
   issueNeeds,
+  listVoices,
   markRestored,
   planFreeSlots,
   readCastlist,
@@ -62,8 +66,11 @@ export type VoiceWorkSource =
   /** A speaker whose castlist voice is archived. */
   | "archived voice";
 
-/** `made`: the voice exists, waiting on `settle`. */
-export type VoiceWorkState = "pending" | "made" | "settled";
+/**
+ * `made`: the voice exists, waiting on `settle`. `needs attention`: a
+ * `carryOut` is in flight or stopped uncertain; see `operation`.
+ */
+export type VoiceWorkState = "pending" | "made" | "settled" | "needs attention";
 
 /** The voice an item that takes a slot gives back, or the free slot it uses. */
 export type Outgoing =
@@ -92,6 +99,8 @@ export interface VoiceWorkItem {
   source: VoiceWorkSource;
   action: VoiceWorkAction;
   state: VoiceWorkState;
+  /** The `carryOut` recorded on the item's task row, when one is. */
+  operation: OpRecord | null;
   /** Clone or restore: the archived `voices` row that comes back. */
   target: VoiceRow | null;
   /** The character's own active voice, which a clone or design replaces. */
@@ -231,7 +240,40 @@ async function readDescriptions(
   return out;
 }
 
+/**
+ * A `carryOut` in flight, kept in `casting_tasks.status` as `op:<json>` (no
+ * new column): the claim's token, the last phase reached, and what
+ * `reconcile` needs. Phases: `claimed` (nothing spent on ElevenLabs),
+ * `archiving` (DELETE sent), `archived` (DELETE confirmed), `adding` (add
+ * sent, `before` and `name` recorded), `added` (ElevenLabs id known).
+ */
+export interface OpRecord {
+  token: string;
+  phase: "claimed" | "archiving" | "archived" | "adding" | "added";
+  /** `voices.id` archived for the item. */
+  archived?: string;
+  /** ElevenLabs ids on the account before the add. */
+  before?: string[];
+  /** The name the add used. */
+  name?: string;
+  elevenLabsId?: string;
+}
+
+const OP_PREFIX = "op:";
+const encodeOp = (op: OpRecord) => OP_PREFIX + JSON.stringify(op);
+
+export function decodeOp(status: string | undefined): OpRecord | null {
+  if (!status?.startsWith(OP_PREFIX)) return null;
+  try {
+    return JSON.parse(status.slice(OP_PREFIX.length)) as OpRecord;
+  } catch {
+    // Unreadable is still in flight: never treat it as pending.
+    return { token: "", phase: "adding" };
+  }
+}
+
 function stateOf(status: string | undefined): VoiceWorkState {
+  if (decodeOp(status)) return "needs attention";
   if (status === "in_progress") return "made";
   if (status === "complete" || status === "skipped") return "settled";
   return "pending";
@@ -316,6 +358,7 @@ export async function planVoiceWork(
       source: "request",
       action: r.action,
       state: stateOf(r.status),
+      operation: decodeOp(r.status),
       target:
         r.action === "clone" && r.targetVoiceUuid
           ? (voiceById.get(r.targetVoiceUuid) ?? null)
@@ -334,6 +377,7 @@ export async function planVoiceWork(
         source: "archived voice",
         action: "restore",
         state: stateOf(tasks.get(id)),
+        operation: decodeOp(tasks.get(id)),
         target: row,
         replaces: null,
       });
@@ -346,6 +390,7 @@ export async function planVoiceWork(
       source: "no voice",
       action: first ? "clone" : "design",
       state: stateOf(tasks.get(id)),
+      operation: decodeOp(tasks.get(id)),
       target: first ? (voiceById.get(first.id) ?? null) : null,
       replaces: null,
     });
@@ -356,7 +401,9 @@ export async function planVoiceWork(
     items.filter((i) => i.action === "design").map((i) => i.characterId),
   );
   for (const item of items) {
-    if (item.state !== "pending") continue;
+    // A run that has only claimed the item revalidates it with this plan.
+    if (item.state !== "pending" && item.operation?.phase !== "claimed")
+      continue;
     const id = item.characterId;
     if (book.resolve(id)?.id !== id)
       item.refusals.push(`no characters row for ${id}`);
@@ -379,16 +426,35 @@ export async function planVoiceWork(
         ...check.refusals.map((r) => `${item.target!.display_name}: ${r}`),
       );
     }
-    item.needsSlot = item.refusals.length === 0;
+    item.needsSlot = item.state === "pending" && item.refusals.length === 0;
   }
 
   // The whole list planned together: items that replace a voice give that
-  // voice back; the rest take a free slot, then the policy's picks.
+  // voice back; the rest take a free slot, then the policy's picks. Every
+  // outgoing voice is reserved for one item only.
   const slotItems = items.filter((i) => i.needsSlot);
+  const replacing = slotItems.filter((i) => i.replaces);
   const others = slotItems.filter((i) => !i.replaces);
   const free = await planFreeSlots(deps, others.length, { bookId, issueId });
   let freeLeft = free.freeNow;
-  let pickAt = 0;
+  const reserved = new Set<string>();
+  const pool = [
+    ...free.pick.map((voice) => ({ voice, checked: true })),
+    ...free.spare.map((voice) => ({ voice, checked: false })),
+  ];
+  let poolAt = 0;
+  /** The next policy voice no other item holds; spares get their bucket check here. */
+  const nextPick = async (): Promise<VoiceRow | null> => {
+    while (poolAt < pool.length) {
+      const { voice, checked } = pool[poolAt++]!;
+      if (reserved.has(voice.id)) continue;
+      if (!checked && (await archiveRefusals(deps, voice, { needs })).length)
+        continue;
+      reserved.add(voice.id);
+      return voice;
+    }
+    return null;
+  };
   const leaves = (voice: VoiceRow, item: VoiceWorkItem) =>
     castlist
       .filter(
@@ -405,27 +471,41 @@ export async function planVoiceWork(
         issueId: c.issue_id,
         character: c.character,
       }));
+  const archiveFirst = (voice: VoiceRow, item: VoiceWorkItem): Outgoing => ({
+    kind: "archive",
+    voice,
+    order: "archive first",
+    refusals: [],
+    leavesWithoutVoice: leaves(voice, item),
+  });
+
+  // Replacements claim their own voice first; a second item replacing the
+  // same voice gets a policy pick instead.
+  const collided: VoiceWorkItem[] = [];
+  for (const item of replacing) {
+    if (reserved.has(item.replaces!.id)) collided.push(item);
+    else reserved.add(item.replaces!.id);
+  }
   for (const item of others) {
     if (freeLeft > 0) {
       item.outgoing = { kind: "free slot" };
       freeLeft--;
       continue;
     }
-    const voice = free.pick[pickAt++];
-    if (!voice) {
-      item.outgoing = null;
+    const voice = await nextPick();
+    item.outgoing = voice ? archiveFirst(voice, item) : null;
+  }
+  for (const item of replacing) {
+    const old = item.replaces!;
+    if (collided.includes(item)) {
+      const voice = await nextPick();
+      item.outgoing = voice ? archiveFirst(voice, item) : null;
+      item.warnings.push(
+        `${old.display_name} is already the outgoing voice of another item; ${voice ? `${voice.display_name} goes instead` : "no other voice can be archived"}`,
+      );
+      if (!voice) others.push(item);
       continue;
     }
-    item.outgoing = {
-      kind: "archive",
-      voice,
-      order: "archive first",
-      refusals: [],
-      leavesWithoutVoice: leaves(voice, item),
-    };
-  }
-  for (const item of slotItems.filter((i) => i.replaces)) {
-    const old = item.replaces!;
     const without = new Set(needs);
     without.delete(old.id);
     const refusals = await archiveRefusals(deps, old, { needs: without });
@@ -487,7 +567,11 @@ export type CarryOutResult =
   | { status: "refused"; reasons: string[] }
   /** The add was refused; nothing new exists. `restored` when the archived voice came back. */
   | { status: "failed"; reasons: string[]; restored?: string }
-  /** Stopped with something uncertain; nothing more was changed. */
+  /**
+   * Stopped with something uncertain. The operation stays recorded on the
+   * item's `casting_tasks` row, which refuses another create until
+   * `reconcile` settles it.
+   */
   | {
       status: "needs attention";
       reasons: string[];
@@ -521,13 +605,46 @@ function classify(err: unknown): Added {
   return { kind: "uncertain", reason: message(err) };
 }
 
+type ItemKey = Pick<
+  VoiceWorkItem,
+  "bookId" | "issueId" | "characterId" | "action" | "target"
+>;
+
+const taskRow = (client: SupabaseClient, item: ItemKey) =>
+  client
+    .from("casting_tasks")
+    .select("status")
+    .eq("book_id", item.bookId)
+    .eq("issue_id", item.issueId)
+    .eq("character_id", item.characterId);
+
+/** Moves the task row from `from` to `to`; false when the row is not at `from`. */
+async function moveTask(
+  client: SupabaseClient,
+  item: ItemKey,
+  from: string,
+  to: string,
+  completed = false,
+): Promise<boolean> {
+  const upd = await client
+    .from("casting_tasks")
+    .update({
+      status: to,
+      completed_at: completed ? new Date().toISOString() : null,
+    })
+    .eq("book_id", item.bookId)
+    .eq("issue_id", item.issueId)
+    .eq("character_id", item.characterId)
+    .eq("status", from)
+    .select("id");
+  fail(`moving ${item.characterId}'s casting task to ${to}`, upd.error);
+  return (upd.data ?? []).length > 0;
+}
+
 /** Upserts the item's `casting_tasks` row to `status`; inserts one for a speaker with no request. */
 async function markTask(
   client: SupabaseClient,
-  item: Pick<
-    VoiceWorkItem,
-    "bookId" | "issueId" | "characterId" | "action" | "target"
-  >,
+  item: ItemKey,
   status: "in_progress" | "complete",
 ): Promise<void> {
   const completed_at = status === "complete" ? new Date().toISOString() : null;
@@ -552,6 +669,44 @@ async function markTask(
   fail(`inserting ${item.characterId}'s casting task`, ins.error);
 }
 
+/**
+ * Claims the item for one run, atomically, before anything is spent: the
+ * task row moves from `pending` to the op record, or a row is inserted with
+ * it (the unique key refuses a second insert). Returns whether a row was
+ * inserted, so a release can remove it again.
+ */
+async function claimTask(
+  client: SupabaseClient,
+  item: ItemKey,
+  op: OpRecord,
+): Promise<{ ok: true; inserted: boolean } | { ok: false; reason: string }> {
+  const status = encodeOp(op);
+  if (await moveTask(client, item, "pending", status))
+    return { ok: true, inserted: false };
+  const { data, error } = await taskRow(client, item);
+  fail(`reading ${item.characterId}'s casting task`, error);
+  const held = (data ?? []) as { status: string }[];
+  if (held.length > 0)
+    return {
+      ok: false,
+      reason: `the item is ${stateOf(held[0]!.status)}${decodeOp(held[0]!.status) ? ` (operation at ${decodeOp(held[0]!.status)!.phase})` : ""}`,
+    };
+  const ins = await client.from("casting_tasks").insert({
+    book_id: item.bookId,
+    issue_id: item.issueId,
+    character_id: item.characterId,
+    action: item.action === "design" ? "design" : "clone",
+    target_voice_uuid: item.target?.id ?? null,
+    status,
+  });
+  if (ins.error)
+    return {
+      ok: false,
+      reason: `another run claimed the item first (${ins.error.message})`,
+    };
+  return { ok: true, inserted: true };
+}
+
 /** Points the character's castlist rows in every issue of the book at the voice; adds this issue's row first when it has none. */
 async function castVoice(
   client: SupabaseClient,
@@ -571,22 +726,161 @@ async function castVoice(
 }
 
 /**
+ * Records a voice that exists on ElevenLabs: its `voices` row (found by the
+ * ElevenLabs id first, so a rerun never inserts a second), the replaced
+ * voice's metadata, the castlist in every issue, and the task `in_progress`.
+ * Every write is safe to repeat.
+ */
+async function recordVoice(
+  deps: VoiceSlotsDeps,
+  item: VoiceWorkItem,
+  elevenLabsId: string,
+  description: string | null,
+  restored: boolean,
+): Promise<{ voiceUuid: string; castlistRows: number }> {
+  const sb = deps.supabase;
+  const { characterId } = item;
+  let voiceUuid: string;
+  if (item.action === "design") {
+    const found = await sb
+      .from("voices")
+      .select("id")
+      .eq("current_elevenlabs_id", elevenLabsId)
+      .limit(1);
+    fail(`looking up ${elevenLabsId}`, found.error);
+    voiceUuid =
+      ((found.data ?? []) as { id: string }[])[0]?.id ??
+      (await registerVoice(sb, {
+        display_name: item.name,
+        current_elevenlabs_id: elevenLabsId,
+        description,
+        labels: null,
+        source_clip_path: null,
+        source_clip_md5: null,
+        character_id: characterId,
+        design_prompt: description,
+      }));
+  } else {
+    voiceUuid = item.target!.id;
+    if (!restored) {
+      const row = await readVoice(sb, voiceUuid);
+      if (row?.current_elevenlabs_id !== elevenLabsId)
+        await markRestored(sb, row ?? item.target!, elevenLabsId);
+    }
+    const own = await sb
+      .from("voices")
+      .update({ character_id: characterId })
+      .eq("id", voiceUuid)
+      .is("character_id", null);
+    fail(`filing ${voiceUuid} under ${characterId}`, own.error);
+  }
+  if (item.replaces) {
+    // #114 decision 2: the new voice carries the replaced one's metadata.
+    const copy = await sb
+      .from("voices")
+      .update({
+        description: item.replaces.description,
+        labels: item.replaces.labels,
+      })
+      .eq("id", voiceUuid);
+    fail(`copying ${item.replaces.display_name}'s metadata`, copy.error);
+  }
+  const castlistRows = await castVoice(
+    sb,
+    item.bookId,
+    item.issueId,
+    characterId,
+    voiceUuid,
+  );
+  await markTask(sb, item, "in_progress");
+  return { voiceUuid, castlistRows };
+}
+
+/**
  * Performs one item of the issue's voice work. `archiveVoiceId` is the only
- * voice it may archive (null: use a free slot). Re-plans first and refuses
- * when the item changed, is not pending, or is refused; checks headroom
- * before anything is archived; holds the operation claim on every `voices`
- * row it changes; never retries a request. When the add is refused after an
- * archive, the archived voice is restored from its bucket copy; when an
- * add's reply is lost, the new voice is looked up on ElevenLabs, and when
- * that cannot tell, it stops with "needs attention".
+ * voice it may archive (null: use a free slot).
+ *
+ * First it claims the item on its `casting_tasks` row, atomically, before
+ * any paid call (Gemini included), then re-plans and refuses when the item
+ * changed or is refused. Each step is recorded on that row before and after
+ * it spends (`archiving`, `archived`, `adding`, `added`), with the inventory
+ * and the per-add token, so a crash or an uncertain reply leaves the item
+ * "needs attention" and no second create runs until `reconcile` settles it.
+ * It holds the operation claim on every `voices` row it changes and never
+ * retries a request. A refused add after an archive restores the archived
+ * voice; a lost reply is matched only by the add's token, name and the
+ * inventory taken before it.
  */
 export async function carryOut(
   deps: VoiceSlotsDeps,
-  item: Pick<
-    VoiceWorkItem,
-    "bookId" | "issueId" | "characterId" | "action" | "target"
-  >,
+  item: ItemKey,
   opts: { archiveVoiceId: string | null },
+): Promise<CarryOutResult> {
+  const sb = deps.supabase;
+  const op: OpRecord = { token: randomUUID(), phase: "claimed" };
+  const claim = await claimTask(sb, item, op);
+  if (!claim.ok) return { status: "refused", reasons: [claim.reason] };
+
+  let status = encodeOp(op);
+  /** Records the next phase; the row must still hold the previous one. */
+  const record = async (next: Partial<OpRecord>) => {
+    Object.assign(op, next);
+    const to = encodeOp(op);
+    if (!(await moveTask(sb, item, status, to)))
+      throw new Error("the item's operation record changed under this run");
+    status = to;
+  };
+
+  try {
+    const result = await carryOutClaimed(deps, item, opts, op, record);
+    // Refused or failed: nothing of the operation remains, give the item back.
+    if (result.status === "refused" || result.status === "failed")
+      await releaseTaskAt(sb, item, status, claim.inserted);
+    return result;
+  } catch (err) {
+    if (op.phase === "claimed") {
+      await releaseTaskAt(sb, item, status, claim.inserted).catch(
+        () => undefined,
+      );
+      throw err;
+    }
+    return {
+      status: "needs attention",
+      reasons: [
+        `stopped after ${op.phase}: ${message(err)}`,
+        "the operation is recorded on the item; run reconcile",
+      ],
+    };
+  }
+}
+
+/** Gives the item back when nothing of the operation remains. */
+async function releaseTaskAt(
+  client: SupabaseClient,
+  item: ItemKey,
+  status: string,
+  inserted: boolean,
+): Promise<void> {
+  if (!inserted) {
+    await moveTask(client, item, status, "pending");
+    return;
+  }
+  const del = await client
+    .from("casting_tasks")
+    .delete()
+    .eq("book_id", item.bookId)
+    .eq("issue_id", item.issueId)
+    .eq("character_id", item.characterId)
+    .eq("status", status);
+  fail(`releasing ${item.characterId}'s casting task`, del.error);
+}
+
+async function carryOutClaimed(
+  deps: VoiceSlotsDeps,
+  item: ItemKey,
+  opts: { archiveVoiceId: string | null },
+  op: OpRecord,
+  record: (next: Partial<OpRecord>) => Promise<void>,
 ): Promise<CarryOutResult> {
   const sb = deps.supabase;
   const refuse = (...reasons: string[]): CarryOutResult => ({
@@ -595,6 +889,7 @@ export async function carryOut(
   });
   const { bookId, issueId, characterId } = item;
 
+  // Revalidate under the claim: the plan shows this run's own record.
   const plan = await planVoiceWork(deps, bookId, issueId);
   const fresh = plan.items.find((i) => i.characterId === characterId);
   if (!fresh) return refuse(`${characterId} is no longer voice work here`);
@@ -603,7 +898,8 @@ export async function carryOut(
     (fresh.target?.id ?? null) !== (item.target?.id ?? null)
   )
     return refuse("the item changed since its plan; plan again");
-  if (fresh.state !== "pending") return refuse(`the item is ${fresh.state}`);
+  if (fresh.operation?.token !== op.token)
+    return refuse(`the item is ${fresh.state}`);
   if (fresh.refusals.length > 0) return refuse(...fresh.refusals);
   if (plan.addEditHeadroom < 1)
     return refuse(
@@ -623,10 +919,10 @@ export async function carryOut(
   if (archiveRow && fresh.replaces?.id === archiveRow.id)
     needs.delete(archiveRow.id);
   if (archiveRow) {
-    const refused = await archiveRefusals(deps, archiveRow, { needs });
-    if (refused.length > 0)
+    const why = await archiveRefusals(deps, archiveRow, { needs });
+    if (why.length > 0)
       return refuse(
-        `${archiveRow.display_name} cannot be archived: ${refused.join(", ")}`,
+        `${archiveRow.display_name} cannot be archived: ${why.join(", ")}`,
       );
   }
 
@@ -658,48 +954,46 @@ export async function carryOut(
       };
   }
 
+  // The inventory before anything changes: a lost reply is matched against it.
+  let before: string[];
+  try {
+    before = (await listVoices(deps)).map((v) => v.voice_id);
+  } catch (err) {
+    return refuse(`could not list the account's voices: ${message(err)}`);
+  }
   const name = fresh.target?.display_name ?? fresh.name;
   const archived = archiveRow
     ? { id: archiveRow.id, name: archiveRow.display_name }
     : undefined;
 
-  const add = async (): Promise<Added> => {
-    if (fresh.action === "design") {
-      try {
-        const r = await designVoice(deps, {
-          name,
-          description: description!,
-          meta: { step: "voices-stop", bookId, issueId },
-        });
-        return { kind: "added", elevenLabsId: r.voice_id, recorded: false };
-      } catch (err) {
-        return classify(err);
-      }
-    }
-    try {
-      const r = await restoreVoice(deps, fresh.target!, { execute: true });
-      if (!r.executed || !r.newElevenLabsId)
-        return { kind: "refused", reason: r.refusals.join(", ") };
-      return { kind: "added", elevenLabsId: r.newElevenLabsId, recorded: true };
-    } catch (err) {
-      return classify(err);
-    }
-  };
-
   const run = async (): Promise<CarryOutResult> => {
     const warnings: string[] = [];
     let didArchive = false;
-    if (!addFirst && archiveRow) {
+    let deleteConfirmed = false;
+    const archive = async () => {
       try {
-        const r = await archiveVoice(deps, archiveRow, {
+        const r = await archiveVoice(deps, archiveRow!, {
           needs,
           execute: true,
         });
-        if (!r.executed)
-          return refuse(
-            `${archiveRow.display_name} cannot be archived: ${r.refusals.join(", ")}`,
-          );
-        didArchive = true;
+        return r.executed
+          ? { ok: true as const }
+          : { ok: false as const, why: r.refusals.join(", ") };
+      } catch (err) {
+        if (err instanceof ArchiveRecordError) {
+          deleteConfirmed = true;
+          warnings.push(err.message);
+          return { ok: true as const };
+        }
+        throw err;
+      }
+    };
+
+    if (!addFirst && archiveRow) {
+      await record({ phase: "archiving", archived: archiveRow.id });
+      let r;
+      try {
+        r = await archive();
       } catch (err) {
         return {
           status: "needs attention",
@@ -710,124 +1004,93 @@ export async function carryOut(
           archived,
         };
       }
+      if (!r.ok)
+        return refuse(
+          `${archiveRow.display_name} cannot be archived: ${r.why}`,
+        );
+      didArchive = true;
+      await record({ phase: "archived" });
     }
 
-    let added = await add();
+    await record({ phase: "adding", before, name });
+    let added: Added;
+    if (fresh.action === "design") {
+      try {
+        const r = await designVoice(deps, {
+          name,
+          description: description!,
+          opToken: op.token,
+          meta: { step: "voices-stop", bookId, issueId },
+        });
+        added = { kind: "added", elevenLabsId: r.voice_id, recorded: false };
+      } catch (err) {
+        added = classify(err);
+      }
+    } else {
+      try {
+        const r = await restoreVoice(deps, fresh.target!, {
+          execute: true,
+          opToken: op.token,
+        });
+        added =
+          r.executed && r.newElevenLabsId
+            ? { kind: "added", elevenLabsId: r.newElevenLabsId, recorded: true }
+            : { kind: "refused", reason: r.refusals.join(", ") };
+      } catch (err) {
+        added = classify(err);
+      }
+    }
+
     if (added.kind === "refused") {
       if (!didArchive) return { status: "failed", reasons: [added.reason] };
-      try {
-        const back = await readVoice(sb, archiveRow!.id);
-        const r = back
-          ? await restoreVoice(deps, back, { execute: true })
-          : null;
-        if (r?.executed)
-          return {
+      const back = await restoreArchived(deps, archiveRow!, deleteConfirmed);
+      return back.ok
+        ? {
             status: "failed",
             reasons: [added.reason],
             restored: archiveRow!.display_name,
+          }
+        : {
+            status: "needs attention",
+            reasons: [added.reason, back.why],
+            archived,
           };
-        return {
-          status: "needs attention",
-          reasons: [
-            added.reason,
-            `restoring ${archiveRow!.display_name} was refused: ${r?.refusals.join(", ") ?? "row not found"}`,
-          ],
-          archived,
-        };
-      } catch (err) {
-        return {
-          status: "needs attention",
-          reasons: [
-            added.reason,
-            `restoring ${archiveRow!.display_name} did not finish: ${message(err)}`,
-          ],
-          archived,
-        };
-      }
     }
     if (added.kind === "uncertain") {
-      let found: string[] = [];
-      let lookup = "";
-      try {
-        const known = new Set(
-          (await readVoices(sb))
-            .map((v) => v.current_elevenlabs_id)
-            .filter((id): id is string => Boolean(id)),
-        );
-        found = await findUnknownVoicesNamed(deps, name, known);
-      } catch (err) {
-        lookup = `the lookup failed: ${message(err)}`;
-      }
-      if (found.length !== 1)
+      const found = await matchLostAdd(deps, op);
+      if (!found.ok)
         return {
           status: "needs attention",
           reasons: [
             `the add's reply was lost: ${added.reason}`,
-            lookup ||
-              (found.length === 0
-                ? `no unregistered ElevenLabs voice named "${name}"`
-                : `${found.length} unregistered ElevenLabs voices named "${name}"`),
+            found.why,
             "nothing was retried and nothing more was changed",
           ],
           archived: didArchive ? archived : undefined,
         };
       warnings.push(
-        `the add's reply was lost (${added.reason}); found the new voice ${found[0]} on ElevenLabs`,
+        `the add's reply was lost (${added.reason}); found the new voice ${found.id} by its token`,
       );
-      added = { kind: "added", elevenLabsId: found[0]!, recorded: false };
+      added = { kind: "added", elevenLabsId: found.id, recorded: false };
     }
 
     const elevenLabsId = added.elevenLabsId;
-    let voiceUuid: string;
-    let castlistRows: number;
+    await record({ phase: "added", elevenLabsId });
+    let saved: { voiceUuid: string; castlistRows: number };
     try {
-      if (fresh.action === "design") {
-        voiceUuid = await registerVoice(sb, {
-          display_name: name,
-          current_elevenlabs_id: elevenLabsId,
-          description,
-          labels: null,
-          source_clip_path: null,
-          source_clip_md5: null,
-          character_id: characterId,
-          design_prompt: description,
-        });
-      } else {
-        voiceUuid = fresh.target!.id;
-        if (!added.recorded)
-          await markRestored(sb, fresh.target!, elevenLabsId);
-        const own = await sb
-          .from("voices")
-          .update({ character_id: characterId })
-          .eq("id", voiceUuid)
-          .is("character_id", null);
-        fail(`filing ${voiceUuid} under ${characterId}`, own.error);
-      }
-      if (fresh.replaces) {
-        // #114 decision 2: the new voice carries the replaced one's metadata.
-        const copy = await sb
-          .from("voices")
-          .update({
-            description: fresh.replaces.description,
-            labels: fresh.replaces.labels,
-          })
-          .eq("id", voiceUuid);
-        fail(`copying ${fresh.replaces.display_name}'s metadata`, copy.error);
-      }
-      castlistRows = await castVoice(
-        sb,
-        bookId,
-        issueId,
-        characterId,
-        voiceUuid,
+      saved = await recordVoice(
+        deps,
+        fresh,
+        elevenLabsId,
+        description,
+        added.recorded,
       );
-      await markTask(sb, fresh, "in_progress");
     } catch (err) {
       return {
         status: "needs attention",
         reasons: [
           `the voice ${elevenLabsId} exists on ElevenLabs, but recording it failed: ${message(err)}`,
-          "do not run the item again; fix the rows by hand",
+          "the item refuses another create; reconcile finishes the rows",
         ],
         archived: didArchive ? archived : undefined,
         newElevenLabsId: elevenLabsId,
@@ -836,14 +1099,11 @@ export async function carryOut(
 
     if (addFirst && archiveRow) {
       try {
-        const r = await archiveVoice(deps, archiveRow, {
-          needs,
-          execute: true,
-        });
-        if (r.executed) didArchive = true;
+        const r = await archive();
+        if (r.ok) didArchive = true;
         else
           warnings.push(
-            `${archiveRow.display_name} was not archived: ${r.refusals.join(", ")}`,
+            `${archiveRow.display_name} was not archived: ${r.why}`,
           );
       } catch (err) {
         warnings.push(
@@ -853,16 +1113,17 @@ export async function carryOut(
     }
     return {
       status: "done",
-      voiceUuid,
+      voiceUuid: saved.voiceUuid,
       elevenLabsId,
-      castlistRows,
+      castlistRows: saved.castlistRows,
       archived: didArchive ? (archived ?? null) : null,
       warnings,
     };
   };
 
-  // Claims: the voice archived, and the voice that comes back (or, for a
-  // design, the voice it replaces). A design with neither has no row to hold.
+  // Claims on the `voices` rows it changes: the voice archived, and the
+  // voice that comes back (or, for a design, the voice it replaces). The
+  // task-row claim above covers a design that changes no existing row.
   const held =
     fresh.target ?? (fresh.action === "design" ? fresh.replaces : null);
   const holdTarget = () =>
@@ -874,6 +1135,164 @@ export async function carryOut(
     : holdTarget();
 }
 
+/** Brings an archived voice back after a refused add. */
+async function restoreArchived(
+  deps: VoiceSlotsDeps,
+  voice: VoiceRow,
+  deleteConfirmed: boolean,
+): Promise<{ ok: true } | { ok: false; why: string }> {
+  try {
+    const back = await readVoice(deps.supabase, voice.id);
+    if (!back)
+      return { ok: false, why: `${voice.display_name}: row not found` };
+    const r = await restoreVoice(deps, back, {
+      execute: true,
+      deleteConfirmed,
+    });
+    return r.executed
+      ? { ok: true }
+      : {
+          ok: false,
+          why: `restoring ${voice.display_name} was refused: ${r.refusals.join(", ")}`,
+        };
+  } catch (err) {
+    return {
+      ok: false,
+      why: `restoring ${voice.display_name} did not finish: ${message(err)}`,
+    };
+  }
+}
+
+/** The one voice a lost add made, by its token, name and the inventory before it. */
+async function matchLostAdd(
+  deps: VoiceSlotsDeps,
+  op: OpRecord,
+): Promise<{ ok: true; id: string } | { ok: false; why: string }> {
+  if (!op.before || !op.name)
+    return { ok: false, why: "the add's inventory was not recorded" };
+  try {
+    const ids = await findOpVoices(deps, {
+      token: op.token,
+      name: op.name,
+      before: op.before,
+    });
+    if (ids.length === 1) return { ok: true, id: ids[0]! };
+    return {
+      ok: false,
+      why:
+        ids.length === 0
+          ? `no new ElevenLabs voice named "${op.name}" carries this add's token`
+          : `${ids.length} new voices carry this add's token`,
+    };
+  } catch (err) {
+    return { ok: false, why: `the lookup failed: ${message(err)}` };
+  }
+}
+
+/**
+ * Settles an item that `carryOut` left "needs attention", from the record on
+ * its task row; it makes no new voice. `added`: finishes the rows. `adding`:
+ * adopts the voice carrying the add's token, or, with `notAdded` (the owner
+ * checked ElevenLabs), restores what was archived and gives the item back.
+ * `claimed` and `archived`: restores what was archived and gives it back.
+ * `archiving`: can't tell whether the DELETE landed, so it stops.
+ */
+export async function reconcile(
+  deps: VoiceSlotsDeps,
+  item: ItemKey,
+  opts: { notAdded?: boolean } = {},
+): Promise<CarryOutResult> {
+  const sb = deps.supabase;
+  const { data, error } = await taskRow(sb, item);
+  fail(`reading ${item.characterId}'s casting task`, error);
+  const status = ((data ?? []) as { status: string }[])[0]?.status ?? "";
+  const op = decodeOp(status);
+  if (!op)
+    return {
+      status: "refused",
+      reasons: [`nothing to reconcile: the item is ${stateOf(status)}`],
+    };
+  const plan = await planVoiceWork(deps, item.bookId, item.issueId);
+  const fresh = plan.items.find((i) => i.characterId === item.characterId);
+  if (!fresh) return { status: "refused", reasons: ["the item is gone"] };
+  const archivedRow = op.archived ? await readVoice(sb, op.archived) : null;
+  const archived = archivedRow
+    ? { id: archivedRow.id, name: archivedRow.display_name }
+    : undefined;
+  const giveBack = async (): Promise<CarryOutResult> => {
+    if (archivedRow) {
+      const back = await restoreArchived(deps, archivedRow, false);
+      if (!back.ok)
+        return { status: "needs attention", reasons: [back.why], archived };
+    }
+    if (!(await moveTask(sb, item, status, "pending")))
+      return {
+        status: "needs attention",
+        reasons: ["the item's record changed during reconcile"],
+      };
+    return {
+      status: "failed",
+      reasons: ["no voice was made; the item is pending again"],
+      restored: archived?.name,
+    };
+  };
+
+  let elevenLabsId = op.elevenLabsId;
+  if (op.phase === "archiving")
+    return {
+      status: "needs attention",
+      reasons: [
+        "the archive's DELETE may or may not have landed; check ElevenLabs, then Restore the voice from /admin/voices if it is gone",
+      ],
+      archived,
+    };
+  if (op.phase === "claimed" || op.phase === "archived") return giveBack();
+  if (op.phase === "adding") {
+    const found = await matchLostAdd(deps, op);
+    if (!found.ok) {
+      if (opts.notAdded) return giveBack();
+      return { status: "needs attention", reasons: [found.why], archived };
+    }
+    elevenLabsId = found.id;
+    Object.assign(op, { phase: "added", elevenLabsId });
+    if (!(await moveTask(sb, item, status, encodeOp(op))))
+      return {
+        status: "needs attention",
+        reasons: ["the item's record changed during reconcile"],
+      };
+  }
+  const description =
+    fresh.action === "design"
+      ? ((await readDescriptions(sb, [item.characterId])).get(
+          voiceDesignAppearanceId(item.characterId),
+        ) ?? null)
+      : null;
+  try {
+    const saved = await recordVoice(
+      deps,
+      fresh,
+      elevenLabsId!,
+      description,
+      false,
+    );
+    return {
+      status: "done",
+      voiceUuid: saved.voiceUuid,
+      elevenLabsId: elevenLabsId!,
+      castlistRows: saved.castlistRows,
+      archived: archived ?? null,
+      warnings: ["reconciled from the recorded operation"],
+    };
+  } catch (err) {
+    return {
+      status: "needs attention",
+      reasons: [`recording ${elevenLabsId} failed again: ${message(err)}`],
+      archived,
+      newElevenLabsId: elevenLabsId,
+    };
+  }
+}
+
 export type SettleOutcome =
   /** He accepts the voice `carryOut` made. */
   | { kind: "accept" }
@@ -882,22 +1301,59 @@ export type SettleOutcome =
   /** No audio for this character this run. */
   | { kind: "no audio" };
 
-/** Settles one item: marks its `casting_tasks` row complete, after pointing the cast at a picked voice. */
+/**
+ * Writes the skip sentinel on the character's castlist rows in this issue
+ * (adding the row through `cast.ts` when there is none), with `voice_uuid`
+ * cleared, so the audio step skips its bubbles. Rows match as `cast.ts`
+ * matches them; `cast.ts` has no skip writer, so the update is here.
+ */
+async function skipInIssue(
+  client: SupabaseClient,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+): Promise<void> {
+  const here = (book: BookCast) =>
+    book.rows.filter(
+      (r) => r.issue_id === issueId && rowCharacter(book, r) === characterId,
+    );
+  let rows = here(await loadBookCast(client, bookId));
+  if (rows.length === 0) {
+    await addToCast(client, bookId, issueId, characterId);
+    rows = here(await loadBookCast(client, bookId));
+  }
+  for (const row of rows) {
+    const upd = await client
+      .from("castlist")
+      .update({
+        character_id: characterId,
+        voice_id: SKIPPED_VOICE,
+        voice_uuid: null,
+      })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("character", row.character);
+    fail(`skipping ${characterId} in ${issueId}`, upd.error);
+  }
+}
+
+/** Settles one item: points the cast at a picked voice or skips the character, then marks its `casting_tasks` row complete. */
 export async function settle(
   client: SupabaseClient,
-  item: Pick<
-    VoiceWorkItem,
-    "bookId" | "issueId" | "characterId" | "action" | "target"
-  >,
+  item: ItemKey,
   outcome: SettleOutcome,
 ): Promise<void> {
-  if (outcome.kind === "accept") {
-    const tasks = await readTasks(client, item.bookId, item.issueId);
-    if (tasks.get(item.characterId) !== "in_progress")
-      throw new Error(
-        `voice work: ${item.characterId} has no voice made to accept`,
-      );
-  }
+  const { data, error } = await taskRow(client, item);
+  fail(`reading ${item.characterId}'s casting task`, error);
+  const status = ((data ?? []) as { status: string }[])[0]?.status;
+  if (status && decodeOp(status))
+    throw new Error(
+      `voice work: ${item.characterId} has an operation to reconcile first`,
+    );
+  if (outcome.kind === "accept" && status !== "in_progress")
+    throw new Error(
+      `voice work: ${item.characterId} has no voice made to accept`,
+    );
   if (outcome.kind === "pick") {
     const voice = await readVoice(client, outcome.voiceUuid);
     if (voice?.status !== "active")
@@ -912,5 +1368,7 @@ export async function settle(
       voice.id,
     );
   }
+  if (outcome.kind === "no audio")
+    await skipInIssue(client, item.bookId, item.issueId, item.characterId);
   await markTask(client, item, "complete");
 }

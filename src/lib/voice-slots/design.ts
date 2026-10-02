@@ -1,6 +1,7 @@
 import { recordElevenLabsCall, type LlmCallMeta } from "~/lib/llm-usage";
 import {
   ElevenLabsRefusedError,
+  OP_LABEL,
   el,
   failure,
   requireHeadroom,
@@ -11,6 +12,8 @@ export interface DesignVoiceInput {
   /** The ElevenLabs voice name; the lookup after an unread reply matches on it. */
   name: string;
   description: string;
+  /** Minted per add; sent as the `OP_LABEL` label so a lost reply can be matched. */
+  opToken?: string;
   /** Where the `llm_calls` rows say the two requests came from. */
   meta: LlmCallMeta;
 }
@@ -71,6 +74,7 @@ export async function designVoice(
           voice_name: input.name,
           voice_description: input.description,
           generated_voice_id: generatedId,
+          ...(input.opToken ? { labels: { [OP_LABEL]: input.opToken } } : {}),
         }),
       }),
   );
