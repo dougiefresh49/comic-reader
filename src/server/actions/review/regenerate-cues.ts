@@ -86,7 +86,7 @@ export async function regenerateCues(args: Args) {
     if (error) return { ok: false, error: error.message };
 
     revalidatePath(
-      `/admin/${args.bookId}/${args.issueId}/review/bubbles`,
+      `/admin/${args.bookId}/${args.issueId}/review/editor`,
       "page",
     );
     await revalidateReaderPages(

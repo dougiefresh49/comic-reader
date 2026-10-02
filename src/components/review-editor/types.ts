@@ -19,6 +19,8 @@ export interface SrcPage {
   width: number;
   height: number;
   imageUrl: string;
+  /** `pages.reviewed_at`: when the owner approved the page, or null. */
+  reviewedAt: string | null;
 }
 
 export interface SrcPanel {
@@ -105,4 +107,6 @@ export interface EditorData {
   voices: VoiceOption[];
   slotsUsed: number;
   slotsTotal: number;
+  /** The issue's run is paused at the pages gate (`review-pages`), so "Approve issue" shows. */
+  atPagesGate: boolean;
 }
