@@ -1253,8 +1253,9 @@ async function storeLookaheadFacesOrFatal(
     );
   }
 
-  // A named face is one detection per character per panel, as before. An
-  // unnamed face has no key: each one gets its own row.
+  // As before, a named face reuses a detection already stored for its
+  // character on its panel; within this batch every crop gets its own row.
+  // An unnamed face has no key.
   const namedKey = (name: string | null, panelId: string) =>
     `${name}::${panelId}`;
   const detectionByKey = new Map<string, string>();
@@ -1287,7 +1288,6 @@ async function storeLookaheadFacesOrFatal(
       identification_confidence: f.result.confidence,
     });
     detectionIds.push(id);
-    if (key) detectionByKey.set(key, id);
   }
 
   if (newRows.length > 0) {
@@ -1327,23 +1327,26 @@ async function storeLookaheadFacesOrFatal(
     }
   } catch (e) {
     // An exemplar carrying one of this call's new detection ids is one this
-    // call created: delete those before the detections, whose delete would
-    // otherwise null their detection_id and leave them for the rerun's dedupe.
-    const undo: string[] = [];
+    // call created: delete those first. The detections go only after that
+    // succeeds, since their delete would null a surviving exemplar's
+    // detection_id and leave it for the rerun's dedupe.
+    let undo = "";
     try {
       await deleteExemplars(supabase, newIds);
+      if (newIds.length > 0) {
+        const { error } = await supabase
+          .from("panel_character_detections")
+          .delete()
+          .in("id", newIds);
+        if (error) {
+          undo = `; undo failed, detections delete: ${error.message}`;
+        }
+      }
     } catch (undoErr: unknown) {
-      undo.push(errorText(undoErr));
-    }
-    if (newIds.length > 0) {
-      const { error } = await supabase
-        .from("panel_character_detections")
-        .delete()
-        .in("id", newIds);
-      if (error) undo.push(`detections delete: ${error.message}`);
+      undo = `; undo failed, exemplars and detections left as stored: ${errorText(undoErr)}`;
     }
     throw new FatalError(
-      `character_face_exemplars write failed for ${pageLabel}: ${errorText(e)}${undo.length > 0 ? `; undo failed: ${undo.join("; ")}` : ""}`,
+      `character_face_exemplars write failed for ${pageLabel}: ${errorText(e)}${undo}`,
     );
   }
 
@@ -1354,16 +1357,14 @@ async function storeLookaheadFacesOrFatal(
  * Groups every unnamed face in the issue by embedding (`groupFaces`) and
  * writes the group to `cluster_id`, a group of one included (#348). Each run
  * regroups the whole issue, so the last page's run leaves the final grouping;
- * only rows whose group changed are written. With `onlyIfUngrouped` it does
- * nothing unless some unnamed face has no group yet, which heals a run that
- * stored faces and then failed here.
+ * only rows whose group changed are written. A page skipped as stored
+ * regroups too, which repairs a run that failed partway through these writes.
  */
 async function groupUnnamedFacesOrFatal(
   supabase: TypedClient,
   bookId: string,
   issueId: string,
   pageLabel: string,
-  { onlyIfUngrouped }: { onlyIfUngrouped: boolean },
 ): Promise<{ faces: number; groups: number; updated: number } | null> {
   const fail = (what: string, message: string) =>
     new FatalError(`${what} failed for ${pageLabel} (face groups): ${message}`);
@@ -1390,7 +1391,6 @@ async function groupUnnamedFacesOrFatal(
     );
   }
   if (dets.length === 0) return null;
-  if (onlyIfUngrouped && dets.every((d) => d.cluster_id !== null)) return null;
 
   const {
     data: exemplars,
@@ -1485,9 +1485,7 @@ export async function characterLookaheadPage(
   if ("skip" in page) {
     console.log(`[lookahead] ${pageLabel}: ${page.skip}, skip`);
     if (page.stored) {
-      await groupUnnamedFacesOrFatal(supabase, bookId, issueId, pageLabel, {
-        onlyIfUngrouped: true,
-      });
+      await groupUnnamedFacesOrFatal(supabase, bookId, issueId, pageLabel);
     }
     return;
   }
@@ -1512,7 +1510,6 @@ export async function characterLookaheadPage(
     bookId,
     issueId,
     pageLabel,
-    { onlyIfUngrouped: stored.unnamed === 0 },
   );
 
   console.log(
