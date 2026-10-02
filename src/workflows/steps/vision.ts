@@ -2,7 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
 import { GEMINI_MEDIUM } from "~/lib/models";
-import { filterDuplicatePanels, filterSliverPanels } from "~/lib/panel-filter";
+import { filterDuplicateBubbles } from "~/lib/bubble-filter";
+import {
+  bubbleCenter,
+  filterDuplicatePanels,
+  filterSliverPanels,
+  matchBubblePanel,
+} from "~/lib/panel-filter";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json, TablesInsert } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
@@ -434,6 +440,106 @@ async function linkFullPagePanel(
   }
 }
 
+/**
+ * Link the page's unlinked bubbles to its panels with the backfill-panels
+ * matcher (#306). `image` is the pixel size `box_2d` is measured in; without
+ * it the pages row is read, and with neither the page is skipped. A bubble
+ * already linked (full-page panel, review, apply-fixes) is never touched.
+ */
+async function linkBubblesToPanels(
+  supabase: TypedClient,
+  bookId: string,
+  issueId: string,
+  pageNumber: number,
+  pageLabel: string,
+  image: { width: number; height: number } | null,
+) {
+  const { data: bubbles, error: bErr } = await supabase
+    .from("bubbles")
+    .select("id, box_2d")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("page_number", pageNumber)
+    .is("panel_id", null);
+  if (bErr) {
+    throw new FatalError(
+      `unlinked bubbles read failed for ${pageLabel}: ${bErr.message}`,
+    );
+  }
+  if (bubbles.length === 0) return;
+
+  const { data: panels, error: pErr } = await supabase
+    .from("panels")
+    .select("id, bounding_box")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("page_number", pageNumber);
+  if (pErr) {
+    throw new FatalError(
+      `panels read failed for ${pageLabel}: ${pErr.message}`,
+    );
+  }
+  if (panels.length === 0) return;
+
+  let size = image;
+  if (!size) {
+    const { data: pageRow, error: sizeErr } = await supabase
+      .from("pages")
+      .select("width, height")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("number", pageNumber)
+      .maybeSingle();
+    if (sizeErr) {
+      throw new FatalError(
+        `pages read failed for ${pageLabel}: ${sizeErr.message}`,
+      );
+    }
+    size = pageRow;
+  }
+  if (!size || !(size.width > 0) || !(size.height > 0)) {
+    console.warn(
+      `[link] ${pageLabel}: no image size, ${bubbles.length} bubbles left unlinked`,
+    );
+    return;
+  }
+
+  const boxed = panels.map((p) => ({
+    id: p.id,
+    bounding_box: p.bounding_box as BoundingBoxJson,
+  }));
+  let linked = 0;
+  let noBox = 0;
+  for (const bubble of bubbles) {
+    const center = bubbleCenter(bubble.box_2d, size);
+    const { panel } = center
+      ? matchBubblePanel(center, boxed)
+      : { panel: null };
+    if (!panel) {
+      noBox++;
+      continue;
+    }
+    const { data, error } = await supabase
+      .from("bubbles")
+      .update({ panel_id: panel.id })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("page_number", pageNumber)
+      .eq("id", bubble.id)
+      .is("panel_id", null)
+      .select("id");
+    if (error) {
+      throw new FatalError(
+        `bubble panel link failed for ${pageLabel}: ${error.message}`,
+      );
+    }
+    linked += data.length;
+  }
+  console.log(
+    `[link] ${pageLabel}: ${linked} bubbles linked to panels, ${noBox} left unlinked with no usable box_2d`,
+  );
+}
+
 export async function roboflowAnalyzeBatch(
   bookId: string,
   issueId: string,
@@ -510,6 +616,15 @@ export async function roboflowAnalyzeBatch(
           pageLabel,
         );
       }
+      // A rerun links rows already in the DB; page is the pages row.
+      await linkBubblesToPanels(
+        supabase,
+        bookId,
+        issueId,
+        page.pageNumber,
+        pageLabel,
+        page,
+      );
       console.log(
         `[roboflow] ${pageLabel}: page_segmentation already present, skip Roboflow call`,
       );
@@ -530,9 +645,31 @@ export async function roboflowAnalyzeBatch(
     const {
       panelPredictions,
       image: imgDims,
-      bubblePredictions,
+      bubblePredictions: rawBubbles,
       segmentationPredictions: segPreds,
     } = read.parsed;
+    // One box per balloon (#311), before the panel filters see the centers.
+    const bubbleFilter = filterDuplicateBubbles(
+      rawBubbles.map((b, idx) => ({
+        idx,
+        confidence: b.confidence,
+        bounding_box: {
+          x: b.x - b.width / 2,
+          y: b.y - b.height / 2,
+          w: b.width,
+          h: b.height,
+        },
+      })),
+    );
+    for (const { bounding_box: b, confidence } of bubbleFilter.dropped) {
+      console.log(
+        `[roboflow] ${pageLabel}: dropped duplicate bubble x ${Math.round(b.x)} y ${Math.round(b.y)} w ${Math.round(b.w)} h ${Math.round(b.h)} conf ${confidence.toFixed(3)}`,
+      );
+    }
+    const keptBubbleIdx = new Set(bubbleFilter.kept.map((c) => c.idx));
+    const bubblePredictions = rawBubbles.filter((_, idx) =>
+      keptBubbleIdx.has(idx),
+    );
     // Filter before the final map so sort_order and panel_id stay contiguous.
     const bubbleCenters = bubblePredictions.map((b) => ({
       x: b.x / imgDims.width,
@@ -638,6 +775,14 @@ export async function roboflowAnalyzeBatch(
     if (fullPage || onlyFullPage) {
       await linkFullPagePanel(supabase, fullPageRow, fullPage, pageLabel);
     }
+    await linkBubblesToPanels(
+      supabase,
+      bookId,
+      issueId,
+      page.pageNumber,
+      pageLabel,
+      imgDims,
+    );
 
     console.log(
       `[roboflow] ${bookId}/${issueId}: ${pageLabel} → ${fullPage ? "1 full-page" : panelRows.length} panels, ${bubbleRows.length} bubbles, ${segPreds.length} segments`,
@@ -1229,6 +1374,17 @@ export async function getContextPage(
     if (!requeried || requeried.length === 0) return;
     bubbleData = requeried;
   }
+
+  // Every page, not only after the fallback insert: a retry after a failed
+  // link write finds the bubbles present and still links them (#306).
+  await linkBubblesToPanels(
+    supabase,
+    bookId,
+    issueId,
+    pageNumber,
+    pageLabel,
+    null,
+  );
 
   const { data: pagePanels, error: pagePanelsErr } = await supabase
     .from("panels")

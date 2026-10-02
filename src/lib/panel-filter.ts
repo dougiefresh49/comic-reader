@@ -39,9 +39,53 @@ export function filterSliverPanels<T extends FilterablePanel>(
 
 const DUPLICATE_COVER = 0.9;
 
-const area = (b: PanelBoundingBox) => b.w * b.h;
+export const area = (b: PanelBoundingBox) => b.w * b.h;
 
-function intersectArea(a: PanelBoundingBox, b: PanelBoundingBox): number {
+/**
+ * The page-normalized center of a bubble's pixel `box_2d`, or null when the
+ * box has no numeric x, y, width and height.
+ */
+export function bubbleCenter(
+  box2d: unknown,
+  image: { width: number; height: number },
+): BubbleCenter | null {
+  const box = box2d as Record<string, unknown> | null;
+  const [x, y, w, h] = ["x", "y", "width", "height"].map((k) => box?.[k]);
+  if (![x, y, w, h].every((v) => typeof v === "number")) return null;
+  return {
+    x: ((x as number) + (w as number) / 2) / image.width,
+    y: ((y as number) + (h as number) / 2) / image.height,
+  };
+}
+
+/**
+ * The panel a bubble belongs to, ported from detectPanels
+ * (scripts/generate-episode.ts): the smallest panel holding the bubble's
+ * center wins; with none, the nearest panel center. Page-normalized
+ * coordinates. Ingest and backfill-panels both link with this (#306).
+ */
+export function matchBubblePanel<T extends FilterablePanel>(
+  center: BubbleCenter,
+  panels: T[],
+): { panel: T | null; how: string } {
+  if (panels.length === 0) return { panel: null, how: "no panels" };
+  const contained = panels
+    .filter((p) => containsPoint(p.bounding_box, center))
+    .sort((a, b) => area(a.bounding_box) - area(b.bounding_box))[0];
+  if (contained) return { panel: contained, how: "smallest containing" };
+  const dist = ({ bounding_box: b }: T) =>
+    Math.hypot(b.x + b.w / 2 - center.x, b.y + b.h / 2 - center.y);
+  const nearest = panels.reduce((a, b) => (dist(b) < dist(a) ? b : a));
+  return {
+    panel: nearest,
+    how: `nearest center, ${dist(nearest).toFixed(3)} away`,
+  };
+}
+
+export function intersectArea(
+  a: PanelBoundingBox,
+  b: PanelBoundingBox,
+): number {
   const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
   const h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
   return w > 0 && h > 0 ? w * h : 0;
