@@ -216,7 +216,7 @@ function AnalyzeBlock({
             </dd>
             <dt className="text-neutral-500">Cues</dt>
             <dd className="whitespace-pre-wrap text-neutral-100">
-              {proposal.textWithCues || "(none)"}
+              {proposal.textWithCues ?? "(none)"}
             </dd>
             <dt className="text-neutral-500">Speaker</dt>
             <dd

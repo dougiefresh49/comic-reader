@@ -54,8 +54,10 @@ export interface AnalyzeArgs {
 }
 
 export interface AnalyzeProposal {
+  /** "" when the model read no words in the box. */
   text: string;
-  textWithCues: string;
+  /** null when there is no text to cue, so nothing writes an empty `text_with_cues`. */
+  textWithCues: string | null;
   /** A cast id from the list that was sent, or "" when the model named none on it. */
   speaker: string;
   emotion: string;
@@ -190,7 +192,7 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
       ok: true,
       proposal: {
         text,
-        textWithCues: cues || text,
+        textWithCues: text ? cues || text : null,
         speaker: speaker ?? "",
         emotion: str(parsed.emotion) || "neutral",
         type: type ?? "SPEECH",

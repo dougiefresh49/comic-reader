@@ -97,7 +97,10 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
     title: "Edit the selected bubble",
     rows: [
       ["E / Enter", "Edit the text. Enter accepts a proposal when one shows"],
-      ["R", "Try again: analyze the bubble once more, with its hint"],
+      [
+        "R",
+        "While a proposal shows: try again, analyzing the bubble once more with its hint",
+      ],
       [
         "S",
         "Pick the speaker. Enter takes the highlighted name: the nearest face, or the first match once you type",
@@ -586,9 +589,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           p.speaker && castById.has(p.speaker)
             ? setSpeaker(d, id, p.speaker)
             : d;
+        // No words read leaves the text and its cues as they are, so Save
+        // never writes an empty text_with_cues.
+        const words =
+          p.text && p.textWithCues !== null
+            ? { text: p.text, cues: { forText: p.text, value: p.textWithCues } }
+            : {};
         return patchBubble(named, id, {
-          text: p.text,
-          cues: { forText: p.text, value: p.textWithCues },
+          ...words,
           emotion: p.emotion,
           type: p.type,
         });

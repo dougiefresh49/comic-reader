@@ -13,8 +13,9 @@ export type AnalyzePhase = "waiting" | "running" | "ready" | "failed";
 export interface AnalyzeRun {
   phase: AnalyzePhase;
   /**
-   * Drawn in the editor: it asks on its own once the box is still, and again
-   * whenever the box moves, until its proposal is accepted or a call fails.
+   * Drawn in the editor: it asks on its own once the box is still, and asks
+   * again if the box moves before the answer is back. Once a proposal or an
+   * error shows, a move keeps it; Try again and Analyze again ask anew.
    */
   auto: boolean;
   /** The request this run waits on. A reply to any other is dropped. */
@@ -248,11 +249,15 @@ export function useAnalyze({
     [put],
   );
 
-  /** A bubble's box changed: a drawn box waits to be still again and is asked anew. */
+  /**
+   * A bubble's box changed. A drawn box whose call is out goes back to
+   * waiting: that answer is stale and is dropped. A waiting box's timer
+   * restarts on its own. A proposal or an error already showing stays.
+   */
   const moved = useCallback(
     (id: string) => {
       const run = runsRef.current[id];
-      if (run?.auto && run.phase !== "failed" && run.phase !== "waiting")
+      if (run?.auto && run.phase === "running")
         put(id, { ...run, phase: "waiting", proposal: null, error: null });
     },
     [put],
