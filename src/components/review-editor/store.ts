@@ -217,7 +217,10 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       const { id, cues } = action;
       const take = (doc: Doc): Doc => {
         const b = doc.bubbles[id];
-        if (b?.text !== cues.forText) return doc;
+        // A step whose text differs still holds cues for the sent text when
+        // its text is later typed back, so those are replaced too.
+        if (!b || (b.text !== cues.forText && b.cues?.forText !== cues.forText))
+          return doc;
         return { ...doc, bubbles: { ...doc.bubbles, [id]: { ...b, cues } } };
       };
       const takeEntry = (entry: HistoryEntry): HistoryEntry => {
