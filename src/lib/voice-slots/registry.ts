@@ -263,6 +263,10 @@ export interface RegisterVoiceInput {
   labels: Record<string, string> | null;
   source_clip_path: string | null;
   source_clip_md5: string | null;
+  /** The character the voice is for (#91 column). */
+  character_id?: string | null;
+  /** A Voice Design voice's prompt, kept for provenance (#96). */
+  design_prompt?: string | null;
 }
 
 /** Inserts the active row for a voice the module just added. */

@@ -41,6 +41,18 @@ export class ElevenLabsTimeoutError extends Error {
   }
 }
 
+/**
+ * ElevenLabs answered and said no (a non-2xx reply), or a request that never
+ * creates a voice failed. Nothing was added, unlike a timeout or an
+ * unreadable reply, after which the add may have landed.
+ */
+export class ElevenLabsRefusedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ElevenLabsRefusedError";
+  }
+}
+
 export function md5Hex(bytes: Uint8Array): string {
   return createHash("md5").update(bytes).digest("hex");
 }
@@ -52,7 +64,7 @@ function apiKey(deps: VoiceSlotsDeps): string {
 }
 
 /** One attempt, one timeout, the key header set. No retry on any path. */
-async function el(
+export async function el(
   deps: VoiceSlotsDeps,
   path: string,
   init: RequestInit = {},
@@ -75,7 +87,7 @@ async function el(
   }
 }
 
-async function failure(r: Response, what: string): Promise<Error> {
+export async function failure(r: Response, what: string): Promise<Error> {
   const text = await r.text().catch(() => "");
   return new Error(`${what} -> ${r.status}: ${text.slice(0, 200)}`);
 }
@@ -278,8 +290,31 @@ export async function addVoice(
     method: "POST",
     body: buildAddVoiceForm(input),
   });
-  if (!r.ok) throw await failure(r, "POST /v1/voices/add");
+  if (!r.ok)
+    throw new ElevenLabsRefusedError(
+      (await failure(r, "POST /v1/voices/add")).message,
+    );
   const body = (await r.json()) as { voice_id?: string };
   if (!body.voice_id) throw new Error("POST /v1/voices/add: no voice_id");
   return { voice_id: body.voice_id };
+}
+
+/**
+ * The account's voices named `name` whose id is not in `knownIds`: after an
+ * add that timed out or whose reply could not be read, the voice it may have
+ * made. One free GET; the caller decides what one, none or several mean.
+ */
+export async function findUnknownVoicesNamed(
+  deps: VoiceSlotsDeps,
+  name: string,
+  knownIds: Set<string>,
+): Promise<string[]> {
+  const r = await el(deps, "/v1/voices");
+  if (!r.ok) throw await failure(r, "GET /v1/voices");
+  const body = (await r.json()) as {
+    voices?: { voice_id?: string; name?: string }[];
+  };
+  return (body.voices ?? [])
+    .filter((v) => v.name === name && v.voice_id && !knownIds.has(v.voice_id))
+    .map((v) => v.voice_id!);
 }

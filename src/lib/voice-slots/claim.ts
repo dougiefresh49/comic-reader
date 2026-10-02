@@ -1,23 +1,36 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { VoiceRow } from "~/lib/voice-slots";
-import type { VoiceOperation } from "./actions";
+import type { VoiceRow } from "./types";
 
-// #102 adds these columns; the orchestrator regenerates DB types after applying it.
+/** What a claim is for; the claim string starts with it. */
+export type VoiceClaimOperation =
+  | "archive"
+  | "restore"
+  | "snapshot"
+  | "clone"
+  | "design";
+
 interface VoiceClaimRow {
   operation_claim: string | null;
   operation_claimed_at: string | null;
 }
 
+/** A claim older than ten minutes is stale and can be taken over. */
 export function noActiveVoiceClaimFilter(): string {
   const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   return `operation_claim.is.null,operation_claimed_at.lt.${staleBefore}`;
 }
 
+/**
+ * Runs `run` while holding the cross-instance claim on one `voices` row
+ * (#102): the claim only lands when the row still matches what the caller
+ * read (status, ElevenLabs id, archived_at, snapshot hash) and no live claim
+ * is on it. Released in `finally`, whatever `run` did.
+ */
 export async function withVoiceOperationClaim<T>(
   supabase: SupabaseClient,
   voice: VoiceRow,
-  operation: VoiceOperation,
+  operation: VoiceClaimOperation,
   run: () => Promise<T>,
 ): Promise<T> {
   const claim = `${operation}:${randomUUID()}`;
