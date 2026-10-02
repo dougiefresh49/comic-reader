@@ -20,6 +20,16 @@ const HOLD_COVER = 0.9;
 const HOLD_GROWTH = 1.2;
 
 /**
+ * Share of the larger box's width or height the smaller box must span for
+ * the larger to hold it, the #225 strip rule's test. A loose box hugs its
+ * balloon on at least one axis; a big balloon with a separate small one
+ * inside its box ("DUDES…" around "EXACTLY!" on the smoke page, 0.36 wide)
+ * does not. On the smoke page the tightest drop needs 0.76 (a twin
+ * container over the "LET THE FIRE…" lobe, on height).
+ */
+const HOLD_SPAN = 0.75;
+
+/**
  * Intersection over union at which two boxes of similar size are one
  * detection twice. The review prototype's value. The smoke page's one twin
  * pair sits at 0.97, and both of it drop as containers anyway.
@@ -37,9 +47,14 @@ function holds(big: FilterablePanel, small: FilterablePanel): boolean {
   const smallArea = area(small.bounding_box);
   if (smallArea <= 0) return false;
   if (area(big.bounding_box) < HOLD_GROWTH * smallArea) return false;
+  const { w, h } = big.bounding_box;
+  const spans =
+    small.bounding_box.w >= HOLD_SPAN * w ||
+    small.bounding_box.h >= HOLD_SPAN * h;
   return (
+    spans &&
     intersectArea(big.bounding_box, small.bounding_box) >=
-    HOLD_COVER * smallArea
+      HOLD_COVER * smallArea
   );
 }
 
@@ -47,11 +62,13 @@ function holds(big: FilterablePanel, small: FilterablePanel): boolean {
  * Split bubble detections into kept and dropped, one box per balloon (#311).
  * A box is dropped when either:
  *
- * - it holds a smaller kept box: 0.9 or more of that box lies inside it and
- *   it is at least 1.2 times that box's area. A loose box around one balloon
- *   drops for the tight one, and a box spanning the lobes of a split balloon
- *   drops for the lobes, which stay separate bubbles (the #225 inset rule
- *   turned around: for bubbles the inset is the balloon); or
+ * - it holds a smaller kept box: 0.9 or more of that box lies inside it,
+ *   that box spans 0.75 or more of its width or height, and it is at least
+ *   1.2 times that box's area. A loose box around one balloon drops for the
+ *   tight one, and a box spanning the lobes of a split balloon drops for the
+ *   lobes, which stay separate bubbles. A small balloon sitting inside a big
+ *   one's box without spanning it is a separate balloon, and both stay (the
+ *   #225 inset rule); or
  * - it has a kept twin, IoU 0.6 or more, with higher confidence (on a tie,
  *   the earlier box wins).
  *

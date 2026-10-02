@@ -123,8 +123,14 @@ async function recordPage(page: number, idx: number): Promise<FixturePage> {
     confidence: 1,
   }));
 
-  // Bubbles added by hand in review have no geometry; give them a box
-  // centred in their panel (or the page) so the counts match the DB.
+  // Bubbles added by hand in review have no geometry; give them a box in
+  // their panel (or the page) so the counts match the DB. Placeholders in one
+  // panel sit side by side on its middle row, apart, so the ingest's
+  // duplicate-bubble filter (#311) keeps every one.
+  const hasBox = (b: { box_2d: Box2d | null }) =>
+    Boolean(b.box_2d?.width && b.box_2d.height);
+  const panelOf = (b: Record<string, unknown>) =>
+    panels.find((p) => p.id === b.panel_id);
   const bubblePredictions: FixtureBox[] = bubbles.map((b) => {
     const box = b.box_2d ?? {};
     if (box.width && box.height) {
@@ -136,16 +142,15 @@ async function recordPage(page: number, idx: number): Promise<FixturePage> {
         confidence: 1,
       };
     }
-    const bb = panels.find((p) => p.id === b.panel_id)?.bounding_box ?? {
-      x: 0,
-      y: 0,
-      w: 1,
-      h: 1,
-    };
+    const panel = panelOf(b);
+    const bb = panel?.bounding_box ?? { x: 0, y: 0, w: 1, h: 1 };
+    const group = bubbles.filter((o) => !hasBox(o) && panelOf(o) === panel);
+    const n = group.length;
+    const k = group.indexOf(b);
     return {
-      x: r1((bb.x + bb.w / 2) * W),
+      x: r1((bb.x + (bb.w * (k + 1)) / (n + 1)) * W),
       y: r1((bb.y + bb.h / 2) * H),
-      width: r1(bb.w * W * 0.2),
+      width: r1(bb.w * W * Math.min(0.2, 0.8 / (n + 1))),
       height: r1(bb.h * H * 0.2),
       confidence: 1,
     };
