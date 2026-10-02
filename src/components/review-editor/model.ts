@@ -14,6 +14,11 @@ export interface BubbleDoc {
   page: number;
   rect: Rect;
   text: string;
+  /**
+   * The row's `text_with_cues` and the text it was written for, kept so a
+   * deleted row that comes back (an undo after a Save) goes back in whole.
+   */
+  cues: { forText: string; value: string } | null;
   type: BubbleType;
   /** A cast id from the closed list, or null. */
   speakerId: string | null;
@@ -158,11 +163,15 @@ function toBubble(src: SrcBubble, cast: CastMember[]): BubbleDoc {
     page: src.page,
     rect: src.rect,
     text: src.text,
+    cues:
+      src.textWithCues !== null
+        ? { forText: src.text, value: src.textWithCues }
+        : null,
     type: src.type,
     speakerId,
     rawSpeaker: speakerId ? null : src.speaker,
     emotion: src.emotion,
-    silent: false,
+    silent: src.silent,
     ignored: src.ignored,
     deleted: false,
     kept: false,
@@ -516,6 +525,7 @@ export function addBubble(doc: Doc, id: string, page: number, rect: Rect): Doc {
     page,
     rect: clampRect(rect),
     text: "",
+    cues: null,
     type: "SPEECH",
     speakerId: null,
     rawSpeaker: null,

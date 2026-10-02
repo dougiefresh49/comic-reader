@@ -4,13 +4,13 @@ import { type NextRequest } from "next/server";
 import { adminAuthFailure, checkAdminAuth } from "~/lib/admin-auth";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-
-interface BubbleStyle {
-  left: string;
-  top: string;
-  width: string;
-  height: string;
-}
+import {
+  bubbleInsert,
+  bubbleUpdate,
+  loadWriteContext,
+  type BubbleEdit,
+  type WriteContext,
+} from "./write-rules";
 
 interface FixBounds {
   x: number;
@@ -58,19 +58,19 @@ interface FixesJson {
   fixes: FixEntry[];
 }
 
-const AUDIO_AFFECTING_FIELDS = new Set<string>([
-  "speaker",
-  "ocr_text",
-  "textWithCues",
-  "type",
-]);
-
-function boundsToStyle(b: FixBounds): BubbleStyle {
+/** The old editor's change, in the shared rules' terms (write-rules.ts). */
+function toEdit(changes: FixChanges): BubbleEdit {
+  const { bounds } = changes;
   return {
-    left: `${(b.x * 100).toFixed(2)}%`,
-    top: `${(b.y * 100).toFixed(2)}%`,
-    width: `${(b.width * 100).toFixed(2)}%`,
-    height: `${(b.height * 100).toFixed(2)}%`,
+    speaker: changes.speaker,
+    text: changes.ocr_text,
+    textWithCues: changes.textWithCues,
+    type: changes.type,
+    emotion: changes.emotion,
+    ignored: changes.ignored,
+    box: bounds
+      ? { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height }
+      : undefined,
   };
 }
 
@@ -169,6 +169,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // What the shared rules read first: page sizes and the stored confidence
+  // for box edits, and which speakers are `characters` rows.
+  const boxIds: string[] = [];
+  for (const fix of fixes) {
+    if (fix.action !== "update" || !fix.changes.bounds) continue;
+    const uuid = await resolveBubbleUuid(bookId, issueId, fix.bubbleId);
+    if (uuid) boxIds.push(uuid);
+  }
+  let ctx: WriteContext;
+  try {
+    ctx = await loadWriteContext(bookId, issueId, {
+      speakers: fixes.flatMap((f) =>
+        f.action === "update"
+          ? [f.changes.speaker]
+          : f.action === "add"
+            ? [f.data.speaker]
+            : [],
+      ),
+      bubbleIds: boxIds,
+    });
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 500 });
+  }
+
   const results = {
     applied: 0,
     skipped: [] as string[],
@@ -188,7 +212,9 @@ export async function POST(req: NextRequest) {
         const { error } = await supabaseAdmin
           .from("bubbles")
           .delete()
-          .eq("id", uuid);
+          .eq("id", uuid)
+          .eq("book_id", bookId)
+          .eq("issue_id", issueId);
         if (error) {
           results.skipped.push(`delete:${fix.bubbleId} (${error.message})`);
         } else {
@@ -203,28 +229,20 @@ export async function POST(req: NextRequest) {
           results.skipped.push(`update:${fix.bubbleId} (not found)`);
           continue;
         }
-        const { bounds, textWithCues, ...rest } = fix.changes;
-        const patch: Record<string, unknown> = {};
-        if (rest.speaker !== undefined) patch.speaker = rest.speaker;
-        if (rest.ocr_text !== undefined) patch.ocr_text = rest.ocr_text;
-        if (textWithCues !== undefined) patch.text_with_cues = textWithCues;
-        if (rest.type !== undefined) patch.type = rest.type;
-        if (rest.emotion !== undefined) patch.emotion = rest.emotion;
-        if (rest.ignored !== undefined) patch.ignored = rest.ignored;
-        if (bounds) patch.style = boundsToStyle(bounds);
-
-        const affectsAudio = Object.keys(fix.changes).some((k) =>
-          AUDIO_AFFECTING_FIELDS.has(k),
-        );
-        if (affectsAudio && rest.ignored !== true) {
-          patch.needs_audio = true;
-          audioAffectedUuids.add(uuid);
+        const page = ctx.bubblePage.get(uuid);
+        if (fix.changes.bounds && page === undefined) {
+          results.skipped.push(`update:${fix.bubbleId} (not found)`);
+          continue;
         }
+        const patch = bubbleUpdate(uuid, page ?? 0, toEdit(fix.changes), ctx);
+        if (patch.needs_audio) audioAffectedUuids.add(uuid);
 
         const { error } = await supabaseAdmin
           .from("bubbles")
           .update(patch)
-          .eq("id", uuid);
+          .eq("id", uuid)
+          .eq("book_id", bookId)
+          .eq("issue_id", issueId);
         if (error) {
           results.skipped.push(`update:${fix.bubbleId} (${error.message})`);
         } else {
@@ -247,26 +265,18 @@ export async function POST(req: NextRequest) {
         const nextSort =
           ((existing as { sort_order?: number } | null)?.sort_order ?? -1) + 1;
 
-        const { bounds, textWithCues, ...rest } = fix.data;
-        const hasText = !!(rest.ocr_text?.trim() ?? textWithCues?.trim());
-        const insertRow: Record<string, unknown> = {
-          legacy_id: fix.bubbleId,
-          book_id: bookId,
-          issue_id: issueId,
-          page_number: pageNum,
-          sort_order: nextSort,
-          ocr_text: rest.ocr_text ?? null,
-          text_with_cues: textWithCues ?? null,
-          type: rest.type ?? "SPEECH",
-          speaker: rest.speaker ?? null,
-          emotion: rest.emotion ?? null,
-          ignored: rest.ignored ?? false,
-          needs_audio: true,
-          needs_ocr: !hasText,
-          style: bounds ? boundsToStyle(bounds) : null,
-          box_2d: null,
-          panel_id: rest.panelId ?? null,
-        };
+        const insertRow = bubbleInsert(
+          bookId,
+          issueId,
+          {
+            ...toEdit(fix.data),
+            panelId: fix.data.panelId ?? null,
+            page: pageNum,
+            sortOrder: nextSort,
+            legacyId: fix.bubbleId,
+          },
+          ctx,
+        );
         const { data: ins, error } = await supabaseAdmin
           .from("bubbles")
           .insert(insertRow)
@@ -277,13 +287,7 @@ export async function POST(req: NextRequest) {
         } else {
           results.applied += 1;
           const id = (ins as { id?: string } | null)?.id;
-          if (id) {
-            audioAffectedUuids.add(id);
-            await supabaseAdmin
-              .from("bubbles")
-              .update({ audio_storage_path: `${id}.mp3` })
-              .eq("id", id);
-          }
+          if (id) audioAffectedUuids.add(id);
         }
         continue;
       }
@@ -299,7 +303,9 @@ export async function POST(req: NextRequest) {
           const { error } = await supabaseAdmin
             .from("bubbles")
             .update({ sort_order: i })
-            .eq("id", uuid);
+            .eq("id", uuid)
+            .eq("book_id", bookId)
+            .eq("issue_id", issueId);
           if (error) {
             results.skipped.push(`reorder:${id} (${error.message})`);
           } else {

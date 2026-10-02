@@ -202,6 +202,7 @@ export type Database = {
           page_number: number;
           panel_id: string | null;
           side: string | null;
+          silent: boolean;
           sort_order: number;
           speaker: string | null;
           style: Json | null;
@@ -231,6 +232,7 @@ export type Database = {
           page_number: number;
           panel_id?: string | null;
           side?: string | null;
+          silent?: boolean;
           sort_order: number;
           speaker?: string | null;
           style?: Json | null;
@@ -260,6 +262,7 @@ export type Database = {
           page_number?: number;
           panel_id?: string | null;
           side?: string | null;
+          silent?: boolean;
           sort_order?: number;
           speaker?: string | null;
           style?: Json | null;

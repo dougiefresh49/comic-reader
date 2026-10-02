@@ -52,6 +52,8 @@ import {
   writeLocal,
   writeRaw,
 } from "./storage";
+import type { SaveResult } from "~/app/api/apply-fixes/write-rules";
+import { buildSave, saveCount } from "./save";
 import { packState, reducer, restoreState, storedRev } from "./store";
 import { Tree } from "./Tree";
 import type { CastMember, EditorData, Rect, SrcPage } from "./types";
@@ -123,7 +125,7 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
     rows: [
       ["Cmd Z", "Undo. Ctrl works in place of Cmd"],
       ["Shift Cmd Z", "Redo"],
-      ["Cmd S", "Saves nothing yet: shows where the edits are kept"],
+      ["Cmd S", "Save every pending edit. Ctrl works in place of Cmd"],
     ],
   },
   {
@@ -305,7 +307,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const { doc, page: pageNumber, sel } = state;
   const [kept, setKept] = useState<Kept>("kept");
   const [notices, setNotices] = useState(boot.notices);
-  const [flash, setFlash] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [viewport, setViewport] = useState(() => window.innerWidth);
 
   const [tool, setTool] = useState<Tool>("select");
@@ -398,9 +401,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     return out;
   }, [allFlags]);
 
-  /** True while the document differs from the rows as loaded. */
+  /** True while the document differs from the rows as loaded or last saved. */
   const edited = useMemo(
     () => diffDoc(state.base, doc) !== null,
+    [state.base, doc],
+  );
+  /** The rows a Save would write now. */
+  const toWrite = useMemo(
+    () => saveCount(buildSave(state.base, doc)),
     [state.base, doc],
   );
 
@@ -446,6 +454,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     if (staleRef.current) return;
     if (
       written.doc === current.doc &&
+      written.base === current.base &&
       written.past === current.past &&
       written.future === current.future
     )
@@ -507,12 +516,6 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-
-  useEffect(() => {
-    if (!flash) return;
-    const timer = window.setTimeout(() => setFlash(false), 1600);
-    return () => window.clearTimeout(timer);
-  }, [flash]);
 
   // The page lives in the URL too, so a link lands on it.
   useEffect(() => {
@@ -742,6 +745,64 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     );
   };
 
+  /**
+   * Write every pending edit in one request. The editor stays as it is: on
+   * success the document that was sent becomes the baseline, and nothing
+   * else changes; on failure the edits stay pending and the error shows.
+   */
+  const savingRef = useRef(false);
+  const save = async () => {
+    if (savingRef.current) return;
+    const sent = state.doc;
+    const edits = buildSave(state.base, sent);
+    const count = saveCount(edits);
+    if (count === 0) {
+      say("Nothing to save.");
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/apply-fixes/save", {
+        method: "POST",
+        // Basic auth: the browser's session for this origin carries the
+        // credentials, so no secret goes in the client bundle.
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          bookId: data.bookId,
+          issueId: data.issueId,
+          ...edits,
+        }),
+      });
+      const body = (await res.json().catch(() => null)) as
+        | (Partial<SaveResult> & { error?: string })
+        | null;
+      if (!res.ok) {
+        setSaveError(
+          body?.error ??
+            `Nothing was saved: the server answered ${res.status}.`,
+        );
+        return;
+      }
+      dispatch({ type: "saved", base: sent });
+      const audio = body?.needsAudio ?? 0;
+      say(
+        audio > 0
+          ? `Saved ${plural(count, "change")}. ${plural(audio, "bubble")} now need${audio === 1 ? "s" : ""} audio.`
+          : `Saved ${plural(count, "change")}.`,
+      );
+    } catch (e) {
+      // No answer: the request may or may not have reached the database.
+      setSaveError(
+        `The save may or may not have landed (${(e as Error).message}). Your edits are still here; reload the editor to see the rows as they are now.`,
+      );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
+
   const discard = () => {
     setConfirmDiscard(false);
     // A stale tab must not clear what another tab stored.
@@ -870,10 +931,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
 
       if (mod && key === "s") {
-        // Nothing to save yet. Keep the browser's save dialog shut and point
-        // at where the edits are.
+        // Keep the browser's save dialog shut, in a text field too.
         e.preventDefault();
-        setFlash(true);
+        if (!confirmDiscard) void save();
         return;
       }
       if (confirmDiscard) {
@@ -1196,15 +1256,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         >
           Redo
         </button>
-        {(edited || flash || notKept) && (
+        {(edited || notKept) && (
           <span
             role="status"
             className={`shrink-0 rounded-sm px-1 ${
-              notKept
-                ? "text-amber-300"
-                : flash
-                  ? "bg-neutral-100 text-neutral-950"
-                  : "text-neutral-500"
+              notKept ? "text-amber-300" : "text-neutral-500"
             }`}
           >
             {notKept
@@ -1225,12 +1281,40 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         )}
         <button
           type="button"
+          disabled={saving || toWrite === 0}
+          onClick={() => void save()}
+          title="Save every pending edit (Cmd S)"
+          className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-neutral-100 px-2 font-medium text-neutral-950 hover:bg-white disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
+        >
+          {saving ? "Saving" : "Save"}
+          {toWrite > 0 && !saving && (
+            <span className="tabular-nums opacity-60">{toWrite}</span>
+          )}
+        </button>
+        <button
+          type="button"
           onClick={() => setSheet(true)}
           className={BAR_BUTTON}
         >
           Keys <span className="text-neutral-500">?</span>
         </button>
       </header>
+
+      {saveError && (
+        <div
+          role="alert"
+          className="flex shrink-0 items-center gap-3 border-b border-red-400/40 bg-red-500/10 px-3 py-1.5 text-red-200"
+        >
+          <span className="flex-1">{saveError}</span>
+          <button
+            type="button"
+            onClick={() => setSaveError(null)}
+            className="h-6 shrink-0 rounded-sm border border-red-400/50 px-2 hover:bg-red-500/20"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {(kept !== "kept" || notices.length > 0) && (
         <div className="shrink-0 border-b border-amber-400/40 bg-amber-400/10 text-amber-200">

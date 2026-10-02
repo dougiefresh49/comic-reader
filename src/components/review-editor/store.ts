@@ -44,7 +44,14 @@ export type EditorAction =
   | { type: "redo" }
   | { type: "select"; sel: Sel | null }
   | { type: "page"; page: number; sel?: Sel | null }
-  | { type: "discard" };
+  | { type: "discard" }
+  /**
+   * A Save landed: the document it sent is the new baseline. Only the
+   * baseline moves, so edits made while the Save was in flight stay pending,
+   * and the undo history stays: an undo past the save point is measured
+   * against the new baseline and shows as a new pending edit.
+   */
+  | { type: "saved"; base: Doc };
 
 const LIMIT = 60;
 
@@ -195,6 +202,8 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         ...initState(state.base, state.page),
         lastHistory: state.lastHistory,
       };
+    case "saved":
+      return { ...state, base: action.base };
   }
 }
 

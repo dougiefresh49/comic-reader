@@ -41,6 +41,7 @@ export async function getCharactersNeedingVoices(
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("ignored", false)
+      .eq("silent", false)
       .not("speaker", "is", null),
     supabase
       .from("aliases")
@@ -293,11 +294,12 @@ export async function getBubbleIdsForAudio(
   const { data: bubbles, error } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
+      "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("ignored", false)
+    .eq("silent", false)
     .is("audio_storage_path", null)
     .order("page_number")
     .order("sort_order");
@@ -332,7 +334,7 @@ export async function generateAudioBatch(
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, emotion, text_with_cues, ocr_text, audio_storage_path, ignored",
+      "id, speaker, emotion, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
     )
     .in("id", bubbleIds);
 
