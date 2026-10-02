@@ -1,33 +1,15 @@
 /**
  * The hub's map from pipeline step to stage, and the labels for both.
  *
- * `STEP_STAGE` is typed as `Record<PipelineStep, Stage>`, so a step in
- * `PIPELINE_STEPS` without a stage fails `pnpm typecheck`. Until #334 O1 is
- * answered, `PIPELINE_STEPS` is a local copy of the workflow's STEP_ORDER;
- * it should become an import from a shared step list once that lands.
+ * `STEP_STAGE` is typed as `Record<PipelineStep, Stage>`, so a step added to
+ * `STEP_ORDER` in `~/lib/pipeline-steps` without a stage fails
+ * `pnpm typecheck`.
  */
-
-// Waits on issue #334 O1: replace with an import from the shared step list.
-export const PIPELINE_STEPS = [
-  "roboflow-page-analyze",
-  "extract-foreground-masks",
-  "fetch-wiki-context",
-  "character-lookahead",
-  "review-clusters",
-  "get-context",
-  "sort-page-elements",
-  "review-pages",
-  "review-new-characters",
-  "generate-voice-descriptions",
-  "casting",
-  "generate-voice-models",
-  "generate-audio",
-  "upload-audio",
-  "consolidate-music-scenes",
-  "generate-manifest",
-] as const;
-
-export type PipelineStep = (typeof PIPELINE_STEPS)[number];
+import {
+  STEP_ORDER,
+  isPipelineStep,
+  type PipelineStep,
+} from "~/lib/pipeline-steps";
 
 export const STAGES = [
   "detect",
@@ -105,12 +87,8 @@ export const GATE_STEPS: ReadonlySet<PipelineStep> = new Set<PipelineStep>([
   "casting",
 ]);
 
-export function isPipelineStep(value: string): value is PipelineStep {
-  return (PIPELINE_STEPS as readonly string[]).includes(value);
-}
-
 export function stepsOfStage(stage: Stage): PipelineStep[] {
-  return PIPELINE_STEPS.filter((step) => STEP_STAGE[step] === stage);
+  return STEP_ORDER.filter((step) => STEP_STAGE[step] === stage);
 }
 
 export function stepLabel(step: string): string {

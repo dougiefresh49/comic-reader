@@ -3,6 +3,11 @@
  * draws: one state word, the current step, and one view per stage and step.
  * Pure functions; the page computes `now` once and passes it in.
  */
+import {
+  STEP_ORDER,
+  isPipelineStep,
+  type PipelineStep,
+} from "~/lib/pipeline-steps";
 import type { PipelineReviewIssue } from "~/server/admin/pipeline-review";
 import type {
   PipelineRun,
@@ -11,14 +16,11 @@ import type {
 import { formatDuration, plural } from "./format";
 import {
   GATE_STEPS,
-  PIPELINE_STEPS,
   STAGES,
   STAGE_BLURBS,
   STAGE_LABELS,
   STEP_LABELS,
-  isPipelineStep,
   stepsOfStage,
-  type PipelineStep,
   type Stage,
 } from "./stages";
 
@@ -142,11 +144,11 @@ function currentStepOf(
   }
 }
 
-/** Index of the current step in PIPELINE_STEPS; -1 before the first, 16 after the last. */
+/** Index of the current step in STEP_ORDER; -1 before the first, 16 after the last. */
 function cursorOf(state: RunState, currentStep: string | null): number {
-  if (state === "ready") return PIPELINE_STEPS.length;
+  if (state === "ready") return STEP_ORDER.length;
   if (state === "not-started" || currentStep === null) return -1;
-  return isPipelineStep(currentStep) ? PIPELINE_STEPS.indexOf(currentStep) : -1;
+  return isPipelineStep(currentStep) ? STEP_ORDER.indexOf(currentStep) : -1;
 }
 
 interface Timing {
@@ -297,7 +299,7 @@ export function buildHubView(
 
   const stages: StageView[] = STAGES.map((stage) => {
     const steps: StepView[] = stepsOfStage(stage).map((step) => {
-      const index = PIPELINE_STEPS.indexOf(step);
+      const index = STEP_ORDER.indexOf(step);
       const timing = stepTiming(
         run,
         step,
