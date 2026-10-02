@@ -4,11 +4,12 @@
  * in, group numbers out, no DB access and no model call.
  */
 
-// Cosine similarity on gemini-embedding-2 face crops. Prod exemplar pairs
-// (2026-10-02, 5,005 pairs): different characters average 0.74 and 1% reach
-// 0.87; same character averages 0.82. At 0.88 about 70% of pairs that reach it
-// are the same character, and complete linkage asks it of every pair in a group.
-export const FACE_GROUP_MIN_SIMILARITY = 0.88;
+// Cosine similarity on gemini-embedding-2 face crops, chosen by the owner
+// (#348 O2 = C). On tmnt-mmpr-iii issue-1's 100 named exemplars grouped as if
+// unnamed, 0.90 leaves 6 faces in groups that mix characters and 71 alone;
+// 0.88 mixed 13, 0.92 mixed none but left 89 alone. A mixed face is moved out
+// at the characters stop, which is less work than naming a face on its own.
+export const FACE_GROUP_MIN_SIMILARITY = 0.9;
 
 function cosine(a: readonly number[], b: readonly number[]): number {
   if (a.length !== b.length) {
