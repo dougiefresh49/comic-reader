@@ -8,7 +8,8 @@ import { checkAdminAuth } from "~/lib/admin-auth";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
-import type { AliasRow, CastRow } from "~/workflows/steps/audio-plan";
+import { loadBookCast } from "~/lib/cast";
+import { voiceLookupContext } from "~/workflows/steps/audio-plan";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
 const AUDIO_BUCKET = "comic-audio";
@@ -87,7 +88,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, emotion, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
+      "id, legacy_id, speaker, character_id, emotion, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -102,6 +103,7 @@ export async function regenerateAudio(args: Args) {
     id: string;
     legacy_id: string | null;
     speaker: string | null;
+    character_id: string | null;
     emotion: string | null;
     ocr_text: string | null;
     text_with_cues: string | null;
@@ -115,7 +117,7 @@ export async function regenerateAudio(args: Args) {
   if (b.ignored) {
     return { ok: false, error: "Bubble is ignored — cannot regenerate audio" };
   }
-  if (!b.speaker) {
+  if (!b.speaker && !b.character_id) {
     return { ok: false, error: "No speaker assigned" };
   }
   const text = b.text_with_cues ?? b.ocr_text ?? "";
@@ -123,42 +125,29 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: "Empty text" };
   }
 
-  // Look up voice ID with the audio step's rule: exact match, else alias then slug
-  const [
-    { data: castRows, error: castErr },
-    { data: aliasRows, error: aliasErr },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("castlist")
-      .select("character, voice_id")
-      .eq("book_id", args.bookId)
-      .eq("issue_id", args.issueId),
-    supabaseAdmin
-      .from("aliases")
-      .select("alias, canonical")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${args.bookId})`),
-  ]);
-  if (castErr) {
-    return { ok: false, error: castErr.message };
+  // The audio step's lookup: bubbles.character_id, then castlist.character_id
+  // (read by loadBookCast), then the name rule; the voice from voiceFor.
+  let book;
+  try {
+    book = await loadBookCast(supabaseAdmin, args.bookId);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
   }
+  const { data: aliasRows, error: aliasErr } = await supabaseAdmin
+    .from("aliases")
+    .select("alias, canonical")
+    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${args.bookId})`);
   if (aliasErr) {
     return { ok: false, error: aliasErr.message };
   }
   const resolved = resolveSpeakerVoice(
-    b.speaker,
-    (castRows ?? []) as CastRow[],
-    (aliasRows ?? []) as AliasRow[],
+    voiceLookupContext(book, args.issueId, aliasRows ?? []),
+    { speaker: b.speaker, character_id: b.character_id },
   );
   if (!resolved.ok) {
     return { ok: false, error: resolved.error };
   }
   const voiceId = resolved.voiceId;
-  if (!voiceId) {
-    return {
-      ok: false,
-      error: `No voice ID for speaker '${b.speaker}' in castlist`,
-    };
-  }
 
   // Each take goes to a path no earlier take used, so the upload never
   // touches what the reader plays. switch_bubble_audio_take then changes the
