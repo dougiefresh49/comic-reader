@@ -38,6 +38,8 @@ export interface SrcBubble {
   speaker: string | null;
   emotion: string;
   ignored: boolean;
+  /** Shown, no audio: `bubbles.silent`. */
+  silent: boolean;
   confidence: number | null;
 }
 

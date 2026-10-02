@@ -32,6 +32,7 @@ export interface BubbleAudioRow {
   id: string;
   speaker: string | null;
   ignored: boolean;
+  silent?: boolean;
   audio_storage_path: string | null;
   text_with_cues: string | null;
   ocr_text: string | null;
@@ -72,6 +73,7 @@ export interface CastIndex {
 
 export type BubbleSkipReason =
   | "ignored"
+  | "silent"
   | "has audio"
   | "no text"
   | "no speaker"
@@ -253,7 +255,7 @@ export function getVoiceDesignAppearance(
 
 /** Bubble needs audio when path null, not ignored, and has text. */
 export function bubbleNeedsAudio(b: BubbleAudioRow): boolean {
-  if (b.ignored) return false;
+  if (b.ignored || b.silent) return false;
   if (b.audio_storage_path) return false;
   const text = b.text_with_cues ?? b.ocr_text;
   return !!text?.trim();
@@ -278,8 +280,8 @@ export function planBubblesToSend(
   const skipped: SkippedBubble[] = [];
 
   for (const bubble of bubbles) {
-    if (bubble.ignored) {
-      skipped.push({ bubble, reason: "ignored" });
+    if (bubble.ignored || bubble.silent) {
+      skipped.push({ bubble, reason: bubble.silent ? "silent" : "ignored" });
       continue;
     }
     if (bubble.audio_storage_path) {

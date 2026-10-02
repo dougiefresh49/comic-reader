@@ -41,6 +41,7 @@ export async function getCharactersNeedingVoices(
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("ignored", false)
+      .eq("silent", false)
       .not("speaker", "is", null),
     supabase
       .from("aliases")
@@ -298,6 +299,7 @@ export async function getBubbleIdsForAudio(
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("ignored", false)
+    .eq("silent", false)
     .is("audio_storage_path", null)
     .order("page_number")
     .order("sort_order");

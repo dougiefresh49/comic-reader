@@ -162,7 +162,7 @@ function toBubble(src: SrcBubble, cast: CastMember[]): BubbleDoc {
     speakerId,
     rawSpeaker: speakerId ? null : src.speaker,
     emotion: src.emotion,
-    silent: false,
+    silent: src.silent,
     ignored: src.ignored,
     deleted: false,
     kept: false,

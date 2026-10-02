@@ -2,6 +2,7 @@
 import "server-only";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
+import { DEFAULT_PAGE } from "~/app/api/apply-fixes/write-rules";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ROLES, slug, titleCase } from "~/components/review-editor/lib";
 import type {
@@ -17,7 +18,6 @@ import type {
   VoiceOption,
 } from "~/components/review-editor/types";
 
-const DEFAULT_PAGE = { width: 1988, height: 3057 };
 /** The ElevenLabs voice slots this repo shares with the owner's other projects. */
 const SLOTS_TOTAL = 30;
 
@@ -42,6 +42,7 @@ interface BubbleRow {
   speaker: string | null;
   emotion: string | null;
   ignored: boolean | null;
+  silent: boolean | null;
   box_2d: {
     x?: number;
     y?: number;
@@ -194,7 +195,7 @@ export async function loadEditor(
     supabaseAdmin
       .from("bubbles")
       .select(
-        "id, page_number, panel_id, ocr_text, type, speaker, emotion, ignored, box_2d, style",
+        "id, page_number, panel_id, ocr_text, type, speaker, emotion, ignored, silent, box_2d, style",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -267,6 +268,7 @@ export async function loadEditor(
       speaker: b.speaker,
       emotion: b.emotion ?? "",
       ignored: b.ignored ?? false,
+      silent: b.silent ?? false,
       confidence: typeof box.confidence === "number" ? box.confidence : null,
     };
   });
