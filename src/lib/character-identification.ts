@@ -11,7 +11,25 @@ import { GEMINI_MEDIUM } from "./models";
 export interface FaceIdentification {
   characterName: string | null;
   confidence: number;
+  /** The reply's `is_face`; undefined when the reply leaves it out. */
+  isFace?: boolean;
   reasoning?: string;
+}
+
+/** Lookahead stores a face under a name only at this confidence or more. */
+export const NAMED_FACE_MIN_CONFIDENCE = 0.6;
+
+export type FaceOutcome = "named" | "unnamed" | "drop";
+
+/**
+ * What lookahead does with one reply (#348): a confident name is stored as
+ * before, a face it cannot name is stored unnamed, anything else is dropped.
+ */
+export function faceOutcome(result: FaceIdentification): FaceOutcome {
+  if (result.characterName && result.confidence >= NAMED_FACE_MIN_CONFIDENCE) {
+    return "named";
+  }
+  return result.isFace === true ? "unnamed" : "drop";
 }
 
 export interface ExemplarReference {
@@ -50,8 +68,8 @@ IDENTIFICATION RULES:
 1. Identify based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body).
 2. If the face matches a named character from the list above, use that name.
 3. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, robot, unnamed soldier, etc.), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT try to match minions to named characters.
-4. If the crop shows only a body part (fist, arm, torso) without a recognizable face, set character_name to null.
-5. If you cannot confidently identify the character, set character_name to null. Do NOT guess or pick a random name from the list.
+4. If the crop shows only a body part (fist, arm, torso) without a recognizable face, set is_face to false and character_name to null. A masked or helmeted head counts as a face.
+5. If the crop is a face but you cannot confidently identify the character, set is_face to true and character_name to null. Do NOT guess or pick a random name from the list.
 
 CONFIDENCE GUIDELINES:
 - 0.95: Unmistakable — unique visual features clearly visible (e.g. green skin + blue mask = Leonardo)
@@ -60,13 +78,16 @@ CONFIDENCE GUIDELINES:
 - Below 0.60: Too uncertain — set character_name to null instead
 
 Output JSON only (no markdown fences):
-{"character_name": "Leonardo", "confidence": 0.85, "reasoning": "Blue mask, green skin, holding katana — TMNT Leonardo"}
+{"is_face": true, "character_name": "Leonardo", "confidence": 0.85, "reasoning": "Blue mask, green skin, holding katana — TMNT Leonardo"}
 
 If minion/generic enemy:
-{"character_name": "Foot Soldier", "confidence": 0.80, "reasoning": "Dark ninja outfit, generic foot clan soldier"}
+{"is_face": true, "character_name": "Foot Soldier", "confidence": 0.80, "reasoning": "Dark ninja outfit, generic foot clan soldier"}
 
-If unsure or not a face:
-{"character_name": null, "confidence": 0, "reasoning": "Crop shows only a green fist, no identifiable face"}`;
+If a face you cannot confidently identify:
+{"is_face": true, "character_name": null, "confidence": 0, "reasoning": "Gray-haired man in a lab coat, matches no one on the list"}
+
+If not a face:
+{"is_face": false, "character_name": null, "confidence": 0, "reasoning": "Crop shows only a green fist, no identifiable face"}`;
 }
 
 function buildComparisonPrompt(
@@ -164,6 +185,7 @@ export async function identifyFace(
     if (!jsonMatch) return { characterName: null, confidence: 0 };
 
     const parsed = JSON.parse(jsonMatch[0]) as {
+      is_face?: unknown;
       character_name: string | null;
       confidence: number;
       reasoning?: string;
@@ -172,6 +194,7 @@ export async function identifyFace(
     return {
       characterName: parsed.character_name,
       confidence: parsed.confidence,
+      isFace: typeof parsed.is_face === "boolean" ? parsed.is_face : undefined,
       reasoning: parsed.reasoning,
     };
   } catch {

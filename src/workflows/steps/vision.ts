@@ -32,6 +32,12 @@ import type {
   downloadExemplarImage,
   findSimilarExemplars,
 } from "~/lib/exemplar-store";
+import type {
+  FaceIdentification,
+  FaceOutcome,
+} from "~/lib/character-identification";
+import type { FaceCropResult } from "~/lib/face-extraction";
+import { groupFaces } from "~/lib/face-groups";
 
 type TypedClient = SupabaseClient<Database>;
 
@@ -163,10 +169,10 @@ export async function identifyFaceOrFatal<C, T>(
 
 /**
  * A page's lookahead is finished when any of its panels has a
- * `panel_character_detections` row. That insert is the step's last write
- * and one statement, and a failed face is fatal before it
- * (`identifyFaceOrFatal`), so a page with any face unhandled has no
- * detections and runs again.
+ * `panel_character_detections` row. That insert is one statement, a failed
+ * face is fatal before it (`identifyFaceOrFatal`), and a failed exemplar
+ * after it deletes it again (`storeLookaheadFacesOrFatal`), so a page with
+ * any face unhandled has no detections and runs again.
  */
 export async function hasStoredFaceDetections(
   supabase: TypedClient,
@@ -198,25 +204,21 @@ type ExemplarStore = {
 };
 
 /**
- * Similar stored faces for one crop. The embedding already retries a 429 on
- * the fallback key (`~/lib/embeddings`), so anything that reaches here is
- * fatal for the page. The store is passed in: an import here would pull
- * Node-only modules into the workflow bundle.
+ * Similar stored faces for one crop, given as a JPEG in base64 or as its
+ * embedding. The embedding already retries a 429 on the fallback key
+ * (`~/lib/embeddings`), so anything that reaches here is fatal for the page.
+ * The store is passed in: an import here would pull Node-only modules into
+ * the workflow bundle.
  */
 export async function exemplarRefsOrFatal(
   { findSimilarExemplars, downloadExemplarImage }: ExemplarStore,
   supabase: TypedClient,
-  faceJpegBase64: string,
+  face: string | number[],
   bookId: string,
   pageLabel: string,
 ): Promise<ExemplarRef[]> {
   try {
-    const matches = await findSimilarExemplars(
-      supabase,
-      faceJpegBase64,
-      [bookId],
-      3,
-    );
+    const matches = await findSimilarExemplars(supabase, face, [bookId], 3);
     const refs = await Promise.all(
       matches.map(async (m) => {
         const img = await downloadExemplarImage(supabase, m.cropPath);
@@ -883,32 +885,60 @@ export async function extractForegroundMasksBatch(
   }
 }
 
-export async function characterLookaheadPage(
+/** Where a face sits, for a stable group numbering across the issue. */
+export type FacePosition = {
+  pageNumber: number;
+  panelSort: number;
+  x: number;
+  y: number;
+};
+
+export function compareFacePosition(a: FacePosition, b: FacePosition) {
+  return (
+    a.pageNumber - b.pageNumber ||
+    a.panelSort - b.panelSort ||
+    a.y - b.y ||
+    a.x - b.x
+  );
+}
+
+/**
+ * The Node-only modules the lookahead helpers use, imported by the caller
+ * (the step, or the #348 dry run): an import in a helper would pull them
+ * into the workflow bundle.
+ */
+export type LookaheadDeps = {
+  imageLib: typeof import("sharp");
+  faceExtraction: typeof import("~/lib/face-extraction");
+  characterIdentification: typeof import("~/lib/character-identification");
+  exemplarStore: typeof import("~/lib/exemplar-store");
+  llmUsage: typeof import("~/lib/llm-usage");
+  geminiClient: typeof import("~/lib/gemini-client");
+};
+
+export type LookaheadPage = {
+  pageNumber: number;
+  pageLabel: string;
+  imgBuf: Buffer;
+  crops: FaceCropResult[];
+  panelSort: Map<string, number>;
+};
+
+/**
+ * One page's face crops, cut from its stored `page_segmentation` row: no
+ * Roboflow call and no Gemini call. `skipIfStored` is the step's rerun
+ * check; the #348 dry run turns it off.
+ */
+export async function loadLookaheadPageOrFatal(
+  { imageLib, faceExtraction }: LookaheadDeps,
+  supabase: TypedClient,
   bookId: string,
   issueId: string,
   pageNumber: number,
-) {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const supabase = await createTypedStepClient();
-
-  const { getGeminiClient, getFallbackGeminiClient } = await import(
-    "~/lib/gemini-client"
-  );
-  const { extractFaceCropsFromBuffer } = await import("~/lib/face-extraction");
-  const { identifyFace } = await import("~/lib/character-identification");
-  const exemplarStore = await import("~/lib/exemplar-store");
-  const { withLlmMeta } = await import("~/lib/llm-usage");
-
-  const gemini = getGeminiClient();
-  const padded = String(pageNumber).padStart(2, "0");
-  const pageLabel = `page-${padded}`;
-  const llmMeta = {
-    step: "character-lookahead",
-    bookId,
-    issueId,
-    pageNumber,
-  };
+  { skipIfStored }: { skipIfStored: boolean },
+): Promise<LookaheadPage | { skip: string; stored?: true }> {
+  const { extractFaceCropsFromBuffer } = faceExtraction;
+  const pageLabel = `page-${String(pageNumber).padStart(2, "0")}`;
 
   // 1. Load segmentation predictions from DB
   const { data: segRow, error: segErr } = await supabase
@@ -925,10 +955,7 @@ export async function characterLookaheadPage(
     );
   }
 
-  if (!segRow) {
-    console.log(`[lookahead] ${pageLabel}: no segmentation, skip`);
-    return;
-  }
+  if (!segRow) return { skip: "no segmentation" };
 
   const predictions = segRow.predictions as Array<{
     class: string;
@@ -939,10 +966,7 @@ export async function characterLookaheadPage(
   const hasFaces = predictions.some(
     (p) => (p.class === "face" || p.class === "head") && p.points.length >= 3,
   );
-  if (!hasFaces) {
-    console.log(`[lookahead] ${pageLabel}: no faces detected, skip`);
-    return;
-  }
+  if (!hasFaces) return { skip: "no faces detected" };
 
   // 2. Load panels from DB; skip a page whose faces are already stored
   const { data: panels, error: panelsErr } = await supabase
@@ -959,19 +983,17 @@ export async function characterLookaheadPage(
     );
   }
 
-  if (!panels || panels.length === 0) return;
+  if (!panels || panels.length === 0) return { skip: "no panels" };
 
   if (
-    await hasStoredFaceDetections(
+    skipIfStored &&
+    (await hasStoredFaceDetections(
       supabase,
       panels.map((p) => p.id),
       pageLabel,
-    )
+    ))
   ) {
-    console.log(
-      `[lookahead] ${pageLabel}: face detections already stored, skip`,
-    );
-    return;
+    return { skip: "face detections already stored", stored: true };
   }
 
   // 3. Download page image from Storage
@@ -986,16 +1008,13 @@ export async function characterLookaheadPage(
     );
   }
 
-  if (!imageBlob) {
-    console.log(`[lookahead] ${pageLabel}: image not found, skip`);
-    return;
-  }
+  if (!imageBlob) return { skip: "image not found" };
 
   const imgBuf = Buffer.from(await imageBlob.arrayBuffer());
-  const meta = await sharp(imgBuf).metadata();
+  const meta = await imageLib(imgBuf).metadata();
   const imgW = meta.width ?? 0;
   const imgH = meta.height ?? 0;
-  if (imgW === 0 || imgH === 0) return;
+  if (imgW === 0 || imgH === 0) return { skip: "image has no size" };
 
   const panelRects = panels.map((p) => {
     const bb = p.bounding_box as BoundingBoxJson;
@@ -1009,16 +1028,55 @@ export async function characterLookaheadPage(
   });
 
   // 4. Extract face crops with deduplication
-  const faceCrops = await extractFaceCropsFromBuffer(
+  const crops = await extractFaceCropsFromBuffer(
     imgBuf,
     predictions,
     panelRects,
   );
 
-  if (faceCrops.length === 0) {
-    console.log(`[lookahead] ${pageLabel}: no valid face crops, skip`);
-    return;
-  }
+  if (crops.length === 0) return { skip: "no valid face crops" };
+
+  return {
+    pageNumber,
+    pageLabel,
+    imgBuf,
+    crops,
+    panelSort: new Map(panels.map((p) => [p.id, p.sort_order])),
+  };
+}
+
+export type IdentifiedFace = {
+  crop: FaceCropResult;
+  position: FacePosition;
+  /** Computed once per crop: the exemplar lookup and the stored row share it. */
+  embedding: number[];
+  result: FaceIdentification;
+  outcome: FaceOutcome;
+  /** The resolved character for a named face, else null. */
+  characterId: string | null;
+};
+
+/**
+ * One embedding and one Gemini naming call per crop, plus reads. Writes
+ * nothing but the `llm_calls` rows the Gemini wrapper logs, so the #348 dry
+ * run calls it as the step does.
+ */
+export async function identifyLookaheadFacesOrFatal(
+  deps: LookaheadDeps,
+  supabase: TypedClient,
+  bookId: string,
+  issueId: string,
+  page: LookaheadPage,
+  step = "character-lookahead",
+): Promise<IdentifiedFace[]> {
+  const { getGeminiClient, getFallbackGeminiClient } = deps.geminiClient;
+  const { identifyFace, faceOutcome } = deps.characterIdentification;
+  const { exemplarStore } = deps;
+  const { withLlmMeta } = deps.llmUsage;
+
+  const gemini = getGeminiClient();
+  const { pageNumber, pageLabel, imgBuf } = page;
+  const llmMeta = { step, bookId, issueId, pageNumber };
 
   // 5. Build known character list + wiki context
   const dbCharacters = await buildKnownCharacterListOrFatal(
@@ -1081,30 +1139,32 @@ export async function characterLookaheadPage(
     (issueRow?.wiki_summary as string | undefined) ?? undefined;
 
   // 6. Identify each face with exemplar context
-  const detectionRows: Array<{
-    character_id: string | null;
-    suggested_name?: string;
-    panel_id: string;
-    face_bbox: Json;
-    identification_confidence: number;
-  }> = [];
-
   const pageBase64 = imgBuf.toString("base64");
+  const faces: IdentifiedFace[] = [];
 
-  for (const face of faceCrops) {
+  for (const crop of page.crops) {
+    const faceBase64 = crop.jpegBuffer.toString("base64");
+    let embedding: number[];
+    try {
+      embedding = await withLlmMeta(llmMeta, () =>
+        exemplarStore.embedFace(faceBase64),
+      );
+    } catch (err: unknown) {
+      throw new FatalError(
+        `face embedding failed for ${pageLabel}: ${errorText(err)}`,
+      );
+    }
+
     // Retrieve similar exemplars from pgvector
-    const exemplarRefs = await withLlmMeta(llmMeta, () =>
-      exemplarRefsOrFatal(
-        exemplarStore,
-        supabase,
-        face.jpegBuffer.toString("base64"),
-        bookId,
-        pageLabel,
-      ),
+    const exemplarRefs = await exemplarRefsOrFatal(
+      exemplarStore,
+      supabase,
+      embedding,
+      bookId,
+      pageLabel,
     );
 
     // Identify with exemplar context + key failover
-    const faceBase64 = face.jpegBuffer.toString("base64");
     const result = await withLlmMeta(llmMeta, () =>
       identifyFaceOrFatal(
         (client) =>
@@ -1125,93 +1185,337 @@ export async function characterLookaheadPage(
       ),
     );
 
-    if (result.characterName && result.confidence >= 0.6) {
-      const charId = await resolveCharacterIdOrFatal(
-        supabase,
-        result.characterName,
-        pageLabel,
-      );
+    const outcome = faceOutcome(result);
+    const characterId =
+      outcome === "named" && result.characterName
+        ? await resolveCharacterIdOrFatal(
+            supabase,
+            result.characterName,
+            pageLabel,
+          )
+        : null;
 
-      detectionRows.push({
-        character_id: charId,
-        suggested_name: charId ? undefined : result.characterName,
-        panel_id: face.panelId,
-        face_bbox: face.bboxPanelLocal,
-        identification_confidence: result.confidence,
-      });
-
-      // Store face as exemplar (confirmed if resolved + high confidence)
-      if (result.confidence >= 0.7) {
-        const suggestedName = charId ? undefined : result.characterName;
-        try {
-          await withLlmMeta(llmMeta, () =>
-            exemplarStore.storeExemplar(supabase, {
-              jpegBuffer: face.jpegBuffer,
-              characterId: charId,
-              suggestedName,
-              bookId,
-              sourceIssue: issueId,
-              pageNumber,
-              confidence: result.confidence,
-              isConfirmed: charId !== null && result.confidence >= 0.9,
-            }),
-          );
-        } catch (e) {
-          throw new FatalError(
-            `character_face_exemplars write failed for ${pageLabel}: ${e instanceof Error ? e.message : String(e)}`,
-          );
-        }
-      }
-    }
+    faces.push({
+      crop,
+      position: {
+        pageNumber,
+        panelSort: page.panelSort.get(crop.panelId) ?? 0,
+        x: crop.bboxPanelLocal.x,
+        y: crop.bboxPanelLocal.y,
+      },
+      embedding,
+      result,
+      outcome,
+      characterId,
+    });
 
     // Rate limit delay between faces
     await new Promise((r) => setTimeout(r, 800));
   }
 
-  if (detectionRows.length > 0) {
-    const panelIdsInBatch = [...new Set(detectionRows.map((r) => r.panel_id))];
-    const { data: existingDets, error: existingErr } = await supabase
-      .from("panel_character_detections")
-      .select("character_id, suggested_name, panel_id")
-      .in("panel_id", panelIdsInBatch);
+  return faces;
+}
 
-    if (existingErr) {
-      throw new FatalError(
-        `panel_character_detections read failed for ${pageLabel}: ${existingErr.message}`,
-      );
+/** A named face's exemplar is stored at this confidence or more (as before). */
+const NAMED_EXEMPLAR_MIN_CONFIDENCE = 0.7;
+
+/**
+ * Detections first, in one insert, then the exemplars that carry their
+ * `detection_id` (#348). A failed exemplar undoes this call's detections and
+ * unnamed exemplars, so the page has no detections and a rerun does it
+ * again (`hasStoredFaceDetections`).
+ */
+async function storeLookaheadFacesOrFatal(
+  { exemplarStore }: LookaheadDeps,
+  supabase: TypedClient,
+  bookId: string,
+  issueId: string,
+  page: LookaheadPage,
+  faces: IdentifiedFace[],
+): Promise<{ named: number; unnamed: number }> {
+  const { storeExemplar, deleteExemplars } = exemplarStore;
+  const { pageNumber, pageLabel } = page;
+  const kept = faces.filter((f) => f.outcome !== "drop");
+  const named = kept.filter((f) => f.outcome === "named").length;
+  if (kept.length === 0) return { named, unnamed: 0 };
+
+  const panelIds = [...new Set(kept.map((f) => f.crop.panelId))];
+  const { data: existingDets, error: existingErr } = await supabase
+    .from("panel_character_detections")
+    .select("id, character_id, suggested_name, panel_id")
+    .in("panel_id", panelIds);
+
+  if (existingErr) {
+    throw new FatalError(
+      `panel_character_detections read failed for ${pageLabel}: ${existingErr.message}`,
+    );
+  }
+
+  // A named face is one detection per character per panel, as before. An
+  // unnamed face has no key: each one gets its own row.
+  const namedKey = (name: string | null, panelId: string) =>
+    `${name}::${panelId}`;
+  const detectionByKey = new Map<string, string>();
+  for (const d of existingDets ?? []) {
+    const name = d.character_id ?? d.suggested_name;
+    if (name !== null) detectionByKey.set(namedKey(name, d.panel_id), d.id);
+  }
+
+  const newRows: TablesInsert<"panel_character_detections">[] = [];
+  const detectionIds: string[] = [];
+  for (const f of kept) {
+    const suggestedName =
+      f.outcome === "named" && !f.characterId ? f.result.characterName : null;
+    const key =
+      f.outcome === "named"
+        ? namedKey(f.characterId ?? suggestedName, f.crop.panelId)
+        : null;
+    const existing = key ? detectionByKey.get(key) : undefined;
+    if (existing) {
+      detectionIds.push(existing);
+      continue;
     }
+    const id = crypto.randomUUID();
+    newRows.push({
+      id,
+      character_id: f.characterId,
+      suggested_name: suggestedName,
+      panel_id: f.crop.panelId,
+      face_bbox: f.crop.bboxPanelLocal,
+      identification_confidence: f.result.confidence,
+    });
+    detectionIds.push(id);
+    if (key) detectionByKey.set(key, id);
+  }
 
-    const existingKeys = new Set(
-      (existingDets ?? []).map(
-        (d: {
-          character_id: string | null;
-          suggested_name: string | null;
-          panel_id: string;
-        }) => `${d.character_id ?? d.suggested_name}::${d.panel_id}`,
-      ),
-    );
-
-    const newRows = detectionRows.filter(
-      (r) =>
-        !existingKeys.has(
-          `${r.character_id ?? r.suggested_name}::${r.panel_id}`,
-        ),
-    );
-
-    if (newRows.length > 0) {
-      const { error } = await supabase
-        .from("panel_character_detections")
-        .insert(newRows);
-      if (error) {
-        throw new FatalError(
-          `panel_character_detections insert failed for ${pageLabel}: ${error.message}`,
-        );
-      }
+  if (newRows.length > 0) {
+    const { error } = await supabase
+      .from("panel_character_detections")
+      .insert(newRows);
+    if (error) {
+      throw new FatalError(
+        `panel_character_detections insert failed for ${pageLabel}: ${error.message}`,
+      );
     }
   }
 
+  const unnamedExemplars: string[] = [];
+  try {
+    for (const [i, f] of kept.entries()) {
+      const unnamed = f.outcome === "unnamed";
+      if (!unnamed && f.result.confidence < NAMED_EXEMPLAR_MIN_CONFIDENCE) {
+        continue;
+      }
+      const id = await storeExemplar(supabase, {
+        jpegBuffer: f.crop.jpegBuffer,
+        characterId: f.characterId,
+        suggestedName:
+          unnamed || f.characterId
+            ? undefined
+            : (f.result.characterName ?? undefined),
+        bookId,
+        sourceIssue: issueId,
+        pageNumber,
+        confidence: f.result.confidence,
+        isConfirmed:
+          !unnamed && f.characterId !== null && f.result.confidence >= 0.9,
+        detectionId: detectionIds[i],
+        embedding: f.embedding,
+      });
+      if (unnamed) unnamedExemplars.push(id);
+    }
+  } catch (e) {
+    const undo: string[] = [];
+    try {
+      await deleteExemplars(supabase, unnamedExemplars);
+    } catch (undoErr: unknown) {
+      undo.push(errorText(undoErr));
+    }
+    if (newRows.length > 0) {
+      const { error } = await supabase
+        .from("panel_character_detections")
+        .delete()
+        .in(
+          "id",
+          newRows.map((r) => r.id!),
+        );
+      if (error) undo.push(`detections delete: ${error.message}`);
+    }
+    throw new FatalError(
+      `character_face_exemplars write failed for ${pageLabel}: ${errorText(e)}${undo.length > 0 ? `; undo failed: ${undo.join("; ")}` : ""}`,
+    );
+  }
+
+  return { named, unnamed: kept.length - named };
+}
+
+/**
+ * Groups every unnamed face in the issue by embedding (`groupFaces`) and
+ * writes the group to `cluster_id`, a group of one included (#348). Each run
+ * regroups the whole issue, so the last page's run leaves the final grouping;
+ * only rows whose group changed are written. With `onlyIfUngrouped` it does
+ * nothing unless some unnamed face has no group yet, which heals a run that
+ * stored faces and then failed here.
+ */
+async function groupUnnamedFacesOrFatal(
+  supabase: TypedClient,
+  bookId: string,
+  issueId: string,
+  pageLabel: string,
+  { onlyIfUngrouped }: { onlyIfUngrouped: boolean },
+): Promise<{ faces: number; groups: number; updated: number } | null> {
+  const fail = (what: string, message: string) =>
+    new FatalError(`${what} failed for ${pageLabel} (face groups): ${message}`);
+
+  const {
+    data: dets,
+    error: detsErr,
+    count: detsCount,
+  } = await supabase
+    .from("panel_character_detections")
+    .select(
+      "id, cluster_id, face_bbox, panels!inner(book_id, issue_id, page_number, sort_order)",
+      { count: "exact" },
+    )
+    .eq("panels.book_id", bookId)
+    .eq("panels.issue_id", issueId)
+    .is("character_id", null)
+    .is("suggested_name", null);
+  if (detsErr) throw fail("panel_character_detections read", detsErr.message);
+  if ((detsCount ?? 0) > dets.length) {
+    throw fail(
+      "panel_character_detections read",
+      `got ${dets.length} of ${detsCount} rows`,
+    );
+  }
+  if (dets.length === 0) return null;
+  if (onlyIfUngrouped && dets.every((d) => d.cluster_id !== null)) return null;
+
+  const {
+    data: exemplars,
+    error: exErr,
+    count: exCount,
+  } = await supabase
+    .from("character_face_exemplars")
+    .select("detection_id, embedding", { count: "exact" })
+    .eq("book_id", bookId)
+    .eq("source_issue", issueId)
+    .is("character_id", null)
+    .is("suggested_name", null)
+    .not("detection_id", "is", null);
+  if (exErr) throw fail("character_face_exemplars read", exErr.message);
+  if ((exCount ?? 0) > exemplars.length) {
+    throw fail(
+      "character_face_exemplars read",
+      `got ${exemplars.length} of ${exCount} rows`,
+    );
+  }
+
+  const embeddingOf = new Map<string, number[]>();
+  for (const e of exemplars) {
+    if (e.detection_id && e.embedding && !embeddingOf.has(e.detection_id)) {
+      embeddingOf.set(e.detection_id, JSON.parse(e.embedding) as number[]);
+    }
+  }
+
+  const ordered = dets
+    .map((d) => {
+      const bb = d.face_bbox as BoundingBoxJson;
+      return {
+        id: d.id,
+        clusterId: d.cluster_id,
+        position: {
+          pageNumber: d.panels.page_number,
+          panelSort: d.panels.sort_order,
+          x: bb.x,
+          y: bb.y,
+        },
+      };
+    })
+    .sort((a, b) => compareFacePosition(a.position, b.position));
+
+  const groups = groupFaces(ordered.map((d) => embeddingOf.get(d.id) ?? null));
+
+  const changed = new Map<number, string[]>();
+  ordered.forEach((d, i) => {
+    const g = groups[i]!;
+    if (d.clusterId !== g) changed.set(g, [...(changed.get(g) ?? []), d.id]);
+  });
+  let updated = 0;
+  for (const [clusterId, ids] of changed) {
+    const { error } = await supabase
+      .from("panel_character_detections")
+      .update({ cluster_id: clusterId })
+      .in("id", ids);
+    if (error) throw fail("panel_character_detections update", error.message);
+    updated += ids.length;
+  }
+
+  return { faces: ordered.length, groups: Math.max(...groups), updated };
+}
+
+export async function characterLookaheadPage(
+  bookId: string,
+  issueId: string,
+  pageNumber: number,
+) {
+  "use step";
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
+  const deps: LookaheadDeps = {
+    imageLib: sharp,
+    faceExtraction: await import("~/lib/face-extraction"),
+    characterIdentification: await import("~/lib/character-identification"),
+    exemplarStore: await import("~/lib/exemplar-store"),
+    llmUsage: await import("~/lib/llm-usage"),
+    geminiClient: await import("~/lib/gemini-client"),
+  };
+
+  const page = await loadLookaheadPageOrFatal(
+    deps,
+    supabase,
+    bookId,
+    issueId,
+    pageNumber,
+    { skipIfStored: true },
+  );
+  const pageLabel = `page-${String(pageNumber).padStart(2, "0")}`;
+
+  if ("skip" in page) {
+    console.log(`[lookahead] ${pageLabel}: ${page.skip}, skip`);
+    if (page.stored) {
+      await groupUnnamedFacesOrFatal(supabase, bookId, issueId, pageLabel, {
+        onlyIfUngrouped: true,
+      });
+    }
+    return;
+  }
+
+  const faces = await identifyLookaheadFacesOrFatal(
+    deps,
+    supabase,
+    bookId,
+    issueId,
+    page,
+  );
+  const stored = await storeLookaheadFacesOrFatal(
+    deps,
+    supabase,
+    bookId,
+    issueId,
+    page,
+    faces,
+  );
+  const grouped = await groupUnnamedFacesOrFatal(
+    supabase,
+    bookId,
+    issueId,
+    pageLabel,
+    { onlyIfUngrouped: stored.unnamed === 0 },
+  );
+
   console.log(
-    `[lookahead] ${bookId}/${issueId}: ${pageLabel} → ${faceCrops.length} faces, ${detectionRows.length} identified`,
+    `[lookahead] ${bookId}/${issueId}: ${pageLabel} → ${faces.length} faces, ${stored.named} named, ${stored.unnamed} unnamed${grouped ? `; issue has ${grouped.faces} unnamed in ${grouped.groups} group(s), ${grouped.updated} regrouped` : ""}`,
   );
 }
 
