@@ -43,6 +43,8 @@ export interface SrcBubble {
   /** Shown, no audio: `bubbles.silent`. */
   silent: boolean;
   confidence: number | null;
+  /** `audio_storage_path`: the current take in the `comic-audio` bucket, or null when it has none. */
+  audioPath: string | null;
 }
 
 export interface Face {

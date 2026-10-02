@@ -14,7 +14,7 @@ function speakerOf(b: BubbleDoc): string | null {
 }
 
 /** The cues a bubble stores: its `cues` while its text is the text they were written for. */
-function cuesOf(b: BubbleDoc): string | null {
+export function cuesOf(b: BubbleDoc): string | null {
   return b.cues && b.cues.forText === b.text ? b.cues.value : null;
 }
 

@@ -14,8 +14,9 @@ import {
 import type { AnalyzeProposal } from "~/server/actions/review/analyze-bubble";
 import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
-import { Inspector, Key, type Actions } from "./Inspector";
+import { Inspector, Key, type Actions, type ListenView } from "./Inspector";
 import { findCast, needYou, newId, ownVoice, plural, slug } from "./lib";
+import { takesDropped, useListen, type SavedRow } from "./listen";
 import {
   addBubble,
   addCast,
@@ -101,6 +102,7 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
         "R",
         "While a proposal shows: try again, analyzing the bubble once more with its hint",
       ],
+      ["L", "Play the bubble's audio. L again stops it"],
       [
         "S",
         "Pick the speaker. Enter takes the highlighted name: the nearest face, or the first match once you type",
@@ -413,11 +415,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     () => diffDoc(state.base, doc) !== null,
     [state.base, doc],
   );
-  /** The rows a Save would write now. */
-  const toWrite = useMemo(
-    () => saveCount(buildSave(state.base, doc)),
-    [state.base, doc],
-  );
+  /** What a Save would write now, and how many rows. */
+  const pending = useMemo(() => buildSave(state.base, doc), [state.base, doc]);
+  const toWrite = useMemo(() => saveCount(pending), [pending]);
 
   const selBubble = sel?.kind === "bubble" ? doc.bubbles[sel.id] : undefined;
   const selPanel = sel?.kind === "panel" ? doc.panels[sel.id] : undefined;
@@ -806,16 +806,29 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    * Write every pending edit in one request. The editor stays as it is: on
    * success the document that was sent becomes the baseline, and nothing
    * else changes; on failure the edits stay pending and the error shows.
+   * Resolves to the document that is now saved, or why nothing was.
+   * `save` is the button and Cmd S; a regenerate's save-first, which already
+   * holds the lock, calls `writeSave`.
    */
   const savingRef = useRef(false);
   const save = async () => {
-    if (savingRef.current) return;
+    if (refuse()) return;
+    await writeSave();
+  };
+  const writeSave = async (): Promise<
+    { ok: true; sent: Doc } | { ok: false; error: string }
+  > => {
+    if (savingRef.current)
+      return {
+        ok: false,
+        error: "A Save is already running. Try again once it finishes.",
+      };
     const sent = state.doc;
     const edits = buildSave(state.base, sent);
     const count = saveCount(edits);
     if (count === 0) {
       say("Nothing to save.");
-      return;
+      return { ok: true, sent };
     }
     savingRef.current = true;
     setSaving(true);
@@ -836,32 +849,105 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         | (Partial<SaveResult> & { error?: string })
         | null;
       if (!res.ok) {
-        setSaveError(
+        const error =
           body?.error ??
-            `Nothing was saved: the server answered ${res.status}.`,
-        );
-        return;
+          `Nothing was saved: the server answered ${res.status}.`;
+        setSaveError(error);
+        return { ok: false, error };
       }
       dispatch({ type: "saved", base: sent });
+      listen.dropTakes(takesDropped(edits));
       const audio = body?.needsAudio ?? 0;
       say(
         audio > 0
           ? `Saved ${plural(count, "change")}. ${plural(audio, "bubble")} now need${audio === 1 ? "s" : ""} audio.`
           : `Saved ${plural(count, "change")}.`,
       );
+      return { ok: true, sent };
     } catch (e) {
       // No answer: the request may or may not have reached the database.
-      setSaveError(
-        `The save may or may not have landed (${(e as Error).message}). Your edits are still here; reload the editor to see the rows as they are now.`,
-      );
+      const error = `The save may or may not have landed (${(e as Error).message}). Your edits are still here; reload the editor to see the rows as they are now.`;
+      setSaveError(error);
+      return { ok: false, error };
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
 
+  /** The bubble's row is in the database: the baseline holds it, not deleted. */
+  const saved = (id: string) => {
+    const row = state.base.bubbles[id];
+    return !!row && !row.deleted;
+  };
+  /** A Save would write this bubble's row. */
+  const hasPending = (id: string) =>
+    [...pending.bubbles.add, ...pending.bubbles.update].some(
+      (row) => row.id === id,
+    );
+
+  /**
+   * Before a regenerate: when the bubble has a pending edit, part 2's Save
+   * writes every pending edit, and the regenerate runs only once it lands.
+   */
+  const saveFirst = async (id: string): Promise<SavedRow> => {
+    const row = state.base.bubbles[id];
+    if (!row || row.deleted)
+      return { ok: false, error: "This bubble has no saved row yet." };
+    if (!hasPending(id)) return { ok: true, text: row.text };
+    const res = await writeSave();
+    if (!res.ok) return res;
+    return { ok: true, text: res.sent.bubbles[id]?.text ?? row.text };
+  };
+  const listen = useListen({
+    bookId: data.bookId,
+    issueId: data.issueId,
+    bubbles: data.bubbles,
+    selectedId: sel?.id ?? null,
+    saveRunning: () => savingRef.current,
+    saveFirst,
+    onCues: (id, forText, value) =>
+      dispatch({ type: "cuesWritten", id, cues: { forText, value } }),
+  });
+
+  /**
+   * The editor lock. While a Save or a regenerate (its save-first included)
+   * is in flight, the editor holds still: no Save, regenerate, undo, redo or
+   * analyze, and the regenerating bubble's text is read-only. So nothing can
+   * change under the call, and its result always lands on what it was made
+   * for.
+   */
+  const lockReason = listen.active
+    ? `Waiting for Regenerate ${listen.active.job}...`
+    : saving
+      ? "Waiting for Save..."
+      : null;
+  /** True and said when locked, read at the moment of the action. */
+  const refuse = () => {
+    if (!savingRef.current && !listen.isActive()) return false;
+    say(lockReason ?? "Waiting for Save or a regenerate to finish.", "warn");
+    return true;
+  };
+  const history = (type: "undo" | "redo") => {
+    if (!refuse()) dispatch({ type });
+  };
+
+  // A bubble with a saved row that is spoken aloud gets the audio controls.
+  const listenView: ListenView | null =
+    selBubble && saved(selBubble.id) && !selBubble.silent && !selBubble.ignored
+      ? {
+          hasAudio: !!listen.paths[selBubble.id],
+          playing: listen.playing === selBubble.id,
+          running:
+            listen.active?.id === selBubble.id ? listen.active.job : null,
+          notice: listen.notices[selBubble.id] ?? null,
+          saveFirst: hasPending(selBubble.id) ? toWrite : 0,
+        }
+      : null;
+
   const discard = () => {
     setConfirmDiscard(false);
+    if (refuse()) return;
     // A stale tab must not clear what another tab stored.
     if (staleRef.current) return;
     if (storedRev(readRaw(storeKey)) !== revRef.current) {
@@ -964,9 +1050,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     setRect,
     zoomTo: (rect) => canvasRef.current?.zoomTo(rect),
     goto,
-    analyze: analyzer.analyze,
-    accept: analyzer.accept,
+    analyze: (id) => {
+      if (!refuse()) analyzer.analyze(id);
+    },
+    accept: (id) => {
+      if (!refuse()) analyzer.accept(id);
+    },
     setHint: analyzer.setHint,
+    play: listen.play,
+    regenerate: (id, job) => {
+      // The lock is checked first, before any fast path, inside `regenerate`.
+      if (!listen.regenerate(id, job)) refuse();
+    },
   };
 
   const toggleRail = (view: LeftView) => {
@@ -1002,7 +1097,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       }
       if (mod && key === "z") {
         e.preventDefault();
-        dispatch({ type: e.shiftKey ? "redo" : "undo" });
+        history(e.shiftKey ? "redo" : "undo");
         return;
       }
       if (mod) return;
@@ -1127,11 +1222,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       const proposed = analyzer.runs[b.id]?.phase === "ready";
       switch (key) {
         case "Enter":
-          if (proposed) analyzer.accept(b.id);
+          if (proposed) actions.accept(b.id);
           else openField("text");
           return done();
         case "r":
-          if (proposed) analyzer.analyze(b.id);
+          if (proposed) actions.analyze(b.id);
+          return done();
+        case "l":
+          if (listenView?.hasAudio) listen.play(b.id);
           return done();
         case "e":
           openField("text");
@@ -1218,6 +1316,12 @@ function Editor({ data, initialPage }: WorkbenchProps) {
               ["Enter", "accept"],
               ["R", "try again"],
             ] as [string, string][])
+          : []),
+        ...(listenView?.hasAudio
+          ? ([["L", listenView.playing ? "stop" : "play"]] as [
+              string,
+              string,
+            ][])
           : []),
         ["↑↓", "step"],
         ["S", "speaker"],
@@ -1308,10 +1412,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             "Nothing needs you"
           )}
         </button>
+        {lockReason && (
+          <span role="status" className="shrink-0 text-amber-300">
+            {lockReason}
+          </span>
+        )}
         <button
           type="button"
-          disabled={state.past.length === 0}
-          onClick={() => dispatch({ type: "undo" })}
+          disabled={state.past.length === 0 || !!lockReason}
+          onClick={() => history("undo")}
           className={BAR_BUTTON}
           title="Undo (Cmd Z)"
         >
@@ -1324,8 +1433,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         </button>
         <button
           type="button"
-          disabled={state.future.length === 0}
-          onClick={() => dispatch({ type: "redo" })}
+          disabled={state.future.length === 0 || !!lockReason}
+          onClick={() => history("redo")}
           className={BAR_BUTTON}
           title="Redo (Shift Cmd Z)"
         >
@@ -1348,17 +1457,19 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         {edited && kept !== "stale" && (
           <button
             type="button"
+            disabled={!!lockReason}
             onClick={() => setConfirmDiscard(true)}
             className={BAR_BUTTON}
+            title={lockReason ?? undefined}
           >
             Discard edits
           </button>
         )}
         <button
           type="button"
-          disabled={saving || toWrite === 0}
+          disabled={toWrite === 0 || !!lockReason}
           onClick={() => void save()}
-          title="Save every pending edit (Cmd S)"
+          title={lockReason ?? "Save every pending edit (Cmd S)"}
           className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-neutral-100 px-2 font-medium text-neutral-950 hover:bg-white disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
         >
           {saving ? "Saving" : "Save"}
@@ -1734,6 +1845,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                 emotionRef={emotionRef}
                 analysis={analyzer.runs}
                 hints={analyzer.hints}
+                listen={listenView}
+                lock={
+                  lockReason
+                    ? {
+                        reason: lockReason,
+                        bubbleId: listen.active?.id ?? null,
+                      }
+                    : null
+                }
                 actions={actions}
               />
             </div>

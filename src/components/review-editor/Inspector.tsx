@@ -3,6 +3,7 @@
 
 import type { RefObject } from "react";
 import type { AnalyzeRun } from "./analyze";
+import type { ListenJob, ListenNotice } from "./listen";
 import {
   needYou,
   plural,
@@ -26,6 +27,7 @@ import {
   type VoiceChoice,
 } from "./model";
 import { PageCrop } from "./PageCrop";
+import { cuesOf } from "./save";
 import { Portrait, SpeakerPicker } from "./SpeakerPicker";
 import type {
   BubbleType,
@@ -67,6 +69,34 @@ export interface Actions {
   /** Turn the bubble's proposal into pending edits. */
   accept: (id: string) => void;
   setHint: (id: string, text: string) => void;
+  /** Play the bubble's take, or stop it when it is playing. */
+  play: (id: string) => void;
+  /** Save first when the bubble has pending edits, then regenerate. */
+  regenerate: (id: string, job: ListenJob) => void;
+}
+
+/**
+ * The selected bubble's audio controls. Null hides them: the bubble has no
+ * saved row, or is silent or ignored.
+ */
+export interface ListenView {
+  /** The bubble has a take to play. */
+  hasAudio: boolean;
+  playing: boolean;
+  /** The regenerate running on this bubble, or null. */
+  running: ListenJob | null;
+  notice: ListenNotice | null;
+  /** Rows a Save writes before a regenerate; 0 when this bubble has no pending edit. */
+  saveFirst: number;
+}
+
+/**
+ * A Save or a regenerate is in flight, and the editor holds still: why, and
+ * the bubble whose text is read-only meanwhile.
+ */
+export interface Lock {
+  reason: string;
+  bubbleId: string | null;
 }
 
 interface InspectorProps {
@@ -87,6 +117,8 @@ interface InspectorProps {
   emotionRef: RefObject<HTMLInputElement | null>;
   analysis: Record<string, AnalyzeRun>;
   hints: Record<string, string>;
+  listen: ListenView | null;
+  lock: Lock | null;
   actions: Actions;
 }
 
@@ -183,12 +215,14 @@ function AnalyzeBlock({
   run,
   hint,
   castById,
+  lock,
   actions,
 }: {
   bubble: BubbleDoc;
   run: AnalyzeRun | undefined;
   hint: string;
   castById: Map<string, CastMember>;
+  lock: Lock | null;
   actions: Actions;
 }) {
   const proposal = run?.phase === "ready" ? run.proposal : null;
@@ -196,6 +230,7 @@ function AnalyzeBlock({
   const running = run?.phase === "running";
   return (
     <div className="space-y-2 rounded-sm border border-neutral-700 bg-neutral-900 p-2">
+      {lock && <p className="text-amber-300">{lock.reason}</p>}
       {run?.phase === "waiting" && (
         <p className="text-neutral-300">
           New bubble. Analyze starts once the box has been still for a second.
@@ -239,7 +274,8 @@ function AnalyzeBlock({
           <div className="flex gap-1.5">
             <button
               type="button"
-              className={PRIMARY}
+              className={PRIMARY + " disabled:opacity-40"}
+              disabled={!!lock}
               onClick={() => actions.accept(b.id)}
             >
               Accept <Key>Enter</Key>
@@ -247,6 +283,7 @@ function AnalyzeBlock({
             <button
               type="button"
               className={BUTTON + " h-7"}
+              disabled={!!lock}
               onClick={() => actions.analyze(b.id)}
             >
               Try again <Key>R</Key>
@@ -263,7 +300,7 @@ function AnalyzeBlock({
           aria-label="Hint for Analyze again"
           onChange={(e) => actions.setHint(b.id, e.target.value)}
           onKeyDown={(e) => {
-            if (e.key !== "Enter" || running) return;
+            if (e.key !== "Enter" || running || lock) return;
             e.preventDefault();
             // Off the field, so the next Enter accepts what comes back.
             e.currentTarget.blur();
@@ -274,12 +311,113 @@ function AnalyzeBlock({
         <button
           type="button"
           className={BUTTON}
-          disabled={running}
+          disabled={running || !!lock}
           onClick={() => actions.analyze(b.id)}
         >
           Analyze again
         </button>
       </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ listen
+
+/** A click from a pointer. A key on a focused button clicks with `detail` 0. */
+const pointerClick = (e: React.MouseEvent) => e.detail > 0;
+
+/**
+ * Play the bubble's take, see its cues, and regenerate either. The two
+ * regenerate buttons run on a pointer click only, never a key, and are off
+ * while the editor is locked.
+ */
+function ListenBlock({
+  bubble: b,
+  view,
+  lock,
+  actions,
+}: {
+  bubble: BubbleDoc;
+  view: ListenView;
+  lock: Lock | null;
+  actions: Actions;
+}) {
+  const { running, notice } = view;
+  const cues = cuesOf(b);
+  const first = view.saveFirst > 0 ? "Save, then regenerate" : "Regenerate";
+  const off = !!lock;
+  return (
+    <div className="space-y-2 rounded-sm border border-neutral-800 p-2">
+      {view.hasAudio ? (
+        <button
+          type="button"
+          aria-pressed={view.playing}
+          className={BUTTON + " h-7"}
+          onClick={() => actions.play(b.id)}
+        >
+          {view.playing ? "Stop" : "Play"} <Key>L</Key>
+        </button>
+      ) : (
+        <p className="text-neutral-500">No audio yet.</p>
+      )}
+      <div>
+        <Label>Cues, as the audio step reads them</Label>
+        <p className="whitespace-pre-wrap text-neutral-300">
+          {cues ??
+            (b.cues
+              ? "None: the text changed since they were written."
+              : "None. The audio reads the text as it is.")}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          className={BUTTON + " h-7"}
+          disabled={off}
+          onClick={(e) => {
+            if (pointerClick(e)) actions.regenerate(b.id, "cues");
+          }}
+        >
+          {running === "cues" ? "Regenerating cues..." : `${first} cues`}
+        </button>
+        <button
+          type="button"
+          className={
+            BUTTON + " h-auto min-h-7 py-1 text-left whitespace-normal"
+          }
+          disabled={off}
+          onClick={(e) => {
+            if (pointerClick(e)) actions.regenerate(b.id, "audio");
+          }}
+        >
+          {running === "audio"
+            ? "Regenerating audio..."
+            : `${first} audio (uses ElevenLabs credits)`}
+        </button>
+      </div>
+      {lock ? (
+        <p className="text-amber-300">{lock.reason}</p>
+      ) : (
+        view.saveFirst > 0 && (
+          <p className="text-[11px] text-neutral-500">
+            This bubble has unsaved edits, so a regenerate saves{" "}
+            {view.saveFirst === 1
+              ? "the 1 pending change"
+              : `all ${view.saveFirst} pending changes`}{" "}
+            first.
+          </p>
+        )
+      )}
+      {notice && (
+        <p
+          role={notice.tone === "error" ? "alert" : "status"}
+          className={
+            notice.tone === "error" ? "text-red-300" : "text-emerald-300"
+          }
+        >
+          {notice.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -307,8 +445,12 @@ function BubbleInspector(
     emotionRef,
     analysis,
     hints,
+    listen,
+    lock,
     actions,
   } = props;
+  // A regenerate on this bubble sent its saved text; it stays as sent.
+  const textLocked = !!lock && lock.bubbleId === b.id;
   const f = flags.get(b.id) ?? [];
   const member = b.speakerId ? castById.get(b.speakerId) : undefined;
   const siblings = visibleBubbles(
@@ -421,17 +563,22 @@ function BubbleInspector(
         run={analysis[b.id]}
         hint={hints[b.id] ?? ""}
         castById={castById}
+        lock={lock}
         actions={actions}
       />
 
       <div>
         <Label>
           Text <Key>E</Key>
+          {textLocked && (
+            <span className="text-amber-300">read-only: {lock.reason}</span>
+          )}
         </Label>
         <textarea
           key={b.id}
           ref={textRef}
           value={b.text}
+          readOnly={textLocked}
           rows={Math.min(8, Math.max(3, b.text.split("\n").length))}
           onChange={(e) =>
             actions.patch(
@@ -444,6 +591,10 @@ function BubbleInspector(
           className={`${INPUT} resize-y py-1.5 leading-snug`}
         />
       </div>
+
+      {listen && (
+        <ListenBlock bubble={b} view={listen} lock={lock} actions={actions} />
+      )}
 
       <div>
         <Label>

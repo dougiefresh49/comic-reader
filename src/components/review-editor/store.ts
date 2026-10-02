@@ -3,6 +3,7 @@ import {
   applyDocPatch,
   diffDoc,
   reconcile,
+  type BubbleDoc,
   type Doc,
   type DocPatch,
   type Sel,
@@ -51,7 +52,15 @@ export type EditorAction =
    * and the undo history stays: an undo past the save point is measured
    * against the new baseline and shows as a new pending edit.
    */
-  | { type: "saved"; base: Doc };
+  | { type: "saved"; base: Doc }
+  /**
+   * Regenerate cues wrote one row's `text_with_cues` outside Save. The
+   * editor was locked while it ran, so nothing changed under it: the new
+   * cues go into the baseline, the document and every undo and redo step
+   * whose text is the text they were written for, so no step can write
+   * older cues for that text back.
+   */
+  | { type: "cuesWritten"; id: string; cues: NonNullable<BubbleDoc["cues"]> };
 
 const LIMIT = 60;
 
@@ -204,6 +213,28 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       };
     case "saved":
       return { ...state, base: action.base };
+    case "cuesWritten": {
+      const { id, cues } = action;
+      const take = (doc: Doc): Doc => {
+        const b = doc.bubbles[id];
+        // A step whose text differs still holds cues for the sent text when
+        // its text is later typed back, so those are replaced too.
+        if (!b || (b.text !== cues.forText && b.cues?.forText !== cues.forText))
+          return doc;
+        return { ...doc, bubbles: { ...doc.bubbles, [id]: { ...b, cues } } };
+      };
+      const takeEntry = (entry: HistoryEntry): HistoryEntry => {
+        const doc = take(entry.doc);
+        return doc === entry.doc ? entry : { ...entry, doc };
+      };
+      return {
+        ...state,
+        base: take(state.base),
+        doc: take(state.doc),
+        past: state.past.map(takeEntry),
+        future: state.future.map(takeEntry),
+      };
+    }
   }
 }
 
