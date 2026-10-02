@@ -198,7 +198,7 @@ export async function POST(req: NextRequest) {
     ...panels.remove,
   ].map((r) => r.page);
   await revalidateReaderPages(bookId, issueId, pages);
-  revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
+  revalidatePath(`/admin/${bookId}/${issueId}/review/editor`, "page");
   revalidatePath(`/book/${bookId}`);
   revalidatePath("/");
 

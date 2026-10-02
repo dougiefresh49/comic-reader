@@ -42,8 +42,9 @@ export default async function ReviewPanelsPage({ params }: Params) {
         </div>
         <h1 className="mb-1 text-2xl font-semibold">Review panels</h1>
         <p className="mb-6 text-sm text-neutral-400">
-          Drag panel edges to resize. Click a bubble to reassign. All edits stay
-          local until you click <em>Apply</em>.
+          Effects, audio tags and scene breaks for each panel. Boxes, order and
+          bubbles are edited in the review editor. Edits here stay local until
+          you click <em>Apply</em>.
         </p>
         {data.pages.length === 0 ? (
           <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-6 text-sm text-neutral-400">

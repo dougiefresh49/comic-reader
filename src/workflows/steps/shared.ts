@@ -275,7 +275,7 @@ function getPauseUrl(bookId: string, issueId: string, step: string): string {
     case "review-clusters":
       return `${base}/admin/${bookId}/${issueId}/review/clusters`;
     case "review-pages":
-      return `${base}/book/${bookId}/${issueId}/review?mode=pipeline`;
+      return `${base}/admin/${bookId}/${issueId}/review/editor`;
     case "review-new-characters":
       return `${base}/admin/${bookId}/${issueId}/review/new-characters`;
     case "casting":
