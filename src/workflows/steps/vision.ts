@@ -1357,14 +1357,6 @@ export async function getContextPage(
         `bubbles upsert failed for ${pageLabel}: ${upsertErr.message}`,
       );
     }
-    await linkBubblesToPanels(
-      supabase,
-      bookId,
-      issueId,
-      pageNumber,
-      pageLabel,
-      null,
-    );
 
     const { data: requeried, error: requeryErr } = await supabase
       .from("bubbles")
@@ -1382,6 +1374,17 @@ export async function getContextPage(
     if (!requeried || requeried.length === 0) return;
     bubbleData = requeried;
   }
+
+  // Every page, not only after the fallback insert: a retry after a failed
+  // link write finds the bubbles present and still links them (#306).
+  await linkBubblesToPanels(
+    supabase,
+    bookId,
+    issueId,
+    pageNumber,
+    pageLabel,
+    null,
+  );
 
   const { data: pagePanels, error: pagePanelsErr } = await supabase
     .from("panels")
