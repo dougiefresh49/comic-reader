@@ -42,6 +42,8 @@ export interface SrcBubble {
   ignored: boolean;
   /** Shown, no audio: `bubbles.silent`. */
   silent: boolean;
+  /** The owner said an overlap is not a duplicate: `bubbles.kept`. */
+  kept: boolean;
   confidence: number | null;
   /** `audio_storage_path`: the current take in the `comic-audio` bucket, or null when it has none. */
   audioPath: string | null;

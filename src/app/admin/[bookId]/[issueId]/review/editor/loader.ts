@@ -44,6 +44,7 @@ interface BubbleRow {
   emotion: string | null;
   ignored: boolean | null;
   silent: boolean | null;
+  kept: boolean | null;
   audio_storage_path: string | null;
   box_2d: {
     x?: number;
@@ -197,7 +198,7 @@ export async function loadEditor(
     supabaseAdmin
       .from("bubbles")
       .select(
-        "id, page_number, panel_id, ocr_text, text_with_cues, type, speaker, emotion, ignored, silent, audio_storage_path, box_2d, style",
+        "id, page_number, panel_id, ocr_text, text_with_cues, type, speaker, emotion, ignored, silent, kept, audio_storage_path, box_2d, style",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -272,6 +273,7 @@ export async function loadEditor(
       emotion: b.emotion ?? "",
       ignored: b.ignored ?? false,
       silent: b.silent ?? false,
+      kept: b.kept ?? false,
       confidence: typeof box.confidence === "number" ? box.confidence : null,
       audioPath: b.audio_storage_path,
     };

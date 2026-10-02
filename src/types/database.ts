@@ -195,6 +195,7 @@ export type Database = {
           id: string;
           ignored: boolean;
           issue_id: string;
+          kept: boolean;
           legacy_id: string | null;
           needs_audio: boolean;
           needs_ocr: boolean;
@@ -225,6 +226,7 @@ export type Database = {
           id?: string;
           ignored?: boolean;
           issue_id: string;
+          kept?: boolean;
           legacy_id?: string | null;
           needs_audio?: boolean;
           needs_ocr?: boolean;
@@ -255,6 +257,7 @@ export type Database = {
           id?: string;
           ignored?: boolean;
           issue_id?: string;
+          kept?: boolean;
           legacy_id?: string | null;
           needs_audio?: boolean;
           needs_ocr?: boolean;
