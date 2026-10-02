@@ -329,7 +329,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const v = viewRef.current;
-    // A second pointer while one drag is under way starts nothing.
+    // A press while one drag is under way starts no second drag.
     if (!v || drag.current) return;
     const target = e.target instanceof Element ? e.target : null;
     if (target?.closest("[data-face]")) return;
@@ -507,6 +507,9 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      // A drag whose pointer-up never came (a context menu took it) ends here,
+      // so the next press is not ignored. After a normal release it finds no drag.
+      onLostPointerCapture={onPointerUp}
       onPointerLeave={() => onHover(null)}
     >
       {view && (
