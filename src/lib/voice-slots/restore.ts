@@ -7,6 +7,7 @@ import {
 } from "./bucket";
 import {
   ElevenLabsHeadroomError,
+  OP_LABEL,
   addVoice,
   buildAddVoiceForm,
   describeForm,
@@ -15,7 +16,7 @@ import {
   type AddVoiceInput,
   type SampleFile,
 } from "./elevenlabs";
-import { markRestored, registerVoice } from "./registry";
+import { deleteRecorded, markRestored, registerVoice } from "./registry";
 import type {
   CreateVoiceMeta,
   CreateVoiceResult,
@@ -40,10 +41,22 @@ import type {
 export async function restoreVoice(
   deps: VoiceSlotsDeps,
   voice: VoiceRow,
-  opts: { execute?: boolean } = {},
+  opts: {
+    execute?: boolean;
+    /** The caller saw this voice's DELETE succeed (`ArchiveRecordError`). */
+    deleteConfirmed?: boolean;
+    /** Minted per add; sent as the `OP_LABEL` label so a lost reply can be matched. */
+    opToken?: string;
+  } = {},
 ): Promise<RestoreResult> {
   const refusals: RestoreRefusal[] = [];
-  if (voice.status !== "archived") refusals.push("not archived");
+  // An `active` row whose DELETE is confirmed or recorded is archived in
+  // fact: the registry write after the DELETE failed (#351).
+  const deleted =
+    voice.status === "active" &&
+    (opts.deleteConfirmed === true ||
+      (await deleteRecorded(deps.supabase, voice)));
+  if (voice.status !== "archived" && !deleted) refusals.push("not archived");
   if (!voice.source_clip_path || !voice.source_clip_md5)
     refusals.push("no snapshot");
   const base = { voice, refusals, warnings: [] as string[], executed: false };
@@ -68,7 +81,9 @@ export async function restoreVoice(
       name: voice.display_name,
       files: stored.files,
       description: voice.description,
-      labels: voice.labels,
+      labels: opts.opToken
+        ? { ...voice.labels, [OP_LABEL]: opts.opToken }
+        : voice.labels,
     });
   } catch (err) {
     if (err instanceof ElevenLabsHeadroomError)

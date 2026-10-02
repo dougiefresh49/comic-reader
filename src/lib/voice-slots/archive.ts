@@ -93,11 +93,33 @@ export async function archiveVoice(
 
   const elId = voice.current_elevenlabs_id!;
   const { alreadyGone } = await deleteVoice(deps, elId);
-  const forBook =
-    opts.archivedForBookId === undefined
-      ? (booksUsingVoice(voice.id, await readCastlist(deps.supabase))[0] ??
-        null)
-      : opts.archivedForBookId;
-  await markArchived(deps.supabase, voice, elId, forBook);
+  try {
+    const forBook =
+      opts.archivedForBookId === undefined
+        ? (booksUsingVoice(voice.id, await readCastlist(deps.supabase))[0] ??
+          null)
+        : opts.archivedForBookId;
+    await markArchived(deps.supabase, voice, elId, forBook);
+  } catch (err) {
+    throw new ArchiveRecordError(voice, elId, err);
+  }
   return { voice, ok: true, refusals: [], executed: true, alreadyGone };
+}
+
+/**
+ * The DELETE was confirmed but a registry write after it failed. The slot is
+ * free; `restoreVoice` takes the voice back with `deleteConfirmed`, or from
+ * the `voice_archives` row when that write landed.
+ */
+export class ArchiveRecordError extends Error {
+  constructor(
+    public readonly voice: VoiceRow,
+    public readonly formerElevenLabsId: string,
+    cause: unknown,
+  ) {
+    super(
+      `DELETE of ${voice.display_name} (${formerElevenLabsId}) landed, but recording it failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+    this.name = "ArchiveRecordError";
+  }
 }

@@ -8,8 +8,22 @@
  * Every function takes `VoiceSlotsDeps` first: the Supabase client to use
  * and, for a scratch run, a fake `fetch`.
  */
-export { archiveRefusals, archiveVoice, ROOM_CONSUMER } from "./archive";
+export {
+  ArchiveRecordError,
+  archiveRefusals,
+  archiveVoice,
+  ROOM_CONSUMER,
+} from "./archive";
 export type { ArchiveGuardOptions, ArchiveOptions } from "./archive";
+export {
+  CLAIM_STALE_MS,
+  claimHeld,
+  noActiveVoiceClaimFilter,
+  withVoiceOperationClaim,
+} from "./claim";
+export type { VoiceClaimOperation } from "./claim";
+export { designVoice } from "./design";
+export type { DesignVoiceInput } from "./design";
 export {
   VOICE_CLIPS_BUCKET,
   clipObjectPath,
@@ -18,10 +32,14 @@ export {
 } from "./bucket";
 export {
   ElevenLabsHeadroomError,
+  ElevenLabsRefusedError,
   ElevenLabsTimeoutError,
   buildAddVoiceForm,
   describeForm,
   describeHeadroom,
+  OP_LABEL,
+  findOpVoices,
+  listVoices,
   getSlotStatus as slotStatus,
   headroomRefusals,
   md5Hex,
@@ -38,11 +56,16 @@ export { orderCandidates, planFreeSlots } from "./plan";
 export type { PlanFreeSlotsOptions } from "./plan";
 export {
   booksUsingVoice,
+  deleteRecorded,
+  finishArchive,
   issueNeeds,
+  markRestored,
   readCastlist,
   readVoice,
   readVoices,
+  registerVoice,
 } from "./registry";
+export type { RegisterVoiceInput } from "./registry";
 export { createVoiceFromSamples, restoreVoice } from "./restore";
 export { snapshotSample } from "./snapshot";
 export type * from "./types";

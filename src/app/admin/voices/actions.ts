@@ -6,11 +6,9 @@ import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
+  archiveVoice,
   noActiveVoiceClaimFilter,
   withVoiceOperationClaim,
-} from "./operation-claim";
-import {
-  archiveVoice,
   restoreVoice,
   snapshotSample,
   slotStatus,

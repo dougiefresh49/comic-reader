@@ -612,6 +612,16 @@ export async function storeVoiceRequest(
   characterId: string,
   request: VoiceRequest,
 ): Promise<void> {
+  // `operation` (#351) is not in database.ts yet: read it untyped.
+  const open = await client
+    .from("casting_tasks")
+    .select("operation")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId);
+  must(`reading the voice request for ${characterId}`, open.error);
+  if (((open.data ?? []) as { operation: unknown }[]).some((r) => r.operation))
+    throw new Error(`cast: a voice operation is open for ${characterId}`);
   const { error } = await db(client)
     .from("casting_tasks")
     .upsert(
@@ -660,12 +670,20 @@ export async function cancelVoiceRequest(
   issueId: string,
   characterId: string,
 ): Promise<void> {
-  const { error } = await db(client)
+  const { data, error } = await client
     .from("casting_tasks")
     .delete()
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("character_id", characterId)
-    .not("action", "is", null);
+    .not("action", "is", null)
+    .is("operation", null)
+    .select("character_id");
   must(`cancelling the voice request for ${characterId}`, error);
+  if ((data ?? []).length > 0) return;
+  const left = (await readVoiceRequests(client, bookId, issueId)).some(
+    (r) => r.characterId === characterId,
+  );
+  if (left)
+    throw new Error(`cast: a voice operation is open for ${characterId}`);
 }
