@@ -1,0 +1,86 @@
+import { area, intersectArea, type FilterablePanel } from "~/lib/panel-filter";
+
+/** Anything carrying a bubble box and its detection confidence. */
+export type FilterableBubble = FilterablePanel & { confidence: number };
+
+/**
+ * Share of a smaller box that must lie inside a larger one for the larger to
+ * hold it. 0.9 is the #225 strip threshold. On the #97 smoke page each
+ * dropped box holds a balloon at 0.98 or more, while no kept balloon has
+ * even 0.3 of its box inside another kept box, so neighbours stay apart.
+ */
+const HOLD_COVER = 0.9;
+
+/**
+ * How much larger a box must be than one it holds before it counts as the
+ * looser detection. Below this the two are twins, settled by confidence. The
+ * smallest case on the smoke page is 1.7 times (a balloon and its tighter
+ * box); 1.2 is the review prototype's value.
+ */
+const HOLD_GROWTH = 1.2;
+
+/**
+ * Intersection over union at which two boxes of similar size are one
+ * detection twice. The review prototype's value. The smoke page's one twin
+ * pair sits at 0.97, and both of it drop as containers anyway.
+ */
+const TWIN_IOU = 0.6;
+
+const iou = (a: FilterablePanel, b: FilterablePanel) => {
+  const inter = intersectArea(a.bounding_box, b.bounding_box);
+  const union = area(a.bounding_box) + area(b.bounding_box) - inter;
+  return union > 0 ? inter / union : 0;
+};
+
+/** True when `big` is the looser detection of the balloon in `small`. */
+function holds(big: FilterablePanel, small: FilterablePanel): boolean {
+  const smallArea = area(small.bounding_box);
+  if (smallArea <= 0) return false;
+  if (area(big.bounding_box) < HOLD_GROWTH * smallArea) return false;
+  return (
+    intersectArea(big.bounding_box, small.bounding_box) >=
+    HOLD_COVER * smallArea
+  );
+}
+
+/**
+ * Split bubble detections into kept and dropped, one box per balloon (#311).
+ * A box is dropped when either:
+ *
+ * - it holds a smaller kept box: 0.9 or more of that box lies inside it and
+ *   it is at least 1.2 times that box's area. A loose box around one balloon
+ *   drops for the tight one, and a box spanning the lobes of a split balloon
+ *   drops for the lobes, which stay separate bubbles (the #225 inset rule
+ *   turned around: for bubbles the inset is the balloon); or
+ * - it has a kept twin, IoU 0.6 or more, with higher confidence (on a tie,
+ *   the earlier box wins).
+ *
+ * Boxes are judged largest first against the ones still kept, so every
+ * dropped box leaves a kept box over the same text. The box units only need
+ * to agree with each other. Order is preserved in both lists.
+ */
+export function filterDuplicateBubbles<T extends FilterableBubble>(
+  bubbles: T[],
+): { kept: T[]; dropped: T[] } {
+  const dropped = new Set<T>();
+  const bySize = [...bubbles].sort(
+    (a, b) => area(b.bounding_box) - area(a.bounding_box),
+  );
+  for (const bubble of bySize) {
+    const i = bubbles.indexOf(bubble);
+    const isDuplicate = bubbles.some((other, j) => {
+      if (j === i || dropped.has(other)) return false;
+      if (holds(bubble, other)) return true;
+      if (iou(bubble, other) < TWIN_IOU) return false;
+      return (
+        other.confidence > bubble.confidence ||
+        (other.confidence === bubble.confidence && j < i)
+      );
+    });
+    if (isDuplicate) dropped.add(bubble);
+  }
+  return {
+    kept: bubbles.filter((b) => !dropped.has(b)),
+    dropped: bubbles.filter((b) => dropped.has(b)),
+  };
+}
