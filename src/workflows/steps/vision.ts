@@ -170,9 +170,11 @@ export async function identifyFaceOrFatal<C, T>(
 /**
  * A page's lookahead is finished when any of its panels has a
  * `panel_character_detections` row. That insert is one statement, a failed
- * face is fatal before it (`identifyFaceOrFatal`), and a failed exemplar
- * after it deletes it again (`storeLookaheadFacesOrFatal`), so a page with
- * any face unhandled has no detections and runs again.
+ * face is fatal before it (`identifyFaceOrFatal`), and an exemplar write
+ * that throws after it deletes it again (`storeLookaheadFacesOrFatal`), so
+ * such a page has no detections and runs again. A hard stop (step timeout,
+ * process kill) between the insert and the last exemplar is not undone: the
+ * page keeps its detections, misses exemplars, and is skipped from then on.
  */
 export async function hasStoredFaceDetections(
   supabase: TypedClient,
@@ -1222,8 +1224,8 @@ const NAMED_EXEMPLAR_MIN_CONFIDENCE = 0.7;
 /**
  * Detections first, in one insert, then the exemplars that carry their
  * `detection_id` (#348). A failed exemplar undoes this call's detections and
- * unnamed exemplars, so the page has no detections and a rerun does it
- * again (`hasStoredFaceDetections`).
+ * the exemplars cut from them, so the page has no detections and a rerun does
+ * it again (`hasStoredFaceDetections`).
  */
 async function storeLookaheadFacesOrFatal(
   { exemplarStore }: LookaheadDeps,
@@ -1299,14 +1301,14 @@ async function storeLookaheadFacesOrFatal(
     }
   }
 
-  const unnamedExemplars: string[] = [];
+  const newIds = newRows.map((r) => r.id!);
   try {
     for (const [i, f] of kept.entries()) {
       const unnamed = f.outcome === "unnamed";
       if (!unnamed && f.result.confidence < NAMED_EXEMPLAR_MIN_CONFIDENCE) {
         continue;
       }
-      const id = await storeExemplar(supabase, {
+      await storeExemplar(supabase, {
         jpegBuffer: f.crop.jpegBuffer,
         characterId: f.characterId,
         suggestedName:
@@ -1322,23 +1324,22 @@ async function storeLookaheadFacesOrFatal(
         detectionId: detectionIds[i],
         embedding: f.embedding,
       });
-      if (unnamed) unnamedExemplars.push(id);
     }
   } catch (e) {
+    // An exemplar carrying one of this call's new detection ids is one this
+    // call created: delete those before the detections, whose delete would
+    // otherwise null their detection_id and leave them for the rerun's dedupe.
     const undo: string[] = [];
     try {
-      await deleteExemplars(supabase, unnamedExemplars);
+      await deleteExemplars(supabase, newIds);
     } catch (undoErr: unknown) {
       undo.push(errorText(undoErr));
     }
-    if (newRows.length > 0) {
+    if (newIds.length > 0) {
       const { error } = await supabase
         .from("panel_character_detections")
         .delete()
-        .in(
-          "id",
-          newRows.map((r) => r.id!),
-        );
+        .in("id", newIds);
       if (error) undo.push(`detections delete: ${error.message}`);
     }
     throw new FatalError(

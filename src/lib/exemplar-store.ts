@@ -122,17 +122,19 @@ export async function storeExemplar(
   return id;
 }
 
-/** `face` is a JPEG as base64, or its embedding from `embedFace`. */
-/** Deletes exemplar rows and their crops in Storage. Throws on any failure. */
+/**
+ * Deletes the exemplars cut from these detections, rows and their crops in
+ * Storage. Throws on any failure.
+ */
 export async function deleteExemplars(
   supabase: SupabaseClient,
-  ids: string[],
+  detectionIds: string[],
 ): Promise<void> {
-  if (ids.length === 0) return;
+  if (detectionIds.length === 0) return;
   const { data, error } = await supabase
     .from("character_face_exemplars")
     .delete()
-    .in("id", ids)
+    .in("detection_id", detectionIds)
     .select("crop_path");
   if (error) {
     throw new Error(`character_face_exemplars delete failed: ${error.message}`);
@@ -147,6 +149,7 @@ export async function deleteExemplars(
   }
 }
 
+/** `face` is a JPEG as base64, or its embedding from `embedFace`. */
 export async function findSimilarExemplars(
   supabase: SupabaseClient,
   face: string | number[],

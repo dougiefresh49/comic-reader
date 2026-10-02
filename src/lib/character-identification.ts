@@ -68,7 +68,7 @@ IDENTIFICATION RULES:
 1. Identify based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body).
 2. If the face matches a named character from the list above, use that name.
 3. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, robot, unnamed soldier, etc.), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT try to match minions to named characters.
-4. If the crop shows only a body part (fist, arm, torso) without a recognizable face, set is_face to false and character_name to null. A masked or helmeted head counts as a face.
+4. If the crop shows only a body part (fist, arm, torso) without a visible face or head, set is_face to false and character_name to null. A masked or helmeted head counts as a face.
 5. If the crop is a face but you cannot confidently identify the character, set is_face to true and character_name to null. Do NOT guess or pick a random name from the list.
 
 CONFIDENCE GUIDELINES:
@@ -78,6 +78,7 @@ CONFIDENCE GUIDELINES:
 - Below 0.60: Too uncertain — set character_name to null instead
 
 Output JSON only (no markdown fences):
+is_face: whether the crop shows a face or head, named or not.
 {"is_face": true, "character_name": "Leonardo", "confidence": 0.85, "reasoning": "Blue mask, green skin, holding katana — TMNT Leonardo"}
 
 If minion/generic enemy:
@@ -194,7 +195,12 @@ export async function identifyFace(
     return {
       characterName: parsed.character_name,
       confidence: parsed.confidence,
-      isFace: typeof parsed.is_face === "boolean" ? parsed.is_face : undefined,
+      isFace:
+        parsed.is_face === true || parsed.is_face === "true"
+          ? true
+          : parsed.is_face === false || parsed.is_face === "false"
+            ? false
+            : undefined,
       reasoning: parsed.reasoning,
     };
   } catch {
