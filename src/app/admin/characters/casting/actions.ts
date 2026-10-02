@@ -74,17 +74,21 @@ async function saveCastVoice(
   });
   if (!registered.ok) return registered;
 
-  const { error: taskErr } = await supabaseAdmin
+  const { data: done, error: taskErr } = await supabaseAdmin
     .from("casting_tasks")
     .update({
       status: "complete",
       completed_at: new Date().toISOString(),
     })
-    .eq("id", args.taskId);
-  if (taskErr) {
+    .eq("id", args.taskId)
+    .is("operation", null)
+    .select("id");
+  if (taskErr || !done?.length) {
     return {
       ok: false,
-      error: taskErr.message,
+      error:
+        taskErr?.message ??
+        "the task has an open voice operation or is gone; finish it on the voices stop",
       stage: "castlist",
       voiceUuid: registered.voiceUuid,
     };
@@ -143,14 +147,22 @@ export async function skipAndAddLater(args: SkipArgs): Promise<ActionResult> {
   );
   if (castErr) return { ok: false, error: castErr.message };
 
-  const { error: taskErr } = await supabaseAdmin
+  const { data: done, error: taskErr } = await supabaseAdmin
     .from("casting_tasks")
     .update({
       status: "skipped",
       completed_at: new Date().toISOString(),
     })
-    .eq("id", args.taskId);
+    .eq("id", args.taskId)
+    .is("operation", null)
+    .select("id");
   if (taskErr) return { ok: false, error: taskErr.message };
+  if (!done?.length)
+    return {
+      ok: false,
+      error:
+        "The task has an open voice operation or is gone; the castlist skip was written, finish the task on the voices stop.",
+    };
 
   revalidatePath("/admin/characters/casting", "page");
   return { ok: true };

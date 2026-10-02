@@ -16,7 +16,8 @@ interface VoiceClaimRow {
 }
 
 /** A claim older than ten minutes is stale and can be taken over. */
-const CLAIM_STALE_MS = 10 * 60 * 1000;
+/** How long a claim or an op record counts as a live run. */
+export const CLAIM_STALE_MS = 10 * 60 * 1000;
 
 export function noActiveVoiceClaimFilter(): string {
   const staleBefore = new Date(Date.now() - CLAIM_STALE_MS).toISOString();

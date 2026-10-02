@@ -33,6 +33,7 @@ import {
   archiveRefusals,
   archiveVoice,
   designVoice,
+  CLAIM_STALE_MS,
   claimHeld,
   findOpVoices,
   finishArchive,
@@ -257,6 +258,8 @@ async function readDescriptions(
 export interface OpRecord {
   token: string;
   rev: string;
+  /** When the record was last written; a younger one is a live run. */
+  at?: string;
   phase:
     | "claimed"
     | "archiving"
@@ -690,9 +693,16 @@ async function markTask(
     .eq("book_id", item.bookId)
     .eq("issue_id", item.issueId)
     .eq("character_id", item.characterId)
+    .is("operation", null)
     .select("id");
   fail(`marking ${item.characterId}'s casting task ${status}`, upd.error);
   if ((upd.data ?? []).length > 0) return;
+  const row = await taskRow(client, item);
+  fail(`reading ${item.characterId}'s casting task`, row.error);
+  if ((row.data ?? []).length > 0)
+    throw new Error(
+      `voice work: ${item.characterId} has an open operation; reconcile it first`,
+    );
   const ins = await client.from("casting_tasks").insert({
     book_id: item.bookId,
     issue_id: item.issueId,
@@ -855,6 +865,7 @@ export async function carryOut(
   const op: OpRecord = {
     token: randomUUID(),
     rev: randomUUID(),
+    at: new Date().toISOString(),
     phase: "claimed",
   };
   const claim = await claimTask(sb, item, op);
@@ -901,10 +912,15 @@ function recorder(sb: SupabaseClient, item: ItemKey, op: OpRecord): Recorder {
   return {
     op,
     record: async (next) => {
-      const from = op.rev;
-      Object.assign(op, next, { rev: randomUUID() });
-      if (!(await swapOperation(sb, item, { rev: from }, op)))
+      const to: OpRecord = {
+        ...op,
+        ...next,
+        rev: randomUUID(),
+        at: new Date().toISOString(),
+      };
+      if (!(await swapOperation(sb, item, { rev: op.rev }, to)))
         throw new Error("the item's operation record changed under this run");
+      Object.assign(op, to);
     },
     end: (to) => swapOperation(sb, item, { rev: op.rev }, null, to),
   };
@@ -1373,7 +1389,10 @@ export async function reconcile(
       status: "refused",
       reasons: [`nothing to reconcile: the item is ${stateOf(task)}`],
     };
-  // A live run holds the claim on the voices it changes: leave it be.
+  // A live run writes its record as it goes and holds the claim on the
+  // voices it changes: leave it be while either is younger than the window.
+  if (op.at && Date.parse(op.at) >= Date.now() - CLAIM_STALE_MS)
+    return { status: "refused", reasons: ["a run is still in progress"] };
   const held = [op.archived, task.target_voice_uuid, item.target?.id].filter(
     (id): id is string => Boolean(id),
   );

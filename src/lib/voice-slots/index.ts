@@ -16,6 +16,7 @@ export {
 } from "./archive";
 export type { ArchiveGuardOptions, ArchiveOptions } from "./archive";
 export {
+  CLAIM_STALE_MS,
   claimHeld,
   noActiveVoiceClaimFilter,
   withVoiceOperationClaim,

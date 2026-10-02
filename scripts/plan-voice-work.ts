@@ -240,6 +240,7 @@ class FakeDb {
     return {
       from: (table: string) => new FakeQuery(this, table),
       storage,
+      fakeDb: this,
     } as never;
   }
 }
@@ -637,6 +638,8 @@ function fakeAccount(limit: number) {
     addMode: "ok" as AddMode,
     /** One entry per coming `GET /v1/voices`: "fail" answers 503. */
     lists: [] as ("ok" | "fail")[],
+    /** While set, an add waits on it: the run is mid-add. */
+    gate: null as Promise<void> | null,
     fetch: (async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(String(input));
       const path = url.pathname;
@@ -681,6 +684,7 @@ function fakeAccount(limit: number) {
         labels = body.labels ?? {};
       } else throw new Error(`fake account: no answer for ${method} ${path}`);
       acct.adds++;
+      if (acct.gate) await acct.gate;
       if (acct.addMode === "refuse")
         return json({ detail: "voice_limit_reached" }, 400);
       if (acct.voices.length >= limit) return json({ detail: "full" }, 400);
@@ -807,7 +811,21 @@ async function checkCarryOut() {
     "~/lib/voice-requests"
   )) as typeof import("~/lib/voice-requests");
   const slots = await import("~/lib/voice-slots");
-  const reconcile = (lib as Partial<typeof lib>).reconcile;
+  const liveReconcile = (lib as Partial<typeof lib>).reconcile;
+  /**
+   * The cases below reconcile a run that stopped a moment ago; a record that
+   * young reads as a live run (round 5), so age it past the window first.
+   */
+  const reconcile = liveReconcile
+    ? (...a: Parameters<typeof lib.reconcile>) => {
+        const db = (a[0].supabase as unknown as { fakeDb: FakeDb }).fakeDb;
+        for (const t of db.rows("casting_tasks")) {
+          const op = t.operation as { at?: string } | null;
+          if (op) op.at = new Date(Date.now() - 3_600_000).toISOString();
+        }
+        return liveReconcile(...a);
+      }
+    : undefined;
   const results: { name: string; pass: boolean }[] = [];
   const report = (name: string, lines: string[], pass: boolean) => {
     console.log(`\n${name}: ${pass ? "PASS" : "FAIL"}`);
@@ -1584,6 +1602,41 @@ async function checkCarryOut() {
         row.status === "active" &&
         task(w.db, "rex") === "pending (open at adding)" &&
         w.acct.adds === 0,
+    );
+  }
+
+  // ── round 5 ──
+
+  {
+    const w = world({ characters: ["kit"], voices: [] });
+    w.db.rows("character_appearances").push({
+      id: "kit-voice-design",
+      character_id: "kit",
+      voice_description: "Kit sounds bright.",
+    });
+    let release = () => {};
+    w.acct.gate = new Promise<void>((r) => (release = r));
+    const item = await itemOf(w.deps, "kit");
+    const run = attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    while (w.acct.adds === 0) await new Promise((r) => setImmediate(r));
+    const during = liveReconcile
+      ? await attempt(() => liveReconcile(w.deps, item, { notAdded: true }))
+      : "reconcile does not exist";
+    release();
+    const r = await run;
+    report(
+      "round 5, finding 2: reconcile({notAdded}) refuses while a design for a voiceless speaker is mid-add",
+      [
+        `kit has no voice and no task row; carryOut's add is in flight`,
+        `reconcile during the add: ${short(during)}`,
+        `carryOut after: ${short(r)}; task: ${task(w.db, "kit")}; creates ${w.acct.adds}`,
+      ],
+      short(during).includes("a run is still in progress") &&
+        (r as { status?: string }).status === "done" &&
+        task(w.db, "kit") === "in_progress" &&
+        w.acct.adds === 1,
     );
   }
 
