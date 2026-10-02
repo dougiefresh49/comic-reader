@@ -174,7 +174,7 @@ function toBubble(src: SrcBubble, cast: CastMember[]): BubbleDoc {
     silent: src.silent,
     ignored: src.ignored,
     deleted: false,
-    kept: false,
+    kept: src.kept,
     auto: false,
     confidence: src.confidence,
   };

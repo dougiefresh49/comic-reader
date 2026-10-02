@@ -25,6 +25,8 @@ export interface BubbleEdit {
   ignored?: boolean;
   /** Left out by the old editor, which predates the column. */
   silent?: boolean;
+  /** The owner said an overlap is not a duplicate. Left out by the old editor. */
+  kept?: boolean;
   panelId?: string | null;
   sortOrder?: number;
   box?: Box;
@@ -190,6 +192,7 @@ export function bubbleUpdate(
   if (edit.emotion !== undefined) row.emotion = edit.emotion;
   if (edit.ignored !== undefined) row.ignored = edit.ignored;
   if (edit.silent !== undefined) row.silent = edit.silent;
+  if (edit.kept !== undefined) row.kept = edit.kept;
   if (edit.panelId !== undefined) row.panel_id = edit.panelId;
   if (edit.sortOrder !== undefined) row.sort_order = edit.sortOrder;
   if (edit.box)
@@ -241,6 +244,7 @@ export function bubbleInsert(
     emotion: bubble.emotion ?? null,
     ignored: bubble.ignored ?? false,
     ...(bubble.silent !== undefined ? { silent: bubble.silent } : {}),
+    ...(bubble.kept !== undefined ? { kept: bubble.kept } : {}),
     needs_audio: true,
     needs_ocr: !hasText,
     audio_storage_path: null,
@@ -331,6 +335,7 @@ const bubbleEdit = z
     emotion: z.string().optional(),
     ignored: z.boolean().optional(),
     silent: z.boolean().optional(),
+    kept: z.boolean().optional(),
     panelId: uuid.nullable().optional(),
     sortOrder: order.optional(),
     box: box.optional(),
