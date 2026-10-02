@@ -190,6 +190,31 @@ async function unnamedHere(scope: Scope, ids: string[]): Promise<string[]> {
   return ids.filter((id) => here.has(id));
 }
 
+/**
+ * The ids of this issue's loose, unnamed exemplars (no `character_id`, no
+ * `detection_id`) whose `suggested_name` is one of the group's, compared
+ * slugified: the same match the loader uses to show them under the group.
+ */
+async function looseUnnamedIds(
+  scope: Scope,
+  suggestedNames: string[],
+): Promise<string[]> {
+  if (suggestedNames.length === 0) return [];
+  const names = new Set(suggestedNames.map(slugify));
+  const { data, error } = await supabaseAdmin
+    .from("character_face_exemplars")
+    .select("id, suggested_name")
+    .eq("book_id", scope.bookId)
+    .eq("source_issue", scope.issueId)
+    .is("character_id", null)
+    .is("detection_id", null)
+    .not("suggested_name", "is", null);
+  must("reading the group's exemplars", error);
+  return ((data ?? []) as { id: string; suggested_name: string | null }[])
+    .filter((e) => e.suggested_name && names.has(slugify(e.suggested_name)))
+    .map((e) => e.id);
+}
+
 /** The success line, with a crop warning appended when Storage kept a file. */
 function done(message: string, warning: string | null): ActionResult {
   return { ok: true, message: warning ? `${message} ${warning}` : message };
@@ -227,7 +252,8 @@ export async function nameGroup(args: {
         .in("detection_id", detectionIds);
       must("naming the faces' exemplars", byDetection.error);
     }
-    if (suggestedNames.length > 0) {
+    const looseIds = await looseUnnamedIds(scope, suggestedNames);
+    if (looseIds.length > 0) {
       const { error } = await supabaseAdmin
         .from("character_face_exemplars")
         .update({
@@ -235,10 +261,8 @@ export async function nameGroup(args: {
           suggested_name: null,
           is_confirmed: true,
         })
-        .eq("book_id", scope.bookId)
-        .eq("source_issue", scope.issueId)
-        .is("character_id", null)
-        .in("suggested_name", suggestedNames);
+        .in("id", looseIds)
+        .is("character_id", null);
       must("naming the group's exemplars", error);
     }
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
@@ -265,14 +289,13 @@ export async function rejectGroup(args: {
     const warnings: string[] = [];
     const byDetection = await deleteExemplars(supabaseAdmin, detectionIds);
     if (byDetection) warnings.push(byDetection);
-    if (suggestedNames.length > 0) {
+    const looseIds = await looseUnnamedIds(scope, suggestedNames);
+    if (looseIds.length > 0) {
       const { data, error } = await supabaseAdmin
         .from("character_face_exemplars")
         .delete()
-        .eq("book_id", scope.bookId)
-        .eq("source_issue", scope.issueId)
+        .in("id", looseIds)
         .is("character_id", null)
-        .in("suggested_name", suggestedNames)
         .select("crop_path");
       must("dropping the group's exemplars", error);
       const byName = await removeCrops(
@@ -390,11 +413,12 @@ export async function rejectFace(args: {
 }
 
 /**
- * "Faces are right": confirms the character's exemplars in this issue whose
- * face is known, meaning those with a `detection_id` of the character's and
- * the loose ones on pages where it has exactly one face. A loose exemplar on
- * a page with two or more of its faces stays as it is: a move or reject there
- * left it unconfirmed on purpose. Its detections here become human-verified.
+ * "Faces are right": confirms the exemplars whose face is known, meaning
+ * those with a `detection_id` of the character's detections in this issue.
+ * A loose exemplar (no `detection_id`) is never confirmed here: when it is
+ * unconfirmed, a move or reject left it that way on purpose, and it stays
+ * out of the matcher until it is dealt with; when it is already confirmed it
+ * stays confirmed. Its detections here become human-verified.
  */
 export async function confirmFaces(args: {
   scope: Scope;
@@ -403,9 +427,6 @@ export async function confirmFaces(args: {
   try {
     const { scope, characterId } = args;
     const faces = await detectionsOf(scope, characterId);
-    const perPage = new Map<number, number>();
-    for (const f of faces) perPage.set(f.page, (perPage.get(f.page) ?? 0) + 1);
-    const singlePages = [...perPage].filter(([, n]) => n === 1).map(([p]) => p);
     let confirmed = 0;
     if (faces.length > 0) {
       const { data, error } = await supabaseAdmin
@@ -420,19 +441,6 @@ export async function confirmFaces(args: {
         )
         .select("id");
       must("confirming the faces' exemplars", error);
-      confirmed += data?.length ?? 0;
-    }
-    if (singlePages.length > 0) {
-      const { data, error } = await supabaseAdmin
-        .from("character_face_exemplars")
-        .update({ is_confirmed: true })
-        .eq("book_id", scope.bookId)
-        .eq("source_issue", scope.issueId)
-        .eq("character_id", characterId)
-        .is("detection_id", null)
-        .in("page_number", singlePages)
-        .select("id");
-      must("confirming the pages' exemplars", error);
       confirmed += data?.length ?? 0;
     }
     if (faces.length > 0) {

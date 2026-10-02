@@ -431,7 +431,8 @@ function LooseStrip({ items }: { items: LooseExemplar[] }) {
         to a page, not a face. When the page has one face of this character, a
         move or reject takes {items.length === 1 ? "it" : "them"} along; with
         more faces there, {items.length === 1 ? "it stays" : "they stay"} here,
-        unconfirmed.
+        unconfirmed. An unconfirmed one stays out of the matcher until it is
+        dealt with; &quot;Faces are right&quot; does not confirm it.
       </div>
       <div className="flex flex-wrap gap-2">
         {items.map((e) => (
