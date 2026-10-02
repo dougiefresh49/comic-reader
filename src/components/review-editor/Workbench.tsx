@@ -807,9 +807,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    * success the document that was sent becomes the baseline, and nothing
    * else changes; on failure the edits stay pending and the error shows.
    * Resolves to the document that is now saved, or why nothing was.
+   * `save` is the button and Cmd S; a regenerate's save-first, which already
+   * holds the lock, calls `writeSave`.
    */
   const savingRef = useRef(false);
-  const save = async (): Promise<
+  const save = async () => {
+    if (refuse()) return;
+    await writeSave();
+  };
+  const writeSave = async (): Promise<
     { ok: true; sent: Doc } | { ok: false; error: string }
   > => {
     if (savingRef.current)
@@ -817,14 +823,6 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         ok: false,
         error: "A Save is already running. Try again once it finishes.",
       };
-    // A regenerate in flight reads or writes the row as saved; a Save landing
-    // under it would pair its result with other text.
-    if (listen.isWriting()) {
-      const error =
-        "A regenerate is running. Save again once it finishes; your edits stay pending.";
-      say(error, "warn");
-      return { ok: false, error };
-    }
     const sent = state.doc;
     const edits = buildSave(state.base, sent);
     const count = saveCount(edits);
@@ -897,7 +895,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     if (!row || row.deleted)
       return { ok: false, error: "This bubble has no saved row yet." };
     if (!hasPending(id)) return { ok: true, text: row.text };
-    const res = await save();
+    const res = await writeSave();
     if (!res.ok) return res;
     return { ok: true, text: res.sent.bubbles[id]?.text ?? row.text };
   };
@@ -906,19 +904,44 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     issueId: data.issueId,
     bubbles: data.bubbles,
     selectedId: sel?.id ?? null,
+    saveRunning: () => savingRef.current,
     saveFirst,
     onCues: (id, forText, value) =>
       dispatch({ type: "cuesWritten", id, cues: { forText, value } }),
   });
+
+  /**
+   * The editor lock. While a Save or a regenerate (its save-first included)
+   * is in flight, the editor holds still: no Save, regenerate, undo, redo or
+   * analyze, and the regenerating bubble's text is read-only. So nothing can
+   * change under the call, and its result always lands on what it was made
+   * for.
+   */
+  const lockReason = listen.active
+    ? `Waiting for Regenerate ${listen.active.job}...`
+    : saving
+      ? "Waiting for Save..."
+      : null;
+  /** True and said when locked, read at the moment of the action. */
+  const refuse = () => {
+    if (!savingRef.current && !listen.isActive()) return false;
+    say(lockReason ?? "Waiting for Save or a regenerate to finish.", "warn");
+    return true;
+  };
+  const history = (type: "undo" | "redo") => {
+    if (!refuse()) dispatch({ type });
+  };
+
   // A bubble with a saved row that is spoken aloud gets the audio controls.
   const listenView: ListenView | null =
     selBubble && saved(selBubble.id) && !selBubble.silent && !selBubble.ignored
       ? {
           hasAudio: !!listen.paths[selBubble.id],
           playing: listen.playing === selBubble.id,
-          run: listen.runs[selBubble.id],
+          running:
+            listen.active?.id === selBubble.id ? listen.active.job : null,
+          notice: listen.notices[selBubble.id] ?? null,
           saveFirst: hasPending(selBubble.id) ? toWrite : 0,
-          saveBlocked: listen.writing,
         }
       : null;
 
@@ -1026,11 +1049,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     setRect,
     zoomTo: (rect) => canvasRef.current?.zoomTo(rect),
     goto,
-    analyze: analyzer.analyze,
-    accept: analyzer.accept,
+    analyze: (id) => {
+      if (!refuse()) analyzer.analyze(id);
+    },
+    accept: (id) => {
+      if (!refuse()) analyzer.accept(id);
+    },
     setHint: analyzer.setHint,
     play: listen.play,
-    regenerate: (id, job) => void listen.regenerate(id, job),
+    regenerate: (id, job) => {
+      // The lock is checked first, before any fast path, inside `regenerate`.
+      if (!listen.regenerate(id, job)) refuse();
+    },
   };
 
   const toggleRail = (view: LeftView) => {
@@ -1066,7 +1096,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       }
       if (mod && key === "z") {
         e.preventDefault();
-        dispatch({ type: e.shiftKey ? "redo" : "undo" });
+        history(e.shiftKey ? "redo" : "undo");
         return;
       }
       if (mod) return;
@@ -1191,11 +1221,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       const proposed = analyzer.runs[b.id]?.phase === "ready";
       switch (key) {
         case "Enter":
-          if (proposed) analyzer.accept(b.id);
+          if (proposed) actions.accept(b.id);
           else openField("text");
           return done();
         case "r":
-          if (proposed) analyzer.analyze(b.id);
+          if (proposed) actions.analyze(b.id);
           return done();
         case "l":
           if (listenView?.hasAudio) listen.play(b.id);
@@ -1381,10 +1411,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             "Nothing needs you"
           )}
         </button>
+        {lockReason && (
+          <span role="status" className="shrink-0 text-amber-300">
+            {lockReason}
+          </span>
+        )}
         <button
           type="button"
-          disabled={state.past.length === 0}
-          onClick={() => dispatch({ type: "undo" })}
+          disabled={state.past.length === 0 || !!lockReason}
+          onClick={() => history("undo")}
           className={BAR_BUTTON}
           title="Undo (Cmd Z)"
         >
@@ -1397,8 +1432,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         </button>
         <button
           type="button"
-          disabled={state.future.length === 0}
-          onClick={() => dispatch({ type: "redo" })}
+          disabled={state.future.length === 0 || !!lockReason}
+          onClick={() => history("redo")}
           className={BAR_BUTTON}
           title="Redo (Shift Cmd Z)"
         >
@@ -1429,13 +1464,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         )}
         <button
           type="button"
-          disabled={saving || toWrite === 0 || listen.writing}
+          disabled={toWrite === 0 || !!lockReason}
           onClick={() => void save()}
-          title={
-            listen.writing
-              ? "Save waits until the regenerate finishes"
-              : "Save every pending edit (Cmd S)"
-          }
+          title={lockReason ?? "Save every pending edit (Cmd S)"}
           className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-neutral-100 px-2 font-medium text-neutral-950 hover:bg-white disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
         >
           {saving ? "Saving" : "Save"}
@@ -1812,6 +1843,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                 analysis={analyzer.runs}
                 hints={analyzer.hints}
                 listen={listenView}
+                lock={
+                  lockReason
+                    ? {
+                        reason: lockReason,
+                        bubbleId: listen.active?.id ?? null,
+                      }
+                    : null
+                }
                 actions={actions}
               />
             </div>

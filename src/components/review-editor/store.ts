@@ -54,17 +54,15 @@ export type EditorAction =
    */
   | { type: "saved"; base: Doc }
   /**
-   * Regenerate cues wrote one row's `text_with_cues` outside Save. The new
-   * cues are the baseline and replace the bubble's cues in every undo and
-   * redo step, so no step writes superseded cues back; the document takes
-   * them unless it holds a cues edit of its own.
+   * Regenerate cues wrote one row's `text_with_cues` outside Save. The
+   * editor was locked while it ran, so nothing changed under it: the new
+   * cues go into the baseline, the document and every undo and redo step
+   * whose text is the text they were written for, so no step can write
+   * older cues for that text back.
    */
   | { type: "cuesWritten"; id: string; cues: NonNullable<BubbleDoc["cues"]> };
 
 const LIMIT = 60;
-
-const sameCues = (a: BubbleDoc["cues"], b: BubbleDoc["cues"]) =>
-  a === b || (!!a && !!b && a.forText === b.forText && a.value === b.value);
 
 function exists(doc: Doc, sel: Sel | null): Sel | null {
   if (!sel) return null;
@@ -216,23 +214,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "saved":
       return { ...state, base: action.base };
     case "cuesWritten": {
-      const was = state.base.bubbles[action.id];
-      if (!was) return state;
+      const { id, cues } = action;
       const take = (doc: Doc): Doc => {
-        const b = doc.bubbles[action.id];
-        if (!b || sameCues(b.cues, action.cues)) return doc;
-        return {
-          ...doc,
-          bubbles: {
-            ...doc.bubbles,
-            [action.id]: { ...b, cues: action.cues },
-          },
-        };
+        const b = doc.bubbles[id];
+        if (b?.text !== cues.forText) return doc;
+        return { ...doc, bubbles: { ...doc.bubbles, [id]: { ...b, cues } } };
       };
-      // Every undo and redo step gets the new cues, whatever cues it held:
-      // any older ones are superseded, and stepping onto them would have
-      // Save write them back. The step's other edits stay. Where its text
-      // differs, the new cues do not apply and Save writes no cues.
       const takeEntry = (entry: HistoryEntry): HistoryEntry => {
         const doc = take(entry.doc);
         return doc === entry.doc ? entry : { ...entry, doc };
@@ -240,11 +227,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
       return {
         ...state,
         base: take(state.base),
-        // A cues edit made while the call ran (an accepted proposal) is newer
-        // than the regenerate and stays pending.
-        doc: sameCues(state.doc.bubbles[action.id]?.cues ?? null, was.cues)
-          ? take(state.doc)
-          : state.doc,
+        doc: take(state.doc),
         past: state.past.map(takeEntry),
         future: state.future.map(takeEntry),
       };

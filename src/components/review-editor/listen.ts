@@ -8,11 +8,10 @@ import type { SrcBubble } from "./types";
 
 export type ListenJob = "cues" | "audio";
 
-export interface ListenRun {
-  /** The call in flight, or null. Both controls are off while one runs. */
-  running: ListenJob | null;
-  /** What the last play or call came to, shown next to the controls. */
-  notice: { tone: "ok" | "error"; text: string } | null;
+/** What the last play or regenerate of a bubble came to, shown next to the controls. */
+export interface ListenNotice {
+  tone: "ok" | "error";
+  text: string;
 }
 
 /** What `saveFirst` comes to: the row's saved text, or why it is not saved. */
@@ -26,6 +25,8 @@ interface UseListenArgs {
   bubbles: SrcBubble[];
   /** The selected bubble: choosing another one stops playback. */
   selectedId: string | null;
+  /** A Save is in flight: the editor is locked and no regenerate may start. */
+  saveRunning: () => boolean;
   /** Save when this bubble has a pending edit (part 2's Save), then the row as saved. */
   saveFirst: (id: string) => Promise<SavedRow>;
   /** Regenerate cues wrote the row's cues for this text. */
@@ -37,6 +38,7 @@ export function useListen({
   issueId,
   bubbles,
   selectedId,
+  saveRunning,
   saveFirst,
   onCues,
 }: UseListenArgs) {
@@ -47,40 +49,35 @@ export function useListen({
     for (const b of bubbles) if (b.audioPath) out[b.id] = b.audioPath;
     return out;
   });
-  const [runs, setRuns] = useState<Record<string, ListenRun>>({});
+  const [notices, setNotices] = useState<Record<string, ListenNotice | null>>(
+    {},
+  );
   const [playing, setPlaying] = useState<string | null>(null);
+  /**
+   * The one regenerate running in the editor, its save-first included. While
+   * it runs the editor is locked, so nothing can change under it.
+   */
+  const [active, setActive] = useState<{ id: string; job: ListenJob } | null>(
+    null,
+  );
+  const activeRef = useRef(active);
 
   // Calls land long after the click, so they read the latest through refs.
   const pathsRef = useRef(paths);
   const playingRef = useRef(playing);
+  const saveRunningRef = useRef(saveRunning);
   const saveFirstRef = useRef(saveFirst);
   const onCuesRef = useRef(onCues);
   useEffect(() => {
     pathsRef.current = paths;
+    saveRunningRef.current = saveRunning;
     saveFirstRef.current = saveFirst;
     onCuesRef.current = onCues;
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  /** Bubbles with a call in flight, checked before any state update lands. */
-  const busy = useRef(new Set<string>());
-  /**
-   * Regenerate actions past their Save and not yet answered. While one runs,
-   * no Save may write: the action reads or writes the row as it was saved,
-   * and a Save landing under it would pair the result with other text.
-   */
-  const writingRef = useRef(0);
-  const [writing, setWriting] = useState(0);
-  const isWriting = useCallback(() => writingRef.current > 0, []);
-  const countWriting = useCallback((by: 1 | -1) => {
-    writingRef.current += by;
-    setWriting(writingRef.current);
-  }, []);
 
-  const put = useCallback((id: string, run: Partial<ListenRun>) => {
-    setRuns((prev) => ({
-      ...prev,
-      [id]: { running: null, notice: null, ...prev[id], ...run },
-    }));
+  const note = useCallback((id: string, notice: ListenNotice | null) => {
+    setNotices((prev) => ({ ...prev, [id]: notice }));
   }, []);
 
   const stop = useCallback(() => {
@@ -105,13 +102,11 @@ export function useListen({
       audioRef.current = audio;
       playingRef.current = id;
       setPlaying(id);
-      put(id, { notice: null });
+      note(id, null);
       const failed = (why: string) => {
         if (audioRef.current !== audio) return;
         stop();
-        put(id, {
-          notice: { tone: "error", text: `The take did not play (${why}).` },
-        });
+        note(id, { tone: "error", text: `The take did not play (${why}).` });
       };
       audio.addEventListener("ended", () => {
         if (audioRef.current === audio) stop();
@@ -124,7 +119,7 @@ export function useListen({
       });
       audio.play().catch((e: Error) => failed(e.message));
     },
-    [bookId, issueId, put, stop],
+    [bookId, issueId, note, stop],
   );
 
   // Another bubble selected, or none: playback stops. So does leaving the editor.
@@ -135,88 +130,76 @@ export function useListen({
 
   /**
    * Regenerate the bubble's cues or audio: Save first when it has pending
-   * edits, and call the action only once that Save has landed.
+   * edits, and call the action only once that Save has landed. Refused, and
+   * false, while a Save or another regenerate holds the editor.
    */
   const regenerate = useCallback(
-    async (id: string, job: ListenJob) => {
-      if (busy.current.has(id)) return;
-      busy.current.add(id);
-      put(id, { running: job, notice: null });
-      let counted = false;
-      try {
-        const saved = await saveFirstRef.current(id);
-        if (!saved.ok) {
-          put(id, {
-            notice: {
+    (id: string, job: ListenJob): boolean => {
+      if (activeRef.current || saveRunningRef.current()) return false;
+      activeRef.current = { id, job };
+      setActive(activeRef.current);
+      note(id, null);
+      void (async () => {
+        try {
+          const saved = await saveFirstRef.current(id);
+          if (!saved.ok) {
+            note(id, {
               tone: "error",
               text: `Nothing was regenerated: the Save before it did not go through. ${saved.error}`,
-            },
-          });
-          return;
-        }
-        // Counted in the same task the Save landed in, before another can start.
-        countWriting(1);
-        counted = true;
-        if (job === "cues") {
-          const res = await regenerateCues({
-            bookId,
-            issueId,
-            bubbleId: id,
-            text: saved.text,
-          });
-          if (res.ok && res.textWithCues) {
-            onCuesRef.current(id, saved.text, res.textWithCues);
-            put(id, {
-              notice: {
+            });
+            return;
+          }
+          if (job === "cues") {
+            const res = await regenerateCues({
+              bookId,
+              issueId,
+              bubbleId: id,
+              text: saved.text,
+            });
+            if (res.ok && res.textWithCues) {
+              onCuesRef.current(id, saved.text, res.textWithCues);
+              note(id, {
                 tone: "ok",
                 text: "New cues saved. The audio reads the old cues until you regenerate it.",
-              },
-            });
-          } else {
-            put(id, {
-              notice: {
+              });
+            } else {
+              note(id, {
                 tone: "error",
                 text: res.error ?? "Regenerate cues failed.",
-              },
-            });
+              });
+            }
+            return;
           }
-          return;
-        }
-        const res = await regenerateAudio({ bookId, issueId, bubbleId: id });
-        if (res.ok && res.audioStoragePath) {
-          const path = res.audioStoragePath;
-          if (playingRef.current === id) stop();
-          setPaths((prev) => ({ ...prev, [id]: path }));
-          put(id, {
-            notice: { tone: "ok", text: "New take saved. L plays it." },
-          });
-        } else {
-          put(id, {
-            notice: {
+          const res = await regenerateAudio({ bookId, issueId, bubbleId: id });
+          if (res.ok && res.audioStoragePath) {
+            const path = res.audioStoragePath;
+            if (playingRef.current === id) stop();
+            setPaths((prev) => ({ ...prev, [id]: path }));
+            note(id, { tone: "ok", text: "New take saved. L plays it." });
+          } else {
+            note(id, {
               tone: "error",
               text: res.error ?? "Regenerate audio failed.",
-            },
-          });
-        }
-      } catch (e) {
-        // No answer from the server: the call may or may not have run.
-        const why = (e as Error).message;
-        put(id, {
-          notice: {
+            });
+          }
+        } catch (e) {
+          // No answer from the server: the call may or may not have run.
+          const why = (e as Error).message;
+          note(id, {
             tone: "error",
             text:
               job === "cues"
                 ? `Regenerate cues got no answer (${why}). The new cues may have saved; reload the editor to see.`
                 : `Regenerate audio got no answer (${why}). ElevenLabs may have made and charged for a take; reload the editor to see whether this bubble has a new one. Regenerating will spend ElevenLabs credits again.`,
-          },
-        });
-      } finally {
-        if (counted) countWriting(-1);
-        busy.current.delete(id);
-        put(id, { running: null });
-      }
+          });
+        } finally {
+          activeRef.current = null;
+          setActive(null);
+        }
+      })();
+      return true;
     },
-    [bookId, issueId, put, stop, countWriting],
+    [bookId, issueId, note, stop],
   );
 
   /**
@@ -238,13 +221,14 @@ export function useListen({
 
   return {
     paths,
-    runs,
+    notices,
     playing,
     play,
+    /** The regenerate holding the editor, or null. */
+    active,
+    /** Read at the moment of an action, before a render catches up. */
+    isActive: () => activeRef.current !== null,
     regenerate,
-    /** A regenerate is running: Save is off until it answers. */
-    writing: writing > 0,
-    isWriting,
     dropTakes,
   };
 }
