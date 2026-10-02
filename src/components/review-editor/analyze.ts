@@ -39,7 +39,12 @@ const CROP_MAX = 1024;
 /** Room around the box, as a share of it, so the tail shows. */
 const CROP_PAD = 0.06;
 
-const rectKey = (r: Rect) => `${r.x}:${r.y}:${r.w}:${r.h}`;
+/**
+ * A box as a key, rounded well below a pixel so float noise from the resize
+ * math (1 - (1 - w) is not always w) never reads as a move.
+ */
+const rectKey = (r: Rect) =>
+  [r.x, r.y, r.w, r.h].map((n) => n.toFixed(5)).join(":");
 
 const images = new Map<string, Promise<HTMLImageElement>>();
 

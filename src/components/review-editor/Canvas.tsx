@@ -329,7 +329,8 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const v = viewRef.current;
-    if (!v) return;
+    // A second pointer while one drag is under way starts nothing.
+    if (!v || drag.current) return;
     const target = e.target instanceof Element ? e.target : null;
     if (target?.closest("[data-face]")) return;
     const hit = target?.closest<HTMLElement>("[data-kind]");
@@ -457,6 +458,8 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     const d = drag.current;
     drag.current = null;
     setPanning(false);
+    // Every way out of a drag ends the busy box, so its analyze timer resumes.
+    onBusy(null);
     if (e.currentTarget.hasPointerCapture(e.pointerId))
       e.currentTarget.releasePointerCapture(e.pointerId);
     if (!d) return;
@@ -472,7 +475,6 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     }
     const rect = live?.rect;
     setLive(null);
-    onBusy(null);
     if (rect && (d.kind === "resize" || d.moved)) onCommitRect(d.sel, rect);
   };
 
