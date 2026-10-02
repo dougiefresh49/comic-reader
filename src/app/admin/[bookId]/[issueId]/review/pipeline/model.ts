@@ -150,28 +150,40 @@ function cursorOf(state: RunState, currentStep: string | null): number {
 }
 
 interface Timing {
-  ms: number;
+  /** null when the only window is open and nothing can end it. */
+  ms: number | null;
   open: boolean;
 }
 
-/** Sum of the step's windows in this run; open windows count up to `now`. */
+/**
+ * Sum of the step's windows in this run. An open window ends at the run's
+ * `completed_at` when it has one (a failed or cancelled run), at `now` only
+ * when `live` (the step a running run is on right now), and otherwise adds
+ * nothing, so a dead run's timer never climbs on a poll.
+ */
 function stepTiming(
   run: PipelineRun | null,
   step: PipelineStep,
   now: number,
+  live: boolean,
 ): Timing | null {
   const windows = run?.timings[step];
   if (!windows || windows.length === 0) return null;
-  let ms = 0;
+  const openEnd = run?.completedAt
+    ? new Date(run.completedAt).getTime()
+    : live
+      ? now
+      : null;
+  let ms: number | null = null;
   let open = false;
   for (const w of windows) {
     const start = new Date(w.startedAt).getTime();
     if (Number.isNaN(start)) continue;
     if (w.endedAt) {
-      ms += Math.max(0, new Date(w.endedAt).getTime() - start);
+      ms = (ms ?? 0) + Math.max(0, new Date(w.endedAt).getTime() - start);
     } else {
-      ms += Math.max(0, now - start);
       open = true;
+      if (openEnd !== null) ms = (ms ?? 0) + Math.max(0, openEnd - start);
     }
   }
   return { ms, open };
@@ -286,7 +298,12 @@ export function buildHubView(
   const stages: StageView[] = STAGES.map((stage) => {
     const steps: StepView[] = stepsOfStage(stage).map((step) => {
       const index = PIPELINE_STEPS.indexOf(step);
-      const timing = stepTiming(run, step, now);
+      const timing = stepTiming(
+        run,
+        step,
+        now,
+        state === "running" && step === currentStep,
+      );
 
       let status: RowStatus;
       if (index < cursor) {
@@ -371,7 +388,7 @@ export function buildHubView(
 
   const currentTiming =
     currentStep && isPipelineStep(currentStep)
-      ? stepTiming(run, currentStep, now)
+      ? stepTiming(run, currentStep, now, state === "running")
       : null;
   const currentProgress =
     currentStep && isPipelineStep(currentStep)
@@ -382,7 +399,7 @@ export function buildHubView(
   switch (state) {
     case "running":
       summary = [
-        `${currentLabel ?? "Starting"}${currentTiming ? ` for ${formatDuration(currentTiming.ms)}` : ""}`,
+        `${currentLabel ?? "Starting"}${currentTiming?.ms !== null && currentTiming?.ms !== undefined ? ` for ${formatDuration(currentTiming.ms)}` : ""}`,
         currentProgress,
       ]
         .filter(Boolean)

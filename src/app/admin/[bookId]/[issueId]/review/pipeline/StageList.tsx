@@ -16,7 +16,8 @@ function StageRow({ stage, index }: { stage: StageView; index: number }) {
   const active =
     stage.status === "running" ||
     stage.status === "waiting" ||
-    stage.status === "failed";
+    stage.status === "failed" ||
+    stage.status === "cancelled";
   const muted = stage.status === "pending";
 
   return (
@@ -71,8 +72,11 @@ function StepRow({ step }: { step: StepView }) {
         )}
       </div>
       <span className="text-neutral-500 tabular-nums">
-        {step.durationMs !== null &&
-          `${formatDuration(step.durationMs)}${step.unfinished ? " (unfinished)" : ""}`}
+        {step.durationMs !== null
+          ? `${formatDuration(step.durationMs)}${step.unfinished ? " (unfinished)" : ""}`
+          : step.unfinished
+            ? "unfinished"
+            : ""}
       </span>
     </li>
   );
