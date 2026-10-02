@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { slugify } from "~/lib/character-id";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
+import { SKIPPED_VOICE } from "~/lib/voice-settings";
 
 type Client = SupabaseClient;
 const db = (client: Client) => client as SupabaseClient<Database>;
@@ -68,19 +69,21 @@ export interface CastRow {
   in_issue: boolean;
 }
 
-interface CharacterRow {
+export interface CharacterRow {
   id: string;
   display_name: string | null;
   aliases: string[];
   voice_of: string | null;
 }
 
-/** What `voiceFor` reads: the book's castlist, its issue order, and `characters.voice_of`. */
+/** What `voiceFor` and the writers read: the book's castlist, its issue order, `characters.voice_of`, and the name resolver. */
 export interface BookCast {
   bookId: string;
   rows: CastRow[];
   issueNumber: Map<string, number>;
   voiceOf: Map<string, string | null>;
+  /** The `characters` row a name means: its id, display name or an alias, compared slugified. */
+  resolve: (name: string) => CharacterRow | undefined;
 }
 
 export type VoiceRequest =
@@ -133,7 +136,27 @@ async function readCharacters(client: Client): Promise<CharacterRow[]> {
   );
 }
 
-/** The book's castlist, issue order and `voice_of` links, for `voiceFor`. */
+/**
+ * The one name rule, shared by `proposeCast` and every writer: a name means a
+ * `characters` row when, slugified, it is the row's id, display name or an
+ * alias. Ids win over display names, display names over aliases (the rule in
+ * the review editor's loader).
+ */
+function nameResolver(
+  characters: CharacterRow[],
+): (name: string) => CharacterRow | undefined {
+  const rowByKey = new Map<string, CharacterRow>();
+  const index = (key: string, row: CharacterRow) => {
+    if (key && !rowByKey.has(key)) rowByKey.set(key, row);
+  };
+  for (const row of characters) index(row.id, row);
+  for (const row of characters) index(slugify(row.display_name ?? ""), row);
+  for (const row of characters)
+    for (const alias of row.aliases) index(slugify(alias), row);
+  return (name) => rowByKey.get(slugify(name));
+}
+
+/** The book's castlist, issue order, `voice_of` links and name resolver, for `voiceFor` and the writers. */
 export async function loadBookCast(
   client: Client,
   bookId: string,
@@ -161,15 +184,20 @@ export async function loadBookCast(
       (issues.data ?? []).map((i) => [i.id, i.number ?? 0] as const),
     ),
     voiceOf: new Map(characters.map((c) => [c.id, c.voice_of])),
+    resolve: nameResolver(characters),
   };
 }
 
-/** One issue's rows for a character: by `character_id`, else the null-id row whose text slugifies to it. */
-function matchRows(issueRows: CastRow[], characterId: string): CastRow[] {
+/** One issue's rows for a character: by `character_id`, else the null-id rows whose text resolves to it (`rowCharacterId`). */
+function matchRows(
+  book: BookCast,
+  issueRows: CastRow[],
+  characterId: string,
+): CastRow[] {
   const byId = issueRows.filter((r) => r.character_id === characterId);
   if (byId.length > 0) return byId;
   return issueRows.filter(
-    (r) => r.character_id === null && slugify(r.character) === characterId,
+    (r) => r.character_id === null && rowCharacterId(book, r) === characterId,
   );
 }
 
@@ -178,10 +206,24 @@ function matchBookRows(book: BookCast, characterId: string): CastRow[] {
   const byIssue = new Map<string, CastRow[]>();
   for (const r of book.rows)
     byIssue.set(r.issue_id, [...(byIssue.get(r.issue_id) ?? []), r]);
-  return [...byIssue.values()].flatMap((rows) => matchRows(rows, characterId));
+  return [...byIssue.values()].flatMap((rows) =>
+    matchRows(book, rows, characterId),
+  );
 }
 
-const hasVoice = (r: CastRow) => r.voice_uuid !== null || r.voice_id !== null;
+/** The character a castlist row belongs to: its `character_id`, else what its text resolves to, else its slug. */
+function rowCharacterId(book: BookCast, row: CastRow): string {
+  return (
+    row.character_id ??
+    book.resolve(row.character)?.id ??
+    slugify(row.character)
+  );
+}
+
+/** The skip sentinel marks deliberate silence; it is not a voice. */
+const isSkipped = (r: CastRow) => r.voice_id === SKIPPED_VOICE;
+const hasVoice = (r: CastRow) =>
+  !isSkipped(r) && (r.voice_uuid !== null || r.voice_id !== null);
 
 /** The character's own castlist voice: this issue's row first, then the latest issue's. */
 function ownVoice(
@@ -199,13 +241,20 @@ function ownVoice(
   )[0];
 }
 
-/** The one voice rule: the character's own castlist voice, else that of the character its `voice_of` names; null when neither has one. */
+/**
+ * The one voice rule: the character's own castlist voice, else that of the
+ * character its `voice_of` names; null when neither has one.
+ * A character whose row in `issueId` is skipped (and none of its rows there is voiced) gets null: silent, no own or borrowed voice.
+ */
 export function voiceFor(
   book: BookCast,
   characterId: string,
   issueId?: string,
 ): CastVoice | null {
   const own = ownVoice(book, characterId, issueId);
+  if (own && own.issue_id === issueId) return toVoice(own, characterId);
+  const here = book.rows.filter((r) => r.issue_id === issueId);
+  if (matchRows(book, here, characterId).some(isSkipped)) return null;
   if (own) return toVoice(own, characterId);
   const other = book.voiceOf.get(characterId);
   if (!other || other === characterId) return null;
@@ -242,28 +291,17 @@ export async function proposeCast(
   bookId: string,
   issueId: string,
 ): Promise<CastProposal> {
-  const issue = await selectIssue(
-    client,
-    bookId,
-    issueId,
-    "wiki_appearances",
-  ).maybeSingle();
-  must("reading the issue", issue.error);
-  if (!issue.data) throw new Error(`cast: no issue ${bookId}/${issueId}`);
+  return proposeFrom(client, await loadBookCast(client, bookId), issueId);
+}
 
-  const [characters, castRows, faceRows] = await Promise.all([
-    readCharacters(client),
-    readAll<{ character: string; character_id: string | null }>(
-      "the castlist",
-      (from, to) =>
-        db(client)
-          .from("castlist")
-          .select("character, character_id")
-          .eq("book_id", bookId)
-          .order("issue_id")
-          .order("character")
-          .range(from, to),
-    ),
+async function proposeFrom(
+  client: Client,
+  book: BookCast,
+  issueId: string,
+): Promise<CastProposal> {
+  const { bookId, resolve } = book;
+  const [issue, faceRows] = await Promise.all([
+    selectIssue(client, bookId, issueId, "wiki_appearances").maybeSingle(),
     readAll<{ character_id: string | null }>("face detections", (from, to) =>
       db(client)
         .from("panel_character_detections")
@@ -275,17 +313,8 @@ export async function proposeCast(
         .range(from, to),
     ),
   ]);
-
-  // A name means a `characters` row when it is the row's id, display name or
-  // alias (the rule in the review editor's loader).
-  const rowByKey = new Map<string, CharacterRow>();
-  const index = (key: string, row: CharacterRow) => {
-    if (key && !rowByKey.has(key)) rowByKey.set(key, row);
-  };
-  for (const row of characters) index(row.id, row);
-  for (const row of characters) index(slugify(row.display_name ?? ""), row);
-  for (const row of characters)
-    for (const alias of row.aliases) index(slugify(alias), row);
+  must("reading the issue", issue.error);
+  if (!issue.data) throw new Error(`cast: no issue ${bookId}/${issueId}`);
 
   const members = new Map<string, ProposedMember>();
   const member = (row: CharacterRow, source: CastSource): ProposedMember => {
@@ -311,18 +340,18 @@ export async function proposeCast(
   };
 
   for (const id of ROLE_IDS) {
-    const row = rowByKey.get(id);
+    const row = resolve(id);
     member(
       row ?? { id, display_name: id, aliases: [], voice_of: null },
       "role",
     );
   }
   for (const f of faceRows) {
-    const row = f.character_id ? rowByKey.get(f.character_id) : undefined;
+    const row = f.character_id ? resolve(f.character_id) : undefined;
     if (row) member(row, "faces").faces++;
   }
-  for (const c of castRows) {
-    const row = rowByKey.get(c.character_id ?? slugify(c.character));
+  for (const c of book.rows) {
+    const row = resolve(c.character_id ?? c.character);
     if (row) {
       const m = member(row, "cast before");
       if (!m.castNames.includes(c.character)) m.castNames.push(c.character);
@@ -331,9 +360,7 @@ export async function proposeCast(
   for (const { name, qualifier } of wikiNames(issue.data.wiki_appearances)) {
     // "Kimberly Hart (Pink Ranger)": a name no row knows joins the row its
     // qualifier names, and does not become a second member.
-    const row =
-      rowByKey.get(slugify(name)) ??
-      (qualifier ? rowByKey.get(slugify(qualifier)) : undefined);
+    const row = resolve(name) ?? (qualifier ? resolve(qualifier) : undefined);
     const label = qualifier ? `${name} (${qualifier})` : name;
     if (row) member(row, "wiki").wikiNames.push(label);
     else suggest({ name, qualifier, source: "wiki" });
@@ -408,27 +435,25 @@ async function insertRow(
 }
 
 export interface SeedResult {
-  /** Rows found by slug that now carry `character_id`. */
+  /** Rows found by name (id, display name or alias) that now carry `character_id`. */
   linked: string[];
   inserted: string[];
   /** Members whose row already had `character_id`, removed ones included. */
   kept: string[];
 }
 
-/** Writes `proposeCast`'s members into the issue's castlist: links a row found by slug, inserts one only when none matches; never creates a character, never sets `in_issue` back to true. */
+/** Writes `proposeCast`'s members into the issue's castlist: links a row found by name (as `proposeCast` resolves it), inserts one only when none matches; never creates a character, never sets `in_issue` back to true. */
 export async function seedCast(
   client: Client,
   bookId: string,
   issueId: string,
 ): Promise<SeedResult> {
-  const [proposal, book] = await Promise.all([
-    proposeCast(client, bookId, issueId),
-    loadBookCast(client, bookId),
-  ]);
+  const book = await loadBookCast(client, bookId);
+  const proposal = await proposeFrom(client, book, issueId);
   const issueRows = book.rows.filter((r) => r.issue_id === issueId);
   const result: SeedResult = { linked: [], inserted: [], kept: [] };
   for (const m of proposal.members) {
-    const found = matchRows(issueRows, m.id);
+    const found = matchRows(book, issueRows, m.id);
     if (found.length === 0) {
       await insertRow(client, book, issueId, m.id, m.name);
       result.inserted.push(m.id);
@@ -464,7 +489,7 @@ export async function getCast(
     .map((r) => ({
       character: r.character,
       characterId: r.character_id,
-      voice: voiceFor(book, r.character_id ?? slugify(r.character), issueId),
+      voice: voiceFor(book, rowCharacterId(book, r), issueId),
     }));
 }
 
@@ -477,6 +502,7 @@ export async function addToCast(
 ): Promise<void> {
   const book = await loadBookCast(client, bookId);
   const found = matchRows(
+    book,
     book.rows.filter((r) => r.issue_id === issueId),
     characterId,
   );
@@ -488,19 +514,15 @@ export async function addToCast(
       });
     return;
   }
-  const { data, error } = await db(client)
-    .from("characters")
-    .select("display_name")
-    .eq("id", characterId)
-    .maybeSingle();
-  must(`reading character ${characterId}`, error);
-  if (!data) throw new Error(`cast: no character ${characterId}`);
+  const character = book.resolve(characterId);
+  if (character?.id !== characterId)
+    throw new Error(`cast: no character ${characterId}`);
   await insertRow(
     client,
     book,
     issueId,
     characterId,
-    data.display_name ?? characterId,
+    character.display_name ?? characterId,
   );
 }
 
@@ -513,6 +535,7 @@ export async function removeFromCast(
 ): Promise<number> {
   const book = await loadBookCast(client, bookId);
   const found = matchRows(
+    book,
     book.rows.filter((r) => r.issue_id === issueId),
     characterId,
   );
