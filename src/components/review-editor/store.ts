@@ -55,9 +55,9 @@ export type EditorAction =
   | { type: "saved"; base: Doc }
   /**
    * Regenerate cues wrote one row's `text_with_cues` outside Save. The new
-   * cues are the baseline, and the document and its undo history take them
-   * wherever they still held the old ones, so neither shows them as a pending
-   * edit and no undo writes the old cues back.
+   * cues are the baseline and replace the bubble's cues in every undo and
+   * redo step, so no step writes superseded cues back; the document takes
+   * them unless it holds a cues edit of its own.
    */
   | { type: "cuesWritten"; id: string; cues: NonNullable<BubbleDoc["cues"]> };
 
@@ -218,9 +218,9 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
     case "cuesWritten": {
       const was = state.base.bubbles[action.id];
       if (!was) return state;
-      const follow = (doc: Doc): Doc => {
+      const take = (doc: Doc): Doc => {
         const b = doc.bubbles[action.id];
-        if (!b || !sameCues(b.cues, was.cues)) return doc;
+        if (!b || sameCues(b.cues, action.cues)) return doc;
         return {
           ...doc,
           bubbles: {
@@ -229,16 +229,24 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           },
         };
       };
-      const followEntry = (entry: HistoryEntry): HistoryEntry => {
-        const doc = follow(entry.doc);
+      // Every undo and redo step gets the new cues, whatever cues it held:
+      // any older ones are superseded, and stepping onto them would have
+      // Save write them back. The step's other edits stay. Where its text
+      // differs, the new cues do not apply and Save writes no cues.
+      const takeEntry = (entry: HistoryEntry): HistoryEntry => {
+        const doc = take(entry.doc);
         return doc === entry.doc ? entry : { ...entry, doc };
       };
       return {
         ...state,
-        base: follow(state.base),
-        doc: follow(state.doc),
-        past: state.past.map(followEntry),
-        future: state.future.map(followEntry),
+        base: take(state.base),
+        // A cues edit made while the call ran (an accepted proposal) is newer
+        // than the regenerate and stays pending.
+        doc: sameCues(state.doc.bubbles[action.id]?.cues ?? null, was.cues)
+          ? take(state.doc)
+          : state.doc,
+        past: state.past.map(takeEntry),
+        future: state.future.map(takeEntry),
       };
     }
   }

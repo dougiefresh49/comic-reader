@@ -1,5 +1,6 @@
 // Hear a bubble in the editor, and regenerate its cues or audio through the review actions, after a Save when it has pending edits.
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { SaveEdits } from "~/app/api/apply-fixes/write-rules";
 import { audioUrl } from "~/lib/storage";
 import { regenerateAudio } from "~/server/actions/review/regenerate-audio";
 import { regenerateCues } from "~/server/actions/review/regenerate-cues";
@@ -62,6 +63,18 @@ export function useListen({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   /** Bubbles with a call in flight, checked before any state update lands. */
   const busy = useRef(new Set<string>());
+  /**
+   * Regenerate actions past their Save and not yet answered. While one runs,
+   * no Save may write: the action reads or writes the row as it was saved,
+   * and a Save landing under it would pair the result with other text.
+   */
+  const writingRef = useRef(0);
+  const [writing, setWriting] = useState(0);
+  const isWriting = useCallback(() => writingRef.current > 0, []);
+  const countWriting = useCallback((by: 1 | -1) => {
+    writingRef.current += by;
+    setWriting(writingRef.current);
+  }, []);
 
   const put = useCallback((id: string, run: Partial<ListenRun>) => {
     setRuns((prev) => ({
@@ -129,6 +142,7 @@ export function useListen({
       if (busy.current.has(id)) return;
       busy.current.add(id);
       put(id, { running: job, notice: null });
+      let counted = false;
       try {
         const saved = await saveFirstRef.current(id);
         if (!saved.ok) {
@@ -140,6 +154,9 @@ export function useListen({
           });
           return;
         }
+        // Counted in the same task the Save landed in, before another can start.
+        countWriting(1);
+        counted = true;
         if (job === "cues") {
           const res = await regenerateCues({
             bookId,
@@ -194,12 +211,56 @@ export function useListen({
           },
         });
       } finally {
+        if (counted) countWriting(-1);
         busy.current.delete(id);
         put(id, { running: null });
       }
     },
-    [bookId, issueId, put, stop],
+    [bookId, issueId, put, stop, countWriting],
   );
 
-  return { paths, runs, playing, play, regenerate };
+  /**
+   * A Save landed: the takes it dropped are gone from the rows, so they leave
+   * playback too, and one playing stops.
+   */
+  const dropTakes = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      if (playingRef.current && ids.includes(playingRef.current)) stop();
+      setPaths((prev) => {
+        const next = { ...prev };
+        for (const id of ids) delete next[id];
+        return next;
+      });
+    },
+    [stop],
+  );
+
+  return {
+    paths,
+    runs,
+    playing,
+    play,
+    regenerate,
+    /** A regenerate is running: Save is off until it answers. */
+    writing: writing > 0,
+    isWriting,
+    dropTakes,
+  };
+}
+
+/**
+ * The bubbles whose take a Save leaves with no `audio_storage_path`: a
+ * removed row, an inserted one, and one marked silent. The rule this follows
+ * lives in `bubbleUpdate` and `bubbleInsert` in
+ * `src/app/api/apply-fixes/write-rules.ts`.
+ */
+export function takesDropped(edits: SaveEdits): string[] {
+  return [
+    ...edits.bubbles.remove.map((r) => r.id),
+    ...edits.bubbles.add.map((r) => r.id),
+    ...edits.bubbles.update
+      .filter((r) => r.set.silent === true)
+      .map((r) => r.id),
+  ];
 }

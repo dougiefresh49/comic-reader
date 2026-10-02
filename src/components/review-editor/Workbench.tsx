@@ -16,7 +16,7 @@ import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
 import { Inspector, Key, type Actions, type ListenView } from "./Inspector";
 import { findCast, needYou, newId, ownVoice, plural, slug } from "./lib";
-import { useListen, type SavedRow } from "./listen";
+import { takesDropped, useListen, type SavedRow } from "./listen";
 import {
   addBubble,
   addCast,
@@ -817,6 +817,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         ok: false,
         error: "A Save is already running. Try again once it finishes.",
       };
+    // A regenerate in flight reads or writes the row as saved; a Save landing
+    // under it would pair its result with other text.
+    if (listen.isWriting()) {
+      const error =
+        "A regenerate is running. Save again once it finishes; your edits stay pending.";
+      say(error, "warn");
+      return { ok: false, error };
+    }
     const sent = state.doc;
     const edits = buildSave(state.base, sent);
     const count = saveCount(edits);
@@ -850,6 +858,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         return { ok: false, error };
       }
       dispatch({ type: "saved", base: sent });
+      listen.dropTakes(takesDropped(edits));
       const audio = body?.needsAudio ?? 0;
       say(
         audio > 0
@@ -909,6 +918,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           playing: listen.playing === selBubble.id,
           run: listen.runs[selBubble.id],
           saveFirst: hasPending(selBubble.id) ? toWrite : 0,
+          saveBlocked: listen.writing,
         }
       : null;
 
@@ -1419,9 +1429,13 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         )}
         <button
           type="button"
-          disabled={saving || toWrite === 0}
+          disabled={saving || toWrite === 0 || listen.writing}
           onClick={() => void save()}
-          title="Save every pending edit (Cmd S)"
+          title={
+            listen.writing
+              ? "Save waits until the regenerate finishes"
+              : "Save every pending edit (Cmd S)"
+          }
           className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-neutral-100 px-2 font-medium text-neutral-950 hover:bg-white disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
         >
           {saving ? "Saving" : "Save"}

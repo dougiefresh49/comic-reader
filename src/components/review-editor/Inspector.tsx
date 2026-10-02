@@ -86,6 +86,8 @@ export interface ListenView {
   run: ListenRun | undefined;
   /** Rows a Save writes before a regenerate; 0 when this bubble has no pending edit. */
   saveFirst: number;
+  /** A regenerate is running, so no Save may start. */
+  saveBlocked: boolean;
 }
 
 interface InspectorProps {
@@ -327,6 +329,8 @@ function ListenBlock({
   const notice = view.run?.notice ?? null;
   const cues = cuesOf(b);
   const first = view.saveFirst > 0 ? "Save, then regenerate" : "Regenerate";
+  // A regenerate that has to save first waits for any other to finish.
+  const off = running !== null || (view.saveFirst > 0 && view.saveBlocked);
   return (
     <div className="space-y-2 rounded-sm border border-neutral-800 p-2">
       {view.hasAudio ? (
@@ -354,7 +358,7 @@ function ListenBlock({
         <button
           type="button"
           className={BUTTON + " h-7"}
-          disabled={running !== null}
+          disabled={off}
           onClick={(e) => {
             if (pointerClick(e)) actions.regenerate(b.id, "cues");
           }}
@@ -366,7 +370,7 @@ function ListenBlock({
           className={
             BUTTON + " h-auto min-h-7 py-1 text-left whitespace-normal"
           }
-          disabled={running !== null}
+          disabled={off}
           onClick={(e) => {
             if (pointerClick(e)) actions.regenerate(b.id, "audio");
           }}
@@ -382,7 +386,9 @@ function ListenBlock({
           {view.saveFirst === 1
             ? "the 1 pending change"
             : `all ${view.saveFirst} pending changes`}{" "}
-          first.
+          first
+          {view.saveBlocked ? ", once the regenerate running now finishes" : ""}
+          .
         </p>
       )}
       {notice && (
