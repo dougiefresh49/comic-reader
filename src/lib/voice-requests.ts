@@ -1358,7 +1358,7 @@ async function matchLostAdd(
 
 /**
  * Settles an item that `carryOut` left "needs attention", from the record on
- * its task row. It never spends (decisions row 262): it reads ElevenLabs
+ * its task row. It never spends (decisions row 264): it reads ElevenLabs
  * with free GETs and writes rows. A voice left archived is named in the
  * result for the Restore in `/admin/voices`, which holds the row's claim and
  * runs the bucket-hash guard.

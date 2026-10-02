@@ -1307,7 +1307,7 @@ async function checkCarryOut() {
     );
   }
 
-  // ── round 3 (decisions row 262: reconcile never spends) ──
+  // ── round 3 (decisions row 264: reconcile never spends) ──
 
   const seedOp = (
     db: FakeDb,
