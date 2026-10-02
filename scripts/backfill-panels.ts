@@ -22,7 +22,12 @@ import path from "path";
 import { supabase } from "./lib/supabase.js";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { selectIssue } from "~/lib/issue-queries";
-import { type BubbleCenter, filterDuplicatePanels } from "~/lib/panel-filter";
+import {
+  type BubbleCenter,
+  bubbleCenter,
+  filterDuplicatePanels,
+  matchBubblePanel,
+} from "~/lib/panel-filter";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { runRoboflowWorkflow } from "~/lib/roboflow-client";
 import { pageImageUrl } from "~/lib/storage";
@@ -169,42 +174,6 @@ function attachForegroundPolygons(
       p.foreground_polygons = { characters, bubbles };
     }
   });
-}
-
-/**
- * Ported from detectPanels (scripts/generate-episode.ts): the smallest panel
- * holding the bubble's box_2d center wins; with none, the nearest panel
- * center. Distances are in page-normalized coordinates, as there.
- */
-function linkBubble(
-  bubble: Bubble,
-  panels: PanelRow[],
-  image: { width: number; height: number },
-): Link {
-  if (panels.length === 0) return { bubble, panel: null, how: "no panels" };
-  const box = bubble.box_2d as Record<string, unknown> | null;
-  const [x, y, w, h] = ["x", "y", "width", "height"].map((k) => box?.[k]);
-  if (![x, y, w, h].every((v) => typeof v === "number")) {
-    return { bubble, panel: null, how: "no pixel box_2d" };
-  }
-  const cx = ((x as number) + (w as number) / 2) / image.width;
-  const cy = ((y as number) + (h as number) / 2) / image.height;
-  const area = (p: PanelRow) => p.bounding_box.w * p.bounding_box.h;
-  const contained = panels
-    .filter(({ bounding_box: b }) => {
-      return cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h;
-    })
-    .sort((a, b) => area(a) - area(b))[0];
-  if (contained)
-    return { bubble, panel: contained, how: "smallest containing" };
-  const dist = ({ bounding_box: b }: PanelRow) =>
-    Math.hypot(b.x + b.w / 2 - cx, b.y + b.h / 2 - cy);
-  const nearest = panels.reduce((a, b) => (dist(b) < dist(a) ? b : a));
-  return {
-    bubble,
-    panel: nearest,
-    how: `nearest center, ${dist(nearest).toFixed(3)} away`,
-  };
 }
 
 type CacheEntry = {
@@ -369,20 +338,23 @@ async function main() {
     const pageBubbles = (bubbles as Bubble[]).filter(
       (b) => b.page_number === n,
     );
-    const centers = pageBubbles.flatMap((b) => {
-      const box = b.box_2d as Record<string, unknown> | null;
-      const [x, y, w, h] = ["x", "y", "width", "height"].map((k) => box?.[k]);
-      if (![x, y, w, h].every((v) => typeof v === "number")) return [];
-      return [
-        {
-          x: ((x as number) + (w as number) / 2) / parsed.image.width,
-          y: ((y as number) + (h as number) / 2) / parsed.image.height,
-        },
-      ];
-    });
-    const panels = orderedPanels(book, issue, n, parsed, centers);
+    const centers = pageBubbles.map((b) =>
+      bubbleCenter(b.box_2d, parsed.image),
+    );
+    const panels = orderedPanels(
+      book,
+      issue,
+      n,
+      parsed,
+      centers.filter((c): c is BubbleCenter => c !== null),
+    );
     attachForegroundPolygons(panels, parsed);
-    const links = pageBubbles.map((b) => linkBubble(b, panels, parsed.image));
+    // Links on a page with no panels are never printed or written.
+    const links: Link[] = pageBubbles.map((bubble, i) => {
+      const center = centers[i];
+      if (!center) return { bubble, panel: null, how: "no pixel box_2d" };
+      return { bubble, ...matchBubblePanel(center, panels) };
+    });
     plans.push({ pageNumber: n, parsed, panels, links });
   }
 
