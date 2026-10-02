@@ -20,7 +20,7 @@ The output is read aloud by ElevenLabs text to speech. Audio tags in square brac
 
 ### The words never change
 - Do not add, remove, reorder, respell or translate any word, and never put a word of the line inside brackets. Letter case (below) is the only change allowed to the words.
-- Keep every punctuation mark exactly as written. "..." stays "..." wherever it is, at the start, middle or end: it is the pause and the weight, so never turn it into a dash and never drop it. "--" stays "--". Do not add or remove "!", "?", "...", commas or dashes.
+- Keep every punctuation mark exactly as written. "..." stays "..." wherever it is, at the start, middle or end: it is the pause and the weight, so never turn it into a dash, never drop it, and never add a pause tag such as [short pause] beside it; the punctuation already carries the pause. "--" stays "--". Do not add or remove "!", "?", "...", commas or dashes.
 - If the input already has audio tags in square brackets, they are from an earlier pass: remove them all and write fresh ones. Never keep an old tag beside a new one.
 
 ### Letter case
@@ -38,7 +38,7 @@ The output is read aloud by ElevenLabs text to speech. Audio tags in square brac
 - Put a tag right before the words it colors. A reaction the voice makes, such as [sighs] or [laughs], can go right after the words that cause it. Most lines need one tag at the start; add another only where the delivery changes inside the line. A line that already reads right with no tag can have none.
 - These are examples, not the whole set. Write whatever tag the moment needs:
   - delivery: [happy], [sad], [excited], [angry], [annoyed], [appalled], [thoughtful], [surprised], [dismissive], [sarcastic], [curious], [mischievously], [whispers], [shouting], [crying], [menacing], [reassuring];
-  - sounds the voice makes: [laughs], [chuckles], [sighs], [exhales sharply], [inhales deeply], [gasps], [clears throat], [short pause], [long pause];
+  - sounds the voice makes: [laughs], [chuckles], [sighs], [exhales sharply], [inhales deeply], [gasps], [clears throat];
   - fuller directions: [low, steady voice, restrained urgency], [softly, with wonder], [warm, conversational tone], [quiet, reflective narration].
 - Never write a tag for a sound that is not the speaker's voice, such as [explosion], [gunshot], [applause], [crash], [footsteps] or [music]: the model plays those as sound effects. When the words themselves are a sound effect (BOOM!, KRAK!), they stay words for the voice to say; a tag may say how to say them ([loud, forceful voice]) but never names the sound.
 - Never write a tag for something no one can hear, such as [standing], [grinning], [pacing] or [points].`;
@@ -69,7 +69,7 @@ Output: [shouting, panicked] GET DOWN!
 Speaker: bebop
 Emotion: Mocking
 Input: [angry] YOU THINK THAT SCARES ME, TURTLE?
-Output: [mocking, gruff voice] You think that SCARES me, turtle?
+Output: [mocking, gruff voice] You think that scares me, turtle?
 
 Speaker: narrator
 Emotion: (none recorded)
