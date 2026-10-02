@@ -5,6 +5,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { slugify } from "~/lib/character-id";
 import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import type { Database } from "~/types/database";
 
@@ -86,16 +87,6 @@ export interface SkippedBubble {
 export interface BubbleSendPlan {
   toSend: { bubble: BubbleAudioRow; voiceId: string }[];
   skipped: SkippedBubble[];
-}
-
-/** Copied from scripts/utils/registry.ts slugify. Do not import that module. */
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
 }
 
 export function buildAliasMap(rows: AliasRow[]): Map<string, string> {

@@ -1,19 +1,8 @@
 // Small pure helpers shared by the review editor's loader and its client components.
+import { slugify } from "~/lib/character-id";
 import type { CastMember, KnownCharacter, VoiceOption } from "./types";
 
-/**
- * A name to a character id. The rule is `slugify` in
- * src/workflows/steps/audio-plan.ts, copied because that file cannot enter a
- * client bundle. The one difference: the name is trimmed first.
- */
-export function slug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-}
+export const slug = slugify;
 
 /** "1 bubble", "2 bubbles". */
 export function plural(count: number, word: string): string {

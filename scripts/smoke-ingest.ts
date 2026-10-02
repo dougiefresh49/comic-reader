@@ -30,7 +30,7 @@ import {
   selectIssue,
 } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
-import { slugify } from "~/workflows/steps/audio-plan";
+import { slugify } from "~/lib/character-id";
 import { supabase } from "./lib/supabase";
 
 const BOOK = "smoke-test";
