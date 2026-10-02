@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { AnalyzePhase } from "./analyze";
 import { tintFor } from "./lib";
 import {
   area,
@@ -50,6 +51,10 @@ interface CanvasProps {
   onDraw: (rect: Rect) => void;
   onPickFace: (characterId: string) => void;
   onZoom: (zoom: number) => void;
+  /** Where each bubble's analyze stands, for a word on its box. */
+  analysis: Map<string, AnalyzePhase>;
+  /** A box started moving or resizing (its id), or stopped (null). */
+  onBusy: (id: string | null) => void;
 }
 
 interface View {
@@ -106,6 +111,14 @@ function box(rect: Rect) {
   };
 }
 
+/** What a box says while its analyze waits, runs, offers a proposal or failed. */
+const ANALYZE_WORD: Record<AnalyzePhase, string> = {
+  waiting: "analyzing",
+  running: "analyzing",
+  ready: "proposal",
+  failed: "analyze failed",
+};
+
 function flagWord(flags: Flag[] | undefined): string | null {
   const first = flags?.[0];
   if (!first) return null;
@@ -132,6 +145,8 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     onDraw,
     onPickFace,
     onZoom,
+    analysis,
+    onBusy,
   },
   ref,
 ) {
@@ -314,7 +329,8 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const v = viewRef.current;
-    if (!v) return;
+    // A press while one drag is under way starts no second drag.
+    if (!v || drag.current) return;
     const target = e.target instanceof Element ? e.target : null;
     if (target?.closest("[data-face]")) return;
     const hit = target?.closest<HTMLElement>("[data-kind]");
@@ -351,6 +367,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       const start = rectOf(sel);
       if (start) {
         drag.current = { kind: "resize", sel, handle, start };
+        onBusy(sel.id);
         return;
       }
     }
@@ -406,6 +423,7 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       const dx = e.clientX - d.px;
       const dy = e.clientY - d.py;
       if (!d.moved && Math.hypot(dx, dy) < 4) return;
+      if (!d.moved) onBusy(d.sel.id);
       d.moved = true;
       setLive({
         sel: d.sel,
@@ -440,6 +458,8 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
     const d = drag.current;
     drag.current = null;
     setPanning(false);
+    // Every way out of a drag ends the busy box, so its analyze timer resumes.
+    onBusy(null);
     if (e.currentTarget.hasPointerCapture(e.pointerId))
       e.currentTarget.releasePointerCapture(e.pointerId);
     if (!d) return;
@@ -487,6 +507,9 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      // A drag whose pointer-up never came (a context menu took it) ends here,
+      // so the next press is not ignored. After a normal release it finds no drag.
+      onLostPointerCapture={onPointerUp}
       onPointerLeave={() => onHover(null)}
     >
       {view && (
@@ -570,17 +593,24 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
             const selected = isSel("bubble", b.id);
             const hovered = isHover("bubble", b.id);
             const f = flags.get(b.id);
-            const word = flagWord(f);
+            const phase = analysis.get(b.id);
+            const failed = phase === "failed";
+            const word = phase ? ANALYZE_WORD[phase] : flagWord(f);
             const member = b.speakerId ? castById.get(b.speakerId) : undefined;
             const tint = tintFor(member);
-            const tone = b.ignored
-              ? "border-dashed border-neutral-500/70"
-              : word
-                ? `border-amber-400 bg-amber-400/15 ${
-                    f?.[0]?.kind === "duplicate" ? "border-dashed" : ""
-                  }`
-                : tint.border;
-            const showName = named || selected || hovered;
+            const tone = failed
+              ? "border-red-400 bg-red-500/15"
+              : phase
+                ? "border-dashed border-amber-400 bg-amber-400/15"
+                : b.ignored
+                  ? "border-dashed border-neutral-500/70"
+                  : word
+                    ? `border-amber-400 bg-amber-400/15 ${
+                        f?.[0]?.kind === "duplicate" ? "border-dashed" : ""
+                      }`
+                    : tint.border;
+            // An analyze word shows at any zoom: it is news about this box.
+            const showName = named || selected || hovered || !!phase;
             return (
               <div
                 key={b.id}
@@ -599,17 +629,19 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
               >
                 <span
                   className={`pointer-events-none absolute bottom-full left-0 mb-px flex items-center gap-1 px-1 text-[10px] leading-4 whitespace-nowrap ${
-                    word && !b.ignored
-                      ? "bg-amber-400 font-medium text-neutral-950"
-                      : selected
-                        ? "bg-white font-medium text-neutral-950"
-                        : "bg-neutral-950/85 text-neutral-200"
+                    failed
+                      ? "bg-red-400 font-medium text-neutral-950"
+                      : word && (phase || !b.ignored)
+                        ? "bg-amber-400 font-medium text-neutral-950"
+                        : selected
+                          ? "bg-white font-medium text-neutral-950"
+                          : "bg-neutral-950/85 text-neutral-200"
                   }`}
                 >
                   <span className="tabular-nums">{numbers.get(b.id)}</span>
                   {showName && (
                     <span>
-                      {b.ignored
+                      {b.ignored && !phase
                         ? "ignored"
                         : (word ??
                           (b.silent

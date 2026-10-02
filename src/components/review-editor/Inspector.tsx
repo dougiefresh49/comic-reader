@@ -2,6 +2,7 @@
 "use client";
 
 import type { RefObject } from "react";
+import type { AnalyzeRun } from "./analyze";
 import {
   needYou,
   plural,
@@ -61,6 +62,11 @@ export interface Actions {
   setRect: (sel: Sel, rect: Rect, coalesce?: string) => void;
   zoomTo: (rect: Rect) => void;
   goto: (page: number, sel: Sel | null) => void;
+  /** Analyze again, or Try again: one model call with the bubble's hint. */
+  analyze: (id: string) => void;
+  /** Turn the bubble's proposal into pending edits. */
+  accept: (id: string) => void;
+  setHint: (id: string, text: string) => void;
 }
 
 interface InspectorProps {
@@ -79,6 +85,8 @@ interface InspectorProps {
   emotions: string[];
   textRef: RefObject<HTMLTextAreaElement | null>;
   emotionRef: RefObject<HTMLInputElement | null>;
+  analysis: Record<string, AnalyzeRun>;
+  hints: Record<string, string>;
   actions: Actions;
 }
 
@@ -164,6 +172,118 @@ function flagLine(flag: Flag): string {
   return `"${flag.raw}" not in cast`;
 }
 
+// ----------------------------------------------------------------- analyze
+
+/**
+ * The bubble's analyze: the wait, the call, its error, or the proposal with
+ * Accept and Try again; under it the hint and Analyze again.
+ */
+function AnalyzeBlock({
+  bubble: b,
+  run,
+  hint,
+  castById,
+  actions,
+}: {
+  bubble: BubbleDoc;
+  run: AnalyzeRun | undefined;
+  hint: string;
+  castById: Map<string, CastMember>;
+  actions: Actions;
+}) {
+  const proposal = run?.phase === "ready" ? run.proposal : null;
+  const offered = proposal?.speaker ? castById.get(proposal.speaker) : null;
+  const running = run?.phase === "running";
+  return (
+    <div className="space-y-2 rounded-sm border border-neutral-700 bg-neutral-900 p-2">
+      {run?.phase === "waiting" && (
+        <p className="text-neutral-300">
+          New bubble. Analyze starts once the box has been still for a second.
+        </p>
+      )}
+      {running && <p className="text-neutral-300">Analyzing...</p>}
+      {run?.phase === "failed" && (
+        <p role="alert" className="text-red-300">
+          Analyze failed: {run.error}. Every field below still works by hand.
+        </p>
+      )}
+      {proposal && (
+        <>
+          <dl className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1">
+            <dt className="text-neutral-500">Text</dt>
+            <dd className="whitespace-pre-wrap text-neutral-100">
+              {proposal.text || "(no text read)"}
+            </dd>
+            <dt className="text-neutral-500">Cues</dt>
+            <dd className="whitespace-pre-wrap text-neutral-100">
+              {proposal.textWithCues ?? "(none)"}
+            </dd>
+            <dt className="text-neutral-500">Speaker</dt>
+            <dd
+              className={offered ? tintFor(offered).text : "text-neutral-400"}
+            >
+              {offered
+                ? offered.name
+                : b.speakerId
+                  ? "none from the cast; Accept keeps the current speaker"
+                  : "none from the cast"}
+            </dd>
+            <dt className="text-neutral-500">Emotion</dt>
+            <dd className="text-neutral-100">{proposal.emotion}</dd>
+            <dt className="text-neutral-500">Type</dt>
+            <dd className="text-neutral-100">
+              {TYPES.find((t) => t.id === proposal.type)?.label ??
+                proposal.type}
+            </dd>
+          </dl>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              className={PRIMARY}
+              onClick={() => actions.accept(b.id)}
+            >
+              Accept <Key>Enter</Key>
+            </button>
+            <button
+              type="button"
+              className={BUTTON + " h-7"}
+              onClick={() => actions.analyze(b.id)}
+            >
+              Try again <Key>R</Key>
+            </button>
+          </div>
+        </>
+      )}
+      <div className="flex gap-1.5">
+        <input
+          key={b.id}
+          value={hint}
+          maxLength={500}
+          placeholder="Hint: it's the Yellow Ranger, she is angry"
+          aria-label="Hint for Analyze again"
+          onChange={(e) => actions.setHint(b.id, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" || running) return;
+            e.preventDefault();
+            // Off the field, so the next Enter accepts what comes back.
+            e.currentTarget.blur();
+            actions.analyze(b.id);
+          }}
+          className={`${INPUT} h-6 min-w-0 flex-1`}
+        />
+        <button
+          type="button"
+          className={BUTTON}
+          disabled={running}
+          onClick={() => actions.analyze(b.id)}
+        >
+          Analyze again
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ bubble
 
 function BubbleInspector(
@@ -185,6 +305,8 @@ function BubbleInspector(
     emotions,
     textRef,
     emotionRef,
+    analysis,
+    hints,
     actions,
   } = props;
   const f = flags.get(b.id) ?? [];
@@ -293,6 +415,14 @@ function BubbleInspector(
           </div>
         </div>
       )}
+
+      <AnalyzeBlock
+        bubble={b}
+        run={analysis[b.id]}
+        hint={hints[b.id] ?? ""}
+        castById={castById}
+        actions={actions}
+      />
 
       <div>
         <Label>

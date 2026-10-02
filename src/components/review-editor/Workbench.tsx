@@ -11,6 +11,8 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import type { AnalyzeProposal } from "~/server/actions/review/analyze-bubble";
+import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
 import { Inspector, Key, type Actions } from "./Inspector";
 import { findCast, needYou, newId, ownVoice, plural, slug } from "./lib";
@@ -94,7 +96,11 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
   {
     title: "Edit the selected bubble",
     rows: [
-      ["E / Enter", "Edit the text"],
+      ["E / Enter", "Edit the text. Enter accepts a proposal when one shows"],
+      [
+        "R",
+        "While a proposal shows: try again, analyzing the bubble once more with its hint",
+      ],
       [
         "S",
         "Pick the speaker. Enter takes the highlighted name: the nearest face, or the first match once you type",
@@ -327,6 +333,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const [note, setNote] = useState<Note | null>(null);
   const [sheet, setSheet] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const canvasRef = useRef<CanvasHandle>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -573,6 +580,49 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     [],
   );
 
+  /** An accepted proposal: every offered field becomes a pending edit, one undo step. */
+  const acceptProposal = useCallback(
+    (id: string, p: AnalyzeProposal) => {
+      apply("accept analyze proposal", (d) => {
+        // No speaker from the cast leaves the bubble's speaker as it is.
+        const named =
+          p.speaker && castById.has(p.speaker)
+            ? setSpeaker(d, id, p.speaker)
+            : d;
+        // No words read leaves the text and its cues as they are, so Save
+        // never writes an empty text_with_cues.
+        const words =
+          p.text && p.textWithCues !== null
+            ? { text: p.text, cues: { forText: p.text, value: p.textWithCues } }
+            : {};
+        return patchBubble(named, id, {
+          ...words,
+          emotion: p.emotion,
+          type: p.type,
+        });
+      });
+      say("Accepted. Save writes it; audio stays a separate step.");
+    },
+    [apply, castById, say],
+  );
+  const analyzer = useAnalyze({
+    bookId: data.bookId,
+    issueId: data.issueId,
+    doc,
+    cast,
+    pagesByNumber,
+    busyId,
+    onAccept: acceptProposal,
+    say,
+  });
+  const analysisPhases = useMemo(
+    () =>
+      new Map<string, AnalyzePhase>(
+        Object.entries(analyzer.runs).map(([id, run]) => [id, run.phase]),
+      ),
+    [analyzer.runs],
+  );
+
   const select = useCallback((next: Sel | null) => {
     dispatch({ type: "select", sel: next });
   }, []);
@@ -638,8 +688,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     if (next) goto(next.page, { kind: "bubble", id: next.bubbleId });
   };
 
-  /** A box drawn with the bubble or the panel tool. */
-  const drawBox = (rect: Rect, kind: "bubble" | "panel") => {
+  /** A box drawn with the bubble or the panel tool, or dropped with Shift B (`drawn` false). */
+  const drawBox = (rect: Rect, kind: "bubble" | "panel", drawn = true) => {
     const id = newId();
     if (kind === "panel") {
       apply("add panel", (d) => addPanel(d, id, pageNumber, rect), {
@@ -656,12 +706,16 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       apply("add bubble", (d) => addBubble(d, id, pageNumber, rect), {
         select: { kind: "bubble", id },
       });
-      say("New bubble. E types its text, S picks its speaker.");
+      if (drawn) {
+        analyzer.arm(id);
+        say("New bubble. Analyze starts once the box has been still a second.");
+      } else say("New bubble. E types its text, S picks its speaker.");
     }
     setTool("select");
     setRightOpen(true);
   };
 
+  /** Shift B: a box at the panel's centre, not over a balloon yet, so it is not analyzed on its own. */
   const dropBubble = () => {
     const host = focusPanel ?? panels[0];
     const w = 0.14;
@@ -676,10 +730,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           }
         : { x: 0.5 - w / 2, y: 0.5 - h / 2, w, h },
       "bubble",
+      false,
     );
   };
 
-  const setRect = (target: Sel, rect: Rect, coalesce?: string) =>
+  const setRect = (target: Sel, rect: Rect, coalesce?: string) => {
     apply(
       target.kind === "panel" ? "panel box change" : "bubble box change",
       (d) =>
@@ -688,6 +743,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           : setBubbleRect(d, target.id, rect),
       { coalesce },
     );
+    if (target.kind === "bubble") analyzer.moved(target.id, rect);
+  };
 
   /**
    * Delete bubbles, or dismiss them as duplicates: the same removal. The
@@ -907,6 +964,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     setRect,
     zoomTo: (rect) => canvasRef.current?.zoomTo(rect),
     goto,
+    analyze: analyzer.analyze,
+    accept: analyzer.accept,
+    setHint: analyzer.setHint,
   };
 
   const toggleRail = (view: LeftView) => {
@@ -1064,8 +1124,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
 
       if (!selBubble) return;
       const b = selBubble;
+      const proposed = analyzer.runs[b.id]?.phase === "ready";
       switch (key) {
         case "Enter":
+          if (proposed) analyzer.accept(b.id);
+          else openField("text");
+          return done();
+        case "r":
+          if (proposed) analyzer.analyze(b.id);
+          return done();
         case "e":
           openField("text");
           return done();
@@ -1142,8 +1209,16 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const duplicateSelected =
     !!selBubble &&
     !!flags.get(selBubble.id)?.some((f) => f.kind === "duplicate");
+  const proposalShown =
+    !!selBubble && analyzer.runs[selBubble.id]?.phase === "ready";
   const hints: [string, string][] = selBubble
     ? [
+        ...(proposalShown
+          ? ([
+              ["Enter", "accept"],
+              ["R", "try again"],
+            ] as [string, string][])
+          : []),
         ["↑↓", "step"],
         ["S", "speaker"],
         ["E", "text"],
@@ -1554,6 +1629,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
               if (selBubble) actions.setSpeaker(selBubble.id, characterId);
             }}
             onZoom={setZoom}
+            analysis={analysisPhases}
+            onBusy={setBusyId}
           />
           <button
             type="button"
@@ -1655,6 +1732,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                 emotions={emotions}
                 textRef={textRef}
                 emotionRef={emotionRef}
+                analysis={analyzer.runs}
+                hints={analyzer.hints}
                 actions={actions}
               />
             </div>

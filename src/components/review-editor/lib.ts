@@ -37,7 +37,7 @@ export const ROLES = [
  */
 export function resolveSpeaker(
   raw: string | null,
-  cast: CastMember[],
+  cast: Pick<CastMember, "id" | "name" | "aliases">[],
 ): string | null {
   if (!raw) return null;
   const key = slug(raw);
