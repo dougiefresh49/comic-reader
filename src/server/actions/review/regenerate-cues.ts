@@ -1,38 +1,24 @@
 "use server";
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
+import { buildCuePrompt } from "~/lib/cue-rules";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-
-function buildPrompt(text: string, userFeedback?: string): string {
-  const feedbackBlock = userFeedback?.trim()
-    ? `\n\nReviewer feedback (apply this to the cue choices):\n"${userFeedback.trim()}"\n`
-    : "";
-
-  return `You format dialogue text for ElevenLabs v3 TTS. Add ElevenLabs audio cues using the following rules:
-
-1. Wrap onomatopoeia and shouts with capitalization for emphasis: "BOOM!", "AAAARGH!"
-2. Use [whisper], [shouting], [emphasis], [laughs], [sigh], [urgent], [determined] inline tags when warranted by the emotion
-3. Convert "..." to " — " for natural pauses
-4. Preserve the original meaning EXACTLY — do not add new words or change the meaning
-5. Output ONLY the formatted text, no explanation, no quotes, no surrounding markdown${feedbackBlock}
-
-Input:
-${text}
-
-Formatted text:`;
-}
 
 interface Args {
   bookId: string;
   issueId: string;
   bubbleId: string;
   text: string;
+  /** The bubble's emotion as the editor holds it; empty or null when none. */
+  emotion: string | null;
+  /** The bubble's speaker (character id) as the editor holds it; null when unassigned. */
+  speaker: string | null;
   /**
    * Optional free-form guidance from the human reviewer about *why* the
    * previous cues didn't work. e.g. "voice should sound urgent, not mellow"
@@ -57,11 +43,17 @@ export async function regenerateCues(args: Args) {
       ai,
       {
         model: GEMINI_FAST,
-        contents: buildPrompt(args.text, args.userFeedback),
-        // When the user supplies feedback, allow a touch of variability so we
-        // don't return the same output verbatim. Without feedback, stay
-        // deterministic.
-        config: { temperature: args.userFeedback?.trim() ? 0.3 : 0 },
+        contents: buildCuePrompt({
+          text: args.text,
+          emotion: args.emotion,
+          speaker: args.speaker,
+          userFeedback: args.userFeedback,
+        }),
+        // No temperature: Google advises leaving Gemini 3 at its default,
+        // since a low one risks looping (#104 drops it repo-wide). Low
+        // thinking, because sentence case, the capitals to keep and a tag
+        // that fits the emotion are judgment, not formatting.
+        config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
       },
       {
         step: "review:regenerate-cues",

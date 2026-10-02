@@ -431,6 +431,8 @@ function BubbleDetail({
               issueId,
               bubbleId: bubble.id,
               text,
+              emotion: bubble.emotion,
+              speaker: bubble.speaker,
               userFeedback: feedback,
             });
             if (res.ok && res.textWithCues) {
