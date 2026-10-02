@@ -1294,7 +1294,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
 
         <Section
           title="Roles"
-          blurb="The narrator, off-panel speech and the crowd. Always offered; their voices are set at the voices stop."
+          blurb="The narrator, off-panel speech and the crowd. Always offered."
           count={roles.length}
         >
           <div className={GRID}>
