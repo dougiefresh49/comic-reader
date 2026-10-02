@@ -21,11 +21,16 @@
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { loadBookCast } from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { buildTtsRequest, type TtsRequest } from "~/lib/tts-request";
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
-import { normalizeAlignment } from "~/workflows/steps/audio-plan";
+import {
+  lookupVoice,
+  normalizeAlignment,
+  voiceLookupContext,
+  type VoiceLookup,
+} from "~/workflows/steps/audio-plan";
 import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -66,10 +71,10 @@ Context for a --bubble read (both required with it):
   --issue <id>       issue_id, e.g. issue-1
 
 Overrides:
-  --voice <el id>    ElevenLabs voice id. Required when the castlist lookup
-                     misses, which it does today: the lookup reads this book
-                     and this issue only, and bubble speakers are slugs like
-                     "soldier" while castlist.character is "Soldier" (#90).
+  --voice <el id>    ElevenLabs voice id. Required when the audio step's voice
+                     lookup finds no voice for the bubble (no castlist row,
+                     or a row with no voice yet). With --bubble the lookup
+                     still runs, and a castlist conflict is still refused.
   --emotion <word>   Emotion, with --text or to replace the bubble's own.
   --stability <n>    0 to 1
   --style <n>        0 to 1
@@ -171,6 +176,7 @@ function parseArgs(argv: string[]): Args {
 interface BubbleRow {
   id: string;
   speaker: string | null;
+  character_id: string | null;
   emotion: string | null;
   ocr_text: string | null;
   text_with_cues: string | null;
@@ -184,7 +190,7 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
   const { data, error } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, emotion, ocr_text, text_with_cues, page_number, sort_order",
+      "id, speaker, character_id, emotion, ocr_text, text_with_cues, page_number, sort_order",
     )
     .eq("book_id", spec.book)
     .eq("issue_id", spec.issue)
@@ -199,48 +205,29 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
   return data as BubbleRow;
 }
 
-/** Why the castlist gave no voice, so the message names the case it is. */
-type VoiceMiss = "no-row" | "skipped" | "no-voice" | "conflict";
-
 /**
- * The voice for a speaker, from the castlist of this book and this issue.
- *
- * The castlist is per book (decisions row 28), but rows still carry an
- * `issue_id` until #118, and the audio step loads one `issue_id`
- * (`src/workflows/steps/generation.ts:296`). So the lookup is this book, this
- * issue, this speaker and nothing else: a row for another issue of the same
- * book is not an answer here, because a render that spent on it would be
- * audio the pipeline would never play (decisions row 173).
- *
- * A row for this issue that carries the `__SKIPPED__` sentinel, a null
- * `voice_id`, or a `voice_id` another row of the same issue disagrees with is
- * a miss too, and each is reported as itself rather than as a slug mismatch.
+ * The bubble's voice by the audio step's own lookup (`lookupVoice`, #352):
+ * `bubbles.character_id`, then the castlist rows' `character_id`, then the
+ * name rule, with the voice from `voiceFor`. A render that spent on any other
+ * answer would be audio the pipeline would never play (decisions row 173).
+ * A slug group or a character whose castlist rows disagree on `voice_id` is
+ * a `castlist conflict`, refused before any call (#291).
  */
-async function readCastlistVoice(
+async function readBubbleVoice(
   bookId: string,
   issueId: string,
-  speaker: string,
-): Promise<{ voiceId: string | null; miss: VoiceMiss | null }> {
-  const { data, error } = await supabase
-    .from("castlist")
-    .select("voice_id")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("character", speaker);
-  if (error) fail(`Reading castlist for '${speaker}': ${error.message}`);
-  const rows = (data ?? []) as { voice_id: string | null }[];
-  const usable = (r: { voice_id: string | null }) =>
-    r.voice_id !== null && r.voice_id !== SKIPPED_VOICE ? r.voice_id : null;
-  const voices = new Set(rows.map(usable));
-  if (voices.size === 1 && rows.every((r) => usable(r) !== null)) {
-    return { voiceId: [...voices][0]!, miss: null };
-  }
-  if (rows.length === 0) return { voiceId: null, miss: "no-row" };
-  if (voices.size > 1) return { voiceId: null, miss: "conflict" };
-  if (rows.some((r) => r.voice_id === SKIPPED_VOICE)) {
-    return { voiceId: null, miss: "skipped" };
-  }
-  return { voiceId: null, miss: "no-voice" };
+  bubble: { speaker: string | null; character_id: string | null },
+): Promise<VoiceLookup> {
+  const [book, aliases] = await Promise.all([
+    loadBookCast(supabase, bookId).catch((e: Error) => fail(e.message)),
+    supabase
+      .from("aliases")
+      .select("alias, canonical")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
+  ]);
+  if (aliases.error) fail(`Reading aliases: ${aliases.error.message}`);
+  const rows = (aliases.data ?? []) as { alias: string; canonical: string }[];
+  return lookupVoice(voiceLookupContext(book, issueId, rows), bubble);
 }
 
 /**
@@ -288,48 +275,46 @@ async function readNeighbours(
 
 /**
  * Why there is no voice, naming the case, because the fix is not the same for
- * each: a missing row is fixed by `--voice` and by #90, a silent character and
- * a conflicting pair are castlist data problems that `--voice` would only
- * paper over for this one render.
+ * each: a missing row or voice is fixed by `--voice` for this one render, a
+ * silent character and a conflicting pair are castlist data problems that
+ * `--voice` would only paper over.
  */
 function noVoiceMessage(
   speaker: string | null,
   bookId: string | null,
   issueId: string | null,
-  miss: VoiceMiss | "no-speaker",
+  miss: (VoiceLookup & { ok: false }) | null,
 ): string {
   const who = `speaker '${speaker ?? "(none)"}'`;
   const where = `${bookId ?? "the book"}/${issueId ?? "the issue"}`;
-  switch (miss) {
-    case "skipped":
+  switch (miss?.reason ?? "no speaker") {
+    case "skip sentinel":
       return (
         `The castlist row for ${who} in ${where} is the __SKIPPED__ sentinel, so this ` +
         `character is silent in this issue and the audio step renders no audio for it. ` +
         `This script will not spend a call on audio the pipeline never plays.`
       );
-    case "conflict":
+    case "castlist conflict":
       return (
-        `The castlist rows for ${who} in ${where} carry different voice_id values, so no ` +
-        `single voice is the cast. Decide which one is right (decisions row 54, #90) ` +
+        `The castlist rows for ${who} in ${where} disagree, so no single voice is the ` +
+        `cast (${miss!.detail}). Decide which one is right (decisions row 54) ` +
         `rather than picking one here.`
       );
-    case "no-voice":
+    case "cast without a voice":
       return (
-        `The castlist row for ${who} in ${where} has a null voice_id, so the character is ` +
-        `cast without a voice yet. Cast it first, or pass --voice <elevenlabs voice id> ` +
+        `No voice for ${who} in ${where} (${miss!.detail}), so the character is cast ` +
+        `without a voice yet. Cast it first, or pass --voice <elevenlabs voice id> ` +
         `for this one render.`
       );
-    case "no-speaker":
+    case "no speaker":
       return (
-        `Nothing to look up: this line has no speaker, so the castlist cannot answer. ` +
-        `Pass --voice <elevenlabs voice id>.`
+        `Nothing to look up: this line has no speaker and no character_id, so the ` +
+        `castlist cannot answer. Pass --voice <elevenlabs voice id>.`
       );
     default:
       return (
-        `No castlist row for ${who} in ${where}. The castlist is read for this book and ` +
-        `this issue only (decisions row 173), and bubble speakers are slugs like ` +
-        `"soldier" while castlist.character is title case, which #90 fixes. ` +
-        `Pass --voice <elevenlabs voice id>.`
+        `No castlist row for ${who} in ${where} by character_id or by name ` +
+        `(${miss!.detail}). Pass --voice <elevenlabs voice id>.`
       );
   }
 }
@@ -391,6 +376,7 @@ async function planRender(
   let text = spec.text ?? "";
   let emotion = spec.emotion ?? null;
   let speaker: string | null = null;
+  let characterId: string | null = null;
   let source: string;
   let bookId = spec.book ?? null;
   let issueId = spec.issue ?? null;
@@ -403,6 +389,7 @@ async function planRender(
     text = bubble.text_with_cues ?? bubble.ocr_text ?? "";
     emotion = spec.emotion ?? bubble.emotion;
     speaker = bubble.speaker;
+    characterId = bubble.character_id;
     bookId = bookId ?? "";
     issueId = issueId ?? "";
     source = `bubble ${bubble.id} (${spec.book}/${spec.issue} page ${bubble.page_number})`;
@@ -434,16 +421,23 @@ async function planRender(
 
   if (!text.trim()) fail(`No text to render (${source}).`);
 
-  let voiceId = spec.voice ?? null;
-  if (!voiceId) {
-    let miss: VoiceMiss | "no-speaker" = "no-speaker";
-    if (speaker && bookId && issueId) {
-      const found = await readCastlistVoice(bookId, issueId, speaker);
-      voiceId = found.voiceId;
-      miss = found.miss ?? "no-speaker";
-    }
-    if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));
+  // A --bubble render always runs the lookup, so a castlist conflict is
+  // refused even with --voice; --voice then replaces the voice it found.
+  let miss: (VoiceLookup & { ok: false }) | null = null;
+  let voiceId: string | null = null;
+  if ((speaker || characterId) && bookId && issueId) {
+    const found = await readBubbleVoice(bookId, issueId, {
+      speaker,
+      character_id: characterId,
+    });
+    if (found.ok) voiceId = found.voiceId;
+    else miss = found;
   }
+  if (miss?.reason === "castlist conflict") {
+    fail(noVoiceMessage(speaker, bookId, issueId, miss));
+  }
+  voiceId = spec.voice ?? voiceId;
+  if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));
 
   const request = buildTtsRequest({
     text,
