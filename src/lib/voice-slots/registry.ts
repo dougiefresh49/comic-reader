@@ -235,24 +235,31 @@ export async function finishArchive(
   formerElevenLabsId: string,
 ): Promise<void> {
   if (voice.current_elevenlabs_id !== formerElevenLabsId) return;
-  if (await deleteRecorded(supabase, voice)) {
-    const upd = await supabase
-      .from("voices")
-      .update({
-        status: "archived",
-        current_elevenlabs_id: null,
-        archived_at: new Date().toISOString(),
-      })
-      .eq("id", voice.id);
-    if (upd.error) fail("update voices", upd.error);
-    const cast = await supabase
-      .from("castlist")
-      .update({ voice_id: null })
-      .eq("voice_uuid", voice.id);
-    if (cast.error) fail("update castlist", cast.error);
-    return;
+  if (!(await deleteRecorded(supabase, voice))) {
+    const log = await supabase.from("voice_archives").insert({
+      voice_id: voice.id,
+      former_elevenlabs_id: formerElevenLabsId,
+      archived_for_book_id: null,
+    });
+    if (log.error) fail("insert voice_archives", log.error);
   }
-  await markArchived(supabase, voice, formerElevenLabsId, null);
+  // Both updates hold only while the row still has the deleted id.
+  const upd = await supabase
+    .from("voices")
+    .update({
+      status: "archived",
+      current_elevenlabs_id: null,
+      archived_at: new Date().toISOString(),
+    })
+    .eq("id", voice.id)
+    .eq("current_elevenlabs_id", formerElevenLabsId);
+  if (upd.error) fail("update voices", upd.error);
+  const cast = await supabase
+    .from("castlist")
+    .update({ voice_id: null })
+    .eq("voice_uuid", voice.id)
+    .eq("voice_id", formerElevenLabsId);
+  if (cast.error) fail("update castlist", cast.error);
 }
 
 /**
