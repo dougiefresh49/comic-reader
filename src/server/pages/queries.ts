@@ -190,9 +190,11 @@ export async function getIssueData(
 
 /**
  * Every book with its issues. Public routes pass `publishedOnly: true` so a
- * draft book stays out of the library and 404s on `/book/...`. The default
- * keeps drafts because the admin callers (the review editor, the preview
- * route) need them.
+ * draft book stays out of the library and 404s on `/book/...`, and so does
+ * an issue still at `status = 'pending'`: the pipeline sets `ready` only
+ * when it finishes, and a pending issue may hold pages nobody has reviewed
+ * (#374). The default keeps both because the admin callers (the review
+ * editor, the preview route) need them.
  */
 export async function getManifest({
   publishedOnly = false,
@@ -203,7 +205,9 @@ export async function getManifest({
       "id, name, issues(id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps)",
     )
     .order("number", { ascending: true, foreignTable: "issues" });
-  if (publishedOnly) query = query.eq("published", true);
+  if (publishedOnly) {
+    query = query.eq("published", true).neq("issues.status", "pending");
+  }
 
   const { data, error } = await query;
 
