@@ -12,10 +12,9 @@ import {
 } from "~/lib/voice-slots";
 import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
 import { skippedIn } from "~/workflows/steps/voice";
-import { canContinueVoices } from "~/server/admin/voices-gate";
+import { readVoicesGate } from "~/server/admin/voices-gate";
 import { loadCharacters } from "../load";
 import type {
-  Candidate,
   ItemView,
   LeftWithout,
   OutgoingChoice,
@@ -24,6 +23,14 @@ import type {
 } from "./types";
 
 const SAMPLES = 3;
+
+interface LabRow {
+  id: string;
+  character_id: string;
+  lab_default: boolean | null;
+}
+
+type RawCandidate = { id: string; name: string; labDefault: boolean };
 
 const ref = (v: VoiceRow) => ({ id: v.id, name: v.display_name });
 
@@ -80,36 +87,45 @@ export async function loadVoices(
     planError = err instanceof Error ? err.message : String(err);
   }
 
-  const [book, voices, castlist, faces, verdict] = await Promise.all([
+  const [book, voices, castlist, faces, gate, labRes] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
     readVoices(supabaseAdmin),
     readCastlist(supabaseAdmin),
     portraits(bookId, issueId),
-    canContinueVoices(bookId, issueId),
+    readVoicesGate(bookId, issueId),
+    supabaseAdmin
+      .from("voices")
+      .select("id, character_id, lab_default")
+      .eq("status", "archived")
+      .not("character_id", "is", null),
   ]);
+  if (labRes.error)
+    throw new Error(`voices stop loader, voice-lab: ${labRes.error.message}`);
   const lines = await readSpeakerLines(supabaseAdmin, book, bookId, issueId);
   const voiceById = new Map(voices.map((v) => [v.id, v]));
   const linkedHere = new Set(
     book.rows.map((r) => r.voice_uuid).filter((id): id is string => !!id),
   );
+  /** The gate's list (`planCastingTasks`): the screen shows controls for exactly these. */
+  const unsettled = new Set(gate.plan.unsettled);
+  const openRow = new Map(gate.plan.open.map((t) => [t.characterId, t]));
 
-  // Clips for every candidate, signed in one call.
-  const candidateIds = new Set(
-    (plan?.items ?? []).flatMap((i) => i.candidates.map((c) => c.id)),
-  );
-  const clipPaths = [...candidateIds]
-    .map((id) => voiceById.get(id)?.source_clip_path)
-    .filter((p): p is string => !!p);
-  const clipUrl = new Map<string, string>();
-  if (clipPaths.length > 0) {
-    const signed = await supabaseAdmin.storage
-      .from(VOICE_CLIPS_BUCKET)
-      .createSignedUrls(clipPaths, 3600);
-    if (signed.error)
-      console.error("voices stop loader, the clips:", signed.error);
-    for (const s of signed.data ?? [])
-      if (s.path && s.signedUrl) clipUrl.set(s.path, s.signedUrl);
-  }
+  /** #350's rule: a voice-lab clone has a source clip and no castlist link in this book. */
+  const offerable = (id: string) =>
+    Boolean(voiceById.get(id)?.source_clip_path) && !linkedHere.has(id);
+  const labOf = (id: string): RawCandidate[] =>
+    ((labRes.data ?? []) as LabRow[])
+      .filter((r) => r.character_id === id && voiceById.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        name: voiceById.get(r.id)?.display_name ?? r.id,
+        labDefault: Boolean(r.lab_default),
+      }))
+      .sort(
+        (a, b) =>
+          Number(b.labDefault) - Number(a.labDefault) ||
+          a.name.localeCompare(b.name),
+      );
 
   /** Castlist rows an archive of `voice` would leave without a voice; the character's own rows in this book do not count when it replaces that voice. */
   const leaves = (
@@ -145,6 +161,28 @@ export async function loadVoices(
     return row?.status === "active" ? ref(row) : null;
   };
 
+  const blank = (id: string): Omit<ItemView, "source" | "state"> => ({
+    characterId: id,
+    name: book.resolve(id)?.display_name ?? id,
+    known: book.resolve(id)?.id === id,
+    action: "design",
+    lines: lines.get(id)?.length ?? 0,
+    target: null,
+    replaces: null,
+    candidates: [],
+    hasDescription: false,
+    needsSlot: false,
+    outgoing: null,
+    choices: [],
+    refusals: [],
+    warnings: [],
+    noDefault: null,
+    attention: null,
+    noAudio: skippedIn(book, id, issueId),
+    voice: voiceNow(id),
+    samples: samplesOf(id),
+  });
+
   const items: ItemView[] = (plan?.items ?? []).map((item) => {
     const replaces = item.replaces?.id ?? null;
     const choices: OutgoingChoice[] = [];
@@ -161,32 +199,20 @@ export async function loadVoices(
     if (item.replaces) offer(item.replaces);
     for (const v of plan?.spare ?? []) offer(v);
 
-    const candidates: Candidate[] = item.candidates
-      .filter((c) => {
-        const row = voiceById.get(c.id);
-        return (
-          row?.source_clip_path &&
-          (!linkedHere.has(c.id) || c.id === item.target?.id)
-        );
-      })
-      .map((c) => {
-        const path = voiceById.get(c.id)?.source_clip_path;
-        return { ...c, clipUrl: path ? (clipUrl.get(path) ?? null) : null };
-      });
-
     const archivedId = item.operation?.archived;
     const archived = archivedId ? voiceById.get(archivedId) : undefined;
-    return {
-      characterId: item.characterId,
+    const view: ItemView = {
+      ...blank(item.characterId),
       name: item.name,
-      known: book.resolve(item.characterId)?.id === item.characterId,
       source: item.source,
       action: item.action,
       state: item.state,
       lines: item.lines,
       target: item.target ? ref(item.target) : null,
       replaces: item.replaces ? ref(item.replaces) : null,
-      candidates,
+      candidates: item.candidates
+        .filter((c) => offerable(c.id))
+        .map((c) => ({ ...c, clipUrl: null })),
       hasDescription: item.hasDescription,
       needsSlot: item.needsSlot,
       outgoing:
@@ -208,40 +234,95 @@ export async function loadVoices(
             archived: archived ? ref(archived) : null,
           }
         : null,
-      noAudio: skippedIn(book, item.characterId, issueId),
-      voice: voiceNow(item.characterId),
-      samples: samplesOf(item.characterId),
     };
+    // The plan's default clone for a speaker with no voice is its first
+    // voice-lab candidate; one already cast in this book is not offered.
+    if (
+      item.source === "no voice" &&
+      item.action === "clone" &&
+      item.target &&
+      !offerable(item.target.id)
+    ) {
+      view.noDefault = `${item.target.display_name} is ${linkedHere.has(item.target.id) ? "already cast in this book" : "missing its source clip"}, so it is not offered. Pick a voice below.`;
+      view.action = "design";
+      view.target = null;
+      view.needsSlot = false;
+      view.outgoing = null;
+    }
+    // The screen and the gate read one list: settled here means settled there.
+    if (unsettled.has(item.characterId) && view.state === "settled") {
+      view.state = "pending";
+      view.needsSlot = false;
+      view.outgoing = null;
+      view.warnings = [
+        ...view.warnings,
+        "Settled earlier, but it still has no voice.",
+      ];
+    } else if (!unsettled.has(item.characterId) && view.state !== "settled") {
+      view.state = "settled";
+    }
+    return view;
   });
 
-  // "No audio this run" speakers drop out of the plan; list them so the mark can be cleared.
+  // Gate items the plan does not list (or every one, when the plan failed),
+  // with the controls that need no plan: a clone or design choice, an
+  // active voice, no audio, and Accept or Check again on an open row.
   const listed = new Set(items.map((i) => i.characterId));
-  for (const id of [...lines.keys()].sort()) {
-    if (listed.has(id) || !skippedIn(book, id, issueId)) continue;
+  for (const id of gate.plan.unsettled) {
+    if (listed.has(id)) continue;
+    const row = openRow.get(id);
     items.push({
-      characterId: id,
-      name: book.resolve(id)?.display_name ?? id,
-      known: book.resolve(id)?.id === id,
-      source: "no voice",
-      action: "design",
-      state: "settled",
-      lines: lines.get(id)?.length ?? 0,
-      target: null,
-      replaces: null,
-      candidates: [],
-      hasDescription: false,
-      needsSlot: false,
-      outgoing: null,
-      choices: [],
-      refusals: [],
-      warnings: [],
-      attention: null,
-      noAudio: true,
-      voice: null,
-      samples: [],
+      ...blank(id),
+      source: voiceFor(book, id, issueId) ? "archived voice" : "no voice",
+      state: row?.operation
+        ? "needs attention"
+        : row?.status === "in_progress"
+          ? "made"
+          : "pending",
+      candidates: labOf(id)
+        .filter((c) => offerable(c.id))
+        .map((c) => ({ ...c, clipUrl: null })),
+      attention: row?.operation ? { phase: "recorded", archived: null } : null,
+      warnings: plan
+        ? [
+            "The slot plan does not list this item yet: choose a clone or a new voice to plan it, or use an active voice.",
+          ]
+        : [],
     });
+    listed.add(id);
   }
 
+  // "No audio this run" speakers drop out of the plan; list them so the mark can be cleared.
+  for (const id of [...lines.keys()].sort()) {
+    if (listed.has(id) || !skippedIn(book, id, issueId)) continue;
+    items.push({ ...blank(id), source: "no voice", state: "settled" });
+  }
+
+  // Clips for every candidate shown, signed in one call.
+  const clipPaths = [
+    ...new Set(
+      items.flatMap((i) =>
+        i.candidates
+          .map((c) => voiceById.get(c.id)?.source_clip_path)
+          .filter((p): p is string => !!p),
+      ),
+    ),
+  ];
+  if (clipPaths.length > 0) {
+    const signed = await supabaseAdmin.storage
+      .from(VOICE_CLIPS_BUCKET)
+      .createSignedUrls(clipPaths, 3600);
+    if (signed.error)
+      console.error("voices stop loader, the clips:", signed.error);
+    const url = new Map(
+      (signed.data ?? []).map((s) => [s.path, s.signedUrl] as const),
+    );
+    for (const item of items)
+      for (const c of item.candidates) {
+        const path = voiceById.get(c.id)?.source_clip_path;
+        c.clipUrl = (path ? url.get(path) : undefined) ?? null;
+      }
+  }
   return {
     bookId,
     issueId,
@@ -267,6 +348,6 @@ export async function loadVoices(
       .map(ref)
       .sort((a, b) => a.name.localeCompare(b.name)),
     portraits: faces,
-    blocker: verdict.ok ? null : verdict.reason,
+    blocker: gate.verdict.ok ? null : gate.verdict.reason,
   };
 }

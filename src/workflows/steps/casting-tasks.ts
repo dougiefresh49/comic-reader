@@ -37,9 +37,9 @@ export interface OpenTask {
 export interface CastingPlan {
   /** Distinct speakers in the issue's non-ignored, non-silent bubbles. */
   speakers: number;
-  /** Speakers `voiceFor` finds a voice for. */
+  /** Speakers with a usable voice (`hasUsableVoice`). */
   cast: number;
-  /** Speakers with no voice and no skip marker, as character ids (or speaker keys). */
+  /** Speakers with no usable voice and no skip marker, as character ids (or speaker keys). */
   noVoice: string[];
   /** Of `noVoice`, the ones no `characters` row knows: they get no task row. */
   unresolved: string[];
@@ -47,6 +47,8 @@ export interface CastingPlan {
   toCreate: string[];
   /** Pending or in-progress rows that are still voice work (see `planCastingTasks`). */
   open: OpenTask[];
+  /** Every character the voices stop must settle: `open` rows and `noVoice` speakers. */
+  unsettled: string[];
   /**
    * Always empty since #353: `seedCast` copies the castlist forward. Kept so
    * `scripts/check-casting-plan.ts` still reads.
@@ -135,14 +137,54 @@ export async function readSpeakerLines(
   }
 }
 
+/** `voices.status` for every voice the book's castlist points at. */
+export async function readCastVoiceStatus(
+  client: SupabaseClient,
+  book: BookCast,
+): Promise<Map<string, string>> {
+  const ids = [
+    ...new Set(
+      book.rows.map((r) => r.voice_uuid).filter((id): id is string => !!id),
+    ),
+  ];
+  const status = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await client
+      .from("voices")
+      .select("id, status")
+      .in("id", ids.slice(i, i + 200));
+    fail("reading voice status", error);
+    for (const v of (data ?? []) as { id: string; status: string }[])
+      status.set(v.id, v.status);
+  }
+  return status;
+}
+
+/**
+ * The one voice rule the gate, the pipeline's pause and the voices stop
+ * share (#353): a speaker has a voice when `voiceFor` finds one with an
+ * ElevenLabs id, and the `voices` row it points at, if any, is active. A
+ * castlist voice that is archived (or has no ElevenLabs id) is no voice.
+ */
+export function hasUsableVoice(
+  book: BookCast,
+  voiceStatus: Map<string, string>,
+  characterId: string,
+  issueId: string,
+): boolean {
+  const v = voiceFor(book, characterId, issueId);
+  if (!v?.voiceId) return false;
+  return !v.voiceUuid || voiceStatus.get(v.voiceUuid) === "active";
+}
+
 /**
  * Read-only: the issue's voice work as the gate counts it. A speaker is
- * settled when `voiceFor` finds a voice or the issue's castlist marks it
- * "no audio this run" (the skip marker). A `casting_tasks` row is open while
- * pending or in progress, when it is a request, carries a `carryOut`
- * record, or its speaker still has no voice; a stale row for a speaker who
- * has a voice now is not work the voices stop could show, so it never holds
- * the run.
+ * settled when it has a usable voice (`hasUsableVoice`) or the issue's
+ * castlist marks it "no audio this run" (the skip marker). A
+ * `casting_tasks` row is open while pending or in progress, when it is a
+ * request, carries a `carryOut` record, or its speaker still has no voice; a
+ * stale row for a speaker who has a voice now is not work the voices stop
+ * could show, so it never holds the run.
  */
 export async function planCastingTasks(
   client: SupabaseClient,
@@ -150,13 +192,14 @@ export async function planCastingTasks(
   issueId: string,
 ): Promise<CastingPlan> {
   const book = await loadBookCast(client, bookId);
-  const [lines, tasks] = await Promise.all([
+  const [lines, tasks, voiceStatus] = await Promise.all([
     readSpeakerLines(client, book, bookId, issueId),
     client
       .from("casting_tasks")
       .select("character_id, status, action, operation")
       .eq("book_id", bookId)
       .eq("issue_id", issueId),
+    readCastVoiceStatus(client, book),
   ]);
   fail("reading casting tasks", tasks.error);
   const rows = (tasks.data ?? []) as {
@@ -167,8 +210,9 @@ export async function planCastingTasks(
   }[];
 
   const ids = [...lines.keys()].sort();
+  const voiced = (id: string) => hasUsableVoice(book, voiceStatus, id, issueId);
   const noVoice = ids.filter(
-    (id) => !voiceFor(book, id, issueId) && !skippedIn(book, id, issueId),
+    (id) => !voiced(id) && !skippedIn(book, id, issueId),
   );
   const unresolved = noVoice.filter((id) => book.resolve(id)?.id !== id);
   const hasRow = new Set(rows.map((r) => r.character_id));
@@ -188,21 +232,23 @@ export async function planCastingTasks(
     }));
   return {
     speakers: ids.length,
-    cast: ids.filter((id) => voiceFor(book, id, issueId)).length,
+    cast: ids.filter(voiced).length,
     noVoice,
     unresolved,
     toCreate: noVoice.filter(
       (id) => !unresolved.includes(id) && !hasRow.has(id),
     ),
     open,
+    unsettled: [
+      ...new Set([...open.map((t) => t.characterId), ...noVoice]),
+    ].sort(),
     toCopy: [],
   };
 }
 
 /** Items the voices stop must settle: every open row, plus speakers with no voice and no open row. */
 export function pendingFromPlan(plan: CastingPlan): number {
-  const opened = new Set(plan.open.map((t) => t.characterId));
-  return plan.open.length + plan.noVoice.filter((id) => !opened.has(id)).length;
+  return plan.unsettled.length;
 }
 
 /**
