@@ -16,6 +16,23 @@
  * `panel-page` (the page, then the bubble's panel cropped from it) or `panel`
  * (the panel crop alone). Panels are the reviewed ones.
  *
+ * `--cast` picks the prompt. `closed` (the default for `--source reviewed`)
+ * is #354's: the speaker must come from the issue's cast, here `proposeCast`
+ * held in memory with each member's aliases from its `characters` row, listed
+ * by `closedCastLines` with that page's face detections marked, and the book
+ * context the step sends (name, franchises, synopsis). Scoring maps the
+ * reviewed speaker and the reply to a cast id with `matchCastSpeaker`; a
+ * reviewed speaker outside the cast is counted apart and left out. The old
+ * GEMINI_HIGH run (`--baseline`, row 232) is scored on the same subset.
+ * `open` (the default for `--source smoke`) is the pre-#354 prompt.
+ *
+ * `--dry-run` does every read and builds every prompt and truth id, prints the
+ * cast, the counts and one full prompt, and exits before any model call.
+ *
+ * `--model` takes an id or a tier name (`GEMINI_HIGH`, `GEMINI_MEDIUM`,
+ * `GEMINI_FAST`) from `src/lib/models.ts`; a tier is priced from
+ * `GEMINI_USD_PER_1M_TOKENS` unless `--price-in` / `--price-out` are given.
+ *
  * `--provider openrouter` (default) refuses ids that do not end in `:free`
  * and are not in PAID_OK. `--provider gemini` runs `gemma-` ids freely and
  * any other id only under LIVE_API_OK=1 (a spend the owner named). It writes
@@ -23,13 +40,14 @@
  *
  * Usage:
  *   pnpm tsx --env-file=.env scripts/bench-speaker-model.ts \
- *     [--provider openrouter|gemini] [--model <id>] \
+ *     [--provider openrouter|gemini] [--model <id>|GEMINI_HIGH] \
  *     [--source smoke|reviewed] [--book <id> --issue <id>] [--pages 1,2|3-13] \
- *     [--variant page|panel-page|panel] [--limit n] [--max-calls 40] \
+ *     [--variant page|panel-page|panel] [--cast closed|open] [--dry-run] \
+ *     [--baseline <old run .json>] [--limit n] [--max-calls 40] \
  *     [--page-concurrency 1] [--price-in <usd/1M> --price-out <usd/1M>] \
  *     [--out /tmp/comic-reader-briefs/bench-out]
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   ApiError,
@@ -38,12 +56,24 @@ import {
   createPartFromText,
 } from "@google/genai";
 import sharp from "sharp";
+import { loadBookCast, proposeCast } from "~/lib/cast";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { selectIssue } from "~/lib/issue-queries";
+import {
+  GEMINI_FAST,
+  GEMINI_HIGH,
+  GEMINI_MEDIUM,
+  GEMINI_USD_PER_1M_TOKENS,
+} from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { createTypedStepClient } from "~/workflows/step-utils";
 import {
+  CLOSED_CAST_NOTES,
   buildContextUpdate,
+  closedCastLines,
+  contextSpeakerReply,
+  matchCastSpeaker,
+  type ClosedCastMember,
   type ContextParsed,
 } from "~/workflows/steps/vision-rows";
 
@@ -63,6 +93,17 @@ const PROVIDERS = ["openrouter", "gemini"] as const;
 type Provider = (typeof PROVIDERS)[number];
 const SOURCES = ["smoke", "reviewed"] as const;
 type Source = (typeof SOURCES)[number];
+const CAST_MODES = ["closed", "open"] as const;
+type CastMode = (typeof CAST_MODES)[number];
+/** Row 232's GEMINI_HIGH run on the 120 reviewed bubbles: the old baseline. */
+const DEFAULT_BASELINE =
+  "/tmp/comic-reader-briefs/bench-out/gemini-3-1-pro-preview-gemini-reviewed-page-2026-10-01T04-57-28-152Z.json";
+/** `--model` may name a tier; the id comes from `src/lib/models.ts`. */
+const TIERS: Record<string, string> = {
+  GEMINI_HIGH,
+  GEMINI_MEDIUM,
+  GEMINI_FAST,
+};
 const PANEL_PAGE_PREFACE =
   "Two images follow. Image 1 is the full comic page. Image 2 is the one panel that contains the speech bubble, cropped from that page. The bounding box below is in Image 1's pixels. Use Image 2 to trace the bubble's tail to the speaker, and Image 1 to see who else is on the page.";
 const PANEL_PREFACE =
@@ -129,25 +170,41 @@ function parsePages(raw: string): number[] {
 const provider = oneOf("--provider", PROVIDERS, "openrouter");
 const source = oneOf("--source", SOURCES, "smoke");
 const variant = oneOf("--variant", VARIANTS, "page");
-const model =
+const castMode = oneOf(
+  "--cast",
+  CAST_MODES,
+  source === "reviewed" ? "closed" : "open",
+);
+if (castMode === "closed" && source !== "reviewed") {
+  die("--cast closed needs --source reviewed (each row is its own truth)");
+}
+const closed = castMode === "closed";
+const dryRun = argv.includes("--dry-run");
+const baselinePath = opt("--baseline") ?? DEFAULT_BASELINE;
+const modelArg =
   opt("--model") ??
   (provider === "openrouter"
     ? "google/gemma-4-31b-it:free"
     : die("--provider gemini needs --model"));
+const model = TIERS[modelArg] ?? modelArg;
 const pages = parsePages(opt("--pages") ?? "1,2");
 const limit = intOpt("--limit", undefined);
 const maxCalls = intOpt("--max-calls", 40)!;
 const concurrency = intOpt("--page-concurrency", 1)!;
 const outDir = opt("--out") ?? "/tmp/comic-reader-briefs/bench-out";
-const priceIn = priceOpt("--price-in");
-const priceOut = priceOpt("--price-out");
+const tierRate =
+  provider === "gemini" ? GEMINI_USD_PER_1M_TOKENS[model] : undefined;
+const priceIn = priceOpt("--price-in") ?? tierRate?.input;
+const priceOut = priceOpt("--price-out") ?? tierRate?.output;
 const priced = priceIn !== undefined && priceOut !== undefined;
 
 // Paid ids the owner has named a spend for (#321). Anything else must be free.
 const PAID_OK = ["google/gemma-4-31b-it", "google/gemini-3.8-flash"];
 let openRouterKey: string | undefined;
 let gemini: GoogleGenAI | null = null;
-if (provider === "openrouter") {
+if (dryRun) {
+  // No model call: no key, no client, no spend gate.
+} else if (provider === "openrouter") {
   if (!model.endsWith(":free") && !PAID_OK.includes(model)) {
     die(
       `refusing model "${model}": only ids ending in ":free" or listed in PAID_OK are allowed`,
@@ -187,6 +244,7 @@ type Row = {
   provider: Provider;
   source: Source;
   variant: Variant;
+  cast: CastMode;
   page: number;
   /** The reviewed panel's label (`p07-02`), or null when none was sent. */
   panel: string | null;
@@ -199,6 +257,12 @@ type Row = {
   bench: (Triple & { textWithCues: string | null }) | null;
   parsed: boolean;
   rawReply: string | null;
+  /** `--cast closed`: the reviewed speaker's cast id; null when outside the cast. */
+  truthId: string | null;
+  /** `--cast closed`: the name the reply gives (`contextSpeakerReply`), before matching. */
+  replySpeaker: string | null;
+  /** `--cast closed`: the cast id the reply maps to; null when none. */
+  replyId: string | null;
   latencyMs: number | null;
   usage: unknown;
   costUsd: number | null;
@@ -242,7 +306,15 @@ const aliased = (s: string | null | undefined) => {
 };
 
 // ── Reads, as getContextPage does them ──────────────────────────────────
-async function loadBookContext(bookId: string, issueId: string) {
+/**
+ * `--cast closed` sends what the #354 step sends: book name, franchises and
+ * synopsis, or nothing when all three are empty. `open` adds the wiki names
+ * and the canonical-names line, as the step did before #354.
+ */
+async function loadBookContext(
+  bookId: string,
+  issueId: string,
+): Promise<string | undefined> {
   const [bookRes, issueRes] = await Promise.all([
     supabase.from("books").select("name, franchises").eq("id", bookId).single(),
     selectIssue(
@@ -263,6 +335,7 @@ async function loadBookContext(bookId: string, issueId: string) {
   if (issueRow?.wiki_summary) {
     parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary}`);
   }
+  if (closed) return parts.length > 0 ? parts.join("\n") : undefined;
   if (issueRow?.wiki_appearances) {
     type AppEntry = { name: string; qualifier?: string };
     const appearances = issueRow.wiki_appearances as AppEntry[];
@@ -277,12 +350,33 @@ async function loadBookContext(bookId: string, issueId: string) {
   return parts.join("\n");
 }
 
-/** Face-detection names for the page, as getContextPage derives them. */
-async function loadPageCharNames(
+/**
+ * The issue's cast for `--cast closed`: `proposeCast` (read-only), each
+ * member's aliases from its `characters` row. Held in memory, never written.
+ */
+async function loadClosedCast(bookId: string, issueId: string) {
+  const [proposal, bookCast] = await Promise.all([
+    proposeCast(supabase, bookId, issueId),
+    loadBookCast(supabase, bookId),
+  ]);
+  const cast: ClosedCastMember[] = proposal.members.map((m) => ({
+    id: m.id,
+    name: m.name,
+    aliases: bookCast.resolve(m.id)?.aliases ?? [],
+  }));
+  return { cast, suggestions: proposal.suggestions };
+}
+
+/**
+ * The page's face detections as getContextPage reads them: the
+ * `character_id`s (`--cast closed` marks those members seen) and, for
+ * `--cast open`, the same ids as names.
+ */
+async function loadPageDetections(
   bookId: string,
   issueId: string,
   page: number,
-): Promise<string[]> {
+): Promise<{ names: string[]; seenIds: Set<string> }> {
   const panels = must(
     await supabase
       .from("panels")
@@ -293,7 +387,8 @@ async function loadPageCharNames(
     "panels read",
   );
   const names: string[] = [];
-  if (!panels || panels.length === 0) return names;
+  const seenIds = new Set<string>();
+  if (!panels || panels.length === 0) return { names, seenIds };
   const detections = must(
     await supabase
       .from("panel_character_detections")
@@ -306,10 +401,11 @@ async function loadPageCharNames(
   );
   for (const d of detections ?? []) {
     if (d.character_id == null) continue;
+    seenIds.add(d.character_id);
     const name = d.character_id.replace(/-/g, " ");
     if (!names.includes(name)) names.push(name);
   }
-  return names;
+  return { names, seenIds };
 }
 
 /** Reviewed panels of a page, as pixel rects clamped to the image. */
@@ -663,10 +759,29 @@ function tokenCell(usage: unknown): string {
 // ── One page ────────────────────────────────────────────────────────────
 let bubblesSent = 0;
 const limitReached = () => limit !== undefined && bubblesSent >= limit;
+/** `--cast closed`: the issue's cast, loaded once before any page. */
+let cast: ClosedCastMember[] = [];
+/** `--dry-run`: the first prompt built, printed in full. */
+let samplePrompt: { label: string; images: number; prompt: string } | null =
+  null;
+/** `--dry-run`: each page's seen ids, for the printout. */
+const seenByPage = new Map<number, string[]>();
+
+/** The cast id a reviewed row's speaker maps to; null when outside the cast. */
+const truthIdOf = (t: Triple | null) =>
+  t
+    ? (matchCastSpeaker(
+        contextSpeakerReply({
+          type: t.type ?? undefined,
+          speaker: t.speaker,
+        }),
+        cast,
+      )?.id ?? null)
+    : null;
 
 async function runPage(
   page: number,
-  bookContext: string,
+  bookContext: string | undefined,
 ): Promise<{ rows: Row[]; stop: string | null }> {
   const log = (s: string) => console.log(`[p${page}] ${s}`);
   const blob = must(
@@ -680,7 +795,19 @@ async function runPage(
   const meta = await sharp(pageBuf).metadata();
   if (!meta.width || !meta.height) die(`page ${page}: no image size`);
   const [w, h] = [meta.width!, meta.height!];
-  const pageCharNames = await loadPageCharNames(book!, issue!, page);
+  const { names: pageCharNames, seenIds } = await loadPageDetections(
+    book!,
+    issue!,
+    page,
+  );
+  seenByPage.set(
+    page,
+    [...seenIds].filter((id) => cast.some((m) => m.id === id)),
+  );
+  const castLines = closed ? closedCastLines(cast, seenIds) : [];
+  const promptOpts = closed
+    ? { closedList: true, castNotes: CLOSED_CAST_NOTES }
+    : undefined;
   // Panels come from the reviewed issue: the source page for smoke.
   const panels =
     variant === "page"
@@ -726,9 +853,13 @@ async function runPage(
       continue;
     }
 
-    const allCharacters = [...pageCharNames, ...uniqueSpeakers].filter(
-      (name, i, arr) => arr.indexOf(name) === i,
-    );
+    // Closed: the cast lines the step sends. Open: the pre-#354 list, face
+    // names plus the speakers this page's replies have named so far.
+    const allCharacters = closed
+      ? castLines
+      : [...pageCharNames, ...uniqueSpeakers].filter(
+          (name, i, arr) => arr.indexOf(name) === i,
+        );
 
     // The bubble's panel: its known panel, else the reviewed panel covering
     // the largest share of the box, else none.
@@ -745,20 +876,27 @@ async function runPage(
     }
 
     let images = [pageB64];
-    let prompt = buildContextPrompt(b.text, box, allCharacters, bookContext);
+    let prompt = buildContextPrompt(
+      b.text,
+      box,
+      allCharacters,
+      bookContext,
+      promptOpts,
+    );
     if (panel && variant === "panel-page") {
       images = [pageB64, await crop(panel)];
       prompt = `${PANEL_PAGE_PREFACE}\n\n${prompt}`;
     } else if (panel && variant === "panel") {
       images = [await crop(panel)];
       const cropBox = boxInCrop(box, panel.rect);
-      prompt = `${PANEL_PREFACE}\n\n${buildContextPrompt(b.text, cropBox, allCharacters, bookContext)}`;
+      prompt = `${PANEL_PREFACE}\n\n${buildContextPrompt(b.text, cropBox, allCharacters, bookContext, promptOpts)}`;
     }
 
     const row: Row = {
       provider,
       source,
       variant,
+      cast: castMode,
       page,
       panel: panel?.label ?? null,
       sortOrder: b.sortOrder,
@@ -769,6 +907,9 @@ async function runPage(
       bench: null,
       parsed: false,
       rawReply: null,
+      truthId: closed ? truthIdOf(b.truth) : null,
+      replySpeaker: null,
+      replyId: null,
       latencyMs: null,
       usage: null,
       costUsd: null,
@@ -778,6 +919,15 @@ async function runPage(
       `${b.label}${panel ? ` (${panel.label})` : ""}: ${b.text.slice(0, 60).replace(/\s+/g, " ")}`,
     );
     bubblesSent++;
+    if (dryRun) {
+      samplePrompt ??= {
+        label: `page ${page} ${b.label ?? b.id}`,
+        images: images.length,
+        prompt,
+      };
+      rows.push(row);
+      continue;
+    }
     const callsBefore = calls;
     const result = await callModel(images, prompt, log);
     if (result.kind === "stop-page" || result.kind === "stop-run") {
@@ -810,16 +960,21 @@ async function runPage(
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0]) as ContextParsed;
-          const update = buildContextUpdate(parsed, b.text, aiReasoning);
+          // Closed: the step's own update, speaker matched to the cast.
+          // Open: the reply's name as given (the cast is empty).
+          const update = buildContextUpdate(parsed, b.text, aiReasoning, cast);
+          const replySpeaker = contextSpeakerReply(parsed);
           row.parsed = true;
+          row.replySpeaker = replySpeaker;
+          row.replyId = closed ? (update.character_id ?? null) : null;
           row.bench = {
-            speaker: update.speaker ?? null,
+            speaker: closed ? (update.speaker ?? null) : replySpeaker,
             emotion: update.emotion ?? null,
             type: update.type ?? null,
             textWithCues: update.text_with_cues ?? null,
           };
-          const speaker = update.speaker ?? null;
-          if (speaker && !uniqueSpeakers.includes(speaker)) {
+          const speaker = row.bench.speaker;
+          if (!closed && speaker && !uniqueSpeakers.includes(speaker)) {
             uniqueSpeakers.push(speaker);
           }
         } catch (e) {
@@ -829,7 +984,7 @@ async function runPage(
         }
       }
       log(
-        `  → ${row.bench ? `${row.bench.speaker} / ${row.bench.emotion} / ${row.bench.type}` : "unparsed"} (${row.latencyMs} ms); truth ${row.truth?.speaker ?? "none"}${b.geminiHigh ? `; GEMINI_HIGH ${b.geminiHigh.speaker}` : ""}`,
+        `  → ${row.bench ? `${row.bench.speaker} / ${row.bench.emotion} / ${row.bench.type}` : "unparsed"}${closed && row.parsed ? ` (reply ${JSON.stringify(row.replySpeaker)} → ${row.replyId ?? "no cast member"})` : ""} (${row.latencyMs} ms); truth ${row.truth?.speaker ?? "none"}${closed ? ` → ${row.truthId ?? "outside the cast"}` : ""}${b.geminiHigh ? `; GEMINI_HIGH ${b.geminiHigh.speaker}` : ""}`,
       );
     }
     rows.push(row);
@@ -856,13 +1011,170 @@ function speakerVerdict(
   return norm(t.speaker) === norm(row.truth.speaker) ? "match" : "differs";
 }
 
+// ── Closed-cast scoring (#354) ──────────────────────────────────────────
+/** What the baseline file holds per row; the rest of its Row is unused. */
+type OldRow = { bubbleId: string; truth: Triple | null; bench: Triple | null };
+const short = (s: string | null | undefined, n = 60) =>
+  (s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+const rowLabel = (r: Row) => `p${r.page} #${r.sortOrder ?? "?"}`;
+
+/** Closed verdict on one row: outside the cast, right, or wrong. */
+const closedVerdict = (r: Row) =>
+  r.truthId === null
+    ? "outside cast"
+    : r.replyId === r.truthId
+      ? "right"
+      : "wrong";
+
+/** The reviewed speakers outside the cast, one line each. */
+function outsideLines(rows: Row[]): string[] {
+  return rows
+    .filter((r) => r.truthId === null)
+    .map(
+      (r) =>
+        `- ${rowLabel(r)} "${short(r.text)}": reviewed speaker ${JSON.stringify(r.truth?.speaker ?? null)} (${r.truth?.type ?? "no type"})`,
+    );
+}
+
+/**
+ * Row 232's GEMINI_HIGH run scored on this run's in-cast subset, joined on
+ * `bubbleId`. Exact: `matchCastSpeaker` maps the old reply to the truth id.
+ * Identity: exact, or `speakerVerdict` with SAME_CHARACTER (row 232's rule)
+ * calls the old reply and today's reviewed speaker one character.
+ */
+function baselineLines(rows: Row[]): {
+  headline: string;
+  detail: string[];
+} {
+  if (!existsSync(baselinePath)) {
+    return {
+      headline: `old GEMINI_HIGH baseline not scored: ${baselinePath} is missing`,
+      detail: [],
+    };
+  }
+  const oldRows = JSON.parse(readFileSync(baselinePath, "utf8")) as OldRow[];
+  const old = new Map(oldRows.map((o) => [o.bubbleId, o]));
+  const ours = new Set(rows.map((r) => r.bubbleId));
+  const inCast = rows.filter((r) => r.truthId !== null);
+  const missingOld = inCast.filter((r) => !old.has(r.bubbleId));
+  const missingNew = oldRows.filter((o) => !ours.has(o.bubbleId));
+  const compared = inCast.filter((r) => old.has(r.bubbleId));
+  let exact = 0;
+  let identity = 0;
+  const drift: string[] = [];
+  for (const r of compared) {
+    const o = old.get(r.bubbleId)!;
+    const oldId = o.bench
+      ? matchCastSpeaker(
+          contextSpeakerReply({
+            type: o.bench.type ?? undefined,
+            speaker: o.bench.speaker,
+          }),
+          cast,
+        )?.id
+      : undefined;
+    const isExact = oldId === r.truthId;
+    if (isExact) exact++;
+    if (isExact || speakerVerdict(r, o.bench, aliased) === "match") identity++;
+    if (plain(o.truth?.speaker) !== plain(r.truth?.speaker)) {
+      drift.push(
+        `- ${rowLabel(r)} "${short(r.text)}": reviewed ${JSON.stringify(o.truth?.speaker ?? null)} then, ${JSON.stringify(r.truth?.speaker ?? null)} now`,
+      );
+    }
+  }
+  const n = compared.length;
+  const detail: string[] = [];
+  if (missingOld.length) {
+    detail.push(
+      `In-cast bubbles missing from the baseline (${missingOld.length}), left out of its count:`,
+      ...missingOld.map(
+        (r) => `- ${rowLabel(r)} ${r.bubbleId} "${short(r.text)}"`,
+      ),
+    );
+  }
+  if (missingNew.length) {
+    detail.push(
+      `Baseline bubbles missing from this run (${missingNew.length}):`,
+      ...missingNew.map(
+        (o) =>
+          `- ${o.bubbleId} truth ${JSON.stringify(o.truth?.speaker ?? null)}`,
+      ),
+    );
+  }
+  if (drift.length) {
+    detail.push(
+      `Reviewed speaker changed since the baseline run (${drift.length}); scored against today's:`,
+      ...drift,
+    );
+  }
+  return {
+    headline: `old GEMINI_HIGH on the same subset: ${exact}/${n} exact match, ${identity}/${n} by identity${missingOld.length ? ` (${missingOld.length} in-cast bubbles not in the baseline)` : ""}`,
+    detail,
+  };
+}
+
+/** `--dry-run`: everything the run would send and score, before any call. */
+function dryRunReport(
+  rows: Row[],
+  suggestions: { name: string; qualifier: string; source: string }[],
+) {
+  const out: string[] = [
+    `DRY RUN, no model call. Model ${model} via ${provider}, variant ${variant}, cast ${castMode}.`,
+    `Pages ${pages.join(", ")} of ${book} / ${issue}: ${rows.length} bubbles, ${rows.length} prompts built. A run needs --max-calls ${rows.length} or more (plus retries).`,
+    "",
+  ];
+  if (closed) {
+    const lines = closedCastLines(cast, []);
+    out.push(
+      `Cast (${cast.length} members from proposeCast), as the prompt lists it before the per-page "seen" marks:`,
+      ...lines.map((l) => `  ${l}`),
+      "",
+      "Seen on each page (face detections naming a cast member):",
+      ...pages.map(
+        (p) => `  p${p}: ${(seenByPage.get(p) ?? []).join(", ") || "(none)"}`,
+      ),
+      "",
+      `proposeCast suggestions (names no characters row knows, not in the cast): ${suggestions.map((s) => `${s.name}${s.qualifier ? ` (${s.qualifier})` : ""} [${s.source}]`).join("; ") || "(none)"}`,
+      "",
+      "Truth per bubble (reviewed speaker → cast id):",
+      ...rows.map(
+        (r) =>
+          `  ${rowLabel(r).padEnd(8)} ${JSON.stringify(r.truth?.speaker ?? null).padEnd(22)} ${(r.truth?.type ?? "").padEnd(10)} → ${r.truthId ?? "OUTSIDE"}  "${short(r.text, 40)}"`,
+      ),
+      "",
+    );
+    const outside = outsideLines(rows);
+    const base = baselineLines(rows);
+    out.push(
+      `In-cast subset: ${rows.length - outside.length} of ${rows.length}. Reviewed speaker outside the cast: ${outside.length}.`,
+      ...outside,
+      ...(outside.length > 15
+        ? [
+            `owner call: ${outside.length} reviewed speakers land outside the cast (over 15): an alias gap, or truly absent from the issue's cast?`,
+          ]
+        : []),
+      "",
+      base.headline,
+      ...base.detail,
+      "",
+    );
+  }
+  out.push(
+    `One full prompt (${samplePrompt?.label ?? "none built"}, ${samplePrompt?.images ?? 0} image(s) before it):`,
+    "-----",
+    samplePrompt?.prompt ?? "(none)",
+    "-----",
+  );
+  console.log(`\n${out.join("\n")}`);
+}
+
 function writeOutputs(rows: Row[], stops: string[]) {
   mkdirSync(outDir, { recursive: true });
   const slug = model.replace(/[^a-zA-Z0-9]+/g, "-");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const base = join(
     outDir,
-    `${slug}-${provider}-${source}-${variant}-${stamp}`,
+    `${slug}-${provider}-${source}-${variant}${closed ? "-closed" : ""}-${stamp}`,
   );
   writeFileSync(`${base}.json`, JSON.stringify(rows, null, 2));
 
@@ -930,11 +1242,60 @@ function writeOutputs(rows: Row[], stops: string[]) {
         ] as typeof columns)
       : []),
     ["bench vs truth (aliases)", (r) => speakerVerdict(r, r.bench, aliased)],
+    ...(closed
+      ? ([
+          ["truth id", (r) => r.truthId ?? "outside cast"],
+          ["reply speaker", (r) => r.replySpeaker],
+          ["reply id", (r) => r.replyId],
+          ["closed verdict", (r) => closedVerdict(r)],
+        ] as typeof columns)
+      : []),
   ];
 
+  const closedHead: string[] = [];
+  if (closed) {
+    const inCast = rows.filter((r) => r.truthId !== null);
+    const right = inCast.filter((r) => r.replyId === r.truthId).length;
+    const named = rows.filter(
+      (r) => r.parsed && r.replySpeaker?.trim() && r.replyId === null,
+    );
+    const nulls = rows.filter((r) => r.parsed && !r.replySpeaker?.trim());
+    const unparsed = rows.filter((r) => !r.parsed);
+    const errors = unparsed.filter((r) => r.rawReply?.startsWith("error:"));
+    const outside = outsideLines(rows);
+    const baseline = baselineLines(rows);
+    closedHead.push(
+      `- Model: ${model}`,
+      `- In-cast subset: ${inCast.length} of ${rows.length} bubbles (cast of ${cast.length})`,
+      `- Right on the subset: ${right}/${inCast.length}`,
+      `- ${baseline.headline.replace(/^old/, "Old")}`,
+      `- Named outside the list: ${named.length} (ship gate: 0)`,
+      `- Null replies: ${nulls.length}`,
+      `- Unparsed: ${unparsed.length}${errors.length ? ` (${errors.length} of them API errors)` : ""}`,
+      `- Reviewed speaker outside the cast: ${outside.length}`,
+      `- ${cost}, median latency ${medianMs ?? "n/a"} ms, ${calls} requests`,
+      "",
+      ...(named.length
+        ? [
+            "Named outside the list:",
+            ...named.map(
+              (r) =>
+                `- ${rowLabel(r)} "${short(r.text)}": reply ${JSON.stringify(r.replySpeaker)}, truth ${r.truthId ?? "outside cast"}`,
+            ),
+            "",
+          ]
+        : []),
+      ...(outside.length
+        ? ["Reviewed speaker outside the cast:", ...outside, ""]
+        : []),
+      ...(baseline.detail.length ? [...baseline.detail, ""] : []),
+    );
+  }
+
   const lines = [
-    `# Speaker bench: ${model} via ${provider}, variant ${variant}, source ${source}`,
+    `# Speaker bench: ${model} via ${provider}, variant ${variant}, source ${source}${closed ? ", #354 closed cast" : ""}`,
     "",
+    ...closedHead,
     smoke
       ? `Smoke pages ${pages.join(", ")} (\`${SMOKE_BOOK}\` / \`${SMOKE_ISSUE}\`), truth from \`${TRUTH_BOOK}\` / \`${TRUTH_ISSUE}\`.`
       : `Reviewed pages ${pages.join(", ")} of \`${book}\` / \`${issue}\`; each row is its own truth.`,
@@ -953,11 +1314,16 @@ function writeOutputs(rows: Row[], stops: string[]) {
   ];
   writeFileSync(`${base}.md`, lines.join("\n"));
   console.log(`\nwrote ${base}.json\nwrote ${base}.md`);
-  console.log(lines[4]);
+  console.log(closed ? closedHead.join("\n") : lines[4]);
 }
 
 // ── Main: up to --page-concurrency pages at once, bubbles in series ─────
 const bookContext = await loadBookContext(book!, issue!);
+let suggestions: { name: string; qualifier: string; source: string }[] = [];
+if (closed) {
+  ({ cast, suggestions } = await loadClosedCast(book!, issue!));
+  if (cast.length === 0) die(`${book}/${issue}: proposeCast returned no cast`);
+}
 const queue = [...pages];
 const results = new Map<number, Row[]>();
 const stops: string[] = [];
@@ -981,4 +1347,5 @@ const rows = pages.flatMap((p) =>
     )
     .map(({ r }) => r),
 );
-writeOutputs(rows, stops);
+if (dryRun) dryRunReport(rows, suggestions);
+else writeOutputs(rows, stops);
