@@ -31,6 +31,7 @@ import {
 } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
 import { slugify } from "~/lib/character-id";
+import type { Json } from "~/types/database";
 import { supabase } from "./lib/supabase";
 
 const BOOK = "smoke-test";
@@ -383,12 +384,25 @@ async function setup(scenario: Scenario) {
       .insert(fixtureIds().map((id) => ({ id, franchise, aliases: [] }))),
     "characters insert",
   );
+  // The cast proposal reads wiki_appearances and lookahead reads
+  // wiki_summary, so the smoke issue carries the source issue's values.
+  const srcIssue = must(
+    await selectIssue(
+      supabase,
+      SRC_BOOK,
+      SRC_ISSUE,
+      "wiki_appearances, wiki_summary",
+    ).single(),
+    "source issue",
+  ) as { wiki_appearances: Json | null; wiki_summary: string | null };
   must(
     await insertIssue(supabase, {
       book_id: BOOK,
       id: ISSUE,
       number: 1,
       name: "Smoke",
+      wiki_appearances: srcIssue.wiki_appearances,
+      wiki_summary: srcIssue.wiki_summary,
     }),
     "issues insert",
   );
