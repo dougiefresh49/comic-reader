@@ -600,7 +600,8 @@ function CharacterCardView({
           )}
           {!card.removed &&
             card.group === "here" &&
-            card.faces.length === 0 && (
+            card.faces.length === 0 &&
+            card.sources.includes("wiki") && (
               <div className="mt-1 truncate text-neutral-500">
                 From the wiki
                 {card.wikiNames.length > 0
