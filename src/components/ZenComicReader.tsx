@@ -458,7 +458,7 @@ export default function ZenComicReader({
   // the ONLY play control, so SpeechBox gets no onTogglePlay there.
   const caption = speech ? (
     <SpeechBox
-      speaker={selectedBubble?.speaker}
+      speaker={selectedBubble?.speakerName ?? selectedBubble?.speaker}
       text={speech.cleanText}
       words={speech.words}
       activeWordIndex={activeWordIndex}
