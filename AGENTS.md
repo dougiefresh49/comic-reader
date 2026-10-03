@@ -465,9 +465,12 @@ GitHub issues are the specs. Claim per the rule above, then one worktree per iss
 
 ## Cursor Cloud specific instructions
 
-Config for Cloud Agent VMs, where there is no main-checkout `.env` to copy.
+How a Cloud Agent VM starts. There is no `.env` to copy. The prod-write and spend lines are the ones in "Verifying here"; this section says how they apply when the task is the ask.
 
-- The app secrets arrive as process environment variables. Do not write a `.env` and do not set `SKIP_ENV_VALIDATION`. `pnpm dev` and `next build` read `process.env`. `src/env.mjs` requires `ROBOFLOW_API_KEY`, `ROBOFLOW_WORKFLOW_URL`, `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, `ELEVENLABS_API_KEY`, and `VENICE_API_KEY`. The reader also needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
-- Dev server: `pnpm exec next dev --turbo --hostname 0.0.0.0 --port 3000`. `pnpm dev -- --hostname 0.0.0.0` fails, because Next treats the forwarded `--hostname` as a project directory.
-- Read-only check: `GET /` is the library, `GET /book/tmnt-mmpr-iii/issue-1/4` is a page with bubbles. Do not use admin save, regenerate, ingest, or voice-create controls. Those write production and can spend money.
-- Install is `pnpm install --frozen-lockfile`. pnpm 10 skips the `supabase` package build script, so the Supabase CLI binary is absent. The reader does not need it.
+- Secrets are already in the environment. Do not write a `.env`. Do not set `SKIP_ENV_VALIDATION`. `pnpm dev` and `next build` read `process.env`. `src/env.mjs` requires `ROBOFLOW_API_KEY`, `ROBOFLOW_WORKFLOW_URL`, `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, `ELEVENLABS_API_KEY`, and `VENICE_API_KEY`. The reader also needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
+- If `node_modules` is missing, run `pnpm install --frozen-lockfile`. Running it again is safe.
+- If nothing is listening on port 3000, start the dev server with `pnpm exec next dev --turbo --hostname 0.0.0.0 --port 3000`. `pnpm dev -- --hostname 0.0.0.0` fails, because Next treats the forwarded `--hostname` as a project directory. If port 3000 is already open, use that server.
+- A read-only check is `GET /` (the library) and `GET /book/tmnt-mmpr-iii/issue-1/4` (a page with bubbles). `pnpm check` is the lint and typecheck gate.
+- The review editor is `/admin/<bookId>/<issueId>/review/editor`. Admin is `/admin`. When both `ADMIN_USERNAME` and `ADMIN_PASSWORD` are set, those routes need that basic auth. When either is unset, local dev lets them through.
+- Saving in the review editor or admin writes production, from this dev server too. Do that save when the task says to verify by saving. A task that only says to verify the page does not. Regenerating audio, re-running context, ingest, Voice Design, and creating a voice spend money. Do those only when the task names that spend. A save is not permission to spend.
+- `onlyBuiltDependencies` in `pnpm-workspace.yaml` is the allowlist of install scripts. Leave it. pnpm 10 skips the `supabase` postinstall, so the Supabase CLI binary is absent, and the same warning names `@nestjs/core`, `@swc/core`, `@tsparticles/engine`, and `cbor-extract`. Do not add those packages to the allowlist. The reader, `pnpm dev`, and `pnpm check` do not use the CLI. `pnpm db:types` is the command that needs it, and that command also needs a Supabase access token this environment does not have.
