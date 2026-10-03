@@ -158,7 +158,14 @@ export async function loadVoices(
   const voiceNow = (id: string) => {
     const v = voiceFor(book, id, issueId);
     const row = v?.voiceUuid ? voiceById.get(v.voiceUuid) : undefined;
-    return row?.status === "active" ? ref(row) : null;
+    // Active and library voices play; an archived one does not.
+    return row && row.status !== "archived" ? ref(row) : null;
+  };
+
+  /** The castlist voice `voiceFor` finds is a `voices` row that really is archived. */
+  const isArchived = (id: string) => {
+    const uuid = voiceFor(book, id, issueId)?.voiceUuid;
+    return uuid ? voiceById.get(uuid)?.status === "archived" : false;
   };
 
   const blank = (id: string): Omit<ItemView, "source" | "state"> => ({
@@ -273,7 +280,7 @@ export async function loadVoices(
     const row = openRow.get(id);
     items.push({
       ...blank(id),
-      source: voiceFor(book, id, issueId) ? "archived voice" : "no voice",
+      source: isArchived(id) ? "archived voice" : "no voice",
       state: row?.operation
         ? "needs attention"
         : row?.status === "in_progress"
