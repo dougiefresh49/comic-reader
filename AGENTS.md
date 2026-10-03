@@ -462,3 +462,12 @@ GitHub issues are the specs. Claim per the rule above, then one worktree per iss
   never read after being written (26 of 45, then 27 of 32). Archiving and
   then deleting an existing memory dir is per repo and owner-run; fleet's
   `scripts/memory-audit.sh` gives the read/write counts first.
+
+## Cursor Cloud specific instructions
+
+Config for Cloud Agent VMs, where there is no main-checkout `.env` to copy.
+
+- The app secrets arrive as process environment variables. Do not write a `.env` and do not set `SKIP_ENV_VALIDATION`. `pnpm dev` and `next build` read `process.env`. `src/env.mjs` requires `ROBOFLOW_API_KEY`, `ROBOFLOW_WORKFLOW_URL`, `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, `ELEVENLABS_API_KEY`, and `VENICE_API_KEY`. The reader also needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
+- Dev server: `pnpm exec next dev --turbo --hostname 0.0.0.0 --port 3000`. `pnpm dev -- --hostname 0.0.0.0` fails, because Next treats the forwarded `--hostname` as a project directory.
+- Read-only check: `GET /` is the library, `GET /book/tmnt-mmpr-iii/issue-1/4` is a page with bubbles. Do not use admin save, regenerate, ingest, or voice-create controls. Those write production and can spend money.
+- Install is `pnpm install --frozen-lockfile`. pnpm 10 skips the `supabase` package build script, so the Supabase CLI binary is absent. The reader does not need it.
