@@ -14,9 +14,9 @@ export interface ListenNotice {
   text: string;
 }
 
-/** What `saveFirst` comes to: the row's saved text, or why it is not saved. */
+/** What `saveFirst` comes to: the row as saved (text, emotion, speaker), or why it is not saved. */
 export type SavedRow =
-  | { ok: true; text: string }
+  | { ok: true; text: string; emotion: string; speaker: string | null }
   | { ok: false; error: string };
 
 interface UseListenArgs {
@@ -162,14 +162,13 @@ export function useListen({
             return;
           }
           if (job === "cues") {
-            const row = bubbles.find((b) => b.id === id);
             const res = await regenerateCues({
               bookId,
               issueId,
               bubbleId: id,
               text: saved.text,
-              emotion: row?.emotion ?? null,
-              speaker: row?.speaker ?? null,
+              emotion: saved.emotion,
+              speaker: saved.speaker,
             });
             if (res.ok && res.textWithCues) {
               onCuesRef.current(id, saved.text, res.textWithCues);
@@ -214,7 +213,7 @@ export function useListen({
       })();
       return true;
     },
-    [bookId, issueId, bubbles, note, stop],
+    [bookId, issueId, note, stop],
   );
 
   /**
