@@ -13,7 +13,7 @@ import {
   voiceFor,
   type CastVoice,
 } from "~/lib/cast";
-import { slug, titleCase } from "~/components/review-editor/lib";
+import { NARRATOR_ID, slug, titleCase } from "~/components/review-editor/lib";
 import type {
   BubbleType,
   CastMember,
@@ -353,13 +353,21 @@ export async function loadEditor(
     return voice ? { id: voice.id, name: voice.display_name } : null;
   };
 
-  // The speaker list is the issue's cast (#355). An issue with no cast rows
-  // gets the proposed cast, in memory only; nothing is written here.
+  // The speaker list is the issue's cast (#355). An issue with no castlist
+  // rows at all gets the proposed cast, in memory only; nothing is written
+  // here. Rows with `in_issue` false are removals and stay out.
+  const rowId = (characterId: string | null, character: string) =>
+    characterId ?? book.resolve(character)?.id ?? slug(character);
+  const issueRows = book.rows.filter((r) => r.issue_id === issueId);
+  const removed = new Set(
+    issueRows
+      .filter((r) => !r.in_issue)
+      .map((r) => rowId(r.character_id, r.character)),
+  );
   const listed: { id: string; voice: CastVoice | null; label: string }[] =
-    castEntries.length > 0
+    issueRows.length > 0
       ? castEntries.map((e) => ({
-          id:
-            e.characterId ?? book.resolve(e.character)?.id ?? slug(e.character),
+          id: rowId(e.characterId, e.character),
           voice: e.voice,
           label: e.character,
         }))
@@ -370,10 +378,13 @@ export async function loadEditor(
             label: m.name,
           }),
         );
-  // The three roles are always offered, whether or not the cast lists them.
-  for (const id of ROLE_IDS)
-    if (!listed.some((l) => l.id === id))
-      listed.push({ id, voice: voiceFor(book, id, issueId), label: id });
+  // A role is offered unless the cast removed it.
+  for (const id of ROLE_IDS) {
+    if (listed.some((l) => l.id === id)) continue;
+    // Narrator always stays: model.ts assigns narration bubbles to it.
+    if (removed.has(id) && id !== NARRATOR_ID) continue;
+    listed.push({ id, voice: voiceFor(book, id, issueId), label: id });
+  }
 
   const facesOf = new Map<string, Face[]>();
   for (const f of faces)
