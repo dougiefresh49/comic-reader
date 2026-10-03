@@ -163,8 +163,9 @@ export async function readCastVoiceStatus(
 /**
  * The one voice rule the gate, the pipeline's pause and the voices stop
  * share (#353): a speaker has a voice when `voiceFor` finds one with an
- * ElevenLabs id, and the `voices` row it points at, if any, is active. A
- * castlist voice that is archived (or has no ElevenLabs id) is no voice.
+ * ElevenLabs id whose `voices` row, if any, is not archived. `active` and
+ * `library` voices both play (a library voice takes no slot); an archived
+ * castlist voice, or one with no ElevenLabs id, is no voice.
  */
 export function hasUsableVoice(
   book: BookCast,
@@ -174,7 +175,7 @@ export function hasUsableVoice(
 ): boolean {
   const v = voiceFor(book, characterId, issueId);
   if (!v?.voiceId) return false;
-  return !v.voiceUuid || voiceStatus.get(v.voiceUuid) === "active";
+  return !v.voiceUuid || voiceStatus.get(v.voiceUuid) !== "archived";
 }
 
 /**

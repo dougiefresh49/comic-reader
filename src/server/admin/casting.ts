@@ -8,6 +8,10 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { loadBookCast, type BookCast } from "~/lib/cast";
+import {
+  hasUsableVoice,
+  readCastVoiceStatus,
+} from "~/workflows/steps/casting-tasks";
 import { slugify } from "~/lib/character-id";
 import { SKIPPED_VOICE } from "~/lib/voice-settings";
 
@@ -49,12 +53,24 @@ function issueRows(book: BookCast, issueId: string, characterId: string) {
   );
 }
 
+/** The speaker key now names a `characters` row (any hit, even a different id): the screen is stale. */
+function staleKey(book: BookCast, speakerKey: string): Error | null {
+  const hit = book.resolve(speakerKey);
+  return hit
+    ? new Error(
+        `"${speakerKey}" now names the character ${hit.display_name ?? hit.id}. Reload the page.`,
+      )
+    : null;
+}
+
 /**
  * "No audio this run" for a speaker no `characters` row knows (owner answer
- * O1 = C on #353): the skip marker on its castlist row in this issue, under
+ * O1 = C on #353): the skip marker on its castlist rows in this issue, under
  * the speaker key, the row `acceptUnresolvedAsSilent` used to write. It does
  * not go through `settle`, which needs a `characters` row for `addToCast`
- * and for the `casting_tasks` row it writes.
+ * and for the `casting_tasks` row it writes. Only `voice_id` changes, so a
+ * row's `voice_uuid` is kept (#346: a voice link is never dropped); a row is
+ * inserted only when the issue has none.
  */
 export async function markNoAudioUnknown(
   bookId: string,
@@ -62,16 +78,17 @@ export async function markNoAudioUnknown(
   speakerKey: string,
 ): Promise<void> {
   const book = await loadBookCast(supabaseAdmin, bookId);
-  if (book.resolve(speakerKey)?.id === speakerKey)
-    throw new Error(`casting: ${speakerKey} is a character; settle it instead`);
-  const rows = issueRows(book, issueId, speakerKey);
-  if (rows.some((r) => r.voice_id !== null && r.voice_id !== SKIPPED_VOICE))
+  const stale = staleKey(book, speakerKey);
+  if (stale) throw stale;
+  const voiceStatus = await readCastVoiceStatus(supabaseAdmin, book);
+  if (hasUsableVoice(book, voiceStatus, speakerKey, issueId))
     throw new Error(`casting: ${speakerKey} has a voice in this issue`);
+  const rows = issueRows(book, issueId, speakerKey);
   const { error } =
     rows.length > 0
       ? await supabaseAdmin
           .from("castlist")
-          .update({ voice_id: SKIPPED_VOICE, voice_uuid: null })
+          .update({ voice_id: SKIPPED_VOICE })
           .eq("book_id", bookId)
           .eq("issue_id", issueId)
           .in(
@@ -93,9 +110,11 @@ export async function markNoAudioUnknown(
  * Clears "no audio this run" for a character in one issue: its skip-marked
  * castlist rows there get no voice (so `voiceFor` falls back to the book's
  * other issues, or finds none), and a settled `casting_tasks` row goes back
- * to pending, so the item is voice work again. A speaker no `characters`
- * row knows has its marker row deleted: the row exists only for the marker.
- * Returns the rows cleared.
+ * to pending, so the item is voice work again. `voice_uuid` is kept; the
+ * `voice_id` the marker replaced is not recorded anywhere, so it goes back
+ * to null. A row that holds nothing but the marker (no `character_id`, no
+ * `voice_uuid`, in the issue: the row "No audio" inserts for an unknown
+ * speaker) is deleted. Returns the rows cleared.
  */
 export async function clearNoAudio(
   bookId: string,
@@ -109,14 +128,18 @@ export async function clearNoAudio(
   );
   for (const row of rows) {
     const table = supabaseAdmin.from("castlist");
+    const markerOnly =
+      !known &&
+      row.character_id === null &&
+      row.voice_uuid === null &&
+      row.in_issue;
     const { error } = await (
-      known
-        ? table.update({
+      markerOnly
+        ? table.delete().is("voice_uuid", null).is("character_id", null)
+        : table.update({
             voice_id: null,
-            voice_uuid: null,
-            character_id: characterId,
+            ...(known ? { character_id: characterId } : {}),
           })
-        : table.delete()
     )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)

@@ -133,8 +133,14 @@ export async function noAudio(args: {
   const id = args.item.characterId;
   try {
     await requireAdmin();
-    const book = await loadBookCast(supabaseAdmin, bookId);
-    if (book.resolve(id)?.id !== id) {
+    const hit = (await loadBookCast(supabaseAdmin, bookId)).resolve(id);
+    if (hit && hit.id !== id)
+      // The key names a character now: the page is stale, never skip `settle` for it.
+      return {
+        ok: false,
+        error: `"${id}" now names the character ${hit.display_name ?? hit.id}. Reload the page.`,
+      };
+    if (!hit) {
       // O1 = C: `settle` needs a `characters` row, so this path writes the marker itself.
       await markNoAudioUnknown(bookId, issueId, id);
       revalidate(args.scope);
@@ -412,8 +418,9 @@ export async function playSample(args: {
       ? await readVoice(supabaseAdmin, voice.voiceUuid)
       : null;
     const voiceId = row?.current_elevenlabs_id;
-    if (row?.status !== "active" || !voiceId)
-      return { ok: false, error: "The character has no active voice to play." };
+    // Active and library voices play; an archived one is off the account.
+    if (!row || row.status === "archived" || !voiceId)
+      return { ok: false, error: "The character has no voice to play." };
     const client = await getElevenLabsClient();
     const response = await recordElevenLabsCall(
       { step: "voices-stop:sample", bookId, issueId, model: TTS_MODEL },
