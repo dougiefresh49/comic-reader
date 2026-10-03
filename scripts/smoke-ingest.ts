@@ -778,11 +778,15 @@ async function runPipeline(
       }
       if (gate === "review-clusters") await rejectUnknownFaces(scenario);
       if (gate === "casting" && insertOmitted) {
+        // The characters stop's seedCast may already have added the row
+        // without a voice, so this sets the voice on it (#383).
         must(
-          await supabase.from("castlist").insert(insertOmitted()),
-          "castlist insert before casting resume",
+          await supabase.from("castlist").upsert(insertOmitted(), {
+            onConflict: "book_id,issue_id,character",
+          }),
+          "castlist upsert before casting resume",
         );
-        console.log("  castlist: inserted the left-out row (owner simulation)");
+        console.log("  castlist: voiced the left-out row (owner simulation)");
       }
       await resume(gate);
       resumed.push(gate);
