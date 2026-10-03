@@ -3,15 +3,25 @@ import { type NextRequest } from "next/server";
 import { resumeHook } from "workflow/api";
 import { canApproveCharacters } from "~/server/admin/characters-gate";
 import { canContinueVoices } from "~/server/admin/voices-gate";
+import { canResumePages } from "~/server/admin/pages-gate";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
-    bookId: string;
-    issueId: string;
-    step: string;
+    bookId: unknown;
+    issueId: unknown;
+    step: unknown;
   };
 
-  if (!body.bookId || !body.issueId || !body.step) {
+  // Strings only: an array step would skip the checks below and still
+  // stringify into a live hook token.
+  if (
+    typeof body.bookId !== "string" ||
+    typeof body.issueId !== "string" ||
+    typeof body.step !== "string" ||
+    !body.bookId ||
+    !body.issueId ||
+    !body.step
+  ) {
     return Response.json(
       { error: "missing bookId, issueId, or step" },
       { status: 400 },
@@ -32,6 +42,15 @@ export async function POST(req: NextRequest) {
     const verdict = await canContinueVoices(body.bookId, body.issueId);
     if (!verdict.ok) {
       return Response.json({ error: verdict.reason }, { status: 409 });
+    }
+  }
+
+  // The pages stop (#384): the same check the editor's Approve issue runs,
+  // so a direct POST cannot skip it.
+  if (body.step === "page-review") {
+    const verdict = await canResumePages(body.bookId, body.issueId);
+    if (!verdict.ok) {
+      return Response.json({ error: verdict.error }, { status: 409 });
     }
   }
 
