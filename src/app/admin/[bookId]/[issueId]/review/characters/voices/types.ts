@@ -67,6 +67,8 @@ export interface ItemView {
   choices: OutgoingChoice[];
   refusals: string[];
   warnings: string[];
+  /** Why the plan's default clone is not offered; the item then has no choice yet. */
+  noDefault: string | null;
   /** A `carryOut` stopped uncertain: its phase, and the voice it archived. */
   attention: { phase: string; archived: VoiceRef | null } | null;
   /** The issue's castlist says "no audio this run" for this character. */

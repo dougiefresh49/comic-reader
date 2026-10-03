@@ -89,6 +89,9 @@ function sourceLine(item: ItemView): string {
 }
 
 function choiceLine(item: ItemView): string {
+  // Not a request and not planned: the plan's default is not on offer.
+  if (item.source !== "request" && !item.needsSlot && !item.refusals.length)
+    return "Nothing chosen yet.";
   if (item.action === "design") return "Now: a new designed voice.";
   const name = item.target?.name ?? "a voice not found";
   return item.action === "restore"
@@ -355,7 +358,7 @@ function Choices({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        {item.action !== "design" && (
+        {!(item.action === "design" && item.source === "request") && (
           <button
             type="button"
             className={BUTTON}
@@ -453,19 +456,49 @@ function ItemCard({
   ];
 
   let body: React.ReactNode;
-  if (!item.known) {
+  if (item.state === "settled" && item.noAudio) {
     body = (
-      <p className="mt-2 text-amber-200">
-        No character goes by this speaker, so nothing can be settled here. Name
-        the speaker on the{" "}
-        <Link
-          href={`/admin/${scope.bookId}/${scope.issueId}/review/editor`}
-          className="underline hover:text-amber-100"
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span className="text-neutral-300">No audio this run.</span>
+        <button
+          type="button"
+          className={QUIET}
+          disabled={busy}
+          onClick={() =>
+            run("Clearing", () =>
+              clearNoAudio({ scope, characterId: item.characterId }),
+            )
+          }
         >
-          pages stop
-        </Link>
-        .
-      </p>
+          Clear
+        </button>
+      </div>
+    );
+  } else if (!item.known) {
+    body = (
+      <div className="mt-2 space-y-2">
+        <p className="text-amber-200">
+          No character goes by this speaker, so it cannot get a voice here. Name
+          the speaker on the{" "}
+          <Link
+            href={`/admin/${scope.bookId}/${scope.issueId}/review/editor`}
+            className="underline hover:text-amber-100"
+          >
+            pages stop
+          </Link>
+          , or skip it for this run.
+        </p>
+        <button
+          type="button"
+          className={BUTTON}
+          disabled={busy}
+          onClick={() =>
+            run("No audio this run", () => noAudio({ scope, item: ref }))
+          }
+        >
+          No audio this run
+        </button>
+      </div>
     );
   } else if (item.state === "needs attention") {
     const archived = item.attention?.archived ?? null;
@@ -557,23 +590,7 @@ function ItemCard({
       </div>
     );
   } else if (item.state === "settled") {
-    body = item.noAudio ? (
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span className="text-neutral-300">No audio this run.</span>
-        <button
-          type="button"
-          className={QUIET}
-          disabled={busy}
-          onClick={() =>
-            run("Clearing", () =>
-              clearNoAudio({ scope, characterId: item.characterId }),
-            )
-          }
-        >
-          Clear
-        </button>
-      </div>
-    ) : (
+    body = (
       <div className="mt-2">
         <p className="text-neutral-300">
           Voice: {item.voice?.name ?? "none active"}.
@@ -584,7 +601,9 @@ function ItemCard({
   } else {
     body = (
       <div className="mt-2">
-        <p className="text-neutral-300">{choiceLine(item)}</p>
+        <p className={item.noDefault ? "text-amber-200" : "text-neutral-300"}>
+          {item.noDefault ?? choiceLine(item)}
+        </p>
         <Reasons items={item.warnings} tone="note" />
         {item.needsSlot && data.slots ? (
           <SlotPlan

@@ -15,7 +15,12 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { loadBookCast, storeVoiceRequest, voiceFor } from "~/lib/cast";
+import {
+  cancelVoiceRequest,
+  loadBookCast,
+  storeVoiceRequest,
+  voiceFor,
+} from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
@@ -30,7 +35,10 @@ import {
 } from "~/lib/voice-requests";
 import { readVoice } from "~/lib/voice-slots";
 import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
-import { clearNoAudio as clearNoAudioRows } from "~/server/admin/casting";
+import {
+  clearNoAudio as clearNoAudioRows,
+  markNoAudioUnknown,
+} from "~/server/admin/casting";
 import { canContinueVoices } from "~/server/admin/voices-gate";
 import {
   executeVoiceOperation,
@@ -92,6 +100,7 @@ async function settleWith(
   message: string,
 ): Promise<ActionResult> {
   try {
+    await requireAdmin();
     await settle(supabaseAdmin, await itemKey(scope, item), outcome);
     revalidate(scope);
     return { ok: true, message };
@@ -115,11 +124,26 @@ export async function pickActiveVoice(args: {
   );
 }
 
-/** "No audio this run": the skip marker, through `settle`. */
+/** "No audio this run": the skip marker, through `settle`; a speaker no `characters` row knows gets it directly. */
 export async function noAudio(args: {
   scope: Scope;
   item: ItemRef;
 }): Promise<ActionResult> {
+  const { bookId, issueId } = args.scope;
+  const id = args.item.characterId;
+  try {
+    await requireAdmin();
+    const book = await loadBookCast(supabaseAdmin, bookId);
+    if (book.resolve(id)?.id !== id) {
+      // O1 = C: `settle` needs a `characters` row, so this path writes the marker itself.
+      await markNoAudioUnknown(bookId, issueId, id);
+      revalidate(args.scope);
+      return { ok: true, message: "No audio this run." };
+    }
+  } catch (err) {
+    revalidate(args.scope);
+    return fail("no audio", err);
+  }
   return settleWith(
     args.scope,
     args.item,
@@ -134,6 +158,7 @@ export async function clearNoAudio(args: {
   characterId: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const rows = await clearNoAudioRows(
       args.scope.bookId,
       args.scope.issueId,
@@ -159,6 +184,7 @@ export async function chooseVoice(args: {
       };
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     await storeVoiceRequest(
       supabaseAdmin,
       args.scope.bookId,
@@ -217,6 +243,7 @@ export async function runItem(args: {
   archiveVoiceId: string | null;
 }): Promise<ActionResult> {
   const { scope, item } = args;
+  let stored = false;
   try {
     await requireAdmin();
     const deps = { supabase: supabaseAdmin };
@@ -233,30 +260,56 @@ export async function runItem(args: {
         error: "The item changed since this page loaded. Check the plan again.",
       };
     }
-    if (fresh.refusals.length > 0)
-      return { ok: false, error: `Refused: ${fresh.refusals.join("; ")}` };
+    // Run is offered only on a pending item that takes a slot.
+    if (fresh.state !== "pending" || !fresh.needsSlot) {
+      revalidate(scope);
+      return {
+        ok: false,
+        error: `Refused: the item is ${fresh.state}${fresh.refusals.length ? `: ${fresh.refusals.join("; ")}` : ""}.`,
+      };
+    }
     // A speaker with no request row runs as a request, so the voice it
     // makes stays on the list as "made" until he accepts it: the plan lists
     // requests by row, and a speaker with a voice no longer as "no voice".
-    if (fresh.source !== "request")
+    if (fresh.source !== "request") {
+      if (fresh.action !== "design" && !fresh.target)
+        return { ok: false, error: "Refused: no voice to clone." };
       await storeVoiceRequest(
         supabaseAdmin,
         scope.bookId,
         scope.issueId,
         fresh.characterId,
-        fresh.action === "design"
+        fresh.action === "design" || !fresh.target
           ? { action: "design" }
-          : { action: "clone", targetVoiceUuid: fresh.target!.id },
+          : { action: "clone", targetVoiceUuid: fresh.target.id },
       );
+      stored = true;
+    }
     const result = await carryOut(deps, fresh, {
       archiveVoiceId: args.archiveVoiceId,
     });
+    // Refused or failed: carryOut released its claim and nothing was made,
+    // so the request stored above goes too and the item is "no voice" again.
+    if (stored && (result.status === "refused" || result.status === "failed"))
+      await dropStoredRequest(scope, fresh.characterId);
     revalidate(scope);
     return describe(result);
   } catch (err) {
+    // carryOut throws only before its claim holds anything (it releases first).
+    if (stored)
+      await dropStoredRequest(scope, item.characterId).catch(() => undefined);
     revalidate(scope);
     return fail("running", err);
   }
+}
+
+async function dropStoredRequest(scope: Scope, characterId: string) {
+  await cancelVoiceRequest(
+    supabaseAdmin,
+    scope.bookId,
+    scope.issueId,
+    characterId,
+  );
 }
 
 /** Accepts the voice Run made: settles the item. */
@@ -290,6 +343,7 @@ export async function checkAgain(args: {
   item: ItemRef;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const result = await reconcile(
       { supabase: supabaseAdmin },
       await itemKey(args.scope, args.item),
@@ -383,6 +437,7 @@ export async function playSample(args: {
 /** Continue: the gate first, then the `casting` hook resumes and the run goes on to audio. */
 export async function continueRun(scope: Scope): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const verdict = await canContinueVoices(scope.bookId, scope.issueId);
     if (!verdict.ok) {
       revalidate(scope);
