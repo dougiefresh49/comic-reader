@@ -81,9 +81,18 @@ export async function markNoAudioUnknown(
   const stale = staleKey(book, speakerKey);
   if (stale) throw stale;
   const voiceStatus = await readCastVoiceStatus(supabaseAdmin, book);
-  if (hasUsableVoice(book, voiceStatus, speakerKey, issueId))
-    throw new Error(`casting: ${speakerKey} has a voice in this issue`);
   const rows = issueRows(book, issueId, speakerKey);
+  // Every row the update writes, not only the one `voiceFor` picks: a row
+  // with a live voice (an ElevenLabs id whose voice is not archived) is
+  // never overwritten.
+  const live = rows.some(
+    (r) =>
+      r.voice_id !== null &&
+      r.voice_id !== SKIPPED_VOICE &&
+      (!r.voice_uuid || voiceStatus.get(r.voice_uuid) !== "archived"),
+  );
+  if (live || hasUsableVoice(book, voiceStatus, speakerKey, issueId))
+    throw new Error(`casting: ${speakerKey} has a voice in this issue`);
   const { error } =
     rows.length > 0
       ? await supabaseAdmin
@@ -112,9 +121,9 @@ export async function markNoAudioUnknown(
  * other issues, or finds none), and a settled `casting_tasks` row goes back
  * to pending, so the item is voice work again. `voice_uuid` is kept; the
  * `voice_id` the marker replaced is not recorded anywhere, so it goes back
- * to null. A row that holds nothing but the marker (no `character_id`, no
- * `voice_uuid`, in the issue: the row "No audio" inserts for an unknown
- * speaker) is deleted. Returns the rows cleared.
+ * to null. No row is ever deleted, so the speaker stays in `getCast`; the
+ * next "No audio" updates the row instead of inserting one. Returns the
+ * rows cleared.
  */
 export async function clearNoAudio(
   bookId: string,
@@ -127,20 +136,12 @@ export async function clearNoAudio(
     (r) => r.voice_id === SKIPPED_VOICE,
   );
   for (const row of rows) {
-    const table = supabaseAdmin.from("castlist");
-    const markerOnly =
-      !known &&
-      row.character_id === null &&
-      row.voice_uuid === null &&
-      row.in_issue;
-    const { error } = await (
-      markerOnly
-        ? table.delete().is("voice_uuid", null).is("character_id", null)
-        : table.update({
-            voice_id: null,
-            ...(known ? { character_id: characterId } : {}),
-          })
-    )
+    const { error } = await supabaseAdmin
+      .from("castlist")
+      .update({
+        voice_id: null,
+        ...(known ? { character_id: characterId } : {}),
+      })
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("character", row.character)
