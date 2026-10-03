@@ -604,6 +604,30 @@ export async function renameCharacter(
   if (!data?.length) throw new Error(`cast: no character ${characterId}`);
 }
 
+/** Makes a name resolve to a character by appending it to `aliases`; false when it already did, a throw when it means another character. */
+export async function addAlias(
+  client: Client,
+  characterId: string,
+  alias: string,
+): Promise<boolean> {
+  const name = alias.trim();
+  if (!slugify(name)) throw new Error(`cast: "${name}" is not a name`);
+  const characters = await readCharacters(client);
+  const means = nameResolver(characters)(name);
+  if (means?.id === characterId) return false;
+  if (means) throw new Error(`cast: "${name}" already means ${means.id}`);
+  const row = characters.find((c) => c.id === characterId);
+  if (!row) throw new Error(`cast: no character ${characterId}`);
+  const { data, error } = await db(client)
+    .from("characters")
+    .update({ aliases: [...row.aliases, name] })
+    .eq("id", characterId)
+    .select("id");
+  must(`adding an alias to ${characterId}`, error);
+  if (!data?.length) throw new Error(`cast: no character ${characterId}`);
+  return true;
+}
+
 /** Records the voice the owner wants for a character in this issue; upserts on (book, issue, character), so a cancelled or carried-out request can be made again. */
 export async function storeVoiceRequest(
   client: Client,
