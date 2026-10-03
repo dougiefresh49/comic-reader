@@ -1,6 +1,8 @@
 import { createHook } from "workflow";
 import { FatalError } from "workflow";
 
+import { STEP_ORDER } from "~/lib/pipeline-steps";
+
 import {
   updatePipelineStep,
   recordStepStart,
@@ -36,7 +38,6 @@ import {
   createCastingTasks,
 } from "./steps/casting-tasks";
 import {
-  countUnresolvedFaces,
   countPendingNewCharacters,
   recordGateSkip,
   recordGateWait,
@@ -49,25 +50,6 @@ interface IngestInput {
   fromStep?: string;
 }
 
-const STEP_ORDER = [
-  "roboflow-page-analyze",
-  "extract-foreground-masks",
-  "fetch-wiki-context",
-  "character-lookahead",
-  "review-clusters",
-  "get-context",
-  "sort-page-elements",
-  "review-pages",
-  "review-new-characters",
-  "generate-voice-descriptions",
-  "casting",
-  "generate-voice-models",
-  "generate-audio",
-  "upload-audio",
-  "consolidate-music-scenes",
-  "generate-manifest",
-] as const;
-
 function shouldRun(step: string, fromStep?: string): boolean {
   if (!fromStep) return true;
   const fromIdx = STEP_ORDER.indexOf(fromStep as (typeof STEP_ORDER)[number]);
@@ -75,8 +57,6 @@ function shouldRun(step: string, fromStep?: string): boolean {
   if (fromIdx === -1) return true;
   return stepIdx >= fromIdx;
 }
-
-export { STEP_ORDER };
 
 export async function ingestPipeline(input: IngestInput) {
   "use workflow";
@@ -157,35 +137,18 @@ export async function ingestPipeline(input: IngestInput) {
     if (run("review-clusters")) {
       currentStep = "review-clusters";
       const timing = await recordStepStart(bookId, issueId, currentStep);
-      const faces = await countUnresolvedFaces(bookId, issueId);
-      if (faces.total === 0) {
-        await updatePipelineStep(bookId, issueId, currentStep);
-        await recordGateSkip(
-          bookId,
-          issueId,
-          "review-clusters",
-          "no unresolved faces",
-          {
-            unresolvedDetections: faces.unresolvedDetections,
-            unresolvedExemplars: faces.unresolvedExemplars,
-          },
-        );
-        console.log(
-          `[review-clusters] skipped: 0 unresolved faces for ${bookId}/${issueId}`,
-        );
-        await recordStepEnd(bookId, issueId, currentStep, timing);
-      } else {
-        // The window closes before the gate opens, so the pause is the gate
-        // wait's row and never this step's time (#255).
-        await recordStepEnd(bookId, issueId, currentStep, timing);
-        await updatePipelineStep(bookId, issueId, currentStep, true);
-        await recordGateWait(bookId, issueId, currentStep, "open");
-        using clusterHook = createHook<{ approved: boolean }>({
-          token: `ingest:${bookId}/${issueId}/cluster-review`,
-        });
-        await clusterHook;
-        await recordGateWait(bookId, issueId, currentStep, "close");
-      }
+      // The characters stop always pauses (#349): the owner confirms the cast
+      // even when every face has a name. The window closes before the gate
+      // opens, so the pause is the gate wait's row and never this step's
+      // time (#255).
+      await recordStepEnd(bookId, issueId, currentStep, timing);
+      await updatePipelineStep(bookId, issueId, currentStep, true);
+      await recordGateWait(bookId, issueId, currentStep, "open");
+      using clusterHook = createHook<{ approved: boolean }>({
+        token: `ingest:${bookId}/${issueId}/cluster-review`,
+      });
+      await clusterHook;
+      await recordGateWait(bookId, issueId, currentStep, "close");
     }
 
     // ── Phase 3: OCR + Context ────────────────────────────────────────

@@ -1,10 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { slugify } from "~/lib/character-id";
 import { listAllIssues } from "~/lib/issue-queries";
-import {
-  buildAliasMap,
-  slugify,
-  speakerKey,
-} from "~/workflows/steps/audio-plan";
+import { buildAliasMap, speakerKey } from "~/workflows/steps/audio-plan";
 import type { CastlistRow, CharacterRow, IssueTarget, VoiceRow } from "./types";
 
 const PAGE = 1000;
@@ -195,7 +192,9 @@ export async function lastUsedByVoice(
   return last;
 }
 
-// The writes below are #66's `runArchive` and `runRestore` rows, unchanged.
+// The writes below are #66's `runArchive` and `runRestore` rows. The
+// `voice_archives` row goes first: it records the confirmed DELETE, so a
+// failed `voices` update still leaves Restore a way back (#351).
 
 export async function markArchived(
   supabase: SupabaseClient,
@@ -203,6 +202,12 @@ export async function markArchived(
   formerElevenLabsId: string,
   archivedForBookId: string | null,
 ): Promise<void> {
+  const log = await supabase.from("voice_archives").insert({
+    voice_id: voice.id,
+    former_elevenlabs_id: formerElevenLabsId,
+    archived_for_book_id: archivedForBookId,
+  });
+  if (log.error) fail("insert voice_archives", log.error);
   const upd = await supabase
     .from("voices")
     .update({
@@ -217,12 +222,63 @@ export async function markArchived(
     .update({ voice_id: null })
     .eq("voice_uuid", voice.id);
   if (cast.error) fail("update castlist", cast.error);
-  const log = await supabase.from("voice_archives").insert({
-    voice_id: voice.id,
-    former_elevenlabs_id: formerElevenLabsId,
-    archived_for_book_id: archivedForBookId,
-  });
-  if (log.error) fail("insert voice_archives", log.error);
+}
+
+/**
+ * Finishes the registry writes for a DELETE that is known to have landed
+ * (`ArchiveRecordError`): the `voice_archives` row unless it is there, then
+ * the `voices` and castlist updates. A row already moved on is left alone.
+ */
+export async function finishArchive(
+  supabase: SupabaseClient,
+  voice: VoiceRow,
+  formerElevenLabsId: string,
+): Promise<void> {
+  if (voice.current_elevenlabs_id !== formerElevenLabsId) return;
+  if (!(await deleteRecorded(supabase, voice))) {
+    const log = await supabase.from("voice_archives").insert({
+      voice_id: voice.id,
+      former_elevenlabs_id: formerElevenLabsId,
+      archived_for_book_id: null,
+    });
+    if (log.error) fail("insert voice_archives", log.error);
+  }
+  // Both updates hold only while the row still has the deleted id.
+  const upd = await supabase
+    .from("voices")
+    .update({
+      status: "archived",
+      current_elevenlabs_id: null,
+      archived_at: new Date().toISOString(),
+    })
+    .eq("id", voice.id)
+    .eq("current_elevenlabs_id", formerElevenLabsId);
+  if (upd.error) fail("update voices", upd.error);
+  const cast = await supabase
+    .from("castlist")
+    .update({ voice_id: null })
+    .eq("voice_uuid", voice.id)
+    .eq("voice_id", formerElevenLabsId);
+  if (cast.error) fail("update castlist", cast.error);
+}
+
+/**
+ * True when `voice_archives` records a DELETE of the row's current
+ * ElevenLabs id: the slot is gone even though the `voices` update failed.
+ */
+export async function deleteRecorded(
+  supabase: SupabaseClient,
+  voice: VoiceRow,
+): Promise<boolean> {
+  if (!voice.current_elevenlabs_id) return false;
+  const { data, error } = await supabase
+    .from("voice_archives")
+    .select("voice_id")
+    .eq("voice_id", voice.id)
+    .eq("former_elevenlabs_id", voice.current_elevenlabs_id)
+    .limit(1);
+  if (error) fail("read voice_archives", error);
+  return (data ?? []).length > 0;
 }
 
 export async function markRestored(
@@ -266,6 +322,10 @@ export interface RegisterVoiceInput {
   labels: Record<string, string> | null;
   source_clip_path: string | null;
   source_clip_md5: string | null;
+  /** The character the voice is for (#91 column). */
+  character_id?: string | null;
+  /** A Voice Design voice's prompt, kept for provenance (#96). */
+  design_prompt?: string | null;
 }
 
 /** Inserts the active row for a voice the module just added. */

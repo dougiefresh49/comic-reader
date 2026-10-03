@@ -1,12 +1,15 @@
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { slugify } from "~/lib/character-id";
 import type {
   CharacterRegistry,
   CharacterRegistryEntry,
   AppearanceEntry,
   CastSelections,
 } from "../types/registry.js";
+
+export { slugify };
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,15 +53,6 @@ export function getMostRecentReadyAppearance(
     const bDate = b.voice?.createdAt ?? "";
     return bDate.localeCompare(aDate);
   })[0];
-}
-
-export function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .trim();
 }
 
 export function generateAppearanceId(

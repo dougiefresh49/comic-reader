@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     issueId: string;
   };
   await revalidateReaderPages(bookId, issueId);
-  revalidatePath(`/admin/${bookId}/${issueId}/review/bubbles`, "page");
+  revalidatePath(`/admin/${bookId}/${issueId}/review/editor`, "page");
   revalidatePath(`/book/${bookId}`);
   revalidatePath("/");
   return Response.json({ revalidated: true, bookId, issueId });

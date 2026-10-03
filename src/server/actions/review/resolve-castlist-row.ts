@@ -1,55 +1,44 @@
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import {
-  buildAliasMap,
-  buildCastIndex,
-  formatCastConflicts,
-  slugify,
-  speakerKey,
-  type AliasRow,
-  type CastRow,
+  lookupVoice,
+  type VoiceLookupContext,
 } from "~/workflows/steps/audio-plan";
 
 export type ResolveSpeakerVoiceResult =
-  | { ok: true; voiceId: string | null }
+  | { ok: true; voiceId: string }
   | { ok: false; error: string };
 
 /**
- * Resolve a bubble speaker to its castlist voice with the audio step's rule
- * (audio-plan.ts): an exact castlist.character match picks its own slug
- * group, otherwise the speaker goes through the aliases table and then the
- * slug. A slug group whose rows differ in voice_id is an error naming every
- * row. voiceId is null when the matched group has no voice yet. A group
- * whose voice is the skip marker is an error, as the audio step skips it.
+ * A bubble's voice for the review editor, through the audio step's own
+ * lookup (`lookupVoice` in audio-plan.ts): `bubbles.character_id`, then the
+ * castlist rows' `character_id`, then the name rule, with the voice from
+ * `voiceFor`. Every miss is an error the owner reads, naming its case.
  */
 export function resolveSpeakerVoice(
-  speaker: string,
-  castRows: CastRow[],
-  aliasRows: AliasRow[],
+  ctx: VoiceLookupContext,
+  bubble: { speaker: string | null; character_id: string | null },
 ): ResolveSpeakerVoiceResult {
-  const raw = speaker.trim();
-  const cast = buildCastIndex(castRows);
-  const exact = castRows.some((row) => row.character === raw);
-  const key = exact ? slugify(raw) : speakerKey(raw, buildAliasMap(aliasRows));
-
-  const conflict = cast.conflicts.find((c) => c.slug === key);
-  if (conflict) {
-    return {
-      ok: false,
-      error: `Ambiguous castlist match for speaker '${speaker}': ${formatCastConflicts([conflict])}`,
-    };
+  const found = lookupVoice(ctx, bubble);
+  if (found.ok) return { ok: true, voiceId: found.voiceId };
+  const who = `speaker '${bubble.speaker ?? "(none)"}'${bubble.character_id ? ` (${bubble.character_id})` : ""}`;
+  switch (found.reason) {
+    case "castlist conflict":
+      return {
+        ok: false,
+        error: `Ambiguous castlist match for ${who}: ${found.detail}`,
+      };
+    case "skip sentinel":
+      return {
+        ok: false,
+        error: `${who} is marked no audio in the castlist, so it gets no audio`,
+      };
+    case "cast without a voice":
+      return { ok: false, error: `No voice for ${who}: ${found.detail}` };
+    case "no speaker":
+      return { ok: false, error: "No speaker assigned" };
+    default:
+      return {
+        ok: false,
+        error: `No castlist row matched ${who} after alias lookup`,
+      };
   }
-  if (!cast.members.has(key)) {
-    return {
-      ok: false,
-      error: `No castlist row matched speaker '${speaker}' after alias lookup`,
-    };
-  }
-  const voiceId = cast.voices.get(key) ?? null;
-  if (voiceId === SKIPPED_VOICE) {
-    return {
-      ok: false,
-      error: `Speaker '${speaker}' is marked skipped in the castlist, so it gets no audio`,
-    };
-  }
-  return { ok: true, voiceId };
 }

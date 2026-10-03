@@ -41,6 +41,22 @@ export class ElevenLabsTimeoutError extends Error {
   }
 }
 
+/**
+ * ElevenLabs answered and said no (a non-2xx reply), or a request that never
+ * creates a voice failed. Nothing was added, unlike a timeout or an
+ * unreadable reply, after which the add may have landed.
+ */
+export class ElevenLabsRefusedError extends Error {
+  /** The reply's HTTP status, when there was a reply. A 5xx may still have added. */
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = "ElevenLabsRefusedError";
+  }
+}
+
 export function md5Hex(bytes: Uint8Array): string {
   return createHash("md5").update(bytes).digest("hex");
 }
@@ -52,7 +68,7 @@ function apiKey(deps: VoiceSlotsDeps): string {
 }
 
 /** One attempt, one timeout, the key header set. No retry on any path. */
-async function el(
+export async function el(
   deps: VoiceSlotsDeps,
   path: string,
   init: RequestInit = {},
@@ -75,7 +91,7 @@ async function el(
   }
 }
 
-async function failure(r: Response, what: string): Promise<Error> {
+export async function failure(r: Response, what: string): Promise<Error> {
   const text = await r.text().catch(() => "");
   return new Error(`${what} -> ${r.status}: ${text.slice(0, 200)}`);
 }
@@ -278,8 +294,58 @@ export async function addVoice(
     method: "POST",
     body: buildAddVoiceForm(input),
   });
-  if (!r.ok) throw await failure(r, "POST /v1/voices/add");
+  if (!r.ok)
+    throw new ElevenLabsRefusedError(
+      (await failure(r, "POST /v1/voices/add")).message,
+      r.status,
+    );
   const body = (await r.json()) as { voice_id?: string };
   if (!body.voice_id) throw new Error("POST /v1/voices/add: no voice_id");
   return { voice_id: body.voice_id };
+}
+
+/** The label key an add carries its per-operation token under (#351). */
+export const OP_LABEL = "comic_reader_op";
+
+export interface ListedVoice {
+  voice_id: string;
+  name: string;
+  labels: Record<string, string> | null;
+}
+
+/** Every voice on the account. One free GET. */
+export async function listVoices(deps: VoiceSlotsDeps): Promise<ListedVoice[]> {
+  const r = await el(deps, "/v1/voices");
+  if (!r.ok) throw await failure(r, "GET /v1/voices");
+  const body = (await r.json()) as { voices?: Partial<ListedVoice>[] };
+  return (body.voices ?? [])
+    .filter((v): v is Partial<ListedVoice> & { voice_id: string } =>
+      Boolean(v.voice_id),
+    )
+    .map((v) => ({
+      voice_id: v.voice_id,
+      name: v.name ?? "",
+      labels: v.labels ?? null,
+    }));
+}
+
+/**
+ * After an add whose reply was lost: the voices that add made. A voice
+ * counts only when it was not in `before` (the inventory taken before the
+ * add), has the add's `name`, and carries its `OP_LABEL` token. The caller
+ * adopts exactly one and stops on none or several.
+ */
+export async function findOpVoices(
+  deps: VoiceSlotsDeps,
+  op: { token: string; name: string; before: string[] },
+): Promise<string[]> {
+  const before = new Set(op.before);
+  return (await listVoices(deps))
+    .filter(
+      (v) =>
+        !before.has(v.voice_id) &&
+        v.name === op.name &&
+        v.labels?.[OP_LABEL] === op.token,
+    )
+    .map((v) => v.voice_id);
 }

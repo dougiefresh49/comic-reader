@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildCastIndex, slugify as castSlug, speakerKey } from "./audio-plan";
+import { slugify as castSlug } from "~/lib/character-id";
+import { buildCastIndex, speakerKey } from "./audio-plan";
 
 const SPEECH_TYPES = ["SPEECH", "NARRATION", "CAPTION"] as const;
 const SKIPPED_VOICE = "__SKIPPED__";
@@ -62,7 +63,7 @@ export async function planCastingTasks(
 ): Promise<CastingPlan> {
   const { data: bubbleRows, error: bubErr } = await client
     .from("bubbles")
-    .select("speaker, type, ignored")
+    .select("speaker, type, ignored, silent")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .not("speaker", "is", null)
@@ -76,8 +77,9 @@ export async function planCastingTasks(
       speaker: string | null;
       type: string;
       ignored: boolean | null;
+      silent: boolean | null;
     };
-    if (!r.speaker || r.ignored) continue;
+    if (!r.speaker || r.ignored || r.silent) continue;
     speakerSet.add(r.speaker);
   }
 

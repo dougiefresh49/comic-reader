@@ -41,6 +41,7 @@ function runSyntheticCases(): void {
       id: "b1",
       speaker: "green-ranger",
       ignored: false,
+      silent: false,
       audio_storage_path: "b1.mp3",
       text_with_cues: "Already has audio",
       ocr_text: null,
@@ -49,6 +50,7 @@ function runSyntheticCases(): void {
       id: "b2",
       speaker: "green-ranger",
       ignored: true,
+      silent: false,
       audio_storage_path: null,
       text_with_cues: "Ignored",
       ocr_text: null,
@@ -57,6 +59,7 @@ function runSyntheticCases(): void {
       id: "b3",
       speaker: "green-ranger",
       ignored: false,
+      silent: false,
       audio_storage_path: null,
       text_with_cues: null,
       ocr_text: "Needs audio",
@@ -93,6 +96,7 @@ function runSyntheticCases(): void {
     id: "b-null-voice",
     speaker: "green-ranger",
     ignored: false,
+    silent: false,
     audio_storage_path: null,
     text_with_cues: "Hello",
     ocr_text: null,
@@ -144,7 +148,7 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
     supabase
       .from("bubbles")
       .select(
-        "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text",
+        "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)

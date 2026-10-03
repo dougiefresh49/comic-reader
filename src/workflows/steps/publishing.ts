@@ -169,7 +169,7 @@ export async function generateManifest(bookId: string, issueId: string) {
     const { data, error } = await supabase
       .from("bubbles")
       .select(
-        "id, speaker, ignored, audio_storage_path, text_with_cues, ocr_text",
+        "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)

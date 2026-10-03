@@ -84,6 +84,7 @@ interface SortPanelRow {
   page_number: number;
   sort_order: number;
   bounding_box: BoundingBoxJson;
+  source: string;
 }
 
 interface SortBubbleRow {
@@ -419,7 +420,7 @@ export async function sortPageElements(
 
   const { data: panelRows, error: pErr } = await supabase
     .from("panels")
-    .select("id, panel_id, page_number, sort_order, bounding_box")
+    .select("id, panel_id, page_number, sort_order, bounding_box, source")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("page_number", pageNumber)
@@ -444,14 +445,20 @@ export async function sortPageElements(
   const panels = (panelRows ?? []) as SortPanelRow[];
   const bubbles = (bubbleRows ?? []) as SortBubbleRow[];
 
-  if (panels.length === 0 && bubbles.length === 0) {
+  // A lone full-page panel (#237) is a page with no detected panel: it takes
+  // the free heuristic, not the Gemini sort (#306).
+  const onlyFullPage =
+    panels.length === 1 && panels[0]!.source === "heuristic-fullpage";
+  const noDetectedPanels = panels.length === 0 || onlyFullPage;
+
+  if (noDetectedPanels && bubbles.length === 0) {
     console.log(
       `[sort] ${bookId}/${issueId}: page-${padded}: no panels or bubbles, skip`,
     );
     return;
   }
 
-  if (panels.length === 0 && bubbles.length > 0) {
+  if (noDetectedPanels && bubbles.length > 0) {
     const orderedIds = sortBubbleRowsHeuristic(bubbles, imgW, imgH);
     const bubbleGlobalOrder = new Map<string, number>();
     orderedIds.forEach((id, idx) => bubbleGlobalOrder.set(id, idx));
@@ -467,7 +474,7 @@ export async function sortPageElements(
       throw errors.find((e) => e instanceof FatalError) ?? errors[0];
     }
     console.log(
-      `[sort] ${bookId}/${issueId}: page-${padded}: 0 panels, heuristic bubble sort (${bubbles.length})`,
+      `[sort] ${bookId}/${issueId}: page-${padded}: ${onlyFullPage ? "full-page panel only" : "0 panels"}, heuristic bubble sort (${bubbles.length})`,
     );
     return;
   }

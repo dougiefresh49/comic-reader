@@ -12,6 +12,10 @@ export interface StoreExemplarParams {
   pageNumber: number;
   confidence: number;
   isConfirmed: boolean;
+  /** The `panel_character_detections` row this crop was cut from. */
+  detectionId?: string;
+  /** The crop's embedding when the caller already has it (`embedFace`). */
+  embedding?: number[];
 }
 
 export interface ExemplarMatch {
@@ -24,7 +28,7 @@ export interface ExemplarMatch {
 }
 
 /** `embedImage` already tries the fallback key on a 429; name the service. */
-async function embedOrThrow(jpegBase64: string): Promise<number[]> {
+export async function embedFace(jpegBase64: string): Promise<number[]> {
   try {
     return await embedImage(jpegBase64);
   } catch (err: unknown) {
@@ -35,6 +39,11 @@ async function embedOrThrow(jpegBase64: string): Promise<number[]> {
   }
 }
 
+/**
+ * One exemplar per character (or suggested name) per page. A face with
+ * neither is unnamed (#348): it matches only an exemplar cut from the same
+ * detection, never another face's, so each unnamed crop gets its own row.
+ */
 export async function storeExemplar(
   supabase: SupabaseClient,
   params: StoreExemplarParams,
@@ -46,20 +55,27 @@ export async function storeExemplar(
     .eq("source_issue", params.sourceIssue)
     .eq("page_number", params.pageNumber);
 
+  let dedupe = true;
   if (params.characterId) {
     query = query.eq("character_id", params.characterId);
   } else if (params.suggestedName) {
     query = query.eq("suggested_name", params.suggestedName);
+  } else if (params.detectionId) {
+    query = query.eq("detection_id", params.detectionId);
+  } else {
+    dedupe = false;
   }
 
-  const { data: existing, error: existingErr } = await query.limit(1);
-  if (existingErr) {
-    throw new Error(
-      `character_face_exemplars read failed: ${existingErr.message}`,
-    );
-  }
-  if (existing?.[0]) {
-    return existing[0].id as string;
+  if (dedupe) {
+    const { data: existing, error: existingErr } = await query.limit(1);
+    if (existingErr) {
+      throw new Error(
+        `character_face_exemplars read failed: ${existingErr.message}`,
+      );
+    }
+    if (existing?.[0]) {
+      return existing[0].id as string;
+    }
   }
 
   const id = crypto.randomUUID();
@@ -77,7 +93,8 @@ export async function storeExemplar(
     throw new Error(`Storage upload failed: ${uploadError.message}`);
   }
 
-  const embedding = await embedOrThrow(params.jpegBuffer.toString("base64"));
+  const embedding =
+    params.embedding ?? (await embedFace(params.jpegBuffer.toString("base64")));
   const vectorString = `[${embedding.join(",")}]`;
 
   const row: Record<string, unknown> = {
@@ -92,6 +109,7 @@ export async function storeExemplar(
   };
   if (params.characterId) row.character_id = params.characterId;
   if (params.suggestedName) row.suggested_name = params.suggestedName;
+  if (params.detectionId) row.detection_id = params.detectionId;
 
   const { error: insertError } = await supabase
     .from("character_face_exemplars")
@@ -104,13 +122,42 @@ export async function storeExemplar(
   return id;
 }
 
+/**
+ * Deletes the exemplars cut from these detections, rows and their crops in
+ * Storage. Throws only when the row delete fails. A failed Storage remove
+ * comes back as a message naming the crops left behind; null means all gone.
+ */
+export async function deleteExemplars(
+  supabase: SupabaseClient,
+  detectionIds: string[],
+): Promise<string | null> {
+  if (detectionIds.length === 0) return null;
+  const { data, error } = await supabase
+    .from("character_face_exemplars")
+    .delete()
+    .in("detection_id", detectionIds)
+    .select("crop_path");
+  if (error) {
+    throw new Error(`character_face_exemplars delete failed: ${error.message}`);
+  }
+  const paths = (data ?? []).map((r) => r.crop_path as string);
+  if (paths.length === 0) return null;
+  const { error: removeErr } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .remove(paths);
+  return removeErr
+    ? `${STORAGE_BUCKET} remove failed (${removeErr.message}), orphaned crops: ${paths.join(", ")}`
+    : null;
+}
+
+/** `face` is a JPEG as base64, or its embedding from `embedFace`. */
 export async function findSimilarExemplars(
   supabase: SupabaseClient,
-  jpegBase64: string,
+  face: string | number[],
   bookIds: string[],
   limit = 5,
 ): Promise<ExemplarMatch[]> {
-  const embedding = await embedOrThrow(jpegBase64);
+  const embedding = typeof face === "string" ? await embedFace(face) : face;
   const vectorString = `[${embedding.join(",")}]`;
 
   const { data, error } = (await supabase.rpc("match_face_exemplars", {
