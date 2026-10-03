@@ -9,6 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
+  addAlias,
   addToCast,
   createCharacter,
   loadBookCast,
@@ -530,7 +531,7 @@ export async function renameCharacter(args: {
  * A name no `characters` row knows (a wiki name, or a castlist text) becomes
  * a character or joins one as an alias, so the next read resolves it and the
  * suggestion clears; either way the character is in the cast. The alias is
- * written whenever the row's name is not this name, a fresh row included.
+ * written unless the name already resolves to that character (`addAlias`).
  */
 export async function nameSuggestion(args: {
   scope: Scope;
@@ -542,22 +543,7 @@ export async function nameSuggestion(args: {
     const { scope } = args;
     const wikiName = args.name.trim();
     const who = await resolveTarget(scope.bookId, args.target, args.franchise);
-    if (slugify(who.name) !== slugify(wikiName)) {
-      const { data, error } = await supabaseAdmin
-        .from("characters")
-        .select("aliases")
-        .eq("id", who.id)
-        .maybeSingle();
-      must("reading the aliases", error);
-      const aliases = (data?.aliases ?? []) as string[];
-      if (!aliases.some((a) => slugify(a) === slugify(wikiName))) {
-        const { error: writeError } = await supabaseAdmin
-          .from("characters")
-          .update({ aliases: [...aliases, wikiName] })
-          .eq("id", who.id);
-        must("adding the alias", writeError);
-      }
-    }
+    await addAlias(supabaseAdmin, who.id, wikiName);
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
     return {
