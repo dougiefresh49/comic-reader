@@ -542,6 +542,19 @@ export async function nameSuggestion(args: {
   try {
     const { scope } = args;
     const wikiName = args.name.trim();
+    if (!slugify(wikiName)) throw new Error("a name is needed");
+    // A stale suggestion (the name means a character now) is refused before
+    // resolveTarget can create a row that addAlias would then refuse.
+    const means = (await loadBookCast(supabaseAdmin, scope.bookId)).resolve(
+      wikiName,
+    );
+    if (
+      means &&
+      !(args.target.kind === "existing" && args.target.id === means.id)
+    )
+      throw new Error(
+        `"${wikiName}" already means ${means.display_name ?? means.id}; reload the page`,
+      );
     const who = await resolveTarget(scope.bookId, args.target, args.franchise);
     await addAlias(supabaseAdmin, who.id, wikiName);
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
