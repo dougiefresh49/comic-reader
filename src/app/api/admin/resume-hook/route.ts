@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import { resumeHook } from "workflow/api";
 import { canApproveCharacters } from "~/server/admin/characters-gate";
 import { canContinueVoices } from "~/server/admin/voices-gate";
+import { canResumePages } from "~/server/admin/pages-gate";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
@@ -32,6 +33,15 @@ export async function POST(req: NextRequest) {
     const verdict = await canContinueVoices(body.bookId, body.issueId);
     if (!verdict.ok) {
       return Response.json({ error: verdict.reason }, { status: 409 });
+    }
+  }
+
+  // The pages stop (#384): the same check the editor's Approve issue runs,
+  // so a direct POST cannot skip it.
+  if (body.step === "page-review") {
+    const verdict = await canResumePages(body.bookId, body.issueId);
+    if (!verdict.ok) {
+      return Response.json({ error: verdict.error }, { status: 409 });
     }
   }
 
