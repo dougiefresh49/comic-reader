@@ -5,6 +5,12 @@
 export interface ContextPromptOptions {
   /** The speaker must be a name from `uniqueCharacters`, or null. */
   closedList?: boolean;
+  /**
+   * A line under the cast heading saying how to read the list, for a caller
+   * whose entries carry notes after the name (the pipeline's closed cast,
+   * `CLOSED_CAST_NOTES` in `vision-rows.ts`). Omitted, nothing is added.
+   */
+  castNotes?: string;
   /** The region has no text yet: the model reads it and returns it as `text`. */
   transcribe?: boolean;
   /** A close-up crop of the region follows the page image. */
@@ -32,9 +38,11 @@ export function buildContextPrompt(
   const textLine = opts.transcribe
     ? "* **Text:** not read yet. Read it from the target region on the page."
     : `* **Text:** "${ocrText}"`;
-  const castHeading = opts.closedList
-    ? "* **Cast (the only names you may give as the speaker):**"
-    : "* **Unique Characters:**";
+  const castHeading =
+    (opts.closedList
+      ? "* **Cast (the only names you may give as the speaker):**"
+      : "* **Unique Characters:**") +
+    (opts.castNotes ? `\n  ${opts.castNotes}` : "");
   const locate = opts.transcribe
     ? "Find the target region on the page and read every word inside it, exactly as printed, in reading order. That is `text`. Classify it as one of:"
     : "Find the text on the page. Classify it as one of:";
