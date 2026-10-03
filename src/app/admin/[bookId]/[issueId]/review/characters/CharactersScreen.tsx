@@ -600,7 +600,8 @@ function CharacterCardView({
           )}
           {!card.removed &&
             card.group === "here" &&
-            card.faces.length === 0 && (
+            card.faces.length === 0 &&
+            card.sources.includes("wiki") && (
               <div className="mt-1 truncate text-neutral-500">
                 From the wiki
                 {card.wikiNames.length > 0
@@ -1228,7 +1229,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
 
         <Section
           title="In this issue"
-          blurb="A face the lookahead named, or a wiki mention. Remove who is not here."
+          blurb="A face the lookahead named, a wiki mention, or a character added to the cast. Remove who is not here."
           count={here.filter((c) => !c.removed).length}
           action={
             adding ? (
@@ -1276,7 +1277,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
 
         <Section
           title="Cast before, no sign here"
-          blurb="In the book's castlist from an earlier issue, with no face or wiki mention in this one. Remove who is absent."
+          blurb="In the book's castlist from an earlier issue, and not in this issue's cast yet. Remove who is absent."
           count={before.length}
         >
           {before.length === 0 ? (
