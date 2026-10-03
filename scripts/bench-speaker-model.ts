@@ -257,8 +257,13 @@ type Row = {
   bench: (Triple & { textWithCues: string | null }) | null;
   parsed: boolean;
   rawReply: string | null;
-  /** `--cast closed`: the reviewed speaker's cast id; null when outside the cast. */
+  /**
+   * `--cast closed`: the reviewed speaker's cast id, by `matchCastSpeaker`,
+   * else by identity (`truthIdOf`); null when outside the cast.
+   */
   truthId: string | null;
+  /** `--cast closed`: the reviewed speaker's cast id by `matchCastSpeaker` alone. */
+  truthIdStrict: string | null;
   /** `--cast closed`: the name the reply gives (`contextSpeakerReply`), before matching. */
   replySpeaker: string | null;
   /** `--cast closed`: the cast id the reply maps to; null when none. */
@@ -767,17 +772,31 @@ let samplePrompt: { label: string; images: number; prompt: string } | null =
 /** `--dry-run`: each page's seen ids, for the printout. */
 const seenByPage = new Map<number, string[]>();
 
-/** The cast id a reviewed row's speaker maps to; null when outside the cast. */
-const truthIdOf = (t: Triple | null) =>
-  t
-    ? (matchCastSpeaker(
-        contextSpeakerReply({
-          type: t.type ?? undefined,
-          speaker: t.speaker,
-        }),
-        cast,
-      )?.id ?? null)
-    : null;
+/**
+ * The cast id a reviewed row's speaker maps to. Strict: `matchCastSpeaker`,
+ * as the step stores a reply. Folded: strict, else row 232's identity rule
+ * (`aliased`, so "Trini" is the Yellow Ranger) against each member's id, name
+ * and aliases. Truth side only; a reply is never folded.
+ */
+function truthIdOf(t: Triple | null): {
+  strict: string | null;
+  folded: string | null;
+} {
+  if (!t) return { strict: null, folded: null };
+  const said = contextSpeakerReply({
+    type: t.type ?? undefined,
+    speaker: t.speaker,
+  });
+  const strict = matchCastSpeaker(said, cast)?.id ?? null;
+  if (strict || !said) return { strict, folded: strict };
+  const key = aliased(said);
+  const member = key
+    ? cast.find((m) =>
+        [m.id, m.name, ...m.aliases].some((n) => aliased(n) === key),
+      )
+    : undefined;
+  return { strict, folded: member?.id ?? null };
+}
 
 async function runPage(
   page: number,
@@ -907,7 +926,8 @@ async function runPage(
       bench: null,
       parsed: false,
       rawReply: null,
-      truthId: closed ? truthIdOf(b.truth) : null,
+      truthId: closed ? truthIdOf(b.truth).folded : null,
+      truthIdStrict: closed ? truthIdOf(b.truth).strict : null,
       replySpeaker: null,
       replyId: null,
       latencyMs: null,
@@ -1036,13 +1056,24 @@ function outsideLines(rows: Row[]): string[] {
     );
 }
 
+/** Right on a subset: the reply's cast id equals the truth id `pick` gives. */
+function rightOn(rows: Row[], pick: (r: Row) => string | null) {
+  const subset = rows.filter((r) => pick(r) !== null);
+  const right = subset.filter((r) => r.replyId === pick(r)).length;
+  return `${right}/${subset.length}`;
+}
+
 /**
- * Row 232's GEMINI_HIGH run scored on this run's in-cast subset, joined on
- * `bubbleId`. Exact: `matchCastSpeaker` maps the old reply to the truth id.
- * Identity: exact, or `speakerVerdict` with SAME_CHARACTER (row 232's rule)
- * calls the old reply and today's reviewed speaker one character.
+ * Row 232's GEMINI_HIGH run scored on this run's in-cast subset (truth ids
+ * from `pick`), joined on `bubbleId`. Exact: `matchCastSpeaker` maps the old
+ * reply to the truth id. Identity: exact, or `speakerVerdict` with
+ * SAME_CHARACTER (row 232's rule) calls the old reply and today's reviewed
+ * speaker one character.
  */
-function baselineLines(rows: Row[]): {
+function baselineLines(
+  rows: Row[],
+  pick: (r: Row) => string | null = (r) => r.truthId,
+): {
   headline: string;
   detail: string[];
 } {
@@ -1055,7 +1086,7 @@ function baselineLines(rows: Row[]): {
   const oldRows = JSON.parse(readFileSync(baselinePath, "utf8")) as OldRow[];
   const old = new Map(oldRows.map((o) => [o.bubbleId, o]));
   const ours = new Set(rows.map((r) => r.bubbleId));
-  const inCast = rows.filter((r) => r.truthId !== null);
+  const inCast = rows.filter((r) => pick(r) !== null);
   const missingOld = inCast.filter((r) => !old.has(r.bubbleId));
   const missingNew = oldRows.filter((o) => !ours.has(o.bubbleId));
   const compared = inCast.filter((r) => old.has(r.bubbleId));
@@ -1073,7 +1104,7 @@ function baselineLines(rows: Row[]): {
           cast,
         )?.id
       : undefined;
-    const isExact = oldId === r.truthId;
+    const isExact = oldId === pick(r);
     if (isExact) exact++;
     if (isExact || speakerVerdict(r, o.bench, aliased) === "match") identity++;
     if (plain(o.truth?.speaker) !== plain(r.truth?.speaker)) {
@@ -1108,7 +1139,7 @@ function baselineLines(rows: Row[]): {
     );
   }
   return {
-    headline: `old GEMINI_HIGH on the same subset: ${exact}/${n} exact match, ${identity}/${n} by identity${missingOld.length ? ` (${missingOld.length} in-cast bubbles not in the baseline)` : ""}`,
+    headline: `old GEMINI_HIGH: ${exact}/${n} exact match, ${identity}/${n} by identity${missingOld.length ? ` (${missingOld.length} in-cast bubbles not in the baseline)` : ""}`,
     detail,
   };
 }
@@ -1139,14 +1170,16 @@ function dryRunReport(
       "Truth per bubble (reviewed speaker → cast id):",
       ...rows.map(
         (r) =>
-          `  ${rowLabel(r).padEnd(8)} ${JSON.stringify(r.truth?.speaker ?? null).padEnd(22)} ${(r.truth?.type ?? "").padEnd(10)} → ${r.truthId ?? "OUTSIDE"}  "${short(r.text, 40)}"`,
+          `  ${rowLabel(r).padEnd(8)} ${JSON.stringify(r.truth?.speaker ?? null).padEnd(22)} ${(r.truth?.type ?? "").padEnd(10)} → ${r.truthId ?? "OUTSIDE"}${r.truthId && !r.truthIdStrict ? " (folded)" : ""}  "${short(r.text, 40)}"`,
       ),
       "",
     );
     const outside = outsideLines(rows);
+    const strictN = rows.filter((r) => r.truthIdStrict !== null).length;
     const base = baselineLines(rows);
+    const strictBase = baselineLines(rows, (r) => r.truthIdStrict);
     out.push(
-      `In-cast subset: ${rows.length - outside.length} of ${rows.length}. Reviewed speaker outside the cast: ${outside.length}.`,
+      `In-cast subset (folded by identity): ${rows.length - outside.length} of ${rows.length}. Strict (matchCastSpeaker only): ${strictN}. Reviewed speaker outside the cast: ${outside.length}.`,
       ...outside,
       ...(outside.length > 15
         ? [
@@ -1154,7 +1187,8 @@ function dryRunReport(
           ]
         : []),
       "",
-      base.headline,
+      `On the folded set, ${base.headline}`,
+      `On the strict set, ${strictBase.headline}`,
       ...base.detail,
       "",
     );
@@ -1245,6 +1279,7 @@ function writeOutputs(rows: Row[], stops: string[]) {
     ...(closed
       ? ([
           ["truth id", (r) => r.truthId ?? "outside cast"],
+          ["truth id strict", (r) => r.truthIdStrict],
           ["reply speaker", (r) => r.replySpeaker],
           ["reply id", (r) => r.replyId],
           ["closed verdict", (r) => closedVerdict(r)],
@@ -1255,7 +1290,7 @@ function writeOutputs(rows: Row[], stops: string[]) {
   const closedHead: string[] = [];
   if (closed) {
     const inCast = rows.filter((r) => r.truthId !== null);
-    const right = inCast.filter((r) => r.replyId === r.truthId).length;
+    const strictN = rows.filter((r) => r.truthIdStrict !== null).length;
     const named = rows.filter(
       (r) => r.parsed && r.replySpeaker?.trim() && r.replyId === null,
     );
@@ -1264,11 +1299,12 @@ function writeOutputs(rows: Row[], stops: string[]) {
     const errors = unparsed.filter((r) => r.rawReply?.startsWith("error:"));
     const outside = outsideLines(rows);
     const baseline = baselineLines(rows);
+    const strictBase = baselineLines(rows, (r) => r.truthIdStrict);
     closedHead.push(
       `- Model: ${model}`,
-      `- In-cast subset: ${inCast.length} of ${rows.length} bubbles (cast of ${cast.length})`,
-      `- Right on the subset: ${right}/${inCast.length}`,
-      `- ${baseline.headline.replace(/^old/, "Old")}`,
+      `- In-cast subset, reviewed labels folded by identity: ${inCast.length} of ${rows.length} bubbles (cast of ${cast.length})`,
+      `- Right on the subset: ${rightOn(rows, (r) => r.truthId)}; ${baseline.headline}`,
+      `- Strict subset (matchCastSpeaker only, ${strictN} bubbles): right ${rightOn(rows, (r) => r.truthIdStrict)}; ${strictBase.headline}`,
       `- Named outside the list: ${named.length} (ship gate: 0)`,
       `- Null replies: ${nulls.length}`,
       `- Unparsed: ${unparsed.length}${errors.length ? ` (${errors.length} of them API errors)` : ""}`,
