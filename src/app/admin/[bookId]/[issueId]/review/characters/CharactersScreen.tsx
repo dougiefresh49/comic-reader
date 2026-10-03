@@ -851,6 +851,14 @@ function CharacterCardView({
             {card.group === "role" ? "Role, no faces" : facesLine(card.faces)}
           </div>
           <div className="mt-1 truncate">{voice}</div>
+          {card.voiceRequest && (
+            <div className="mt-1 truncate text-amber-300">
+              {card.voiceRequest.action === "clone"
+                ? "Wants a voice-lab clone"
+                : "Wants a new designed voice"}
+              , made at the voices stop
+            </div>
+          )}
           {card.removed && (
             <div className="mt-1 text-amber-300">Out of this issue</div>
           )}
