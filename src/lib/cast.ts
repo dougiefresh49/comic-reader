@@ -611,6 +611,7 @@ export async function addAlias(
   alias: string,
 ): Promise<boolean> {
   const name = alias.trim();
+  if (!slugify(name)) throw new Error(`cast: "${name}" is not a name`);
   const characters = await readCharacters(client);
   const means = nameResolver(characters)(name);
   if (means?.id === characterId) return false;
