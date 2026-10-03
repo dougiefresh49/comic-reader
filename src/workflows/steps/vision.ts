@@ -15,12 +15,16 @@ import type { PageMeta, BoundingBoxJson } from "./shared";
 import {
   bubbleHasContext,
   buildContextUpdate,
+  closedCastLines,
+  CLOSED_CAST_NOTES,
+  contextSpeakerReply,
   mapBubbleRows,
   mapForegroundPolygons,
   mapPanelRows,
   mapSegmentationRow,
   normalizePanelAudioTags,
   parseRoboflowSam3Output,
+  type ClosedCastMember,
   type ContextParsed,
   type ForegroundPrediction,
   type ParsedRoboflowSam3,
@@ -1557,19 +1561,16 @@ export async function getContextPage(
   const pageLabel = `page-${padded}`;
   const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
 
-  // Load book + wiki context for richer prompts
+  // Book and synopsis context for the prompt. The wiki's character names stay
+  // out: the speaker comes from the closed cast below, never from an open
+  // list (#354).
   let bookContext: string | undefined;
   const [
     { data: bookRow, error: bookErr },
     { data: issueRow, error: issueErr },
   ] = await Promise.all([
     supabase.from("books").select("name, franchises").eq("id", bookId).single(),
-    selectIssue(
-      supabase,
-      bookId,
-      issueId,
-      "wiki_summary, wiki_appearances",
-    ).single(),
+    selectIssue(supabase, bookId, issueId, "wiki_summary").single(),
   ]);
   if (bookErr) {
     throw new FatalError(
@@ -1593,18 +1594,46 @@ export async function getContextPage(
     if (issueRow?.wiki_summary) {
       parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary}`);
     }
-    if (issueRow?.wiki_appearances) {
-      type AppEntry = { name: string; qualifier?: string };
-      const appearances = issueRow.wiki_appearances as AppEntry[];
-      const names = appearances.map((a) =>
-        a.qualifier ? `${a.name} (${a.qualifier})` : a.name,
-      );
-      parts.push(`\nKnown Characters in this issue:\n${names.join(", ")}`);
+    bookContext = parts.length > 0 ? parts.join("\n") : undefined;
+  }
+
+  // The closed cast (#354): the issue's castlist, each row joined to its
+  // `characters` row for the id the bubble gets and the aliases the match
+  // accepts. One `loadBookCast` read; the row filter mirrors `getCast` (an
+  // issue's rows with `in_issue`), which would read the same tables again.
+  // Both throws come before any download or Gemini call, so a bad cast
+  // fails here and spends nothing.
+  const { loadBookCast } = await import("~/lib/cast");
+  const bookCast = await loadBookCast(supabase, bookId);
+  const castRows = bookCast.rows.filter(
+    (r) => r.issue_id === issueId && r.in_issue,
+  );
+  const cast: ClosedCastMember[] = [];
+  const unresolved: string[] = [];
+  for (const entry of castRows) {
+    const row = bookCast.resolve(entry.character_id ?? entry.character);
+    if (!row) {
+      // `bubbles.character_id` references `characters`, so a row with no
+      // character could never be a match. Nothing is created for it.
+      unresolved.push(entry.character);
+      continue;
     }
-    parts.push(
-      "Use your knowledge of comics and pop culture to identify characters by their proper canonical names where possible.",
+    if (cast.some((m) => m.id === row.id)) continue;
+    cast.push({
+      id: row.id,
+      name: row.display_name ?? entry.character,
+      aliases: row.aliases,
+    });
+  }
+  if (unresolved.length > 0) {
+    throw new FatalError(
+      `get-context: ${bookId}/${issueId} castlist row${unresolved.length === 1 ? "" : "s"} ${unresolved.map((c) => JSON.stringify(c)).join(", ")} match no characters row. Name ${unresolved.length === 1 ? "it" : "them"} under "Needs a name" at the characters stop (review-clusters) before running get-context.`,
     );
-    bookContext = parts.join("\n");
+  }
+  if (cast.length === 0) {
+    throw new FatalError(
+      `get-context: ${bookId}/${issueId} has no cast. The cast is seeded at the characters stop (review-clusters); confirm it there before running get-context.`,
+    );
   }
 
   const storagePath = pageStoragePath(bookId, issueId, pageNumber);
@@ -1713,7 +1742,10 @@ export async function getContextPage(
     );
   }
 
-  const pageCharNames: string[] = [];
+  // The cast members a face detection on this page named: marked "seen on
+  // this page" in the list. A detection naming nobody on the cast adds
+  // nothing; the list is the cast and only the cast.
+  const seenIds = new Set<string>();
   if (pagePanels && pagePanels.length > 0) {
     const panelIds = pagePanels.map((p) => p.id);
     const { data: detections, error: detsErr } = await supabase
@@ -1727,14 +1759,11 @@ export async function getContextPage(
       );
     }
 
-    if (detections) {
-      for (const d of detections) {
-        if (d.character_id == null) continue;
-        const name = d.character_id.replace(/-/g, " ");
-        if (!pageCharNames.includes(name)) pageCharNames.push(name);
-      }
+    for (const d of detections ?? []) {
+      if (d.character_id != null) seenIds.add(d.character_id);
     }
   }
+  const castLines = closedCastLines(cast, seenIds);
 
   type BubbleRow = {
     id: string;
@@ -1755,7 +1784,8 @@ export async function getContextPage(
     return;
   }
 
-  const uniqueSpeakers: string[] = [];
+  let matched = 0;
+  let unmatched = 0;
 
   for (const bubble of bubbles) {
     const box = bubble.box_2d;
@@ -1795,16 +1825,13 @@ export async function getContextPage(
 
     if (!ocrText) continue;
 
-    const allCharacters = [...pageCharNames, ...uniqueSpeakers].filter(
-      (name, i, arr) => arr.indexOf(name) === i,
-    );
-
     const { buildContextPrompt } = await import("~/lib/gemini-prompts");
     const contextPrompt = buildContextPrompt(
       ocrText,
       box,
-      allCharacters,
+      castLines,
       bookContext,
+      { closedList: true, castNotes: CLOSED_CAST_NOTES },
     );
 
     try {
@@ -1831,11 +1858,18 @@ export async function getContextPage(
       if (!jsonMatch) continue;
 
       const parsed = JSON.parse(jsonMatch[0]) as ContextParsed;
-      const update = buildContextUpdate(parsed, ocrText, aiReasoning);
-      const speaker = update.speaker ?? null;
+      const update = buildContextUpdate(parsed, ocrText, aiReasoning, cast);
 
-      if (speaker && !uniqueSpeakers.includes(speaker)) {
-        uniqueSpeakers.push(speaker);
+      if (update.character_id) {
+        matched++;
+      } else if (!update.ignored) {
+        // Null speaker on a spoken bubble: the review editor flags it as
+        // "needs you" and page approval waits on it. Nothing is guessed.
+        unmatched++;
+        const raw = contextSpeakerReply(parsed);
+        console.warn(
+          `[context] ${pageLabel} bubble ${bubble.legacy_id}: speaker ${raw === null ? "null" : JSON.stringify(raw)} is not in the cast, stored null for review`,
+        );
       }
 
       const { error: updateErr } = await supabase
@@ -1861,6 +1895,6 @@ export async function getContextPage(
   }
 
   console.log(
-    `[context] ${bookId}/${issueId}: ${pageLabel} → ${bubbles.length} bubbles processed, ${uniqueSpeakers.length} speakers found`,
+    `[context] ${bookId}/${issueId}: ${pageLabel} → ${bubbles.length} bubbles processed, ${matched} speakers matched from a cast of ${cast.length}, ${unmatched} left for review`,
   );
 }

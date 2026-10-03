@@ -1,10 +1,19 @@
 /**
- * Switches for the review editor's analyze call. With none passed, the prompt
- * is the pipeline's get-context prompt, word for word.
+ * Switches for the get-context prompt. The pipeline passes `closedList` and
+ * `castNotes` (#354); the review editor's analyze call passes `closedList`,
+ * `transcribe` and `crop`. With none passed, the prompt is the old open-list
+ * one, which only scripts still use (`scripts/utils/gemini-context.ts` and
+ * `scripts/check-fakes.ts`).
  */
 export interface ContextPromptOptions {
-  /** The speaker must be a name from `uniqueCharacters`, or null. */
+  /** The speaker must be a name from the start of a `uniqueCharacters` line, or null. */
   closedList?: boolean;
+  /**
+   * A line under the cast heading saying how to read the list, for a caller
+   * whose entries carry notes after the name (the pipeline's closed cast,
+   * `CLOSED_CAST_NOTES` in `vision-rows.ts`). Omitted, nothing is added.
+   */
+  castNotes?: string;
   /** The region has no text yet: the model reads it and returns it as `text`. */
   transcribe?: boolean;
   /** A close-up crop of the region follows the page image. */
@@ -32,21 +41,23 @@ export function buildContextPrompt(
   const textLine = opts.transcribe
     ? "* **Text:** not read yet. Read it from the target region on the page."
     : `* **Text:** "${ocrText}"`;
-  const castHeading = opts.closedList
-    ? "* **Cast (the only names you may give as the speaker):**"
-    : "* **Unique Characters:**";
+  const castHeading =
+    (opts.closedList
+      ? "* **Cast (the only names you may give as the speaker):**"
+      : "* **Unique Characters:**") +
+    (opts.castNotes ? `\n  ${opts.castNotes}` : "");
   const locate = opts.transcribe
     ? "Find the target region on the page and read every word inside it, exactly as printed, in reading order. That is `text`. Classify it as one of:"
     : "Find the text on the page. Classify it as one of:";
   const speaker = opts.closedList
-    ? "* **Speaker:** If SPEECH, trace the bubble's tail. Who is it? The speaker must be a name from the cast list above, written exactly as listed. Use the list's narrator entry for narration, its off-panel entry for a voice from someone not drawn in the panel, and its crowd entry for many voices at once, when the list has them. If the speaker is not on the list, or you cannot tell, give `null`. Never make up a name."
+    ? "* **Speaker:** If SPEECH, trace the bubble's tail. Who is it? The speaker must be the name at the start of a cast line above, with nothing from the parentheses or brackets. A cast member speaking from outside the panel is still that member. Use the list's narrator entry for narration, its crowd entry for many unnamed voices at once, and its off-panel entry only for a voice from outside the panel whose speaker you cannot tell, when the list has them. One figure who is not on the list, or a speaker you cannot tell: give `null`. Never make up a name."
     : "* **Speaker:** If SPEECH, trace the bubble's tail. Who is it? Above is a list of unique characters already identified in the book. If the speaker in this panel looks like one of these characters, reuse the exact name. Only create a new name if it is clearly a different character.";
   // The closed list keeps names that are not on it out of the examples too.
   const extra = opts.closedList
-    ? "A generic or unnamed figure. Give the list's crowd or off-panel entry for them, never a description as a name."
+    ? "A generic or unnamed figure. Many of them speaking at once get the list's crowd entry; one of them gets `null` as the speaker, never a description as a name."
     : 'Generic/Unnamed (e.g., "Foot Soldier", "Civilian", "Reporter").';
   const reasoning = opts.closedList
-    ? "A row of generic foot soldiers shout it together. None of them is on the cast list, so the speaker is the list's crowd entry. They are attacking.\nImportance is EXTRA. They are shouting."
+    ? "A row of generic foot soldiers shout it together. Many unnamed voices at once, so the speaker is the list's crowd entry; one foot soldier alone would be `null`. They are attacking.\nImportance is EXTRA. They are shouting."
     : "The speaker is a generic Foot Soldier (Villain). He is attacking.\nImportance is EXTRA. He is shouting.";
   const exampleSpeaker = opts.closedList ? "Crowd" : "Foot Soldier";
   const textExample = opts.transcribe ? `  "text": "You'll never win!",\n` : "";
