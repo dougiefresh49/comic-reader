@@ -664,6 +664,19 @@ export async function requestVoice(args: {
           ok: false,
           error: `That voice-lab clone is not on file for ${args.name}.`,
         };
+      // A lab candidate is linked to no castlist row of this book (load.ts).
+      const linked = await supabaseAdmin
+        .from("castlist")
+        .select("character")
+        .eq("book_id", scope.bookId)
+        .eq("voice_uuid", target)
+        .limit(1);
+      must("reading the castlist", linked.error);
+      if (linked.data?.length)
+        return {
+          ok: false,
+          error: "That voice-lab clone is already a voice in this book.",
+        };
       request = { action: "clone", targetVoiceUuid: target };
       wants = `a voice-lab clone: ${row.display_name}`;
     } else if (args.request.action === "design") {
