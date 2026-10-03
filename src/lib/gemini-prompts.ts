@@ -47,14 +47,14 @@ export function buildContextPrompt(
     ? "Find the target region on the page and read every word inside it, exactly as printed, in reading order. That is `text`. Classify it as one of:"
     : "Find the text on the page. Classify it as one of:";
   const speaker = opts.closedList
-    ? "* **Speaker:** If SPEECH, trace the bubble's tail. Who is it? The speaker must be a name from the cast list above, written exactly as listed. Use the list's narrator entry for narration, its off-panel entry for a voice from someone not drawn in the panel, and its crowd entry for many voices at once, when the list has them. If the speaker is not on the list, or you cannot tell, give `null`. Never make up a name."
+    ? "* **Speaker:** If SPEECH, trace the bubble's tail. Who is it? The speaker must be the name at the start of a cast line above, with nothing from the parentheses or brackets. A cast member speaking from outside the panel is still that member. Use the list's narrator entry for narration, its crowd entry for many unnamed voices at once, and its off-panel entry only for a voice from outside the panel whose speaker you cannot tell, when the list has them. One figure who is not on the list, or a speaker you cannot tell: give `null`. Never make up a name."
     : "* **Speaker:** If SPEECH, trace the bubble's tail. Who is it? Above is a list of unique characters already identified in the book. If the speaker in this panel looks like one of these characters, reuse the exact name. Only create a new name if it is clearly a different character.";
   // The closed list keeps names that are not on it out of the examples too.
   const extra = opts.closedList
-    ? "A generic or unnamed figure. Give the list's crowd or off-panel entry for them, never a description as a name."
+    ? "A generic or unnamed figure. Many of them speaking at once get the list's crowd entry; one of them gets `null` as the speaker, never a description as a name."
     : 'Generic/Unnamed (e.g., "Foot Soldier", "Civilian", "Reporter").';
   const reasoning = opts.closedList
-    ? "A row of generic foot soldiers shout it together. None of them is on the cast list, so the speaker is the list's crowd entry. They are attacking.\nImportance is EXTRA. They are shouting."
+    ? "A row of generic foot soldiers shout it together. Many unnamed voices at once, so the speaker is the list's crowd entry; one foot soldier alone would be `null`. They are attacking.\nImportance is EXTRA. They are shouting."
     : "The speaker is a generic Foot Soldier (Villain). He is attacking.\nImportance is EXTRA. He is shouting.";
   const exampleSpeaker = opts.closedList ? "Crowd" : "Foot Soldier";
   const textExample = opts.transcribe ? `  "text": "You'll never win!",\n` : "";

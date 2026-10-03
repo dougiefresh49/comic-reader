@@ -388,8 +388,9 @@ export function bubbleHasContext(bubble: BubbleContextFields): boolean {
 /**
  * One member of the closed cast get-context chooses the speaker from (#354):
  * a `characters` row the issue's castlist holds, or one of the three roles.
- * The bench builds these from `proposeCast`; the step builds them from
- * `getCast` and the book's `characters` rows.
+ * The step builds them from the issue's castlist rows and the book's
+ * `characters` rows; the bench script (branch `issue-354-bench`, not merged)
+ * builds them from `proposeCast`.
  */
 export type ClosedCastMember = {
   /** The `characters.id`; what `bubbles.character_id` gets on a match. */
@@ -408,7 +409,7 @@ export const SEEN_ON_PAGE = "[seen on this page]";
  * `castNotes`, so the list and its legend stay in step here, not in the
  * prompt builder.
  */
-export const CLOSED_CAST_NOTES = `Each line is one cast member: the name first, then "(also called ...)" with the other names they go by, then "${SEEN_ON_PAGE}" when a face on this page was identified as them. A member without that mark can still be the speaker, from off-panel or with their face unrecognized. Give the name alone, not the notes after it.`;
+export const CLOSED_CAST_NOTES = `Each line is one cast member: the name first, then "(also called ...)" with the other names they go by, then "${SEEN_ON_PAGE}" when a face on this page was identified as them. A member without that mark can still be the speaker, with their face unrecognized or speaking from outside the panel, and is still named as that member. Give the name at the start of the line, with nothing from the parentheses or brackets.`;
 
 /**
  * The cast as the get-context prompt lists it, one line per member in the

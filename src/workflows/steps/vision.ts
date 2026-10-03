@@ -1599,23 +1599,23 @@ export async function getContextPage(
 
   // The closed cast (#354): the issue's castlist, each row joined to its
   // `characters` row for the id the bubble gets and the aliases the match
-  // accepts. Loaded before any download or Gemini call, so an unseeded issue
+  // accepts. One `loadBookCast` read; the row filter mirrors `getCast` (an
+  // issue's rows with `in_issue`), which would read the same tables again.
+  // Both throws come before any download or Gemini call, so a bad cast
   // fails here and spends nothing.
-  const { getCast, loadBookCast } = await import("~/lib/cast");
-  const [castEntries, bookCast] = await Promise.all([
-    getCast(supabase, bookId, issueId),
-    loadBookCast(supabase, bookId),
-  ]);
+  const { loadBookCast } = await import("~/lib/cast");
+  const bookCast = await loadBookCast(supabase, bookId);
+  const castRows = bookCast.rows.filter(
+    (r) => r.issue_id === issueId && r.in_issue,
+  );
   const cast: ClosedCastMember[] = [];
-  for (const entry of castEntries) {
-    const row = bookCast.resolve(entry.characterId ?? entry.character);
+  const unresolved: string[] = [];
+  for (const entry of castRows) {
+    const row = bookCast.resolve(entry.character_id ?? entry.character);
     if (!row) {
       // `bubbles.character_id` references `characters`, so a row with no
-      // character cannot be a match; it is left off the list and nothing is
-      // created for it.
-      console.warn(
-        `[context] ${bookId}/${issueId}: castlist row "${entry.character}" has no characters row, left out of the cast list`,
-      );
+      // character could never be a match. Nothing is created for it.
+      unresolved.push(entry.character);
       continue;
     }
     if (cast.some((m) => m.id === row.id)) continue;
@@ -1624,6 +1624,11 @@ export async function getContextPage(
       name: row.display_name ?? entry.character,
       aliases: row.aliases,
     });
+  }
+  if (unresolved.length > 0) {
+    throw new FatalError(
+      `get-context: ${bookId}/${issueId} castlist row${unresolved.length === 1 ? "" : "s"} ${unresolved.map((c) => JSON.stringify(c)).join(", ")} match no characters row. Link or remove ${unresolved.length === 1 ? "it" : "them"} at the characters stop (review-clusters) before running get-context.`,
+    );
   }
   if (cast.length === 0) {
     throw new FatalError(
