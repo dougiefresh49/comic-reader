@@ -28,6 +28,16 @@ interface BubbleRow {
   page_number: number;
   sort_order: number;
   audio_timestamps?: TimestampRow | TimestampRow[] | null;
+  characters?: CharacterRow | CharacterRow[] | null;
+}
+
+/**
+ * The embedded `characters` row for a bubble's `character_id`. The FK makes
+ * it many-to-one, so PostgREST returns an object (or null); the array form
+ * is accepted the same way as `TimestampRow`.
+ */
+interface CharacterRow {
+  display_name: string | null;
 }
 
 /**
@@ -60,12 +70,16 @@ interface BookRow {
 }
 
 function rowToBubble(row: BubbleRow): Bubble {
+  const character = Array.isArray(row.characters)
+    ? row.characters[0]
+    : row.characters;
   return {
     id: row.id,
     box_2d: row.box_2d ?? {},
     ocr_text: row.ocr_text ?? "",
     type: row.type as Bubble["type"],
     speaker: row.speaker ?? null,
+    speakerName: character?.display_name ?? row.speaker ?? null,
     emotion: row.emotion ?? "",
     textWithCues: row.text_with_cues ?? undefined,
     aiReasoning: row.ai_reasoning ?? undefined,
@@ -96,7 +110,7 @@ export async function getPageData(
     const { data: bubbleRows, error: bubbleError } = await supabase
       .from("bubbles")
       .select(
-        "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment)",
+        "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
