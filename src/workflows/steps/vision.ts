@@ -1627,7 +1627,7 @@ export async function getContextPage(
   }
   if (unresolved.length > 0) {
     throw new FatalError(
-      `get-context: ${bookId}/${issueId} castlist row${unresolved.length === 1 ? "" : "s"} ${unresolved.map((c) => JSON.stringify(c)).join(", ")} match no characters row. Link or remove ${unresolved.length === 1 ? "it" : "them"} at the characters stop (review-clusters) before running get-context.`,
+      `get-context: ${bookId}/${issueId} castlist row${unresolved.length === 1 ? "" : "s"} ${unresolved.map((c) => JSON.stringify(c)).join(", ")} match no characters row. Name ${unresolved.length === 1 ? "it" : "them"} under "Needs a name" at the characters stop (review-clusters) before running get-context.`,
     );
   }
   if (cast.length === 0) {

@@ -1,9 +1,11 @@
 /**
- * Switches for the review editor's analyze call. With none passed, the prompt
- * is the pipeline's get-context prompt, word for word.
+ * Switches for the get-context prompt. The pipeline passes `closedList` and
+ * `castNotes` (#354); the review editor's analyze call passes `closedList`,
+ * `transcribe` and `crop`. With none passed, the prompt is the old open-list
+ * one, which only the legacy local scripts still use.
  */
 export interface ContextPromptOptions {
-  /** The speaker must be a name from `uniqueCharacters`, or null. */
+  /** The speaker must be a name from the start of a `uniqueCharacters` line, or null. */
   closedList?: boolean;
   /**
    * A line under the cast heading saying how to read the list, for a caller
