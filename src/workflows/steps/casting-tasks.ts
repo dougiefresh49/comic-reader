@@ -1,380 +1,214 @@
+/**
+ * The casting gate's work list (#353): the issue's speakers, which of them
+ * have no voice, and which `casting_tasks` rows are still open. The voices
+ * stop (`/admin/<book>/<issue>/review/characters/voices`) is where the owner
+ * settles them; `canContinueVoices` and the pipeline's pause read the same
+ * plan, so the screen, the resume route and the gate agree.
+ *
+ * The castlist is no longer copied forward here: `seedCast` does that at the
+ * characters stop. Request rows (`action` set) are never written here.
+ */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { slugify as castSlug } from "~/lib/character-id";
-import { buildCastIndex, speakerKey } from "./audio-plan";
+import { loadBookCast, voiceFor, type BookCast } from "~/lib/cast";
+import { buildAliasMap, speakerKey } from "./audio-plan";
+import { skippedIn } from "./voice";
 
-const SPEECH_TYPES = ["SPEECH", "NARRATION", "CAPTION"] as const;
-const SKIPPED_VOICE = "__SKIPPED__";
+const PAGE = 1000;
 
-function slugify(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, "-");
+/** One line a character speaks in the issue, in reading order. */
+export interface SpeakerLine {
+  bubbleId: string;
+  page: number;
+  /** `text_with_cues`, else `ocr_text`. */
+  text: string;
+  emotion: string | null;
 }
 
-function norm(s: string): string {
-  return s.toLowerCase().trim();
-}
-
-/** Postgres unique_violation; treat as "row already exists". */
-function isUniqueViolation(error: {
-  code?: string;
-  message?: string;
-}): boolean {
-  return error.code === "23505";
-}
-
-export interface CastlistCopyRow {
-  character: string;
-  voice_id: string;
-  voice_uuid: string | null;
-  /** True when filling a this-issue row that already exists with null voice_id. */
-  fillGap: boolean;
+/** An unsettled `casting_tasks` row. */
+export interface OpenTask {
+  characterId: string;
+  status: string;
+  /** A voice request (`action` set) from the characters stop. */
+  request: boolean;
+  /** A `carryOut` is recorded on the row: "needs attention". */
+  operation: boolean;
 }
 
 export interface CastingPlan {
+  /** Distinct speakers in the issue's non-ignored, non-silent bubbles. */
   speakers: number;
+  /** Speakers `voiceFor` finds a voice for. */
   cast: number;
+  /** Speakers with no voice and no skip marker, as character ids (or speaker keys). */
+  noVoice: string[];
+  /** Of `noVoice`, the ones no `characters` row knows: they get no task row. */
   unresolved: string[];
-  toCopy: CastlistCopyRow[];
+  /** Of `noVoice`, the ones with a `characters` row and no task row yet. */
   toCreate: string[];
-  existingPending: number;
+  /** Pending or in-progress rows that are still voice work (see `planCastingTasks`). */
+  open: OpenTask[];
   /**
-   * Skip-sentinel castlist rows, keyed the way the audio step keys speakers,
-   * that mark each unresolved speaker silent. Written only when the owner
-   * resumes the casting gate (acceptUnresolvedAsSilent).
+   * Always empty since #353: `seedCast` copies the castlist forward. Kept so
+   * `scripts/check-casting-plan.ts` still reads.
    */
-  toSilence: CastlistCopyRow[];
+  toCopy: { character: string }[];
 }
 
 export interface CreateCastingTasksResult {
   speakers: number;
   cast: number;
   created: number;
+  /** Items the voices stop must settle; the gate pauses while above zero. */
   pending: number;
   unresolved: string[];
 }
 
+/** Postgres unique_violation; treat as "row already exists". */
+function isUniqueViolation(error: { code?: string }): boolean {
+  return error.code === "23505";
+}
+
+function fail(what: string, error: { message: string } | null): void {
+  if (error) throw new Error(`[casting] ${what}: ${error.message}`);
+}
+
 /**
- * Read-only plan: which speakers resolve, which are already cast (including
- * rows that can be copied from another issue), and which need a casting_task.
+ * Each speaker's lines in the issue, keyed as `planVoiceWork` keys them:
+ * `bubbles.character_id`, else the speaker through the aliases, resolved to
+ * a `characters.id` when a row knows the name.
+ */
+export async function readSpeakerLines(
+  client: SupabaseClient,
+  book: BookCast,
+  bookId: string,
+  issueId: string,
+): Promise<Map<string, SpeakerLine[]>> {
+  const aliasRes = await client
+    .from("aliases")
+    .select("alias, canonical")
+    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`);
+  fail("reading aliases", aliasRes.error);
+  const aliasMap = buildAliasMap(
+    (aliasRes.data ?? []) as { alias: string; canonical: string }[],
+  );
+  const lines = new Map<string, SpeakerLine[]>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await client
+      .from("bubbles")
+      .select(
+        "id, page_number, character_id, speaker, text_with_cues, ocr_text, emotion",
+      )
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("ignored", false)
+      .eq("silent", false)
+      .order("page_number")
+      .order("sort_order")
+      .order("id")
+      .range(from, from + PAGE - 1);
+    fail("reading bubbles", error);
+    const page = (data ?? []) as {
+      id: string;
+      page_number: number;
+      character_id: string | null;
+      speaker: string | null;
+      text_with_cues: string | null;
+      ocr_text: string | null;
+      emotion: string | null;
+    }[];
+    for (const b of page) {
+      const key =
+        b.character_id ??
+        (b.speaker?.trim() ? speakerKey(b.speaker, aliasMap) : null);
+      if (!key) continue;
+      const id = book.resolve(key)?.id ?? key;
+      const list = lines.get(id) ?? [];
+      list.push({
+        bubbleId: b.id,
+        page: b.page_number,
+        text: (b.text_with_cues ?? b.ocr_text ?? "").trim(),
+        emotion: b.emotion,
+      });
+      lines.set(id, list);
+    }
+    if (page.length < PAGE) return lines;
+  }
+}
+
+/**
+ * Read-only: the issue's voice work as the gate counts it. A speaker is
+ * settled when `voiceFor` finds a voice or the issue's castlist marks it
+ * "no audio this run" (the skip marker). A `casting_tasks` row is open while
+ * pending or in progress, when it is a request, carries a `carryOut`
+ * record, or its speaker still has no voice; a stale row for a speaker who
+ * has a voice now is not work the voices stop could show, so it never holds
+ * the run.
  */
 export async function planCastingTasks(
   client: SupabaseClient,
   bookId: string,
   issueId: string,
 ): Promise<CastingPlan> {
-  const { data: bubbleRows, error: bubErr } = await client
-    .from("bubbles")
-    .select("speaker, type, ignored, silent")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .not("speaker", "is", null)
-    .in("type", [...SPEECH_TYPES]);
+  const book = await loadBookCast(client, bookId);
+  const [lines, tasks] = await Promise.all([
+    readSpeakerLines(client, book, bookId, issueId),
+    client
+      .from("casting_tasks")
+      .select("character_id, status, action, operation")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId),
+  ]);
+  fail("reading casting tasks", tasks.error);
+  const rows = (tasks.data ?? []) as {
+    character_id: string;
+    status: string;
+    action: string | null;
+    operation: unknown;
+  }[];
 
-  if (bubErr) throw new Error(bubErr.message);
-
-  const speakerSet = new Set<string>();
-  for (const row of bubbleRows ?? []) {
-    const r = row as {
-      speaker: string | null;
-      type: string;
-      ignored: boolean | null;
-      silent: boolean | null;
-    };
-    if (!r.speaker || r.ignored || r.silent) continue;
-    speakerSet.add(r.speaker);
-  }
-
-  // Globals first, then book-scoped, so the book scope wins on the same alias.
-  const { data: globalAliasRows, error: globalAliasErr } = await client
-    .from("aliases")
-    .select("alias, canonical")
-    .eq("scope", "global");
-  if (globalAliasErr) throw new Error(globalAliasErr.message);
-
-  const { data: bookAliasRows, error: bookAliasErr } = await client
-    .from("aliases")
-    .select("alias, canonical")
-    .eq("scope", "book")
-    .eq("scope_id", bookId);
-  if (bookAliasErr) throw new Error(bookAliasErr.message);
-
-  const aliasMap = new Map<string, string>();
-  for (const row of globalAliasRows ?? []) {
-    const r = row as { alias: string; canonical: string };
-    aliasMap.set(norm(r.alias), r.canonical);
-  }
-  for (const row of bookAliasRows ?? []) {
-    const r = row as { alias: string; canonical: string };
-    aliasMap.set(norm(r.alias), r.canonical);
-  }
-
-  const { data: charRows, error: charErr } = await client
-    .from("characters")
-    .select("id, aliases");
-  if (charErr) throw new Error(charErr.message);
-
-  type CharRow = { id: string; aliases: string[] | null };
-  const characters = (charRows ?? []) as CharRow[];
-
-  function resolveCharacterId(speaker: string): string | null {
-    const canonical = aliasMap.get(norm(speaker)) ?? speaker;
-    const sluggedCanonical = slugify(canonical);
-    const needleSpeaker = norm(speaker);
-    const needleCanonical = norm(canonical);
-    const needleSlug = norm(sluggedCanonical);
-
-    for (const c of characters) {
-      const idNorm = norm(c.id);
-      if (
-        idNorm === needleSpeaker ||
-        idNorm === needleCanonical ||
-        idNorm === needleSlug ||
-        c.id === speaker ||
-        c.id === sluggedCanonical
-      ) {
-        return c.id;
-      }
-      for (const a of c.aliases ?? []) {
-        const aNorm = norm(a);
-        if (
-          aNorm === needleSpeaker ||
-          aNorm === needleCanonical ||
-          aNorm === needleSlug
-        ) {
-          return c.id;
-        }
-      }
-    }
-    return null;
-  }
-
-  const { data: castRows, error: castErr } = await client
-    .from("castlist")
-    .select("issue_id, character, voice_id, voice_uuid")
-    .eq("book_id", bookId);
-  if (castErr) throw new Error(castErr.message);
-
-  type CastRow = {
-    issue_id: string;
-    character: string;
-    voice_id: string | null;
-    voice_uuid: string | null;
-  };
-  const castlist = (castRows ?? []) as CastRow[];
-
-  const { data: taskRows, error: taskErr } = await client
-    .from("casting_tasks")
-    .select("character_id, status")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId);
-  if (taskErr) throw new Error(taskErr.message);
-
-  type TaskRow = { character_id: string; status: string };
-  const taskByChar = new Map(
-    ((taskRows ?? []) as TaskRow[]).map((t) => [t.character_id, t]),
+  const ids = [...lines.keys()].sort();
+  const noVoice = ids.filter(
+    (id) => !voiceFor(book, id, issueId) && !skippedIn(book, id, issueId),
   );
-
-  const unresolved: string[] = [];
-  const toCopy: CastlistCopyRow[] = [];
-  const toSilence: CastlistCopyRow[] = [];
-  const toCreateSet = new Set<string>();
-  const pendingSeen = new Set<string>();
-  const copyKeys = new Set<string>();
-  const silenceKeys = new Set<string>();
-  const protectedKeys = new Set<string>();
-  let castCount = 0;
-
-  // This issue's castlist as the audio step reads it: grouped by slug, the
-  // same key speakerKey gives a bubble speaker.
-  const issueCastRows = castlist.filter((c) => c.issue_id === issueId);
-  const issueCast = buildCastIndex(issueCastRows);
-
-  for (const speaker of speakerSet) {
-    const characterId = resolveCharacterId(speaker);
-    if (!characterId) {
-      // No characters row. A decided castlist row under the audio key (a
-      // voice or the skip sentinel) still settles the speaker.
-      const key = speakerKey(speaker, aliasMap);
-      const decided = issueCast.voices.get(key);
-      if (decided !== undefined) {
-        if (decided !== SKIPPED_VOICE) castCount++;
-        continue;
-      }
-      unresolved.push(speaker);
-      if (key) silenceKeys.add(key);
-      continue;
-    }
-    // Audio reads this speaker under these keys, so they are never silenced.
-    protectedKeys.add(speakerKey(speaker, aliasMap));
-    protectedKeys.add(castSlug(characterId));
-
-    const char = characters.find((c) => c.id === characterId);
-    const canonical = aliasMap.get(norm(speaker)) ?? speaker;
-    const matchNames = new Set(
-      [speaker, canonical, characterId, ...(char?.aliases ?? [])].map(norm),
-    );
-
-    const nameMatches = (c: CastRow): boolean =>
-      matchNames.has(norm(c.character));
-
-    const hasVoice = (c: CastRow): boolean =>
-      Boolean(c.voice_id) && c.voice_id !== SKIPPED_VOICE;
-    // Decided: real voice or __SKIPPED__. A null voice_id is a gap, not a decision.
-    const isDecided = (c: CastRow): boolean => c.voice_id != null;
-
-    const thisIssueRows = castlist.filter(
-      (c) => c.issue_id === issueId && nameMatches(c),
-    );
-    if (thisIssueRows.some(isDecided)) {
-      if (thisIssueRows.some(hasVoice)) {
-        castCount++;
-      }
-      // Decided rows stay; ignoreDuplicates on insert path protects them too.
-      continue;
-    }
-
-    const gapRows = thisIssueRows.filter((c) => c.voice_id == null);
-
-    const otherCast = castlist.find(
-      (c) => c.issue_id !== issueId && nameMatches(c) && hasVoice(c),
-    );
-    if (otherCast?.voice_id) {
-      castCount++;
-      if (gapRows.length > 0) {
-        for (const gap of gapRows) {
-          if (!copyKeys.has(gap.character)) {
-            copyKeys.add(gap.character);
-            toCopy.push({
-              character: gap.character,
-              voice_id: otherCast.voice_id,
-              voice_uuid: otherCast.voice_uuid,
-              fillGap: true,
-            });
-          }
-        }
-      } else if (!copyKeys.has(otherCast.character)) {
-        copyKeys.add(otherCast.character);
-        toCopy.push({
-          character: otherCast.character,
-          voice_id: otherCast.voice_id,
-          voice_uuid: otherCast.voice_uuid,
-          fillGap: false,
-        });
-      }
-      continue;
-    }
-
-    const existing = taskByChar.get(characterId);
-    if (existing?.status === "pending") {
-      pendingSeen.add(characterId);
-      continue;
-    }
-    if (existing) {
-      continue;
-    }
-
-    toCreateSet.add(characterId);
-  }
-
-  // Silence plan for unresolved speakers. Casting and audio key a speaker
-  // differently (`Dr. Doom` misses character `dr-doom` here but is `dr-doom`
-  // in audio), so skip any key a resolved speaker or a pending task uses.
-  for (const t of (taskRows ?? []) as TaskRow[]) {
-    if (t.status === "pending") protectedKeys.add(castSlug(t.character_id));
-  }
-  for (const key of silenceKeys) {
-    if (protectedKeys.has(key)) continue;
-    const group = issueCastRows.filter((c) => castSlug(c.character) === key);
-    // A real voice in the group is a conflict the audio step reports; leave
-    // it. Otherwise fill the null rows (a replay after a partial fill finds
-    // only the sentinel set), or add one row under the key.
-    if (group.some((c) => c.voice_id != null && c.voice_id !== SKIPPED_VOICE))
-      continue;
-    const rows =
-      group.length > 0
-        ? group.filter((c) => c.voice_id == null)
-        : [{ character: key }];
-    for (const c of rows) {
-      toSilence.push({
-        character: c.character,
-        voice_id: SKIPPED_VOICE,
-        voice_uuid: null,
-        fillGap: group.length > 0,
-      });
-    }
-  }
-
+  const unresolved = noVoice.filter((id) => book.resolve(id)?.id !== id);
+  const hasRow = new Set(rows.map((r) => r.character_id));
+  const open = rows
+    .filter(
+      (r) =>
+        (r.status === "pending" || r.status === "in_progress") &&
+        (r.action !== null ||
+          r.operation !== null ||
+          noVoice.includes(r.character_id)),
+    )
+    .map((r) => ({
+      characterId: r.character_id,
+      status: r.status,
+      request: r.action !== null,
+      operation: r.operation !== null,
+    }));
   return {
-    speakers: speakerSet.size,
-    cast: castCount,
-    unresolved: unresolved.sort(),
-    toCopy,
-    toCreate: [...toCreateSet],
-    existingPending: pendingSeen.size,
-    toSilence,
+    speakers: ids.length,
+    cast: ids.filter((id) => voiceFor(book, id, issueId)).length,
+    noVoice,
+    unresolved,
+    toCreate: noVoice.filter(
+      (id) => !unresolved.includes(id) && !hasRow.has(id),
+    ),
+    open,
+    toCopy: [],
   };
 }
 
-/**
- * Pending count shared by the planner and the workflow wrapper: tasks the
- * plan would create, plus pending tasks already present for speakers in the
- * plan. Stale pending rows for already-cast speakers are excluded.
- */
+/** Items the voices stop must settle: every open row, plus speakers with no voice and no open row. */
 export function pendingFromPlan(plan: CastingPlan): number {
-  return plan.toCreate.length + plan.existingPending;
+  const opened = new Set(plan.open.map((t) => t.characterId));
+  return plan.open.length + plan.noVoice.filter((id) => !opened.has(id)).length;
 }
 
 /**
- * Write castlist rows for this issue. A fillGap row only updates rows whose
- * voice_id is still null; a new row never overwrites a decided one.
- */
-async function writeCastlistRows(
-  client: SupabaseClient,
-  bookId: string,
-  issueId: string,
-  rows: CastlistCopyRow[],
-): Promise<void> {
-  for (const row of rows) {
-    if (row.fillGap) {
-      // Gap fill: only touch rows whose voice_id is still null.
-      const { error } = await client
-        .from("castlist")
-        .update({
-          voice_id: row.voice_id,
-          voice_uuid: row.voice_uuid,
-        })
-        .eq("book_id", bookId)
-        .eq("issue_id", issueId)
-        .eq("character", row.character)
-        .is("voice_id", null);
-      if (error) {
-        throw new Error(
-          `[casting] castlist fill ${row.character}: ${error.message}`,
-        );
-      }
-    } else {
-      // New row: ignoreDuplicates never overwrites a decided this-issue row.
-      const { error } = await client.from("castlist").upsert(
-        {
-          book_id: bookId,
-          issue_id: issueId,
-          character: row.character,
-          voice_id: row.voice_id,
-          voice_uuid: row.voice_uuid,
-        },
-        { onConflict: "book_id,issue_id,character", ignoreDuplicates: true },
-      );
-      if (error) {
-        throw new Error(
-          `[casting] castlist copy ${row.character}: ${error.message}`,
-        );
-      }
-    }
-  }
-}
-
-/**
- * Workflow step: apply the plan's castlist copy-forward and casting_task
- * inserts. Returns counts the casting gate uses to decide pause vs skip.
+ * Workflow step: a `casting_tasks` row for every speaker in the issue with
+ * no voice (request rows and every existing row left alone), and the count
+ * the gate pauses on.
  */
 export async function createCastingTasks(
   bookId: string,
@@ -386,8 +220,6 @@ export async function createCastingTasks(
   const client = await createStepClient();
   const plan = await planCastingTasks(client, bookId, issueId);
 
-  await writeCastlistRows(client, bookId, issueId, plan.toCopy);
-
   let created = 0;
   for (const characterId of plan.toCreate) {
     const { error } = await client.from("casting_tasks").insert({
@@ -397,10 +229,8 @@ export async function createCastingTasks(
       status: "pending",
     });
     if (error) {
-      if (isUniqueViolation(error)) {
-        // Unique on (book_id, issue_id, character_id): task already exists.
-        continue;
-      }
+      // Unique on (book_id, issue_id, character_id): a row already exists.
+      if (isUniqueViolation(error)) continue;
       throw new Error(
         `[casting] casting_task ${characterId}: ${error.message}`,
       );
@@ -415,24 +245,4 @@ export async function createCastingTasks(
     pending: pendingFromPlan(plan),
     unresolved: plan.unresolved,
   };
-}
-
-/**
- * Workflow step, run when the owner resumes a casting pause: the owner has
- * accepted every speaker still unresolved as silent. Writes the skip sentinel
- * under the audio step's speaker key, so voice design and TTS both skip them
- * and the next run's casting plan counts them as decided. Returns the
- * speakers silenced.
- */
-export async function acceptUnresolvedAsSilent(
-  bookId: string,
-  issueId: string,
-): Promise<string[]> {
-  "use step";
-
-  const { createStepClient } = await import("../step-utils");
-  const client = await createStepClient();
-  const plan = await planCastingTasks(client, bookId, issueId);
-  await writeCastlistRows(client, bookId, issueId, plan.toSilence);
-  return plan.unresolved;
 }
