@@ -38,6 +38,30 @@ export interface VoiceView {
   name: string;
   /** The character whose castlist row holds the voice, when it is borrowed. */
   borrowedFrom: string | null;
+  /** The `voices` row id, when the castlist or the starting voice names one. */
+  uuid: string | null;
+}
+
+/** A voice-lab clone on file for the character: an archived `voices` row with a source clip, linked to no castlist row of this book. */
+export interface LabCandidate {
+  id: string;
+  name: string;
+  labDefault: boolean;
+  /** A signed URL to the source clip, or null when signing failed (no play button). */
+  clipUrl: string | null;
+}
+
+/** A `casting_tasks` request for this character in this issue with `status = 'pending'`. */
+export interface PendingVoiceRequest {
+  action: "clone" | "design";
+  /** The clone's voice display name; null for a design. */
+  targetName: string | null;
+}
+
+/** A `voices` row with `status = 'active'`, for "Another active voice". */
+export interface ActiveVoice {
+  id: string;
+  name: string;
 }
 
 export type CardGroup = "here" | "before" | "role";
@@ -54,6 +78,9 @@ export interface CharacterCard {
   faces: FaceView[];
   looseExemplars: LooseExemplar[];
   voice: VoiceView | null;
+  /** Lab default first, then by name. Empty for a card with no Change control. */
+  labCandidates: LabCandidate[];
+  voiceRequest: PendingVoiceRequest | null;
 }
 
 export interface UnknownGroupView {
@@ -88,6 +115,8 @@ export interface CharactersData {
   suggestions: Suggestion[];
   cards: CharacterCard[];
   known: KnownCharacter[];
+  /** Every active voice, by display name. */
+  activeVoices: ActiveVoice[];
   /** Why Approve would be refused right now, or null when it would pass. */
   blocker: string | null;
 }
