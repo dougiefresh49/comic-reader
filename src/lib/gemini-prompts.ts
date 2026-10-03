@@ -2,7 +2,8 @@
  * Switches for the get-context prompt. The pipeline passes `closedList` and
  * `castNotes` (#354); the review editor's analyze call passes `closedList`,
  * `transcribe` and `crop`. With none passed, the prompt is the old open-list
- * one, which only the legacy local scripts still use.
+ * one, which only scripts still use (`scripts/utils/gemini-context.ts` and
+ * `scripts/check-fakes.ts`).
  */
 export interface ContextPromptOptions {
   /** The speaker must be a name from the start of a `uniqueCharacters` line, or null. */
