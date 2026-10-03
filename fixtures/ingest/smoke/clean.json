@@ -1,9 +1,9 @@
 {
-  "description": "Every fixture id has a smoke characters row and a castlist row (option B), so only review-pages pauses.",
+  "description": "Every fixture id has a smoke characters row and a castlist row (option B), so only the characters stop (review-clusters, which always pauses since #349) and review-pages pause. Every face resolves, so the script has no unknown face to reject at the characters stop.",
   "gates": [
     {
       "gate": "review-clusters",
-      "expect": "skip"
+      "expect": "pause"
     },
     {
       "gate": "review-pages",
@@ -24,5 +24,6 @@
     "page_segmentation": 2,
     "bubbles": 21
   },
-  "strangerBubbles": 0
+  "strangerBubbles": 0,
+  "unknownFaces": false
 }

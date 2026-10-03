@@ -91,6 +91,8 @@ type Scenario = {
   counts: Record<string, number>;
   /** Bubbles the gates fake gives the uncast "Smoke Stranger". */
   strangerBubbles: number;
+  /** Whether the characters stop finds unnamed faces to reject (#383). */
+  unknownFaces: boolean;
 };
 type Skip = { gate: string; reason: string };
 
@@ -646,6 +648,84 @@ async function resume(gate: string): Promise<void> {
   }
 }
 
+/**
+ * Owner simulation at the characters stop (#383): "Not a character" on every
+ * unnamed face of the smoke issue, so the resume gate passes. Deletes the
+ * rows rejectGroup (review/characters/actions.ts) deletes: exemplars cut
+ * from those detections, loose unnamed exemplars under their suggested
+ * names, then the detections. Crops go with cleanup(). Fails when the
+ * scenario's `unknownFaces` disagrees with what the run produced.
+ */
+async function rejectUnknownFaces(scenario: Scenario): Promise<void> {
+  const faces = must(
+    await supabase
+      .from("panel_character_detections")
+      .select("id, suggested_name, panels!inner(book_id, issue_id)")
+      .eq("panels.book_id", BOOK)
+      .eq("panels.issue_id", ISSUE)
+      .is("character_id", null),
+    "unnamed faces",
+  ) as unknown as { id: string; suggested_name: string | null }[];
+  if (scenario.unknownFaces !== faces.length > 0) {
+    fail(
+      `review-clusters: ${faces.length} unknown faces; the scenario expects ${scenario.unknownFaces ? "at least one" : "none"}`,
+    );
+  }
+  if (faces.length === 0) return;
+  const ids = faces.map((f) => f.id);
+  must(
+    await supabase
+      .from("character_face_exemplars")
+      .delete()
+      .eq("book_id", BOOK)
+      .eq("source_issue", ISSUE)
+      .in("detection_id", ids),
+    "delete exemplars of unknown faces",
+  );
+  const names = new Set(
+    faces.flatMap((f) => (f.suggested_name ? [slugify(f.suggested_name)] : [])),
+  );
+  const loose = (
+    must(
+      await supabase
+        .from("character_face_exemplars")
+        .select("id, suggested_name")
+        .eq("book_id", BOOK)
+        .eq("source_issue", ISSUE)
+        .is("character_id", null)
+        .is("detection_id", null)
+        .not("suggested_name", "is", null),
+      "loose unnamed exemplars",
+    ) as { id: string; suggested_name: string }[]
+  ).filter((e) => names.has(slugify(e.suggested_name)));
+  if (loose.length > 0) {
+    must(
+      await supabase
+        .from("character_face_exemplars")
+        .delete()
+        .eq("book_id", BOOK)
+        .eq("source_issue", ISSUE)
+        .is("character_id", null)
+        .in(
+          "id",
+          loose.map((e) => e.id),
+        ),
+      "delete loose unnamed exemplars",
+    );
+  }
+  must(
+    await supabase
+      .from("panel_character_detections")
+      .delete()
+      .in("id", ids)
+      .is("character_id", null),
+    "delete unknown faces",
+  );
+  console.log(
+    `  review-clusters: rejected ${faces.length} unknown faces (owner simulation)`,
+  );
+}
+
 async function runPipeline(
   scenario: Scenario,
   logPath: string,
@@ -696,6 +776,7 @@ async function runPipeline(
       if (gate !== want) {
         fail(`paused at ${gate}; expected ${want ?? "no more pauses"}`);
       }
+      if (gate === "review-clusters") await rejectUnknownFaces(scenario);
       if (gate === "casting" && insertOmitted) {
         must(
           await supabase.from("castlist").insert(insertOmitted()),
