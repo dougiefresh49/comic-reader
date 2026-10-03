@@ -7,12 +7,21 @@ import { canResumePages } from "~/server/admin/pages-gate";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
-    bookId: string;
-    issueId: string;
-    step: string;
+    bookId: unknown;
+    issueId: unknown;
+    step: unknown;
   };
 
-  if (!body.bookId || !body.issueId || !body.step) {
+  // Strings only: an array step would skip the checks below and still
+  // stringify into a live hook token.
+  if (
+    typeof body.bookId !== "string" ||
+    typeof body.issueId !== "string" ||
+    typeof body.step !== "string" ||
+    !body.bookId ||
+    !body.issueId ||
+    !body.step
+  ) {
     return Response.json(
       { error: "missing bookId, issueId, or step" },
       { status: 400 },
