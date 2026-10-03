@@ -1,5 +1,6 @@
 // Small pure helpers shared by the review editor's loader and its client components.
 import { slugify } from "~/lib/character-id";
+import type { RoleId } from "~/lib/cast";
 import type { CastMember, KnownCharacter, VoiceOption } from "./types";
 
 export const slug = slugify;
@@ -17,18 +18,8 @@ export function titleCase(id: string): string {
     .join(" ");
 }
 
-export const NARRATOR_ID = "narrator";
-
-/** The three generic roles of the closed speaker list. */
-export const ROLES = [
-  { id: NARRATOR_ID, name: "Narrator", aliases: ["Narration"] },
-  {
-    id: "off-panel",
-    name: "Off-panel",
-    aliases: ["Off panel", "Offscreen", "Off-screen"],
-  },
-  { id: "crowd", name: "Crowd", aliases: [] as string[] },
-];
+/** The narrator role; the roles themselves are `ROLE_IDS` in `~/lib/cast`. */
+export const NARRATOR_ID: RoleId = "narrator";
 
 /**
  * A stored speaker string to a cast id, or null when it is not in the closed
