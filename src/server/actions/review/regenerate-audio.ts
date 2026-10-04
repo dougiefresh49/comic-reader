@@ -9,6 +9,7 @@ import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadBookCast } from "~/lib/cast";
+import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import { voiceLookupContext } from "~/workflows/steps/audio-plan";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
@@ -148,6 +149,18 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: resolved.error };
   }
   const voiceId = resolved.voiceId;
+  // The audio step's request: same text, voice and voice settings.
+  let request;
+  try {
+    const overrides = await loadVoiceOverrides(supabaseAdmin, [voiceId]);
+    request = buildTtsRequest({
+      text,
+      voiceId,
+      override: overrides.get(voiceId),
+    });
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 
   // Each take goes to a path no earlier take used, so the upload never
   // touches what the reader plays. switch_bubble_audio_take then changes the
@@ -185,12 +198,8 @@ export async function regenerateAudio(args: Args) {
         issueId: args.issueId,
         model: TTS_MODEL,
       },
-      text.length,
-      () =>
-        client.textToSpeech.convertWithTimestamps(
-          voiceId,
-          buildTtsRequest({ text, emotion: b.emotion, voiceId }),
-        ),
+      request.text.length,
+      () => client.textToSpeech.convertWithTimestamps(voiceId, request),
     );
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 

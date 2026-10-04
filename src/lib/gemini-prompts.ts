@@ -1,3 +1,5 @@
+import { CUE_RULES } from "./cue-rules";
+
 /**
  * Switches for the get-context prompt. The pipeline passes `closedList` and
  * `castNotes` (#354); the review editor's analyze call passes `closedList`,
@@ -91,11 +93,9 @@ ${characterList}
     * **Emotion:** Look at the character's eyebrows, mouth, and body language.
 
 3.  **Performance Cues (CRITICAL):**
-    Rewrite the text to guide the voice actor. Use these rules:
-    * **Stuttering:** If the character looks scared or text has "...", add stutters like "I-I don't know..."
-    * **Volume:** If text is bold or bubble is jagged, add \`[Shouting]\` or \`[Screaming]\` at the start.
-    * **Whisper:** If bubble is dotted, add \`[Whispering]\`.
-    * **Tone:** Add natural language cues in brackets like \`[sighs]\`, \`[laughs]\`, \`[grunts]\`, or \`[sarcastically]\`.
+    Write \`textWithCues\`: the text with ElevenLabs audio tags added, by the cue rules below. Use the speaker and emotion from step 2 and what the bubble shows (a jagged bubble shouts, a dotted one whispers).
+
+${CUE_RULES}
 
 **Output Format:**
 First, think step-by-step in a <scratchpad> block to confirm your reasoning.
@@ -114,7 +114,7 @@ ${reasoning}
   "side": "VILLAIN",
   "voiceDescription": "Aggressive, raspy male voice, American accent, high energy",
   "emotion": "shouting",
-${textExample}  "textWithCues": "[Shouting aggressively] You'll never win!"
+${textExample}  "textWithCues": "[shouting, aggressive] You'll never win!"
 }
 \`\`\`
 `;

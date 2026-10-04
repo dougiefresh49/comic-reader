@@ -433,7 +433,6 @@ async function main() {
             voiceId,
             buildTtsRequest({
               text: textToUse,
-              emotion: bubble.emotion,
               voiceId,
               previousText,
               nextText,

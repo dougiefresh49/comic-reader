@@ -4,15 +4,16 @@
  * Render one line with the pipeline's exact TTS request, for listening next to
  * the audio the pipeline already made.
  *
- * The request comes from `buildTtsRequest` (#103), the same call the audio step
- * makes, so what this renders is what a kid hears. The default run is a dry run:
- * it prints the request and the character count and spends nothing. `--execute`
- * makes the one paid call and writes to `tmp/render-bubble/`, never to Storage
- * and never to the database.
+ * The request comes from `buildTtsRequest` (#103) with the voice's stored
+ * `voice_settings` (#412), the same call the audio step makes, so what this
+ * renders is what a kid hears. The default run is a dry run: it prints the
+ * request and the character count and spends nothing. `--execute` makes the
+ * one paid call and writes to `tmp/render-bubble/`, never to Storage and never
+ * to the database.
  *
  * Usage:
  *   pnpm render-bubble -- --bubble <uuid> --book <id> --issue <id> [--voice <el id>]
- *   pnpm render-bubble -- --text "<line>" --emotion <word> --voice <el id>
+ *   pnpm render-bubble -- --text "<line>" --voice <el id>
  *   pnpm render-bubble -- --batch <file.jsonl> --max 3
  *
  * See `--help` for every flag.
@@ -25,6 +26,8 @@ import { loadBookCast } from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { buildTtsRequest, type TtsRequest } from "~/lib/tts-request";
+import { loadVoiceOverrides } from "~/lib/voice-overrides";
+import type { VoiceOverride } from "~/lib/voice-settings";
 import {
   lookupVoice,
   normalizeAlignment,
@@ -44,14 +47,28 @@ interface LineSpec {
   book?: string;
   issue?: string;
   text?: string;
-  emotion?: string;
   voice?: string;
   stability?: number;
-  style?: number;
-  speed?: number;
+  similarity?: number;
+  /** Replaces the voice's stored `line_prefix`; "" means none. */
+  prefix?: string;
   context?: boolean;
   label?: string;
 }
+
+/** Every field a batch line may hold. */
+const LINE_FIELDS = [
+  "bubble",
+  "book",
+  "issue",
+  "text",
+  "voice",
+  "stability",
+  "similarity",
+  "prefix",
+  "context",
+  "label",
+] as const satisfies readonly (keyof LineSpec)[];
 
 interface Args extends LineSpec {
   batch?: string;
@@ -63,7 +80,7 @@ const HELP = `
 Usage: pnpm render-bubble -- <source> [options]
 
 Sources (pick one):
-  --bubble <uuid>    Read text_with_cues ?? ocr_text and emotion from bubbles.
+  --bubble <uuid>    Read text_with_cues ?? ocr_text from bubbles.
   --text "<line>"    Render a line you type.
 
 Context for a --bubble read (both required with it):
@@ -75,11 +92,12 @@ Overrides:
                      lookup finds no voice for the bubble (no castlist row,
                      or a row with no voice yet). With --bubble the lookup
                      still runs, and a castlist conflict is still refused.
-  --emotion <word>   Emotion, with --text or to replace the bubble's own.
-  --stability <n>    0 to 1
-  --style <n>        0 to 1
-  --speed <n>        0.7 to 1.2. Inert on eleven_v3, which ignores it.
-  --context          Send the adjacent bubbles as previous_text and next_text.
+  --stability <n>    0 to 1. Replaces the base and the voice's own value.
+  --similarity <n>   0 to 1. Replaces the base and the voice's own value.
+  --prefix "<tag>"   Replaces the voice's stored line_prefix for this render,
+                     e.g. --prefix "[strong Japanese accent]". --prefix ""
+                     renders with no prefix.
+  --context         Send the adjacent bubbles as previous_text and next_text.
                      Reads the page's other bubbles in reading order, so it
                      needs a --bubble source, not --text.
   --label <name>     Output name under tmp/render-bubble/ (default: derived).
@@ -100,8 +118,7 @@ Other:
 /** What the ElevenLabs API accepts, so a bad override fails before the call. */
 const RANGES = {
   stability: [0, 1],
-  style: [0, 1],
-  speed: [0.7, 1.2],
+  similarity: [0, 1],
 } as const;
 
 function fail(message: string): never {
@@ -154,14 +171,12 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--book") args.book = takeValue(argv, i++, a);
     else if (a === "--issue") args.issue = takeValue(argv, i++, a);
     else if (a === "--text") args.text = takeValue(argv, i++, a);
-    else if (a === "--emotion") args.emotion = takeValue(argv, i++, a);
     else if (a === "--voice") args.voice = takeValue(argv, i++, a);
     else if (a === "--stability")
       args.stability = takeNumber(argv, i++, a, RANGES.stability);
-    else if (a === "--style")
-      args.style = takeNumber(argv, i++, a, RANGES.style);
-    else if (a === "--speed")
-      args.speed = takeNumber(argv, i++, a, RANGES.speed);
+    else if (a === "--similarity")
+      args.similarity = takeNumber(argv, i++, a, RANGES.similarity);
+    else if (a === "--prefix") args.prefix = takeValue(argv, i++, a);
     else if (a === "--label") args.label = checkLabel(takeValue(argv, i++, a));
     else if (a === "--batch") args.batch = takeValue(argv, i++, a);
     else if (a === "--max") args.max = takeNumber(argv, i++, a);
@@ -177,7 +192,6 @@ interface BubbleRow {
   id: string;
   speaker: string | null;
   character_id: string | null;
-  emotion: string | null;
   ocr_text: string | null;
   text_with_cues: string | null;
   page_number: number;
@@ -190,7 +204,7 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
   const { data, error } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, character_id, emotion, ocr_text, text_with_cues, page_number, sort_order",
+      "id, speaker, character_id, ocr_text, text_with_cues, page_number, sort_order",
     )
     .eq("book_id", spec.book)
     .eq("issue_id", spec.issue)
@@ -319,23 +333,28 @@ function noVoiceMessage(
   }
 }
 
+/** Where a setting came from: the base, the voice's `voice_settings`, or a flag. */
+type SettingSource = "base" | "voice" | "flag";
+
 /** One render, before any money is spent. */
 interface PlannedRender {
   label: string;
   voiceId: string;
   request: TtsRequest;
-  /** Dotted paths the flags replaced, e.g. `voiceSettings.speed`. */
-  overridden: string[];
-  /**
-   * Whether the adjacent bubbles ride along. On its own, never in
-   * `overridden`: that list reads as "the flags replaced this", and the
-   * context fields are not settings, so a `--context` run would otherwise
-   * hide that stability, style and speed all came from the emotion table.
-   */
+  /** Where each setting, the line prefix and the voice came from. */
+  from: {
+    voiceId: "lookup" | "flag";
+    stability: SettingSource;
+    similarityBoost: SettingSource;
+    /** "none" when neither the voice nor a flag sets one. */
+    linePrefix: SettingSource | "none";
+  };
+  /** The prefix in front of the text, if any, for the print. */
+  linePrefix: string | null;
+  /** Whether the adjacent bubbles ride along. */
   withContext: boolean;
+  /** `request.text.length`, prefix included: what ElevenLabs bills. */
   characterCount: number;
-  /** The emotion the settings came from, for the print. */
-  emotion: string;
   /** Where the text came from, for the print. */
   source: string;
 }
@@ -374,7 +393,6 @@ async function planRender(
     fail(`${where} sets both --bubble and --text. Pick one source.`);
   }
   let text = spec.text ?? "";
-  let emotion = spec.emotion ?? null;
   let speaker: string | null = null;
   let characterId: string | null = null;
   let source: string;
@@ -382,18 +400,15 @@ async function planRender(
   let issueId = spec.issue ?? null;
   let previousText: string | undefined;
   let nextText: string | undefined;
-  const overridden: string[] = [];
 
   if (spec.bubble) {
     const bubble = await readBubble(spec);
     text = bubble.text_with_cues ?? bubble.ocr_text ?? "";
-    emotion = spec.emotion ?? bubble.emotion;
     speaker = bubble.speaker;
     characterId = bubble.character_id;
     bookId = bookId ?? "";
     issueId = issueId ?? "";
     source = `bubble ${bubble.id} (${spec.book}/${spec.issue} page ${bubble.page_number})`;
-    if (spec.emotion !== undefined) overridden.push("emotion");
     if (spec.context) {
       ({ previousText, nextText } = await readNeighbours(
         bubble,
@@ -402,11 +417,6 @@ async function planRender(
       ));
     }
   } else if (spec.text !== undefined) {
-    if (spec.emotion === undefined) {
-      fail(
-        `${where} uses --text with no --emotion. The settings come from the emotion, so say which one.`,
-      );
-    }
     source = "--text";
     if (spec.context) {
       fail(
@@ -415,7 +425,7 @@ async function planRender(
     }
   } else {
     fail(
-      'Nothing to render. Pass --bubble <uuid> --book <id> --issue <id>, or --text "<line>" --emotion <word>.',
+      'Nothing to render. Pass --bubble <uuid> --book <id> --issue <id>, or --text "<line>" --voice <el id>.',
     );
   }
 
@@ -439,46 +449,62 @@ async function planRender(
   voiceId = spec.voice ?? voiceId;
   if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));
 
+  // The voice's stored override, the audio step's own read, then the flags.
+  const stored: VoiceOverride =
+    (
+      await loadVoiceOverrides(supabase, [voiceId]).catch((e: Error) =>
+        fail(e.message),
+      )
+    ).get(voiceId) ?? {};
+  const override: VoiceOverride = { ...stored };
+  const from: PlannedRender["from"] = {
+    voiceId: spec.voice ? "flag" : "lookup",
+    stability: stored.stability !== undefined ? "voice" : "base",
+    similarityBoost: stored.similarityBoost !== undefined ? "voice" : "base",
+    linePrefix: stored.linePrefix !== undefined ? "voice" : "none",
+  };
+  if (spec.stability !== undefined) {
+    override.stability = spec.stability;
+    from.stability = "flag";
+  }
+  if (spec.similarity !== undefined) {
+    override.similarityBoost = spec.similarity;
+    from.similarityBoost = "flag";
+  }
+  if (spec.prefix !== undefined) {
+    const prefix = spec.prefix.trim();
+    if (prefix) override.linePrefix = prefix;
+    else delete override.linePrefix;
+    from.linePrefix = "flag";
+  }
+
   const request = buildTtsRequest({
     text,
-    emotion,
     voiceId,
+    override,
     previousText,
     nextText,
     withContext: spec.context ?? false,
   });
-  if (spec.stability !== undefined) {
-    request.voiceSettings.stability = spec.stability;
-    overridden.push("voiceSettings.stability");
-  }
-  if (spec.style !== undefined) {
-    request.voiceSettings.style = spec.style;
-    overridden.push("voiceSettings.style");
-  }
-  if (spec.speed !== undefined) {
-    request.voiceSettings.speed = spec.speed;
-    overridden.push("voiceSettings.speed");
-  }
-  if (spec.voice) overridden.push("voiceId");
 
   return {
     label: defaultLabel(spec, index),
     voiceId,
     request,
-    overridden,
+    from,
+    linePrefix: override.linePrefix ?? null,
     withContext: spec.context ?? false,
-    characterCount: text.length,
-    emotion: emotion ?? "neutral",
+    characterCount: request.text.length,
     source,
   };
 }
 
-/** The printed request, with the overridden paths named inside the JSON. */
+/** The printed request, with where each setting came from inside the JSON. */
 function printableJson(render: PlannedRender): string {
   return JSON.stringify(
     {
       ...render.request,
-      overridden: render.overridden,
+      from: render.from,
       withContext: render.withContext,
       characterCount: render.characterCount,
     },
@@ -489,18 +515,22 @@ function printableJson(render: PlannedRender): string {
 
 function printPlan(render: PlannedRender): void {
   console.log(`\n${render.label}`);
+  const { voiceSettings } = render.request;
   console.log(`   source:   ${render.source}`);
-  console.log(`   emotion:  ${render.emotion}`);
-  console.log(`   voice:    ${render.voiceId}`);
+  console.log(`   voice:    ${render.voiceId} (${render.from.voiceId})`);
+  console.log(`   text:     ${render.request.text}`);
   console.log(`   chars:    ${render.characterCount}`);
   console.log(
-    `   settings: stability ${render.request.voiceSettings.stability}, ` +
-      `similarityBoost ${render.request.voiceSettings.similarityBoost}, ` +
-      `style ${render.request.voiceSettings.style}, ` +
-      `speed ${render.request.voiceSettings.speed}` +
-      (render.overridden.some((o) => o.startsWith("voiceSettings."))
-        ? ""
-        : " (all from the emotion table)"),
+    `   settings: stability ${voiceSettings.stability} (${render.from.stability}), ` +
+      `similarityBoost ${voiceSettings.similarityBoost} (${render.from.similarityBoost})`,
+  );
+  console.log(
+    `   prefix:   ` +
+      (render.linePrefix
+        ? `${render.linePrefix} (${render.from.linePrefix})`
+        : render.from.linePrefix === "flag"
+          ? `(none, flag)`
+          : `(none)`),
   );
   if (render.withContext) {
     const absent: string[] = [];
@@ -566,10 +596,9 @@ async function executeRender(render: PlannedRender): Promise<void> {
       {
         label: render.label,
         source: render.source,
-        emotion: render.emotion,
         voiceId: render.voiceId,
         request: render.request,
-        overridden: render.overridden,
+        from: render.from,
         withContext: render.withContext,
         characterCount: render.characterCount,
         alignment,
@@ -596,10 +625,19 @@ async function executeRender(render: PlannedRender): Promise<void> {
  */
 function checkBatchLine(spec: LineSpec, where: string): LineSpec {
   const out: LineSpec = { ...spec };
+  // A field this script no longer reads (style, speed, emotion) would
+  // otherwise be dropped in silence and the line rendered without it.
+  const unknown = Object.keys(out).filter(
+    (k) => !(LINE_FIELDS as readonly string[]).includes(k),
+  );
+  if (unknown.length > 0) {
+    fail(
+      `${where} has ${unknown.join(", ")}, which a line cannot set. The fields are ${LINE_FIELDS.join(", ")}.`,
+    );
+  }
   for (const [key, range] of [
     ["stability", RANGES.stability],
-    ["style", RANGES.style],
-    ["speed", RANGES.speed],
+    ["similarity", RANGES.similarity],
   ] as const) {
     const v = out[key];
     if (v === undefined) continue;
@@ -625,8 +663,8 @@ function checkBatchLine(spec: LineSpec, where: string): LineSpec {
     "book",
     "issue",
     "text",
-    "emotion",
     "voice",
+    "prefix",
   ] as const) {
     const v = out[key];
     if (v !== undefined && typeof v !== "string") {
@@ -664,21 +702,7 @@ async function main(): Promise<void> {
     // A batch line carries every field itself, so a per-line flag beside
     // --batch would read as "and it applies to all of them" and then be
     // ignored. Say so rather than spend on lines nobody asked for.
-    const perLine = (
-      [
-        "bubble",
-        "book",
-        "issue",
-        "text",
-        "emotion",
-        "voice",
-        "stability",
-        "style",
-        "speed",
-        "context",
-        "label",
-      ] as const
-    ).filter((k) => args[k] !== undefined);
+    const perLine = LINE_FIELDS.filter((k) => args[k] !== undefined);
     if (perLine.length > 0) {
       fail(
         `--batch reads every field from ${args.batch}, so ${perLine.map((k) => `--${k}`).join(", ")} would be ignored. ` +

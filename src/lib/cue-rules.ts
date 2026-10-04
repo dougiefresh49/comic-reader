@@ -5,14 +5,13 @@
  * Curated from the ElevenLabs best-practices page, section "Prompting Eleven
  * v4" (Audio tags, Punctuation, Enhancing input), read 2026-10-02:
  * https://elevenlabs.io/docs/overview/capabilities/text-to-speech/best-practices.md
- * Its "Prompting Eleven v3" section says the same techniques apply to v3,
- * which renders every take until #213 moves TTS to v4. Where v4 and v3
- * examples differ, the v4 rule is the one written here.
+ * and from the owner's eleven_v4 tag test of 2026-10-03 (#412). eleven_v4
+ * renders every take (`TTS_MODEL` in `tts-request.ts`).
  *
  * `CUE_RULES` is plain prompt text with no inputs, so any prompt that writes
- * `text_with_cues` can include it: the review editors' Regenerate cues
- * (`buildCuePrompt` below) today, and later the pipeline's "Performance Cues"
- * block in `buildContextPrompt` and `rerun-context.ts` (#213 step 5).
+ * `text_with_cues` includes it: the review editors' Regenerate cues
+ * (`buildCuePrompt` below) and the pipeline's cue instruction in
+ * `buildContextPrompt` (#213 step 5).
  */
 export const CUE_RULES = `## Cue rules
 
@@ -20,6 +19,7 @@ The output is read aloud by ElevenLabs text to speech. Audio tags in square brac
 
 ### The words never change
 - Do not add, remove, reorder, respell or translate any word, and never put a word of the line inside brackets. Letter case (below) is the only change allowed to the words.
+- Never stretch or repeat letters to show singing, shouting or a drawn-out word ("demands" never becomes "demaaands"). Keep each word spelled as printed and let the tag carry the delivery.
 - Keep every punctuation mark exactly as written. "..." stays "..." wherever it is, at the start, middle or end: it is the pause and the weight, so never turn it into a dash, never drop it, and never add a pause tag such as [short pause] beside it; the punctuation already carries the pause. "--" stays "--". Do not add or remove "!", "?", "...", commas or dashes.
 - If the input already has audio tags in square brackets, they are from an earlier pass: remove them all and write fresh ones. Never keep an old tag beside a new one.
 
@@ -29,17 +29,20 @@ The output is read aloud by ElevenLabs text to speech. Audio tags in square brac
   - a sound effect or a cry that is the whole line or stands alone in it (BOOM!, WHAM!, AAAGH!);
   - a short shout of one to three words when the emotion says shouting or screaming, or no emotion is given and the line plainly shouts (MASTER!, NO, WAIT!);
   - at most one stressed word in a longer line, and only when the emotion or the words make the stress obvious.
-- A longer shouted sentence still goes to sentence case. The tag carries the volume, e.g. "[shouting, furious] You'll pay for this!"
+- A longer shouted sentence still goes to sentence case. The tag carries the volume, and the one stressed word above may keep its capitals, e.g. "[shouting, furious] You'll PAY for this!"
 - Text that is already in mixed case keeps its case.
 
 ### Audio tags
 - A tag describes the voice: its emotion, volume, pace, texture, or a sound the speaker's own voice makes. Write tags that clearly describe the delivery, e.g. [low, gravelly voice], [quietly, with controlled fear], [voice rising into firm resolve], [warm, faint amusement]. Short tags such as [whispers] or [sighs] work too.
 - Fit the tag to the moment: the emotion given with the line comes first, then the speaker's character and the words. A wise mentor does not giggle; a hulking brute does not sound timid unless the line says so.
 - Put a tag right before the words it colors. A reaction the voice makes, such as [sighs] or [laughs], can go right after the words that cause it. Most lines need one tag at the start; add another only where the delivery changes inside the line. A line that already reads right with no tag can have none.
+- Tags can chain when the moment builds. A reaction can run into a delivery, e.g. "[starts laughing] You call that a plan? [laughs harder] [sarcastic] Oh, brilliant.", and the delivery can change partway through a line, e.g. "[clears throat, gasping] I'm fine, I'm fine... [quiet, slow realization] wait. Where's Mikey?"
 - These are examples, not the whole set. Write whatever tag the moment needs:
-  - delivery: [happy], [sad], [excited], [angry], [annoyed], [appalled], [thoughtful], [surprised], [dismissive], [sarcastic], [curious], [mischievously], [whispers], [shouting], [crying], [menacing], [reassuring];
+  - delivery: [happy], [sad], [excited], [angry], [annoyed], [appalled], [thoughtful], [surprised], [dismissive], [sarcastic], [curious], [mischievously], [whispers], [shouting], [crying], [sings], [menacing], [reassuring];
   - sounds the voice makes: [laughs], [chuckles], [sighs], [exhales sharply], [inhales deeply], [gasps], [clears throat];
+  - talking through an action: [mouth full], [chewing, slurred];
   - fuller directions: [low, steady voice, restrained urgency], [softly, with wonder], [warm, conversational tone], [quiet, reflective narration].
+- Never write an accent tag such as [Italian accent] or [strong Japanese accent]. The voice already carries the character's accent.
 - Never write a tag for a sound that is not the speaker's voice, such as [explosion], [gunshot], [applause], [crash], [footsteps] or [music]: the model plays those as sound effects. When the words themselves are a sound effect (BOOM!, KRAK!), they stay words for the voice to say; a tag may say how to say them ([loud, forceful voice]) but never names the sound.
 - Never write a tag for something no one can hear, such as [standing], [grinning], [pacing] or [points].`;
 
