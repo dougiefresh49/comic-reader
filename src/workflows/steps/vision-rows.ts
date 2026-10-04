@@ -404,9 +404,6 @@ export type ClosedCastMember = {
 /** The marker a cast line carries when a face on the page was identified as that member. */
 export const SEEN_ON_PAGE = "[seen on this page]";
 
-/** How a cast line's aliases note opens; the note ends with ")". */
-const ALSO_CALLED = "(also called ";
-
 /**
  * What the prompt says a cast line means. Goes under the cast heading as
  * `castNotes`, so the list and its legend stay in step here, not in the
@@ -425,59 +422,55 @@ export function closedCastLines(
   seenIds: Iterable<string>,
 ): string[] {
   const seen = new Set(seenIds);
-  return cast.map((m) => {
-    const nameKey = slugify(m.name);
-    const aliases = m.aliases.filter((a) => {
-      const key = slugify(a);
-      return key !== "" && key !== nameKey && key !== m.id;
-    });
-    const parts = [m.name];
-    if (aliases.length > 0) parts.push(`${ALSO_CALLED}${aliases.join(", ")})`);
-    if (seen.has(m.id)) parts.push(SEEN_ON_PAGE);
-    return parts.join(" ");
+  return cast.map((m) => castLine(m, seen.has(m.id)));
+}
+
+/** One member's cast line; the only place the two notes are written. */
+function castLine(m: ClosedCastMember, seen: boolean): string {
+  const nameKey = slugify(m.name);
+  const aliases = m.aliases.filter((a) => {
+    const key = slugify(a);
+    return key !== "" && key !== nameKey && key !== m.id;
   });
+  const parts = [m.name];
+  if (aliases.length > 0) parts.push(`(also called ${aliases.join(", ")})`);
+  if (seen) parts.push(SEEN_ON_PAGE);
+  return parts.join(" ");
 }
 
 /**
  * The cast member a reply names, or null when it names nobody on the list.
  * Exact after `slugify`, the review editor's `findCast` rule: the id, the
  * display name, or a whole alias, ids winning over names and names over
- * aliases. When that finds nobody, the reply is matched once more with the
- * notes `closedCastLines` appends cut from its end, for a reply that copied
- * the whole cast line (#373, decisions row 269). Nothing else is cut: never
- * an alias's first word, never a fuzzy match. A reply the cast does not hold
- * is stored as null for review, not guessed (#354).
+ * aliases. When that finds nobody, a reply that copied a member's cast line
+ * is that member: the line as `closedCastLines` writes it, with or without
+ * `SEEN_ON_PAGE`, or the name with `SEEN_ON_PAGE` alone (#373, decisions row
+ * 269). The reply is compared whole and never cut: never an alias's first
+ * word, never a fuzzy match. A reply the cast does not hold is stored as null
+ * for review, not guessed (#354).
  */
 export function matchCastSpeaker(
   raw: string | null | undefined,
   cast: ClosedCastMember[],
 ): ClosedCastMember | null {
   if (typeof raw !== "string") return null;
-  return (
-    exactCastMatch(raw, cast) ?? exactCastMatch(stripCastLineNotes(raw), cast)
-  );
-}
-
-function exactCastMatch(
-  raw: string,
-  cast: ClosedCastMember[],
-): ClosedCastMember | null {
   const key = slugify(raw);
   if (!key) return null;
   return (
     cast.find((m) => m.id === key || slugify(m.name) === key) ??
     cast.find((m) => m.aliases.some((a) => slugify(a) === key)) ??
+    cast.find((m) => copiedCastLineKeys(m).includes(key)) ??
     null
   );
 }
 
-/** `raw` without a trailing `SEEN_ON_PAGE`, then without a trailing aliases note. */
-function stripCastLineNotes(raw: string): string {
-  let s = raw.trim();
-  if (s.endsWith(SEEN_ON_PAGE)) s = s.slice(0, -SEEN_ON_PAGE.length).trim();
-  const at = s.indexOf(ALSO_CALLED);
-  if (at > 0 && s.endsWith(")")) s = s.slice(0, at).trim();
-  return s;
+/** The slugs of a member's cast line as a reply can copy it: with and without each note. */
+function copiedCastLineKeys(m: ClosedCastMember): string[] {
+  return [
+    castLine(m, false),
+    castLine(m, true),
+    `${m.name} ${SEEN_ON_PAGE}`,
+  ].map(slugify);
 }
 
 /** The narrator role's `characters.id`; NARRATION and CAPTION resolve to it through the match. */
