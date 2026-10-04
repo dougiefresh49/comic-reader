@@ -11,11 +11,16 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   addAlias,
   addToCast,
+  cancelVoiceRequest,
   createCharacter,
   loadBookCast,
+  readVoiceRequests,
   removeFromCast,
   renameCharacter as renameCharacterRow,
   seedCast,
+  setVoice,
+  storeVoiceRequest,
+  type VoiceRequest,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
@@ -23,6 +28,7 @@ import {
   canApproveCharacters,
   readUnknownDetections,
 } from "~/server/admin/characters-gate";
+import type { CardGroup } from "./types";
 
 export type ActionResult =
   | { ok: true; message: string }
@@ -567,6 +573,153 @@ export async function nameSuggestion(args: {
     };
   } catch (err) {
     return fail("naming a suggestion", err);
+  }
+}
+
+/**
+ * "Another active voice": written at once to the character's castlist rows in
+ * every issue of the book. A pending voice request for this issue is
+ * cancelled first; when that throws, nothing else is written. A cast member
+ * with no castlist row in the book yet gets one here first.
+ */
+export async function setActiveVoice(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+  group: CardGroup;
+  voiceUuid: string;
+}): Promise<ActionResult> {
+  try {
+    const { scope, characterId, voiceUuid } = args;
+    const voice = await supabaseAdmin
+      .from("voices")
+      .select("display_name, status")
+      .eq("id", voiceUuid)
+      .maybeSingle();
+    must("reading the voice", voice.error);
+    const row = voice.data as { display_name: string; status: string } | null;
+    if (row?.status !== "active")
+      return { ok: false, error: "That voice is not active any more." };
+    const pending = (
+      await readVoiceRequests(supabaseAdmin, scope.bookId, scope.issueId)
+    ).some((r) => r.characterId === characterId && r.status === "pending");
+    if (pending)
+      await cancelVoiceRequest(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+      );
+    let n = await setVoice(supabaseAdmin, scope.bookId, characterId, voiceUuid);
+    if (n === 0 && (args.group === "here" || args.group === "role")) {
+      await addToCast(supabaseAdmin, scope.bookId, scope.issueId, characterId);
+      n = await setVoice(supabaseAdmin, scope.bookId, characterId, voiceUuid);
+    }
+    revalidate(scope);
+    if (n === 0)
+      return {
+        ok: false,
+        error: `${args.name} has no castlist row in this book to take the voice.`,
+      };
+    return {
+      ok: true,
+      message: `${args.name} now has ${row.display_name}, in every issue of the book.${pending ? " The voice request is withdrawn." : ""}`,
+    };
+  } catch (err) {
+    return fail("setting a voice", err);
+  }
+}
+
+/** A voice-lab clone or a new designed voice: stored as a request, made at the voices stop. */
+export async function requestVoice(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+  request: VoiceRequest;
+}): Promise<ActionResult> {
+  try {
+    const { scope, characterId } = args;
+    let request: VoiceRequest;
+    let wants: string;
+    if (args.request.action === "clone") {
+      const target = args.request.targetVoiceUuid;
+      const { data, error } = await supabaseAdmin
+        .from("voices")
+        .select("display_name, status, character_id, source_clip_path")
+        .eq("id", target)
+        .maybeSingle();
+      must("reading the voice-lab clone", error);
+      const row = data as {
+        display_name: string;
+        status: string;
+        character_id: string | null;
+        source_clip_path: string | null;
+      } | null;
+      if (
+        row?.status !== "archived" ||
+        row.character_id !== characterId ||
+        !row.source_clip_path
+      )
+        return {
+          ok: false,
+          error: `That voice-lab clone is not on file for ${args.name}.`,
+        };
+      // A lab candidate is linked to no castlist row of this book (load.ts).
+      const linked = await supabaseAdmin
+        .from("castlist")
+        .select("character")
+        .eq("book_id", scope.bookId)
+        .eq("voice_uuid", target)
+        .limit(1);
+      must("reading the castlist", linked.error);
+      if (linked.data?.length)
+        return {
+          ok: false,
+          error: "That voice-lab clone is already a voice in this book.",
+        };
+      request = { action: "clone", targetVoiceUuid: target };
+      wants = `a voice-lab clone: ${row.display_name}`;
+    } else if (args.request.action === "design") {
+      request = { action: "design" };
+      wants = "a new designed voice";
+    } else {
+      return { ok: false, error: "Not a voice request." };
+    }
+    await storeVoiceRequest(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      request,
+    );
+    revalidate(scope);
+    return {
+      ok: true,
+      message: `${args.name} wants ${wants}. It is made at the voices stop.`,
+    };
+  } catch (err) {
+    return fail("requesting a voice", err);
+  }
+}
+
+/** Undoes a voice request, so the options are back and one can be made again. */
+export async function undoVoiceRequest(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+}): Promise<ActionResult> {
+  try {
+    const { scope, characterId } = args;
+    await cancelVoiceRequest(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+    );
+    revalidate(scope);
+    return { ok: true, message: `${args.name}'s voice request is undone.` };
+  } catch (err) {
+    return fail("undoing a voice request", err);
   }
 }
 
