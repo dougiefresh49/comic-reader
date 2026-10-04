@@ -1,4 +1,4 @@
-import { getVoiceSettingsFromEmotion } from "./voice-settings";
+import { BASE_VOICE_SETTINGS, type VoiceOverride } from "./voice-settings";
 
 /**
  * The one model every TTS request names. ElevenLabs defaults `model_id` to
@@ -6,18 +6,23 @@ import { getVoiceSettingsFromEmotion } from "./voice-settings";
  * omits it silently renders with a different model than the one the audio
  * was made with.
  */
-export const TTS_MODEL = "eleven_v3";
+export const TTS_MODEL = "eleven_v4";
 
 export interface TtsRequestOptions {
   /** The bubble's `text_with_cues`, else its `ocr_text`. */
   text: string;
-  /** The bubble's `emotion`. Null and undefined both read as "neutral". */
-  emotion?: string | null;
   /**
    * The castlist `voice_id`. Not part of the returned object: the SDK takes
    * it as the first positional argument, beside the request.
    */
   voiceId: string;
+  /**
+   * The voice's parsed `voices.voice_settings` (`loadVoiceOverrides`). Its
+   * numbers replace the base settings and its `linePrefix` goes in front of
+   * the text. Required, so a call site cannot forget the voice's settings;
+   * `undefined` (a voice with no row) uses the base and the bare text.
+   */
+  override: VoiceOverride | undefined;
   /** The adjacent bubble's text, in reading order. Only sent with `withContext`. */
   previousText?: string;
   /** The adjacent bubble's text, in reading order. Only sent with `withContext`. */
@@ -35,39 +40,26 @@ export interface TtsRequestOptions {
    *   speech's continuity in the current generation."
    * - `next_text`: the same, for the text after. Sending both is what
    *   `scripts/generate-audio.ts` had commented out.
-   * - `voice_settings.speed`: "A value of 1.0 is the default speed, while
-   *   values less than 1.0 slow down the speech, and values greater than
-   *   1.0 speed it up."
-   * - `voice_settings.similarity_boost`: how closely the AI adheres to the
-   *   original voice. Default 0.75, which is what `getVoiceSettingsFromEmotion`
-   *   returns for every emotion.
    * - `voice_settings.use_speaker_boost`: a boolean, server default true. It
-   *   raises resemblance to the original speaker and costs latency. The
-   *   voice-settings table has no field for it, so every request leaves it to
-   *   the server default.
+   *   raises resemblance to the original speaker and costs latency. Every
+   *   request leaves it to the server default.
    * - `model_id`: defaults to `eleven_multilingual_v2` when omitted.
    */
   withContext?: boolean;
 }
 
 /**
- * What `eleven_v3` does with `voiceSettings`, read 2026-09-29, no call made.
+ * What `eleven_v4` does with `voiceSettings`, from the #213 probe
+ * (2026-09-28, two with-timestamps calls on the Michelangelo voice):
  *
- * `stability` and `style` are available on v3 and are the only two settings
- * that reach the model. ElevenLabs documents, on the Text to Speech playground
- * page (https://elevenlabs.io/docs/eleven-creative/playground/text-to-speech#voice-settings):
- *
- * - "Speed is not available for the Eleven v3 model."
- * - "Similarity is not available for the Eleven v3 model."
- * - "Speaker Boost is not available for the Eleven v3 model."
- *
- * So `speed` and `similarityBoost` are sent on every request and dropped by
- * v3. The builder still sends them: the request is one object for every call
- * site, and dropping fields per model belongs to #111, which owns the
- * settings table. The consequence worth knowing: `getVoiceSettingsFromEmotion`
- * varies `speed` per emotion and holds `similarityBoost` at a constant 0.75,
- * so on v3 only the `stability` and `style` columns in that table change what
- * a kid hears. `speed` is inert until the model or the table changes.
+ * - `stability` and `similarity_boost` are the two settings v4 uses.
+ *   `GET /v1/models` reports `can_use_style: false` for it.
+ * - A call that also sent `style: 0.5` and `speed: 1.1` returned 200 with
+ *   audio of the same length and byte count as one without them, so v4
+ *   accepts both and ignores them. The builder sends neither.
+ * - The alignment holds every character of the text, tag characters
+ *   included, which is why a `linePrefix` tag needs no reader change:
+ *   `buildWordTimings` drops anything in square brackets.
  */
 
 /** The SDK's `BodyTextToSpeechFullWithTimestamps`, narrowed to what we send. */
@@ -77,33 +69,42 @@ export interface TtsRequest {
   voiceSettings: {
     stability: number;
     similarityBoost: number;
-    style: number;
-    speed: number;
   };
   previousText?: string;
   nextText?: string;
 }
 
 /**
- * The request every TTS call sends, built from one table.
+ * The request every TTS call sends: the base settings with the voice's
+ * override on top, and the voice's line prefix in front of the text. The
+ * prefix is added here and nowhere else, so #106's content hash of the
+ * request covers it, and it is billed, so callers record `text.length` of
+ * the returned request.
  *
  * Pure: no SDK import, no env read, no I/O, so #106's content hash, #107 and
  * voice-lab's design card can call it without a client.
  */
 export function buildTtsRequest({
   text,
-  emotion,
+  override,
   previousText,
   nextText,
   withContext = false,
 }: TtsRequestOptions): TtsRequest {
-  const { stability, similarityBoost, style, speed } =
-    getVoiceSettingsFromEmotion(emotion ?? "neutral");
-
+  // An older or hand-edited `text_with_cues` can already carry the voice's
+  // tag, so a text that starts with it is sent as it is, not tagged twice.
+  const prefix = override?.linePrefix;
   const request: TtsRequest = {
     modelId: TTS_MODEL,
-    text,
-    voiceSettings: { stability, similarityBoost, style, speed },
+    text:
+      prefix && !text.trimStart().toLowerCase().startsWith(prefix.toLowerCase())
+        ? `${prefix} ${text}`
+        : text,
+    voiceSettings: {
+      stability: override?.stability ?? BASE_VOICE_SETTINGS.stability,
+      similarityBoost:
+        override?.similarityBoost ?? BASE_VOICE_SETTINGS.similarityBoost,
+    },
   };
 
   if (withContext) {
