@@ -936,10 +936,16 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     const row = state.base.bubbles[id];
     if (!row || row.deleted)
       return { ok: false, error: "This bubble has no saved row yet." };
-    if (!hasPending(id)) return { ok: true, text: row.text };
+    const asSaved = (b: BubbleDoc): SavedRow => ({
+      ok: true,
+      text: b.text,
+      emotion: b.emotion,
+      speaker: b.speakerId ?? b.rawSpeaker,
+    });
+    if (!hasPending(id)) return asSaved(row);
     const res = await writeSave();
     if (!res.ok) return res;
-    return { ok: true, text: res.sent.bubbles[id]?.text ?? row.text };
+    return asSaved(res.sent.bubbles[id] ?? row);
   };
   const listen = useListen({
     bookId: data.bookId,
