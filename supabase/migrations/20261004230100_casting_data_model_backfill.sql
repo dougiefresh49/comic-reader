@@ -156,7 +156,8 @@ on conflict (id) do nothing;
 
 -- Any other castlist name that resolves to nothing gets its own character
 -- row. This narrows the spec rule (decision row 286): the name must have no
--- candidate at all in its own book and no book-scoped alias in any book. An
+-- candidate at all in its own book, and its slug, which becomes the new id
+-- and so outranks every alias, equals no book-scoped alias in any book. An
 -- ambiguous name stays unresolved, since a new row would win it by id, here
 -- and in every other book. A no-op on today's rows, where the two such names
 -- are in the list above.
@@ -171,9 +172,9 @@ where k.character_id is null
     from aliases a
     where a.scope = 'book'
       and a.character_id is not null
-      and a.alias_norm in (
-        pg_temp.norm(k.character),
-        pg_temp.norm(pg_temp.strip_brackets(k.character))
+      and pg_temp.slug(a.alias) in (
+        pg_temp.slug(k.character),
+        pg_temp.slug(pg_temp.strip_brackets(k.character))
       )
   )
 group by pg_temp.slug(k.character)
