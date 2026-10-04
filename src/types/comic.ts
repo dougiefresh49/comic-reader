@@ -13,6 +13,8 @@ export interface Bubble {
   ocr_text: string;
   type: "SPEECH" | "NARRATION" | "CAPTION" | "SFX" | "BACKGROUND";
   speaker: string | null;
+  /** The reader's caption: `characters.display_name` for the bubble's `character_id`, else `speaker`. */
+  speakerName?: string | null;
   emotion: string;
   textWithCues?: string;
   aiReasoning?: string;
