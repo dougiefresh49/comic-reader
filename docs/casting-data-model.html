@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comic Reader: casting data model redesign</title>
+<meta name="description" content="Spec for the character, cast and voice data model: one home for each fact, delivered in six issues.">
+<style>
+  :root { --bg:#111317; --panel:#191c22; --line:#2c313b; --text:#dfe3ea; --dim:#98a1b0; --accent:#7cc4ff; --ok:#7ddc9a; --warn:#f2c46b; --bad:#ff8f8f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { display:grid; grid-template-columns:240px minmax(0,1fr); max-width:1280px; margin:0 auto; }
+  nav { position:sticky; top:0; align-self:start; height:100vh; overflow:auto; padding:24px 16px; border-right:1px solid var(--line); font-size:14px; }
+  nav a { display:block; color:var(--dim); text-decoration:none; padding:4px 0; }
+  nav a:hover { color:var(--accent); }
+  nav strong { display:block; color:var(--text); margin-bottom:8px; }
+  main { padding:32px 40px 96px; min-width:0; }
+  h1 { font-size:30px; margin:0 0 8px; }
+  h2 { font-size:22px; margin:48px 0 12px; padding-top:16px; border-top:1px solid var(--line); }
+  h3 { font-size:17px; margin:28px 0 8px; }
+  p, li { max-width:78ch; }
+  a { color:var(--accent); }
+  code { background:#232833; padding:1px 5px; border-radius:4px; font-size:13.5px; }
+  pre { background:#232833; padding:12px 14px; border-radius:6px; overflow:auto; font-size:13px; }
+  pre code { background:none; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:12px 0 20px; font-size:14px; }
+  th, td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  th { background:var(--panel); }
+  .tablewrap { overflow-x:auto; }
+  .lede { color:var(--dim); font-size:15px; }
+  .box { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 18px; margin:14px 0; }
+  .tag { display:inline-block; font-size:12px; padding:1px 7px; border-radius:10px; border:1px solid var(--line); white-space:nowrap; }
+  .new { color:var(--ok); border-color:var(--ok); }
+  .chg { color:var(--warn); border-color:var(--warn); }
+  .drop { color:var(--bad); border-color:var(--bad); }
+  .keep { color:var(--dim); }
+  svg text { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  @media (max-width:860px) { .wrap { grid-template-columns:1fr; } nav { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } main { padding:24px 18px 72px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <strong>Casting data model</strong>
+  <a href="#summary">Summary</a>
+  <a href="#rules">The rules</a>
+  <a href="#diagram">Diagram</a>
+  <a href="#tables">Tables</a>
+  <a href="#flows">How it works after</a>
+  <a href="#backfill">Backfill</a>
+  <a href="#voicelab">Voice-lab handoff</a>
+  <a href="#delivery">Delivery: six issues</a>
+  <a href="#decides">Who decides what</a>
+  <a href="#triage">Open issue triage</a>
+  <a href="#calls">Calls you can reverse</a>
+  <a href="#notdoing">Not in this redesign</a>
+  <a href="#owner">Owner items</a>
+  <a href="#roundtable">Roundtable outcome</a>
+</nav>
+<main>
+
+<h1>Casting data model redesign</h1>
+<p class="lede">Spec for <a href="https://github.com/dougiefresh49/comic-reader/issues/413">#413</a> "Casting data model redesign: one home for each fact (spec and roundtable)". Revised twice on 2026-10-04 after two roundtable rounds; the <a href="#roundtable">record</a> is at the end. Counts were read from the production database on 2026-10-03.</p>
+
+<h2 id="summary">Summary</h2>
+<p>The character, cast and voice tables carry four generations of schema at once. The ElevenLabs voice id is stored in three tables. The castlist is keyed by the character's text name. The id columns added on 2026-09-30 were never filled: <code>bubbles.character_id</code> is empty on all 640 bubbles and <code>voices.character_id</code> on all 88 voices. Most of the owner questions from the last few days trace back to code keeping those copies in step.</p>
+<p>The redesign gives each fact one home and links everything by id:</p>
+<ul>
+  <li>A <strong>character</strong> is an identity. It belongs to a franchise and can be a form of another character.</li>
+  <li>A <strong>work</strong> is one movie, show, game or comic run. An <strong>appearance</strong> says who voiced a character in a work.</li>
+  <li>A <strong>voice</strong> is something we have or have asked for. It is the only place the ElevenLabs id lives.</li>
+  <li>The <strong>castlist</strong> says which voice a character uses in an issue. It holds ids and two flags.</li>
+</ul>
+<p>No bubble, page, panel, audio file or timestamp is deleted. Issues 1 and 2 keep playing throughout. No step calls Gemini, ElevenLabs or Roboflow.</p>
+
+<h2 id="rules">The rules</h2>
+<p>These are what a builder checks its work against. Each is enforced by the database or a lint entry once the last issue lands.</p>
+<table>
+  <tr><th>#</th><th>Rule</th><th>Enforced by</th></tr>
+  <tr><td>R1</td><td>The ElevenLabs voice id is stored in <code>voices.current_elevenlabs_id</code> and nowhere else.</td><td>The other two columns are dropped.</td></tr>
+  <tr><td>R2</td><td>Characters, voices, works and appearances are linked by id. No code looks up a character or a voice by its display name, except the alias resolver turning outside text into an id.</td><td>Foreign keys; the text key columns are dropped.</td></tr>
+  <tr><td>R3</td><td>A castlist row is <code>(book_id, issue_id, character_id)</code> plus a voice reference and two flags. Archive and restore never write to it.</td><td>Primary key; lint entry limits <code>.from("castlist")</code> to <code>src/lib/cast.ts</code>.</td></tr>
+  <tr><td>R4</td><td>"No audio" is a boolean on the castlist row. No marker value is written into an id column.</td><td>The column that held the marker is dropped.</td></tr>
+  <tr><td>R5</td><td><code>bubbles.character_id</code> decides who speaks. <code>bubbles.speaker</code> is the raw label and is shown only while the id is null. A bubble with a null id gets no audio and is listed for review.</td><td>The name fallback in the audio plan is removed.</td></tr>
+  <tr><td>R6</td><td>One alias store: the <code>aliases</code> table, keyed on <code>character_id</code>.</td><td><code>characters.aliases</code> and <code>aliases.canonical</code> are dropped.</td></tr>
+  <tr><td>R7</td><td>An appearance holds facts about the world (character, work, actor). A voice holds what we own (clip, prompt, slot). Neither repeats the other's columns.</td><td>The old appearances table is dropped; the new one has no voice columns.</td></tr>
+</table>
+
+<h2 id="diagram">Diagram</h2>
+<svg viewBox="0 0 900 470" role="img" aria-label="Entity diagram: franchises, works, characters, appearances, voices, castlist, bubbles, aliases, issues" style="width:100%;max-width:900px;background:#191c22;border:1px solid #2c313b;border-radius:8px">
+  <g fill="none" stroke="#5b6577" stroke-width="1.5">
+    <line x1="150" y1="60" x2="330" y2="60"/>
+    <line x1="90" y1="85" x2="90" y2="165"/>
+    <line x1="390" y1="85" x2="390" y2="165"/>
+    <line x1="150" y1="190" x2="330" y2="190"/>
+    <line x1="390" y1="215" x2="390" y2="295"/>
+    <line x1="90" y1="215" x2="90" y2="295"/>
+    <line x1="150" y1="320" x2="330" y2="320"/>
+    <line x1="450" y1="320" x2="620" y2="320"/>
+    <line x1="680" y1="215" x2="680" y2="295"/>
+    <line x1="90" y1="345" x2="90" y2="405"/>
+    <line x1="150" y1="190" x2="200" y2="140"/><line x1="200" y1="140" x2="620" y2="140"/><line x1="620" y1="140" x2="650" y2="165"/>
+    <path d="M40 180 C10 180 10 215 40 205"/>
+  </g>
+  <g font-size="14" fill="#dfe3ea">
+    <rect x="30" y="35" width="120" height="50" rx="6" fill="#232833" stroke="#7ddc9a"/><text x="90" y="65" text-anchor="middle">franchises</text>
+    <rect x="330" y="35" width="120" height="50" rx="6" fill="#232833" stroke="#7ddc9a"/><text x="390" y="65" text-anchor="middle">works</text>
+    <rect x="30" y="165" width="120" height="50" rx="6" fill="#232833" stroke="#f2c46b"/><text x="90" y="195" text-anchor="middle">characters</text>
+    <rect x="330" y="165" width="120" height="50" rx="6" fill="#232833" stroke="#7ddc9a"/><text x="390" y="195" text-anchor="middle">appearances</text>
+    <rect x="330" y="295" width="120" height="50" rx="6" fill="#232833" stroke="#f2c46b"/><text x="390" y="325" text-anchor="middle">voices</text>
+    <rect x="30" y="295" width="120" height="50" rx="6" fill="#232833" stroke="#f2c46b"/><text x="90" y="325" text-anchor="middle">castlist</text>
+    <rect x="620" y="295" width="120" height="50" rx="6" fill="#232833" stroke="#5b6577"/><text x="680" y="325" text-anchor="middle">casting_tasks</text>
+    <rect x="620" y="165" width="120" height="50" rx="6" fill="#232833" stroke="#5b6577"/><text x="680" y="195" text-anchor="middle">bubbles</text>
+    <rect x="30" y="405" width="120" height="50" rx="6" fill="#232833" stroke="#5b6577"/><text x="90" y="435" text-anchor="middle">issues</text>
+    <rect x="620" y="35" width="120" height="50" rx="6" fill="#232833" stroke="#f2c46b"/><text x="680" y="65" text-anchor="middle">aliases</text>
+  </g>
+  <g font-size="12" fill="#98a1b0">
+    <text x="240" y="52" text-anchor="middle">franchise has works</text>
+    <text x="98" y="130">franchise_id</text>
+    <text x="398" y="130">work_id</text>
+    <text x="240" y="182" text-anchor="middle">character_id</text>
+    <text x="398" y="260">appearance_id (optional)</text>
+    <text x="98" y="260">character_id</text>
+    <text x="240" y="312" text-anchor="middle">voice_uuid</text>
+    <text x="535" y="312" text-anchor="middle">target voice</text>
+    <text x="98" y="380">book_id, issue_id</text>
+    <text x="420" y="132" text-anchor="middle">bubbles.character_id</text>
+    <text x="8" y="160">form_of</text>
+    <text x="620" y="110">aliases.character_id points at characters</text>
+    <text x="620" y="440">green: new, yellow: changed, grey: unchanged</text>
+    <text x="620" y="458">voices also carry character_id</text>
+  </g>
+</svg>
+
+<h2 id="tables">Tables</h2>
+<p>Each table is listed in its end state. <span class="tag new">new</span> is added, <span class="tag chg">changed</span> is altered, <span class="tag drop">dropped</span> leaves, and anything unmarked stays as it is.</p>
+
+<h3><code>franchises</code> <span class="tag new">new</span></h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+  <tr><td><code>id</code></td><td>text, primary key</td><td>A slug: <code>tmnt</code>, <code>power-rangers</code>, <code>sonic</code>, <code>dc</code>, <code>tmnt-mmpr</code>.</td></tr>
+  <tr><td><code>name</code></td><td>text, not null</td><td>Display name.</td></tr>
+</table>
+<p><code>book_franchises</code> <span class="tag new">new</span> joins books to franchises: <code>book_id</code>, <code>franchise_id</code>, <code>position</code> (integer; the lowest is the default franchise for a character created in that book). It replaces <code>books.franchises text[]</code>.</p>
+
+<h3><code>works</code> <span class="tag new">new</span></h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+  <tr><td><code>id</code></td><td>text, primary key</td><td>The slug of the title, a hyphen, and the year: <code>tmnt-2007</code>, <code>teenage-mutant-ninja-turtles-1990</code>. Every work has a year so the id is the same whoever builds it.</td></tr>
+  <tr><td><code>franchise_id</code></td><td>text, references <code>franchises</code>, nullable</td><td>Null for a one-off such as the narrator's source film.</td></tr>
+  <tr><td><code>title</code></td><td>text, not null</td><td></td></tr>
+  <tr><td><code>year</code></td><td>integer, not null</td><td>The first release year.</td></tr>
+  <tr><td><code>medium</code></td><td>text, not null</td><td>Check: <code>movie</code>, <code>animated_series</code>, <code>live_action</code>, <code>video_game</code>, <code>comic</code>, <code>podcast</code>. The first four are today's values; <code>podcast</code> is new for the Chaotix work.</td></tr>
+  <tr><td><code>universe</code></td><td>text, nullable</td><td>A free label for grouping works in one continuity, such as "Rise". Nothing joins on it.</td></tr>
+</table>
+<p>This replaces the <code>series</code> table, which has no rows and no code.</p>
+
+<h3><code>appearances</code> <span class="tag new">new</span>, replacing <code>character_appearances</code> <span class="tag drop">dropped</span></h3>
+<table>
+  <tr><th>Column</th><th>Type</th><th>Notes</th></tr>
+  <tr><td><code>id</code></td><td>uuid, primary key</td><td></td></tr>
+  <tr><td><code>character_id</code></td><td>text, references <code>characters</code>, not null</td><td></td></tr>
+  <tr><td><code>work_id</code></td><td>text, references <code>works</code>, not null</td><td>Unique with <code>character_id</code>.</td></tr>
+  <tr><td><code>voice_actor</code></td><td>text, nullable</td><td></td></tr>
+  <tr><td><code>search_terms</code></td><td>text[], nullable</td><td>Today's <code>youtube_search_terms</code>, for finding source clips.</td></tr>
+  <tr><td><code>notes</code></td><td>text, nullable</td><td></td></tr>
+</table>
+<p>It is a new table, not an alter of the old one, so the old table keeps working until the last issue drops it. The old table's voice columns (<code>voice_id</code>, <code>voice_type</code>, <code>voice_status</code>, <code>voice_description</code>, <code>voice_created_at</code>, <code>voice_model_*</code>, <code>clip_*</code>) and its 26 <code>-voice-design</code> rows do not carry over. Their content already lives in <code>voices</code> or moves there in the backfill.</p>
+
+<h3><code>characters</code> <span class="tag chg">changed</span></h3>
+<table>
+  <tr><th>Column</th><th>Change</th><th>Notes</th></tr>
+  <tr><td><code>id</code>, <code>display_name</code>, timestamps</td><td class="keep">stay</td><td>The id stays a text slug (decision row 27).</td></tr>
+  <tr><td><code>franchise_id</code></td><td><span class="tag new">new</span></td><td>References <code>franchises</code>, nullable (Crowd, Narrator).</td></tr>
+  <tr><td><code>form_of</code></td><td><span class="tag new">new</span></td><td>References <code>characters</code>. "Batman is a form of Bruce Wayne." One level deep. Replaces <code>voice_of</code>. No row uses it yet; see owner item O2.</td></tr>
+  <tr><td><code>voice_mode</code></td><td class="keep">stays</td><td>Belongs on a form row: the morphed Red Ranger uses Jason's voice in <code>morphed</code> mode. Nothing reads it yet; #116 will.</td></tr>
+  <tr><td><code>franchise</code> (text), <code>aliases</code> (text[]), <code>voice_of</code></td><td><span class="tag drop">dropped</span></td><td></td></tr>
+</table>
+
+<h3><code>aliases</code> <span class="tag chg">changed</span></h3>
+<p>Stays as the one alias store: <code>alias</code>, <code>alias_norm</code>, <code>character_id</code>, <code>scope</code>, <code>scope_id</code>. <code>character_id</code> becomes not null. <code>canonical</code> (the character's name as text) becomes nullable in P1 and is <span class="tag drop">dropped</span> in P6. An alias is another text label for the same character row. A form is a separate character row; see <a href="#flows">forms and aliases</a>.</p>
+
+<h3><code>voices</code> <span class="tag chg">changed</span></h3>
+<table>
+  <tr><th>Column</th><th>Change</th><th>Notes</th></tr>
+  <tr><td><code>id</code>, <code>display_name</code>, <code>description</code>, <code>labels</code>, <code>design_prompt</code>, <code>source_clip_path</code>, <code>source_clip_md5</code>, <code>consumers</code>, <code>keep_active</code>, <code>voice_settings</code>, <code>operation_claim</code>, <code>operation_claimed_at</code>, timestamps</td><td class="keep">stay</td><td><code>display_name</code> is the label sent to ElevenLabs on restore; no code looks a voice up by it (decision row 153). <code>voice_settings</code> has no reader today but <a href="https://github.com/dougiefresh49/comic-reader/issues/412">#412</a> "Tune eleven_v4 voice settings and cue rules from the owner's v4 tag test" plans to use it.</td></tr>
+  <tr><td><code>current_elevenlabs_id</code></td><td class="keep">stays</td><td>The only ElevenLabs id in the database (R1).</td></tr>
+  <tr><td><code>character_id</code></td><td class="keep">stays, now filled</td><td>Nullable only for a voice that belongs to no comic character (a room-only voice).</td></tr>
+  <tr><td><code>appearance_id</code></td><td><span class="tag new">new</span></td><td>References <code>appearances</code>, nullable, with a plain unique constraint (nulls are allowed to repeat): at most one voice per appearance. Null for a designed voice.</td></tr>
+  <tr><td><code>status</code></td><td><span class="tag chg">changed</span></td><td>Adds <code>needs_clip</code> to <code>active</code> and <code>archived</code>, with a check constraint. <code>needs_clip</code>: asked for, no clip yet. <code>archived</code>: a sample is stored in the clips bucket (a source clip or a design preview), not in a slot. <code>active</code>: in a slot, and <code>current_elevenlabs_id</code> is set.</td></tr>
+  <tr><td><code>starting_pick</code></td><td><span class="tag new">new</span></td><td>Boolean. Replaces <code>lab_default</code>: the voice the owner picked as this character's default on the voice-lab cast sheet.</td></tr>
+  <tr><td><code>series_id</code>, <code>lab_default</code></td><td><span class="tag drop">dropped</span></td><td></td></tr>
+</table>
+
+<h3><code>castlist</code> <span class="tag chg">changed</span></h3>
+<table>
+  <tr><th>Column</th><th>Change</th><th>Notes</th></tr>
+  <tr><td><code>book_id</code>, <code>issue_id</code></td><td class="keep">stay</td><td>One row per issue (decision row 258).</td></tr>
+  <tr><td><code>character_id</code></td><td><span class="tag chg">changed</span></td><td>Not null, and part of the primary key <code>(book_id, issue_id, character_id)</code>.</td></tr>
+  <tr><td><code>voice_uuid</code></td><td class="keep">stays</td><td>References <code>voices</code>, nullable (cast but no voice chosen yet).</td></tr>
+  <tr><td><code>in_issue</code></td><td class="keep">stays</td><td>False means the owner removed the character from this issue. The row is a tombstone: without it <code>seedCast</code> re-adds the character from faces, wiki names and other issues' rows.</td></tr>
+  <tr><td><code>no_audio</code></td><td><span class="tag new">new</span></td><td>Boolean, default false. The character is in the issue and has lines, and renders no audio. The voice reference is left alone.</td></tr>
+  <tr><td><code>character</code> (text), <code>voice_id</code> (ElevenLabs id)</td><td><span class="tag drop">dropped</span></td><td>With them goes the <code>__SKIPPED__</code> marker.</td></tr>
+</table>
+
+<h3>Unchanged and removed</h3>
+<ul>
+  <li><code>bubbles</code>: no column changes. <code>character_id</code> gets filled.</li>
+  <li><code>casting_tasks</code>: stays as the voice-work queue, unchanged.</li>
+  <li><code>voice_archives</code>: stays as the archive log.</li>
+  <li><code>books</code>: <code>franchises</code> and <code>series_id</code> are <span class="tag drop">dropped</span>.</li>
+  <li><span class="tag drop">dropped</span> outright: <code>series</code>, <code>speaker_reviews</code>, <code>bubbles_character_id_backup_v1</code>, <code>panel_character_detections_backup_v1</code>. None has rows or a live caller.</li>
+</ul>
+
+<h2 id="flows">How it works after</h2>
+
+<h3>Rendering a bubble</h3>
+<ol>
+  <li>Read <code>bubbles.character_id</code>. Null: no audio, and the bubble is listed as unassigned.</li>
+  <li>Look at this issue's castlist row for the character. If it has <code>in_issue</code> false, stop: no audio, and the bubble is listed as "speaker removed from this issue". This is the one intended change from today, where <code>in_issue</code> is ignored.</li>
+  <li>If that row has <code>no_audio</code> true, stop: no audio, by choice. It does not borrow from another issue.</li>
+  <li>If that row has a voice, use it. If there is no row, or the row has no voice, use the latest issue's row in the book that has a voice. This is what <code>voiceFor</code> does today.</li>
+  <li>Still no voice and the character has <code>form_of</code>: repeat steps 2 to 4 for that character, once.</li>
+  <li>Read the voice row. <code>status</code> is <code>active</code>: render with <code>current_elevenlabs_id</code>. Otherwise the character is "cast, voice not in a slot", which the voices stop already shows.</li>
+</ol>
+
+<h3>Archive and restore</h3>
+<p>Both change one <code>voices</code> row and add or read one <code>voice_archives</code> row. Neither touches the castlist. A restored voice is picked up by every castlist row that references it, because they hold its uuid.</p>
+<p>The earlier owner question (a restore overwriting a "no audio" marker) cannot occur: the flag is its own column and restore never writes to that table.</p>
+
+<h3>Picking a voice for a character</h3>
+<p>The picker for a character lists, in this order: voices for that character that are <code>active</code>, then <code>archived</code> (clip ready), then <code>needs_clip</code>, then appearances with no voice yet. Designed voices sit in the same list with no work beside them.</p>
+<ol>
+  <li>New TMNT book, Leonardo. The owner picks "TMNT (2007)".</li>
+  <li>No voice exists for that appearance, so one <code>voices</code> row is created with <code>status = needs_clip</code>, the character and the appearance. The castlist row references it.</li>
+  <li>One <code>casting_tasks</code> row with <code>action = clone</code> targets that voice. That is the voice-lab to-do.</li>
+  <li>The voice-lab import delivers the clip, keyed by character and work. The voice becomes <code>archived</code> (sample stored), and the voices stop can put it in a slot.</li>
+</ol>
+<p>An appearance not in the list is added by hand (work, actor) or suggested by the existing lookup, which stays an optional action and writes facts only.</p>
+
+<h3 id="forms">Forms and aliases</h3>
+<ul>
+  <li>Use an <strong>alias</strong> when the text differs and nothing else does: "Leo", "Mikey", "Donnie".</li>
+  <li>Use a <strong>form</strong> (a second character row with <code>form_of</code>) when the pipeline must tell the two apart: a different face for face matching, or a different voice or voice mode. Batman and Bruce Wayne. Red Ranger and Jason.</li>
+  <li>A form with no voice of its own uses the voice of the character it points to. A form with its own castlist voice uses that.</li>
+  <li>Whether the existing rangers are split into civilian and morphed rows now is owner item O2. Until it is answered, existing rows are not split: "Zack Taylor" stays an alias of Black Ranger.</li>
+</ul>
+
+<h2 id="backfill">Backfill</h2>
+<p>The backfill is SQL in a migration file, written in three sections. It fills new columns and tables and removes nothing. Each section is safe to run twice, and each has a last run: once the issue that takes over its facts has deployed, the section is never run again, because the old columns it reads are stale from then on.</p>
+<table>
+  <tr><th>Section</th><th>Fills</th><th>Last run</th></tr>
+  <tr><td>Cast</td><td><code>castlist.character_id</code>, <code>castlist.no_audio</code></td><td>Right before P2 deploys.</td></tr>
+  <tr><td>Voices</td><td><code>works</code>, <code>appearances</code>, <code>voices.character_id</code>, <code>voices.appearance_id</code>, <code>voices.starting_pick</code>, old appearance content</td><td>Right before P3 deploys.</td></tr>
+  <tr><td>Identity</td><td><code>aliases</code>, <code>franchises</code>, <code>book_franchises</code>, <code>characters.franchise_id</code>, <code>characters.form_of</code>, <code>bubbles.character_id</code> (only where it is null)</td><td>Right before P4 deploys.</td></tr>
+</table>
+<p>Measured against production on 2026-10-03:</p>
+<table>
+  <tr><th>Target</th><th>Rule</th><th>Measured</th></tr>
+  <tr><td><code>aliases</code></td><td>Insert every <code>characters.aliases[]</code> entry that the table lacks, scope global.</td><td>9 entries missing, including "Jason Lee Scott", "Kimberly Ann Hart", "Trini Kwan" and "Zack Taylor".</td></tr>
+  <tr><td><code>castlist.character_id</code></td><td>Resolve the text name through character id, display name and aliases. A name that resolves to nothing gets a new character row.</td><td>88 of 92 rows resolve. Two names do not: "Armored Villain" and "Rock Soldier" (4 rows); both are in the list of characters to create. No two rows in one issue resolve to the same character.</td></tr>
+  <tr><td><code>castlist.no_audio</code></td><td>True where <code>voice_id</code> holds the marker.</td><td>0 rows today. PR <a href="https://github.com/dougiefresh49/comic-reader/pull/401">#401</a> may add some.</td></tr>
+  <tr><td><code>bubbles.character_id</code></td><td>Resolve <code>speaker</code> the same way. Unresolved or ambiguous stays null.</td><td>623 of 639 resolve today. 16 do not: bit parts ("Director", "Female Soldier"), two multi-speaker labels, "Goldar" (one bubble, which resolves once his character row is created), and one ambiguous name ("Robotic Foot Soldier"). P1's PR lists the bubble ids left null; that list is the allowed set in P2's gate.</td></tr>
+  <tr><td><code>franchises</code>, <code>book_franchises</code>, <code>characters.franchise_id</code></td><td>One <code>franchises</code> row per distinct franchise text, plus <code>sonic</code> and <code>dc</code>. One <code>book_franchises</code> row per entry of <code>books.franchises</code>, with <code>position</code> equal to its place in the array, starting at 0.</td><td>Three texts today: TMNT (30 characters), Power Rangers (14), TMNT MMPR (8). 4 characters have none.</td></tr>
+  <tr><td><code>characters.form_of</code></td><td>Copy <code>voice_of</code>.</td><td>Null on all 56 rows.</td></tr>
+  <tr><td><code>works</code>, <code>appearances</code></td><td>One work per distinct title, year and medium in the old table; one appearance per old non-design row.</td><td>53 rows over 32 title-year-medium combinations, 28 after the merges listed below.</td></tr>
+  <tr><td><code>voices.character_id</code>, <code>voices.appearance_id</code></td><td>Split the display name into a character name and a variant in brackets. The name resolves to a character; the variant maps to a work through the list below. If two voices land on the same character and work, the appearance goes to the active one, else the starting pick, else the newest; the others keep a null <code>appearance_id</code> and are named in the PR.</td><td>44 of 88 names resolve to a character today. The other 44 resolve once the 31 characters below exist and double brackets are stripped.</td></tr>
+  <tr><td><code>voices.starting_pick</code></td><td>Copy <code>lab_default</code>.</td><td>47 true, 12 false, 29 null.</td></tr>
+  <tr><td>Old appearance voice ids</td><td>Each ElevenLabs id on an old appearance row must already be on a <code>voices</code> row; the backfill raises an error if one is not.</td><td>27 real ids on old rows, all 27 found in <code>voices</code>. Two more rows hold an empty string, not an id.</td></tr>
+  <tr><td>Old appearance voice content</td><td><code>voice_description</code>: kept only where the matching voice has no <code>description</code>; otherwise the voice's own wins, since that is what restore sends to ElevenLabs. An old row with <code>voice_status = needs_clips</code> becomes a <code>voices</code> row with <code>status = needs_clip</code> on the new appearance. <code>voice_type</code>, <code>voice_status</code>, <code>voice_model_*</code>, <code>voice_created_at</code> and <code>clip_*</code> are not carried: the voice row already says the same thing, and the clip columns are empty on every row.</td><td>25 design rows have a description and so does their voice; 11 of the pairs differ. Two rows are <code>needs_clips</code> (Bulk, Krang).</td></tr>
+</table>
+
+<h3>The three literal lists</h3>
+<p>Three mappings cannot be derived. They go in the backfill file as literal value lists. The owner read and confirmed all three on 2026-10-04 (owner item E1), so the builder has nothing to ask.</p>
+<p><strong>1. Characters to create (31).</strong> These names have a voice or a castlist row and no character row. The id is the slug of the name.</p>
+<table>
+  <tr><th>Franchise</th><th>Characters</th></tr>
+  <tr><td><code>sonic</code> (17)</td><td>Amy Rose, Big, Blaze, Charmy, Dr. Eggman, Espio, Infinite, Jet, Knuckles, Rouge, Shadow, Silver, Sonic, Storm, Tails, Tangle, Vector</td></tr>
+  <tr><td><code>dc</code> (10)</td><td>Alfred, Bane, Batman, Cyborg, Darkseid, Flash, Star Sapphire, Supergirl, Superman, Wonder Woman</td></tr>
+  <tr><td><code>tmnt</code> (1)</td><td>April O'Neil</td></tr>
+  <tr><td><code>power-rangers</code> (1)</td><td>Goldar</td></tr>
+  <tr><td>none (2)</td><td>Armored Villain, Rock Soldier</td></tr>
+</table>
+<p>A voice name with two brackets, such as "Red Ranger (Jason) (1993)", resolves by stripping every trailing bracket: the character is Red Ranger and the variant is the last bracket.</p>
+<p><strong>2. Duplicate works to merge.</strong> The old table has 32 title-year-medium combinations. These collapse:</p>
+<table>
+  <tr><th>Merge</th><th>Into</th></tr>
+  <tr><td>TMNT: Mutants in Manhattan (2016)</td><td>Teenage Mutant Ninja Turtles: Mutants in Manhattan (2016, video game)</td></tr>
+  <tr><td>TMNT: Shredder's Revenge (2022)</td><td>Teenage Mutant Ninja Turtles: Shredder's Revenge (2022, video game)</td></tr>
+  <tr><td>Power Rangers: Battle for the Grid (2021)</td><td>Power Rangers: Battle for the Grid (2019, video game)</td></tr>
+  <tr><td>Power Rangers Samurai (2012)</td><td>Power Rangers Samurai (2011, live action)</td></tr>
+</table>
+<p>That leaves 28 works, plus up to 10 new ones from the variant table. P1's PR prints the full works table (id, title, year, medium, franchise) so voice-lab can copy ids from it. "The Lord of the Rings: The Fellowship of the Ring (2001)" is the narrator's source and gets no franchise. If a merge would put one character in the same work twice, the row with a voice actor is kept and the other is named in the PR.</p>
+<p><strong>3. Variant to work</strong> for the 13 variants in voice names:</p>
+<table>
+  <tr><th>Variant in the voice name</th><th>Proposed work</th><th>State</th></tr>
+  <tr><td>1990</td><td>Teenage Mutant Ninja Turtles (1990, movie)</td><td>Work exists in the old table.</td></tr>
+  <tr><td>2012</td><td>Teenage Mutant Ninja Turtles (2012, animated series)</td><td>Work exists.</td></tr>
+  <tr><td>1993</td><td>Mighty Morphin Power Rangers (1993, live action)</td><td>Work exists.</td></tr>
+  <tr><td>Forces</td><td>Sonic Forces (2017, video game)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>Prime</td><td>Sonic Prime (2022, animated series)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>Shadow Generations</td><td>Sonic X Shadow Generations (2024, video game)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>CrossWorlds</td><td>Sonic Racing: CrossWorlds (2025, video game)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>JL Doom</td><td>Justice League: Doom (2012, movie)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>JL War</td><td>Justice League: War (2014, movie)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>SB Apocalypse</td><td>Superman/Batman: Apocalypse (2010, movie)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>TDKR</td><td>The Dark Knight Rises (2012, movie)</td><td>Confirmed by the owner, 2026-10-04.</td></tr>
+  <tr><td>Boom</td><td>Sonic Boom (2014, animated series)</td><td>Owner answer, 2026-10-04.</td></tr>
+  <tr><td>Chaotix</td><td>Sonic the Hedgehog Presents: The Chaotix Casefiles (2026, podcast)</td><td>Owner answer, 2026-10-04.</td></tr>
+</table>
+
+<h2 id="voicelab">Voice-lab handoff</h2>
+<p>Today the import reads <code>casting/&lt;book&gt;/cast.json</code> from the voice-lab checkout. Rows carry a character name, a variant, a default flag, a file and a status. The import builds a display name "Character (variant)" and detects an already-imported row by its clip path. A second file, the ElevenLabs snapshot, fills description, labels and design prompt. Nothing reads the copies under <code>data/casting/</code> in this repo.</p>
+<p>Version 2 is one file per voice-lab book folder, <code>casting/&lt;folder&gt;/voices.json</code> in the voice-lab checkout. It has one row per voice and names things by id:</p>
+<pre><code>{
+  "version": 2,
+  "voices": [
+    {
+      "character_id": "leonardo",
+      "work": { "id": "tmnt-2007", "title": "TMNT", "year": 2007,
+                "medium": "movie", "franchise_id": "tmnt" },
+      "voice_actor": "James Arnold Taylor",
+      "file": "leonardo/tmnt-2007.mp3",
+      "md5": "…",
+      "description": "…",
+      "labels": { "accent": "american", "age": "young" },
+      "starting_pick": true,
+      "status": "approved"
+    },
+    {
+      "character_id": "armored-villain",
+      "design_prompt": "…",
+      "file": "armored-villain/design-preview.mp3",
+      "md5": "…",
+      "description": "…",
+      "labels": { },
+      "status": "approved"
+    }
+  ]
+}</code></pre>
+<table>
+  <tr><th>Field</th><th>Rule</th></tr>
+  <tr><td><code>character_id</code></td><td>Required. Must exist in <code>characters</code>. A row with an unknown id is skipped with a message naming it. The import does not create characters.</td></tr>
+  <tr><td><code>voice_uuid</code></td><td>Optional. When present, the row updates that <code>voices</code> row and no other matching is done. Use it for a voice that already exists here.</td></tr>
+  <tr><td><code>work</code></td><td>Present for a cloned voice. For a work that already exists, <code>work.id</code> is the id from the <code>works</code> table; for a new one it follows the title-and-year rule. The import upserts the work on its <code>id</code>, then the appearance on <code>(character_id, work_id)</code>, then the voice on <code>appearance_id</code>.</td></tr>
+  <tr><td><code>design_prompt</code></td><td>Present instead of <code>work</code> for a designed voice. The voice has no appearance and is matched on <code>(character_id, md5)</code>.</td></tr>
+  <tr><td><code>file</code>, <code>md5</code></td><td>Required for every row: the source clip of a clone, or the preview sample of a designed voice. Restore rebuilds a voice from this stored sample and refuses one without it. <code>file</code> is relative to <code>clone-sources/&lt;folder&gt;/</code> in the voice-lab checkout. The clip is uploaded to the existing clips bucket with the md5 check, as today.</td></tr>
+  <tr><td><code>description</code>, <code>labels</code></td><td>Required: the restore step refuses a voice without them. They replace the snapshot file's role.</td></tr>
+  <tr><td><code>starting_pick</code></td><td>Optional, default false.</td></tr>
+  <tr><td><code>consumers</code></td><td>Optional list. A new voice without it gets <code>["comic"]</code>. On an existing voice a missing field leaves the column alone, and a present list is merged into what is there, never replacing it: <code>room</code> is what protects a shared voice from being archived (decision row 23). This replaces the room-characters file.</td></tr>
+  <tr><td><code>status</code></td><td>Rows with <code>approved</code> or <code>ready to clone</code> are imported, as today. Others are skipped.</td></tr>
+</table>
+<ul>
+  <li>A voice in <code>needs_clip</code> for the same appearance receives the clip and becomes <code>archived</code> (sample stored).</li>
+  <li>No absolute path appears in the file. Paths are relative to the folder.</li>
+  <li>Voice-lab needs to write version 2. This repo never edits the voice-lab checkout; P5's PR carries the ask for the voice-lab thread, with this section as its spec.</li>
+  <li>The 59 voices already imported are linked by the backfill, so the import does not need to read version 1 again.</li>
+  <li><a href="https://github.com/dougiefresh49/comic-reader/issues/316">#316</a> "data/casting/tmnt-x-mmpr commits a local absolute path and clone-source file names in a public repo" is about the files already committed here. It is unchanged by this spec and continues on its own.</li>
+</ul>
+
+<h2 id="delivery">Delivery: six issues, one at a time</h2>
+<p>Three phases: add, switch, drop. The six issues run in order, P1 to P6, and only one is in flight at a time. The files in this area overlap too much to split between parallel agents: <code>src/lib/cast.ts</code>, <code>src/lib/voice-requests.ts</code>, <code>src/lib/voices-registry.ts</code> and <code>src/workflows/steps/audio-plan.ts</code> each touch the castlist, the voices, the aliases and the old appearances table. A sweep on 2026-10-03 found 75 files in <code>src/</code> and <code>scripts/</code> that reference these tables.</p>
+<p>So an issue is not defined by a file list. It is defined by the <strong>names it removes</strong>. Its builder may edit any file in <code>src/</code> and <code>scripts/</code> that uses those names, and its gate is a repo-wide grep for them. Nothing is left unowned, because every dropped name belongs to exactly one issue:</p>
+<table>
+  <tr><th>Issue</th><th>Names it removes from <code>src/</code> and <code>scripts/</code></th><th>Blocked by</th></tr>
+  <tr><td><a href="#p1">P1 Add</a></td><td>None. Adds tables, columns and the backfill.</td><td>Owner items O2 and E1 answered.</td></tr>
+  <tr><td><a href="#p2">P2 Cast and audio</a></td><td><code>castlist.voice_id</code>; the <code>__SKIPPED__</code> marker and every <code>SKIPPED</code> constant; castlist lookups by the text <code>character</code>; <code>.from("castlist")</code> outside <code>src/lib/cast.ts</code>; resolving a speaker's text to a cast row (<code>nameVoice</code>, <code>buildAliasMap</code> and their callers); <code>voice_of</code>.</td><td>P1 applied; the <a href="#before-p2">two prerequisites</a>.</td></tr>
+  <tr><td><a href="#p3">P3 Voices and appearances</a></td><td><code>character_appearances</code> (every reference); <code>voices.series_id</code>; <code>voices.lab_default</code>; <code>books.series_id</code>; <code>speaker_reviews</code>; <code>.from("voices")</code> outside the voices module; any lookup of a voice by its name.</td><td>P2 deployed.</td></tr>
+  <tr><td><a href="#p4">P4 Identity</a></td><td><code>characters.aliases</code>; <code>aliases.canonical</code>; <code>characters.franchise</code>; <code>books.franchises</code>; any write of <code>bubbles.speaker</code> that does not set <code>character_id</code> in the same statement; <code>.from("aliases")</code> outside <code>src/lib/character-aliases.ts</code>.</td><td>P3 deployed.</td></tr>
+  <tr><td><a href="#p5">P5 Voice-lab import</a></td><td>The version 1 manifest reader.</td><td>P4 deployed.</td></tr>
+  <tr><td><a href="#p6">P6 Drop</a></td><td>The compatibility write of <code>castlist.character</code>. Then the columns and tables themselves.</td><td>P5 deployed; owner sign-off O4.</td></tr>
+</table>
+<p>Common to every issue:</p>
+<ul>
+  <li><strong>Name gate.</strong> Two checks, because a bare column name such as <code>voice_id</code> also belongs to tables that stay. First, the builder deletes the issue's columns from its local copy of <code>src/types/database.ts</code>, runs <code>pnpm typecheck</code> until it is clean, and restores the file. Second, the PR lists every remaining grep hit for each name in <code>src/</code> and <code>scripts/</code> with the reason it stays (for example <code>voice_archives.voice_id</code>, or the ElevenLabs response field). Table names and constants (<code>character_appearances</code>, <code>speaker_reviews</code>, <code>SKIPPED</code>) must return no hits at all.</li>
+  <li><strong>Repo gate.</strong> <code>pnpm format:write</code>, then <code>pnpm typecheck</code>, <code>pnpm lint</code> and <code>pnpm format:check</code> clean.</li>
+  <li><strong>Scripts.</strong> A script that uses a removed name is converted if it has a <code>package.json</code> entry or an importer. A script with neither may be deleted; the PR lists each deletion with the grep that showed no entry and no importer.</li>
+  <li><strong>Subagents</strong> are allowed inside an issue. The repo's rule on a fix round that doubles the diff still applies.</li>
+  <li><strong>Migrations</strong> are written by the builder and applied by the lead. The builder does not regenerate types; the lead commits the regenerated <code>src/types/database.ts</code> to the issue's branch.</li>
+</ul>
+
+<h3 id="before-p2">Two prerequisites before P2</h3>
+<ol>
+  <li><strong>The open PRs that edit these files are merged or closed:</strong> #401, #402, #400, #399, #398, #397, #396 and #395. See owner item O1. From then until P6 lands, no other issue edits <code>src/lib/cast.ts</code>, <code>src/lib/voice-requests.ts</code>, <code>src/lib/voices-registry.ts</code>, <code>src/lib/voice-slots/</code>, <code>src/workflows/steps/audio-plan.ts</code>, <code>casting-tasks.ts</code>, <code>voice.ts</code>, <code>vision.ts</code>, <code>vision-rows.ts</code>, the review characters folder, the review editor's <code>loader.ts</code>, <code>scripts/voice-lab-import.ts</code> or <code>scripts/smoke-ingest.ts</code>. <code>src/server/pages/queries.ts</code> is frozen too. An issue marked "continue" in the triage that needs one of these files waits for P6.</li>
+  <li><strong><a href="https://github.com/dougiefresh49/comic-reader/issues/357">#357</a> "Retire the clusters, new-characters and casting pages" has landed.</strong> Those pages write the old appearance voice columns and the marker, and read the alias text. Retiring them first removes that code instead of converting it. #357 is itself blocked on #353, whose PR is #401.</li>
+</ol>
+<p>P1 needs neither prerequisite and can start as soon as O2 and E1 are answered.</p>
+
+<h3 id="p1">P1 Add</h3>
+<p><strong>Files:</strong> two new files under <code>supabase/migrations/</code> (schema, then backfill), and two decision rows in <code>docs/decisions.md</code> recording this spec and what it replaces in row 27.</p>
+<p><strong>Schema file:</strong></p>
+<ul>
+  <li>Creates <code>franchises</code>, <code>book_franchises</code>, <code>works</code>, <code>appearances</code>.</li>
+  <li>Adds <code>characters.franchise_id</code>, <code>characters.form_of</code>, <code>voices.appearance_id</code>, <code>voices.starting_pick</code>, <code>castlist.no_audio</code>, and the <code>voices.status</code> check.</li>
+  <li>Adds a unique index on <code>castlist (book_id, issue_id, character_id)</code>. P2's upserts use it as their conflict target while the old primary key remains.</li>
+  <li>Adds a plain unique constraint on <code>voices (appearance_id)</code>, not a partial index, so the import can upsert on the column.</li>
+  <li>Makes <code>aliases.canonical</code> nullable, so P4 can stop writing it before P6 drops it.</li>
+  <li>Removes and renames nothing. The deployed code keeps working.</li>
+</ul>
+<p><strong>Backfill file:</strong> the rules and literal lists in <a href="#backfill">Backfill</a>, safe to run twice.</p>
+<p><strong>Gate, run by the lead:</strong></p>
+<ul>
+  <li>Before applying: both files run inside one transaction that is rolled back, and the counts below are read from inside it.</li>
+  <li><code>castlist</code> rows with null <code>character_id</code>: 0. Duplicate <code>(book_id, issue_id, character_id)</code>: 0.</li>
+  <li><code>bubbles</code> with <code>character_id</code>: at least 623. The unresolved speakers are listed in the PR.</li>
+  <li><code>voices</code> with consumer <code>comic</code> and null <code>character_id</code>: 0. Every voice whose name had a variant has an <code>appearance_id</code>.</li>
+  <li>Every old non-design appearance row maps to exactly one new <code>appearances</code> row; the PR shows the count and each merge.</li>
+  <li>After applying: the lead commits the regenerated <code>src/types/database.ts</code> to the P1 branch, and the <a href="#playback">playback check</a> passes.</li>
+</ul>
+<p>Old code keeps writing the old columns until the switch issues deploy, so the lead re-runs each backfill section at its last-run point in <a href="#backfill">Backfill</a>, and not after.</p>
+
+<h3 id="p2">P2 Cast and audio</h3>
+<p><strong>Does:</strong></p>
+<ul>
+  <li>Every castlist read and write lives in <code>src/lib/cast.ts</code> and is keyed on <code>character_id</code>. Other files call it. Upserts conflict on the new unique index. Until P6 the text <code>character</code> column is still not null, so an insert of a new row fills it with the character id; existing rows keep their text.</li>
+  <li>The render chain in <a href="#flows">How it works after</a>, including the <code>in_issue</code>, <code>no_audio</code> and <code>form_of</code> rules. The ElevenLabs id comes from the voice row. Nothing reads or writes <code>castlist.voice_id</code>, and that includes archive and restore in <code>src/lib/voice-slots/</code>.</li>
+  <li>Every place that resolves a speaker's text to a cast row uses <code>bubbles.character_id</code> instead: the audio plan, the voice step, the voice-work planner, the voices gate, regenerate-audio, and the slot planner's "which voices does this issue need".</li>
+  <li>Skip writers set <code>no_audio</code> and leave the voice reference alone.</li>
+  <li>The characters card shows a <code>no_audio</code> character as silent. It does not fall back to the character's latest active voice (<a href="https://github.com/dougiefresh49/comic-reader/issues/410">#410</a>; the fallback becomes live once P1 fills <code>voices.character_id</code>).</li>
+  <li>The castlist lint entry is added to <code>eslint.config.js</code>, copying the existing <code>.from("issues")</code> entry.</li>
+  <li>Takes over <a href="https://github.com/dougiefresh49/comic-reader/issues/409">#409</a>, <a href="https://github.com/dougiefresh49/comic-reader/issues/410">#410</a> and <a href="https://github.com/dougiefresh49/comic-reader/issues/406">#406</a>; their acceptance lines are copied into this issue when it is cut.</li>
+</ul>
+<p><strong>Gate:</strong></p>
+<ul>
+  <li>The name gate for P2's names.</li>
+  <li>A planted <code>.from("castlist")</code> outside <code>src/lib/cast.ts</code> fails <code>pnpm lint</code>.</li>
+  <li>The baseline. Before any other change, the builder adds a mode to <code>scripts/compare-voice-lookup.ts</code> that prints one line per bubble for issues 1 and 2: the bubble id and the voice uuid that today's <code>lookupVoice</code> resolves. It runs that on unmodified code and attaches the output to the PR. After the change, the same mode on the new chain matches line for line, except the bubble ids P1's PR listed as left null. Any other difference fails the gate. No API call.</li>
+</ul>
+<p><strong>Rollback:</strong> redeploy the previous build and run one statement on <code>castlist.voice_id</code>: where <code>no_audio</code> is true, write the marker; otherwise copy the voice's ElevenLabs id through <code>voice_uuid</code>. The column exists until P6. The statement is written into the P2 issue.</p>
+
+<h3 id="p3">P3 Voices and appearances</h3>
+<p><strong>Does:</strong></p>
+<ul>
+  <li>Designing a voice writes a <code>voices</code> row. Every reader of voice state on the old appearances table (<code>readPlanningAppearances</code>, the voice-work planner, the repair step in <code>findCharactersNeedingVoices</code>, the speakers loader) reads <code>voices</code>. Every reader of appearance facts reads the new <code>appearances</code> and <code>works</code>.</li>
+  <li><code>scripts/find-voice-sources.ts</code> writes works and appearances and no voice columns.</li>
+  <li>The voice picker at the characters stop lists voices and appearances as in <a href="#flows">Picking a voice</a>. Picking an appearance with no voice creates the <code>needs_clip</code> voice and its <code>casting_tasks</code> row.</li>
+  <li>The picker reads <code>starting_pick</code>. The voices admin page stops filtering on <code>series_id</code>.</li>
+  <li><code>getSpeakerReviews</code> and the other <code>speaker_reviews</code> references are deleted; nothing calls them.</li>
+  <li>Every <code>.from("voices")</code> lives in <code>src/lib/voice-slots/</code>, <code>src/lib/voices-registry.ts</code> or <code>src/lib/voice-requests.ts</code>. Other files (the cast module, the editor and characters loaders, the voices admin actions, the import script) call a function there. A lint entry enforces it.</li>
+  <li>No code picks a voice by its name. The review editor's <code>ownVoice</code> fallback in <code>src/components/review-editor/lib.ts</code> matches by voice uuid.</li>
+</ul>
+<p><strong>Gate:</strong></p>
+<ul>
+  <li>The name gate for P3's names. A planted <code>.from("voices")</code> outside the three module paths fails <code>pnpm lint</code>.</li>
+  <li>The offline fixtures in <code>scripts/plan-voice-work.ts</code> pass. One fixture is added: archive then restore a voice against the fake account, and assert that the voice row's id changed and the castlist rows that reference it are unchanged. No ElevenLabs call.</li>
+  <li>On the smoke-test book (owner item O3), driven with real pointer input through codex computer use: at the characters stop, pick an appearance that has no voice. The database then shows one new <code>voices</code> row with <code>needs_clip</code> and one <code>casting_tasks</code> row. The check names the input method in its report.</li>
+</ul>
+
+<h3 id="p4">P4 Identity</h3>
+<p><strong>Does:</strong></p>
+<ul>
+  <li>Alias reads and writes go through one new module, <code>src/lib/character-aliases.ts</code>, which is the only file that queries the <code>aliases</code> table; a lint entry enforces it. Reads are by <code>character_id</code>. Writes insert a row and leave <code>canonical</code> null.</li>
+  <li>Franchise filters and prompt lines read <code>characters.franchise_id</code> and <code>book_franchises</code>. A new character takes the book's franchise with the lowest <code>position</code> unless the owner picks another.</li>
+  <li>One function writes a bubble's speaker: it takes the bubble, the character id or null, and the raw label, and sets <code>character_id</code> and <code>speaker</code> together. Every writer calls it: the review editor save, <code>apply-fixes</code>, rerun-context, and the context step. Changing or clearing a speaker changes or clears the id.</li>
+  <li>The review editor loads <code>bubbles.character_id</code> and trusts it. A bubble with a null id shows as unassigned and stays flagged, even when its raw label would match a character.</li>
+</ul>
+<p><strong>Gate:</strong></p>
+<ul>
+  <li>The name gate for P4's names. For the bubble rule: the PR lists every statement that writes <code>bubbles.speaker</code>, and each is inside the one function.</li>
+  <li>For each page of issue 1, the closed cast handed to the speaker prompt lists the same character ids before and after. The same holds for the known-character list the face step builds for issue 1, which is what the franchise filter feeds. The builder adds the comparison as a script that builds both inputs and stops before any Gemini call.</li>
+  <li>On the smoke-test book (O3), with real pointer input: change a bubble's speaker in the review editor and save. The bubble row's <code>character_id</code> matches the picked character. A bubble whose id is null and whose label reads like a known character still shows as unassigned.</li>
+</ul>
+
+<h3 id="p5">P5 Voice-lab import</h3>
+<p><strong>Does:</strong> <code>scripts/voice-lab-import.ts</code> reads <a href="#voicelab">manifest version 2</a> and no longer reads version 1. The script splits into a pure planning function (manifest plus current rows in, list of writes out) and the code that applies the list.</p>
+<p><strong>Gate:</strong></p>
+<ul>
+  <li>A fixture manifest and fixture rows are committed with the script. The planning function, given them, returns the expected writes. Given the same manifest and the rows as they would be after applying, it returns no writes. The fixtures include a voice that already has <code>room</code> in its consumers and a manifest row that omits the field; the plan leaves <code>room</code> in place. They include one designed voice with its preview sample.</li>
+  <li>The dry-run mode against production prints its plan and writes nothing. No paid call.</li>
+  <li>The PR includes the text of the ask for the voice-lab thread: what version 2 needs from its export.</li>
+</ul>
+
+<h3 id="p6">P6 Drop</h3>
+<p><strong>Files:</strong> two new migrations and <code>src/lib/cast.ts</code> (the compatibility write). The lint entries already exist from P2, P3 and P4.</p>
+<p><strong>The order, run by the lead with owner sign-off O4:</strong></p>
+<ol>
+  <li>Save a dump of the columns and tables to be dropped to private storage.</li>
+  <li>Apply migration A. It checks the rules and raises an error if any fails: no castlist row with a null <code>character_id</code>, no duplicate <code>(book_id, issue_id, character_id)</code>, every row that still holds the old marker has <code>no_audio</code> true, no <code>comic</code> voice without a character, no alias without a <code>character_id</code>. Then it swaps the castlist primary key to <code>(book_id, issue_id, character_id)</code> and makes <code>castlist.character</code> nullable.</li>
+  <li>Merge and deploy the code: inserts stop filling <code>castlist.character</code>.</li>
+  <li>Run the name gate once more for every dropped column and table. P2 to P4 already passed it for their own names; a new hit is fixed in this issue, in whatever file it is.</li>
+  <li>Apply migration B: drop everything marked <span class="tag drop">dropped</span> in <a href="#tables">Tables</a>. Commit the regenerated types.</li>
+</ol>
+<p><strong>Gate:</strong> <code>scripts/plan-audio.ts</code> for issues 1 and 2 prints the same plan before step 2 and after step 5. The <a href="#playback">playback check</a> passes after step 5.</p>
+
+<h3 id="playback">The playback check</h3>
+<p>Run after P1 is applied, after each of P2 to P4 deploys, and after P6. One delegated round of codex computer use against the deployed reader, with real pointer input: open two pages in issue 1 and two in issue 2, tap two bubbles on each, and report whether audio played and the highlight moved across the words. This shows the reader still serves the stored audio. It does not exercise the voice lookup, which P2's baseline covers. Whether the right voice speaks is owner item E2.</p>
+
+<h2 id="decides">Who decides what</h2>
+<p>Each of the six issues carries this block, so a builder does not stop to ask what it can settle itself.</p>
+<div class="box">
+<p><strong>The builder decides and writes the choice in the PR:</strong> function names and file layout inside the files it owns; how a query is shaped; whether a helper is new or reused; any behavior this spec states; anything a rule R1 to R7 settles.</p>
+<p><strong>The builder stops and asks:</strong> a table or column this spec does not list; deleting rows; anything that would call Gemini, ElevenLabs or Roboflow; a change to what a kid hears that this spec does not state; a change to a file that does not use any of the issue's names.</p>
+</div>
+
+<h2 id="triage">Open issue triage</h2>
+<p>Verdicts: <strong>absorbed</strong> closes into one of the six issues. <strong>pause</strong> waits until P6 has landed, because the switch issues hold the files it needs. <strong>continue</strong> is independent.</p>
+<div class="tablewrap">
+<table>
+  <tr><th>Issue</th><th>Title</th><th>Verdict</th><th>Why</th></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/118">#118</a></td><td>Drop legacy character-name columns and key castlist on character_id</td><td>absorbed, P6</td><td>P6 does exactly this.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/409">#409</a></td><td>One home for the issue's cast rule, and the characters stop holds Approve on unnamed castlist rows</td><td>absorbed, P2</td><td>An unnamed castlist row cannot exist once <code>character_id</code> is the key.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/410">#410</a></td><td>A silent character's card shows a voice it does not have</td><td>absorbed, P2</td><td>P2 carries the card rule: a silent character shows as silent.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/406">#406</a></td><td>One rule keys speakers to lines for the voices gate and planVoiceWork</td><td>absorbed, P2</td><td>Both copies become a group-by on <code>bubbles.character_id</code>.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/353">#353</a></td><td>Voices stop: confirm swaps, run them, and hear the voice before audio</td><td>owner item O1</td><td>PR #401 is built on the marker and adds six writers of it. #357 waits on it.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/390">#390</a></td><td>carryOut follow-ups from #382 round 6</td><td>pause until P6</td><td>Writes the marker and depends on voice status.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/388">#388</a></td><td>Voice-lab clone rows get character metadata, then run #351's one real carryOut</td><td>pause until P6</td><td>P1 fills the character ids it asks for.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/359">#359</a></td><td>Re-render a character's lines after a voice change</td><td>pause until P6</td><td>Builds on the voice lookup P2 rewrites.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/358">#358</a></td><td>More characters than voice slots: render an issue's audio in rounds</td><td>pause until P6</td><td>Its "no audio this run" is the marker.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/116">#116</a></td><td>Add civilian/morphed voice modes on one clone per character</td><td>pause until P6</td><td>Re-spec on <code>form_of</code>; <code>voice_mode</code> stays.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/114">#114</a></td><td>Decide and run the TMNT x MMPR voice swap round before issues 3–5 audio</td><td>pause the run until P6</td><td>The questions can be answered now.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/113">#113</a></td><td>One character resolver; speaker and face prompts return character ids</td><td>pause until P6</td><td>Specced on the franchise text and alias array.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/101">#101</a></td><td>Pre-seed face exemplars for a new franchise from wiki art</td><td>pause until P6</td><td>Creates characters with free-text franchise.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/98">#98</a></td><td>Build a comic vision eval harness scored against reviewed issues 1-2</td><td>pause until P6</td><td>Normalizes through <code>aliases.canonical</code>.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/393">#393</a></td><td>Rerun issues 1 and 2 on the new flow, after exporting their reviewed bubbles</td><td>pause until P6</td><td>A paid run on the old shape would be paid for twice.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/375">#375</a></td><td>First real run on the new flow: tmnt-mmpr-iii issue-3</td><td>pause until P6</td><td>Same reason.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/412">#412</a></td><td>Tune eleven_v4 voice settings and cue rules from the owner's v4 tag test</td><td>continue</td><td>Uses <code>voices.voice_settings</code>, which stays.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/357">#357</a></td><td>Retire the clusters, new-characters and casting pages</td><td>continue; must land before P2</td><td>Removes the old pages' code instead of converting it.</td></tr>
+  <tr><td><a href="https://github.com/dougiefresh49/comic-reader/issues/110">#110</a></td><td>Run the slot-rotation and same-clip settings test (cases A–E) on three voices</td><td>continue, before P2 or after P6</td><td>Uses the rotation script the switch edits.</td></tr>
+  <tr><td colspan="2">#407, #405, #403, #392, #391, #387, #383, #377, #356, #355, #350, #349, #322, #316, #252, #213, #111, #106, #64</td><td>continue</td><td>UI, harness, model or tracker work that the schema does not change. Those with open PRs on the frozen files (#395, #396, #397, #398, #399, #400, #402) merge before P2; see <a href="#before-p2">the prerequisites</a>. #377 owns showing the character's display name in the reader; its PR #395 merges before P2 with the others.</td></tr>
+</table>
+</div>
+
+<h2 id="calls">Calls you can reverse</h2>
+<ul>
+  <li><strong><code>tmnt-mmpr</code> is a franchise row.</strong> Eight crossover-only characters (Dr. Boyd and others) carry that text today, and the speaker prompt filters on it. Keeping it changes no behavior.</li>
+  <li><strong>The uuid column keeps the name <code>voice_uuid</code>.</strong> Renaming it to <code>voice_id</code> in the same release that drops the old <code>voice_id</code> would hand an old build a uuid where it expects an ElevenLabs id.</li>
+  <li><strong>Voice status keeps <code>active</code> and <code>archived</code>.</strong> "Archived" also covers a clip that was never in a slot. Renaming the values would mean a data flip timed to a deploy.</li>
+  <li><strong><code>voices.voice_settings</code> and <code>characters.voice_mode</code> stay.</strong> I first listed both as drops. #412 and #116 each plan a use, and both columns sit in the right place.</li>
+  <li><strong>A line whose speaker was removed from the issue gets no audio</strong> and is listed for review. Today the audio plan ignores <code>in_issue</code> and renders it.</li>
+  <li><strong>The backfill creates character rows</strong> for voices and castlist names that have none, from the reviewed list. The alternative leaves 44 voices with no character.</li>
+  <li><strong>The six issues run one at a time.</strong> It costs wall-clock time and removes every file collision between them.</li>
+</ul>
+
+<h2 id="notdoing">Not in this redesign</h2>
+<ul>
+  <li>No change to pages, panels, bubbles' other columns, audio files, timestamps or the reader.</li>
+  <li>No universe table. <code>works.universe</code> is a label until something needs to join on it.</li>
+  <li>No change to <code>casting_tasks</code> columns or to the claim columns on <code>voices</code>.</li>
+  <li>No re-run of issues 1 and 2. That stays <a href="https://github.com/dougiefresh49/comic-reader/issues/393">#393</a>, after this work and after the cheaper speaker model and eleven_v4 land.</li>
+  <li>The unused <code>series</code> value in the alias scope enum stays; removing an enum value is not worth a migration.</li>
+</ul>
+
+<h2 id="owner">Owner items</h2>
+<p>No action required today. The owner answered on 2026-10-04: O1 = A, O2 = B, O3 = A, and E1 is done (both unknown variants named, the other guesses and the franchises confirmed). O4 and E2 come later. The questions stay below as the record.</p>
+<h3>Decisions</h3>
+<p><strong>O1.</strong> <a href="https://github.com/dougiefresh49/comic-reader/issues/353">#353</a> "Voices stop: confirm swaps, run them, and hear the voice before audio" and the other built PRs in this area (#401, #402, #400, #399, #398, #397, #396, #395): merge them now and let the switch issues convert what they added (A), or hold them and rebase each onto the new shape after P6 (B)? Recommend: A. They are built, #357 cannot start until #353 lands, and each switch issue removes its names repo-wide, so their additions are converted either way. For the question PR #401's thread asked you (a restore overwriting a "no audio" marker), answer "leave it": P2 removes the marker.</p>
+<p><strong>O2.</strong> <a href="https://github.com/dougiefresh49/comic-reader/issues/116">#116</a> "Add civilian/morphed voice modes on one clone per character": decision row 27 (accepted 2026-09-26) says every ranger gets a civilian row, with morphed and unmorphed as separate character rows. No such rows exist today, and <code>docs/morphed-voice-modes.md</code> describes morphed as a mode on one clone. Create the civilian rows in P1's backfill, as row 27 says (A), or leave the rangers as they are and let #116 decide when it is re-specced on <code>form_of</code> (B)? Recommend: B. Splitting them now also means choosing which bubbles belong to which form, which is review work on issues 1 and 2.</p>
+<p><strong>O3.</strong> <a href="https://github.com/dougiefresh49/comic-reader/issues/413">#413</a>: may the checks for P3 and P4 write to the <code>smoke-test</code> book in production (one voice pick, one speaker change)? Yes (A), or prove those two by reading the database after you do them by hand (B)? Recommend: A. The book is unpublished test data.</p>
+<p><strong>O4, later.</strong> <a href="https://github.com/dougiefresh49/comic-reader/issues/413">#413</a>, at P6: sign-off to drop the listed columns and five tables in production. Asked when P6 is ready, with the dump saved. Nothing to answer today.</p>
+<h3>Needs your eyes</h3>
+<p><strong>E1.</strong> <a href="https://github.com/dougiefresh49/comic-reader/issues/413">#413</a>, before P1 is cut: read the three lists in <a href="#backfill">Backfill</a>. Give the title and year for "Boom" and "Chaotix", correct any wrong guess in the variant table, and correct any wrong franchise in the 31 characters to create.</p>
+<p><strong>E2, later.</strong> <a href="https://github.com/dougiefresh49/comic-reader/issues/413">#413</a>, after P2 deploys and again after P6: nothing in this work regenerates audio, so issues 1 and 2 should sound exactly as they do today. Tap three bubbles in issue 1 on your device and confirm the voices are unchanged.</p>
+
+<h2 id="roundtable">Roundtable outcome (2026-10-04)</h2>
+<p>Reviewers: gpt-6.1 Sol (codex exec, reasoning high; 16 findings in round one, 10 in round two) and grok-4.7 (cursor-agent ask mode, high; 14 findings in round one, 12 in round two). Both seats completed both rounds. No Anthropic seat: the plan was drafted by fable. Round two ran because round one's revision was structural: the six issues went from four parallel file lists to one serial chain defined by names. Everything accepted is in the plan above; everything rejected is below with the reason.</p>
+
+<h3>Accepted</h3>
+<ul>
+  <li><strong>P2's gate could not pass inside its own file list</strong> (codex 1, grok 1): the switch issues now run one at a time and each is defined by the names it removes, with a repo-wide gate.</li>
+  <li><strong>Files with no owner</strong> (codex 2, grok 4/5/6/7): ownership by name covers every file. #357 became a hard prerequisite of P2. Each dropped name is assigned to one issue in the delivery table.</li>
+  <li><strong>P3 and P4 needed helpers in P2's files</strong> (codex 3/4, grok 3): removed by the serial order.</li>
+  <li><strong><code>aliases.canonical</code> is not null</strong> (codex 5): P1 makes it nullable.</li>
+  <li><strong>P6 dropped a column the code still wrote</strong> (codex 6): P6 is now migration A, code deploy, migration B.</li>
+  <li><strong>Castlist upserts did not match the old primary key</strong> (grok 13): P1 adds a unique index on <code>(book_id, issue_id, character_id)</code>; P6 checks for duplicates.</li>
+  <li><strong>A speaker edit could keep the old character id</strong> (codex 7): P4 has one function that writes speaker and id together, and names rerun-context among its callers.</li>
+  <li><strong>Open PRs collide with the switch</strong> (codex 8, grok 2, R2 grok 7/8): the merge-or-close list and the file freeze in "Two prerequisites before P2"; paused issues wait for P6.</li>
+  <li><strong>P1's lists were unresolved</strong> (codex 9): the three literal lists are in the spec and E1 is answered before P1 is cut.</li>
+  <li><strong>No transfer rule for old appearance content</strong> (codex 10): the "Old appearance voice content" backfill row.</li>
+  <li><strong>No conflict key for the import</strong> (codex 11, R2 codex 1): a plain unique constraint on <code>voices.appearance_id</code>.</li>
+  <li><strong>Imported clips lacked the metadata restore requires</strong> (codex 12, grok 10): version 2 requires description and labels, and carries consumers and a designed-voice row.</li>
+  <li><strong>Impossible dry-run gate</strong> (codex 13): P5's gate is a pure planning function tested against fixtures.</li>
+  <li><strong>P6's comparison had no baseline; P2's baseline was not per bubble</strong> (codex 14, R2 codex 8, R2 grok 5): P2 saves one line per bubble from today's lookup; P6 compares the audio plan before and after.</li>
+  <li><strong>No behavioral playback gate</strong> (codex 15, first half): the playback check, plus owner item E2.</li>
+  <li><strong>The real swap contradicted zero spend</strong> (codex 16): replaced by an offline archive-and-restore fixture; the owner decision for it is gone.</li>
+  <li><strong>Decision row 27 contradicted</strong> (grok 8): raised as owner item O2; P1 records the outcome in <code>docs/decisions.md</code>.</li>
+  <li><strong>Manifest version 2 was not implementable</strong> (grok 9): path, the root for <code>file</code>, imported statuses, and no <code>book</code> field.</li>
+  <li><strong>#316 called settled</strong> (grok 11, wording): the spec now says #316 is unchanged and continues.</li>
+  <li><strong><code>in_issue</code> differences in P2's gate</strong> (grok 12, R2 grok 6): the render chain now states today's fallback exactly and names the one intended change; no such row exists in issues 1 and 2.</li>
+  <li><strong>Types not committed after P1</strong> (grok 14, second half): in P1's gate.</li>
+  <li><strong>Backfill reruns could undo newer facts</strong> (R2 codex 2): the backfill has three sections, each with a last run.</li>
+  <li><strong>P6 rejected markers that P2 preserves</strong> (R2 codex 3): migration A checks that each marker row has <code>no_audio</code> true.</li>
+  <li><strong>Rollback lost deliberate silence</strong> (R2 codex 4, R2 grok 11): the rollback statement writes the marker where <code>no_audio</code> is true.</li>
+  <li><strong>P6's lints named files it did not own</strong> (R2 codex 5, R2 grok 9): the voices lint moved to P3 and the aliases lint to P4, with the module paths named.</li>
+  <li><strong>Voice lookup by display name survived</strong> (R2 codex 6): a P3 name, with the editor's <code>ownVoice</code> fallback called out.</li>
+  <li><strong>The editor could hide a null character id</strong> (R2 codex 7): P4 step and gate line.</li>
+  <li><strong>Designed imports had no restore source</strong> (R2 codex 9): every manifest row carries a sample file and md5.</li>
+  <li><strong>The consumers default could strip <code>room</code></strong> (R2 codex 10, R2 grok 3): omitted leaves the column alone; present merges.</li>
+  <li><strong><code>book_franchises</code> had no backfill rule and the face filter no gate</strong> (R2 grok 1): position is the array index; P4's gate compares the face step's character list too.</li>
+  <li><strong>Work ids were not fixed</strong> (R2 grok 2, first half): the id is the slug of the title plus the year, and every work has a year.</li>
+  <li><strong>No survivor rule or stable key for an existing voice</strong> (R2 grok 4): the survivor rule in the voices backfill row; an optional <code>voice_uuid</code> in the manifest; designed voices match on the sample's md5.</li>
+  <li><strong>P6's grep could not come back empty</strong> (R2 grok 10): the name gate is a type check with the columns deleted, plus a listed reason for every remaining hit.</li>
+  <li><strong>Filling <code>voices.character_id</code> turns on the silent-card fallback</strong> (R2 grok 12): the card rule is a P2 step.</li>
+</ul>
+
+<h3>Rejected</h3>
+<ul>
+  <li><strong>Assign the reader's display-name read to this plan</strong> (codex 15, second half): <a href="https://github.com/dougiefresh49/comic-reader/issues/377">#377</a> "Reader shows the character's display name, not the speaker slug" already owns it and has PR #395 open. Adding it here would put one change in two issues.</li>
+  <li><strong>Block P5 on P1 only</strong> (grok 14, first half): <code>scripts/voice-lab-import.ts</code> also uses <code>lab_default</code> and the alias array, which P3 and P4 remove. Running P5 beside them brings back the file collision the serial order exists to remove.</li>
+  <li><strong>Give one of these issues the <code>data/casting/</code> cleanup</strong> (grok 11, ownership): that is #316's whole scope and it depends on nothing in the schema. It stays its own issue.</li>
+  <li><strong>List every work id in the spec</strong> (R2 grok 2, second half): the id is derived from a title and year that are already in the lists E1 reviews, so a second hand-typed table would be a second copy to keep in step. P1's PR prints the table from the database.</li>
+</ul>
+
+<h3>Final pass</h3>
+<p>Skipped. It is owner-optional and has not been asked for.</p>
+
+</main>
+</div>
+</body>
+</html>
