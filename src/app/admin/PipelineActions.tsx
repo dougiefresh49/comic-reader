@@ -25,30 +25,25 @@ interface PipelineActionsProps {
 }
 
 const REVIEW_STEPS: Record<string, string> = {
-  "review-clusters": "Review Clusters",
+  "review-clusters": "Characters",
   "review-pages": "Review Pages",
-  "review-new-characters": "Review Characters",
-  casting: "Review Casting",
+  casting: "Voices",
 };
 
 const STEP_LABELS: Record<string, string> = {
   queued: "Queued",
   "roboflow-page-analyze": "Analyze pages",
-  "extract-foreground-masks": "Extract masks",
   "fetch-wiki-context": "Fetch wiki",
   "character-lookahead": "Character lookahead",
-  "review-clusters": "Cluster review",
+  "review-clusters": "Characters",
   "get-context": "Get context",
   "sort-page-elements": "Sort elements",
   "review-pages": "Page review",
-  "review-new-characters": "Character review",
   "generate-voice-descriptions": "Voice descriptions",
-  casting: "Casting",
-  "generate-voice-models": "Generate voices",
+  casting: "Voices",
   "generate-audio": "Generate audio",
-  "upload-audio": "Upload audio",
-  "consolidate-music-scenes": "Music scenes",
   "generate-manifest": "Generate manifest",
+  "extract-foreground-masks": "Extract masks",
   complete: "Complete",
 };
 

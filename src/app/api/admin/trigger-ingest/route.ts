@@ -5,18 +5,34 @@ import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
+import { resolvePipelineStep } from "~/lib/pipeline-steps";
 import { PAUSE_TO_HOOK_STEP, ingestHookToken } from "../cancel-ingest/hooks";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
     bookId: string;
     issueId: string;
-    fromStep?: string;
+    fromStep?: unknown;
   };
 
   if (!body.bookId || !body.issueId) {
     return Response.json(
       { error: "missing bookId or issueId" },
+      { status: 400 },
+    );
+  }
+
+  // A retired step resolves to the step that does its work now; a name the
+  // workflow cannot place is refused here, before any write or run (#356).
+  const fromStep =
+    body.fromStep === undefined || body.fromStep === null
+      ? undefined
+      : typeof body.fromStep === "string"
+        ? resolvePipelineStep(body.fromStep)
+        : null;
+  if (fromStep === null) {
+    return Response.json(
+      { error: `unknown fromStep ${JSON.stringify(body.fromStep)}` },
       { status: 400 },
     );
   }
@@ -138,14 +154,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const pipelineStep = body.fromStep ?? "roboflow-page-analyze";
-
+  // A masks-only retry leaves pipeline_step alone: masks run after the issue
+  // is ready and never write it, and the run marks the issue ready before
+  // masks start (#356).
   const { error } = await updateIssue(
     supabaseAdmin,
     body.bookId,
     body.issueId,
     {
-      pipeline_step: pipelineStep,
+      ...(fromStep === "extract-foreground-masks"
+        ? {}
+        : { pipeline_step: fromStep ?? "roboflow-page-analyze" }),
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
@@ -160,7 +179,7 @@ export async function POST(req: NextRequest) {
     {
       bookId: body.bookId,
       issueId: body.issueId,
-      fromStep: body.fromStep,
+      fromStep,
     },
   ]);
 
@@ -170,7 +189,7 @@ export async function POST(req: NextRequest) {
     status: "running",
     steps: {
       runId: run.runId,
-      fromStep: body.fromStep ?? null,
+      fromStep: fromStep ?? null,
       skipped: [],
     },
   });
@@ -181,7 +200,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       bookId: body.bookId,
       issueId: body.issueId,
-      fromStep: body.fromStep ?? null,
+      fromStep: fromStep ?? null,
       runId: run.runId,
       status: "started",
       warning: runError.message,
@@ -192,7 +211,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     bookId: body.bookId,
     issueId: body.issueId,
-    fromStep: body.fromStep ?? null,
+    fromStep: fromStep ?? null,
     runId: run.runId,
     status: "started",
   });

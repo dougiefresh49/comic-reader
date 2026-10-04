@@ -144,7 +144,7 @@ function currentStepOf(
   }
 }
 
-/** Index of the current step in STEP_ORDER; -1 before the first, 16 after the last. */
+/** Index of the current step in STEP_ORDER; -1 before the first, STEP_ORDER.length after the last. */
 function cursorOf(state: RunState, currentStep: string | null): number {
   if (state === "ready") return STEP_ORDER.length;
   if (state === "not-started" || currentStep === null) return -1;
@@ -200,32 +200,24 @@ function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
   switch (step) {
     case "roboflow-page-analyze":
       return ratio(c.pagesWithPanels, c.pages, "pages have panels");
-    case "extract-foreground-masks":
-      return ratio(c.panelsWithMasks, c.panels, "panels have masks");
     case "review-clusters":
       return c.faces === 0
         ? "no faces found"
         : ratio(c.facesNamed, c.faces, "faces named");
     case "get-context":
       return ratio(c.bubblesWithSpeaker, c.bubbles, "bubbles have a speaker");
-    case "review-new-characters":
-      return c.newCharactersPending === null
-        ? null
-        : `${c.newCharactersPending} new ${plural(c.newCharactersPending, "character")} pending`;
     case "casting":
       return c.castingTasks > 0
         ? ratio(c.castingTasksDone, c.castingTasks, "casting tasks done")
         : `${c.castlist} ${plural(c.castlist, "speaker")} in the castlist`;
-    case "generate-voice-models":
-      return ratio(c.castlistWithVoice, c.castlist, "speakers have a voice");
     case "generate-audio":
       return ratio(
         c.bubblesWithAudio,
         c.spokenBubbles,
         "spoken bubbles have audio",
       );
-    case "consolidate-music-scenes":
-      return `${c.musicScenes} music ${plural(c.musicScenes, "scene")}`;
+    case "extract-foreground-masks":
+      return ratio(c.panelsWithMasks, c.panels, "panels have masks");
     default:
       return null;
   }
@@ -246,16 +238,12 @@ function stageResult(
         : `${c.facesNamed} of ${c.faces} faces named`;
     case "read":
       return `${c.bubblesWithSpeaker} of ${c.bubbles} bubbles have a speaker`;
-    case "pages": {
-      const base = `${c.bubbles} ${plural(c.bubbles, "bubble")} on ${c.pages} ${plural(c.pages, "page")}`;
-      return c.newCharactersPending
-        ? `${base}, ${c.newCharactersPending} new ${plural(c.newCharactersPending, "character")} pending`
-        : base;
-    }
+    case "pages":
+      return `${c.bubbles} ${plural(c.bubbles, "bubble")} on ${c.pages} ${plural(c.pages, "page")}`;
     case "voices-audio":
       return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${c.castlistWithVoice} of ${c.castlist} speakers have a voice`;
     case "ready":
-      return `${c.musicScenes} music ${plural(c.musicScenes, "scene")}`;
+      return `${c.panelsWithMasks} of ${c.panels} panels have masks`;
   }
 }
 
@@ -308,7 +296,11 @@ export function buildHubView(
       );
 
       let status: RowStatus;
-      if (index < cursor) {
+      if (step === "extract-foreground-masks" && run?.masksError) {
+        // Masks run after ready, so the cursor has passed them; only the
+        // run row knows they failed (#356).
+        status = "failed";
+      } else if (index < cursor) {
         status = skipReasons.has(step) ? "skipped" : "done";
       } else if (index === cursor) {
         status =
@@ -325,6 +317,8 @@ export function buildHubView(
       const parts: string[] = [];
       if (status === "skipped") {
         parts.push(`skipped: ${skipReasons.get(step)}`);
+      } else if (step === "extract-foreground-masks" && run?.masksError) {
+        parts.push(`failed: ${run.masksError}`);
       } else if (status !== "pending") {
         const progress = stepProgress(step, counts);
         if (progress) parts.push(progress);
@@ -417,7 +411,7 @@ export function buildHubView(
       summary = `Cancelled at ${currentLabel}. Earlier steps keep their rows; a retry starts from this step.`;
       break;
     case "ready":
-      summary = `The issue plays in the reader${run?.completedAt && durationMs !== null ? `; the last run took ${formatDuration(durationMs)}` : ""}.`;
+      summary = `The issue plays in the reader${run?.completedAt && durationMs !== null ? `; the last run took ${formatDuration(durationMs)}` : ""}.${run?.masksError ? " Foreground masks failed on that run, so pages play without them." : ""}`;
       break;
     case "not-started":
       summary =

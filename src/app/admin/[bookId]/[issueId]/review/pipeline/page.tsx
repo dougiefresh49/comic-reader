@@ -279,12 +279,11 @@ function toRelativeHref(url: string): string {
 
 function reviewPages(bookId: string, issueId: string, hasWebP: boolean) {
   const base = `/admin/${bookId}/${issueId}/review`;
-  const q = `book=${encodeURIComponent(bookId)}&issue=${encodeURIComponent(issueId)}`;
   return [
     {
-      label: "Character clusters",
-      href: `${base}/clusters`,
-      note: "Name the faces the run could not place. The Characters gate.",
+      label: "Characters",
+      href: `${base}/characters`,
+      note: "Confirm the cast and name the faces the run could not place. The Characters stop.",
     },
     {
       label: "Speakers",
@@ -309,17 +308,12 @@ function reviewPages(bookId: string, issueId: string, hasWebP: boolean) {
       note: "Panels and bubbles in one workbench; edits stay in the browser.",
     },
     {
-      label: "New characters",
-      href: `${base}/new-characters`,
-      note: "Aliases or new roles before any voice is made.",
-    },
-    {
-      label: "Casting",
-      href: `/admin/characters/casting?${q}`,
-      note: "Voice sources and clips. The Casting gate.",
-    },
-    {
       label: "Voices",
+      href: `${base}/characters/voices`,
+      note: "Say which voice each character gets. The Voices stop; it pauses only when there is voice work.",
+    },
+    {
+      label: "Voice library",
       href: "/admin/voices",
       note: "ElevenLabs slots and PVC tools, across every book.",
     },

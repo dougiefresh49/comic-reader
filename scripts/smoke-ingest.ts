@@ -762,7 +762,7 @@ async function runPipeline(
     }
     const step = row.pipeline_step ?? "";
     if (step.startsWith("failed:")) fail(`pipeline_step = ${step}`);
-    if (step === "complete") return;
+    if (step === "complete") break;
 
     const key = `${step}|${row.pipeline_paused}`;
     if (key !== lastKey) {
@@ -805,12 +805,41 @@ async function runPipeline(
     await sleep(3000);
     row = await readIssue();
   }
+
+  // Masks run after the issue reads complete (#356), so the run row closes
+  // later. Wait for it before the dev server stops, then check that masks
+  // left pipeline_step alone and recorded no failure.
+  const readyAt = Date.now();
+  for (;;) {
+    checkStop();
+    const hits = logHits(logPath);
+    if (hits.length > 0) {
+      fail(`server log shows a failure:\n  ${hits.join("\n  ")}`);
+    }
+    const closing = await readRun(run.id);
+    if (closing?.status !== "running") break;
+    if (Date.now() - readyAt > gateTimeoutMs) {
+      fail(
+        `masks: pipeline_runs row still running ${gateTimeoutMs / 60_000} min after the issue read complete`,
+      );
+    }
+    await sleep(3000);
+  }
+  const after = await readIssue();
+  if (after.pipeline_step !== "complete") {
+    fail(
+      `pipeline_step = ${after.pipeline_step} after masks; expected complete`,
+    );
+  }
+  const masksError = (await readRun(run.id))?.steps?.masksError;
+  if (masksError) fail(`masks failed: ${masksError}`);
+  console.log("  extract-foreground-masks: ran after ready");
 }
 
 type RunRow = {
   status: string;
   completed_at: string | null;
-  steps: { skipped?: Skip[] } | null;
+  steps: { skipped?: Skip[]; masksError?: string } | null;
 };
 
 /** This run's pipeline_runs row, matched on the trigger's runId. */

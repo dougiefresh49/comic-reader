@@ -9,56 +9,6 @@ import {
   voiceLookupContext,
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
-import { isDryRun } from "~/lib/fakes/dry-run";
-import {
-  designCharacterVoice,
-  findCharactersNeedingVoices,
-} from "~/lib/voices-registry";
-
-const fatal = (err: unknown) =>
-  new FatalError(err instanceof Error ? err.message : String(err));
-
-export async function getCharactersNeedingVoices(
-  bookId: string,
-  issueId: string,
-): Promise<string[]> {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const supabase = await createTypedStepClient();
-  const found = await findCharactersNeedingVoices(supabase, bookId, issueId, {
-    dryRun: isDryRun(),
-  }).catch((err: unknown) => {
-    throw fatal(err);
-  });
-  console.log(
-    `[get-chars] ${bookId}/${issueId}: ${found.needDesign.length} need Voice Design, ${found.reused} castlist reuse from ready appearances` +
-      (found.repaired.length > 0
-        ? `, castlist voice written back to ${found.repaired.join(", ")}`
-        : ""),
-  );
-  return found.needDesign;
-}
-
-export async function generateVoiceModel(
-  bookId: string,
-  issueId: string,
-  characterId: string,
-) {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const supabase = await createTypedStepClient();
-  if (!process.env.ELEVENLABS_API_KEY)
-    throw new FatalError("ELEVENLABS_API_KEY not set");
-  const { elevenLabsFetch } = await import("~/lib/elevenlabs-client");
-  await designCharacterVoice(
-    supabase,
-    { bookId, issueId, characterId },
-    { dryRun: isDryRun(), fetch: elevenLabsFetch },
-  ).catch((err: unknown) => {
-    throw fatal(err);
-  });
-}
-generateVoiceModel.maxRetries = 0;
 
 export async function getBubbleIdsForAudio(
   bookId: string,
