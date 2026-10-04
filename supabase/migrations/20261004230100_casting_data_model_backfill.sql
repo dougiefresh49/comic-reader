@@ -94,15 +94,6 @@ language sql stable as $$
   )
 $$;
 
--- True when the name, or the name with its trailing brackets stripped, has
--- any candidate at all. An ambiguous name has candidates and resolves to
--- null; an unknown name has none.
-create or replace function pg_temp.has_candidates(p_name text, p_book text) returns boolean
-language sql stable as $$
-  select exists (select 1 from pg_temp.candidates(p_name, p_book))
-      or exists (select 1 from pg_temp.candidates(pg_temp.strip_brackets(p_name), p_book))
-$$;
-
 -- ===========================================================================
 -- Cast: castlist.character_id, castlist.no_audio.
 -- Also creates the characters of literal list 1, which Voices and Identity
@@ -154,31 +145,11 @@ from (
 ) as v (name, franchise)
 on conflict (id) do nothing;
 
--- Any other castlist name that resolves to nothing gets its own character
--- row. This narrows the spec rule (decision row 286): the name must have no
--- candidate at all in its own book, and its slug, which becomes the new id
--- and so outranks every alias, equals no book-scoped alias in any book. An
--- ambiguous name stays unresolved, since a new row would win it by id, here
--- and in every other book. A no-op on today's rows, where the two such names
--- are in the list above.
-insert into characters (id, display_name)
-select pg_temp.slug(k.character), min(k.character)
-from castlist k
-where k.character_id is null
-  and pg_temp.slug(k.character) <> ''
-  and not pg_temp.has_candidates(k.character, k.book_id)
-  and not exists (
-    select 1
-    from aliases a
-    where a.scope = 'book'
-      and a.character_id is not null
-      and pg_temp.slug(a.alias) in (
-        pg_temp.slug(k.character),
-        pg_temp.slug(pg_temp.strip_brackets(k.character))
-      )
-  )
-group by pg_temp.slug(k.character)
-on conflict (id) do nothing;
+-- No other character is created here. A castlist name that still resolves
+-- to nothing keeps a null character_id and fails the lead's gate, and a
+-- person adds the row. This narrows the spec rule (decision rows 286 and
+-- 288): a row made from a name's slug outranks every alias and display name
+-- in every book. Today the only two such names are in the list above.
 
 -- Only where character_id is null, so a link seedCast already wrote is kept.
 -- Nothing here stops two rows of one issue resolving to the same character:
