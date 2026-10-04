@@ -284,12 +284,7 @@ async function main() {
     }
     const gemini = new GoogleGenAI({ apiKey });
 
-    // Load ElevenLabs documentation
-    console.log("📚 Loading ElevenLabs documentation...");
     const elevenLabsDocs = loadElevenLabsDocs();
-    console.log(
-      `   ✓ Loaded documentation (${elevenLabsDocs.length} characters)\n`,
-    );
 
     // Load context cache
     console.log("📖 Loading bubbles cache...");

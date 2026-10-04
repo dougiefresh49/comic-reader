@@ -22,11 +22,32 @@ export interface VoiceOverride {
   linePrefix?: string;
 }
 
+/** Keys `parseVoiceOverride` reads. */
+const READ_KEYS = ["stability", "similarity_boost", "line_prefix"];
 /**
- * Parses a stored `voices.voice_settings` value. Null or `{}` is no override;
- * unknown keys are ignored. A wrong type, a number outside 0 to 1, or a blank
- * `line_prefix` throws naming the key: a silent fallback would spend credits
- * on settings nobody chose. `where` names the voice in the error.
+ * ElevenLabs settings another consumer of the `voices` table may store.
+ * eleven_v4 ignores them, so the parser does too.
+ */
+const IGNORED_KEYS = ["style", "speed", "use_speaker_boost"];
+
+/**
+ * Whether a line prefix is one audio tag, e.g. "[strong Japanese accent]". An
+ * unclosed bracket would leave the reader with no highlighted words, and a
+ * prefix with no brackets would be spoken aloud.
+ */
+export function isAudioTag(prefix: string): boolean {
+  return /^\[[^[\]]+\]$/.test(prefix.trim());
+}
+
+/**
+ * Parses a stored `voices.voice_settings` value. Null or `{}` is no override.
+ * `stability`, `similarity_boost` and `line_prefix` are read; `style`, `speed`
+ * and `use_speaker_boost` are accepted and ignored, since eleven_v4 ignores
+ * them. Any other key throws naming it, so a misspelled `similarityBoost`
+ * cannot render at the base in silence. A wrong type, a number outside 0 to 1,
+ * or a `line_prefix` that is not one audio tag (`isAudioTag`) throws naming
+ * the key: a silent fallback would spend credits on settings nobody chose.
+ * `where` names the voice in the error.
  */
 export function parseVoiceOverride(
   stored: unknown,
@@ -40,6 +61,14 @@ export function parseVoiceOverride(
   }
   const raw = stored as Record<string, unknown>;
   const out: VoiceOverride = {};
+
+  for (const key of Object.keys(raw)) {
+    if (!READ_KEYS.includes(key) && !IGNORED_KEYS.includes(key)) {
+      throw new Error(
+        `${where}.${key} is not a voice setting. Read: ${READ_KEYS.join(", ")}; ignored: ${IGNORED_KEYS.join(", ")}.`,
+      );
+    }
+  }
 
   const unit = (key: string): number | undefined => {
     const v = raw[key];
@@ -58,9 +87,9 @@ export function parseVoiceOverride(
 
   const prefix = raw.line_prefix;
   if (prefix !== undefined && prefix !== null) {
-    if (typeof prefix !== "string" || !prefix.trim()) {
+    if (typeof prefix !== "string" || !isAudioTag(prefix)) {
       throw new Error(
-        `${where}.line_prefix must be a non-blank string, got ${JSON.stringify(prefix)}`,
+        `${where}.line_prefix must be one audio tag like "[strong Japanese accent]", got ${JSON.stringify(prefix)}`,
       );
     }
     out.linePrefix = prefix.trim();

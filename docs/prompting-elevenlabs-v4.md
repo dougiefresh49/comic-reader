@@ -31,20 +31,33 @@ key is optional; null or `{}` means no override.
 | ------------------ | -------------- | ------------------------------------------- |
 | `stability`        | number, 0 to 1 | replaces the base stability                 |
 | `similarity_boost` | number, 0 to 1 | replaces the base similarity                |
-| `line_prefix`      | string         | goes in front of every line the voice says  |
+| `line_prefix`      | one audio tag  | goes in front of every line the voice says  |
 
 ```json
 { "line_prefix": "[strong Japanese accent]" }
 ```
 
+`style`, `speed` and `use_speaker_boost` are accepted and ignored: another
+consumer of the `voices` table may store them, and eleven_v4 ignores them.
+Any other key is an error, so a misspelled `similarityBoost` stops the render
+rather than leaving the voice at the base.
+
+`line_prefix` must be one bracketed tag after trimming, e.g.
+`[strong Japanese accent]`. An unclosed bracket would leave the reader with
+no highlighted words, and a prefix with no brackets would be spoken aloud.
+When a line already starts with the voice's prefix (an older or hand-edited
+`text_with_cues`), `buildTtsRequest` sends it as it is rather than tagging it
+twice.
+
 `parseVoiceOverride` (`src/lib/voice-settings.ts`) reads the value and throws
-on a wrong type, a number outside 0 to 1, or a blank `line_prefix`, so a bad
-row stops the render instead of paying for the wrong settings.
-`loadVoiceOverrides` (`src/lib/voice-overrides.ts`) reads it by
-`current_elevenlabs_id`, and `buildTtsRequest` applies it. The prefix is
+on an unknown key, a wrong type, a number outside 0 to 1, or a `line_prefix`
+that is not one tag, so a bad row stops the render instead of paying for the
+wrong settings. `loadVoiceOverrides` (`src/lib/voice-overrides.ts`) reads it
+by `current_elevenlabs_id`, and `buildTtsRequest` applies it. The prefix is
 billed and appears in the alignment; the reader skips it because
 `buildWordTimings` drops bracketed text.
 
 To hear a change before storing it, `pnpm render-bubble` takes
 `--stability`, `--similarity` and `--prefix` (a dry run unless
-`--execute`).
+`--execute`). `--prefix` follows the same one-tag rule; `--prefix ""` renders
+with no prefix.

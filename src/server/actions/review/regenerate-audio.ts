@@ -89,7 +89,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, character_id, emotion, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
+      "id, legacy_id, speaker, character_id, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -105,7 +105,6 @@ export async function regenerateAudio(args: Args) {
     legacy_id: string | null;
     speaker: string | null;
     character_id: string | null;
-    emotion: string | null;
     ocr_text: string | null;
     text_with_cues: string | null;
     type: string;

@@ -27,7 +27,7 @@ import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { buildTtsRequest, type TtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
-import type { VoiceOverride } from "~/lib/voice-settings";
+import { isAudioTag, type VoiceOverride } from "~/lib/voice-settings";
 import {
   lookupVoice,
   normalizeAlignment,
@@ -157,6 +157,16 @@ function checkLabel(label: string): string {
   return label;
 }
 
+/** A prefix is "" (none) or one audio tag, the rule a stored line_prefix meets. */
+function checkPrefix(prefix: string, where: string): string {
+  if (prefix.trim() && !isAudioTag(prefix)) {
+    fail(
+      `${where} must be one audio tag like "[strong Japanese accent]", or "" for none, got '${prefix}'`,
+    );
+  }
+  return prefix;
+}
+
 function parseArgs(argv: string[]): Args {
   const args: Args = { max: 1, execute: false };
   for (let i = 0; i < argv.length; i++) {
@@ -176,7 +186,8 @@ function parseArgs(argv: string[]): Args {
       args.stability = takeNumber(argv, i++, a, RANGES.stability);
     else if (a === "--similarity")
       args.similarity = takeNumber(argv, i++, a, RANGES.similarity);
-    else if (a === "--prefix") args.prefix = takeValue(argv, i++, a);
+    else if (a === "--prefix")
+      args.prefix = checkPrefix(takeValue(argv, i++, a), a);
     else if (a === "--label") args.label = checkLabel(takeValue(argv, i++, a));
     else if (a === "--batch") args.batch = takeValue(argv, i++, a);
     else if (a === "--max") args.max = takeNumber(argv, i++, a);
@@ -671,6 +682,7 @@ function checkBatchLine(spec: LineSpec, where: string): LineSpec {
       fail(`${where} has ${key}: ${JSON.stringify(v)}. It must be a string.`);
     }
   }
+  if (out.prefix !== undefined) checkPrefix(out.prefix, `${where} prefix`);
   return out;
 }
 

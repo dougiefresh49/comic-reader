@@ -19,9 +19,10 @@ export interface TtsRequestOptions {
   /**
    * The voice's parsed `voices.voice_settings` (`loadVoiceOverrides`). Its
    * numbers replace the base settings and its `linePrefix` goes in front of
-   * the text. Omitted, the request uses the base and the bare text.
+   * the text. Required, so a call site cannot forget the voice's settings;
+   * `undefined` (a voice with no row) uses the base and the bare text.
    */
-  override?: VoiceOverride;
+  override: VoiceOverride | undefined;
   /** The adjacent bubble's text, in reading order. Only sent with `withContext`. */
   previousText?: string;
   /** The adjacent bubble's text, in reading order. Only sent with `withContext`. */
@@ -90,9 +91,15 @@ export function buildTtsRequest({
   nextText,
   withContext = false,
 }: TtsRequestOptions): TtsRequest {
+  // An older or hand-edited `text_with_cues` can already carry the voice's
+  // tag, so a text that starts with it is sent as it is, not tagged twice.
+  const prefix = override?.linePrefix;
   const request: TtsRequest = {
     modelId: TTS_MODEL,
-    text: override?.linePrefix ? `${override.linePrefix} ${text}` : text,
+    text:
+      prefix && !text.trimStart().startsWith(prefix)
+        ? `${prefix} ${text}`
+        : text,
     voiceSettings: {
       stability: override?.stability ?? BASE_VOICE_SETTINGS.stability,
       similarityBoost:

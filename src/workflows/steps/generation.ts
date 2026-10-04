@@ -111,7 +111,7 @@ export async function generateAudioBatch(
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, character_id, emotion, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
+      "id, speaker, character_id, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
     )
     .in("id", bubbleIds);
 
