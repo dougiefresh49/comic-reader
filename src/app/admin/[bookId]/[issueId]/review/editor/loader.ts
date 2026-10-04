@@ -26,11 +26,7 @@ import type {
   SrcPanel,
   VoiceOption,
 } from "~/components/review-editor/types";
-
-/** The ElevenLabs voice slots this repo shares with the owner's other projects. */
-// Still hard-coded: the live count is an ElevenLabs GET (`voice_limit`), and
-// this loader makes SELECTs only (#355 owner call).
-const SLOTS_TOTAL = 30;
+import { VOICE_SLOTS_TOTAL } from "~/lib/voice-slots/types";
 
 interface IssueRow {
   name: string;
@@ -461,7 +457,7 @@ export async function loadEditor(
     known,
     voices,
     slotsUsed: active.length,
-    slotsTotal: SLOTS_TOTAL,
+    slotsTotal: VOICE_SLOTS_TOTAL,
     atPagesGate:
       issue.pipeline_step === "review-pages" && issue.pipeline_paused === true,
   };

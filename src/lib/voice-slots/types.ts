@@ -177,3 +177,6 @@ export interface CreateVoiceResult {
   /** The `voices` row id when `register` was set. */
   registeredId?: string;
 }
+
+/** The ElevenLabs voice slots this repo shares with the owner's other projects. */
+export const VOICE_SLOTS_TOTAL = 30;
