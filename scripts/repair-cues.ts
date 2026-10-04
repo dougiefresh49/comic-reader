@@ -167,22 +167,16 @@ function textsDiffer(text1: string, text2: string): boolean {
 }
 
 /**
- * Read the ElevenLabs documentation markdown file
+ * This script is from the eleven_v3 era: its prompt was built around
+ * `docs/prompting-elevenlabs-v3-with-emotion.md`, which #213 deleted when TTS
+ * moved to eleven_v4. It stops here, before any Gemini call, until someone
+ * ports its prompt to `CUE_RULES` (`src/lib/cue-rules.ts`) or deletes it.
  */
-async function loadElevenLabsDocs(): Promise<string> {
-  const docsPath = join(
-    PROJECT_ROOT,
-    "docs",
-    "prompting-elevenlabs-v3-with-emotion.md",
+function loadElevenLabsDocs(): string {
+  throw new Error(
+    "repair-cues is retired: it was written for eleven_v3 and its reference doc is gone. " +
+      "Use Regenerate cues in the review editor, which follows CUE_RULES in src/lib/cue-rules.ts.",
   );
-  try {
-    const content = await fs.readFile(docsPath, "utf-8");
-    return content;
-  } catch (error) {
-    console.error(`❌ Failed to load ElevenLabs documentation: ${error}`);
-    console.error(`   Expected at: ${docsPath}`);
-    throw error;
-  }
 }
 
 /**
@@ -290,12 +284,7 @@ async function main() {
     }
     const gemini = new GoogleGenAI({ apiKey });
 
-    // Load ElevenLabs documentation
-    console.log("📚 Loading ElevenLabs documentation...");
-    const elevenLabsDocs = await loadElevenLabsDocs();
-    console.log(
-      `   ✓ Loaded documentation (${elevenLabsDocs.length} characters)\n`,
-    );
+    const elevenLabsDocs = loadElevenLabsDocs();
 
     // Load context cache
     console.log("📖 Loading bubbles cache...");

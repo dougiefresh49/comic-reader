@@ -23,6 +23,8 @@ import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
 import { SKIPPED_VOICE } from "~/lib/voice-settings.js";
 import { buildTtsRequest } from "~/lib/tts-request.js";
+import { loadVoiceOverrides } from "~/lib/voice-overrides.js";
+import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -433,8 +435,11 @@ async function main() {
             voiceId,
             buildTtsRequest({
               text: textToUse,
-              emotion: bubble.emotion,
               voiceId,
+              // The voice's stored settings and line prefix, as the pipeline reads them.
+              override: (await loadVoiceOverrides(supabase, [voiceId])).get(
+                voiceId,
+              ),
               previousText,
               nextText,
             }),

@@ -23,18 +23,22 @@ Don't clone a second voice per ranger first. Treat morphed as a delivery
 mode layered on the civilian clone:
 
 1. **Clone source**: civilian reels (cleanest, most dialogue). Per
-   ElevenLabs' own v3 guidance (see `prompting-elevenlabs-v3-with-emotion.md`:
-   "for expressive IVC voices, vary emotional tones across the recording —
-   include both neutral and dynamic samples"), **mix a few morphed shouted
+   ElevenLabs' own cloning guidance ("for expressive IVC voices, vary
+   emotional tones across the recording — include both neutral and dynamic
+   samples"), **mix a few morphed shouted
    lines into the IVC sample set** so the clone has the range for the tags
    below. Keep the ratio civilian-heavy (roughly 4:1).
 2. **Text layer** (the rewrite prompt): a `mode: morphed` flag → command
    register: short imperative sentences, exclamations, team call-outs
-   ("Zack, take the left!"), and v3 audio tags such as `[shouting]`,
+   ("Zack, take the left!"), and audio tags such as `[shouting]`,
    `[intense]`, `[battle cry]` at the top of the line. Civilian mode keeps
-   the character's normal register and softer tags.
+   the character's normal register and softer tags. The tag rules live in
+   `src/lib/cue-rules.ts`.
 3. **Voice settings per mode** (per request, same voice id): morphed →
-   lower `stability`, higher `style`; civilian → the defaults.
+   lower `stability`; civilian → the base settings. eleven_v4 uses only
+   `stability` and `similarity_boost` and ignores `style`
+   (`docs/prompting-elevenlabs-v4.md`). Today's override is per voice
+   (`voices.voice_settings`), so a per-mode one would need building.
 4. **Audio layer**: a "helmet" post-effect on playback — light band-pass
    (~300 Hz–4 kHz), short room reverb, gentle compression. This is most of
    what the show's post did. ffmpeg sketch:

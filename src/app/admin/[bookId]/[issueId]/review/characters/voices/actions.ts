@@ -24,6 +24,7 @@ import {
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
+import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import {
   carryOut,
   planVoiceWork,
@@ -421,15 +422,17 @@ export async function playSample(args: {
     // Active and library voices play; an archived one is off the account.
     if (!row || row.status === "archived" || !voiceId)
       return { ok: false, error: "The character has no voice to play." };
+    const overrides = await loadVoiceOverrides(supabaseAdmin, [voiceId]);
+    const request = buildTtsRequest({
+      text: line.text,
+      voiceId,
+      override: overrides.get(voiceId),
+    });
     const client = await getElevenLabsClient();
     const response = await recordElevenLabsCall(
       { step: "voices-stop:sample", bookId, issueId, model: TTS_MODEL },
-      line.text.length,
-      () =>
-        client.textToSpeech.convertWithTimestamps(
-          voiceId,
-          buildTtsRequest({ text: line.text, emotion: line.emotion, voiceId }),
-        ),
+      request.text.length,
+      () => client.textToSpeech.convertWithTimestamps(voiceId, request),
     );
     return { ok: true, audio: response.audioBase64 };
   } catch (err) {

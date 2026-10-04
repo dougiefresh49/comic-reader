@@ -42,17 +42,19 @@ export const GEMINI_USD_PER_1M_TOKENS: Record<
 // gemini-embedding-2, per image embedded. Text embeddings have no rate yet.
 export const GEMINI_EMBEDDING_USD_PER_IMAGE = 0.00012;
 
-// owner's ElevenLabs pricing table, 2026-09-30: eleven_v3 $0.08 per 1K characters on Creator
+// owner's ElevenLabs pricing table, 2026-09-30: $0.08 per 1K characters on
+// Creator for v3 TTS; v4 lists at the same price (#213)
 export const ELEVENLABS_USD_PER_CHARACTER = 0.00008;
 
 // Fallback credits per character when `character-cost` is absent (#251).
-// TTS v3 keeps the existing 1-credit assumption pending the owner's usage check.
+// TTS eleven_v4: `GET /v1/models` reports `character_cost_multiplier: 1.0`
+// on this account (#213 probe, 2026-09-28).
 // Voice Design v3 bills preview text once for all three samples. Its FAQ says
 // credits equal preview characters and calls this the single-credit rule:
 // https://elevenlabs.io/blog/voice-design-v3
 // https://help.elevenlabs.io/hc/en-us/articles/29315418701073-How-much-does-Voice-Design-cost
 // Models without a documented rate keep credits null.
 export const ELEVENLABS_CREDITS_PER_CHARACTER: Record<string, number> = {
-  eleven_v3: 1,
+  eleven_v4: 1,
   eleven_ttv_v3: 1,
 };

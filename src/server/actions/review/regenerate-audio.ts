@@ -9,6 +9,7 @@ import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadBookCast } from "~/lib/cast";
+import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import { voiceLookupContext } from "~/workflows/steps/audio-plan";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
@@ -88,7 +89,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, character_id, emotion, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
+      "id, legacy_id, speaker, character_id, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -104,7 +105,6 @@ export async function regenerateAudio(args: Args) {
     legacy_id: string | null;
     speaker: string | null;
     character_id: string | null;
-    emotion: string | null;
     ocr_text: string | null;
     text_with_cues: string | null;
     type: string;
@@ -148,6 +148,18 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: resolved.error };
   }
   const voiceId = resolved.voiceId;
+  // The audio step's request: same text, voice and voice settings.
+  let request;
+  try {
+    const overrides = await loadVoiceOverrides(supabaseAdmin, [voiceId]);
+    request = buildTtsRequest({
+      text,
+      voiceId,
+      override: overrides.get(voiceId),
+    });
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 
   // Each take goes to a path no earlier take used, so the upload never
   // touches what the reader plays. switch_bubble_audio_take then changes the
@@ -185,12 +197,8 @@ export async function regenerateAudio(args: Args) {
         issueId: args.issueId,
         model: TTS_MODEL,
       },
-      text.length,
-      () =>
-        client.textToSpeech.convertWithTimestamps(
-          voiceId,
-          buildTtsRequest({ text, emotion: b.emotion, voiceId }),
-        ),
+      request.text.length,
+      () => client.textToSpeech.convertWithTimestamps(voiceId, request),
     );
     const audioBuffer = Buffer.from(response.audioBase64, "base64");
 
