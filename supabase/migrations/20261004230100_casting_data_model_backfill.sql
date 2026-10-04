@@ -41,41 +41,46 @@ language sql immutable as $$
   select btrim(regexp_replace(t, '(\s*\([^()]*\))+\s*$', ''))
 $$;
 
--- A text name to a character id, trying in turn: the id, the display name, a
--- book-scoped alias, then a global alias (the aliases table or an entry of
--- characters.aliases). The first tier with any match decides; two different
--- characters in that tier is ambiguous and gives null.
+-- Every character a text name could mean, with its tier: 1 the id, 2 the
+-- display name, 3 a book-scoped alias, 4 a global alias (the aliases table
+-- or an entry of characters.aliases).
+create or replace function pg_temp.candidates(p_name text, p_book text)
+returns table (cand_tier integer, cand_id text)
+language sql stable as $$
+  select 1, c.id
+  from public.characters c
+  where c.id = pg_temp.slug(p_name)
+  union all
+  select 2, c.id
+  from public.characters c
+  where pg_temp.norm(c.display_name) = pg_temp.norm(p_name)
+  union all
+  select 3, a.character_id
+  from public.aliases a
+  where a.scope = 'book'
+    and a.scope_id = p_book
+    and a.alias_norm = pg_temp.norm(p_name)
+    and a.character_id is not null
+  union all
+  select 4, a.character_id
+  from public.aliases a
+  where a.scope = 'global'
+    and a.alias_norm = pg_temp.norm(p_name)
+    and a.character_id is not null
+  union all
+  select 4, c.id
+  from public.characters c, unnest(c.aliases) as e (alias)
+  where pg_temp.norm(e.alias) = pg_temp.norm(p_name)
+$$;
+
+-- A text name to a character id. The first tier with any candidate decides;
+-- two different characters in that tier is ambiguous and gives null.
 create or replace function pg_temp.resolve_exact(p_name text, p_book text) returns text
 language sql stable as $$
-  with candidates as (
-    select 1 as tier, c.id as character_id
-    from public.characters c
-    where c.id = pg_temp.slug(p_name)
-    union all
-    select 2, c.id
-    from public.characters c
-    where pg_temp.norm(c.display_name) = pg_temp.norm(p_name)
-    union all
-    select 3, a.character_id
-    from public.aliases a
-    where a.scope = 'book'
-      and a.scope_id = p_book
-      and a.alias_norm = pg_temp.norm(p_name)
-      and a.character_id is not null
-    union all
-    select 4, a.character_id
-    from public.aliases a
-    where a.scope = 'global'
-      and a.alias_norm = pg_temp.norm(p_name)
-      and a.character_id is not null
-    union all
-    select 4, c.id
-    from public.characters c, unnest(c.aliases) as e (alias)
-    where pg_temp.norm(e.alias) = pg_temp.norm(p_name)
-  )
-  select case when count(distinct character_id) = 1 then min(character_id) end
-  from candidates
-  where tier = (select min(tier) from candidates)
+  with c as (select * from pg_temp.candidates(p_name, p_book))
+  select case when count(distinct cand_id) = 1 then min(cand_id) end
+  from c
+  where cand_tier = (select min(cand_tier) from c)
 $$;
 
 -- Owner call 2026-10-04: a name that does not resolve is tried again with
@@ -87,6 +92,15 @@ language sql stable as $$
     pg_temp.resolve_exact(p_name, p_book),
     pg_temp.resolve_exact(pg_temp.strip_brackets(p_name), p_book)
   )
+$$;
+
+-- True when the name, or the name with its trailing brackets stripped, has
+-- any candidate at all. An ambiguous name has candidates and resolves to
+-- null; an unknown name has none.
+create or replace function pg_temp.has_candidates(p_name text, p_book text) returns boolean
+language sql stable as $$
+  select exists (select 1 from pg_temp.candidates(p_name, p_book))
+      or exists (select 1 from pg_temp.candidates(pg_temp.strip_brackets(p_name), p_book))
 $$;
 
 -- ===========================================================================
@@ -141,20 +155,21 @@ from (
 on conflict (id) do nothing;
 
 -- Any other castlist name that resolves to nothing gets its own character
--- row (spec rule). A no-op on today's rows, where the two such names are in
--- the list above.
+-- row (spec rule). A name with no candidate at all, that is: an ambiguous
+-- name stays unresolved, since a new row would win it by id. A no-op on
+-- today's rows, where the two such names are in the list above.
 insert into characters (id, display_name)
 select pg_temp.slug(k.character), min(k.character)
 from castlist k
 where k.character_id is null
   and pg_temp.slug(k.character) <> ''
-  and pg_temp.resolve_character(k.character, k.book_id) is null
+  and not pg_temp.has_candidates(k.character, k.book_id)
 group by pg_temp.slug(k.character)
 on conflict (id) do nothing;
 
 -- Only where character_id is null, so a link seedCast already wrote is kept.
--- Two rows of one issue resolving to the same character fail the unique
--- index from the schema file, and the transaction with them.
+-- Nothing here stops two rows of one issue resolving to the same character:
+-- the unique index on (book_id, issue_id, character_id) waits for P2.
 update castlist k
 set character_id = r.character_id
 from (
@@ -180,8 +195,19 @@ where no_audio <> coalesce(voice_id = '__SKIPPED__', false);
 -- Last run: right before P3 deploys.
 -- ===========================================================================
 
+-- Every ElevenLabs id a voice holds or held. Archive nulls
+-- current_elevenlabs_id and logs the old id in voice_archives, and restore
+-- writes a new one; neither touches character_appearances.
+create or replace temp view voice_elevenlabs_ids as
+select v.id as voice_id, v.current_elevenlabs_id as elevenlabs_id
+from voices v
+where v.current_elevenlabs_id is not null
+union
+select va.voice_id, va.former_elevenlabs_id
+from voice_archives va;
+
 -- Each ElevenLabs id on an old appearance row must already be on a voices
--- row (an empty string is not an id).
+-- row, now or before an archive (an empty string is not an id).
 do $$
 declare
   missing text;
@@ -191,7 +217,7 @@ begin
   from character_appearances ca
   where nullif(btrim(ca.voice_id), '') is not null
     and not exists (
-      select 1 from voices v where v.current_elevenlabs_id = ca.voice_id
+      select 1 from voice_elevenlabs_ids e where e.elevenlabs_id = ca.voice_id
     );
   if missing is not null then
     raise exception 'character_appearances rows hold an ElevenLabs id no voices row has: %', missing;
@@ -317,8 +343,8 @@ on conflict (character_id, work_id) do nothing;
 
 -- voices.appearance_id, only where null and only to an appearance no voice
 -- holds yet. A voice reaches an appearance through its name's variant, or
--- through an old non-design row holding its ElevenLabs id for the same
--- character (the clones in slots today). When two voices reach one
+-- through an old non-design row holding its ElevenLabs id (current or
+-- archived) for the same character (the clones in slots today). When two voices reach one
 -- appearance, it goes to the active one, else the starting pick, else the
 -- newest; the others keep a null appearance_id.
 update voices v
@@ -336,8 +362,9 @@ from (
       union all
       select vo.id, a.id, 2
       from voices vo
+      join voice_elevenlabs_ids e on e.voice_id = vo.id
       join old_appearance_works ow
-        on ow.voice_id = vo.current_elevenlabs_id
+        on ow.voice_id = e.elevenlabs_id
        and ow.character_id = vo.character_id
       join appearances a
         on a.character_id = ow.character_id
@@ -362,8 +389,9 @@ where v.id = w.voice_id;
 -- is what restore sends to ElevenLabs; the old one fills only a blank.
 update voices v
 set description = ca.voice_description
-from character_appearances ca
-where ca.voice_id = v.current_elevenlabs_id
+from voice_elevenlabs_ids e
+join character_appearances ca on ca.voice_id = e.elevenlabs_id
+where e.voice_id = v.id
   and v.description is null
   and nullif(btrim(ca.voice_description), '') is not null;
 
@@ -388,16 +416,28 @@ where o.voice_status = 'needs_clips'
 -- Last run: right before P4 deploys.
 -- ===========================================================================
 
--- Every characters.aliases entry the table lacks, scope global. An entry that
--- is the character's own display name is left out: the resolver matches the
--- display name already. canonical is filled for the deployed readers until
--- P4.
+-- Every characters.aliases entry the table lacks, scope global, narrowed by
+-- two skips the spec does not name. An entry that is the character's own
+-- display name is left out: the resolver matches the display name already.
+-- An entry that is another character's id or display name is left out too:
+-- the deployed buildAliasMap and resolveAlias (audio-plan.ts) check the
+-- aliases table before names, so the row would take that character's
+-- speakers. canonical is filled for the deployed readers until P4.
 insert into aliases (alias, canonical, character_id, scope)
 select distinct on (pg_temp.norm(e.alias))
        btrim(e.alias), coalesce(c.display_name, c.id), c.id, 'global'
 from characters c, unnest(c.aliases) as e (alias)
 where btrim(e.alias) <> ''
   and pg_temp.norm(e.alias) is distinct from pg_temp.norm(c.display_name)
+  and not exists (
+    select 1
+    from characters o
+    where o.id <> c.id
+      and (
+        o.id = pg_temp.slug(e.alias)
+        or pg_temp.norm(o.display_name) = pg_temp.norm(e.alias)
+      )
+  )
   and not exists (
     select 1
     from aliases a

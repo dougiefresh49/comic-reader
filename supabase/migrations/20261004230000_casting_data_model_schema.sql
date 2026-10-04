@@ -1,8 +1,8 @@
 -- Casting data model P1, schema (#414; spec docs/casting-data-model.html,
 -- sections Tables and P1 Add; decision log rows 279 and 280).
 --
--- Additive only. Every statement adds a table, a column, an index or a
--- constraint, or loosens one (aliases.canonical becomes nullable, the
+-- Additive only. Every statement adds a table, a column, an index, a
+-- grant or a constraint, or loosens one (aliases.canonical becomes nullable, the
 -- voices.status check gains a value). Nothing is removed or renamed, so the
 -- deployed code keeps working against the result. The backfill is the next
 -- migration file.
@@ -67,6 +67,17 @@ create index if not exists appearances_work_id_idx on appearances (work_id);
 alter table appearances enable row level security;
 create policy "public read" on appearances for select using (true);
 
+-- The project's default privileges give these roles nothing on a table
+-- postgres creates, so the grants are explicit.
+grant select on public.franchises to anon, authenticated;
+grant select on public.book_franchises to anon, authenticated;
+grant select on public.works to anon, authenticated;
+grant select on public.appearances to anon, authenticated;
+grant select, insert, update, delete on public.franchises to service_role;
+grant select, insert, update, delete on public.book_franchises to service_role;
+grant select, insert, update, delete on public.works to service_role;
+grant select, insert, update, delete on public.appearances to service_role;
+
 -- characters
 
 alter table characters
@@ -105,10 +116,8 @@ alter table voices
 alter table castlist
   add column if not exists no_audio boolean not null default false;
 
--- P2's upserts conflict on this while the old primary key on the text
--- character column remains.
-create unique index if not exists castlist_book_id_issue_id_character_id_key
-  on castlist (book_id, issue_id, character_id);
+-- The unique index on (book_id, issue_id, character_id) waits for P2: the
+-- deployed upserts still conflict on the text column and would trip it.
 
 -- aliases
 
