@@ -104,6 +104,8 @@ export interface HubView {
   stages: StageView[];
   /** How often the page re-fetches itself; null once the run is done. */
   refreshMs: number | null;
+  /** The Run fact's word: RUN_WORDS for the state, but "Running" while masks still run on a ready issue. */
+  runWord: string;
 }
 
 /**
@@ -266,6 +268,9 @@ export function buildHubView(
   now: number,
 ): HubView {
   const state = runState(issue, run);
+  // Masks run after the issue is ready (#356): while the latest run row is
+  // still open, the masks row is live and the page keeps polling.
+  const masksRunning = state === "ready" && run?.status === "running";
   const currentStep = currentStepOf(issue, state);
   const cursor = cursorOf(state, currentStep);
   const currentLabel = currentStep
@@ -292,7 +297,8 @@ export function buildHubView(
         run,
         step,
         now,
-        state === "running" && step === currentStep,
+        (state === "running" && step === currentStep) ||
+          (masksRunning && step === "extract-foreground-masks"),
       );
 
       let status: RowStatus;
@@ -300,6 +306,8 @@ export function buildHubView(
         // Masks run after ready, so the cursor has passed them; only the
         // run row knows they failed (#356).
         status = "failed";
+      } else if (step === "extract-foreground-masks" && masksRunning) {
+        status = "running";
       } else if (index < cursor) {
         status = skipReasons.has(step) ? "skipped" : "done";
       } else if (index === cursor) {
@@ -411,7 +419,7 @@ export function buildHubView(
       summary = `Cancelled at ${currentLabel}. Earlier steps keep their rows; a retry starts from this step.`;
       break;
     case "ready":
-      summary = `The issue plays in the reader${run?.completedAt && durationMs !== null ? `; the last run took ${formatDuration(durationMs)}` : ""}.${run?.masksError ? " Foreground masks failed on that run, so pages play without them." : ""}`;
+      summary = `The issue plays in the reader${run?.completedAt && durationMs !== null ? `; the last run took ${formatDuration(durationMs)}` : ""}.${run?.masksError ? " Foreground masks failed on that run, so pages play without them." : masksRunning ? " Foreground masks are still running." : ""}`;
       break;
     case "not-started":
       summary =
@@ -429,6 +437,7 @@ export function buildHubView(
     durationMs,
     waitingMs,
     stages,
-    refreshMs: REFRESH_MS[state],
+    refreshMs: masksRunning ? REFRESH_MS.running : REFRESH_MS[state],
+    runWord: masksRunning ? RUN_WORDS.running : RUN_WORDS[state],
   };
 }

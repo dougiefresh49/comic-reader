@@ -649,6 +649,32 @@ async function resume(gate: string): Promise<void> {
 }
 
 /**
+ * Owner simulation at the pages stop: approve every page of the smoke issue
+ * as the editor's setPageApproval does (`pages.reviewed_at`), so the resume
+ * endpoint's canResumePages passes. That check still refuses a spoken bubble
+ * with no speaker, which this does not paper over.
+ */
+async function approvePages(): Promise<void> {
+  const rows = must(
+    await supabase
+      .from("pages")
+      .update({ reviewed_at: new Date().toISOString() })
+      .eq("book_id", BOOK)
+      .eq("issue_id", ISSUE)
+      .select("number"),
+    "pages approve",
+  ) as { number: number }[];
+  if (rows.length !== SRC_PAGES.length) {
+    fail(
+      `review-pages: approved ${rows.length} pages, expected ${SRC_PAGES.length}`,
+    );
+  }
+  console.log(
+    `  review-pages: approved ${rows.length} pages (owner simulation)`,
+  );
+}
+
+/**
  * Owner simulation at the characters stop (#383): "Not a character" on every
  * unnamed face of the smoke issue, so the resume gate passes. Deletes the
  * rows rejectGroup (review/characters/actions.ts) deletes: exemplars cut
@@ -777,6 +803,28 @@ async function runPipeline(
         fail(`paused at ${gate}; expected ${want ?? "no more pauses"}`);
       }
       if (gate === "review-clusters") await rejectUnknownFaces(scenario);
+      if (gate === "review-pages") await approvePages();
+      if (gate === "casting" && scenario.strangerBubbles > 0) {
+        // canContinueVoices holds the run while a speaker has no voice and
+        // no skip marker, so the owner marks the stranger "no audio this
+        // run". It stays uncast, as assertRows expects.
+        must(
+          await supabase.from("castlist").upsert(
+            {
+              book_id: BOOK,
+              issue_id: ISSUE,
+              character: "Smoke Stranger",
+              voice_id: SKIPPED_VOICE,
+              voice_uuid: null,
+            },
+            { onConflict: "book_id,issue_id,character" },
+          ),
+          "castlist skip marker for Smoke Stranger",
+        );
+        console.log(
+          "  castlist: Smoke Stranger marked no audio this run (owner simulation)",
+        );
+      }
       if (gate === "casting" && insertOmitted) {
         // The characters stop's seedCast may already have added the row
         // without a voice, so this sets the voice on it (#383).

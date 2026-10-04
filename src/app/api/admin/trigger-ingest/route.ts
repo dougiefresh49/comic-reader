@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "issue not found" }, { status: 404 });
   }
 
+  // Masks run on a finished issue only (#356).
+  if (
+    fromStep === "extract-foreground-masks" &&
+    issue.pipeline_step !== "complete"
+  ) {
+    return Response.json(
+      {
+        error: `Masks can only be retried on a finished issue; this one reads ${issue.pipeline_step ?? "no step"}.`,
+      },
+      { status: 409 },
+    );
+  }
+
   // Every run of an issue shares the gate hook tokens, so a second run dies
   // with HookConflictError while an older one holds a gate (#208). Refuse only
   // while that run is live; stale state passes, a lookup error refuses.

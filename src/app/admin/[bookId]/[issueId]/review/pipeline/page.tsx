@@ -7,7 +7,7 @@ import { LiveRefresh } from "./LiveRefresh";
 import { LocalTime } from "./LocalTime";
 import { Stages } from "./StageList";
 import { formatAgo, formatDuration } from "./format";
-import { buildHubView, RUN_WORDS, STATE_LABELS, type RunState } from "./model";
+import { buildHubView, STATE_LABELS, type RunState } from "./model";
 import { stepLabel } from "./stages";
 
 export const dynamic = "force-dynamic";
@@ -122,7 +122,7 @@ export default async function PipelineReviewPage({ params }: Params) {
             <Fact label="Run">
               {run ? (
                 <>
-                  {RUN_WORDS[view.state]}
+                  {view.runWord}
                   {run.fromStep && (
                     <span className="ml-2 text-neutral-500">
                       from {stepLabel(run.fromStep)}

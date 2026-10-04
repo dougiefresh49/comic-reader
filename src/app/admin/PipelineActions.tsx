@@ -57,6 +57,8 @@ function toRelativePath(url: string): string {
 
 function nextStepAfter(pausedAt: string | null): string | null {
   if (!pausedAt) return null;
+  // Restarting after casting would run audio without the voices check.
+  if (pausedAt === "casting") return "casting";
   const idx = (STEP_ORDER as readonly string[]).indexOf(pausedAt);
   if (idx < 0) return pausedAt;
   return STEP_ORDER[idx + 1] ?? pausedAt;
