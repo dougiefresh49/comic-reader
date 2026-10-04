@@ -445,7 +445,8 @@ function castLine(m: ClosedCastMember, seen: boolean): string {
  * aliases. When that finds nobody, a reply that copied a member's cast line
  * is that member: the line as `closedCastLines` writes it, with or without
  * `SEEN_ON_PAGE`, or the name with `SEEN_ON_PAGE` alone (#373, decisions row
- * 269). The reply is compared whole and never cut: never an alias's first
+ * 269), and only when one member alone writes that line. The reply is
+ * compared whole and never cut: never an alias's first
  * word, never a fuzzy match. A reply the cast does not hold is stored as null
  * for review, not guessed (#354).
  */
@@ -456,12 +457,13 @@ export function matchCastSpeaker(
   if (typeof raw !== "string") return null;
   const key = slugify(raw);
   if (!key) return null;
-  return (
+  const exact =
     cast.find((m) => m.id === key || slugify(m.name) === key) ??
-    cast.find((m) => m.aliases.some((a) => slugify(a) === key)) ??
-    cast.find((m) => copiedCastLineKeys(m).includes(key)) ??
-    null
-  );
+    cast.find((m) => m.aliases.some((a) => slugify(a) === key));
+  if (exact) return exact;
+  // A copied line names its member only when no other member writes the same line.
+  const copied = cast.filter((m) => copiedCastLineKeys(m).includes(key));
+  return copied.length === 1 ? (copied[0] ?? null) : null;
 }
 
 /** The slugs of a member's cast line as a reply can copy it: with and without each note. */
