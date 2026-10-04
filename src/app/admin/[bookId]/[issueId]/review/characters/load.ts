@@ -331,9 +331,13 @@ export async function loadCharacters(
   for (const m of proposal.members) {
     const mine = issueRowsFor(book, issueRows, m.id);
     const removed = mine.length > 0 && mine.every((r) => !r.in_issue);
+    // In this issue: a face, a wiki mention, or a row in this issue's cast
+    // (Add, or a seeded cast). Cast before: the rest of the book's cast.
     const group = isRoleId(m.id)
       ? "role"
-      : m.sources.includes("faces") || m.sources.includes("wiki")
+      : m.sources.includes("faces") ||
+          m.sources.includes("wiki") ||
+          mine.some((r) => r.in_issue)
         ? "here"
         : "before";
     // A character cast before with no sign here and taken out of this issue
