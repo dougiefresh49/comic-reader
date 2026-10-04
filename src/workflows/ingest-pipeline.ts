@@ -249,7 +249,11 @@ export async function ingestPipeline(input: IngestInput) {
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 
-    await markIssueReady(bookId, issueId);
+    // A masks-only retry leaves the issue row as it found it, so retrying
+    // masks on an issue that failed earlier cannot publish it unfinished.
+    if (from !== "extract-foreground-masks") {
+      await markIssueReady(bookId, issueId);
+    }
     ready = true;
 
     // ── Phase 9: Foreground masks, after ready (#356) ─────────────────

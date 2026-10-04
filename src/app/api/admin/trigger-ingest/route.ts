@@ -154,9 +154,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // A masks-only retry leaves pipeline_step alone: masks run after the issue
-  // is ready and never write it, and the run marks the issue ready before
-  // masks start (#356).
+  // A masks-only retry leaves pipeline_step alone: masks never write it, and
+  // the run leaves the issue row as it found it (#356).
   const { error } = await updateIssue(
     supabaseAdmin,
     body.bookId,
