@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState, useMemo, useRef } from "react";
+import { VOICE_SLOTS_TOTAL } from "~/lib/voice-slots/types";
 import {
   toggleKeepActive,
   planVoiceOperation,
@@ -342,7 +343,7 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
       </div>
 
       <p className="mt-3 text-xs text-neutral-600">
-        {counts.active} active of 30 ElevenLabs Creator slots.
+        {counts.active} active of {VOICE_SLOTS_TOTAL} ElevenLabs Creator slots.
         {counts.active >= 25 && (
           <span className="ml-1 text-amber-400">
             Approaching cap. Consider archiving unused voices.
