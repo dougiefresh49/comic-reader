@@ -1,9 +1,6 @@
 import { getWorkflowMetadata } from "workflow";
 import type { Json } from "~/types/database";
-import type { UnresolvedFaceCounts } from "./gate-counts";
 import { updateRunSteps } from "./pipeline-runs";
-
-export type { UnresolvedFaceCounts };
 
 export type GateSkipRecord = {
   gate: string;
@@ -23,20 +20,6 @@ export type GateWaitRecord = {
   waitedAt: string;
   releasedAt?: string;
 };
-
-/** Count unresolved face detections + exemplars for the cluster gate. */
-export async function countUnresolvedFaces(
-  bookId: string,
-  issueId: string,
-): Promise<UnresolvedFaceCounts> {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const { countUnresolvedFaces: queryUnresolvedFaces } = await import(
-    "./gate-counts"
-  );
-  const client = await createTypedStepClient();
-  return queryUnresolvedFaces(client, bookId, issueId);
-}
 
 /** Count pending new-character queue rows for the character gate. */
 export async function countPendingNewCharacters(

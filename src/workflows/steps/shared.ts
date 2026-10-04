@@ -273,7 +273,7 @@ function getPauseUrl(bookId: string, issueId: string, step: string): string {
     : (process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000");
   switch (step) {
     case "review-clusters":
-      return `${base}/admin/${bookId}/${issueId}/review/clusters`;
+      return `${base}/admin/${bookId}/${issueId}/review/characters`;
     case "review-pages":
       return `${base}/admin/${bookId}/${issueId}/review/editor`;
     case "review-new-characters":
@@ -286,7 +286,7 @@ function getPauseUrl(bookId: string, issueId: string, step: string): string {
 }
 
 const STEP_LABELS: Record<string, string> = {
-  "review-clusters": "Character Cluster Review",
+  "review-clusters": "Characters",
   "review-pages": "Page & Speaker Review",
   "review-new-characters": "New Character Review",
   casting: "Voice Casting",
