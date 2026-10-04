@@ -8,6 +8,7 @@ import {
   isRoleId,
   loadBookCast,
   proposeCast,
+  readVoiceRequests,
   ROLE_IDS,
   voiceFor,
   type BookCast,
@@ -15,15 +16,18 @@ import {
   type RoleId,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
+import { clipObjectPath, VOICE_CLIPS_BUCKET } from "~/lib/voice-slots/bucket";
 import {
   unknownFaceGroups,
   type UnknownDetection,
 } from "~/server/admin/characters-gate";
 import type {
+  ActiveVoice,
   CharacterCard,
   CharactersData,
   FaceView,
   KnownCharacter,
+  LabCandidate,
   LooseExemplar,
   PageView,
   Rect,
@@ -79,6 +83,8 @@ interface VoiceRow {
   character_id: string | null;
   status: string;
   created_at: string;
+  lab_default: boolean | null;
+  source_clip_path: string | null;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -104,6 +110,26 @@ function rows<T>(
     );
   }
   return data;
+}
+
+/** A signed URL to a lab clip, or null: a clip that will not sign loses its play button, never the page. */
+async function signedClipUrl(sourceClipPath: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin.storage
+      .from(VOICE_CLIPS_BUCKET)
+      .createSignedUrl(clipObjectPath(sourceClipPath), 3600);
+    if (error || !data) {
+      console.warn(
+        `characters stop loader, signing ${sourceClipPath}:`,
+        error?.message,
+      );
+      return null;
+    }
+    return data.signedUrl;
+  } catch (err) {
+    console.warn(`characters stop loader, signing ${sourceClipPath}:`, err);
+    return null;
+  }
 }
 
 function exemplarUrl(cropPath: string): string {
@@ -151,6 +177,7 @@ export async function loadCharacters(
     exemplarResult,
     charResult,
     voiceResult,
+    voiceRequests,
   ] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
     proposeCast(supabaseAdmin, bookId, issueId),
@@ -182,9 +209,11 @@ export async function loadCharacters(
       .order("id"),
     supabaseAdmin
       .from("voices")
-      .select("id, display_name, character_id, status, created_at", {
-        count: "exact",
-      }),
+      .select(
+        "id, display_name, character_id, status, created_at, lab_default, source_clip_path",
+        { count: "exact" },
+      ),
+    readVoiceRequests(supabaseAdmin, bookId, issueId),
   ]);
   const pageRows = rows<PageRow>("pages", pageResult);
   const panelRows = rows<PanelRow>("panels", panelResult);
@@ -298,23 +327,61 @@ export async function loadCharacters(
   const displayName = (id: string) => book.resolve(id)?.display_name ?? id;
   // A member with no castlist row yet gets the voice `seedCast` will start it
   // with: its latest active `voices` row, so the card does not change on Approve.
-  const startingVoice = new Map<string, string>();
+  const startingVoice = new Map<string, VoiceRow>();
   for (const v of voiceRows
     .filter((v) => v.status === "active" && v.character_id)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))) {
     if (!startingVoice.has(v.character_id!))
-      startingVoice.set(v.character_id!, v.display_name);
+      startingVoice.set(v.character_id!, v);
   }
   const voiceView = (id: string): VoiceView | null => {
     const v = voiceFor(book, id, issueId);
     if (!v) {
       const starting = startingVoice.get(id);
-      return starting ? { name: starting, borrowedFrom: null } : null;
+      return starting
+        ? { name: starting.display_name, borrowedFrom: null, uuid: starting.id }
+        : null;
     }
     const name = (v.voiceUuid && voiceName.get(v.voiceUuid)) ?? v.voiceId;
     if (!name) return null;
-    return { name, borrowedFrom: v.from === id ? null : displayName(v.from) };
+    return {
+      name,
+      borrowedFrom: v.from === id ? null : displayName(v.from),
+      uuid: v.voiceUuid,
+    };
   };
+
+  // Voice-lab clones on file: archived, with a source clip, and linked to no
+  // castlist row of this book. Lab default first, then by name.
+  const linkedInBook = new Set(
+    book.rows.map((r) => r.voice_uuid).filter((u): u is string => !!u),
+  );
+  const labRowsOf = new Map<string, VoiceRow[]>();
+  for (const v of voiceRows) {
+    if (
+      v.status !== "archived" ||
+      !v.source_clip_path ||
+      !v.character_id ||
+      linkedInBook.has(v.id)
+    )
+      continue;
+    labRowsOf.set(v.character_id, [
+      ...(labRowsOf.get(v.character_id) ?? []),
+      v,
+    ]);
+  }
+  for (const list of labRowsOf.values())
+    list.sort(
+      (a, b) =>
+        Number(Boolean(b.lab_default)) - Number(Boolean(a.lab_default)) ||
+        a.display_name.localeCompare(b.display_name),
+    );
+  const pendingRequest = new Map(
+    voiceRequests
+      .filter((r) => r.status === "pending")
+      .map((r) => [r.characterId, r] as const),
+  );
+  const characterIds = new Set(charRows.map((c) => c.id));
   const issueRows = book.rows.filter((r) => r.issue_id === issueId);
   const facesByCharacter = new Map<string, FaceView[]>();
   for (const d of detectionRows) {
@@ -331,9 +398,13 @@ export async function loadCharacters(
   for (const m of proposal.members) {
     const mine = issueRowsFor(book, issueRows, m.id);
     const removed = mine.length > 0 && mine.every((r) => !r.in_issue);
+    // In this issue: a face, a wiki mention, or a row in this issue's cast
+    // (Add, or a seeded cast). Cast before: the rest of the book's cast.
     const group = isRoleId(m.id)
       ? "role"
-      : m.sources.includes("faces") || m.sources.includes("wiki")
+      : m.sources.includes("faces") ||
+          m.sources.includes("wiki") ||
+          mine.some((r) => r.in_issue)
         ? "here"
         : "before";
     // A character cast before with no sign here and taken out of this issue
@@ -349,8 +420,44 @@ export async function loadCharacters(
       faces: (facesByCharacter.get(m.id) ?? []).sort(byPage),
       looseExemplars: loose.filter((e) => e.character_id === m.id).map(looseOf),
       voice: voiceView(m.id),
+      labCandidates: [],
+      voiceRequest: null,
     });
   }
+
+  // The Change control's data, only on cards that are a `characters` row.
+  // Clips are signed only for cards that show the control (not removed).
+  await Promise.all(
+    cards.map(async (card) => {
+      if (!characterIds.has(card.id)) return;
+      const request = pendingRequest.get(card.id);
+      if (request) {
+        const target = request.targetVoiceUuid;
+        card.voiceRequest = {
+          action: request.action,
+          targetName:
+            request.action === "clone" && target
+              ? (voiceName.get(target) ?? target)
+              : null,
+        };
+      }
+      if (card.removed) return;
+      card.labCandidates = await Promise.all(
+        (labRowsOf.get(card.id) ?? []).map(
+          async (v): Promise<LabCandidate> => ({
+            id: v.id,
+            name: v.display_name,
+            labDefault: Boolean(v.lab_default),
+            clipUrl: await signedClipUrl(v.source_clip_path!),
+          }),
+        ),
+      );
+    }),
+  );
+  const activeVoices: ActiveVoice[] = voiceRows
+    .filter((v) => v.status === "active")
+    .map((v) => ({ id: v.id, name: v.display_name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   // Group order first, so the comparator is one consistent order; then names
   // A to Z, and the roles in their fixed order.
   const rank: Record<CharacterCard["group"], number> = {
@@ -399,6 +506,7 @@ export async function loadCharacters(
     })),
     cards,
     known,
+    activeVoices,
     blocker,
   };
 }

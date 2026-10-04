@@ -5,6 +5,8 @@ import type {
   PanelForegroundPolygons,
   PanelLocalPolygon,
 } from "~/types/panels";
+import type { RoleId } from "~/lib/cast";
+import { slugify } from "~/lib/character-id";
 
 export type RoboflowBoxPrediction = {
   x: number;
@@ -384,24 +386,112 @@ export function bubbleHasContext(bubble: BubbleContextFields): boolean {
 }
 
 /**
+ * One member of the closed cast get-context chooses the speaker from (#354):
+ * a `characters` row the issue's castlist holds, or one of the three roles.
+ * The step builds them from the issue's castlist rows and the book's
+ * `characters` rows; the bench script (branch `issue-354-bench`, not merged)
+ * builds them from `proposeCast`.
+ */
+export type ClosedCastMember = {
+  /** The `characters.id`; what `bubbles.character_id` gets on a match. */
+  id: string;
+  /** The display name; what `bubbles.speaker` gets on a match. */
+  name: string;
+  /** Every other name the character goes by, from `characters.aliases`. */
+  aliases: string[];
+};
+
+/** The marker a cast line carries when a face on the page was identified as that member. */
+export const SEEN_ON_PAGE = "[seen on this page]";
+
+/**
+ * What the prompt says a cast line means. Goes under the cast heading as
+ * `castNotes`, so the list and its legend stay in step here, not in the
+ * prompt builder.
+ */
+export const CLOSED_CAST_NOTES = `Each line is one cast member: the name first, then "(also called ...)" with the other names they go by, then "${SEEN_ON_PAGE}" when a face on this page was identified as them. A member without that mark can still be the speaker, with their face unrecognized or speaking from outside the panel, and is still named as that member. Give the name at the start of the line, with nothing from the parentheses or brackets.`;
+
+/**
+ * The cast as the get-context prompt lists it, one line per member in the
+ * order given: the display name, "(also called ...)" when the member has
+ * aliases that are not the name itself, and `SEEN_ON_PAGE` when `seenIds`
+ * holds the member's id. Pure: the bench renders the same lines the step sends.
+ */
+export function closedCastLines(
+  cast: ClosedCastMember[],
+  seenIds: Iterable<string>,
+): string[] {
+  const seen = new Set(seenIds);
+  return cast.map((m) => {
+    const nameKey = slugify(m.name);
+    const aliases = m.aliases.filter((a) => {
+      const key = slugify(a);
+      return key !== "" && key !== nameKey && key !== m.id;
+    });
+    const parts = [m.name];
+    if (aliases.length > 0) parts.push(`(also called ${aliases.join(", ")})`);
+    if (seen.has(m.id)) parts.push(SEEN_ON_PAGE);
+    return parts.join(" ");
+  });
+}
+
+/**
+ * The cast member a reply names, or null when it names nobody on the list.
+ * Exact after `slugify`, the review editor's `findCast` rule: the id, the
+ * display name, or a whole alias, ids winning over names and names over
+ * aliases. Never an alias's first word, never a fuzzy match: a reply the cast
+ * does not hold is stored as null for review, not guessed (#354).
+ */
+export function matchCastSpeaker(
+  raw: string | null | undefined,
+  cast: ClosedCastMember[],
+): ClosedCastMember | null {
+  if (typeof raw !== "string") return null;
+  const key = slugify(raw);
+  if (!key) return null;
+  return (
+    cast.find((m) => m.id === key || slugify(m.name) === key) ??
+    cast.find((m) => m.aliases.some((a) => slugify(a) === key)) ??
+    null
+  );
+}
+
+/** The narrator role's `characters.id`; NARRATION and CAPTION resolve to it through the match. */
+const NARRATOR_ID: RoleId = "narrator";
+
+/**
+ * The name a reply gives for the speaker, before matching: the narrator role
+ * for NARRATION and CAPTION, else `speaker` as written (null when absent).
+ */
+export function contextSpeakerReply(parsed: ContextParsed): string | null {
+  const bubbleType = parsed.type ?? "SPEECH";
+  if (bubbleType === "NARRATION" || bubbleType === "CAPTION") {
+    return NARRATOR_ID;
+  }
+  return typeof parsed.speaker === "string" ? parsed.speaker : null;
+}
+
+/**
  * Build the `bubbles` update for OCR + speaker/emotion context.
  * `text_with_cues` is the text column; there is no `text` column.
+ * The speaker is `contextSpeakerReply` matched against `cast`: a match writes
+ * the member's id to `character_id` and its display name to `speaker`; no
+ * match writes null to both, which the review editor flags (#354).
  */
 export function buildContextUpdate(
   parsed: ContextParsed,
   ocrText: string,
   aiReasoning: string | null,
+  cast: ClosedCastMember[],
 ): TablesUpdate<"bubbles"> {
   const bubbleType = parsed.type ?? "SPEECH";
-  const speaker =
-    bubbleType === "NARRATION" || bubbleType === "CAPTION"
-      ? "Narrator"
-      : (parsed.speaker ?? null);
+  const match = matchCastSpeaker(contextSpeakerReply(parsed), cast);
 
   return {
     ocr_text: ocrText,
     type: bubbleType,
-    speaker,
+    speaker: match?.name ?? null,
+    character_id: match?.id ?? null,
     emotion: parsed.emotion ?? "neutral",
     character_type: parsed.characterType ?? null,
     side: parsed.side ?? null,

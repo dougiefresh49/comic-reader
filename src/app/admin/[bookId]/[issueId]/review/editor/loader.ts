@@ -4,7 +4,16 @@ import { selectIssue } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
 import { DEFAULT_PAGE } from "~/app/api/apply-fixes/write-rules";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { ROLES, slug, titleCase } from "~/components/review-editor/lib";
+import {
+  getCast,
+  isRoleId,
+  loadBookCast,
+  proposeCast,
+  ROLE_IDS,
+  voiceFor,
+  type CastVoice,
+} from "~/lib/cast";
+import { NARRATOR_ID, slug, titleCase } from "~/components/review-editor/lib";
 import type {
   BubbleType,
   CastMember,
@@ -17,15 +26,12 @@ import type {
   SrcPanel,
   VoiceOption,
 } from "~/components/review-editor/types";
-
-/** The ElevenLabs voice slots this repo shares with the owner's other projects. */
-const SLOTS_TOTAL = 30;
+import { VOICE_SLOTS_TOTAL } from "~/lib/voice-slots/types";
 
 interface IssueRow {
   name: string;
   pipeline_step: string | null;
   pipeline_paused: boolean | null;
-  wiki_appearances: unknown;
   books: { name: string } | null;
 }
 
@@ -89,20 +95,7 @@ interface VoiceRow {
   display_name: string;
   status: string;
   character_id: string | null;
-}
-
-interface CastRow {
-  issue_id: string;
-  character: string;
-  character_id: string | null;
-  voice_uuid: string | null;
-}
-
-interface CastEntry {
-  id: string;
-  name: string;
-  aliases: Set<string>;
-  faces: Face[];
+  current_elevenlabs_id: string | null;
 }
 
 const TYPES: string[] = [
@@ -152,25 +145,6 @@ function rows<T>(
   return data;
 }
 
-/** `issues.wiki_appearances` as name and qualifier pairs, whatever the JSON holds. */
-function wikiNames(value: unknown): { name: string; qualifier: string }[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry: unknown) => {
-    if (!entry || typeof entry !== "object") return [];
-    const { name, qualifier } = entry as {
-      name?: unknown;
-      qualifier?: unknown;
-    };
-    if (typeof name !== "string" || !name.trim()) return [];
-    return [
-      {
-        name: name.trim(),
-        qualifier: typeof qualifier === "string" ? qualifier.trim() : "",
-      },
-    ];
-  });
-}
-
 export async function loadEditor(
   bookId: string,
   issueId: string,
@@ -179,7 +153,7 @@ export async function loadEditor(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, pipeline_step, pipeline_paused, wiki_appearances, books(name)",
+    "name, pipeline_step, pipeline_paused, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("review editor loader, the issue:", issueResult.error);
@@ -196,7 +170,8 @@ export async function loadEditor(
     pageResult,
     charResult,
     voiceResult,
-    castResult,
+    castEntries,
+    book,
   ] = await Promise.all([
     supabaseAdmin
       .from("bubbles")
@@ -226,25 +201,17 @@ export async function loadEditor(
       .select("id, display_name, aliases", { count: "exact" }),
     supabaseAdmin
       .from("voices")
-      .select("id, display_name, status, character_id", { count: "exact" }),
-    // The whole book's rows: a character cast in any issue is in the list.
-    supabaseAdmin
-      .from("castlist")
-      .select("issue_id, character, character_id, voice_uuid", {
+      .select("id, display_name, status, character_id, current_elevenlabs_id", {
         count: "exact",
-      })
-      .eq("book_id", bookId),
+      }),
+    getCast(supabaseAdmin, bookId, issueId),
+    loadBookCast(supabaseAdmin, bookId),
   ]);
   const bubbleRows = rows<BubbleRow>("bubbles", bubbleResult);
   const panelRows = rows<PanelRow>("panels", panelResult);
   const pageRows = rows<PageRow>("pages", pageResult);
   const charRows = rows<CharacterRow>("characters", charResult);
   const voiceRows = rows<VoiceRow>("voices", voiceResult);
-  const castRows = rows<CastRow>("the cast list", castResult)
-    .slice()
-    .sort(
-      (a, b) => Number(b.issue_id === issueId) - Number(a.issue_id === issueId),
-    );
 
   const dims = new Map(pageRows.map((p) => [p.number, p]));
 
@@ -348,99 +315,104 @@ export async function loadEditor(
   }
 
   // A character's voice, always an active `voices` row picked by id
-  // (decisions row 153). In order: this book's castlist `voice_uuid`, which is
-  // the book's voice for the character (row 28), this issue's rows ahead of
-  // the other issues'; then `voices.character_id`; a voice of the same name
-  // only when neither says.
+  // (decisions row 153). In order: the cast's voice (`voiceFor` in
+  // `~/lib/cast`), then `voices.character_id`; a voice of the same name only
+  // when neither says.
   const active = voiceRows.filter((v) => v.status === "active");
   const activeById = new Map(active.map((v) => [v.id, v]));
-  const castVoice = new Map<string, VoiceRow>();
-  for (const row of castRows) {
-    const voice = row.voice_uuid ? activeById.get(row.voice_uuid) : undefined;
-    if (!voice) continue;
-    for (const key of [row.character_id, slug(row.character)]) {
-      if (key && !castVoice.has(key)) castVoice.set(key, voice);
-    }
-  }
+  const activeByElevenLabs = new Map<string, VoiceRow>();
   const voiceByCharacter = new Map<string, VoiceRow>();
   const voiceByName = new Map<string, VoiceRow>();
   for (const v of active) {
+    const el = v.current_elevenlabs_id;
+    if (el && !activeByElevenLabs.has(el)) activeByElevenLabs.set(el, v);
     if (v.character_id && !voiceByCharacter.has(v.character_id))
       voiceByCharacter.set(v.character_id, v);
     const key = slug(v.display_name);
     if (key && !voiceByName.has(key)) voiceByName.set(key, v);
   }
-  const voiceFor = (id: string, name: string): VoiceOption | null => {
+  const voiceOption = (
+    id: string,
+    name: string,
+    castVoice: CastVoice | null,
+  ): VoiceOption | null => {
     const voice =
-      castVoice.get(id) ??
-      castVoice.get(slug(name)) ??
+      (castVoice?.voiceUuid
+        ? activeById.get(castVoice.voiceUuid)
+        : undefined) ??
+      (castVoice?.voiceId
+        ? activeByElevenLabs.get(castVoice.voiceId)
+        : undefined) ??
       voiceByCharacter.get(id) ??
       voiceByName.get(id) ??
       voiceByName.get(slug(name));
     return voice ? { id: voice.id, name: voice.display_name } : null;
   };
 
-  // A name means a `characters` row when it is the row's id, display name or alias.
-  const rowByKey = new Map<string, CharacterRow>();
-  const index = (key: string, row: CharacterRow) => {
-    if (key && !rowByKey.has(key)) rowByKey.set(key, row);
-  };
-  for (const row of charRows) index(row.id, row);
-  for (const row of charRows) index(slug(row.display_name ?? ""), row);
-  for (const row of charRows)
-    for (const alias of row.aliases ?? []) index(slug(alias), row);
-
-  const isRole = (key: string) =>
-    ROLES.some(
-      (r) =>
-        r.id === key ||
-        slug(r.name) === key ||
-        r.aliases.some((a) => slug(a) === key),
-    );
-
-  // The closed list (decisions row 237): characters with a face in this issue,
-  // characters the book has cast in any issue, and the wiki's names. The three
-  // roles are appended below.
-  const entries = new Map<string, CastEntry>();
-  const ensure = (raw: string): CastEntry | null => {
-    const key = slug(raw);
-    if (!key || isRole(key)) return null;
-    const row = rowByKey.get(key);
-    const id = row?.id ?? key;
-    if (isRole(id)) return null;
-    let entry = entries.get(id);
-    if (!entry) {
-      entry = {
-        id,
-        name: row?.display_name ?? (raw === key ? titleCase(raw) : raw.trim()),
-        aliases: new Set(row?.aliases ?? []),
-        faces: [],
-      };
-      entries.set(id, entry);
-    }
-    return entry;
-  };
-  for (const f of faces) {
-    if (f.characterId) ensure(f.characterId)?.faces.push(f);
-  }
-  for (const row of castRows) ensure(row.character_id ?? row.character);
-  for (const { name, qualifier } of wikiNames(issue.wiki_appearances)) {
-    // "Kimberly Hart (Pink Ranger)": a name no row knows joins the row its
-    // qualifier names, as an alias, and does not become a second entry.
-    const folds =
-      !rowByKey.has(slug(name)) && qualifier && rowByKey.has(slug(qualifier));
-    if (folds) ensure(qualifier)?.aliases.add(name);
-    else ensure(name);
+  // The speaker list is the issue's cast (#355). An issue with no castlist
+  // rows at all gets the proposed cast, in memory only; nothing is written
+  // here. Rows with `in_issue` false are removals and stay out.
+  const rowId = (characterId: string | null, character: string) =>
+    characterId ?? book.resolve(character)?.id ?? slug(character);
+  const issueRows = book.rows.filter((r) => r.issue_id === issueId);
+  const removed = new Set(
+    issueRows
+      .filter((r) => !r.in_issue)
+      .map((r) => rowId(r.character_id, r.character)),
+  );
+  const listed: { id: string; voice: CastVoice | null; label: string }[] =
+    issueRows.length > 0
+      ? castEntries.map((e) => ({
+          id: rowId(e.characterId, e.character),
+          voice: e.voice,
+          label: e.character,
+        }))
+      : (await proposeCast(supabaseAdmin, bookId, issueId)).members.map(
+          (m) => ({
+            id: m.id,
+            voice: voiceFor(book, m.id, issueId),
+            label: m.name,
+          }),
+        );
+  // A role is offered unless the cast removed it.
+  for (const id of ROLE_IDS) {
+    if (listed.some((l) => l.id === id)) continue;
+    // Narrator always stays: model.ts assigns narration bubbles to it.
+    if (removed.has(id) && id !== NARRATOR_ID) continue;
+    listed.push({ id, voice: voiceFor(book, id, issueId), label: id });
   }
 
+  const facesOf = new Map<string, Face[]>();
+  for (const f of faces)
+    if (f.characterId)
+      facesOf.set(f.characterId, [...(facesOf.get(f.characterId) ?? []), f]);
   const pageAspect = (n: number) => {
     const d = dims.get(n) ?? DEFAULT_PAGE;
     return d.width / d.height;
   };
-  const members: CastMember[] = [];
-  for (const entry of entries.values()) {
+  const characters: CastMember[] = [];
+  const roles = new Map<string, CastMember>();
+  for (const { id, voice, label } of listed) {
+    if (roles.has(id) || characters.some((c) => c.id === id)) continue;
+    const row = book.resolve(id);
+    const own = row?.id === id ? row : undefined;
+    const name =
+      own?.display_name ?? (label === id ? titleCase(id) : label.trim());
+    const member: CastMember = {
+      id,
+      name,
+      aliases: own?.aliases ?? [],
+      kind: isRoleId(id) ? "role" : "character",
+      tint: 0,
+      voice: voiceOption(id, name, voice),
+      portrait: null,
+    };
+    if (isRoleId(id)) {
+      roles.set(id, member);
+      continue;
+    }
     // The portrait is the most face-like box: close to square, not panel-sized.
-    const best = entry.faces
+    const best = (facesOf.get(id) ?? [])
       .map((f) => {
         const squareness = Math.abs(
           Math.log((f.rect.w * pageAspect(f.page)) / f.rect.h),
@@ -448,29 +420,15 @@ export async function loadEditor(
         return { f, score: f.confidence - squareness - f.rect.h * 2 };
       })
       .sort((a, b) => b.score - a.score)[0];
-    members.push({
-      id: entry.id,
-      name: entry.name,
-      aliases: Array.from(entry.aliases),
-      kind: "character",
-      tint: 0,
-      voice: voiceFor(entry.id, entry.name),
-      portrait: best ? { page: best.f.page, rect: best.f.rect } : null,
-    });
+    if (best) member.portrait = { page: best.f.page, rect: best.f.rect };
+    characters.push(member);
   }
-  members.sort((a, b) => a.name.localeCompare(b.name));
-  members.forEach((member, i) => (member.tint = i));
-  for (const role of ROLES) {
-    members.push({
-      id: role.id,
-      name: role.name,
-      aliases: role.aliases,
-      kind: "role",
-      tint: 0,
-      voice: voiceFor(role.id, role.name),
-      portrait: null,
-    });
-  }
+  characters.sort((a, b) => a.name.localeCompare(b.name));
+  characters.forEach((member, i) => (member.tint = i));
+  const members: CastMember[] = [
+    ...characters,
+    ...ROLE_IDS.flatMap((id) => roles.get(id) ?? []),
+  ];
 
   const known: KnownCharacter[] = charRows.map((row) => {
     const name = row.display_name ?? titleCase(row.id);
@@ -478,7 +436,7 @@ export async function loadEditor(
       id: row.id,
       name,
       aliases: row.aliases ?? [],
-      voice: voiceFor(row.id, name),
+      voice: voiceOption(row.id, name, voiceFor(book, row.id, issueId)),
     };
   });
 
@@ -499,7 +457,7 @@ export async function loadEditor(
     known,
     voices,
     slotsUsed: active.length,
-    slotsTotal: SLOTS_TOTAL,
+    slotsTotal: VOICE_SLOTS_TOTAL,
     atPagesGate:
       issue.pipeline_step === "review-pages" && issue.pipeline_paused === true,
   };

@@ -33,10 +33,7 @@ import {
   consolidateMusicScenes,
   generateManifest,
 } from "./steps/publishing";
-import {
-  acceptUnresolvedAsSilent,
-  createCastingTasks,
-} from "./steps/casting-tasks";
+import { createCastingTasks } from "./steps/casting-tasks";
 import {
   countPendingNewCharacters,
   recordGateSkip,
@@ -241,20 +238,18 @@ export async function ingestPipeline(input: IngestInput) {
     // ── Phase 6: Casting ──────────────────────────────────────────────
     if (run("casting")) {
       currentStep = "casting";
-      // Two windows when the gate pauses: one for createCastingTasks, one for
-      // acceptUnresolvedAsSilent after Doug's cast. The pause between them is
-      // the gate wait's row, so it lands on neither window (#255).
+      // The voices stop (#353): it pauses while a voice request is open or a
+      // speaker has no voice and no "no audio this run" marker. The resume
+      // route checks canContinueVoices, so the run goes on only once every
+      // item is settled; nothing is written here after the hook.
       const timing = await recordStepStart(bookId, issueId, currentStep);
       const casting = await createCastingTasks(bookId, issueId);
       const unresolved = casting.unresolved.length;
-      // Unresolved speakers pause the gate too. Resuming it accepts them as
-      // silent: acceptUnresolvedAsSilent writes their skip-sentinel castlist
-      // rows, and generateManifest counts their bubbles as silentBubbles.
-      if (casting.pending === 0 && unresolved === 0) {
+      if (casting.pending === 0) {
         const reason =
           casting.cast === casting.speakers
             ? "all speakers cast"
-            : "no speakers pending or unresolved";
+            : "no voice work left";
         await updatePipelineStep(bookId, issueId, currentStep);
         await recordGateSkip(bookId, issueId, "casting", reason, {
           speakers: casting.speakers,
@@ -278,14 +273,6 @@ export async function ingestPipeline(input: IngestInput) {
         });
         await castingHook;
         await recordGateWait(bookId, issueId, currentStep, "close");
-        const afterGate = await recordStepStart(bookId, issueId, currentStep);
-        const silenced = await acceptUnresolvedAsSilent(bookId, issueId);
-        if (silenced.length > 0) {
-          console.log(
-            `[casting] resumed: ${silenced.length} unresolved speakers accepted as silent: ${silenced.join(", ")}`,
-          );
-        }
-        await recordStepEnd(bookId, issueId, currentStep, afterGate);
       }
     }
 
