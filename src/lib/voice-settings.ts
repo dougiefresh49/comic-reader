@@ -26,24 +26,28 @@ export interface VoiceOverride {
 const READ_KEYS = ["stability", "similarity_boost", "line_prefix"];
 /**
  * ElevenLabs settings another consumer of the `voices` table may store.
- * eleven_v4 ignores them, so the parser does too.
+ * They are accepted and not sent; the #213 probe found eleven_v4 ignores
+ * `style` and `speed`.
  */
 const IGNORED_KEYS = ["style", "speed", "use_speaker_boost"];
 
 /**
  * Whether a line prefix is one audio tag, e.g. "[strong Japanese accent]". An
  * unclosed bracket would leave the reader with no highlighted words, and a
- * prefix with no brackets would be spoken aloud.
+ * prefix with no brackets would be spoken aloud, and a blank or multi-line tag
+ * is no tag at all.
  */
 export function isAudioTag(prefix: string): boolean {
-  return /^\[[^[\]]+\]$/.test(prefix.trim());
+  return (
+    !/[\r\n]/.test(prefix) && /^\[[^[\]]*[^[\]\s][^[\]]*\]$/.test(prefix.trim())
+  );
 }
 
 /**
  * Parses a stored `voices.voice_settings` value. Null or `{}` is no override.
  * `stability`, `similarity_boost` and `line_prefix` are read; `style`, `speed`
- * and `use_speaker_boost` are accepted and ignored, since eleven_v4 ignores
- * them. Any other key throws naming it, so a misspelled `similarityBoost`
+ * and `use_speaker_boost` are accepted and not sent (eleven_v4 ignores `style`
+ * and `speed`). Any other key throws naming it, so a misspelled `similarityBoost`
  * cannot render at the base in silence. A wrong type, a number outside 0 to 1,
  * or a `line_prefix` that is not one audio tag (`isAudioTag`) throws naming
  * the key: a silent fallback would spend credits on settings nobody chose.

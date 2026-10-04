@@ -37,8 +37,9 @@ key is optional; null or `{}` means no override.
 { "line_prefix": "[strong Japanese accent]" }
 ```
 
-`style`, `speed` and `use_speaker_boost` are accepted and ignored: another
-consumer of the `voices` table may store them, and eleven_v4 ignores them.
+`style`, `speed` and `use_speaker_boost` are accepted and not sent: another
+consumer of the `voices` table may store them, and the #213 probe found
+eleven_v4 ignores `style` and `speed`.
 Any other key is an error, so a misspelled `similarityBoost` stops the render
 rather than leaving the voice at the base.
 

@@ -97,7 +97,7 @@ export function buildTtsRequest({
   const request: TtsRequest = {
     modelId: TTS_MODEL,
     text:
-      prefix && !text.trimStart().startsWith(prefix)
+      prefix && !text.trimStart().toLowerCase().startsWith(prefix.toLowerCase())
         ? `${prefix} ${text}`
         : text,
     voiceSettings: {
