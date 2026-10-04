@@ -155,15 +155,27 @@ from (
 on conflict (id) do nothing;
 
 -- Any other castlist name that resolves to nothing gets its own character
--- row (spec rule). A name with no candidate at all, that is: an ambiguous
--- name stays unresolved, since a new row would win it by id. A no-op on
--- today's rows, where the two such names are in the list above.
+-- row. This narrows the spec rule (decision row 286): the name must have no
+-- candidate at all in its own book and no book-scoped alias in any book. An
+-- ambiguous name stays unresolved, since a new row would win it by id, here
+-- and in every other book. A no-op on today's rows, where the two such names
+-- are in the list above.
 insert into characters (id, display_name)
 select pg_temp.slug(k.character), min(k.character)
 from castlist k
 where k.character_id is null
   and pg_temp.slug(k.character) <> ''
   and not pg_temp.has_candidates(k.character, k.book_id)
+  and not exists (
+    select 1
+    from aliases a
+    where a.scope = 'book'
+      and a.character_id is not null
+      and a.alias_norm in (
+        pg_temp.norm(k.character),
+        pg_temp.norm(pg_temp.strip_brackets(k.character))
+      )
+  )
 group by pg_temp.slug(k.character)
 on conflict (id) do nothing;
 
@@ -370,7 +382,7 @@ from (
         on a.character_id = ow.character_id
        and a.work_id = ow.work_id
     ) c
-    order by c.voice_id, c.source
+    order by c.voice_id, c.source, c.appearance_id
   ) o
   join voices cand on cand.id = o.voice_id
   where cand.appearance_id is null
