@@ -5,6 +5,7 @@
 export const GEMINI_HIGH = "gemini-3.1-pro-preview"; // deep reasoning, page-level context
 export const GEMINI_MEDIUM = "gemini-3-flash-preview"; // vision tasks, OCR, moderate reasoning
 export const GEMINI_FAST = "gemini-3.1-flash-lite"; // simple formatting/validation, no thinking needed
+export const GEMINI_SPEAKER = "gemini-3.5-flash-lite"; // get-context's speaker call only (#373)
 
 // ─── Venice image models ───────────────────────────────────────────────────────
 // Phase 1 — character reference images (text-to-image)
@@ -35,6 +36,7 @@ export const GEMINI_USD_PER_1M_TOKENS: Record<
   [GEMINI_HIGH]: { input: 2.0, output: 12.0 },
   [GEMINI_MEDIUM]: { input: 0.5, output: 3.0 },
   [GEMINI_FAST]: { input: 0.25, output: 1.5 },
+  [GEMINI_SPEAKER]: { input: 0.3, output: 2.5 },
 };
 
 // gemini-embedding-2, per image embedded. Text embeddings have no rate yet.
