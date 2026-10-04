@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       : !ended && newest?.status === "running" && newest.steps?.runId === runId;
     const remedy = cancelIngestWorks
       ? "Cancel it first with cancel-ingest"
-      : `cancel-ingest cannot cancel it from this state, so cancel run ${runId} with the Workflow CLI or the Workflow dashboard`;
+      : `Cancel it first with cancel-ingest given its runId (${runId}), which closes the run and leaves the issue row as it is`;
     return Response.json(
       {
         error: `Run ${runId} of ${label} is ${state}. ${remedy}, then trigger again.`,

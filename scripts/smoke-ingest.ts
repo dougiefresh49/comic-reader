@@ -31,6 +31,7 @@ import {
 } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
 import { slugify } from "~/lib/character-id";
+import { needsSpeaker } from "~/components/review-editor/model";
 import type { Json } from "~/types/database";
 import { supabase } from "./lib/supabase";
 
@@ -83,6 +84,8 @@ const REAL_GATE_TIMEOUT_MS = 15 * 60_000;
 const REAL_RUN_TIMEOUT_MS = 60 * 60_000;
 const RESUME_RETRY_MS = 60_000;
 const SKIPPED_VOICE = "__SKIPPED__";
+/** The cast id the editor gives "Smoke Stranger" when the owner adds it (slug of the name). */
+const STRANGER_ID = "smoke-stranger";
 
 type Expect = { gate: string; expect: "pause" | "skip" };
 type Scenario = {
@@ -649,12 +652,64 @@ async function resume(gate: string): Promise<void> {
 }
 
 /**
- * Owner simulation at the pages stop: approve every page of the smoke issue
- * as the editor's setPageApproval does (`pages.reviewed_at`), so the resume
- * endpoint's canResumePages passes. That check still refuses a spoken bubble
- * with no speaker, which this does not paper over.
+ * Owner simulation at the pages stop. In `gates` the context step stores the
+ * stranger's bubble with no speaker (not in the closed cast), so the owner
+ * does the editor's "Add a character to the cast" with a new voice: that
+ * save writes only `bubbles.speaker`, as the new cast id `smoke-stranger`
+ * (no `characters` or castlist row), which leaves the stranger uncast for
+ * the voices stop. Then every page is approved as the editor's
+ * setPageApproval does (`pages.reviewed_at`). canResumePages still checks
+ * both.
  */
-async function approvePages(): Promise<void> {
+async function approvePages(scenario: Scenario): Promise<void> {
+  const unvoiced = (
+    must(
+      await supabase
+        .from("bubbles")
+        .select("id, type, speaker, silent, ignored")
+        .eq("book_id", BOOK)
+        .eq("issue_id", ISSUE),
+      "bubbles needing a speaker",
+    ) as {
+      id: string;
+      type: string;
+      speaker: string | null;
+      silent: boolean | null;
+      ignored: boolean | null;
+    }[]
+  ).filter((b) =>
+    needsSpeaker({
+      type: b.type,
+      speaker: b.speaker,
+      silent: b.silent ?? false,
+      ignored: b.ignored ?? false,
+    }),
+  );
+  if (unvoiced.length !== scenario.strangerBubbles) {
+    fail(
+      `review-pages: ${unvoiced.length} spoken bubbles have no speaker; the scenario expects ${scenario.strangerBubbles} (the stranger's)`,
+    );
+  }
+  if (unvoiced.length > 0) {
+    must(
+      await supabase
+        .from("bubbles")
+        .update({ speaker: STRANGER_ID })
+        .eq("book_id", BOOK)
+        .eq("issue_id", ISSUE)
+        .in(
+          "id",
+          unvoiced.map((b) => b.id),
+        )
+        .is("speaker", null)
+        .select("id"),
+      "bubbles speaker for the stranger",
+    );
+    console.log(
+      `  review-pages: added ${STRANGER_ID} to the cast for ${unvoiced.length} bubble(s) (owner simulation)`,
+    );
+  }
+
   const rows = must(
     await supabase
       .from("pages")
@@ -803,7 +858,7 @@ async function runPipeline(
         fail(`paused at ${gate}; expected ${want ?? "no more pauses"}`);
       }
       if (gate === "review-clusters") await rejectUnknownFaces(scenario);
-      if (gate === "review-pages") await approvePages();
+      if (gate === "review-pages") await approvePages(scenario);
       if (gate === "casting" && scenario.strangerBubbles > 0) {
         // canContinueVoices holds the run while a speaker has no voice and
         // no skip marker, so the owner marks the stranger "no audio this
@@ -1003,7 +1058,9 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
   if (missing.length > 0) {
     bad.push(`${missing.length} cast bubbles lack audio or timestamps`);
   }
-  const stranger = bubbles.filter((b) => b.speaker === "Smoke Stranger");
+  const stranger = bubbles.filter(
+    (b) => b.speaker && slugify(b.speaker) === STRANGER_ID,
+  );
   if (stranger.length > 0) {
     const withAudio = stranger.filter((b) => b.audio_storage_path).length;
     console.log(

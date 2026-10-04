@@ -55,6 +55,9 @@ function toRelativePath(url: string): string {
   }
 }
 
+/** Masks retry only on a complete issue (trigger-ingest answers 409 otherwise), so a failed issue never offers them. */
+const MASKS_STEP = "extract-foreground-masks";
+
 function nextStepAfter(pausedAt: string | null): string | null {
   if (!pausedAt) return null;
   // Restarting after casting would run audio without the voices check.
@@ -529,17 +532,21 @@ function FailedActions({
             <span className="text-amber-400">↻</span> Start from beginning
           </button>
           <div className="my-1 border-t border-neutral-700" />
-          <button
-            onClick={() => {
-              setMenuOpen(false);
-              onTrigger(failedStep);
-            }}
-            className="flex w-full items-center gap-2 bg-red-900/30 px-3 py-2.5 text-left text-sm font-medium text-red-300 hover:bg-red-900/50 md:py-1.5 md:text-xs"
-          >
-            <span className="text-red-400">▶</span> Retry: {failedLabel}
-          </button>
-          <div className="my-1 border-t border-neutral-700" />
-          {STEP_ORDER.map((step, idx) => {
+          {failedStep !== MASKS_STEP && (
+            <>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  onTrigger(failedStep);
+                }}
+                className="flex w-full items-center gap-2 bg-red-900/30 px-3 py-2.5 text-left text-sm font-medium text-red-300 hover:bg-red-900/50 md:py-1.5 md:text-xs"
+              >
+                <span className="text-red-400">▶</span> Retry: {failedLabel}
+              </button>
+              <div className="my-1 border-t border-neutral-700" />
+            </>
+          )}
+          {STEP_ORDER.filter((step) => step !== MASKS_STEP).map((step, idx) => {
             const stepLabel = STEP_LABELS[step] ?? step;
             const isFailedStep = step === failedStep;
             return (
