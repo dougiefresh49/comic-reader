@@ -62,7 +62,9 @@ export function buildContextPrompt(
     ? "A row of generic foot soldiers shout it together. Many unnamed voices at once, so the speaker is the list's crowd entry; one foot soldier alone would be `null`. They are attacking.\nImportance is EXTRA. They are shouting."
     : "The speaker is a generic Foot Soldier (Villain). He is attacking.\nImportance is EXTRA. He is shouting.";
   const exampleSpeaker = opts.closedList ? "Crowd" : "Foot Soldier";
-  const textExample = opts.transcribe ? `  "text": "You'll never win!",\n` : "";
+  const textExample = opts.transcribe
+    ? `  "text": "You will never defeat us, turtles!",\n`
+    : "";
 
   return `${images}
 **Goal:** Analyze the specific text region described below to determine how it should be voice-acted.
@@ -93,7 +95,7 @@ ${characterList}
     * **Emotion:** Look at the character's eyebrows, mouth, and body language.
 
 3.  **Performance Cues (CRITICAL):**
-    Write \`textWithCues\`: the text with ElevenLabs audio tags added, by the cue rules below. Use the speaker and emotion from step 2 and what the bubble shows (a jagged bubble shouts, a dotted one whispers).
+    Write \`textWithCues\`: the text with ElevenLabs audio tags added, by the cue rules below. Use the speaker and emotion from step 2 and what the page shows: a jagged bubble shouts, a dotted one whispers, and a word lettered bolder or larger than the words around it is the stressed word. The words of \`textWithCues\` are the words of the text, one for one; in the rules below, "the input" is that text and "the output" is \`textWithCues\`.
 
 ${CUE_RULES}
 
@@ -103,7 +105,7 @@ Then, provide the final JSON.
 
 **Example Output:**
 <scratchpad>
-I see the text "You'll never win!". It is in a jagged bubble.
+I see the text "You will never defeat us, turtles!". It is in a jagged bubble.
 ${reasoning}
 </scratchpad>
 \`\`\`json
@@ -114,7 +116,7 @@ ${reasoning}
   "side": "VILLAIN",
   "voiceDescription": "Aggressive, raspy male voice, American accent, high energy",
   "emotion": "shouting",
-${textExample}  "textWithCues": "[shouting, aggressive] You'll never win!"
+${textExample}  "textWithCues": "[shouting, aggressive] You will never defeat us, turtles!"
 }
 \`\`\`
 `;
