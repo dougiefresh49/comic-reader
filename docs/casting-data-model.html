@@ -63,7 +63,7 @@
 <p class="lede">Spec for <a href="https://github.com/dougiefresh49/comic-reader/issues/413">#413</a> "Casting data model redesign: one home for each fact (spec and roundtable)". Revised twice on 2026-10-04 after two roundtable rounds; the <a href="#roundtable">record</a> is at the end. Counts were read from the production database on 2026-10-03.</p>
 
 <h2 id="summary">Summary</h2>
-<p>The character, cast and voice tables carry four generations of schema at once. The ElevenLabs voice id is stored in three tables. The castlist is keyed by the character's text name. The id columns added on 2026-09-30 were never filled: <code>bubbles.character_id</code> is empty on all 640 bubbles and <code>voices.character_id</code> on all 88 voices. Most of the owner questions from the last few days trace back to code keeping those copies in step.</p>
+<p>The character, cast and voice tables carry four generations of schema at once. The ElevenLabs voice id is stored in three tables. The castlist is keyed by the character's text name. The id columns added on 2026-09-30 were never filled: <code>bubbles.character_id</code> is empty on every bubble and <code>voices.character_id</code> on all 88 voices. Most of the owner questions from the last few days trace back to code keeping those copies in step.</p>
 <p>The redesign gives each fact one home and links everything by id:</p>
 <ul>
   <li>A <strong>character</strong> is an identity. It belongs to a franchise and can be a form of another character.</li>
@@ -209,7 +209,7 @@
   <li><code>casting_tasks</code>: stays as the voice-work queue, unchanged.</li>
   <li><code>voice_archives</code>: stays as the archive log.</li>
   <li><code>books</code>: <code>franchises</code> and <code>series_id</code> are <span class="tag drop">dropped</span>.</li>
-  <li><span class="tag drop">dropped</span> outright: <code>series</code>, <code>speaker_reviews</code>, <code>bubbles_character_id_backup_v1</code>, <code>panel_character_detections_backup_v1</code>. None has rows or a live caller.</li>
+  <li><span class="tag drop">dropped</span> outright: <code>series</code>, <code>speaker_reviews</code>, <code>bubbles_character_id_backup_v1</code>, <code>panel_character_detections_backup_v1</code>. None has rows. <code>speaker_reviews</code> still has a caller: the <code>review-speakers</code> script in <code>package.json</code>, which <code>scripts/ingest.ts</code> runs as a step. P3 removes that step and the script. The other three have no caller.</li>
 </ul>
 
 <h2 id="flows">How it works after</h2>
@@ -247,6 +247,7 @@
 </ul>
 
 <h2 id="backfill">Backfill</h2>
+<p><strong>Counts are a snapshot.</strong> The numbers in this section were read on 2026-10-03, when the <code>smoke-test</code> book still had rows. Those rows have since been removed: on 2026-10-04 production holds 608 bubbles (issue-1 230, issue-2 178, issue-3 200) and 58 castlist rows, none with a <code>character_id</code>. Read the counts as proportions. The gates in <a href="#p1">P1</a> are written against the lists the PR prints, not against these numbers, and the builder measures again before writing the backfill.</p>
 <p>The backfill is SQL in a migration file, written in three sections. It fills new columns and tables and removes nothing. Each section is safe to run twice, and each has a last run: once the issue that takes over its facts has deployed, the section is never run again, because the old columns it reads are stale from then on.</p>
 <table>
   <tr><th>Section</th><th>Fills</th><th>Last run</th></tr>
@@ -258,9 +259,9 @@
 <table>
   <tr><th>Target</th><th>Rule</th><th>Measured</th></tr>
   <tr><td><code>aliases</code></td><td>Insert every <code>characters.aliases[]</code> entry that the table lacks, scope global.</td><td>9 entries missing, including "Jason Lee Scott", "Kimberly Ann Hart", "Trini Kwan" and "Zack Taylor".</td></tr>
-  <tr><td><code>castlist.character_id</code></td><td>Resolve the text name through character id, display name and aliases. A name that resolves to nothing gets a new character row.</td><td>88 of 92 rows resolve. Two names do not: "Armored Villain" and "Rock Soldier" (4 rows); both are in the list of characters to create. No two rows in one issue resolve to the same character.</td></tr>
+  <tr><td><code>castlist.character_id</code></td><td>Only where <code>character_id</code> is null, so a link <code>seedCast</code> already wrote is kept. Resolve the text name through character id, display name and aliases. A name that resolves to nothing gets a new character row.</td><td>88 of 92 rows resolve. Two names do not: "Armored Villain" and "Rock Soldier" (4 rows); both are in the list of characters to create. No two rows in one issue resolve to the same character.</td></tr>
   <tr><td><code>castlist.no_audio</code></td><td>True where <code>voice_id</code> holds the marker.</td><td>0 rows today. PR <a href="https://github.com/dougiefresh49/comic-reader/pull/401">#401</a> may add some.</td></tr>
-  <tr><td><code>bubbles.character_id</code></td><td>Resolve <code>speaker</code> the same way. Unresolved or ambiguous stays null.</td><td>623 of 639 resolve today. 16 do not: bit parts ("Director", "Female Soldier"), two multi-speaker labels, "Goldar" (one bubble, which resolves once his character row is created), and one ambiguous name ("Robotic Foot Soldier"). P1's PR lists the bubble ids left null; that list is the allowed set in P2's gate.</td></tr>
+  <tr><td><code>bubbles.character_id</code></td><td>Only where <code>character_id</code> is null. Resolve <code>speaker</code> the same way. Unresolved or ambiguous stays null.</td><td>623 of 639 resolve today. 16 do not: bit parts ("Director", "Female Soldier"), two multi-speaker labels, "Goldar" (one bubble, which resolves once his character row is created), and one ambiguous name ("Robotic Foot Soldier"). P1's PR lists the bubble ids left null; that list is the allowed set in P2's gate.</td></tr>
   <tr><td><code>franchises</code>, <code>book_franchises</code>, <code>characters.franchise_id</code></td><td>One <code>franchises</code> row per distinct franchise text, plus <code>sonic</code> and <code>dc</code>. One <code>book_franchises</code> row per entry of <code>books.franchises</code>, with <code>position</code> equal to its place in the array, starting at 0.</td><td>Three texts today: TMNT (30 characters), Power Rangers (14), TMNT MMPR (8). 4 characters have none.</td></tr>
   <tr><td><code>characters.form_of</code></td><td>Copy <code>voice_of</code>.</td><td>Null on all 56 rows.</td></tr>
   <tr><td><code>works</code>, <code>appearances</code></td><td>One work per distinct title, year and medium in the old table; one appearance per old non-design row.</td><td>53 rows over 32 title-year-medium combinations, 28 after the merges listed below.</td></tr>
@@ -382,7 +383,7 @@
 <h3 id="before-p2">Two prerequisites before P2</h3>
 <ol>
   <li><strong>The open PRs that edit these files are merged or closed:</strong> #401, #402, #400, #399, #398, #397, #396 and #395. See owner item O1. From then until P6 lands, no other issue edits <code>src/lib/cast.ts</code>, <code>src/lib/voice-requests.ts</code>, <code>src/lib/voices-registry.ts</code>, <code>src/lib/voice-slots/</code>, <code>src/workflows/steps/audio-plan.ts</code>, <code>casting-tasks.ts</code>, <code>voice.ts</code>, <code>vision.ts</code>, <code>vision-rows.ts</code>, the review characters folder, the review editor's <code>loader.ts</code>, <code>scripts/voice-lab-import.ts</code> or <code>scripts/smoke-ingest.ts</code>. <code>src/server/pages/queries.ts</code> is frozen too. An issue marked "continue" in the triage that needs one of these files waits for P6.</li>
-  <li><strong><a href="https://github.com/dougiefresh49/comic-reader/issues/357">#357</a> "Retire the clusters, new-characters and casting pages" has landed.</strong> Those pages write the old appearance voice columns and the marker, and read the alias text. Retiring them first removes that code instead of converting it. #357 is itself blocked on #353, whose PR is #401.</li>
+  <li><strong><a href="https://github.com/dougiefresh49/comic-reader/issues/357">#357</a> "Retire the clusters, new-characters and casting pages" has landed.</strong> Those pages write the old appearance voice columns and the marker, and read the alias text. Retiring them first removes that code instead of converting it. #357 is itself blocked by <a href="https://github.com/dougiefresh49/comic-reader/issues/356">#356</a> "Pipeline to twelve steps and three stops", which waits on <a href="https://github.com/dougiefresh49/comic-reader/issues/370">#370</a> "Smoke ingest copies the source issue's wiki fields". So the chain before P2 is #370, #356, #357.</li>
 </ol>
 <p>P1 needs neither prerequisite and can start as soon as O2 and E1 are answered.</p>
 
@@ -402,8 +403,8 @@
 <ul>
   <li>Before applying: both files run inside one transaction that is rolled back, and the counts below are read from inside it.</li>
   <li><code>castlist</code> rows with null <code>character_id</code>: 0. Duplicate <code>(book_id, issue_id, character_id)</code>: 0.</li>
-  <li><code>bubbles</code> with <code>character_id</code>: at least 623. The unresolved speakers are listed in the PR.</li>
-  <li><code>voices</code> with consumer <code>comic</code> and null <code>character_id</code>: 0. Every voice whose name had a variant has an <code>appearance_id</code>.</li>
+  <li><code>bubbles</code> with a null <code>character_id</code>: exactly the bubble ids the PR lists as unresolved, and no others. Each listed id falls in one of the classes named in <a href="#backfill">Backfill</a> (a bit part, a multi-speaker label, an ambiguous name).</li>
+  <li><code>voices</code> with consumer <code>comic</code> and null <code>character_id</code>: 0. Every voice whose name had a variant has an <code>appearance_id</code>, except a voice that lost a same-character, same-work collision and is named in the PR.</li>
   <li>Every old non-design appearance row maps to exactly one new <code>appearances</code> row; the PR shows the count and each merge.</li>
   <li>After applying: the lead commits the regenerated <code>src/types/database.ts</code> to the P1 branch, and the <a href="#playback">playback check</a> passes.</li>
 </ul>
@@ -424,7 +425,7 @@
 <ul>
   <li>The name gate for P2's names.</li>
   <li>A planted <code>.from("castlist")</code> outside <code>src/lib/cast.ts</code> fails <code>pnpm lint</code>.</li>
-  <li>The baseline. Before any other change, the builder adds a mode to <code>scripts/compare-voice-lookup.ts</code> that prints one line per bubble for issues 1 and 2: the bubble id and the voice uuid that today's <code>lookupVoice</code> resolves. It runs that on unmodified code and attaches the output to the PR. After the change, the same mode on the new chain matches line for line, except the bubble ids P1's PR listed as left null. Any other difference fails the gate. No API call.</li>
+  <li>The baseline. Before any other change, the builder adds a mode to <code>scripts/compare-voice-lookup.ts</code> that prints one line per bubble for issues 1 and 2: the bubble id and the ElevenLabs voice id that today's <code>lookupVoice</code> returns (it returns no uuid). It runs that on unmodified code and attaches the output to the PR. After the change, the same mode on the new chain prints the resolved voice's <code>current_elevenlabs_id</code> and matches line for line, except the bubble ids P1's PR listed as left null. Any other difference fails the gate. No API call.</li>
 </ul>
 <p><strong>Rollback:</strong> redeploy the previous build and run one statement on <code>castlist.voice_id</code>: where <code>no_audio</code> is true, write the marker; otherwise copy the voice's ElevenLabs id through <code>voice_uuid</code>. The column exists until P6. The statement is written into the P2 issue.</p>
 
@@ -435,7 +436,7 @@
   <li><code>scripts/find-voice-sources.ts</code> writes works and appearances and no voice columns.</li>
   <li>The voice picker at the characters stop lists voices and appearances as in <a href="#flows">Picking a voice</a>. Picking an appearance with no voice creates the <code>needs_clip</code> voice and its <code>casting_tasks</code> row.</li>
   <li>The picker reads <code>starting_pick</code>. The voices admin page stops filtering on <code>series_id</code>.</li>
-  <li><code>getSpeakerReviews</code> and the other <code>speaker_reviews</code> references are deleted; nothing calls them.</li>
+  <li><code>getSpeakerReviews</code> and the other <code>speaker_reviews</code> references are deleted. That includes <code>scripts/review-speakers.ts</code>, its <code>package.json</code> entry and the <code>review-speakers</code> step in <code>scripts/ingest.ts</code>: the table is empty and the review editor replaced that flow. The PR says so, because the shared script rule would otherwise convert a script that has a <code>package.json</code> entry.</li>
   <li>Every <code>.from("voices")</code> lives in <code>src/lib/voice-slots/</code>, <code>src/lib/voices-registry.ts</code> or <code>src/lib/voice-requests.ts</code>. Other files (the cast module, the editor and characters loaders, the voices admin actions, the import script) call a function there. A lint entry enforces it.</li>
   <li>No code picks a voice by its name. The review editor's <code>ownVoice</code> fallback in <code>src/components/review-editor/lib.ts</code> matches by voice uuid.</li>
 </ul>
@@ -443,7 +444,7 @@
 <ul>
   <li>The name gate for P3's names. A planted <code>.from("voices")</code> outside the three module paths fails <code>pnpm lint</code>.</li>
   <li>The offline fixtures in <code>scripts/plan-voice-work.ts</code> pass. One fixture is added: archive then restore a voice against the fake account, and assert that the voice row's id changed and the castlist rows that reference it are unchanged. No ElevenLabs call.</li>
-  <li>On the smoke-test book (owner item O3), driven with real pointer input through codex computer use: at the characters stop, pick an appearance that has no voice. The database then shows one new <code>voices</code> row with <code>needs_clip</code> and one <code>casting_tasks</code> row. The check names the input method in its report.</li>
+  <li>On the smoke-test book (owner item O3), driven with real pointer input through any computer-use lane the repo allows (decision row 277): at the characters stop, pick an appearance that has no voice. The database then shows one new <code>voices</code> row with <code>needs_clip</code> and one <code>casting_tasks</code> row. The check names the input method in its report.</li>
 </ul>
 
 <h3 id="p4">P4 Identity</h3>
@@ -475,7 +476,7 @@
 <p><strong>The order, run by the lead with owner sign-off O4:</strong></p>
 <ol>
   <li>Save a dump of the columns and tables to be dropped to private storage.</li>
-  <li>Apply migration A. It checks the rules and raises an error if any fails: no castlist row with a null <code>character_id</code>, no duplicate <code>(book_id, issue_id, character_id)</code>, every row that still holds the old marker has <code>no_audio</code> true, no <code>comic</code> voice without a character, no alias without a <code>character_id</code>. Then it swaps the castlist primary key to <code>(book_id, issue_id, character_id)</code> and makes <code>castlist.character</code> nullable.</li>
+  <li>Apply migration A. It checks the rules and raises an error if any fails: no castlist row with a null <code>character_id</code>, no duplicate <code>(book_id, issue_id, character_id)</code>, every row that still holds the old marker has <code>no_audio</code> true, no <code>comic</code> voice without a character, no alias without a <code>character_id</code>. Then it sets <code>aliases.character_id</code> not null, swaps the castlist primary key to <code>(book_id, issue_id, character_id)</code> and makes <code>castlist.character</code> nullable.</li>
   <li>Merge and deploy the code: inserts stop filling <code>castlist.character</code>.</li>
   <li>Run the name gate once more for every dropped column and table. P2 to P4 already passed it for their own names; a new hit is fixed in this issue, in whatever file it is.</li>
   <li>Apply migration B: drop everything marked <span class="tag drop">dropped</span> in <a href="#tables">Tables</a>. Commit the regenerated types.</li>
@@ -483,7 +484,7 @@
 <p><strong>Gate:</strong> <code>scripts/plan-audio.ts</code> for issues 1 and 2 prints the same plan before step 2 and after step 5. The <a href="#playback">playback check</a> passes after step 5.</p>
 
 <h3 id="playback">The playback check</h3>
-<p>Run after P1 is applied, after each of P2 to P4 deploys, and after P6. One delegated round of codex computer use against the deployed reader, with real pointer input: open two pages in issue 1 and two in issue 2, tap two bubbles on each, and report whether audio played and the highlight moved across the words. This shows the reader still serves the stored audio. It does not exercise the voice lookup, which P2's baseline covers. Whether the right voice speaks is owner item E2.</p>
+<p>Run after P1 is applied, after each of P2 to P4 deploys, and after P6. One delegated round of computer use (any lane decision row 277 allows) against the deployed reader, with real pointer input: open two pages in issue 1 and two in issue 2, tap two bubbles on each, and report whether audio played and the highlight moved across the words. This shows the reader still serves the stored audio. It does not exercise the voice lookup, which P2's baseline covers. Whether the right voice speaks is owner item E2.</p>
 
 <h2 id="decides">Who decides what</h2>
 <p>Each of the six issues carries this block, so a builder does not stop to ask what it can settle itself.</p>
