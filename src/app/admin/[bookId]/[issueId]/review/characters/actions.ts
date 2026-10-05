@@ -665,14 +665,8 @@ export async function requestVoice(args: {
           error: `That voice-lab clone is not on file for ${args.name}.`,
         };
       // A lab candidate is linked to no castlist row of this book (load.ts).
-      const linked = await supabaseAdmin
-        .from("castlist")
-        .select("character")
-        .eq("book_id", scope.bookId)
-        .eq("voice_uuid", target)
-        .limit(1);
-      must("reading the castlist", linked.error);
-      if (linked.data?.length)
+      const book = await loadBookCast(supabaseAdmin, scope.bookId);
+      if (book.rows.some((r) => r.voice_uuid === target))
         return {
           ok: false,
           error: "That voice-lab clone is already a voice in this book.",

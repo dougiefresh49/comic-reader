@@ -1,15 +1,11 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { slugify } from "~/lib/character-id";
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
+import { loadBookCast, readCastRow, setIssueVoice } from "~/lib/cast";
 import type { Database } from "~/types/database";
 import {
-  buildAliasMap,
-  buildCastIndex,
   planCharactersNeedingVoices,
   readPlanningAppearances,
-  speakerKeys,
   voiceDesignAppearanceId,
 } from "~/workflows/steps/audio-plan";
 import { isDryRun } from "./fakes/dry-run";
@@ -49,8 +45,7 @@ export function buildVoiceRow(
     "characterId" | "elevenLabsId" | "designPrompt"
   >,
 ): VoiceInsert {
-  // No character display-name column exists, so display_name is the
-  // castlist character string, as in the backfilled rows.
+  // display_name is the character id, as in the backfilled rows.
   return {
     display_name: input.characterId,
     character_id: input.characterId,
@@ -63,10 +58,10 @@ export function buildVoiceRow(
 }
 
 /**
- * The `voices` row this castlist character already points at, or null.
- * Looks the row up by its id, never by `display_name` (row 153: an
- * import candidate row can carry a live voice's name). The castlist row is
- * the issue's row for the character, by `character_id` or by its text.
+ * The `voices` row this character's castlist row in the issue already
+ * points at, or null. Looks the row up by its id, never by `display_name`
+ * (row 153: an import candidate row can carry a live voice's name). The
+ * castlist row is found by `character_id`.
  */
 export async function findRegisteredVoice(
   client: SupabaseClient,
@@ -76,18 +71,13 @@ export async function findRegisteredVoice(
   current_elevenlabs_id: string | null;
 } | null> {
   const db = client as Db;
-  const { data: cast, error: castErr } = await db
-    .from("castlist")
-    .select("voice_uuid")
-    .eq("book_id", input.bookId)
-    .eq("issue_id", input.issueId)
-    .or(
-      `character_id.eq.${input.characterId},character.eq.${input.characterId}`,
-    )
-    .not("voice_uuid", "is", null)
-    .limit(1);
-  if (castErr) throw new Error(castErr.message);
-  const voiceUuid = cast?.[0]?.voice_uuid;
+  const cast = await readCastRow(
+    client,
+    input.bookId,
+    input.issueId,
+    input.characterId,
+  );
+  const voiceUuid = cast?.voice_uuid;
   if (!voiceUuid) return null;
 
   const { data: voice, error: voiceErr } = await db
@@ -101,9 +91,9 @@ export async function findRegisteredVoice(
 
 /**
  * Registers the voice and points castlist at it: finds the `voices` row
- * that owns this ElevenLabs id, or creates one, then upserts the castlist
- * row with both `voice_id` and `voice_uuid`. Both writes set
- * `character_id`; a found row gets it only when it has none. Takes the
+ * that owns this ElevenLabs id, or creates one, then points the issue's
+ * castlist row at it through `setIssueVoice` (keyed on `character_id`). A
+ * found `voices` row gets `character_id` only when it has none. Takes the
  * client as an argument so a script can run it against a fake one; `dryRun`
  * (default: `DRY_RUN`) logs the writes instead.
  */
@@ -169,24 +159,28 @@ export async function registerCastVoice(
       );
   }
 
-  const castRow = {
-    book_id: input.bookId,
-    issue_id: input.issueId,
-    character: input.characterId,
-    character_id: input.characterId,
-    voice_id: input.elevenLabsId,
-    voice_uuid: voiceUuid,
-  };
   if (dryRun) {
-    console.log(`[voice-registry] castlist upsert ${JSON.stringify(castRow)}`);
+    console.log(
+      `[voice-registry] castlist ${input.bookId}/${input.issueId}/${input.characterId} voice_uuid=${voiceUuid}`,
+    );
     return { ok: true, voiceUuid };
   }
 
-  const { error: castErr } = await db
-    .from("castlist")
-    .upsert(castRow, { onConflict: "book_id,issue_id,character" });
-  if (castErr) {
-    return { ok: false, error: castErr.message, stage: "voices", voiceUuid };
+  try {
+    await setIssueVoice(
+      client,
+      input.bookId,
+      input.issueId,
+      input.characterId,
+      voiceUuid,
+    );
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      stage: "voices",
+      voiceUuid,
+    };
   }
 
   return { ok: true, voiceUuid };
@@ -222,16 +216,17 @@ export interface VoiceDesignOptions {
 export interface CharactersNeedingVoices {
   needDesign: string[];
   reused: number;
-  /** Characters whose design appearance got its castlist `voice_id` back. */
+  /** Characters whose design appearance got its castlist voice's ElevenLabs id back. */
   repaired: string[];
 }
 
 /**
- * The issue's speakers that need Voice Design. First, #301 case 1: when this
- * issue's castlist row for a character has `voice_uuid` and the character's
- * design appearance has no `voice_id`, the castlist voice is written back to
- * the appearance, so a later issue without a castlist row takes the
- * stored-id path instead of a second paid create.
+ * The issue's speakers (`bubbles.character_id`) that need Voice Design.
+ * First, #301 case 1: when this issue's castlist row for a character points
+ * at an active voice and the character's design appearance has no
+ * `voice_id`, that voice's ElevenLabs id is written back to the appearance,
+ * so a later issue without a castlist row takes the stored-id path instead
+ * of a second paid create.
  */
 export async function findCharactersNeedingVoices(
   client: SupabaseClient,
@@ -240,96 +235,86 @@ export async function findCharactersNeedingVoices(
   opts: VoiceDesignOptions,
 ): Promise<CharactersNeedingVoices> {
   const db = client as Db;
-  const [
-    { data: bubbleRows, error: bubErr },
-    { data: aliasRows, error: aliasErr },
-    { data: castRows, error: castErr },
-  ] = await Promise.all([
+  const [{ data: bubbleRows, error: bubErr }, book] = await Promise.all([
     db
       .from("bubbles")
-      .select("speaker")
+      .select("character_id")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("ignored", false)
       .eq("silent", false)
-      .not("speaker", "is", null),
-    db
-      .from("aliases")
-      .select("alias, canonical, scope, scope_id")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
-    db
-      .from("castlist")
-      .select("character, character_id, voice_id, voice_uuid")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId),
+      .not("character_id", "is", null),
+    loadBookCast(client, bookId),
   ]);
   if (bubErr) throw new Error(bubErr.message);
-  if (aliasErr) throw new Error(aliasErr.message);
-  if (castErr) throw new Error(castErr.message);
 
-  const aliasMap = buildAliasMap(aliasRows ?? []);
-  const castlist = castRows ?? [];
-  const cast = buildCastIndex(castlist);
-  const rawSpeakers = (bubbleRows ?? [])
-    .map((b) => b.speaker)
-    .filter((s): s is string => !!s);
-  const castKey = (r: { character: string; character_id: string | null }) =>
-    r.character_id ?? slugify(r.character);
+  const castRows = book.rows.flatMap((r) =>
+    r.issue_id === issueId && r.character_id
+      ? [{ ...r, character_id: r.character_id }]
+      : [],
+  );
+  const speakers = (bubbleRows ?? []).flatMap((b) =>
+    b.character_id ? [b.character_id] : [],
+  );
   const appearances = await readPlanningAppearances(db, [
-    ...speakerKeys(rawSpeakers, aliasMap),
-    ...castlist.map(castKey),
+    ...speakers,
+    ...castRows.map((r) => r.character_id),
   ]);
 
   const repaired: string[] = [];
-  for (const row of castlist) {
-    if (!row.voice_uuid || !row.voice_id || row.voice_id === SKIPPED_VOICE)
-      continue;
-    const key = castKey(row);
+  for (const row of castRows) {
+    if (!row.voice_uuid || row.no_audio) continue;
+    const voice = book.voices.get(row.voice_uuid);
+    const elevenLabsId =
+      voice?.status === "active" ? voice.current_elevenlabs_id : null;
+    if (!elevenLabsId) continue;
+    const key = row.character_id;
     const appearance = appearances.find(
       (a) => a.id === voiceDesignAppearanceId(key),
     );
     if (!appearance || appearance.voice_id?.trim()) continue;
     if (opts.dryRun) {
       console.log(
-        `[get-chars] would write voice_id=${row.voice_id} to ${appearance.id}`,
+        `[get-chars] would write voice_id=${elevenLabsId} to ${appearance.id}`,
       );
     } else {
       const { error } = await db
         .from("character_appearances")
-        .update({ voice_id: row.voice_id })
+        .update({ voice_id: elevenLabsId })
         .eq("id", appearance.id);
       if (error)
         throw new Error(
-          `writing castlist voice ${row.voice_id} back to ${appearance.id}: ${error.message}`,
+          `writing castlist voice ${elevenLabsId} back to ${appearance.id}: ${error.message}`,
         );
     }
-    appearance.voice_id = row.voice_id;
+    appearance.voice_id = elevenLabsId;
     repaired.push(key);
   }
 
   const plan = planCharactersNeedingVoices(
-    rawSpeakers,
-    aliasMap,
-    cast,
+    speakers,
+    new Set(castRows.map((r) => r.character_id)),
     appearances,
   );
 
   for (const row of plan.reuse) {
     const appearance = appearances.find(
-      (a) => a.character_id === row.character && a.voice_id === row.voice_id,
+      (a) =>
+        a.character_id === row.characterId && a.voice_id === row.elevenLabsId,
     );
     const saved = await registerCastVoice(
       db,
       {
         bookId,
         issueId,
-        characterId: row.character,
-        elevenLabsId: row.voice_id,
+        characterId: row.characterId,
+        elevenLabsId: row.elevenLabsId,
         designPrompt: appearance?.voice_description?.trim(),
       },
       { dryRun: opts.dryRun },
     );
-    if (!saved.ok) throw new Error(castSaveFailureMessage(row.voice_id, saved));
+    if (!saved.ok)
+      throw new Error(castSaveFailureMessage(row.elevenLabsId, saved));
   }
 
   return { needDesign: plan.needDesign, reused: plan.reuse.length, repaired };

@@ -1,10 +1,8 @@
 import { createPartFromText } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BookCast } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
 import type { generateContentLogged as GenerateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import type { Database } from "~/types/database";
 
 function speakerMatchKey(speaker: string): string {
@@ -283,29 +281,9 @@ export function formatVoiceDecision(d: VoiceDescriptionDecision): string {
 }
 
 /**
- * True when the issue's castlist marks the character silent (the skip
- * sentinel): deliberate silence, not voice work. Rows match as `cast.ts`
- * matches them: `character_id`, else what the row's text resolves to.
- */
-export function skippedIn(
-  book: BookCast,
-  characterId: string,
-  issueId: string,
-): boolean {
-  return book.rows.some(
-    (r) =>
-      r.issue_id === issueId &&
-      r.voice_id === SKIPPED_VOICE &&
-      (r.character_id ??
-        book.resolve(r.character)?.id ??
-        slugify(r.character)) === characterId,
-  );
-}
-
-/**
  * Who `generate-voice-descriptions` may describe (#351): a speaker with an
- * open design request, or one with no voice and no skip. `ids` are the
- * groups' character ids; each is looked up as `cast.ts` resolves it.
+ * open design request, or one with no voice and no "no audio". `ids` are the
+ * groups' character ids, matched to castlist rows by `character_id`.
  */
 export async function loadDescriptionEligibility(
   client: SupabaseClient,
@@ -313,7 +291,7 @@ export async function loadDescriptionEligibility(
   issueId: string,
   ids: string[],
 ): Promise<{ eligible: Set<string>; designRequested: Set<string> }> {
-  const { loadBookCast, readVoiceRequests, voiceFor } = await import(
+  const { isNoAudio, loadBookCast, readVoiceRequests, voiceFor } = await import(
     "~/lib/cast"
   );
   const [book, requests] = await Promise.all([
@@ -331,16 +309,11 @@ export async function loadDescriptionEligibility(
   );
   const eligible = new Set<string>();
   for (const id of ids) {
-    const resolved = book.resolve(id)?.id ?? id;
-    if (designRequested.has(id) || designRequested.has(resolved)) {
+    if (designRequested.has(id)) {
       eligible.add(id);
-      designRequested.add(id);
       continue;
     }
-    if (
-      !voiceFor(book, resolved, issueId) &&
-      !skippedIn(book, resolved, issueId)
-    )
+    if (!voiceFor(book, id, issueId) && !isNoAudio(book, id, issueId))
       eligible.add(id);
   }
   return { eligible, designRequested };

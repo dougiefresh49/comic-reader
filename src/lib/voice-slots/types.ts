@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * Narrow row types, read from `select("*")`. `src/types/database.ts` predates
  * the #91 registry columns (consumers, description, labels, source_clip_md5,
- * lab_default) and #95 (`characters.voice_of`, `castlist.character_id`); the
+ * lab_default); the
  * lead regenerates it after those apply. Until then these carry the shape.
  */
 export interface VoiceRow {
@@ -23,21 +23,8 @@ export interface VoiceRow {
   archived_at: string | null;
 }
 
-export interface CastlistRow {
-  book_id: string;
-  issue_id: string;
-  character: string;
-  /** #95 adds it, #100 fills it. Null on every row before then. */
-  character_id: string | null;
-  voice_id: string | null;
-  voice_uuid: string | null;
-}
-
-export interface CharacterRow {
-  id: string;
-  /** #95: the character whose voice this form speaks with. */
-  voice_of: string | null;
-}
+/** A castlist row's voice reference, as `~/lib/cast` reads it. */
+export type { CastVoiceLink as CastlistRow } from "~/lib/cast";
 
 /**
  * What every module function takes first. `fetch` and `apiKey` default to

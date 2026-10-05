@@ -340,8 +340,8 @@ export async function loadEditor(
       (castVoice?.voiceUuid
         ? activeById.get(castVoice.voiceUuid)
         : undefined) ??
-      (castVoice?.voiceId
-        ? activeByElevenLabs.get(castVoice.voiceId)
+      (castVoice?.elevenLabsId
+        ? activeByElevenLabs.get(castVoice.elevenLabsId)
         : undefined) ??
       voiceByCharacter.get(id) ??
       voiceByName.get(id) ??
@@ -351,22 +351,21 @@ export async function loadEditor(
 
   // The speaker list is the issue's cast (#355). An issue with no castlist
   // rows at all gets the proposed cast, in memory only; nothing is written
-  // here. Rows with `in_issue` false are removals and stay out.
-  const rowId = (characterId: string | null, character: string) =>
-    characterId ?? book.resolve(character)?.id ?? slug(character);
+  // here. Rows with `in_issue` false are removals and stay out; a row with
+  // no `character_id` is held at the characters stop and is not listed.
   const issueRows = book.rows.filter((r) => r.issue_id === issueId);
   const removed = new Set(
-    issueRows
-      .filter((r) => !r.in_issue)
-      .map((r) => rowId(r.character_id, r.character)),
+    issueRows.flatMap((r) =>
+      !r.in_issue && r.character_id ? [r.character_id] : [],
+    ),
   );
   const listed: { id: string; voice: CastVoice | null; label: string }[] =
     issueRows.length > 0
-      ? castEntries.map((e) => ({
-          id: rowId(e.characterId, e.character),
-          voice: e.voice,
-          label: e.character,
-        }))
+      ? castEntries.flatMap((e) =>
+          e.characterId
+            ? [{ id: e.characterId, voice: e.voice, label: e.character }]
+            : [],
+        )
       : (await proposeCast(supabaseAdmin, bookId, issueId)).members.map(
           (m) => ({
             id: m.id,

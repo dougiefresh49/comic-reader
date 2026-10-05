@@ -11,6 +11,7 @@ import { checkAdminAuth } from "~/lib/admin-auth";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { readCastNames } from "~/lib/cast";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 
 const PAGES_BUCKET = "comic-pages";
@@ -172,14 +173,11 @@ export async function rerunContext(args: Args): Promise<Result> {
   const neighbors = (pageBubbles ?? []) as BubbleRow[];
 
   // 4. Pull issue-level character set
-  const { data: castRows } = await supabaseAdmin
-    .from("castlist")
-    .select("character")
-    .eq("book_id", args.bookId)
-    .eq("issue_id", args.issueId);
-  const uniqueCharacters = (
-    (castRows ?? []) as Array<{ character: string }>
-  ).map((r) => r.character);
+  const uniqueCharacters = await readCastNames(
+    supabaseAdmin,
+    args.bookId,
+    args.issueId,
+  ).catch(() => [] as string[]);
 
   // 5. Call Gemini with both images
   try {

@@ -73,10 +73,12 @@ export interface CharacterCard {
   group: CardGroup;
   sources: CastSource[];
   wikiNames: string[];
-  /** The issue's castlist says no (`in_issue` false on every row). */
+  /** The issue's castlist row says no (`in_issue` false). */
   removed: boolean;
   faces: FaceView[];
   looseExemplars: LooseExemplar[];
+  /** The issue's castlist row has `no_audio`: the card shows it silent, with no voice (#410). */
+  noAudio: boolean;
   voice: VoiceView | null;
   /** Lab default first, then by name. Empty for a card with no Change control. */
   labCandidates: LabCandidate[];

@@ -2,7 +2,7 @@
 import "server-only";
 import { selectIssue } from "~/lib/issue-queries";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { loadBookCast, voiceFor } from "~/lib/cast";
+import { isNoAudio, loadBookCast, voiceFor } from "~/lib/cast";
 import { planVoiceWork, type VoiceWorkPlan } from "~/lib/voice-requests";
 import {
   readCastlist,
@@ -11,7 +11,6 @@ import {
   type VoiceRow,
 } from "~/lib/voice-slots";
 import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
-import { skippedIn } from "~/workflows/steps/voice";
 import { readVoicesGate } from "~/server/admin/voices-gate";
 import { loadCharacters } from "../load";
 import type {
@@ -101,7 +100,7 @@ export async function loadVoices(
   ]);
   if (labRes.error)
     throw new Error(`voices stop loader, voice-lab: ${labRes.error.message}`);
-  const lines = await readSpeakerLines(supabaseAdmin, book, bookId, issueId);
+  const lines = await readSpeakerLines(supabaseAdmin, bookId, issueId);
   const voiceById = new Map(voices.map((v) => [v.id, v]));
   const linkedHere = new Set(
     book.rows.map((r) => r.voice_uuid).filter((id): id is string => !!id),
@@ -140,7 +139,7 @@ export async function loadVoices(
           !(
             replaces === voice.id &&
             c.book_id === bookId &&
-            (c.character_id ?? book.resolve(c.character)?.id) === characterId
+            c.character_id === characterId
           ),
       )
       .map((c) => ({
@@ -185,7 +184,7 @@ export async function loadVoices(
     warnings: [],
     noDefault: null,
     attention: null,
-    noAudio: skippedIn(book, id, issueId),
+    noAudio: isNoAudio(book, id, issueId),
     voice: voiceNow(id),
     samples: samplesOf(id),
   });
@@ -301,7 +300,7 @@ export async function loadVoices(
 
   // "No audio this run" speakers drop out of the plan; list them so the mark can be cleared.
   for (const id of [...lines.keys()].sort()) {
-    if (listed.has(id) || !skippedIn(book, id, issueId)) continue;
+    if (listed.has(id) || !isNoAudio(book, id, issueId)) continue;
     items.push({ ...blank(id), source: "no voice", state: "settled" });
   }
 

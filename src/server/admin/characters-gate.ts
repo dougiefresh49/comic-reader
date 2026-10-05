@@ -10,7 +10,7 @@
  */
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { seedCast } from "~/lib/cast";
+import { issueCast, loadBookCast, seedCast } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
 
 export interface UnknownDetection {
@@ -122,8 +122,9 @@ export type GateVerdict = { ok: true } | { ok: false; reason: string };
 
 /**
  * Seeds the cast (the row-242 union, idempotent), then refuses on an empty
- * cast or while any unknown face group is neither named nor rejected.
- * Unmatched wiki names never block.
+ * cast, while an `in_issue` castlist row has no `characters` row (a null
+ * `character_id`, #409; the refusal names the rows), or while any unknown
+ * face group is neither named nor rejected. Unmatched wiki names never block.
  */
 export async function canApproveCharacters(
   bookId: string,
@@ -131,22 +132,23 @@ export async function canApproveCharacters(
 ): Promise<GateVerdict> {
   await seedCast(supabaseAdmin, bookId, issueId);
 
-  const [cast, unnamed] = await Promise.all([
-    supabaseAdmin
-      .from("castlist")
-      .select("character", { count: "exact", head: true })
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .eq("in_issue", true),
+  const [book, unnamed] = await Promise.all([
+    loadBookCast(supabaseAdmin, bookId),
     readUnknownDetections(bookId, issueId),
   ]);
-  if (cast.error)
-    throw new Error(`characters gate: reading the cast: ${cast.error.message}`);
+  const cast = issueCast(book, issueId);
 
-  if (!cast.count) {
+  if (cast.length === 0) {
     return {
       ok: false,
       reason: "The cast is empty: add at least one character.",
+    };
+  }
+  const orphans = cast.filter((r) => !r.character_id).map((r) => r.character);
+  if (orphans.length > 0) {
+    return {
+      ok: false,
+      reason: `${orphans.length} castlist ${orphans.length === 1 ? "row matches" : "rows match"} no character: ${orphans.map((c) => JSON.stringify(c)).join(", ")}. ${orphans.length === 1 ? "It needs" : "Each needs"} a character_id before Approve.`,
     };
   }
   const groups = unknownFaceGroups(unnamed);

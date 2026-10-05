@@ -36,10 +36,7 @@ import {
 } from "~/lib/voice-requests";
 import { readVoice } from "~/lib/voice-slots";
 import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
-import {
-  clearNoAudio as clearNoAudioRows,
-  markNoAudioUnknown,
-} from "~/server/admin/casting";
+import { clearNoAudio as clearNoAudioRows } from "~/server/admin/casting";
 import { canContinueVoices } from "~/server/admin/voices-gate";
 import {
   executeVoiceOperation,
@@ -125,28 +122,22 @@ export async function pickActiveVoice(args: {
   );
 }
 
-/** "No audio this run": the skip marker, through `settle`; a speaker no `characters` row knows gets it directly. */
+/** "No audio this run": `no_audio` on the issue's castlist row, through `settle`. */
 export async function noAudio(args: {
   scope: Scope;
   item: ItemRef;
 }): Promise<ActionResult> {
-  const { bookId, issueId } = args.scope;
+  const { bookId } = args.scope;
   const id = args.item.characterId;
   try {
     await requireAdmin();
     const hit = (await loadBookCast(supabaseAdmin, bookId)).resolve(id);
-    if (hit && hit.id !== id)
-      // The key names a character now: the page is stale, never skip `settle` for it.
+    if (hit?.id !== id)
+      // The key is no character id: the page is stale, never skip `settle` for it.
       return {
         ok: false,
-        error: `"${id}" now names the character ${hit.display_name ?? hit.id}. Reload the page.`,
+        error: `"${id}" is not a character id${hit ? `; it names ${hit.display_name ?? hit.id}` : ""}. Reload the page.`,
       };
-    if (!hit) {
-      // O1 = C: `settle` needs a `characters` row, so this path writes the marker itself.
-      await markNoAudioUnknown(bookId, issueId, id);
-      revalidate(args.scope);
-      return { ok: true, message: "No audio this run." };
-    }
   } catch (err) {
     revalidate(args.scope);
     return fail("no audio", err);
@@ -404,7 +395,7 @@ export async function playSample(args: {
   try {
     await requireAdmin();
     const book = await loadBookCast(supabaseAdmin, bookId);
-    const line = (await readSpeakerLines(supabaseAdmin, book, bookId, issueId))
+    const line = (await readSpeakerLines(supabaseAdmin, bookId, issueId))
       .get(args.characterId)
       ?.filter((l) => l.text)
       .slice(0, 3)
@@ -414,13 +405,9 @@ export async function playSample(args: {
         ok: false,
         error: "That line is not one of the character's first three here.",
       };
-    const voice = voiceFor(book, args.characterId, issueId);
-    const row = voice?.voiceUuid
-      ? await readVoice(supabaseAdmin, voice.voiceUuid)
-      : null;
-    const voiceId = row?.current_elevenlabs_id;
-    // Active and library voices play; an archived one is off the account.
-    if (!row || row.status === "archived" || !voiceId)
+    // Only an active voice plays; an archived one is off the account.
+    const voiceId = voiceFor(book, args.characterId, issueId)?.elevenLabsId;
+    if (!voiceId)
       return { ok: false, error: "The character has no voice to play." };
     const overrides = await loadVoiceOverrides(supabaseAdmin, [voiceId]);
     const request = buildTtsRequest({

@@ -815,7 +815,9 @@ function CharacterCardView({
   const exemplars =
     card.faces.filter((f) => f.exemplar).length + card.looseExemplars.length;
 
-  const voice = card.voice ? (
+  const voice = card.noAudio ? (
+    <span className="text-neutral-300">No audio this run</span>
+  ) : card.voice ? (
     <span className="text-neutral-300">
       {card.voice.name}
       {card.voice.borrowedFrom && (

@@ -16,16 +16,12 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  addToCast,
+  castVoiceInBook,
   loadBookCast,
   readVoiceRequests,
-  setVoice,
+  setNoAudio,
   voiceFor,
-  type BookCast,
-  type CastRow,
 } from "~/lib/cast";
-import { slugify } from "~/lib/character-id";
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import {
   ArchiveRecordError,
   ElevenLabsHeadroomError,
@@ -51,12 +47,9 @@ import {
   type VoiceRow,
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots";
-import {
-  buildAliasMap,
-  speakerKey,
-  voiceDesignAppearanceId,
-} from "~/workflows/steps/audio-plan";
-import { describeVoices, skippedIn } from "~/workflows/steps/voice";
+import { voiceDesignAppearanceId } from "~/workflows/steps/audio-plan";
+import { readSpeakerLines, silencedIn } from "~/workflows/steps/casting-tasks";
+import { describeVoices } from "~/workflows/steps/voice";
 
 export type VoiceWorkAction = "clone" | "design" | "restore";
 
@@ -144,63 +137,8 @@ export interface VoiceWorkPlan {
   unsettled: number;
 }
 
-const PAGE = 1000;
-
 function fail(what: string, error: { message: string } | null): void {
   if (error) throw new Error(`voice work: ${what}: ${error.message}`);
-}
-
-/** The character a castlist row belongs to, as `cast.ts` reads it. */
-function rowCharacter(
-  book: BookCast,
-  r: Pick<CastRow, "character" | "character_id">,
-) {
-  return (
-    r.character_id ?? book.resolve(r.character)?.id ?? slugify(r.character)
-  );
-}
-
-/** Lines per character in the issue: `bubbles.character_id`, else the speaker through the aliases. */
-async function readLines(
-  client: SupabaseClient,
-  book: BookCast,
-  bookId: string,
-  issueId: string,
-): Promise<Map<string, number>> {
-  const aliasRes = await client
-    .from("aliases")
-    .select("alias, canonical")
-    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`);
-  fail("reading aliases", aliasRes.error);
-  const aliasMap = buildAliasMap(
-    (aliasRes.data ?? []) as { alias: string; canonical: string }[],
-  );
-  const lines = new Map<string, number>();
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await client
-      .from("bubbles")
-      .select("character_id, speaker")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .eq("ignored", false)
-      .eq("silent", false)
-      .order("id")
-      .range(from, from + PAGE - 1);
-    fail("reading bubbles", error);
-    const page = (data ?? []) as {
-      character_id: string | null;
-      speaker: string | null;
-    }[];
-    for (const b of page) {
-      const key =
-        b.character_id ??
-        (b.speaker?.trim() ? speakerKey(b.speaker, aliasMap) : null);
-      if (!key) continue;
-      const id = book.resolve(key)?.id ?? key;
-      lines.set(id, (lines.get(id) ?? 0) + 1);
-    }
-    if (page.length < PAGE) return lines;
-  }
 }
 
 async function readTasks(
@@ -318,7 +256,12 @@ export async function planVoiceWork(
     readCastlist(sb),
     issueNeeds(sb, { bookId, issueId }),
   ]);
-  const lines = await readLines(sb, book, bookId, issueId);
+  // Lines per character: the voices gate's own rule (#406).
+  const lines = new Map(
+    [...(await readSpeakerLines(sb, bookId, issueId))].map(
+      ([id, list]) => [id, list.length] as const,
+    ),
+  );
   const voiceById = new Map(voices.map((v) => [v.id, v]));
   const { data: labRows, error: labErr } = await sb
     .from("voices")
@@ -403,7 +346,7 @@ export async function planVoiceWork(
       });
       continue;
     }
-    if (skippedIn(book, id, issueId)) continue;
+    if (silencedIn(book, id, issueId)) continue;
     const first = candidatesOf.get(id)?.[0];
     items.push({
       ...base(id),
@@ -483,7 +426,7 @@ export async function planVoiceWork(
           !(
             item.replaces?.id === voice.id &&
             c.book_id === bookId &&
-            rowCharacter(book, c) === item.characterId
+            c.character_id === item.characterId
           ),
       )
       .map((c) => ({
@@ -753,24 +696,6 @@ async function claimTask(
   return { ok: true, inserted: true };
 }
 
-/** Points the character's castlist rows in every issue of the book at the voice; adds this issue's row first when it has none. */
-async function castVoice(
-  client: SupabaseClient,
-  bookId: string,
-  issueId: string,
-  characterId: string,
-  voiceUuid: string,
-): Promise<number> {
-  const book = await loadBookCast(client, bookId);
-  if (
-    !book.rows.some(
-      (r) => r.issue_id === issueId && rowCharacter(book, r) === characterId,
-    )
-  )
-    await addToCast(client, bookId, issueId, characterId);
-  return setVoice(client, bookId, characterId, voiceUuid);
-}
-
 /**
  * Records a voice that exists on ElevenLabs: its `voices` row (found by the
  * ElevenLabs id first, so a rerun never inserts a second), the replaced
@@ -831,7 +756,7 @@ async function recordVoice(
       .eq("id", voiceUuid);
     fail(`copying ${item.replaces.display_name}'s metadata`, copy.error);
   }
-  const castlistRows = await castVoice(
+  const castlistRows = await castVoiceInBook(
     sb,
     item.bookId,
     item.issueId,
@@ -1573,42 +1498,6 @@ export type SettleOutcome =
    */
   | { kind: "rerun"; targetVoiceUuid?: string };
 
-/**
- * Writes the skip sentinel on the character's castlist rows in this issue
- * (adding the row through `cast.ts` when there is none), with `voice_uuid`
- * cleared, so the audio step skips its bubbles. Rows match as `cast.ts`
- * matches them; `cast.ts` has no skip writer, so the update is here.
- */
-async function skipInIssue(
-  client: SupabaseClient,
-  bookId: string,
-  issueId: string,
-  characterId: string,
-): Promise<void> {
-  const here = (book: BookCast) =>
-    book.rows.filter(
-      (r) => r.issue_id === issueId && rowCharacter(book, r) === characterId,
-    );
-  let rows = here(await loadBookCast(client, bookId));
-  if (rows.length === 0) {
-    await addToCast(client, bookId, issueId, characterId);
-    rows = here(await loadBookCast(client, bookId));
-  }
-  for (const row of rows) {
-    const upd = await client
-      .from("castlist")
-      .update({
-        character_id: characterId,
-        voice_id: SKIPPED_VOICE,
-        voice_uuid: null,
-      })
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .eq("character", row.character);
-    fail(`skipping ${characterId} in ${issueId}`, upd.error);
-  }
-}
-
 /** Settles one item: points the cast at a picked voice or skips the character, then marks its `casting_tasks` row complete; or puts a made item back to pending (`rerun`). */
 export async function settle(
   client: SupabaseClient,
@@ -1662,7 +1551,7 @@ export async function settle(
       throw new Error(
         `voice work: ${outcome.voiceUuid} is not an active voice`,
       );
-    await castVoice(
+    await castVoiceInBook(
       client,
       item.bookId,
       item.issueId,
@@ -1671,6 +1560,7 @@ export async function settle(
     );
   }
   if (outcome.kind === "no audio")
-    await skipInIssue(client, item.bookId, item.issueId, item.characterId);
+    // Skip writers set `no_audio` and leave the voice reference alone (#429).
+    await setNoAudio(client, item.bookId, item.issueId, item.characterId, true);
   await markTask(client, item, "complete");
 }

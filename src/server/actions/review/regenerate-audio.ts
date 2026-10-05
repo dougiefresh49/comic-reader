@@ -10,7 +10,6 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadBookCast } from "~/lib/cast";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
-import { voiceLookupContext } from "~/workflows/steps/audio-plan";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
 const AUDIO_BUCKET = "comic-audio";
@@ -125,25 +124,17 @@ export async function regenerateAudio(args: Args) {
     return { ok: false, error: "Empty text" };
   }
 
-  // The audio step's lookup: bubbles.character_id, then castlist.character_id
-  // (read by loadBookCast), then the name rule; the voice from voiceFor.
+  // The audio step's render chain, keyed on bubbles.character_id.
   let book;
   try {
     book = await loadBookCast(supabaseAdmin, args.bookId);
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
-  const { data: aliasRows, error: aliasErr } = await supabaseAdmin
-    .from("aliases")
-    .select("alias, canonical")
-    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${args.bookId})`);
-  if (aliasErr) {
-    return { ok: false, error: aliasErr.message };
-  }
-  const resolved = resolveSpeakerVoice(
-    voiceLookupContext(book, args.issueId, aliasRows ?? []),
-    { speaker: b.speaker, character_id: b.character_id },
-  );
+  const resolved = resolveSpeakerVoice(book, args.issueId, {
+    speaker: b.speaker,
+    character_id: b.character_id,
+  });
   if (!resolved.ok) {
     return { ok: false, error: resolved.error };
   }
