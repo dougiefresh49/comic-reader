@@ -34,7 +34,8 @@ Each of these is one sweep, then end your turn:
 - Doug sends a message. Answer it first if it is a question. If it
   answers an owner item ("O1 B"), do "When Doug answers" first. Then
   sweep.
-- A lead sends its done message (the launch prompt below asks for one).
+- A lead sends its done message (the launch prompt below asks for one),
+  directly or forwarded by the autopilot you replaced.
 - The scheduled sweep fires.
 - Your first turn as autopilot in a thread. Do "Starting or taking over"
   first.
@@ -146,38 +147,48 @@ open item gets one question back to Doug, and nothing is posted.
 ## Starting or taking over
 
 1. `list_scheduled_tasks`. Delete any autopilot sweep schedule bound to
-   another thread. If one is listed that you cannot delete, name it in
+   another thread, except the thread your first message says you
+   replace; that thread deletes its own. If one is listed that you cannot delete, name it in
    your report for Doug to remove.
 2. Run the sweep.
 3. For each issue with a live lead whose thread has not ended, send
    that thread one message with `t3_thread_send`, mode `queue`:
    "The autopilot thread is now <your thread id>; send your done message
    there." This is how a lead launched by an earlier autopilot finds you.
+4. If your first message names a thread you replace, send that thread
+   one message with `t3_thread_send`, mode `auto`: "Takeover done: the
+   autopilot is thread <your thread id>, titled <your title>."
 
 ## Replacing yourself
 
-At the end of a sweep, once this thread has been compacted or has passed
-about 250k tokens, start the next autopilot. Do not ask Doug first.
+At the end of a sweep, once this thread has been compacted, or the
+harness shows its context past about 250k tokens, start the next
+autopilot. Do not ask Doug first.
 
-1. `t3_thread_launch`, title `Autopilot <today's date>`,
+1. `t3_thread_launch`, title `Autopilot <date> <HH:MM>`,
    `workspaceStrategy`
-   `{"type":"worktree","baseRef":"main","branch":"autopilot-<today's date>","startFromOrigin":true}`,
+   `{"type":"worktree","baseRef":"main","branch":"autopilot-<date>-<HHMM>","startFromOrigin":true}`,
    and the message `You are the autopilot: read
    .claude/skills/autopilot/SKILL.md and run it. You replace thread <your
-   thread id>.`
-2. `t3_thread_wait` on the new thread, up to 15 minutes. The takeover is
-   proven when `list_scheduled_tasks` shows the sweep schedule bound to
-   the new thread and none bound to you. If the wait times out, the new
-   thread ended as `failed`, or the schedule did not move, you are still
-   the autopilot: say what happened in your report and try again at the
-   end of your next sweep.
-3. Tell Doug, as the last line of your report: "The autopilot is now
-   thread `<new title>`. Check in there."
+   thread id>.` Keep your sweep schedule, and end your turn.
+2. From that launch on you are standing by: you run no sweep and launch
+   no issue. On every wake while standing by, read the new thread's
+   status with `t3_thread_list` and take the first line that fits:
+   - Its "Takeover done" message has arrived. Delete your sweep
+     schedule, and tell Doug: "The autopilot is now thread `<new
+     title>`. Check in there." The handover is finished.
+   - The new thread is `failed`, `interrupted`, `cancelled` or
+     `rolled_back`. You are the autopilot again: do "Starting or taking
+     over" yourself, with no thread to replace, and say in your report
+     that the handover failed. Start another one at the end of a later
+     sweep.
+   - Neither. Forward a lead's done message whole to the new thread with
+     `t3_thread_send`, mode `queue`; do nothing on a scheduled wake.
 
-After a proven takeover you run no more sweeps. Two things can still
-reach you, and each has one answer:
+After a finished handover two things can still reach you, and each has
+one answer:
 
 - A lead's done message: forward it whole to the new autopilot's thread
   with `t3_thread_send`, mode `queue`.
 - A message from Doug: if it answers an owner item, do "When Doug
-  answers". Either way, end with the line from step 3.
+  answers". Either way, end with the line that names the new thread.
