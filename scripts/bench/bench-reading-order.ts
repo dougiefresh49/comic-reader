@@ -45,8 +45,9 @@
  * (`right: null`, never scored) that carries the call: tokens, cost,
  * latency, the reply, what was sent, and the page verdict.
  *
- * Arms: A is GEMINI_MEDIUM with no thinking level (production's call), B is
- * GEMINI_FAST with no thinking level, C is GEMINI_FAST at thinkingLevel LOW.
+ * Arms: A is GEMINI_MEDIUM with no thinking level (production's call before
+ * #443), B is GEMINI_FAST with no thinking level, C is GEMINI_FAST at
+ * thinkingLevel LOW (production's call since, decisions row 295).
  * `--arm all` is A and B; C runs only when named (`--arm C`, `--arm A,B,C`).
  *
  * Writes: one `RunFile` per arm and run under `--out` (bench-kit.ts). No
@@ -111,7 +112,7 @@ const STEP = "bench-reading-order";
 const ARMS: Arm[] = [
   {
     name: "A",
-    label: "GEMINI_MEDIUM, no thinking level (production)",
+    label: "GEMINI_MEDIUM, no thinking level (before #443)",
     model: GEMINI_MEDIUM,
   },
   {
@@ -121,7 +122,7 @@ const ARMS: Arm[] = [
   },
   {
     name: "C",
-    label: "GEMINI_FAST, thinkingLevel LOW",
+    label: "GEMINI_FAST, thinkingLevel LOW (production)",
     model: GEMINI_FAST,
     thinkingLevel: ThinkingLevel.LOW,
   },
@@ -430,7 +431,8 @@ async function sortOne(
       sortPlanRequest(
         p.image,
         sortPrompt(p.imgW, p.imgH, p.panels, p.bubbles, handles),
-        { model: arm.model, thinkingLevel: arm.thinkingLevel },
+        // null, not undefined: unset would take production's LOW.
+        { model: arm.model, thinkingLevel: arm.thinkingLevel ?? null },
       ),
       { step: STEP, bookId: book, issueId: issue, pageNumber: p.page },
     );
