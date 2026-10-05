@@ -62,9 +62,24 @@ function context(prompt: string): string {
       side: b.side ?? undefined,
       characterType: b.characterType ?? undefined,
       voiceDescription: b.voiceDescription ?? undefined,
-      textWithCues: b.textWithCues ?? undefined,
     },
   )}`;
+}
+
+/**
+ * The cue call (#437): the fixture bubble whose OCR text, whitespace
+ * collapsed as `buildCuePrompt` collapses it, is the prompt's last `Input:`
+ * line. Its `textWithCues`, else its OCR text.
+ */
+function cues(prompt: string): string {
+  const inputs = [...prompt.matchAll(/^Input: (.*)$/gm)];
+  const text = inputs.at(-1)?.[1] ?? "";
+  const collapse = (s: string) => s.replace(/\s+/g, " ").trim();
+  const b = allBubbles().find((x) => collapse(x.ocrText) === text);
+  if (!b) {
+    throw new Error(`DRY_RUN: no cue fixture for "${text.slice(0, 80)}"`);
+  }
+  return b.textWithCues ?? b.ocrText;
 }
 
 function identifyFace(): string {
@@ -122,6 +137,11 @@ const MATCHERS: Array<{
     purpose: "context",
     opening: "I am providing a full comic book page.",
     respond: context,
+  },
+  {
+    purpose: "cues",
+    opening: "You add ElevenLabs audio tags to one line of comic book dialogue",
+    respond: cues,
   },
   {
     purpose: "face-id",

@@ -1,11 +1,11 @@
 import { CUE_RULES } from "./cue-rules";
 
 /**
- * Switches for the get-context prompt. The pipeline passes `closedList` and
- * `castNotes` (#354); the review editor's analyze call passes `closedList`,
- * `transcribe` and `crop`. With none passed, the prompt is the old open-list
- * one, which only scripts still use (`scripts/utils/gemini-context.ts` and
- * `scripts/check-fakes.ts`).
+ * Switches for the get-context prompt. The pipeline passes `closedList`,
+ * `castNotes` (#354) and `noCues` (#437); the review editor's analyze call
+ * passes `closedList`, `transcribe` and `crop`. With none passed, the prompt
+ * is the old open-list one, which only scripts still use
+ * (`scripts/utils/gemini-context.ts` and `scripts/check-fakes.ts`).
  */
 export interface ContextPromptOptions {
   /** The speaker must be a name from the start of a `uniqueCharacters` line, or null. */
@@ -20,6 +20,12 @@ export interface ContextPromptOptions {
   transcribe?: boolean;
   /** A close-up crop of the region follows the page image. */
   crop?: boolean;
+  /**
+   * The speaker call alone (#437): no step 3 "Performance Cues", no
+   * `CUE_RULES`, and no `textWithCues` in the example reply. The cue line
+   * comes from a second call, `buildCuePrompt` in `cue-rules.ts`.
+   */
+  noCues?: boolean;
 }
 
 export function buildContextPrompt(
@@ -62,9 +68,28 @@ export function buildContextPrompt(
     ? "A row of generic foot soldiers shout it together. Many unnamed voices at once, so the speaker is the list's crowd entry; one foot soldier alone would be `null`. They are attacking.\nImportance is EXTRA. They are shouting."
     : "The speaker is a generic Foot Soldier (Villain). He is attacking.\nImportance is EXTRA. He is shouting.";
   const exampleSpeaker = opts.closedList ? "Crowd" : "Foot Soldier";
-  const textExample = opts.transcribe
-    ? `  "text": "You will never defeat us, turtles!",\n`
-    : "";
+  // The example reply's last fields, from emotion on.
+  const lastFields = [
+    `"emotion": "shouting"`,
+    ...(opts.transcribe
+      ? [`"text": "You will never defeat us, turtles!"`]
+      : []),
+    ...(opts.noCues
+      ? []
+      : [
+          `"textWithCues": "[shouting, aggressive] You will never defeat us, turtles!"`,
+        ]),
+  ]
+    .map((field) => `  ${field}`)
+    .join(",\n");
+  const cueStep = opts.noCues
+    ? ""
+    : `
+3.  **Performance Cues (CRITICAL):**
+    Write \`textWithCues\`: the text with ElevenLabs audio tags added, by the cue rules below. Use the speaker and emotion from step 2 and what the page shows: a jagged bubble shouts, a dotted one whispers, and a word lettered bolder or larger than the words around it is the stressed word. The words of \`textWithCues\` are the words of the text, one for one; in the rules below, "the input" is that text and "the output" is \`textWithCues\`.
+
+${CUE_RULES}
+`;
 
   return `${images}
 **Goal:** Analyze the specific text region described below to determine how it should be voice-acted.
@@ -93,12 +118,7 @@ ${characterList}
         * \`EXTRA\`: ${extra}
     * **Voice Description:** If MINOR or EXTRA, describe their voice for an AI generator. Use their "Side" to influence the tone. (e.g., "Villain Extra: Raspy, aggressive, threatening male voice").
     * **Emotion:** Look at the character's eyebrows, mouth, and body language.
-
-3.  **Performance Cues (CRITICAL):**
-    Write \`textWithCues\`: the text with ElevenLabs audio tags added, by the cue rules below. Use the speaker and emotion from step 2 and what the page shows: a jagged bubble shouts, a dotted one whispers, and a word lettered bolder or larger than the words around it is the stressed word. The words of \`textWithCues\` are the words of the text, one for one; in the rules below, "the input" is that text and "the output" is \`textWithCues\`.
-
-${CUE_RULES}
-
+${cueStep}
 **Output Format:**
 First, think step-by-step in a <scratchpad> block to confirm your reasoning.
 Then, provide the final JSON.
@@ -115,8 +135,7 @@ ${reasoning}
   "characterType": "EXTRA",
   "side": "VILLAIN",
   "voiceDescription": "Aggressive, raspy male voice, American accent, high energy",
-  "emotion": "shouting",
-${textExample}  "textWithCues": "[shouting, aggressive] You will never defeat us, turtles!"
+${lastFields}
 }
 \`\`\`
 `;

@@ -1,3 +1,6 @@
+import { ThinkingLevel } from "@google/genai";
+import { GEMINI_FAST } from "./models";
+
 /**
  * The one home for the rules that turn a comic bubble's words into ElevenLabs
  * text: audio tags, punctuation, letter case, and the words that never change.
@@ -9,9 +12,13 @@
  * renders every take (`TTS_MODEL` in `tts-request.ts`).
  *
  * `CUE_RULES` is plain prompt text with no inputs, so any prompt that writes
- * `text_with_cues` includes it: the review editors' Regenerate cues
- * (`buildCuePrompt` below) and the pipeline's cue instruction in
- * `buildContextPrompt` (#213 step 5).
+ * `text_with_cues` includes it. Two prompts write cue lines today:
+ * - `buildCuePrompt` below, sent through `cueRequest`: the pipeline's
+ *   get-context step, as a second call after the speaker call (#437), and the
+ *   review editor's Regenerate cues.
+ * - `buildContextPrompt` without `noCues`, which asks for the cue line in the
+ *   same reply as the speaker: the review editor's Analyze and the legacy
+ *   scripts, until #460 moves Analyze to `buildCuePrompt`.
  */
 export const CUE_RULES = `## Cue rules
 
@@ -122,4 +129,26 @@ ${feedback}Input: ${text.replace(/\s+/g, " ").trim()}
 
 Reply with ONLY the output line: no explanation, no markdown, and no quote marks around it (quote marks that are in the input stay).
 Output:`;
+}
+
+/**
+ * The `generateContent` params for one cue call: `buildCuePrompt` as the
+ * whole text-only contents, on GEMINI_FAST. Each caller keeps its own trim
+ * and its own handling of an empty reply.
+ *
+ * No temperature: Google advises leaving Gemini 3 at its default, since a low
+ * one risks looping (#104 drops it repo-wide). Low thinking, because sentence
+ * case, the capitals to keep and a tag that fits the emotion are judgment,
+ * not formatting.
+ */
+export function cueRequest(input: CuePromptInput): {
+  model: string;
+  contents: string;
+  config: { thinkingConfig: { thinkingLevel: ThinkingLevel } };
+} {
+  return {
+    model: GEMINI_FAST,
+    contents: buildCuePrompt(input),
+    config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
+  };
 }

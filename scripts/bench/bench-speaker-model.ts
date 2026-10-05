@@ -21,12 +21,12 @@
  * outline drawn round the bubble's box on the page, and one sentence saying
  * so). `--dry-run` with `box-drawn` writes the first drawn page to `--out`.
  * Two more: `no-cues-panel-page` (the no-cues prompt with panel-page's two
- * images) and `two-call` (call 1 is the no-cues prompt with step 3 and the
- * `textWithCues` reply field taken out, scored as usual; call 2 is
- * `buildCuePrompt` on call 1's speaker and emotion, text only, at
- * `thinkingLevel: LOW` as the editor's Regenerate cues action sends it, and
- * its trimmed reply is the cue line). `--dry-run` with `two-call` prints one
- * call 2 prompt too.
+ * images) and `two-call` (call 1 is `buildContextPrompt` with `noCues`, the
+ * speaker prompt get-context sends since #437, scored as usual; call 2 is
+ * `buildCuePrompt` on the cast id call 1's speaker matched, else null, and
+ * the emotion as stored, text only, at `thinkingLevel: LOW` as the editor's
+ * Regenerate cues action sends it, and its trimmed reply is the cue line).
+ * `--dry-run` with `two-call` prints one call 2 prompt too.
  *
  * `--cast` picks the prompt. `closed` (the default for `--source reviewed`)
  * is #354's: the speaker must come from the issue's cast, here `proposeCast`
@@ -72,7 +72,7 @@ import {
 } from "@google/genai";
 import sharp from "sharp";
 import { loadBookCast, proposeCast } from "~/lib/cast";
-import { CUE_RULES, buildCuePrompt } from "~/lib/cue-rules";
+import { CUE_RULES, buildCuePrompt, cueRequest } from "~/lib/cue-rules";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
@@ -160,11 +160,8 @@ const usesPanel =
   variant === "panel-page" ||
   variant === "panel" ||
   variant === "no-cues-panel-page";
-/** Variants that send the prompt without the CUE_RULES block. */
-const cutsCues =
-  variant === "no-cues" ||
-  variant === "no-cues-panel-page" ||
-  variant === "two-call";
+/** Variants that cut the CUE_RULES block out of the prompt. */
+const cutsCues = variant === "no-cues" || variant === "no-cues-panel-page";
 const twoCall = variant === "two-call";
 /**
  * `--speaker-thinking low|medium` (two-call only): call 1's thinkingLevel.
@@ -833,9 +830,12 @@ async function runPage(
     [...seenIds].filter((id) => cast.some((m) => m.id === id)),
   );
   const castLines = closed ? closedCastLines(cast, seenIds) : [];
+  // two-call: call 1 is the pipeline's speaker prompt (#437).
   const promptOpts = closed
-    ? { closedList: true, castNotes: CLOSED_CAST_NOTES }
-    : undefined;
+    ? { closedList: true, castNotes: CLOSED_CAST_NOTES, noCues: twoCall }
+    : twoCall
+      ? { noCues: true }
+      : undefined;
   // Panels come from the reviewed issue: the source page for smoke.
   const panels = !usesPanel
     ? []
@@ -930,19 +930,8 @@ async function runPage(
       if (cut === prompt) die(`${variant}: CUE_RULES not found in the prompt`);
       prompt = cut;
     }
-    if (twoCall) {
-      // Call 1 drops step 3 and the textWithCues field of the example reply.
-      const step3 = /\n3\.  \*\*Performance Cues \(CRITICAL\):\*\*\n[^\n]*\n/;
-      if (!step3.test(prompt)) die("two-call: step 3 not found in the prompt");
-      prompt = prompt.replace(step3, "");
-      const field =
-        ',\n  "textWithCues": "[shouting, aggressive] You will never defeat us, turtles!"\n}';
-      if (!prompt.includes(field))
-        die("two-call: textWithCues field not found");
-      prompt = prompt.replace(field, "\n}");
-      if (/textWithCues|cue rules|Cue rules/.test(prompt)) {
-        die("two-call: the prompt still mentions cues");
-      }
+    if (twoCall && /textWithCues|cue rules|Cue rules/.test(prompt)) {
+      die("two-call: the prompt still mentions cues");
     }
     if (variant === "no-cues-panel-page" && panel) {
       images = [pageB64, await crop(panel)];
@@ -1061,10 +1050,20 @@ async function runPage(
       const jsonMatch = /\{[\s\S]*\}/.exec(responseText);
       if (jsonMatch) {
         try {
-          const parsed = JSON.parse(jsonMatch[0]) as ContextParsed;
+          const parsed = JSON.parse(jsonMatch[0]) as ContextParsed & {
+            textWithCues?: string;
+          };
           // Closed: the step's own update, speaker matched to the cast.
-          // Open: the reply's name as given (the cast is empty).
-          const update = buildContextUpdate(parsed, b.text, aiReasoning, cast);
+          // Open: the reply's name as given (the cast is empty). The cue
+          // line is the reply's own, else the text, as before #437; two-call
+          // replaces it with call 2's below.
+          const update = buildContextUpdate(
+            parsed,
+            b.text,
+            aiReasoning,
+            cast,
+            parsed.textWithCues ?? b.text,
+          );
           const replySpeaker = contextSpeakerReply(parsed);
           row.parsed = true;
           row.replySpeaker = replySpeaker;
@@ -1087,9 +1086,9 @@ async function runPage(
         }
       }
       if (twoCall && row.parsed && row.bench) {
-        // Call 2: the emotion as the step stores it, the speaker as call 1's
-        // cast id, else the name it gave.
-        const speakerSent = row.replyId ?? row.replySpeaker ?? null;
+        // Call 2: what get-context sends, the emotion as the step stores it
+        // and the speaker as call 1's cast id, else null.
+        const speakerSent = row.replyId;
         const emotionSent = row.bench.emotion;
         const cue: NonNullable<Row["cue"]> = {
           speakerSent,
@@ -1100,15 +1099,17 @@ async function runPage(
           costUsd: null,
         };
         row.cue = cue;
+        // The step's prompt and thinking level; the model stays `--model`.
+        const cueParams = cueRequest({
+          text: b.text,
+          emotion: emotionSent,
+          speaker: speakerSent,
+        });
         const r2 = await callModel(
           [],
-          buildCuePrompt({
-            text: b.text,
-            emotion: emotionSent,
-            speaker: speakerSent,
-          }),
+          cueParams.contents,
           log,
-          ThinkingLevel.LOW,
+          cueParams.config.thinkingConfig.thinkingLevel,
         );
         if (r2.kind === "ok") {
           // Parsed as regenerateCues does: the trimmed text, empty is a failure.
