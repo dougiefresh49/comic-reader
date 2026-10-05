@@ -2,7 +2,7 @@ import {
   type GenerateContentParameters,
   type GenerateContentResponse,
   type GoogleGenAI,
-  type ThinkingLevel,
+  ThinkingLevel,
   createPartFromBase64,
   createPartFromText,
 } from "@google/genai";
@@ -276,24 +276,28 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
 
 /**
  * The sort request: page image, prompt, model. Unset, `options` leave it as
- * the step sends it, GEMINI_MEDIUM and no `config` (the model's default
- * thinking). The reading order bench (#443) sets `model` and `thinkingLevel`
- * and sends this same request.
+ * the step sends it, GEMINI_MEDIUM at `thinkingLevel: LOW` (decisions row
+ * 296: LOW holds the default's reading order at about a third of the cost).
+ * The reading order bench sets `model` and `thinkingLevel` and sends this
+ * same request; `thinkingLevel: null` sends no thinking config, the model's
+ * default.
  */
 export function sortPlanRequest(
   pageImage: Buffer,
   prompt: string,
-  options: { model?: string; thinkingLevel?: ThinkingLevel } = {},
+  options: { model?: string; thinkingLevel?: ThinkingLevel | null } = {},
 ): GenerateContentParameters {
+  const thinkingLevel =
+    options.thinkingLevel === undefined
+      ? ThinkingLevel.LOW
+      : options.thinkingLevel;
   return {
     model: options.model ?? GEMINI_MEDIUM,
     contents: [
       createPartFromBase64(pageImage.toString("base64"), "image/webp"),
       createPartFromText(prompt),
     ],
-    ...(options.thinkingLevel
-      ? { config: { thinkingConfig: { thinkingLevel: options.thinkingLevel } } }
-      : {}),
+    ...(thinkingLevel ? { config: { thinkingConfig: { thinkingLevel } } } : {}),
   };
 }
 

@@ -3,10 +3,9 @@
  * against the stored `panels.sort_order` and `bubbles.sort_order` of
  * `tmnt-mmpr-iii` / `issue-1` pages 3 to 13.
  *
- * The key is not a proven review (decisions row 295): no column records a
- * reading-order review, and page 8's stored order plays a bubble added in
- * the editor last on the page, after the panels that follow it. Trust what
- * two arms disagree on more than either arm's score against the key.
+ * The key is the order the owner corrected in the review editor on
+ * 2026-10-05 (#448); the #443 runs before that scored against an order
+ * nobody had reviewed (decisions row 295).
  *
  * Each page is sent the way `sortPageElements` sends it, through the real
  * code in src/workflows/steps/sort.ts: `pageHandles`, `sortPrompt`,
@@ -38,9 +37,10 @@
  *   the reply (by `sortOrder`, as the step flattens them) differs from its
  *   index among the panel's stored bubbles (by `sort_order`, then `id`).
  * A page is fully right when no panel and no bubble is out of place. The
- * global play order is not scored: on pages 3 and 8 the stored play order
- * steps back to an earlier panel, which the step's panel-by-panel flatten
- * can never write. A reply the step's validation rejects (no text, a `.text`
+ * page row also says whether the reply's bubbles play in exactly the stored
+ * order (`playOrderRight`, the order the step would write and a kid hears;
+ * #448). It can be true on a page that is not fully right, when a bubble
+ * sits in a neighboring panel without changing what plays next. A reply the step's validation rejects (no text, a `.text`
  * getter that throws, bad JSON, an unknown, duplicate or dropped id) is a
  * failed reply: every item on the page is wrong, its cost counted. A request with no reply (an HTTP error) leaves the page's
  * items unscored. A bubble with no stored `panel_id` is unscored.
@@ -50,9 +50,12 @@
  * (`right: null`, never scored) that carries the call: tokens, cost,
  * latency, the reply, what was sent, and the page verdict.
  *
- * Arms: A is GEMINI_MEDIUM with no thinking level (production's call), B is
- * GEMINI_FAST with no thinking level, C is GEMINI_FAST at thinkingLevel LOW.
- * `--arm all` is A and B; C runs only when named (`--arm C`, `--arm A,B,C`).
+ * Arms: A is GEMINI_MEDIUM with no thinking level (production's call before
+ * #448; E is its call since, decisions row 296), B is
+ * GEMINI_FAST with no thinking level, C is GEMINI_FAST at thinkingLevel LOW,
+ * D is GEMINI_FAST at MEDIUM and E is GEMINI_MEDIUM at LOW (#448).
+ * `--arm all` is A and B; the others run only when named (`--arm C`,
+ * `--arm A,B,C,D,E`).
  *
  * Writes: one `RunFile` per arm and run under `--out` (bench-kit.ts). No
  * Supabase write: the bench reads rows and the page image and never reaches
@@ -63,8 +66,8 @@
  * Usage:
  *   pnpm exec tsx --env-file=.env scripts/bench/bench-reading-order.ts --dry-run
  *   LIVE_API_OK=1 pnpm exec tsx --env-file=.env scripts/bench/bench-reading-order.ts \
- *     [--arm A|B|C|A,B,C|all] [--runs 3] [--max-calls 70] [--max-usd n] \
- *     [--concurrency 1] [--book tmnt-mmpr-iii --issue issue-1] [--pages 3-13] \
+ *     [--arm A|B|C|D|E|A,B,C,D,E|all] [--runs 3] [--max-calls 70] [--max-usd n] \
+ *     [--concurrency 1] [--book tmnt-mmpr-iii --issue issue-1] [--pages 3-13] [--order-seed s] \
  *     [--out <dir>, default ~/comic-reader-bench]
  * Then: pnpm exec tsx scripts/bench/compare-runs.ts --bench reading-order
  */
@@ -73,6 +76,7 @@ import {
   type GoogleGenAI,
   ThinkingLevel,
 } from "@google/genai";
+import { createHash } from "node:crypto";
 import sharp from "sharp";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST, GEMINI_MEDIUM } from "~/lib/models";
@@ -115,7 +119,7 @@ const STEP = "bench-reading-order";
 const ARMS: Arm[] = [
   {
     name: "A",
-    label: "GEMINI_MEDIUM, no thinking level (production)",
+    label: "GEMINI_MEDIUM, no thinking level (production before #448)",
     model: GEMINI_MEDIUM,
   },
   {
@@ -127,6 +131,19 @@ const ARMS: Arm[] = [
     name: "C",
     label: "GEMINI_FAST, thinkingLevel LOW",
     model: GEMINI_FAST,
+    thinkingLevel: ThinkingLevel.LOW,
+  },
+  {
+    name: "D",
+    label: "GEMINI_FAST, thinkingLevel MEDIUM",
+    model: GEMINI_FAST,
+    // The SDK's enum has no MEDIUM, so its wire value goes as the string.
+    thinkingLevel: "MEDIUM" as ThinkingLevel,
+  },
+  {
+    name: "E",
+    label: "GEMINI_MEDIUM, thinkingLevel LOW (production)",
+    model: GEMINI_MEDIUM,
     thinkingLevel: ThinkingLevel.LOW,
   },
 ];
@@ -158,6 +175,7 @@ const book = opt("--book") ?? "tmnt-mmpr-iii";
 const issue = opt("--issue") ?? "issue-1";
 const pages = parsePages(opt("--pages") ?? "3-13");
 const outDir = opt("--out") ?? DEFAULT_OUT;
+const orderSeed = opt("--order-seed");
 
 let primary: GoogleGenAI | null = null;
 if (!dryRun) {
@@ -181,6 +199,8 @@ type Page = {
   keyPanel: Map<string, number>;
   /** Stored order: bubble id → its panel and index within that panel. */
   keyBubble: Map<string, { panel: string | null; index: number }>;
+  /** Stored play order: every bubble id on the page, by `sort_order`. */
+  keyPlay: string[];
   panelName: Map<string, string>;
   bubbleName: Map<string, string>;
   bubbleText: Map<string, string>;
@@ -188,8 +208,20 @@ type Page = {
 
 const byStored = <T extends { id: string; sort_order: number }>(a: T, b: T) =>
   a.sort_order - b.sort_order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-const byId = <T extends { id: string }>(a: T, b: T) =>
-  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+/**
+ * The fed order. With no `--order-seed` it is UUID order; with one, the rows
+ * are ordered by a hash of the seed and the id, so each seed is another
+ * arbitrary order of the same rows. An arm whose answer changes with the seed
+ * is leaning on the order it was handed (#448).
+ */
+const fedKey = (id: string) =>
+  orderSeed === undefined
+    ? id
+    : createHash("sha1").update(`${orderSeed}:${id}`).digest("hex");
+const byId = <T extends { id: string }>(a: T, b: T) => {
+  const [x, y] = [fedKey(a.id), fedKey(b.id)];
+  return x < y ? -1 : x > y ? 1 : 0;
+};
 
 async function loadPages() {
   const sent: Page[] = [];
@@ -262,6 +294,7 @@ async function loadPages() {
         .map((b, i) => ({ ...b, sort_order: i })),
       keyPanel,
       keyBubble,
+      keyPlay: [...bubbleRows].sort(byStored).map((b) => b.id),
       panelName: new Map(panelRows.map((p) => [p.id, p.panel_id])),
       bubbleName: new Map(
         bubbleRows.map((b) => [b.id, b.legacy_id ?? b.id.slice(0, 8)]),
@@ -285,6 +318,8 @@ async function loadPages() {
 type Placement = {
   panelIndex: Map<string, number>;
   bubble: Map<string, { panel: string; index: number }>;
+  /** Bubble ids in the order the step would write them to `sort_order`. */
+  play: string[];
 };
 
 type ItemVerdict =
@@ -316,7 +351,10 @@ function placementOf(r: ReturnType<typeof sortPlanFromResponse>): Placement {
         bubble.set(b.bubbleId, { panel: entry.panelId, index }),
       );
   }
-  return { panelIndex: r.panelOrders, bubble };
+  const play = [...r.bubbleGlobalOrder]
+    .sort((a, b) => a[1] - b[1])
+    .map(([id]) => id);
+  return { panelIndex: r.panelOrders, bubble, play };
 }
 
 /** A reply that returns the fed order unchanged: the leak check. */
@@ -329,8 +367,17 @@ function echoPlacement(p: Page): Placement {
     within.set(b.panel_id, i + 1);
     bubble.set(b.id, { panel: b.panel_id, index: i });
   }
-  return { panelIndex: new Map(p.panels.map((x, i) => [x.id, i])), bubble };
+  return {
+    panelIndex: new Map(p.panels.map((x, i) => [x.id, i])),
+    bubble,
+    play: p.bubbles.map((b) => b.id),
+  };
 }
+
+/** The reply plays the page's bubbles in exactly the stored order. */
+const playsInStoredOrder = (p: Page, placement: Placement) =>
+  placement.play.length === p.keyPlay.length &&
+  placement.play.every((id, i) => id === p.keyPlay[i]);
 
 /** Every panel and bubble on the page against the stored order. */
 function scorePage(
@@ -397,6 +444,10 @@ type OrderRow = ScoredRow & {
   replyIndex: number | null;
   /** Page row only, from here down. */
   failure: string | null;
+  /** The reply's bubbles play in the stored order (null: no usable reply). */
+  playOrderRight: boolean | null;
+  /** The reply's play order, as bubble names. */
+  playOrder: string[] | null;
   /** The step's validation found an id missing from the reply. */
   droppedId: boolean;
   reply: string | null;
@@ -429,7 +480,7 @@ async function sortOne(
       sortPlanRequest(
         p.image,
         sortPrompt(p.imgW, p.imgH, p.panels, p.bubbles, handles),
-        { model: arm.model, thinkingLevel: arm.thinkingLevel },
+        { model: arm.model, thinkingLevel: arm.thinkingLevel ?? null },
       ),
       { step: STEP, bookId: book, issueId: issue, pageNumber: p.page },
     );
@@ -467,6 +518,8 @@ async function sortOne(
     run,
     page: p.page,
     failure: null,
+    playOrderRight: null,
+    playOrder: null,
     droppedId: false,
     reply: null,
     requestModel: null,
@@ -496,6 +549,8 @@ async function sortOne(
     replyPanel: null,
     replyIndex: null,
     failure,
+    playOrderRight: placement ? playsInStoredOrder(p, placement) : null,
+    playOrder: placement?.play.map((id) => p.bubbleName.get(id) ?? id) ?? null,
     droppedId: failure?.startsWith("Missing ") ?? false,
     reply: ok?.reply ?? null,
     requestModel: last.model,
@@ -542,6 +597,7 @@ function counts(rows: OrderRow[]) {
     rows.filter((r) => r.kind === kind && r.right !== null).length;
   return {
     pagesRight: n("page", "fully right"),
+    playRight: rows.filter((r) => r.kind === "page" && r.playOrderRight).length,
     panelsOut: n("panel", "out of place"),
     panelsScored: scored("panel"),
     bubblesOut: n("bubble", "out of place"),
@@ -560,6 +616,7 @@ function summary(arm: Arm, run: number, rows: OrderRow[]): string {
   return [
     `Arm ${arm.name} run ${run}/${runs} (${tierOf(arm.model) ?? arm.model} ${arm.model}, thinking ${arm.thinkingLevel ?? "default"}):`,
     `pages fully right ${c.pagesRight}/${calls.length},`,
+    `pages whose bubbles play in the stored order ${c.playRight}/${calls.length},`,
     `panels out of place ${c.panelsOut}/${c.panelsScored},`,
     `bubbles out of place ${c.bubblesOut}/${c.bubblesScored},`,
     `failed replies ${failed.length} (${failed.filter((r) => r.droppedId).length} dropped an id),`,
