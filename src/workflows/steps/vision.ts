@@ -1806,7 +1806,7 @@ export async function getContextPage(
 
       const ocrImagePart = cpb64(cropBuf.toString("base64"), "image/webp");
       const ocrPrompt = cpt(
-        "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting.",
+        "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting. Plain text only: bold, italic or larger lettering is written like any other word, with no asterisks, underscores or other markup around it.",
       );
 
       const ocrResponse = await generateContentLogged(
