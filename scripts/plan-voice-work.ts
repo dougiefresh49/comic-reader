@@ -1802,6 +1802,46 @@ async function checkCarryOut() {
     );
   }
 
+  {
+    // Review round 3: a redesign for a character that already had two
+    // active designed voices when it was planned (it uses one, the other is
+    // unused) runs: only a designed voice made after the plan refuses.
+    const w = world({
+      characters: ["kit"],
+      voices: [
+        {
+          id: "kit-a",
+          name: "Kit",
+          status: "active",
+          character: "kit",
+          castAs: ["kit"],
+        },
+        { id: "kit-b", name: "Kit Two", status: "active", character: "kit" },
+      ],
+    });
+    storedDesign(w.db, "kit", "Kit sounds brighter.");
+    request(w.db, "kit", "design");
+    const item = await itemOf(w.deps, "kit");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    const active = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit" && v.status === "active");
+    report(
+      "review 3: a redesign past two active designed voices that existed at plan time makes one voice",
+      [
+        `plan: ${item.action}, replaces ${String(item.replaces?.id)}, designed voices at plan [${item.designedVoices.join(", ")}], outgoing ${String(item.outgoing?.kind)}`,
+        `carryOut: ${short(r)}`,
+        `kit active rows: ${active.length}; ElevenLabs adds: ${w.acct.adds} (want 1)`,
+      ],
+      (r as { status?: string }).status === "done" &&
+        w.acct.adds === 1 &&
+        item.designedVoices.length === 2 &&
+        active.length === 3,
+    );
+  }
+
   const failed = results.filter((r) => !r.pass);
   console.log(
     `\ncarryOut cases: ${results.length - failed.length} of ${results.length} pass; fakes only, no network, no production row`,

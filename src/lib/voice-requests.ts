@@ -114,6 +114,12 @@ export interface VoiceWorkItem {
   lines: number;
   /** Design: a description is stored on the character's `needs_clip` voice with no appearance. */
   hasDescription: boolean;
+  /**
+   * The character's active designed voices (appearance null) when this item
+   * was planned. A design refuses only a designed voice not in this list: a
+   * competing run made it after the plan (#458).
+   */
+  designedVoices: string[];
   /** Pending, not refused: counted in the slot plan. */
   needsSlot: boolean;
   outgoing: Outgoing | null;
@@ -286,6 +292,14 @@ export async function planVoiceWork(
     candidates: candidatesOf.get(id) ?? [],
     lines: lines.get(id) ?? 0,
     hasDescription: false,
+    designedVoices: voices
+      .filter(
+        (v) =>
+          v.character_id === id &&
+          v.status === "active" &&
+          v.appearance_id === null,
+      )
+      .map((v) => v.id),
     needsSlot: false,
     outgoing: null,
     refusals: [] as string[],
@@ -570,7 +584,8 @@ function classify(err: unknown): Added {
 type ItemKey = Pick<
   VoiceWorkItem,
   "bookId" | "issueId" | "characterId" | "action" | "target"
->;
+> &
+  Partial<Pick<VoiceWorkItem, "designedVoices">>;
 
 const taskRow = (client: SupabaseClient, item: ItemKey) =>
   client
@@ -984,15 +999,19 @@ async function carryOutClaimed(
 
   /**
    * A design refuses once the character has an active designed voice
-   * (appearance null) other than the one it replaces: another issue's run
-   * made it from the same stored row after this run planned (#458).
+   * (appearance null) that did not exist when it was planned: another
+   * issue's run made it from the same stored row meanwhile (#458). The
+   * voices the caller's plan already saw (`designedVoices`; this re-plan's
+   * when the caller passed none) are alternatives the owner chose past.
    */
+  const planned = new Set(item.designedVoices ?? fresh.designedVoices);
   const alreadyDesigned = async (): Promise<CarryOutResult | null> => {
     if (fresh.action !== "design") return null;
     const made = (await readCharacterVoices(sb, [characterId])).find(
       (v) =>
         v.status === "active" &&
         v.appearance_id === null &&
+        !planned.has(v.id) &&
         v.id !== fresh.replaces?.id,
     );
     return made
