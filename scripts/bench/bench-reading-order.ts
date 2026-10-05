@@ -3,6 +3,11 @@
  * against the stored `panels.sort_order` and `bubbles.sort_order` of
  * `tmnt-mmpr-iii` / `issue-1` pages 3 to 13.
  *
+ * The key is not a proven review (decisions row 295): no column records a
+ * reading-order review, and page 8's stored order plays a bubble added in
+ * the editor last on the page, after the panels that follow it. Trust what
+ * two arms disagree on more than either arm's score against the key.
+ *
  * Each page is sent the way `sortPageElements` sends it, through the real
  * code in src/workflows/steps/sort.ts: `pageHandles`, `sortPrompt`,
  * `sortPlanRequest` (page image, prompt, model; the step's request) sent
@@ -45,9 +50,8 @@
  * (`right: null`, never scored) that carries the call: tokens, cost,
  * latency, the reply, what was sent, and the page verdict.
  *
- * Arms: A is GEMINI_MEDIUM with no thinking level (production's call before
- * #443), B is GEMINI_FAST with no thinking level, C is GEMINI_FAST at
- * thinkingLevel LOW (production's call since, decisions row 295).
+ * Arms: A is GEMINI_MEDIUM with no thinking level (production's call), B is
+ * GEMINI_FAST with no thinking level, C is GEMINI_FAST at thinkingLevel LOW.
  * `--arm all` is A and B; C runs only when named (`--arm C`, `--arm A,B,C`).
  *
  * Writes: one `RunFile` per arm and run under `--out` (bench-kit.ts). No
@@ -112,7 +116,7 @@ const STEP = "bench-reading-order";
 const ARMS: Arm[] = [
   {
     name: "A",
-    label: "GEMINI_MEDIUM, no thinking level (before #443)",
+    label: "GEMINI_MEDIUM, no thinking level (production)",
     model: GEMINI_MEDIUM,
   },
   {
@@ -122,7 +126,7 @@ const ARMS: Arm[] = [
   },
   {
     name: "C",
-    label: "GEMINI_FAST, thinkingLevel LOW (production)",
+    label: "GEMINI_FAST, thinkingLevel LOW",
     model: GEMINI_FAST,
     thinkingLevel: ThinkingLevel.LOW,
   },
@@ -431,8 +435,7 @@ async function sortOne(
       sortPlanRequest(
         p.image,
         sortPrompt(p.imgW, p.imgH, p.panels, p.bubbles, handles),
-        // null, not undefined: unset would take production's LOW.
-        { model: arm.model, thinkingLevel: arm.thinkingLevel ?? null },
+        { model: arm.model, thinkingLevel: arm.thinkingLevel },
       ),
       { step: STEP, bookId: book, issueId: issue, pageNumber: p.page },
     );

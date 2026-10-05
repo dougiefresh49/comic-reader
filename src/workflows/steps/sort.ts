@@ -2,14 +2,14 @@ import {
   type GenerateContentParameters,
   type GenerateContentResponse,
   type GoogleGenAI,
-  ThinkingLevel,
+  type ThinkingLevel,
   createPartFromBase64,
   createPartFromText,
 } from "@google/genai";
 import sharp from "sharp";
 import { FatalError } from "workflow";
 import type { LlmCallMeta } from "~/lib/llm-usage";
-import { GEMINI_FAST } from "~/lib/models";
+import { GEMINI_MEDIUM } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { computeBubbleStyle, getBubbleStyleSkipReason } from "./bubble-style";
 
@@ -276,27 +276,24 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
 
 /**
  * The sort request: page image, prompt, model. Unset, `options` leave it as
- * the step sends it, GEMINI_FAST at thinkingLevel LOW (docs/decisions.md row
- * 295). The reading order bench (#443) sets `model` and `thinkingLevel` and
- * sends this same request; a null `thinkingLevel` sends no `config`, the
- * model's default thinking.
+ * the step sends it, GEMINI_MEDIUM and no `config` (the model's default
+ * thinking). The reading order bench (#443) sets `model` and `thinkingLevel`
+ * and sends this same request.
  */
 export function sortPlanRequest(
   pageImage: Buffer,
   prompt: string,
-  options: { model?: string; thinkingLevel?: ThinkingLevel | null } = {},
+  options: { model?: string; thinkingLevel?: ThinkingLevel } = {},
 ): GenerateContentParameters {
-  const thinkingLevel =
-    options.thinkingLevel === undefined
-      ? ThinkingLevel.LOW
-      : options.thinkingLevel;
   return {
-    model: options.model ?? GEMINI_FAST,
+    model: options.model ?? GEMINI_MEDIUM,
     contents: [
       createPartFromBase64(pageImage.toString("base64"), "image/webp"),
       createPartFromText(prompt),
     ],
-    ...(thinkingLevel ? { config: { thinkingConfig: { thinkingLevel } } } : {}),
+    ...(options.thinkingLevel
+      ? { config: { thinkingConfig: { thinkingLevel: options.thinkingLevel } } }
+      : {}),
   };
 }
 
