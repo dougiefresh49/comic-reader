@@ -55,6 +55,48 @@ export type Database = {
           },
         ];
       };
+      appearances: {
+        Row: {
+          character_id: string;
+          id: string;
+          notes: string | null;
+          search_terms: string[] | null;
+          voice_actor: string | null;
+          work_id: string;
+        };
+        Insert: {
+          character_id: string;
+          id?: string;
+          notes?: string | null;
+          search_terms?: string[] | null;
+          voice_actor?: string | null;
+          work_id: string;
+        };
+        Update: {
+          character_id?: string;
+          id?: string;
+          notes?: string | null;
+          search_terms?: string[] | null;
+          voice_actor?: string | null;
+          work_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "appearances_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "appearances_work_id_fkey";
+            columns: ["work_id"];
+            isOneToOne: false;
+            referencedRelation: "works";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       audio_timestamps: {
         Row: {
           alignment: Json | null;
@@ -86,6 +128,39 @@ export type Database = {
             columns: ["bubble_id"];
             isOneToOne: true;
             referencedRelation: "bubbles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      book_franchises: {
+        Row: {
+          book_id: string;
+          franchise_id: string;
+          position: number;
+        };
+        Insert: {
+          book_id: string;
+          franchise_id: string;
+          position: number;
+        };
+        Update: {
+          book_id?: string;
+          franchise_id?: string;
+          position?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "book_franchises_book_id_fkey";
+            columns: ["book_id"];
+            isOneToOne: false;
+            referencedRelation: "books";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "book_franchises_franchise_id_fkey";
+            columns: ["franchise_id"];
+            isOneToOne: false;
+            referencedRelation: "franchises";
             referencedColumns: ["id"];
           },
         ];
@@ -314,24 +389,6 @@ export type Database = {
         };
         Relationships: [];
       };
-      camp_schedules: {
-        Row: {
-          id: string;
-          schedule: Json;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          schedule?: Json;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          schedule?: Json;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
       casting_tasks: {
         Row: {
           action: string | null;
@@ -341,6 +398,7 @@ export type Database = {
           created_at: string | null;
           id: string;
           issue_id: string;
+          operation: Json | null;
           status: string;
           target_voice_uuid: string | null;
         };
@@ -352,6 +410,7 @@ export type Database = {
           created_at?: string | null;
           id?: string;
           issue_id: string;
+          operation?: Json | null;
           status?: string;
           target_voice_uuid?: string | null;
         };
@@ -363,6 +422,7 @@ export type Database = {
           created_at?: string | null;
           id?: string;
           issue_id?: string;
+          operation?: Json | null;
           status?: string;
           target_voice_uuid?: string | null;
         };
@@ -397,6 +457,7 @@ export type Database = {
           character_id: string | null;
           in_issue: boolean;
           issue_id: string;
+          no_audio: boolean;
           voice_id: string | null;
           voice_uuid: string | null;
         };
@@ -406,6 +467,7 @@ export type Database = {
           character_id?: string | null;
           in_issue?: boolean;
           issue_id: string;
+          no_audio?: boolean;
           voice_id?: string | null;
           voice_uuid?: string | null;
         };
@@ -415,6 +477,7 @@ export type Database = {
           character_id?: string | null;
           in_issue?: boolean;
           issue_id?: string;
+          no_audio?: boolean;
           voice_id?: string | null;
           voice_uuid?: string | null;
         };
@@ -584,7 +647,9 @@ export type Database = {
           aliases: string[];
           created_at: string | null;
           display_name: string | null;
+          form_of: string | null;
           franchise: string | null;
+          franchise_id: string | null;
           id: string;
           updated_at: string | null;
           voice_mode: string | null;
@@ -594,7 +659,9 @@ export type Database = {
           aliases?: string[];
           created_at?: string | null;
           display_name?: string | null;
+          form_of?: string | null;
           franchise?: string | null;
+          franchise_id?: string | null;
           id: string;
           updated_at?: string | null;
           voice_mode?: string | null;
@@ -604,13 +671,29 @@ export type Database = {
           aliases?: string[];
           created_at?: string | null;
           display_name?: string | null;
+          form_of?: string | null;
           franchise?: string | null;
+          franchise_id?: string | null;
           id?: string;
           updated_at?: string | null;
           voice_mode?: string | null;
           voice_of?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "characters_form_of_fkey";
+            columns: ["form_of"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "characters_franchise_id_fkey";
+            columns: ["franchise_id"];
+            isOneToOne: false;
+            referencedRelation: "franchises";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "characters_voice_of_fkey";
             columns: ["voice_of"];
@@ -619,6 +702,21 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      franchises: {
+        Row: {
+          id: string;
+          name: string;
+        };
+        Insert: {
+          id: string;
+          name: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+        };
+        Relationships: [];
       };
       issues: {
         Row: {
@@ -1257,6 +1355,7 @@ export type Database = {
       };
       voices: {
         Row: {
+          appearance_id: string | null;
           archived_at: string | null;
           character_id: string | null;
           consumers: string[];
@@ -1274,10 +1373,12 @@ export type Database = {
           series_id: string | null;
           source_clip_md5: string | null;
           source_clip_path: string | null;
+          starting_pick: boolean | null;
           status: string;
           voice_settings: Json | null;
         };
         Insert: {
+          appearance_id?: string | null;
           archived_at?: string | null;
           character_id?: string | null;
           consumers?: string[];
@@ -1295,10 +1396,12 @@ export type Database = {
           series_id?: string | null;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
+          starting_pick?: boolean | null;
           status: string;
           voice_settings?: Json | null;
         };
         Update: {
+          appearance_id?: string | null;
           archived_at?: string | null;
           character_id?: string | null;
           consumers?: string[];
@@ -1316,15 +1419,58 @@ export type Database = {
           series_id?: string | null;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
+          starting_pick?: boolean | null;
           status?: string;
           voice_settings?: Json | null;
         };
         Relationships: [
           {
+            foreignKeyName: "voices_appearance_id_fkey";
+            columns: ["appearance_id"];
+            isOneToOne: true;
+            referencedRelation: "appearances";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "voices_character_id_fkey";
             columns: ["character_id"];
             isOneToOne: false;
             referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      works: {
+        Row: {
+          franchise_id: string | null;
+          id: string;
+          medium: string;
+          title: string;
+          universe: string | null;
+          year: number;
+        };
+        Insert: {
+          franchise_id?: string | null;
+          id: string;
+          medium: string;
+          title: string;
+          universe?: string | null;
+          year: number;
+        };
+        Update: {
+          franchise_id?: string | null;
+          id?: string;
+          medium?: string;
+          title?: string;
+          universe?: string | null;
+          year?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "works_franchise_id_fkey";
+            columns: ["franchise_id"];
+            isOneToOne: false;
+            referencedRelation: "franchises";
             referencedColumns: ["id"];
           },
         ];

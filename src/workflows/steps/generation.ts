@@ -61,7 +61,7 @@ export async function generateAudioBatch(
   const { data: bubbles, error: bubErr } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, character_id, emotion, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
+      "id, speaker, character_id, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
     )
     .in("id", bubbleIds);
 
@@ -105,28 +105,32 @@ export async function generateAudioBatch(
     );
   }
 
+  const { loadVoiceOverrides } = await import("~/lib/voice-overrides");
+  const overrides = await loadVoiceOverrides(
+    supabase,
+    sendPlan.toSend.map((s) => s.lookup.voiceId),
+  ).catch((err: unknown) => {
+    throw fatal(err);
+  });
+
   let generated = 0;
 
   for (const {
     bubble,
     lookup: { voiceId },
   } of sendPlan.toSend) {
-    const ttsText = (bubble.text_with_cues ?? bubble.ocr_text)!;
+    const request = buildTtsRequest({
+      text: (bubble.text_with_cues ?? bubble.ocr_text)!,
+      voiceId,
+      override: overrides.get(voiceId),
+    });
 
     let response;
     try {
       response = await recordElevenLabsCall(
         { step: "generate-audio", bookId, issueId, model: TTS_MODEL },
-        ttsText.length,
-        () =>
-          client.textToSpeech.convertWithTimestamps(
-            voiceId,
-            buildTtsRequest({
-              text: ttsText,
-              emotion: bubble.emotion,
-              voiceId,
-            }),
-          ),
+        request.text.length,
+        () => client.textToSpeech.convertWithTimestamps(voiceId, request),
       );
     } catch (e) {
       throw new FatalError(

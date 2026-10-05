@@ -42,6 +42,7 @@ const { parseRoboflowSam3Output } = await import(
 const { GEMINI_FAST, GEMINI_HIGH, GEMINI_MEDIUM } = await import(
   "~/lib/models"
 );
+const { TTS_MODEL } = await import("~/lib/tts-request");
 
 const post = { method: "POST", body: JSON.stringify({ voice_name: "x" }) };
 
@@ -153,7 +154,7 @@ const tts = await (
   await getElevenLabsClient()
 ).textToSpeech.convertWithTimestamps("voice", {
   text: ocrText,
-  modelId: "eleven_v3",
+  modelId: TTS_MODEL,
 });
 const audio = Buffer.from(tts.audioBase64, "base64");
 assert.equal(tts.alignment!.characters.join(""), ocrText);
