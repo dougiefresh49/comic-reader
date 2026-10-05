@@ -20,7 +20,9 @@
  *
  * Arms: A is GEMINI_MEDIUM with no thinking level (production's call before
  * #441), B is GEMINI_MEDIUM at thinkingLevel LOW (production's call since,
- * decisions row 294), C is GEMINI_FAST with no thinking level. `--arm all` interleaves them run by run (A1 B1 C1 A2 ...).
+ * decisions row 294), C is GEMINI_FAST with no thinking level, D is GEMINI_FAST
+ * at thinkingLevel MEDIUM (#450; runs only when named). `--arm all` is A, B
+ * and C, interleaved run by run (A1 B1 C1 A2 ...).
  *
  * Writes: one `RunFile` per arm and run under `--out` (bench-kit.ts), rows
  * per detection. No Supabase write. DRY_RUN is set in this process so
@@ -35,7 +37,7 @@
  * Usage:
  *   pnpm exec tsx --env-file=.env scripts/bench/bench-face-id.ts --dry-run
  *   LIVE_API_OK=1 pnpm exec tsx --env-file=.env scripts/bench/bench-face-id.ts \
- *     [--arm A|B|C|A,B|all] [--runs 3] [--max-calls 40] [--max-usd n] \
+ *     [--arm A|B|C|D|A,B|all] [--skip-unmatched] [--runs 3] [--max-calls 40] [--max-usd n] \
  *     [--concurrency 1] [--book tmnt-mmpr-iii --issue issue-1] [--pages 3-13] \
  *     [--out <dir>, default ~/comic-reader-bench]
  * Then: pnpm exec tsx --env-file=.env scripts/bench/compare-runs.ts --bench face-id
@@ -98,6 +100,13 @@ const ARMS: Arm[] = [
     label: "GEMINI_FAST, no thinking level",
     model: GEMINI_FAST,
   },
+  {
+    name: "D",
+    label: "GEMINI_FAST, thinkingLevel MEDIUM (#450)",
+    model: GEMINI_FAST,
+    // The SDK's enum has no MEDIUM, so its wire value goes as the string.
+    thinkingLevel: "MEDIUM" as ThinkingLevel,
+  },
 ];
 /**
  * Face ID's `llm_calls` rows on run wrun_01M458NQZ6TG3XPD7SGATD2V4J (#436's
@@ -117,7 +126,15 @@ const MAX_ERRORS_IN_A_ROW = 3;
 // ── Args ────────────────────────────────────────────────────────────────
 const { opt, flag, die, intOpt, parsePages, must } = benchCli("bench-face-id");
 const dryRun = flag("--dry-run");
-const arms = pickArms(ARMS, opt("--arm") ?? "all", die);
+/**
+ * Leave out a detection whose crop is gone. A detection's box is local to
+ * its panel, so editing the panel's box in the review editor moves the crop
+ * the bench cuts and the stored row no longer matches one (#450: page 10).
+ */
+const skipUnmatched = flag("--skip-unmatched");
+const unmatched: string[] = [];
+const armArg = opt("--arm") ?? "all";
+const arms = pickArms(ARMS, armArg === "all" ? "A,B,C" : armArg, die);
 const runs = intOpt("--runs", 3)!;
 const gate = newGate(intOpt("--max-calls", 40)!);
 const maxUsdRaw = opt("--max-usd");
@@ -228,9 +245,13 @@ async function loadDetections() {
         .filter(
           ({ c }) => c.panelId === r.panel_id && sameBox(c.bboxPanelLocal, box),
         );
+      if (hits.length === 0 && skipUnmatched) {
+        unmatched.push(`p${page} ${r.id}`);
+        continue;
+      }
       if (hits.length !== 1) {
         die(
-          `page ${page}: detection ${r.id} matches ${hits.length} crops (want 1)`,
+          `page ${page}: detection ${r.id} matches ${hits.length} crops (want 1). A panel box edited since the detection was stored moves its crops; --skip-unmatched leaves such detections out.`,
         );
       }
       const { c, i } = hits[0]!;
@@ -253,6 +274,11 @@ async function loadDetections() {
     cropsUnused += lp.crops.length - used.size;
     perPage.push(
       `p${page}: ${pageDets.length} detections, ${lp.crops.length} crops (${lp.crops.length - used.size} with no detection, not sent)`,
+    );
+  }
+  if (unmatched.length > 0) {
+    perPage.push(
+      `Left out, no matching crop (--skip-unmatched): ${unmatched.join(", ")}`,
     );
   }
   return { detections, perPage, cropsUnused };
@@ -467,7 +493,7 @@ const callUsd = (model: string, t: Tokens) =>
 
 /** One call's USD on an arm, low and high, from arm A's measured tokens. */
 function armCallUsd(a: Arm, m: Tokens): [number, number] {
-  if (a.model !== GEMINI_MEDIUM) {
+  if (a.model !== GEMINI_MEDIUM && !a.thinkingLevel) {
     const c = callUsd(a.model, { ...m, thinking: 0 });
     return [c, c];
   }
@@ -559,7 +585,7 @@ async function dryRunReport(
       out.push(
         `  ${a.name} (${tier}, default thinking): $${(floor * calls).toFixed(2)} at $${floor.toFixed(5)} a call. Measured tokens, priced at ${tier}'s rate.`,
       );
-    } else if (a.model === GEMINI_MEDIUM) {
+    } else if (a.thinkingLevel) {
       out.push(
         `  ${a.name} (${tier}, thinking ${a.thinkingLevel}): $${(floor * calls).toFixed(2)} to $${(ceil * calls).toFixed(2)}. Input and output measured; thinking is a guess, from 0 up to arm A's measured ${Math.round(m.thinking)} a call.`,
       );
