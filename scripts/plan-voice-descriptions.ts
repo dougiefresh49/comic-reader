@@ -10,7 +10,6 @@ import {
   groupVoiceBubblesByCharacter,
   loadVoiceDescriptionPlanInput,
   planVoiceDescriptions,
-  type VoiceAliasRow,
   type VoiceBubbleSnippet,
 } from "~/workflows/steps/voice";
 
@@ -39,27 +38,33 @@ const supabase = createClient<Database>(url, key, {
 });
 
 function runSynthetic() {
-  const aliases: VoiceAliasRow[] = [
-    { alias: "tommy", canonical: "Green Ranger" },
-  ];
   const bubbles: VoiceBubbleSnippet[] = [
     {
       speaker: "Dr. Boyd",
+      character_id: "dr-boyd",
       voice_description: "calm clinician",
       ignored: false,
     },
     {
       speaker: "tommy",
+      character_id: "green-ranger",
       voice_description: "earnest teen hero",
       ignored: false,
     },
     {
       speaker: "New Guy",
+      character_id: "new-guy",
       voice_description: "unknown newcomer",
       ignored: false,
     },
     {
+      speaker: "Rex",
+      voice_description: "unassigned: no character_id, so no group",
+      ignored: false,
+    },
+    {
       speaker: "Old Guy",
+      character_id: "old-guy",
       voice_description: "gravelly elder",
       ignored: false,
     },
@@ -70,18 +75,15 @@ function runSynthetic() {
   const designDescriptions = new Map<string, string | null>();
 
   return planVoiceDescriptions({
-    groups: groupVoiceBubblesByCharacter(bubbles, aliases),
+    groups: groupVoiceBubblesByCharacter(bubbles),
     readyCharacterIds,
     existingCharacterIds,
     designDescriptions,
   });
 }
 
-/** Alias-label stability: raw GREEN RANGER + tommy → label Green Ranger both orders. */
-function runAliasLabelSynthetic() {
-  const aliases: VoiceAliasRow[] = [
-    { alias: "tommy", canonical: "Green Ranger" },
-  ];
+/** Label stability: GREEN RANGER + tommy on one character_id → the same label in both orders. */
+function runLabelSynthetic() {
   const readyCharacterIds = new Set<string>();
   const existingCharacterIds = new Set(["green-ranger"]);
   const designDescriptions = new Map<string, string | null>();
@@ -89,11 +91,13 @@ function runAliasLabelSynthetic() {
   const orderA: VoiceBubbleSnippet[] = [
     {
       speaker: "GREEN RANGER",
+      character_id: "green-ranger",
       voice_description: "raw caps variant",
       ignored: false,
     },
     {
       speaker: "tommy",
+      character_id: "green-ranger",
       voice_description: "alias variant",
       ignored: false,
     },
@@ -101,24 +105,26 @@ function runAliasLabelSynthetic() {
   const orderB: VoiceBubbleSnippet[] = [
     {
       speaker: "tommy",
+      character_id: "green-ranger",
       voice_description: "alias variant",
       ignored: false,
     },
     {
       speaker: "GREEN RANGER",
+      character_id: "green-ranger",
       voice_description: "raw caps variant",
       ignored: false,
     },
   ];
 
   const planA = planVoiceDescriptions({
-    groups: groupVoiceBubblesByCharacter(orderA, aliases),
+    groups: groupVoiceBubblesByCharacter(orderA),
     readyCharacterIds,
     existingCharacterIds,
     designDescriptions,
   });
   const planB = planVoiceDescriptions({
-    groups: groupVoiceBubblesByCharacter(orderB, aliases),
+    groups: groupVoiceBubblesByCharacter(orderB),
     readyCharacterIds,
     existingCharacterIds,
     designDescriptions,
@@ -150,12 +156,13 @@ async function main() {
   const oldGuy = synthetic.decisions.find((d) =>
     d.speakers.includes("Old Guy"),
   );
+  const rex = synthetic.decisions.some((d) => d.speakers.includes("Rex"));
   console.log(
-    `Character: tommy → "${tommy?.resolvedName}"; Old Guy → "${oldGuy?.resolvedName}"`,
+    `Character: tommy → "${tommy?.resolvedName}"; Old Guy → "${oldGuy?.resolvedName}"; Rex grouped: ${rex} (want false)`,
   );
 
-  console.log("--- alias-label synthetic ---");
-  const { planA, planB } = runAliasLabelSynthetic();
+  console.log("--- label synthetic ---");
+  const { planA, planB } = runLabelSynthetic();
   const groupA = planA.decisions.find((d) => d.characterId === "green-ranger");
   const groupB = planB.decisions.find((d) => d.characterId === "green-ranger");
   console.log(

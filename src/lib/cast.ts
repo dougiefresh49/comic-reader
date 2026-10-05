@@ -563,6 +563,12 @@ async function updateRow(
  * Inserts the issue's row for the character, `character` filled with the id
  * (P6 drops that column). Upserts on `(book_id, issue_id, character_id)`
  * ignoring a duplicate, so a row another writer added first is kept as it is.
+ *
+ * A legacy row with a null `character_id` whose text is that id (character
+ * "narrator", for example) holds the old primary key on (book_id, issue_id,
+ * character), so the insert would fail: that row is adopted instead, its
+ * `character_id` set and its other columns kept. Callers that write a patch
+ * update the row after this.
  */
 async function insertRow(
   client: Client,
@@ -571,6 +577,16 @@ async function insertRow(
   characterId: string,
   row: Required<CastPatch>,
 ): Promise<void> {
+  const adopted = await db(client)
+    .from("castlist")
+    .update({ character_id: characterId })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character", characterId)
+    .is("character_id", null)
+    .select("issue_id");
+  must(`adopting castlist ${issueId}/${characterId}`, adopted.error);
+  if (adopted.data?.length) return;
   const { error } = await db(client)
     .from("castlist")
     .upsert(

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadBookCast, readCastVoiceLinks } from "~/lib/cast";
+import { loadBookCast, readCastVoiceLinks, voiceFor } from "~/lib/cast";
 import { listAllIssues } from "~/lib/issue-queries";
 import type { CastlistRow, IssueTarget, VoiceRow } from "./types";
 
@@ -100,9 +100,10 @@ async function readIssueBubbles(
 }
 
 /**
- * The `voices.id` set the target issue needs (decisions row 28): every voice
- * the book's castlist holds for a character its bubbles name by
- * `character_id`, or for the character that one is a `form_of`.
+ * The `voices.id` set the target issue needs (decisions row 28): the voice
+ * the render chain (`voiceFor`) finds for each character its bubbles name by
+ * `character_id`. An archived pick stays needed; a chain that stops ("no
+ * audio", removed, no voice) needs nothing (#429).
  */
 export async function issueNeeds(
   supabase: SupabaseClient,
@@ -112,17 +113,11 @@ export async function issueNeeds(
     readIssueBubbles(supabase, target),
     loadBookCast(supabase, target.bookId),
   ]);
-  const ids = new Set<string>();
-  for (const b of bubbles) {
-    if (!b.character_id) continue;
-    ids.add(b.character_id);
-    const other = book.formOf.get(b.character_id);
-    if (other) ids.add(other);
-  }
   const needed = new Set<string>();
-  for (const r of book.rows)
-    if (r.voice_uuid && r.character_id && ids.has(r.character_id))
-      needed.add(r.voice_uuid);
+  for (const id of new Set(bubbles.map((b) => b.character_id))) {
+    const voice = id ? voiceFor(book, id, target.issueId) : null;
+    if (voice) needed.add(voice.voiceUuid);
+  }
   return needed;
 }
 

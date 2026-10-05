@@ -121,34 +121,37 @@ export async function readUnknownDetections(
 export type GateVerdict = { ok: true } | { ok: false; reason: string };
 
 /**
- * Seeds the cast (the row-242 union, idempotent), then refuses on an empty
- * cast, while an `in_issue` castlist row has no `characters` row (a null
- * `character_id`, #409; the refusal names the rows), or while any unknown
- * face group is neither named nor rejected. Unmatched wiki names never block.
+ * Refuses while an `in_issue` castlist row has no `characters` row (a null
+ * `character_id`, #409; the refusal names the rows), checked before the cast
+ * is seeded so such a row is never written around. Then seeds the cast (the
+ * row-242 union, idempotent) and refuses on an empty cast, or while any
+ * unknown face group is neither named nor rejected. Unmatched wiki names
+ * never block.
  */
 export async function canApproveCharacters(
   bookId: string,
   issueId: string,
 ): Promise<GateVerdict> {
+  const orphans = issueCast(await loadBookCast(supabaseAdmin, bookId), issueId)
+    .filter((r) => !r.character_id)
+    .map((r) => r.character);
+  if (orphans.length > 0) {
+    return {
+      ok: false,
+      reason: `${orphans.length} castlist ${orphans.length === 1 ? "row matches" : "rows match"} no character: ${orphans.map((c) => JSON.stringify(c)).join(", ")}. ${orphans.length === 1 ? "It needs" : "Each needs"} a character_id before Approve.`,
+    };
+  }
+
   await seedCast(supabaseAdmin, bookId, issueId);
 
   const [book, unnamed] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
     readUnknownDetections(bookId, issueId),
   ]);
-  const cast = issueCast(book, issueId);
-
-  if (cast.length === 0) {
+  if (issueCast(book, issueId).length === 0) {
     return {
       ok: false,
       reason: "The cast is empty: add at least one character.",
-    };
-  }
-  const orphans = cast.filter((r) => !r.character_id).map((r) => r.character);
-  if (orphans.length > 0) {
-    return {
-      ok: false,
-      reason: `${orphans.length} castlist ${orphans.length === 1 ? "row matches" : "rows match"} no character: ${orphans.map((c) => JSON.stringify(c)).join(", ")}. ${orphans.length === 1 ? "It needs" : "Each needs"} a character_id before Approve.`,
     };
   }
   const groups = unknownFaceGroups(unnamed);
