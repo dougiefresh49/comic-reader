@@ -607,6 +607,11 @@ if (dryRun) {
   await dryRunReport(detections, perPage, cropsUnused);
   process.exit(0);
 }
+if (unmatched.length > 0) {
+  console.log(
+    `Left out, no matching crop (--skip-unmatched), ${unmatched.length}: ${unmatched.join(", ")}`,
+  );
+}
 
 if (maxUsd !== undefined) {
   // Each request reserves the high estimate of the dearest arm in the run.
@@ -670,6 +675,7 @@ for (let run = 1; run <= runs && !gate.halted; run++) {
       startedAt,
       finishedAt: new Date().toISOString(),
       rows,
+      ...(unmatched.length > 0 ? { leftOut: unmatched } : {}),
     };
     written.push(writeRunFile(outDir, file));
     const line = summary(arm, run, rows);

@@ -384,6 +384,8 @@ export type RunFile<R extends ScoredRow = ScoredRow> = {
   startedAt: string;
   finishedAt: string;
   rows: R[];
+  /** Items the run was told to leave out, so its scores cover fewer items. */
+  leftOut?: string[];
   /** Set by `readRunFiles`, never written. */
   path?: string;
 };
@@ -494,6 +496,11 @@ export function compareRuns(files: RunFile[]): string[] {
       out.push(
         `- run ${i + 1} (${f.startedAt}${f.complete ? "" : ", PARTIAL"}): ${s.right}/${s.of} right, cost $${cost.toFixed(4)}${f.path ? `, ${f.path}` : ""}`,
       );
+      if (f.leftOut?.length) {
+        out.push(
+          `  - left out of this run (${f.leftOut.length}): ${f.leftOut.join(", ")}. Its counts cover fewer items than a full run; the pairwise test below uses only items both arms scored.`,
+        );
+      }
     }
     out.push(
       `- spread over ${runs.length} run(s): min ${Math.min(...counts)}, max ${Math.max(...counts)}`,
