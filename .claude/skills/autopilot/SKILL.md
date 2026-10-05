@@ -29,7 +29,9 @@ need.
 
 ## When you wake
 
-Each of these is one sweep, then end your turn:
+Each of these is one sweep, then end your turn. The one exception: while
+you are standing by after launching your replacement, step 2 of
+"Replacing yourself" is what you do on every wake.
 
 - Doug sends a message. Answer it first if it is a question. If it
   answers an owner item ("O1 B"), do "When Doug answers" first. Then
@@ -130,8 +132,9 @@ this thread: `schedule_task` with `{"type":"interval","everyMs":3600000}`
 (config: hourly) and the prompt `Autopilot sweep: read
 .claude/skills/autopilot/SKILL.md and run its sweep.` Check
 `list_scheduled_tasks` before creating one. When a sweep ends with no
-issue holding a live lead, delete the schedule and say so; create it
-again at the next launch.
+issue holding a live lead, delete your own schedule (the one bound to
+this thread, never another thread's) and say so; create it again at the
+next launch.
 
 ## When Doug answers
 
@@ -170,7 +173,9 @@ autopilot. Do not ask Doug first.
    `{"type":"worktree","baseRef":"main","branch":"autopilot-<date>-<HHMM>","startFromOrigin":true}`,
    and the message `You are the autopilot: read
    .claude/skills/autopilot/SKILL.md and run it. You replace thread <your
-   thread id>.` Keep your sweep schedule, and end your turn.
+   thread id>.` Then make sure a sweep schedule is bound to this thread,
+   creating one if the last sweep deleted it: it is your wake if the new
+   thread dies. End your turn.
 2. From that launch on you are standing by: you run no sweep and launch
    no issue. On every wake while standing by, read the new thread's
    status with `t3_thread_list` and take the first line that fits:
@@ -178,12 +183,15 @@ autopilot. Do not ask Doug first.
      schedule, and tell Doug: "The autopilot is now thread `<new
      title>`. Check in there." The handover is finished.
    - The new thread is `failed`, `interrupted`, `cancelled` or
-     `rolled_back`. You are the autopilot again: do "Starting or taking
+     `rolled_back`, or is `completed` with no "Takeover done" message
+     here. You are the autopilot again: do "Starting or taking
      over" yourself, with no thread to replace, and say in your report
      that the handover failed. Start another one at the end of a later
      sweep.
    - Neither. Forward a lead's done message whole to the new thread with
-     `t3_thread_send`, mode `queue`; do nothing on a scheduled wake.
+     `t3_thread_send`, mode `queue`. When Doug's message answers an
+     owner item, do "When Doug answers" and tell him a handover is under
+     way. Do nothing on a scheduled wake.
 
 After a finished handover two things can still reach you, and each has
 one answer:
