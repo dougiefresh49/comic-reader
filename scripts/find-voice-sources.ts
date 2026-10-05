@@ -20,6 +20,7 @@ import {
 import type { AppearanceEntry, MediaType } from "./types/registry.js";
 import { supabase } from "./lib/supabase.js";
 import { updateIssue } from "~/lib/issue-queries.js";
+import { readCastRow } from "~/lib/cast";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -469,16 +470,8 @@ async function runBookMode(
       // 3. casting_tasks — one row per character that doesn't already have a
       //    voice in castlist for this issue. Idempotent: if the row exists
       //    and is already complete/skipped, leave it alone.
-      const { data: existingCast } = await supabase
-        .from("castlist")
-        .select("voice_id")
-        .eq("book_id", book)
-        .eq("issue_id", issue)
-        .eq("character", character)
-        .maybeSingle();
-      const existingCastVoice = (existingCast as { voice_id?: string } | null)
-        ?.voice_id;
-      if (existingCastVoice && existingCastVoice !== "__SKIPPED__") {
+      const existingCast = await readCastRow(supabase, book, issue, character);
+      if (existingCast?.voice_uuid && !existingCast.no_audio) {
         continue;
       }
       const { data: existingTask } = await supabase

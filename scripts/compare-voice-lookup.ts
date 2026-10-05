@@ -1,27 +1,26 @@
 #!/usr/bin/env node
 
 /**
- * SELECT-only evidence for #352: resolves every bubble of one issue two ways,
- * the audio step's old name rule (`planBubblesToSend`: alias, then slug, then
- * the issue's castlist voice) and the new `lookupVoice` (bubble
- * `character_id`, castlist `character_id`, name rule; voice from `voiceFor`),
- * and prints every bubble where the two disagree. Then prints the forms
- * (characters with `voice_of`) whose own castlist voice is null, and the voice
- * `voiceFor` gives them. Calls nothing paid and writes nothing.
+ * SELECT-only evidence for the render chain (`renderVoice` in `~/lib/cast`,
+ * #429): resolves every bubble of one issue by its `character_id` and counts
+ * the outcomes, then prints the forms (characters with `form_of`) and the
+ * voice the chain gives them, and runs the form and "no audio" rules on an
+ * in-memory copy of the book's cast. Calls nothing paid and writes nothing.
+ *
+ * `--baseline`: one line per bubble of issues 1 and 2, the bubble id and the
+ * ElevenLabs id the chain renders with ("none" when it gives none). #429's
+ * gate compares this output before and after the switch, line for line.
  *
  * Usage: tsx --env-file=.env scripts/compare-voice-lookup.ts [--book <id>] [--issue <id>]
+ *        tsx --env-file=.env scripts/compare-voice-lookup.ts --baseline [--book <id>]
  */
 
-import { loadBookCast, voiceFor, type BookCast } from "~/lib/cast";
-import { slugify } from "~/lib/character-id";
 import {
-  buildAliasMap,
-  buildCastIndex,
-  lookupVoice,
-  planBubblesToSend,
-  voiceLookupContext,
-  type BubbleAudioRow,
-} from "~/workflows/steps/audio-plan";
+  loadBookCast,
+  renderVoice,
+  type BookCast,
+  type CastRow,
+} from "~/lib/cast";
 import { supabase } from "./lib/supabase.js";
 
 function flag(name: string, fallback: string): string {
@@ -32,22 +31,22 @@ function flag(name: string, fallback: string): string {
 const bookId = flag("--book", "tmnt-mmpr-iii");
 const issueId = flag("--issue", "issue-1");
 
-type Bubble = BubbleAudioRow & {
+interface Bubble {
+  id: string;
+  speaker: string | null;
   character_id: string | null;
   page_number: number;
   sort_order: number;
-};
+}
 
-async function readBubbles(): Promise<Bubble[]> {
+async function readBubbles(issue = issueId): Promise<Bubble[]> {
   const out: Bubble[] = [];
   for (;;) {
     const { data, error } = await supabase
       .from("bubbles")
-      .select(
-        "id, speaker, character_id, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
-      )
+      .select("id, speaker, character_id, page_number, sort_order")
       .eq("book_id", bookId)
-      .eq("issue_id", issueId)
+      .eq("issue_id", issue)
       .order("page_number")
       .order("sort_order")
       .order("id")
@@ -58,66 +57,29 @@ async function readBubbles(): Promise<Bubble[]> {
   }
 }
 
+/** One line per bubble of issues 1 and 2: the bubble id and the ElevenLabs id the chain renders with. */
+async function baseline(): Promise<void> {
+  const book = await loadBookCast(supabase, bookId);
+  for (const issue of ["issue-1", "issue-2"]) {
+    for (const b of await readBubbles(issue)) {
+      const found = renderVoice(book, b.character_id, issue);
+      console.log(`${issue} ${b.id} ${found.ok ? found.elevenLabsId : "none"}`);
+    }
+  }
+}
+
+const describe = (found: ReturnType<typeof renderVoice>) =>
+  found.ok
+    ? `voice ${found.elevenLabsId} (character ${found.characterId}, from ${found.from})`
+    : `${found.reason} (${found.detail})`;
+
 async function main(): Promise<void> {
-  const [book, aliases, bubbles] = await Promise.all([
+  if (process.argv.includes("--baseline")) return baseline();
+  const [book, bubbles] = await Promise.all([
     loadBookCast(supabase, bookId),
-    supabase
-      .from("aliases")
-      .select("alias, canonical")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
     readBubbles(),
   ]);
-  if (aliases.error)
-    throw new Error(`reading aliases: ${aliases.error.message}`);
-  const aliasRows = (aliases.data ?? []) as {
-    alias: string;
-    canonical: string;
-  }[];
   const issueRows = book.rows.filter((r) => r.issue_id === issueId);
-
-  // Old: the audio step before #352, on the issue's castlist only.
-  const oldAliasMap = buildAliasMap(aliasRows);
-  const oldCast = buildCastIndex(issueRows);
-  const oldVoice = (b: Bubble): string => {
-    // Only the voice part of the rule: the bubble as if it needed audio.
-    const plan = planBubblesToSend(
-      [
-        {
-          ...b,
-          ignored: false,
-          silent: false,
-          audio_storage_path: null,
-          text_with_cues: "x",
-        },
-      ],
-      oldAliasMap,
-      oldCast,
-    );
-    const sent = plan.toSend[0];
-    return sent ? sent.voiceId : `(${plan.skipped[0]!.reason})`;
-  };
-
-  const ctx = voiceLookupContext(book, issueId, aliasRows);
-  const sources = new Map<string, number>();
-  const disagreements: string[] = [];
-  for (const b of bubbles) {
-    const before = oldVoice(b);
-    const found = lookupVoice(ctx, b);
-    const after = found.ok ? found.voiceId : `(${found.reason})`;
-    const key = `${found.ok ? "voice" : found.reason} via ${found.source ?? "-"}`;
-    sources.set(key, (sources.get(key) ?? 0) + 1);
-    if (before === after) continue;
-    disagreements.push(
-      `  p${b.page_number}#${b.sort_order} ${b.id}` +
-        ` speaker=${JSON.stringify(b.speaker)} character_id=${b.character_id ?? "null"}` +
-        `${b.ignored ? " [ignored]" : ""}${b.silent ? " [silent]" : ""}\n` +
-        `      old: ${before}\n` +
-        `      new: ${after} via ${found.source ?? "-"}` +
-        (found.ok
-          ? ` (character ${found.characterId ?? "-"}, voice from ${found.from ?? "-"})`
-          : ` (${found.detail})`),
-    );
-  }
 
   console.log(`${bookId}/${issueId}`);
   console.log(
@@ -127,112 +89,83 @@ async function main(): Promise<void> {
   console.log(
     `bubbles: ${bubbles.length}; with character_id: ${bubbles.filter((b) => b.character_id).length}`,
   );
-  console.log(`slug conflicts in this issue: ${ctx.cast.conflicts.length}`);
-  console.log(`new lookup outcomes:`);
-  for (const [k, n] of [...sources].sort()) console.log(`  ${n}\t${k}`);
-  console.log(`disagreements (old vs new): ${disagreements.length}`);
-  for (const d of disagreements) console.log(d);
+  const outcomes = new Map<string, number>();
+  const misses: string[] = [];
+  for (const b of bubbles) {
+    const found = renderVoice(book, b.character_id, issueId);
+    const key = found.ok
+      ? found.from === found.characterId
+        ? "voice"
+        : "voice via form_of"
+      : found.reason;
+    outcomes.set(key, (outcomes.get(key) ?? 0) + 1);
+    if (!found.ok)
+      misses.push(
+        `  p${b.page_number}#${b.sort_order} ${b.id} speaker=${JSON.stringify(b.speaker)}: ${describe(found)}`,
+      );
+  }
+  console.log(`render chain outcomes:`);
+  for (const [k, n] of [...outcomes].sort()) console.log(`  ${n}\t${k}`);
+  console.log(`bubbles with no voice: ${misses.length}`);
+  for (const m of misses) console.log(m);
 
-  console.log(`\nforms whose own castlist voice is null (voice_of):`);
+  console.log(`\nforms (form_of) with no voice of their own:`);
   let forms = 0;
-  for (const [id, other] of [...book.voiceOf].sort()) {
+  for (const [id, other] of [...book.formOf].sort()) {
     if (!other || other === id) continue;
-    const voice = voiceFor(book, id, issueId);
-    if (voice && voice.from === id) continue; // has a voice of its own
-    const ownRows = issueRows.filter(
-      (r) =>
-        r.character_id === id ||
-        (r.character_id === null &&
-          (book.resolve(r.character)?.id ?? "") === id),
-    );
-    const lines = bubbles.filter(
-      (b) => lookupVoice(ctx, b).characterId === id,
-    ).length;
+    const found = renderVoice(book, id, issueId);
+    if (found.ok && found.from === id) continue;
     forms++;
+    const lines = bubbles.filter((b) => b.character_id === id).length;
     console.log(
-      `  ${id} -> voice_of ${other}: own castlist rows here ` +
-        `[${ownRows.map((r) => `${r.character}=${r.voice_id ?? "null"}`).join(", ") || "none"}], ` +
-        `voiceFor = ${voice ? `${voice.voiceId} (from ${voice.from})` : "null"}, ` +
-        `bubbles resolved to it: ${lines}`,
+      `  ${id} -> form_of ${other}: ${describe(found)}, bubbles: ${lines}`,
     );
   }
   if (forms === 0) console.log("  none in the database");
 
-  // No `characters` row has `voice_of` in prod yet, so the form case also runs
-  // on an in-memory copy of this book's cast: one added form with a null-voice
-  // castlist row and `voice_of` pointing at a voiced character. Nothing is written.
+  // The form and "no audio" rules on an in-memory copy of the book's cast:
+  // forms with a voiceless castlist row and `form_of` pointing at a voiced
+  // character. Nothing is written.
   const donorRow = issueRows.find(
-    (r) => r.voice_id && r.voice_id !== "__SKIPPED__",
+    (r) => r.character_id && r.voice_uuid && !r.no_audio && r.in_issue,
   );
-  if (!donorRow) return;
-  const donor =
-    book.resolve(donorRow.character)?.id ?? slugify(donorRow.character);
-  const form = (id: string, voice_id: string | null) => ({
+  if (!donorRow?.character_id) return;
+  const donor = donorRow.character_id;
+  const form = (id: string, patch: Partial<CastRow> = {}): CastRow => ({
     issue_id: issueId,
     character: id,
     character_id: id,
-    voice_id,
     voice_uuid: null,
     in_issue: true,
+    no_audio: false,
+    ...patch,
   });
   const synthetic: BookCast = {
     ...book,
     rows: [
       ...book.rows,
-      form("synthetic-form", null),
-      form("synthetic-silent-form", "__SKIPPED__"),
+      form("synthetic-form"),
+      form("synthetic-silent-form", { no_audio: true }),
+      form("synthetic-removed-form", { in_issue: false }),
     ],
-    voiceOf: new Map([
-      ...book.voiceOf,
+    formOf: new Map([
+      ...book.formOf,
       ["synthetic-form", donor],
       ["synthetic-silent-form", donor],
+      ["synthetic-removed-form", donor],
     ]),
   };
-  const sctx = voiceLookupContext(synthetic, issueId, aliasRows);
   console.log(
-    `\nsynthetic (in memory, not in the database): voice_of -> ${donor} (${donorRow.character}=${donorRow.voice_id})`,
+    `\nsynthetic (in memory, not in the database): form_of -> ${donor} (voice ${donorRow.voice_uuid})`,
   );
-  for (const [label, bubble] of [
-    [
-      "bubble character_id",
-      { speaker: "someone else", character_id: "synthetic-form" },
-    ],
-    [
-      "castlist character_id",
-      { speaker: "Synthetic Form", character_id: null },
-    ],
-    [
-      "no audio this run",
-      { speaker: null, character_id: "synthetic-silent-form" },
-    ],
-  ] as const) {
-    const found = lookupVoice(sctx, bubble);
-    console.log(
-      `  ${label}: ` +
-        (found.ok
-          ? `voice ${found.voiceId} via ${found.source}, character ${found.characterId}, from ${found.from}`
-          : `${found.reason} via ${found.source} (${found.detail})`),
-    );
-  }
-
-  // The donor's own rows disagree: the form's lookup must refuse (#380 review).
-  const split: BookCast = {
-    ...synthetic,
-    rows: [
-      ...synthetic.rows,
-      {
-        ...donorRow,
-        character: donorRow.character.toUpperCase(),
-        voice_id: "synthetic-other-voice",
-      },
-    ],
-  };
-  const refused = lookupVoice(voiceLookupContext(split, issueId, aliasRows), {
-    speaker: null,
-    character_id: "synthetic-form",
-  });
+  for (const id of [
+    "synthetic-form",
+    "synthetic-silent-form",
+    "synthetic-removed-form",
+  ])
+    console.log(`  ${id}: ${describe(renderVoice(synthetic, id, issueId))}`);
   console.log(
-    `  donor rows disagree: ${refused.ok ? `voice ${refused.voiceId} (WRONG, should refuse)` : `${refused.reason} (${refused.detail})`}`,
+    `  null character_id: ${describe(renderVoice(synthetic, null, issueId))}`,
   );
 }
 

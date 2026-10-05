@@ -19,6 +19,7 @@ import pLimit from "p-limit";
 import { join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 import { upsertIssue } from "~/lib/issue-queries.js";
+import { importCastJson } from "./lib/cast-json.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -444,19 +445,9 @@ async function publishToSupabase(
       string,
       string
     >;
-    const castRows = Object.entries(castData).map(([character, voice_id]) => ({
-      book_id: bookId,
-      issue_id: issueId,
-      character,
-      voice_id,
-    }));
-    if (castRows.length > 0) {
-      const { error: ce } = await supabase
-        .from("castlist")
-        .upsert(castRows, { onConflict: "book_id,issue_id,character" });
-      if (ce) throw new Error(`castlist upsert: ${ce.message}`);
-    }
-    console.log(`   ✓ castlist (${castRows.length} entries)\n`);
+    const cast = await importCastJson(supabase, bookId, issueId, castData);
+    for (const s of cast.skipped) console.warn(`   ⚠ castlist: skipped ${s}`);
+    console.log(`   ✓ castlist (${cast.written} entries)\n`);
   }
 
   const bubbleCount = Object.values(bubblesData).reduce(

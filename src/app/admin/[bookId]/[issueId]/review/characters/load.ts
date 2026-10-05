@@ -11,8 +11,8 @@ import {
   readVoiceRequests,
   ROLE_IDS,
   voiceFor,
-  type BookCast,
-  type CastRow,
+  castRow,
+  isNoAudio,
   type RoleId,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
@@ -135,21 +135,6 @@ async function signedClipUrl(sourceClipPath: string): Promise<string | null> {
 function exemplarUrl(cropPath: string): string {
   const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
   return `${base}/storage/v1/object/public/face-exemplars/${cropPath}`;
-}
-
-/** The issue's castlist rows for a character, matched as `cast.ts` matches: by id, else the null-id rows whose text resolves to it. */
-function issueRowsFor(
-  book: BookCast,
-  issueRows: CastRow[],
-  characterId: string,
-): CastRow[] {
-  const byId = issueRows.filter((r) => r.character_id === characterId);
-  if (byId.length > 0) return byId;
-  return issueRows.filter(
-    (r) =>
-      r.character_id === null &&
-      (book.resolve(r.character)?.id ?? slugify(r.character)) === characterId,
-  );
 }
 
 export async function loadCharacters(
@@ -335,14 +320,18 @@ export async function loadCharacters(
       startingVoice.set(v.character_id!, v);
   }
   const voiceView = (id: string): VoiceView | null => {
-    const v = voiceFor(book, id, issueId);
+    // A "no audio" row is silent: no voice of its own, and no fallback (#410).
+    if (isNoAudio(book, id, issueId)) return null;
+    // A removed member's card still shows the voice it would come back with.
+    const removed = castRow(book, id, issueId)?.in_issue === false;
+    const v = voiceFor(book, id, removed ? undefined : issueId);
     if (!v) {
       const starting = startingVoice.get(id);
       return starting
         ? { name: starting.display_name, borrowedFrom: null, uuid: starting.id }
         : null;
     }
-    const name = (v.voiceUuid && voiceName.get(v.voiceUuid)) ?? v.voiceId;
+    const name = voiceName.get(v.voiceUuid) ?? v.elevenLabsId;
     if (!name) return null;
     return {
       name,
@@ -382,7 +371,6 @@ export async function loadCharacters(
       .map((r) => [r.characterId, r] as const),
   );
   const characterIds = new Set(charRows.map((c) => c.id));
-  const issueRows = book.rows.filter((r) => r.issue_id === issueId);
   const facesByCharacter = new Map<string, FaceView[]>();
   for (const d of detectionRows) {
     if (!d.character_id) continue;
@@ -396,15 +384,15 @@ export async function loadCharacters(
 
   const cards: CharacterCard[] = [];
   for (const m of proposal.members) {
-    const mine = issueRowsFor(book, issueRows, m.id);
-    const removed = mine.length > 0 && mine.every((r) => !r.in_issue);
+    const mine = castRow(book, m.id, issueId);
+    const removed = mine?.in_issue === false;
     // In this issue: a face, a wiki mention, or a row in this issue's cast
     // (Add, or a seeded cast). Cast before: the rest of the book's cast.
     const group = isRoleId(m.id)
       ? "role"
       : m.sources.includes("faces") ||
           m.sources.includes("wiki") ||
-          mine.some((r) => r.in_issue)
+          mine?.in_issue === true
         ? "here"
         : "before";
     // A character cast before with no sign here and taken out of this issue
@@ -417,6 +405,7 @@ export async function loadCharacters(
       sources: m.sources,
       wikiNames: m.wikiNames,
       removed,
+      noAudio: mine?.no_audio === true,
       faces: (facesByCharacter.get(m.id) ?? []).sort(byPage),
       looseExemplars: loose.filter((e) => e.character_id === m.id).map(looseOf),
       voice: voiceView(m.id),

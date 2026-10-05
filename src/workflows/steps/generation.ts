@@ -2,11 +2,9 @@ import { FatalError } from "workflow";
 import type { Json } from "~/types/database";
 import {
   bubbleNeedsAudio,
-  formatCastConflicts,
   normalizeAlignment,
   planBubbleVoices,
   type AlignmentRaw,
-  voiceLookupContext,
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 
@@ -72,35 +70,11 @@ export async function generateAudioBatch(
   if (!bubbles || bubbles.length === 0) return;
 
   const { loadBookCast } = await import("~/lib/cast");
-  const [book, { data: aliasRows, error: aliasErr }] = await Promise.all([
-    loadBookCast(supabase, bookId).catch((e: Error) => {
-      throw new FatalError(e.message);
-    }),
-    supabase
-      .from("aliases")
-      .select("alias, canonical, scope, scope_id")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
-  ]);
-  if (aliasErr) throw new FatalError(aliasErr.message);
+  const book = await loadBookCast(supabase, bookId).catch((e: Error) => {
+    throw new FatalError(e.message);
+  });
 
-  const lookup = voiceLookupContext(book, issueId, aliasRows ?? []);
-  if (lookup.cast.conflicts.length > 0) {
-    throw new FatalError(
-      `castlist slug conflicts before audio: ${formatCastConflicts(lookup.cast.conflicts)}`,
-    );
-  }
-
-  const sendPlan = planBubbleVoices(bubbles, lookup);
-  const conflicts = sendPlan.skipped.flatMap((s) =>
-    s.lookup && !s.lookup.ok && s.reason === "castlist conflict"
-      ? [`${s.bubble.id}: ${s.lookup.detail}`]
-      : [],
-  );
-  if (conflicts.length > 0) {
-    throw new FatalError(
-      `castlist conflicts before audio: ${conflicts.join("; ")}`,
-    );
-  }
+  const sendPlan = planBubbleVoices(bubbles, book, issueId);
   for (const { bubble, reason, lookup: found } of sendPlan.skipped) {
     const speaker = bubble.speaker?.trim() ?? "";
     console.log(
@@ -111,7 +85,7 @@ export async function generateAudioBatch(
   const { loadVoiceOverrides } = await import("~/lib/voice-overrides");
   const overrides = await loadVoiceOverrides(
     supabase,
-    sendPlan.toSend.map((s) => s.lookup.voiceId),
+    sendPlan.toSend.map((s) => s.lookup.elevenLabsId),
   ).catch((err: unknown) => {
     throw fatal(err);
   });
@@ -120,7 +94,7 @@ export async function generateAudioBatch(
 
   for (const {
     bubble,
-    lookup: { voiceId },
+    lookup: { elevenLabsId: voiceId },
   } of sendPlan.toSend) {
     const request = buildTtsRequest({
       text: (bubble.text_with_cues ?? bubble.ocr_text)!,

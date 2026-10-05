@@ -1,8 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { slugify } from "~/lib/character-id";
+import { loadBookCast, readCastVoiceLinks, voiceFor } from "~/lib/cast";
 import { listAllIssues } from "~/lib/issue-queries";
-import { buildAliasMap, speakerKey } from "~/workflows/steps/audio-plan";
-import type { CastlistRow, CharacterRow, IssueTarget, VoiceRow } from "./types";
+import type { CastlistRow, IssueTarget, VoiceRow } from "./types";
 
 const PAGE = 1000;
 
@@ -57,22 +56,12 @@ export async function readVoice(
   return row ? toVoiceRow(row) : null;
 }
 
+/** Every castlist row's voice reference, through `~/lib/cast`. */
 export async function readCastlist(
   supabase: SupabaseClient,
   bookId?: string,
 ): Promise<CastlistRow[]> {
-  let q = supabase.from("castlist").select("*");
-  if (bookId) q = q.eq("book_id", bookId);
-  const { data, error } = await q;
-  if (error) fail("read castlist", error);
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    book_id: String(r.book_id),
-    issue_id: String(r.issue_id),
-    character: String(r.character),
-    character_id: (r.character_id as string | null) ?? null,
-    voice_id: (r.voice_id as string | null) ?? null,
-    voice_uuid: (r.voice_uuid as string | null) ?? null,
-  }));
+  return readCastVoiceLinks(supabase, bookId);
 }
 
 export function booksUsingVoice(
@@ -84,20 +73,8 @@ export function booksUsingVoice(
   return [...books].sort();
 }
 
-async function readCharacters(
-  supabase: SupabaseClient,
-): Promise<CharacterRow[]> {
-  const { data, error } = await supabase.from("characters").select("*");
-  if (error) fail("read characters", error);
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    id: String(r.id),
-    voice_of: (r.voice_of as string | null) ?? null,
-  }));
-}
-
 interface NeedBubble {
   character_id: string | null;
-  speaker: string | null;
 }
 
 /** Every non-ignored bubble of the issue, paged past the 1000-row cap. */
@@ -109,7 +86,7 @@ async function readIssueBubbles(
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("bubbles")
-      .select("character_id, speaker")
+      .select("character_id")
       .eq("book_id", target.bookId)
       .eq("issue_id", target.issueId)
       .eq("ignored", false)
@@ -123,43 +100,23 @@ async function readIssueBubbles(
 }
 
 /**
- * The `voices.id` set the target issue needs (decisions row 28): each
- * bubble's `character_id`, or until #100 fills that column its `speaker`
- * through the audio step's alias-then-slug rule, mapped through
- * `coalesce(characters.voice_of, characters.id)` to the book's castlist.
+ * The `voices.id` set the target issue needs (decisions row 28): the voice
+ * the render chain (`voiceFor`) finds for each character its bubbles name by
+ * `character_id`. An archived pick stays needed; a chain that stops ("no
+ * audio", removed, no voice) needs nothing (#429).
  */
 export async function issueNeeds(
   supabase: SupabaseClient,
   target: IssueTarget,
 ): Promise<Set<string>> {
-  const [bubbles, aliasRes, characters, castlist] = await Promise.all([
+  const [bubbles, book] = await Promise.all([
     readIssueBubbles(supabase, target),
-    supabase
-      .from("aliases")
-      .select("alias, canonical")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${target.bookId})`),
-    readCharacters(supabase),
-    readCastlist(supabase, target.bookId),
+    loadBookCast(supabase, target.bookId),
   ]);
-  if (aliasRes.error) fail("read aliases", aliasRes.error);
-  const aliasMap = buildAliasMap(
-    (aliasRes.data ?? []) as { alias: string; canonical: string }[],
-  );
-  const voiceOf = new Map(characters.map((c) => [c.id, c.voice_of ?? c.id]));
-
-  const slugs = new Set<string>();
-  for (const b of bubbles) {
-    const key =
-      b.character_id ?? (b.speaker ? speakerKey(b.speaker, aliasMap) : null);
-    if (!key) continue;
-    slugs.add(voiceOf.get(key) ?? key);
-  }
-
   const needed = new Set<string>();
-  for (const c of castlist) {
-    if (!c.voice_uuid) continue;
-    if (slugs.has(c.character_id ?? slugify(c.character)))
-      needed.add(c.voice_uuid);
+  for (const id of new Set(bubbles.map((b) => b.character_id))) {
+    const voice = id ? voiceFor(book, id, target.issueId) : null;
+    if (voice) needed.add(voice.voiceUuid);
   }
   return needed;
 }
@@ -217,17 +174,12 @@ export async function markArchived(
     })
     .eq("id", voice.id);
   if (upd.error) fail("update voices", upd.error);
-  const cast = await supabase
-    .from("castlist")
-    .update({ voice_id: null })
-    .eq("voice_uuid", voice.id);
-  if (cast.error) fail("update castlist", cast.error);
 }
 
 /**
  * Finishes the registry writes for a DELETE that is known to have landed
  * (`ArchiveRecordError`): the `voice_archives` row unless it is there, then
- * the `voices` and castlist updates. A row already moved on is left alone.
+ * the `voices` update. A row already moved on is left alone.
  */
 export async function finishArchive(
   supabase: SupabaseClient,
@@ -243,7 +195,7 @@ export async function finishArchive(
     });
     if (log.error) fail("insert voice_archives", log.error);
   }
-  // Both updates hold only while the row still has the deleted id.
+  // The update holds only while the row still has the deleted id.
   const upd = await supabase
     .from("voices")
     .update({
@@ -254,12 +206,6 @@ export async function finishArchive(
     .eq("id", voice.id)
     .eq("current_elevenlabs_id", formerElevenLabsId);
   if (upd.error) fail("update voices", upd.error);
-  const cast = await supabase
-    .from("castlist")
-    .update({ voice_id: null })
-    .eq("voice_uuid", voice.id)
-    .eq("voice_id", formerElevenLabsId);
-  if (cast.error) fail("update castlist", cast.error);
 }
 
 /**
@@ -295,11 +241,6 @@ export async function markRestored(
     })
     .eq("id", voice.id);
   if (upd.error) fail("update voices", upd.error);
-  const cast = await supabase
-    .from("castlist")
-    .update({ voice_id: newElevenLabsId })
-    .eq("voice_uuid", voice.id);
-  if (cast.error) fail("update castlist", cast.error);
 }
 
 export async function recordSnapshot(

@@ -252,6 +252,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
   private mode: "many" | "single" | "maybe" = "many";
   private returning = false;
   private conflict: string[] = [];
+  private ignoreDuplicates = false;
   private max = Infinity;
   private skip = 0;
 
@@ -275,10 +276,12 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
     this.payload = structuredClone(patch);
     return this;
   }
-  upsert(row: Row, opts?: { onConflict?: string }) {
+  /** `ignoreDuplicates` keeps a row that already holds the conflict key, as `ON CONFLICT DO NOTHING` does. */
+  upsert(row: Row, opts?: { onConflict?: string; ignoreDuplicates?: boolean }) {
     this.op = "upsert";
     this.payload = structuredClone(row);
     this.conflict = (opts?.onConflict ?? "id").split(",");
+    this.ignoreDuplicates = opts?.ignoreDuplicates ?? false;
     return this;
   }
   delete() {
@@ -386,8 +389,9 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
         const hit = rows.find((r) =>
           this.conflict.every((c) => r[c] === this.payload[c]),
         );
-        if (hit) Object.assign(hit, this.payload);
-        else rows.push({ ...this.payload });
+        if (hit) {
+          if (!this.ignoreDuplicates) Object.assign(hit, this.payload);
+        } else rows.push({ ...this.payload });
       }
       if (!this.returning) return { data: null, error: null };
     }
@@ -444,6 +448,7 @@ function seed(characters: string[]): FakeDb {
         id: `${issue}-${id}`,
         book_id: BOOK,
         issue_id: issue,
+        character_id: id,
         speaker: id[0]!.toUpperCase() + id.slice(1),
         ignored: false,
         silent: false,
@@ -541,7 +546,8 @@ async function check301() {
         voiceIdAfterA === null &&
         Boolean(castAfterA?.voice_uuid) &&
         voiceIdAfterB === "fake-voice-1" &&
-        !found.needDesign.includes("rex"),
+        !found.needDesign.includes("rex") &&
+        c === "returned stored id fake-voice-1",
     );
   }
 
@@ -553,25 +559,31 @@ async function check301() {
     db.failNext("character_appearances", "update", readyUpdate, "write 2 down");
     const a = await run(db, t, "issue-1", "rex");
     const voices = db.rows("voices").length;
+    const castAfterA = db.rows("castlist").length;
     const voiceIdAfterA = appearance(db, "rex").voice_id;
     const b = await run(db, t, "issue-1", "rex");
     const cast = db
       .rows("castlist")
       .find((r) => r.issue_id === "issue-1" && r.character_id === "rex");
+    const made = db.rows("voices").find((v) => v.character_id === "rex");
     report(
       "case 2: voices insert lands, castlist upsert and both appearance writes fail",
       [
         `run 1 issue-1: ${a}`,
-        `after run 1: ${voices} voices row(s), appearance voice_id=${String(voiceIdAfterA)} (the voice_id-only retry)`,
+        `after run 1: ${voices} voices row(s), ${castAfterA} castlist row(s), appearance voice_id=${String(voiceIdAfterA)} (the voice_id-only retry)`,
         `run 2 issue-1 (writes healthy): ${b}`,
-        `after run 2: castlist voice_id=${String(cast?.voice_id ?? null)}`,
+        `after run 2: castlist voice_uuid=${String(cast?.voice_uuid ?? null)} no_audio=${String(cast?.no_audio ?? null)}; voices row ${String(made?.id)} ${String(made?.current_elevenlabs_id)}; ${db.rows("voices").length} voices row(s)`,
         `paid creates: ${t.creates} (want 1)`,
       ],
       t.creates === 1 &&
         a.startsWith("threw") &&
+        castAfterA === 0 &&
         voiceIdAfterA === "fake-voice-1" &&
         b.startsWith("returned stored id") &&
-        cast?.voice_id === "fake-voice-1",
+        db.rows("voices").length === 1 &&
+        made?.current_elevenlabs_id === "fake-voice-1" &&
+        cast?.voice_uuid === made.id &&
+        cast?.no_audio === false,
     );
   }
 
@@ -728,7 +740,7 @@ function world(opts: {
       id: c,
       display_name: name,
       aliases: [],
-      voice_of: null,
+      form_of: null,
     });
     db.rows("bubbles").push({
       id: `b-${c}`,
@@ -775,11 +787,11 @@ function world(opts: {
       db.rows("castlist").push({
         book_id: BOOK,
         issue_id: "issue-1",
-        character: c[0]!.toUpperCase() + c.slice(1),
+        character: c,
         character_id: c,
-        voice_id: elId,
         voice_uuid: v.id,
         in_issue: true,
+        no_audio: false,
       });
   }
   for (const name of opts.unrelated ?? [])
@@ -811,6 +823,7 @@ async function checkCarryOut() {
     "~/lib/voice-requests"
   )) as typeof import("~/lib/voice-requests");
   const slots = await import("~/lib/voice-slots");
+  const castLib = await import("~/lib/cast");
   const liveReconcile = (lib as Partial<typeof lib>).reconcile;
   /**
    * The cases below reconcile a run that stopped a moment ago; a record that
@@ -852,12 +865,25 @@ async function checkCarryOut() {
     const op = row.operation as { phase?: string } | null | undefined;
     return `${String(row.status)}${op ? ` (open at ${op.phase})` : ""}`;
   };
+  /** The character's castlist rows as the new model holds them: the voice reference and "no audio". */
   const cast = (db: FakeDb, c: string) =>
     db
       .rows("castlist")
       .filter((r) => r.character_id === c)
-      .map((r) => `${String(r.voice_id)}/${String(r.voice_uuid)}`)
+      .map(
+        (r) =>
+          `${String(r.voice_uuid)}${r.no_audio === true ? " no_audio" : ""}`,
+      )
       .join(", ") || "none";
+  /** What a tapped bubble of the character plays in issue-1: the render chain's ElevenLabs id, or why it plays none. */
+  const plays = async (db: FakeDb, c: string) => {
+    const r = castLib.renderVoice(
+      await castLib.loadBookCast(db.client(), BOOK),
+      c,
+      "issue-1",
+    );
+    return r.ok ? r.elevenLabsId : `none (${r.reason})`;
+  };
   const attempt = async <T>(f: () => Promise<T>) => {
     try {
       return await f();
@@ -888,18 +914,21 @@ async function checkCarryOut() {
       lib.settle(w.db.client(), item, { kind: "accept" }),
     );
     const row = w.db.rows("voices").find((v) => v.id === "zed-1993")!;
+    const zedPlays = await plays(w.db, "zed");
     report(
       "happy path: a clone into the free slot, then accept",
       [
         `plan: ${item.action} ${item.target?.display_name}, outgoing ${item.outgoing?.kind}`,
         `carryOut: ${short(r)}`,
-        `voices row: ${String(row.status)} ${String(row.current_elevenlabs_id)}; castlist zed: ${cast(w.db, "zed")}`,
+        `voices row: ${String(row.status)} ${String(row.current_elevenlabs_id)}; castlist zed: ${cast(w.db, "zed")}; zed plays ${zedPlays}`,
         `task after carryOut: ${afterCarry}; settle accept: ${settled === undefined ? "ok" : short(settled)}; task: ${task(w.db, "zed")}`,
         `ElevenLabs: ${w.acct.adds} add(s), ${w.acct.deletes} delete(s)`,
       ],
       (r as { status?: string }).status === "done" &&
         row.status === "active" &&
-        cast(w.db, "zed") === `${String(row.current_elevenlabs_id)}/zed-1993` &&
+        cast(w.db, "zed") === "zed-1993" &&
+        zedPlays === row.current_elevenlabs_id &&
+        zedPlays === "el-new-1" &&
         afterCarry === "in_progress" &&
         task(w.db, "zed") === "complete" &&
         w.acct.adds === 1 &&
@@ -927,16 +956,18 @@ async function checkCarryOut() {
     const r = await attempt(() =>
       lib.carryOut(w.deps, item, { archiveVoiceId: "rex-old" }),
     );
+    const rexPlays = await plays(w.db, "rex");
     report(
       "finding 1: a lost add reply never adopts an unrelated voice with the same name",
       [
         `the account already holds an unregistered voice named "Rex (1993)"; the add times out and makes nothing`,
         `carryOut (add first, archive rex-old after): ${short(r)}`,
-        `castlist rex: ${cast(w.db, "rex")}; ElevenLabs deletes: ${w.acct.deletes} (want 0)`,
+        `castlist rex: ${cast(w.db, "rex")}; rex plays ${rexPlays}; ElevenLabs deletes: ${w.acct.deletes} (want 0)`,
       ],
       (r as { status?: string }).status === "needs attention" &&
         w.acct.deletes === 0 &&
-        cast(w.db, "rex") === "el-rex-old/rex-old",
+        cast(w.db, "rex") === "rex-old" &&
+        rexPlays === "el-rex-old",
     );
   }
 
@@ -976,7 +1007,8 @@ async function checkCarryOut() {
     const zedAdds = w.acct.adds;
 
     const kit = await itemOf(w.deps, "kit");
-    w.db.failNext("castlist", "insert", () => true, "castlist down");
+    // kit has no castlist row: the write is an update that changes nothing, then this upsert.
+    w.db.failNext("castlist", "upsert", () => true, "castlist down");
     const k1 = await attempt(() =>
       lib.carryOut(w.deps, kit, { archiveVoiceId: null }),
     );
@@ -1071,19 +1103,92 @@ async function checkCarryOut() {
   }
 
   {
-    const w = world({ characters: ["kit"], voices: [] });
-    const item = await itemOf(w.deps, "kit");
-    const r = await attempt(() =>
-      lib.settle(w.db.client(), item, { kind: "no audio" }),
-    );
-    report(
-      'finding 5: "no audio this run" writes the skip sentinel',
+    // kit with no voice gets a row with no_audio and no voice; kit with an
+    // archived voice keeps that voice on its row (#429: a skip leaves
+    // voice_uuid alone).
+    const lines: string[] = [];
+    let pass = true;
+    for (const voices of [
+      [],
       [
-        `settle: ${r === undefined ? "ok" : short(r)}`,
-        `castlist kit: ${cast(w.db, "kit")}; task: ${task(w.db, "kit")}`,
-      ],
-      cast(w.db, "kit") === "__SKIPPED__/null" &&
-        task(w.db, "kit") === "complete",
+        {
+          id: "kit-voice",
+          name: "Kit",
+          status: "archived",
+          castAs: ["kit"],
+        },
+      ] as WorldVoice[],
+    ]) {
+      const w = world({ characters: ["kit"], voices });
+      const before = cast(w.db, "kit");
+      const item = await itemOf(w.deps, "kit");
+      const r = await attempt(() =>
+        lib.settle(w.db.client(), item, { kind: "no audio" }),
+      );
+      const want = voices.length ? "kit-voice no_audio" : "null no_audio";
+      const kitPlays = await plays(w.db, "kit");
+      lines.push(
+        `${voices.length ? "kit cast with an archived voice" : "kit with no voice"} (${item.action}): castlist before ${before}; settle: ${r === undefined ? "ok" : short(r)}`,
+        `  castlist kit after: ${cast(w.db, "kit")} (want ${want}); kit plays ${kitPlays}; task: ${task(w.db, "kit")}`,
+      );
+      pass &&=
+        r === undefined &&
+        cast(w.db, "kit") === want &&
+        kitPlays === "none (no audio)" &&
+        task(w.db, "kit") === "complete";
+    }
+    report(
+      'finding 5: "no audio this run" sets no_audio and leaves the voice reference as it was',
+      lines,
+      pass,
+    );
+  }
+
+  {
+    // #429 round 3: a pending clone request for a character whose own row in
+    // this issue is "no audio" or removed is refused, takes no slot, and does
+    // not hold the voices gate.
+    const { planCastingTasks } = await import(
+      "~/workflows/steps/casting-tasks"
+    );
+    const lines: string[] = [];
+    let pass = true;
+    for (const [removed, want] of [
+      [false, "no audio in this issue"],
+      [true, "removed from this issue"],
+    ] as const) {
+      const w = world({
+        characters: ["zed"],
+        voices: [
+          { id: "zed-1993", name: "Zed", status: "archived", character: "zed" },
+        ],
+      });
+      w.db.rows("castlist").push({
+        book_id: BOOK,
+        issue_id: "issue-1",
+        character: "zed",
+        character_id: "zed",
+        voice_uuid: null,
+        in_issue: !removed,
+        no_audio: !removed,
+      });
+      request(w.db, "zed", "clone", "zed-1993");
+      // The database reads a request with no operation as null.
+      for (const t of w.db.rows("casting_tasks")) t.operation ??= null;
+      const item = await itemOf(w.deps, "zed");
+      const gate = await planCastingTasks(w.db.client(), BOOK, "issue-1");
+      lines.push(
+        `zed ${want}: refusals [${item.refusals.join("; ")}], needsSlot ${item.needsSlot}; gate unsettled [${gate.unsettled.join(", ")}]`,
+      );
+      pass &&=
+        item.refusals.includes(want) &&
+        !item.needsSlot &&
+        !gate.unsettled.includes("zed");
+    }
+    report(
+      "#429 round 3: a request for a character its own row silences or removes is refused and holds no gate",
+      lines,
+      pass,
     );
   }
 
@@ -1132,15 +1237,17 @@ async function checkCarryOut() {
     const r = await attempt(() =>
       lib.carryOut(w.deps, item, { archiveVoiceId: null }),
     );
+    const annPlays = await plays(w.db, "ann");
     report(
       "round 2, finding 2: a restore into a free slot for a character with no task row",
       [
         `plan: ${item.action} (${item.source}), outgoing ${item.outgoing?.kind}`,
         `carryOut: ${short(r)}`,
-        `castlist ann: ${cast(w.db, "ann")}; task: ${task(w.db, "ann")}; adds: ${w.acct.adds}`,
+        `castlist ann: ${cast(w.db, "ann")}; ann plays ${annPlays}; task: ${task(w.db, "ann")}; adds: ${w.acct.adds}`,
       ],
       (r as { status?: string }).status === "done" &&
-        cast(w.db, "ann") === "el-new-1/ann-voice" &&
+        cast(w.db, "ann") === "ann-voice" &&
+        annPlays === "el-new-1" &&
         task(w.db, "ann") === "in_progress" &&
         w.acct.adds === 1,
     );
@@ -1217,15 +1324,17 @@ async function checkCarryOut() {
     const r = await attempt(() =>
       lib.carryOut(w.deps, item, { archiveVoiceId: null }),
     );
+    const zedPlays = await plays(w.db, "zed");
     report(
       "round 2, finding 6: a 5xx on the add is uncertain, and the landed voice is matched",
       [
         `the add answers 502 but the voice exists`,
         `carryOut: ${short(r)}`,
-        `castlist zed: ${cast(w.db, "zed")}; adds: ${w.acct.adds} (want 1)`,
+        `castlist zed: ${cast(w.db, "zed")}; zed plays ${zedPlays}; adds: ${w.acct.adds} (want 1)`,
       ],
       (r as { status?: string }).status === "done" &&
-        cast(w.db, "zed") === "el-new-1/zed-1993" &&
+        cast(w.db, "zed") === "zed-1993" &&
+        zedPlays === "el-new-1" &&
         w.acct.adds === 1,
     );
   }
@@ -1478,7 +1587,7 @@ async function checkCarryOut() {
         `castlist zed: ${cast(w.db, "zed")}; zed-1993: ${String(made.status)}; adds ${w.acct.adds}, deletes ${w.acct.deletes}`,
       ],
       (r as { status?: string }).status === "done" &&
-        cast(w.db, "zed").endsWith("/zed-2012") &&
+        cast(w.db, "zed") === "zed-2012" &&
         made.status === "active" &&
         w.acct.deletes === 0,
     );

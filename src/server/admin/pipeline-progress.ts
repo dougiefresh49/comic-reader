@@ -1,5 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { countIssueCast } from "~/lib/cast";
 
 /**
  * Read side of the issue hub (#334): the latest `pipeline_runs` row and the
@@ -165,8 +166,7 @@ async function getCounts(
     exemplarsNamed,
     castingTasks,
     castingTasksDone,
-    castlist,
-    castlistWithVoice,
+    cast,
   ] = await Promise.all([
     panelsQuery,
     // select count(*) from pages where book_id = $1 and issue_id = $2
@@ -201,10 +201,15 @@ async function getCounts(
     scoped("casting_tasks"),
     // ... and completed_at is not null
     scoped("casting_tasks").not("completed_at", "is", null),
-    // select count(*) from castlist where book_id = $1 and issue_id = $2
-    scoped("castlist"),
-    // ... and voice_id is not null
-    scoped("castlist").not("voice_id", "is", null),
+    // The castlist through `~/lib/cast`: the issue's rows, and those with an
+    // active voice or `no_audio`. Logs and reads 0 on error, like countOf.
+    countIssueCast(supabaseAdmin, bookId, issueId).catch((e: unknown) => {
+      console.error(
+        "pipeline-progress castlist:",
+        e instanceof Error ? e.message : e,
+      );
+      return { rows: 0, withVoice: 0 };
+    }),
   ]);
 
   const panelRows = (panelsResult.error ? [] : (panelsResult.data ?? [])) as {
@@ -253,8 +258,8 @@ async function getCounts(
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
     castingTasks: countOf("castingTasks", castingTasks),
     castingTasksDone: countOf("castingTasksDone", castingTasksDone),
-    castlist: countOf("castlist", castlist),
-    castlistWithVoice: countOf("castlistWithVoice", castlistWithVoice),
+    castlist: cast.rows,
+    castlistWithVoice: cast.withVoice,
   };
 }
 

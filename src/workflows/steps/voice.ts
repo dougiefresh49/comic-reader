@@ -1,27 +1,16 @@
 import { createPartFromText } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BookCast } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
 import type { generateContentLogged as GenerateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
 import type { Database } from "~/types/database";
-
-function speakerMatchKey(speaker: string): string {
-  return speaker.toLowerCase().trim().replace(/-/g, " ");
-}
 
 export type VoiceBubbleSnippet = {
   speaker: string;
   voice_description: string;
   ignored?: boolean | null;
-  /** `bubbles.character_id`: when set, it is the group key (#351). */
+  /** `bubbles.character_id`, the group key (#351); a bubble without one is in no group (#429). */
   character_id?: string | null;
-};
-
-export type VoiceAliasRow = {
-  alias: string;
-  canonical: string;
 };
 
 export type VoiceDescriptionDecisionKind =
@@ -35,20 +24,19 @@ export type VoiceDescriptionDecisionKind =
 export type VoiceCharacterGroup = {
   characterId: string;
   /**
-   * Alias target when any speaker in the group matched an alias; otherwise the
-   * first raw speaker string in sorted order.
+   * The first raw speaker string in sorted order.
    */
   resolvedName: string;
-  /** Raw speaker strings that resolved to this character id, sorted. */
+  /** Raw speaker strings of this character's bubbles, sorted. */
   speakers: string[];
   snippets: string[];
 };
 
 export type VoiceDescriptionDecision = {
   characterId: string;
-  /** Alias target when aliased, otherwise the stable raw-speaker label. */
+  /** The stable raw-speaker label. */
   resolvedName: string;
-  /** Raw speaker strings that resolved to this character id. */
+  /** Raw speaker strings of this character's bubbles. */
   speakers: string[];
   snippetCount: number;
   snippets: string[];
@@ -83,73 +71,39 @@ export type PlanVoiceDescriptionsInput = {
   designRequestedIds?: ReadonlySet<string>;
 };
 
-function resolveSpeaker(
-  speaker: string,
-  aliasMap: Map<string, string>,
-): { resolvedName: string; characterId: string; aliased: boolean } {
-  const key = speakerMatchKey(speaker);
-  const aliasedTo = aliasMap.get(key);
-  const resolvedName = aliasedTo ?? speaker;
-  const characterId = slugify(resolvedName);
-  return {
-    resolvedName,
-    characterId,
-    aliased: aliasedTo !== undefined,
-  };
-}
-
 /**
- * Group non-ignored bubble voice snippets by character id: the bubble's
- * `character_id` when set, else the speaker resolved through the aliases
- * and slugified (today's name grouping). Label rule: alias target when any
- * speaker matched an alias, else the first raw speaker string in sorted order.
+ * Group non-ignored bubble voice snippets by `bubbles.character_id`. A bubble
+ * with no `character_id` is unassigned and joins no group: its speaker text
+ * is a label only, never a key (#429). Label: the first raw speaker string
+ * in sorted order.
  */
 export function groupVoiceBubblesByCharacter(
   bubbles: VoiceBubbleSnippet[],
-  aliases: VoiceAliasRow[],
 ): VoiceCharacterGroup[] {
-  const aliasMap = new Map<string, string>();
-  for (const row of aliases) {
-    aliasMap.set(row.alias.toLowerCase().trim(), row.canonical);
-  }
-
-  type Acc = {
-    speakers: Set<string>;
-    snippets: string[];
-    aliasTarget: string | null;
-  };
-  const byCharacter = new Map<string, Acc>();
-
+  const byCharacter = new Map<
+    string,
+    { speakers: Set<string>; snippets: string[] }
+  >();
   for (const bubble of bubbles) {
     if (bubble.ignored) continue;
     const speaker = bubble.speaker?.trim();
     const desc = bubble.voice_description?.trim();
-    if (!speaker || !desc) continue;
-
-    const byName = resolveSpeaker(speaker, aliasMap);
-    const fromBubble = bubble.character_id?.trim();
-    const { characterId, resolvedName, aliased } = fromBubble
-      ? { characterId: fromBubble, resolvedName: speaker, aliased: false }
-      : byName;
+    const characterId = bubble.character_id?.trim();
+    if (!speaker || !desc || !characterId) continue;
     let acc = byCharacter.get(characterId);
     if (!acc) {
-      acc = { speakers: new Set(), snippets: [], aliasTarget: null };
+      acc = { speakers: new Set(), snippets: [] };
       byCharacter.set(characterId, acc);
     }
     acc.speakers.add(speaker);
     acc.snippets.push(desc);
-    if (aliased) {
-      acc.aliasTarget = resolvedName;
-    }
   }
-
-  const characterIds = [...byCharacter.keys()].sort();
-  return characterIds.map((characterId) => {
+  return [...byCharacter.keys()].sort().map((characterId) => {
     const acc = byCharacter.get(characterId)!;
     const speakers = [...acc.speakers].sort();
     return {
       characterId,
-      resolvedName: acc.aliasTarget ?? speakers[0]!,
+      resolvedName: speakers[0]!,
       speakers,
       snippets: acc.snippets,
     };
@@ -283,29 +237,12 @@ export function formatVoiceDecision(d: VoiceDescriptionDecision): string {
 }
 
 /**
- * True when the issue's castlist marks the character silent (the skip
- * sentinel): deliberate silence, not voice work. Rows match as `cast.ts`
- * matches them: `character_id`, else what the row's text resolves to.
- */
-export function skippedIn(
-  book: BookCast,
-  characterId: string,
-  issueId: string,
-): boolean {
-  return book.rows.some(
-    (r) =>
-      r.issue_id === issueId &&
-      r.voice_id === SKIPPED_VOICE &&
-      (r.character_id ??
-        book.resolve(r.character)?.id ??
-        slugify(r.character)) === characterId,
-  );
-}
-
-/**
  * Who `generate-voice-descriptions` may describe (#351): a speaker with an
- * open design request, or one with no voice and no skip. `ids` are the
- * groups' character ids; each is looked up as `cast.ts` resolves it.
+ * open design request, or one with no voice (#429). A character whose own
+ * castlist row in this issue is removed or "no audio" never is; one whose
+ * chain stops only through its `form_of` target is, with a design request.
+ * `ids` are the groups' character ids, matched to castlist rows by
+ * `character_id`.
  */
 export async function loadDescriptionEligibility(
   client: SupabaseClient,
@@ -313,9 +250,8 @@ export async function loadDescriptionEligibility(
   issueId: string,
   ids: string[],
 ): Promise<{ eligible: Set<string>; designRequested: Set<string> }> {
-  const { loadBookCast, readVoiceRequests, voiceFor } = await import(
-    "~/lib/cast"
-  );
+  const { castRow, loadBookCast, readVoiceRequests, renderVoice, voiceFor } =
+    await import("~/lib/cast");
   const [book, requests] = await Promise.all([
     loadBookCast(client, bookId),
     readVoiceRequests(client, bookId, issueId),
@@ -331,17 +267,21 @@ export async function loadDescriptionEligibility(
   );
   const eligible = new Set<string>();
   for (const id of ids) {
-    const resolved = book.resolve(id)?.id ?? id;
-    if (designRequested.has(id) || designRequested.has(resolved)) {
+    // Its own row removes or silences it here: a leftover request buys nothing.
+    const own = castRow(book, id, issueId);
+    if (own && (!own.in_issue || own.no_audio)) continue;
+    if (designRequested.has(id)) {
       eligible.add(id);
-      designRequested.add(id);
       continue;
     }
+    // A stop inherited through `form_of` skips it unless a design is requested.
+    const found = renderVoice(book, id, issueId);
     if (
-      !voiceFor(book, resolved, issueId) &&
-      !skippedIn(book, resolved, issueId)
+      !found.ok &&
+      (found.reason === "removed" || found.reason === "no audio")
     )
-      eligible.add(id);
+      continue;
+    if (!voiceFor(book, id, issueId)) eligible.add(id);
   }
   return { eligible, designRequested };
 }
@@ -362,16 +302,10 @@ export async function loadVoiceDescriptionPlanInput(
     .eq("issue_id", issueId)
     .not("voice_description", "is", null)
     .not("speaker", "is", null)
+    .not("character_id", "is", null)
     .order("id");
 
   if (bubbleErr) throw new Error(bubbleErr.message);
-
-  const { data: aliasRows, error: aliasErr } = await client
-    .from("aliases")
-    .select("alias, canonical, scope, scope_id")
-    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`);
-
-  if (aliasErr) throw new Error(aliasErr.message);
 
   const bubbles: VoiceBubbleSnippet[] = [];
   for (const row of bubbleRows ?? []) {
@@ -384,12 +318,7 @@ export async function loadVoiceDescriptionPlanInput(
     });
   }
 
-  const aliases: VoiceAliasRow[] = (aliasRows ?? []).map((row) => ({
-    alias: row.alias,
-    canonical: row.canonical,
-  }));
-
-  const groups = groupVoiceBubblesByCharacter(bubbles, aliases);
+  const groups = groupVoiceBubblesByCharacter(bubbles);
   const resolvedIdList = groups.map((g) => g.characterId);
 
   const readyCharacterIds = new Set<string>();

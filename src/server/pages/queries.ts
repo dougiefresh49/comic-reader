@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { supabase } from "~/lib/supabase";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { pageImageUrl } from "~/lib/storage";
+import { readCastNames } from "~/lib/cast";
 import type ZenComicReader from "~/components/ZenComicReader";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { BookManifest, Manifest } from "~/types/manifest";
@@ -177,17 +178,17 @@ export async function getIssueData(
     allBubbles[key].push(rowToBubble(row));
   }
 
-  const { data: castRows, error: castError } = await supabase
-    .from("castlist")
-    .select("character")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId);
+  let castNames: string[] = [];
+  let castError: unknown = null;
+  try {
+    castNames = await readCastNames(supabase, bookId, issueId);
+  } catch (e) {
+    castError = e;
+  }
 
   let characters: string[] = [];
-  if (!castError && castRows?.length) {
-    characters = (castRows as { character: string }[])
-      .map((r) => r.character)
-      .sort();
+  if (!castError && castNames.length) {
+    characters = [...castNames].sort();
   } else {
     if (castError) console.error("getIssueData castlist:", castError);
     const seen = new Set<string>();

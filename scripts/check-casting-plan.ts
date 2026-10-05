@@ -57,9 +57,6 @@ async function main() {
   if (wouldCreate > 0) {
     console.log(`would_create_ids=${plan.toCreate.join(",")}`);
   }
-  if (plan.toCopy.length > 0) {
-    console.log(`would_copy=${plan.toCopy.map((r) => r.character).join(",")}`);
-  }
 }
 
 main().catch((err) => {

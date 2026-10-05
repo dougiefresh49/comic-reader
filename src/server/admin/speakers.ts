@@ -1,5 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { loadBookCast, readCastVoiceLinks } from "~/lib/cast";
+import { slugify } from "~/lib/character-id";
 
 export interface SpeakerReview {
   /** speaker_reviews.id (UUID) — null if no row exists yet (synthetic, lazy-created on action) */
@@ -100,8 +102,8 @@ export async function getSpeakerReviews(
 
   // 4. Pull aliases (global + book-scoped) and characters with ready voices,
   //    used to auto-mark known speakers
-  const [{ data: aliasRows }, { data: charRows }, { data: castRows }] =
-    await Promise.all([
+  const [{ data: aliasRows }, { data: charRows }, castRows] = await Promise.all(
+    [
       supabaseAdmin
         .from("aliases")
         .select("alias, canonical, scope, scope_id")
@@ -109,12 +111,11 @@ export async function getSpeakerReviews(
       supabaseAdmin
         .from("character_appearances")
         .select("character_id, voice_status, voice_model_status"),
-      supabaseAdmin
-        .from("castlist")
-        .select("character, voice_id")
-        .eq("book_id", bookId)
-        .eq("issue_id", issueId),
-    ]);
+      loadBookCast(supabaseAdmin, bookId)
+        .then((book) => book.rows.filter((r) => r.issue_id === issueId))
+        .catch(() => []),
+    ],
+  );
 
   const aliasMap = new Map<string, string>();
   for (const r of (aliasRows ?? []) as Array<{
@@ -134,12 +135,8 @@ export async function getSpeakerReviews(
     }
   }
   const castedCharacters = new Set<string>();
-  for (const r of (castRows ?? []) as Array<{
-    character: string;
-    voice_id: string;
-  }>) {
-    castedCharacters.add(r.character);
-  }
+  for (const r of castRows)
+    if (r.character_id) castedCharacters.add(r.character_id);
 
   // 5. Merge into SpeakerReview list
   const result: SpeakerReview[] = [];
@@ -149,7 +146,7 @@ export async function getSpeakerReviews(
     const canonicalGuess = aliased ?? name;
     const autoKnown =
       readyCharacters.has(canonicalGuess) ||
-      castedCharacters.has(canonicalGuess);
+      castedCharacters.has(slugify(canonicalGuess));
 
     if (persisted) {
       result.push({
@@ -213,17 +210,14 @@ export async function getSpeakerReviews(
 export async function getKnownCharactersForIssue(
   bookId: string,
 ): Promise<string[]> {
-  const { data: castRows } = await supabaseAdmin
-    .from("castlist")
-    .select("character")
-    .eq("book_id", bookId);
+  const castRows = await readCastVoiceLinks(supabaseAdmin, bookId).catch(
+    () => [],
+  );
   const { data: charRows } = await supabaseAdmin
     .from("characters")
     .select("id, aliases");
   const set = new Set<string>();
-  for (const r of (castRows ?? []) as Array<{ character: string }>) {
-    set.add(r.character);
-  }
+  for (const r of castRows) set.add(r.character);
   for (const r of (charRows ?? []) as Array<{
     id: string;
     aliases: string[] | null;

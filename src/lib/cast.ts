@@ -1,19 +1,22 @@
 /**
- * The one home for an issue's cast (#347): the three role ids, the proposed
- * cast (decisions rows 237 and 242), seeding it into `castlist`, the voice rule,
- * add, remove, set a voice, creating and renaming characters, and voice
- * requests (`casting_tasks` rows with an `action`).
+ * The one home for an issue's cast (#347) and the one home of every
+ * `castlist` read and write (#429): the three role ids, the proposed cast
+ * (decisions rows 237 and 242), seeding it into `castlist`, the render chain
+ * (which voice a character speaks with), add, remove, set a voice, "no
+ * audio", creating and renaming characters, and voice requests
+ * (`casting_tasks` rows with an `action`).
  *
  * Every function takes the Supabase client, like `issue-queries.ts`: server
  * code passes `supabaseAdmin`, a workflow step its step client, a script its
  * own. Every `castlist` and `casting_tasks` query filters by book, and by issue
- * when it is about one issue. Every `castlist` write sets `character_id`.
+ * when it is about one issue. Every `castlist` row is found by
+ * `character_id`; the text `character` is only shown, and an insert fills it
+ * with the character id until P6 drops it.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { slugify } from "~/lib/character-id";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
-import { SKIPPED_VOICE } from "~/lib/voice-settings";
 
 type Client = SupabaseClient;
 const db = (client: Client) => client as SupabaseClient<Database>;
@@ -52,37 +55,49 @@ export interface CastProposal {
   suggestions: CastSuggestion[];
 }
 
-/** A character's voice: the `voices` row id and the ElevenLabs id, as `castlist` stores them. */
+/** A character's voice as the render chain finds it. */
 export interface CastVoice {
-  voiceUuid: string | null;
-  voiceId: string | null;
-  /** The character whose castlist row holds it: the character itself, or its `voice_of`. */
+  /** The `voices` row. */
+  voiceUuid: string;
+  /** Its `current_elevenlabs_id` while the voice is active; null when it is not in a slot. */
+  elevenLabsId: string | null;
+  /** The character whose castlist row holds it: the character itself, or its `form_of`. */
   from: string;
 }
 
 export interface CastRow {
   issue_id: string;
+  /** Shown only, never matched on; P6 drops it. */
   character: string;
   character_id: string | null;
-  voice_id: string | null;
   voice_uuid: string | null;
   in_issue: boolean;
+  no_audio: boolean;
+}
+
+/** The `voices` fields the render chain reads. */
+export interface CastVoiceRow {
+  id: string;
+  current_elevenlabs_id: string | null;
+  status: string;
 }
 
 export interface CharacterRow {
   id: string;
   display_name: string | null;
   aliases: string[];
-  voice_of: string | null;
+  form_of: string | null;
 }
 
-/** What `voiceFor` and the writers read: the book's castlist, its issue order, `characters.voice_of`, and the name resolver. */
+/** What the render chain and the writers read: the book's castlist, its issue order, the `voices` rows it points at, `characters.form_of`, and the name resolver. */
 export interface BookCast {
   bookId: string;
   rows: CastRow[];
   issueNumber: Map<string, number>;
-  voiceOf: Map<string, string | null>;
-  /** The `characters` row a name means: its id, display name or an alias, compared slugified. */
+  /** Every `voices` row a castlist row of the book points at, by id. */
+  voices: Map<string, CastVoiceRow>;
+  formOf: Map<string, string | null>;
+  /** The `characters` row a name means: its id, display name or an alias, compared slugified. For wiki names and new aliases; never for a castlist row. */
   resolve: (name: string) => CharacterRow | undefined;
 }
 
@@ -130,14 +145,14 @@ async function readCharacters(client: Client): Promise<CharacterRow[]> {
   return readAll<CharacterRow>("characters", (from, to) =>
     db(client)
       .from("characters")
-      .select("id, display_name, aliases, voice_of")
+      .select("id, display_name, aliases, form_of")
       .order("id")
       .range(from, to),
   );
 }
 
 /**
- * The one name rule, shared by `proposeCast` and every writer: a name means a
+ * The one name rule for wiki names and new aliases: a name means a
  * `characters` row when, slugified, it is the row's id, display name or an
  * alias. Ids win over display names, display names over aliases (the rule in
  * the review editor's loader).
@@ -156,7 +171,28 @@ function nameResolver(
   return (name) => rowByKey.get(slugify(name));
 }
 
-/** The book's castlist, issue order, `voice_of` links and name resolver, for `voiceFor` and the writers. */
+const CAST_COLUMNS =
+  "issue_id, character, character_id, voice_uuid, in_issue, no_audio";
+
+/** The `voices` rows these ids name, in chunks that keep the URL short. */
+async function readCastVoices(
+  client: Client,
+  ids: Iterable<string>,
+): Promise<Map<string, CastVoiceRow>> {
+  const list = [...new Set(ids)];
+  const out = new Map<string, CastVoiceRow>();
+  for (let i = 0; i < list.length; i += 200) {
+    const { data, error } = await db(client)
+      .from("voices")
+      .select("id, current_elevenlabs_id, status")
+      .in("id", list.slice(i, i + 200));
+    must("reading the cast's voices", error);
+    for (const v of data ?? []) out.set(v.id, v);
+  }
+  return out;
+}
+
+/** The book's castlist, issue order, the voices it points at, `form_of` links and name resolver, for the render chain and the writers. */
 export async function loadBookCast(
   client: Client,
   bookId: string,
@@ -165,9 +201,7 @@ export async function loadBookCast(
     readAll<CastRow>("the castlist", (from, to) =>
       db(client)
         .from("castlist")
-        .select(
-          "issue_id, character, character_id, voice_id, voice_uuid, in_issue",
-        )
+        .select(CAST_COLUMNS)
         .eq("book_id", bookId)
         .order("issue_id")
         .order("character")
@@ -177,95 +211,204 @@ export async function loadBookCast(
     readCharacters(client),
   ]);
   must("reading the book's issues", issues.error);
+  const voices = await readCastVoices(
+    client,
+    rows.flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : [])),
+  );
   return {
     bookId,
     rows,
     issueNumber: new Map(
       (issues.data ?? []).map((i) => [i.id, i.number ?? 0] as const),
     ),
-    voiceOf: new Map(characters.map((c) => [c.id, c.voice_of])),
+    voices,
+    formOf: new Map(characters.map((c) => [c.id, c.form_of])),
     resolve: nameResolver(characters),
   };
 }
 
-/** One issue's rows for a character: by `character_id`, else the null-id rows whose text resolves to it (`rowCharacterId`). */
-function matchRows(
-  book: BookCast,
-  issueRows: CastRow[],
-  characterId: string,
-): CastRow[] {
-  const byId = issueRows.filter((r) => r.character_id === characterId);
-  if (byId.length > 0) return byId;
-  return issueRows.filter(
-    (r) => r.character_id === null && rowCharacterId(book, r) === characterId,
-  );
+/** One home for the issue's cast (#409): its castlist rows with `in_issue` true. */
+export function issueCast(book: BookCast, issueId: string): CastRow[] {
+  return book.rows.filter((r) => r.issue_id === issueId && r.in_issue);
 }
 
-/** The character's rows in every issue of the book, matched per issue as `matchRows` does. */
-function matchBookRows(book: BookCast, characterId: string): CastRow[] {
-  const byIssue = new Map<string, CastRow[]>();
-  for (const r of book.rows)
-    byIssue.set(r.issue_id, [...(byIssue.get(r.issue_id) ?? []), r]);
-  return [...byIssue.values()].flatMap((rows) =>
-    matchRows(book, rows, characterId),
-  );
-}
-
-/** The character a castlist row belongs to: its `character_id`, else what its text resolves to, else its slug. */
-function rowCharacterId(book: BookCast, row: CastRow): string {
-  return (
-    row.character_id ??
-    book.resolve(row.character)?.id ??
-    slugify(row.character)
-  );
-}
-
-/** The skip sentinel marks deliberate silence; it is not a voice. */
-const isSkipped = (r: CastRow) => r.voice_id === SKIPPED_VOICE;
-const hasVoice = (r: CastRow) =>
-  !isSkipped(r) && (r.voice_uuid !== null || r.voice_id !== null);
-
-/** The character's own castlist voice: this issue's row first, then the latest issue's. */
-function ownVoice(
+/** The issue's castlist row for a character, found by `character_id`. */
+export function castRow(
   book: BookCast,
   characterId: string,
-  issueId?: string,
+  issueId: string,
 ): CastRow | undefined {
-  const voiced = matchBookRows(book, characterId).filter(hasVoice);
-  const here = voiced.find((r) => r.issue_id === issueId);
-  if (here) return here;
-  return voiced.sort(
-    (a, b) =>
-      (book.issueNumber.get(b.issue_id) ?? 0) -
-      (book.issueNumber.get(a.issue_id) ?? 0),
-  )[0];
+  return book.rows.find(
+    (r) => r.issue_id === issueId && r.character_id === characterId,
+  );
+}
+
+/** The latest issue's row in the book that holds a voice for the character. A "no audio" row silences its own issue only and still lends its voice here. */
+function latestVoicedRow(
+  book: BookCast,
+  characterId: string,
+): CastRow | undefined {
+  return book.rows
+    .filter((r) => r.character_id === characterId && r.voice_uuid)
+    .sort(
+      (a, b) =>
+        (book.issueNumber.get(b.issue_id) ?? 0) -
+        (book.issueNumber.get(a.issue_id) ?? 0),
+    )[0];
+}
+
+/** Why the render chain gives a character no audio. */
+export type NoVoiceReason =
+  /** `bubbles.character_id` is null: the bubble is unassigned. */
+  | "unassigned"
+  /** The issue's row has `in_issue` false: speaker removed from this issue. */
+  | "removed"
+  /** The issue's row has `no_audio` true: silent by choice. */
+  | "no audio"
+  /** No row in the book holds a voice, the character's or its `form_of`'s. */
+  | "no voice"
+  /** Cast, and the voice is not in a slot. */
+  | "not in a slot";
+
+export type RenderVoice =
+  | {
+      ok: true;
+      characterId: string;
+      /** The character whose castlist row holds the voice: itself, or its `form_of`. */
+      from: string;
+      voiceUuid: string;
+      elevenLabsId: string;
+    }
+  | {
+      ok: false;
+      reason: NoVoiceReason;
+      characterId: string | null;
+      /** Set when a voice was found ("not in a slot"). */
+      voice: CastVoice | null;
+      /** One line naming the case, for logs and error messages. */
+      detail: string;
+    };
+
+/** Steps 2 to 4 of the chain for one character: a stop, the row that holds its voice, or none. */
+function chainStep(
+  book: BookCast,
+  characterId: string,
+  issueId: string | undefined,
+): { stop: "removed" | "no audio" } | { row: CastRow } | null {
+  const here = issueId ? castRow(book, characterId, issueId) : undefined;
+  if (here && !here.in_issue) return { stop: "removed" };
+  if (here?.no_audio) return { stop: "no audio" };
+  if (here?.voice_uuid) return { row: here };
+  const latest = latestVoicedRow(book, characterId);
+  return latest ? { row: latest } : null;
 }
 
 /**
- * The one voice rule: the character's own castlist voice, else that of the
- * character its `voice_of` names; null when neither has one.
- * A character whose row in `issueId` is skipped (and none of its rows there is voiced) gets null: silent, no own or borrowed voice.
+ * The render chain ("How it works after" in `docs/casting-data-model.html`),
+ * the one rule for which voice a character speaks with in an issue:
+ *
+ * 1. No character (a null `bubbles.character_id`): no audio, unassigned.
+ * 2. The issue's row has `in_issue` false: no audio, removed from this issue.
+ * 3. The issue's row has `no_audio` true: no audio by choice, nothing borrowed.
+ * 4. That row's voice; with no row or no voice there, the latest issue's row
+ *    in the book that has one.
+ * 5. Still none and the character has `form_of`: steps 2 to 4 for that
+ *    character, once.
+ * 6. The `voices` row: active renders with `current_elevenlabs_id`; anything
+ *    else is "cast, voice not in a slot".
+ *
+ * With no `issueId`, steps 2 and 3 are skipped and step 4 is the latest row.
+ */
+export function renderVoice(
+  book: BookCast,
+  characterId: string | null,
+  issueId?: string,
+): RenderVoice {
+  const no = (
+    reason: NoVoiceReason,
+    detail: string,
+    voice: CastVoice | null = null,
+  ): RenderVoice => ({ ok: false, reason, characterId, voice, detail });
+  if (!characterId) return no("unassigned", "no character_id");
+
+  let from = characterId;
+  let step = chainStep(book, characterId, issueId);
+  if (step === null) {
+    const other = book.formOf.get(characterId);
+    if (other && other !== characterId) {
+      from = other;
+      step = chainStep(book, other, issueId);
+    }
+  }
+  const via = from === characterId ? "" : ` (form of ${from})`;
+  if (step === null)
+    return no("no voice", `${characterId} has no voice of its own${via}`);
+  if ("stop" in step)
+    return step.stop === "removed"
+      ? no("removed", `${from} is removed from this issue${via}`)
+      : no("no audio", `${from} is marked no audio in this issue${via}`);
+
+  const voiceUuid = step.row.voice_uuid!;
+  const row = book.voices.get(voiceUuid);
+  const elevenLabsId =
+    row?.status === "active" ? (row.current_elevenlabs_id ?? null) : null;
+  const voice: CastVoice = { voiceUuid, elevenLabsId, from };
+  if (!elevenLabsId)
+    return no(
+      "not in a slot",
+      `${characterId}'s voice ${voiceUuid} is ${row?.status ?? "missing"}, not in a slot${via}`,
+      voice,
+    );
+  return { ok: true, characterId, from, voiceUuid, elevenLabsId };
+}
+
+/**
+ * The voice the render chain finds for a character, playable or not: null
+ * when the chain stops before a voice (removed, no audio, or none at all).
+ * `elevenLabsId` is null when the voice is not in a slot.
  */
 export function voiceFor(
   book: BookCast,
   characterId: string,
   issueId?: string,
 ): CastVoice | null {
-  const own = ownVoice(book, characterId, issueId);
-  if (own && own.issue_id === issueId) return toVoice(own, characterId);
-  const here = book.rows.filter((r) => r.issue_id === issueId);
-  if (matchRows(book, here, characterId).some(isSkipped)) return null;
-  if (own) return toVoice(own, characterId);
-  const other = book.voiceOf.get(characterId);
-  if (!other || other === characterId) return null;
-  const borrowed = ownVoice(book, other, issueId);
-  return borrowed ? toVoice(borrowed, other) : null;
+  const found = renderVoice(book, characterId, issueId);
+  if (found.ok)
+    return {
+      voiceUuid: found.voiceUuid,
+      elevenLabsId: found.elevenLabsId,
+      from: found.from,
+    };
+  return found.voice;
 }
 
-function toVoice(row: CastRow, from: string): CastVoice {
-  return { voiceUuid: row.voice_uuid, voiceId: row.voice_id, from };
+/** The issue hub's two castlist counts: the issue's rows, and those settled for audio (an active voice, or "no audio"). */
+export async function countIssueCast(
+  client: Client,
+  bookId: string,
+  issueId: string,
+): Promise<{ rows: number; withVoice: number }> {
+  const book = await loadBookCast(client, bookId);
+  const rows = book.rows.filter((r) => r.issue_id === issueId);
+  return {
+    rows: rows.length,
+    withVoice: rows.filter(
+      (r) =>
+        r.no_audio ||
+        (r.voice_uuid !== null &&
+          book.voices.get(r.voice_uuid)?.status === "active"),
+    ).length,
+  };
 }
 
+/** True when the issue's castlist row for the character has `no_audio`: deliberate silence, not voice work. */
+export function isNoAudio(
+  book: BookCast,
+  characterId: string,
+  issueId: string,
+): boolean {
+  return castRow(book, characterId, issueId)?.no_audio === true;
+}
 /** `issues.wiki_appearances` as name and qualifier pairs, whatever the JSON holds. */
 function wikiNames(value: unknown): { name: string; qualifier: string }[] {
   if (!Array.isArray(value)) return [];
@@ -341,17 +484,14 @@ async function proposeFrom(
 
   for (const id of ROLE_IDS) {
     const row = resolve(id);
-    member(
-      row ?? { id, display_name: id, aliases: [], voice_of: null },
-      "role",
-    );
+    member(row ?? { id, display_name: id, aliases: [], form_of: null }, "role");
   }
   for (const f of faceRows) {
     const row = f.character_id ? resolve(f.character_id) : undefined;
     if (row) member(row, "faces").faces++;
   }
   for (const c of book.rows) {
-    const row = resolve(c.character_id ?? c.character);
+    const row = c.character_id ? resolve(c.character_id) : undefined;
     if (row) {
       const m = member(row, "cast before");
       if (!m.castNames.includes(c.character)) m.castNames.push(c.character);
@@ -379,70 +519,166 @@ async function startingVoice(
   client: Client,
   book: BookCast,
   characterId: string,
-): Promise<{ voice_id: string | null; voice_uuid: string | null }> {
-  const latest = ownVoice(book, characterId);
-  if (latest)
-    return { voice_id: latest.voice_id, voice_uuid: latest.voice_uuid };
+): Promise<string | null> {
+  const latest = latestVoicedRow(book, characterId);
+  if (latest) return latest.voice_uuid;
   const { data, error } = await db(client)
     .from("voices")
-    .select("id, current_elevenlabs_id")
+    .select("id")
     .eq("character_id", characterId)
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(1);
   must(`reading the voice of ${characterId}`, error);
-  const v = data?.[0];
-  return {
-    voice_id: v?.current_elevenlabs_id ?? null,
-    voice_uuid: v?.id ?? null,
-  };
+  return data?.[0]?.id ?? null;
 }
 
-async function linkRow(
+type CastPatch = Pick<
+  Database["public"]["Tables"]["castlist"]["Update"],
+  "in_issue" | "no_audio" | "voice_uuid"
+>;
+
+/** Updates the issue's row for the character; returns how many rows changed (0 or 1). */
+async function updateRow(
   client: Client,
   bookId: string,
-  row: CastRow,
-  patch: Database["public"]["Tables"]["castlist"]["Update"],
-): Promise<void> {
-  const { error } = await db(client)
+  issueId: string,
+  characterId: string,
+  patch: CastPatch,
+): Promise<number> {
+  const { data, error } = await db(client)
     .from("castlist")
     .update(patch)
     .eq("book_id", bookId)
-    .eq("issue_id", row.issue_id)
-    .eq("character", row.character);
-  must(`updating castlist ${row.issue_id}/${row.character}`, error);
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId)
+    .select("issue_id");
+  must(`updating castlist ${issueId}/${characterId}`, error);
+  return data?.length ?? 0;
 }
 
+/**
+ * Inserts the issue's row for the character, `character` filled with the id
+ * (P6 drops that column). Upserts on `(book_id, issue_id, character_id)`
+ * ignoring a duplicate, so a row another writer added first is kept as it is.
+ *
+ * A legacy row with a null `character_id` whose text is that id (character
+ * "narrator", for example) holds the old primary key on (book_id, issue_id,
+ * character), so the insert would fail: that row is adopted instead, in one
+ * update that sets its `character_id` and the caller's `patch`, and leaves
+ * its other columns as they are.
+ */
 async function insertRow(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+  row: Required<CastPatch>,
+  patch: CastPatch = {},
+): Promise<void> {
+  const adopted = await db(client)
+    .from("castlist")
+    .update({ ...patch, character_id: characterId })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character", characterId)
+    .is("character_id", null)
+    .select("issue_id");
+  must(`adopting castlist ${issueId}/${characterId}`, adopted.error);
+  if (adopted.data?.length) return;
+  const { error } = await db(client)
+    .from("castlist")
+    .upsert(
+      {
+        book_id: bookId,
+        issue_id: issueId,
+        character: characterId,
+        character_id: characterId,
+        ...row,
+      },
+      { onConflict: "book_id,issue_id,character_id", ignoreDuplicates: true },
+    );
+  must(`inserting castlist ${issueId}/${characterId}`, error);
+}
+
+/** Writes the patch on the issue's row, or inserts the row with the starting voice when there is none. */
+async function writeRow(
   client: Client,
   book: BookCast,
   issueId: string,
   characterId: string,
-  name: string,
+  patch: CastPatch,
 ): Promise<void> {
-  const voice = await startingVoice(client, book, characterId);
-  const { error } = await db(client)
+  if ((await updateRow(client, book.bookId, issueId, characterId, patch)) > 0)
+    return;
+  const voice_uuid =
+    patch.voice_uuid !== undefined
+      ? patch.voice_uuid
+      : await startingVoice(client, book, characterId);
+  await insertRow(
+    client,
+    book.bookId,
+    issueId,
+    characterId,
+    {
+      in_issue: patch.in_issue ?? true,
+      no_audio: patch.no_audio ?? false,
+      voice_uuid,
+    },
+    patch,
+  );
+  // A row another writer inserted first was kept: write the patch on it.
+  await updateRow(client, book.bookId, issueId, characterId, patch);
+}
+
+/** Points the issue's row for the character at a voice, inserting the row (`in_issue` true) when there is none; other issues' rows are left alone. */
+export async function setIssueVoice(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+  voiceUuid: string,
+): Promise<void> {
+  const patch = { voice_uuid: voiceUuid };
+  if ((await updateRow(client, bookId, issueId, characterId, patch)) > 0)
+    return;
+  await insertRow(
+    client,
+    bookId,
+    issueId,
+    characterId,
+    { in_issue: true, no_audio: false, voice_uuid: voiceUuid },
+    patch,
+  );
+  // A row another writer inserted first was kept: write the patch on it.
+  await updateRow(client, bookId, issueId, characterId, patch);
+}
+
+/** The issue's castlist row for one character, read on its own; null when there is none. */
+export async function readCastRow(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+): Promise<CastRow | null> {
+  const { data, error } = await db(client)
     .from("castlist")
-    .insert({
-      book_id: book.bookId,
-      issue_id: issueId,
-      character: name,
-      character_id: characterId,
-      in_issue: true,
-      ...voice,
-    });
-  must(`inserting castlist ${issueId}/${name}`, error);
+    .select(CAST_COLUMNS)
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId)
+    .limit(1);
+  must(`reading castlist ${issueId}/${characterId}`, error);
+  return data?.[0] ?? null;
 }
 
 export interface SeedResult {
-  /** Rows found by name (id, display name or alias) that now carry `character_id`. */
-  linked: string[];
   inserted: string[];
-  /** Members whose row already had `character_id`, removed ones included. */
+  /** Members that already had a row, removed ones included. */
   kept: string[];
 }
 
-/** Writes `proposeCast`'s members into the issue's castlist: links a row found by name (as `proposeCast` resolves it), inserts one only when none matches; never creates a character, never sets `in_issue` back to true. */
+/** Writes `proposeCast`'s members into the issue's castlist: inserts a row only for a member with none; never creates a character, never sets `in_issue` back to true. */
 export async function seedCast(
   client: Client,
   bookId: string,
@@ -450,23 +686,18 @@ export async function seedCast(
 ): Promise<SeedResult> {
   const book = await loadBookCast(client, bookId);
   const proposal = await proposeFrom(client, book, issueId);
-  const issueRows = book.rows.filter((r) => r.issue_id === issueId);
-  const result: SeedResult = { linked: [], inserted: [], kept: [] };
+  const result: SeedResult = { inserted: [], kept: [] };
   for (const m of proposal.members) {
-    const found = matchRows(book, issueRows, m.id);
-    if (found.length === 0) {
-      await insertRow(client, book, issueId, m.id, m.name);
-      result.inserted.push(m.id);
+    if (castRow(book, m.id, issueId)) {
+      result.kept.push(m.id);
       continue;
     }
-    for (const row of found) {
-      if (row.character_id === m.id) continue;
-      await linkRow(client, bookId, row, { character_id: m.id });
-    }
-    (found.some((r) => r.character_id === null)
-      ? result.linked
-      : result.kept
-    ).push(m.id);
+    await insertRow(client, bookId, issueId, m.id, {
+      in_issue: true,
+      no_audio: false,
+      voice_uuid: await startingVoice(client, book, m.id),
+    });
+    result.inserted.push(m.id);
   }
   return result;
 }
@@ -477,23 +708,21 @@ export interface CastEntry {
   voice: CastVoice | null;
 }
 
-/** The issue's cast: its castlist rows with `in_issue` true, each with its voice from `voiceFor`. */
+/** The issue's cast (`issueCast`), each row with its voice from `voiceFor`. */
 export async function getCast(
   client: Client,
   bookId: string,
   issueId: string,
 ): Promise<CastEntry[]> {
   const book = await loadBookCast(client, bookId);
-  return book.rows
-    .filter((r) => r.issue_id === issueId && r.in_issue)
-    .map((r) => ({
-      character: r.character,
-      characterId: r.character_id,
-      voice: voiceFor(book, rowCharacterId(book, r), issueId),
-    }));
+  return issueCast(book, issueId).map((r) => ({
+    character: r.character,
+    characterId: r.character_id,
+    voice: r.character_id ? voiceFor(book, r.character_id, issueId) : null,
+  }));
 }
 
-/** Puts a character in the issue's cast: sets `in_issue` and `character_id` on its row, or inserts one with its starting voice. */
+/** Puts a character in the issue's cast: sets `in_issue` on its row, or inserts one with its starting voice. */
 export async function addToCast(
   client: Client,
   bookId: string,
@@ -501,77 +730,141 @@ export async function addToCast(
   characterId: string,
 ): Promise<void> {
   const book = await loadBookCast(client, bookId);
-  const found = matchRows(
-    book,
-    book.rows.filter((r) => r.issue_id === issueId),
-    characterId,
-  );
-  if (found.length > 0) {
-    for (const row of found)
-      await linkRow(client, bookId, row, {
-        character_id: characterId,
-        in_issue: true,
-      });
-    return;
+  if (!castRow(book, characterId, issueId)) {
+    const character = book.resolve(characterId);
+    if (character?.id !== characterId)
+      throw new Error(`cast: no character ${characterId}`);
   }
-  const character = book.resolve(characterId);
-  if (character?.id !== characterId)
-    throw new Error(`cast: no character ${characterId}`);
-  await insertRow(
-    client,
-    book,
-    issueId,
-    characterId,
-    character.display_name ?? characterId,
-  );
+  await writeRow(client, book, issueId, characterId, { in_issue: true });
 }
 
-/** Takes a character out of the issue's cast: `in_issue` false on its rows, which are never deleted, so the voice is kept. Returns the rows changed. */
+/** Takes a character out of the issue's cast: `in_issue` false on its row, which is never deleted, so the voice is kept. Returns the rows changed. */
 export async function removeFromCast(
   client: Client,
   bookId: string,
   issueId: string,
   characterId: string,
 ): Promise<number> {
-  const book = await loadBookCast(client, bookId);
-  const found = matchRows(
-    book,
-    book.rows.filter((r) => r.issue_id === issueId),
-    characterId,
-  );
-  for (const row of found)
-    await linkRow(client, bookId, row, {
-      character_id: characterId,
-      in_issue: false,
-    });
-  return found.length;
+  return updateRow(client, bookId, issueId, characterId, { in_issue: false });
 }
 
-/** Sets the character's voice on its castlist rows in every issue of the book (decisions row 28), matched as `seedCast` matches; inserts none. Returns the rows written. */
+/**
+ * Sets or clears "no audio" on the issue's row for the character (#429). The
+ * voice reference is left alone. Setting it inserts the row (with its
+ * starting voice) when the issue has none; clearing it inserts nothing.
+ * Returns the rows changed.
+ */
+export async function setNoAudio(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+  noAudio: boolean,
+): Promise<number> {
+  if (!noAudio)
+    return updateRow(client, bookId, issueId, characterId, {
+      no_audio: false,
+    });
+  const book = await loadBookCast(client, bookId);
+  if (!castRow(book, characterId, issueId)) {
+    const character = book.resolve(characterId);
+    if (character?.id !== characterId)
+      throw new Error(`cast: no character ${characterId}`);
+  }
+  await writeRow(client, book, issueId, characterId, { no_audio: true });
+  return 1;
+}
+
+/** Sets the character's voice on its castlist rows in every issue of the book (decisions row 28); inserts none. Returns the rows written. */
 export async function setVoice(
   client: Client,
   bookId: string,
   characterId: string,
   voiceUuid: string,
 ): Promise<number> {
-  const [book, voice] = await Promise.all([
-    loadBookCast(client, bookId),
-    db(client)
-      .from("voices")
-      .select("id, current_elevenlabs_id")
-      .eq("id", voiceUuid)
-      .maybeSingle(),
-  ]);
+  const voice = await db(client)
+    .from("voices")
+    .select("id")
+    .eq("id", voiceUuid)
+    .maybeSingle();
   must(`reading voice ${voiceUuid}`, voice.error);
   if (!voice.data) throw new Error(`cast: no voice ${voiceUuid}`);
-  const rows = matchBookRows(book, characterId);
-  for (const row of rows)
-    await linkRow(client, bookId, row, {
-      character_id: characterId,
-      voice_uuid: voice.data.id,
-      voice_id: voice.data.current_elevenlabs_id,
-    });
-  return rows.length;
+  const { data, error } = await db(client)
+    .from("castlist")
+    .update({ voice_uuid: voice.data.id })
+    .eq("book_id", bookId)
+    .eq("character_id", characterId)
+    .select("issue_id");
+  must(`setting the voice of ${characterId}`, error);
+  return data?.length ?? 0;
+}
+
+/**
+ * Casts a voice for a character in one issue and the rest of the book: the
+ * issue's row is inserted when it has none (with `in_issue` true), then every
+ * row of the character in the book points at the voice. Returns the rows
+ * written.
+ */
+export async function castVoiceInBook(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+  voiceUuid: string,
+): Promise<number> {
+  await setIssueVoice(client, bookId, issueId, characterId, voiceUuid);
+  return setVoice(client, bookId, characterId, voiceUuid);
+}
+
+/** A castlist row anywhere in the database, for the slot planner: which books and issues hold each voice. */
+export interface CastVoiceLink {
+  book_id: string;
+  issue_id: string;
+  character: string;
+  character_id: string | null;
+  voice_uuid: string | null;
+}
+
+/** Every castlist row with its voice reference, in one book or every book. */
+export async function readCastVoiceLinks(
+  client: Client,
+  bookId?: string,
+): Promise<CastVoiceLink[]> {
+  return readAll<CastVoiceLink>("the castlist", (from, to) => {
+    let q = db(client)
+      .from("castlist")
+      .select("book_id, issue_id, character, character_id, voice_uuid");
+    if (bookId) q = q.eq("book_id", bookId);
+    return q
+      .order("book_id")
+      .order("issue_id")
+      .order("character")
+      .range(from, to);
+  });
+}
+
+/** Deletes every castlist row of a book; for a scratch book's cleanup (`scripts/smoke-ingest.ts`), never a real one. */
+export async function deleteBookCast(
+  client: Client,
+  bookId: string,
+): Promise<void> {
+  const { error } = await db(client)
+    .from("castlist")
+    .delete()
+    .eq("book_id", bookId);
+  must(`deleting the castlist of ${bookId}`, error);
+}
+
+/** The issue's cast (`issueCast`, so removed rows stay out) as its castlist `character` texts, sorted, as shown to the reader and to Gemini; empty when the issue has none. */
+export async function readCastNames(
+  client: Client,
+  bookId: string,
+  issueId: string,
+): Promise<string[]> {
+  const book = await loadBookCast(client, bookId);
+  return issueCast(book, issueId)
+    .map((r) => r.character)
+    .sort();
 }
 
 /** Creates a `characters` row; the id must already be in slug form (`slugify`). */

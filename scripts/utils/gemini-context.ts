@@ -45,7 +45,7 @@ export async function analyzeContext(
   // Step 3: Context analysis with Gemini
   if (options.skipGemini) {
     console.log(
-      `\n🤖 Analyzing context with Gemini... SKIPPED (--skip-gemini)`,
+      `\n🤖 Analyzing context with Gemini... skipped (--skip-gemini)`,
     );
     console.log(
       `\n✅ Stopping before Gemini analysis. Review OCR results in viewer file`,

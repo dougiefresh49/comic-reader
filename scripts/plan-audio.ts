@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * SELECT-only audio plan for an issue. No ElevenLabs client, no DB writes.
+ * Speakers are `bubbles.character_id`; each bubble's voice comes from the
+ * render chain (`renderVoice` in `~/lib/cast`, #429).
  *
  *   pnpm tsx --env-file=.env scripts/plan-audio.ts <book> <issue>
  */
@@ -8,18 +10,18 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import {
-  buildAliasMap,
-  buildCastIndex,
-  formatCastConflicts,
+  loadBookCast,
+  renderVoice,
+  type BookCast,
+  type CastRow,
+} from "~/lib/cast";
+import {
   normalizeAlignment,
-  planBubblesToSend,
+  planBubbleVoices,
   planCharactersNeedingVoices,
-  planSpeakerMatching,
   readPlanningAppearances,
   selectBubblesNeedingAudio,
-  speakerKeys,
   type BubbleAudioRow,
-  type CastRow,
 } from "~/workflows/steps/audio-plan";
 
 function parseArgs(): { book: string; issue: string } {
@@ -33,6 +35,31 @@ function parseArgs(): { book: string; issue: string } {
     process.exit(1);
   }
   return { book, issue };
+}
+
+/** An in-memory book cast for the synthetic cases; nothing is read or written. */
+function syntheticBook(rows: Partial<CastRow>[]): BookCast {
+  return {
+    bookId: "synthetic",
+    rows: rows.map((r) => ({
+      issue_id: "issue-1",
+      character: r.character_id ?? "",
+      character_id: null,
+      voice_uuid: null,
+      in_issue: true,
+      no_audio: false,
+      ...r,
+    })),
+    issueNumber: new Map([["issue-1", 1]]),
+    voices: new Map([
+      [
+        "v-active",
+        { id: "v-active", current_elevenlabs_id: "el-a", status: "active" },
+      ],
+    ]),
+    formOf: new Map(),
+    resolve: () => undefined,
+  };
 }
 
 function runSyntheticCases(): void {
@@ -79,53 +106,50 @@ function runSyntheticCases(): void {
     `synthetic alignment keys: ${normalized ? Object.keys(normalized).join(", ") : "(null)"}`,
   );
 
-  // Finding 1: cast row with null voice_id is membership, not a Voice Design target.
-  const nullVoiceCast: CastRow[] = [
-    { character: "green-ranger", voice_id: null },
-  ];
-  const nullVoiceIndex = buildCastIndex(nullVoiceCast);
-  const nullVoiceAlias = buildAliasMap([]);
-  const nullVoiceSpeakers = ["green-ranger"];
-  const nullVoicePlan = planCharactersNeedingVoices(
-    nullVoiceSpeakers,
-    nullVoiceAlias,
-    nullVoiceIndex,
-    [],
-  );
-  const nullVoiceBubble: BubbleAudioRow = {
-    id: "b-null-voice",
-    speaker: "green-ranger",
+  const bubble = (id: string, characterId: string | null) => ({
+    id,
+    speaker: characterId,
+    character_id: characterId,
     ignored: false,
     silent: false,
     audio_storage_path: null,
     text_with_cues: "Hello",
     ocr_text: null,
-  };
-  const nullVoiceSend = planBubblesToSend(
-    [nullVoiceBubble],
-    nullVoiceAlias,
-    nullVoiceIndex,
+  });
+  const summary = (plan: ReturnType<typeof planBubbleVoices>) =>
+    `toSend=${plan.toSend.length} skipped=${plan.skipped.map((s) => `${s.bubble.id}:${s.reason}`).join(",")}`;
+
+  // A cast row with no voice is membership, not a Voice Design target.
+  const noVoice = syntheticBook([{ character_id: "green-ranger" }]);
+  const noVoicePlan = planCharactersNeedingVoices(
+    ["green-ranger"],
+    new Set(["green-ranger"]),
+    [],
   );
-  const nullSkip = nullVoiceSend.skipped
-    .map((s) => `${s.bubble.id}:${s.reason}`)
-    .join(",");
   console.log(
-    `synthetic cast without voice: needDesign=${nullVoicePlan.needDesign.length} reuse=${nullVoicePlan.reuse.length} toSend=${nullVoiceSend.toSend.length} skipped=${nullSkip}`,
+    `synthetic cast without voice: needDesign=${noVoicePlan.needDesign.length} reuse=${noVoicePlan.reuse.length} ${summary(planBubbleVoices([bubble("b-no-voice", "green-ranger")], noVoice, "issue-1"))}`,
   );
 
-  // Finding 2: same slug, different voice_ids is a conflict naming both rows.
-  const conflictCast: CastRow[] = [
-    { character: "Green Ranger", voice_id: "voice-a" },
-    { character: "green-ranger", voice_id: "voice-b" },
-  ];
-  const conflictIndex = buildCastIndex(conflictCast);
-  const conflictMatch = planSpeakerMatching(
-    ["Green Ranger", "green-ranger"],
-    buildAliasMap([]),
-    conflictIndex,
-  );
+  // "No audio" keeps its voice reference and renders nothing; a removed
+  // character and an unassigned bubble render nothing either.
+  const stops = syntheticBook([
+    { character_id: "silent", voice_uuid: "v-active", no_audio: true },
+    { character_id: "gone", voice_uuid: "v-active", in_issue: false },
+    { character_id: "voiced", voice_uuid: "v-active" },
+  ]);
   console.log(
-    `synthetic castlist conflict: count=${conflictIndex.conflicts.length} detail=${formatCastConflicts(conflictIndex.conflicts)} conflicted=${conflictMatch.conflicted.join(",")} cast_without_voice=${conflictMatch.castWithoutVoice.length}`,
+    `synthetic chain stops: ${summary(
+      planBubbleVoices(
+        [
+          bubble("b-silent", "silent"),
+          bubble("b-gone", "gone"),
+          bubble("b-unassigned", null),
+          bubble("b-voiced", "voiced"),
+        ],
+        stops,
+        "issue-1",
+      ),
+    )}`,
   );
 }
 
@@ -140,80 +164,57 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
     auth: { persistSession: false },
   });
 
-  const [
-    { data: bubbleRows, error: bubErr },
-    { data: aliasRows, error: aliasErr },
-    { data: castRows, error: castErr },
-  ] = await Promise.all([
+  const [{ data: bubbleRows, error: bubErr }, book] = await Promise.all([
     supabase
       .from("bubbles")
       .select(
-        "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text",
+        "id, speaker, character_id, ignored, silent, audio_storage_path, text_with_cues, ocr_text",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("ignored", false),
-    supabase
-      .from("aliases")
-      .select("alias, canonical, scope, scope_id")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
-    supabase
-      .from("castlist")
-      .select("character, voice_id")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId),
+    loadBookCast(supabase, bookId),
+  ]);
+  if (bubErr) throw new Error(bubErr.message);
+
+  const bubbles = bubbleRows ?? [];
+  const speakers = [
+    ...new Set(
+      bubbles.flatMap((b) => (b.character_id ? [b.character_id] : [])),
+    ),
+  ].sort();
+  const castMembers = new Set(
+    book.rows.flatMap((r) =>
+      r.issue_id === issueId && r.character_id ? [r.character_id] : [],
+    ),
+  );
+  const appearances = await readPlanningAppearances(supabase, [
+    ...speakers,
+    ...castMembers,
   ]);
 
-  if (bubErr) throw new Error(bubErr.message);
-  if (aliasErr) throw new Error(aliasErr.message);
-  if (castErr) throw new Error(castErr.message);
-
-  const aliasMap = buildAliasMap(aliasRows ?? []);
-  const cast = buildCastIndex(castRows ?? []);
-
-  const rawSpeakers = (bubbleRows ?? [])
-    .map((b) => b.speaker)
-    .filter((s): s is string => !!s);
-  const appearances = await readPlanningAppearances(
-    supabase,
-    speakerKeys(rawSpeakers, aliasMap),
-  );
-
-  const matching = planSpeakerMatching(rawSpeakers, aliasMap, cast);
-  const bubbles = (bubbleRows ?? []) as BubbleAudioRow[];
-  const sendPlan = planBubblesToSend(bubbles, aliasMap, cast);
+  const byReason = new Map<string, string[]>();
+  for (const id of speakers) {
+    const found = renderVoice(book, id, issueId);
+    const key = found.ok ? "voiced" : found.reason;
+    byReason.set(key, [...(byReason.get(key) ?? []), id]);
+  }
+  const unassigned = bubbles.filter((b) => !b.character_id).length;
+  const sendPlan = planBubbleVoices(bubbles, book, issueId);
   const voicePlan = planCharactersNeedingVoices(
-    rawSpeakers,
-    aliasMap,
-    cast,
+    speakers,
+    castMembers,
     appearances,
   );
 
-  const bubblesToSendPart =
-    cast.conflicts.length > 0
-      ? "0 bubbles to send (blocked by conflicts)"
-      : `${sendPlan.toSend.length} bubbles to send`;
-
   console.log(
-    `${matching.distinctSpeakers.length} distinct speaker strings, ${matching.matched.length} matched, ${matching.unmatched.length} unmatched, ${bubblesToSendPart}, ${voicePlan.needDesign.length} need Voice Design`,
+    `${speakers.length} speakers (character ids), ${byReason.get("voiced")?.length ?? 0} voiced, ${unassigned} unassigned bubbles, ${sendPlan.toSend.length} bubbles to send, ${voicePlan.needDesign.length} need Voice Design`,
   );
-  console.log(`castlist conflicts: ${cast.conflicts.length}`);
-
-  if (cast.conflicts.length > 0) {
-    console.log(`conflicts=${formatCastConflicts(cast.conflicts)}`);
-  }
-  if (matching.conflicted.length > 0) {
-    console.log(`conflicted_speakers=${matching.conflicted.join(",")}`);
-  }
-  if (matching.unmatched.length > 0) {
-    console.log(`unmatched=${matching.unmatched.join(",")}`);
-  }
-  if (matching.castWithoutVoice.length > 0) {
-    console.log(`cast_without_voice=${matching.castWithoutVoice.join(",")}`);
-  }
+  for (const [reason, ids] of [...byReason].sort())
+    if (reason !== "voiced") console.log(`${reason}=${ids.join(",")}`);
   if (voicePlan.reuse.length > 0) {
     console.log(
-      `would_reuse_castlist=${voicePlan.reuse.map((r) => r.character).join(",")}`,
+      `would_reuse_castlist=${voicePlan.reuse.map((r) => r.characterId).join(",")}`,
     );
   }
   if (voicePlan.needDesign.length > 0) {

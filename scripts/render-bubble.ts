@@ -22,18 +22,13 @@
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { loadBookCast } from "~/lib/cast";
+import { loadBookCast, renderVoice, type RenderVoice } from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { buildTtsRequest, type TtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import { isAudioTag, type VoiceOverride } from "~/lib/voice-settings";
-import {
-  lookupVoice,
-  normalizeAlignment,
-  voiceLookupContext,
-  type VoiceLookup,
-} from "~/workflows/steps/audio-plan";
+import { normalizeAlignment } from "~/workflows/steps/audio-plan";
 import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -88,10 +83,10 @@ Context for a --bubble read (both required with it):
   --issue <id>       issue_id, e.g. issue-1
 
 Overrides:
-  --voice <el id>    ElevenLabs voice id. Required when the audio step's voice
-                     lookup finds no voice for the bubble (no castlist row,
-                     or a row with no voice yet). With --bubble the lookup
-                     still runs, and a castlist conflict is still refused.
+  --voice <el id>    ElevenLabs voice id. Required when the audio step's render
+                     chain finds no voice for the bubble (no character_id,
+                     no voice cast yet, or a voice not in a slot). With
+                     --bubble the chain still runs; --voice replaces its voice.
   --stability <n>    0 to 1. Replaces the base and the voice's own value.
   --similarity <n>   0 to 1. Replaces the base and the voice's own value.
   --prefix "<tag>"   Replaces the voice's stored line_prefix for this render,
@@ -231,28 +226,20 @@ async function readBubble(spec: LineSpec): Promise<BubbleRow> {
 }
 
 /**
- * The bubble's voice by the audio step's own lookup (`lookupVoice`, #352):
- * `bubbles.character_id`, then the castlist rows' `character_id`, then the
- * name rule, with the voice from `voiceFor`. A render that spent on any other
- * answer would be audio the pipeline would never play (decisions row 173).
- * A slug group or a character whose castlist rows disagree on `voice_id` is
- * a `castlist conflict`, refused before any call (#291).
+ * The bubble's voice by the audio step's own rule, the render chain
+ * (`renderVoice`, #429) on `bubbles.character_id`. A render that spent on any
+ * other answer would be audio the pipeline would never play (decisions row
+ * 173).
  */
 async function readBubbleVoice(
   bookId: string,
   issueId: string,
-  bubble: { speaker: string | null; character_id: string | null },
-): Promise<VoiceLookup> {
-  const [book, aliases] = await Promise.all([
-    loadBookCast(supabase, bookId).catch((e: Error) => fail(e.message)),
-    supabase
-      .from("aliases")
-      .select("alias, canonical")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`),
-  ]);
-  if (aliases.error) fail(`Reading aliases: ${aliases.error.message}`);
-  const rows = (aliases.data ?? []) as { alias: string; canonical: string }[];
-  return lookupVoice(voiceLookupContext(book, issueId, rows), bubble);
+  characterId: string | null,
+): Promise<RenderVoice> {
+  const book = await loadBookCast(supabase, bookId).catch((e: Error) =>
+    fail(e.message),
+  );
+  return renderVoice(book, characterId, issueId);
 }
 
 /**
@@ -299,47 +286,56 @@ async function readNeighbours(
 }
 
 /**
- * Why there is no voice, naming the case, because the fix is not the same for
- * each: a missing row or voice is fixed by `--voice` for this one render, a
- * silent character and a conflicting pair are castlist data problems that
- * `--voice` would only paper over.
+ * Why there is no voice, naming the render chain's case, because the fix is
+ * not the same for each: a missing or unslotted voice is fixed by `--voice`
+ * for this one render, a removed or "no audio" character is castlist data
+ * that `--voice` would only paper over.
  */
 function noVoiceMessage(
   speaker: string | null,
   bookId: string | null,
   issueId: string | null,
-  miss: (VoiceLookup & { ok: false }) | null,
+  miss: (RenderVoice & { ok: false }) | null,
 ): string {
-  const who = `speaker '${speaker ?? "(none)"}'`;
+  const who = miss?.characterId
+    ? `character '${miss.characterId}'`
+    : `speaker '${speaker ?? "(none)"}'`;
   const where = `${bookId ?? "the book"}/${issueId ?? "the issue"}`;
-  switch (miss?.reason ?? "no speaker") {
-    case "skip sentinel":
+  switch (miss?.reason ?? "no bubble") {
+    case "no audio":
       return (
-        `The castlist row for ${who} in ${where} is the __SKIPPED__ sentinel, so this ` +
-        `character is silent in this issue and the audio step renders no audio for it. ` +
-        `This script will not spend a call on audio the pipeline never plays.`
+        `The castlist row for ${who} in ${where} has no_audio set (${miss!.detail}), so ` +
+        `the audio step renders no audio for it. This script will not spend a call ` +
+        `on audio the pipeline never plays.`
       );
-    case "castlist conflict":
+    case "removed":
       return (
-        `The castlist rows for ${who} in ${where} disagree, so no single voice is the ` +
-        `cast (${miss!.detail}). Decide which one is right (decisions row 54) ` +
-        `rather than picking one here.`
+        `${who} is removed from the cast of ${where} (${miss!.detail}), so the audio ` +
+        `step renders no audio for it. This script will not spend a call on audio ` +
+        `the pipeline never plays.`
       );
-    case "cast without a voice":
+    case "not in a slot":
+      return (
+        `${who} is cast in ${where}, but its voice is not in a slot (${miss!.detail}). ` +
+        `Put the voice in a slot first, or pass --voice <elevenlabs voice id> for ` +
+        `this one render.`
+      );
+    case "no voice":
       return (
         `No voice for ${who} in ${where} (${miss!.detail}), so the character is cast ` +
         `without a voice yet. Cast it first, or pass --voice <elevenlabs voice id> ` +
         `for this one render.`
       );
-    case "no speaker":
+    case "unassigned":
       return (
-        `Nothing to look up: this line has no speaker and no character_id, so the ` +
-        `castlist cannot answer. Pass --voice <elevenlabs voice id>.`
+        `This bubble (${who}) has no character_id, so the render chain cannot ` +
+        `answer and the audio step renders no audio for it. Assign it in the ` +
+        `review editor, or pass --voice <elevenlabs voice id>.`
       );
     default:
       return (
-        `No castlist row for ${who} in ${where} by character_id or by name ` +
-        `(${miss!.detail}). Pass --voice <elevenlabs voice id>.`
+        `Nothing to look up: this line has no bubble, so the castlist cannot ` +
+        `answer. Pass --voice <elevenlabs voice id>.`
       );
   }
 }
@@ -442,20 +438,14 @@ async function planRender(
 
   if (!text.trim()) fail(`No text to render (${source}).`);
 
-  // A --bubble render always runs the lookup, so a castlist conflict is
-  // refused even with --voice; --voice then replaces the voice it found.
-  let miss: (VoiceLookup & { ok: false }) | null = null;
+  // A --bubble render always runs the render chain; --voice then replaces
+  // the voice it found.
+  let miss: (RenderVoice & { ok: false }) | null = null;
   let voiceId: string | null = null;
-  if ((speaker || characterId) && bookId && issueId) {
-    const found = await readBubbleVoice(bookId, issueId, {
-      speaker,
-      character_id: characterId,
-    });
-    if (found.ok) voiceId = found.voiceId;
+  if (spec.bubble && bookId && issueId) {
+    const found = await readBubbleVoice(bookId, issueId, characterId);
+    if (found.ok) voiceId = found.elevenLabsId;
     else miss = found;
-  }
-  if (miss?.reason === "castlist conflict") {
-    fail(noVoiceMessage(speaker, bookId, issueId, miss));
   }
   voiceId = spec.voice ?? voiceId;
   if (!voiceId) fail(noVoiceMessage(speaker, bookId, issueId, miss));

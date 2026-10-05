@@ -1599,19 +1599,18 @@ export async function getContextPage(
 
   // The closed cast (#354): the issue's castlist, each row joined to its
   // `characters` row for the id the bubble gets and the aliases the match
-  // accepts. One `loadBookCast` read; the row filter mirrors `getCast` (an
-  // issue's rows with `in_issue`), which would read the same tables again.
+  // accepts. One `loadBookCast` read; `issueCast` is the rule `getCast` uses.
   // Both throws come before any download or Gemini call, so a bad cast
   // fails here and spends nothing.
-  const { loadBookCast } = await import("~/lib/cast");
+  const { issueCast, loadBookCast } = await import("~/lib/cast");
   const bookCast = await loadBookCast(supabase, bookId);
-  const castRows = bookCast.rows.filter(
-    (r) => r.issue_id === issueId && r.in_issue,
-  );
+  const castRows = issueCast(bookCast, issueId);
   const cast: ClosedCastMember[] = [];
   const unresolved: string[] = [];
   for (const entry of castRows) {
-    const row = bookCast.resolve(entry.character_id ?? entry.character);
+    const row = entry.character_id
+      ? bookCast.resolve(entry.character_id)
+      : undefined;
     if (!row) {
       // `bubbles.character_id` references `characters`, so a row with no
       // character could never be a match. Nothing is created for it.
