@@ -14,7 +14,7 @@ import type { BubbleType } from "~/components/review-editor/types";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { generateContentLogged } from "~/lib/llm-usage";
-import { GEMINI_MEDIUM } from "~/lib/models";
+import { GEMINI_FAST } from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -146,7 +146,7 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
     const response = await generateContentLogged(
       ai,
       {
-        model: GEMINI_MEDIUM,
+        model: GEMINI_FAST,
         contents: [
           createPartFromBase64(pageBase64, "image/webp"),
           createPartFromBase64(data, mime),

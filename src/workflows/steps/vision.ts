@@ -1554,7 +1554,7 @@ export async function getContextPage(
   const { getGeminiClient: getGemini } = await import("~/lib/gemini-client");
   const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const gemini = getGemini();
-  const { GEMINI_SPEAKER } = await import("~/lib/models");
+  const { GEMINI_FAST } = await import("~/lib/models");
   const { generateContentLogged } = await import("~/lib/llm-usage");
 
   const padded = String(pageNumber).padStart(2, "0");
@@ -1806,12 +1806,12 @@ export async function getContextPage(
 
       const ocrImagePart = cpb64(cropBuf.toString("base64"), "image/webp");
       const ocrPrompt = cpt(
-        "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting.",
+        "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting. Plain text only: bold, italic or larger lettering is written like any other word, with no asterisks, underscores or other markup around it.",
       );
 
       const ocrResponse = await generateContentLogged(
         gemini,
-        { model: GEMINI_MEDIUM, contents: [ocrImagePart, ocrPrompt] },
+        { model: GEMINI_FAST, contents: [ocrImagePart, ocrPrompt] },
         llmMeta,
       );
 
@@ -1842,7 +1842,7 @@ export async function getContextPage(
 
       const contextResponse = await generateContentLogged(
         gemini,
-        { model: GEMINI_SPEAKER, contents: [pageImagePart, contextTextPart] },
+        { model: GEMINI_FAST, contents: [pageImagePart, contextTextPart] },
         llmMeta,
       );
 

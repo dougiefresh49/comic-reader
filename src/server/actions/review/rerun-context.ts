@@ -9,7 +9,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { generateContentLogged } from "~/lib/llm-usage";
-import { GEMINI_MEDIUM } from "~/lib/models";
+import { GEMINI_FAST } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 
@@ -204,7 +204,7 @@ export async function rerunContext(args: Args): Promise<Result> {
     // only if quality drops below acceptable.
     const response = await generateContentLogged(
       ai,
-      { model: GEMINI_MEDIUM, contents: [pagePart, cropPart, textPart] },
+      { model: GEMINI_FAST, contents: [pagePart, cropPart, textPart] },
       {
         step: "review:rerun-context",
         bookId: args.bookId,
