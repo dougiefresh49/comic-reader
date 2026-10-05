@@ -1,8 +1,11 @@
 "use server";
 
-// The review editor's analyze: one Gemini call that proposes a bubble's text,
-// cues, speaker, emotion and type. It writes no bubble; the editor shows the
-// proposal and the owner accepts it into the pending edits.
+// The review editor's analyze: two Gemini calls, as get-context makes them
+// (#437, #460). The speaker call proposes the bubble's type, speaker, emotion
+// and, for an empty box, its text; the cue call (`cueRequest`, the one Regenerate
+// cues sends) writes the cue line from that text, speaker and emotion. It writes
+// no bubble; the editor shows the proposal and the owner accepts it into the
+// pending edits.
 import {
   GoogleGenAI,
   createPartFromBase64,
@@ -12,6 +15,7 @@ import { headers } from "next/headers";
 import { resolveSpeaker } from "~/components/review-editor/lib";
 import type { BubbleType } from "~/components/review-editor/types";
 import { checkAdminAuth } from "~/lib/admin-auth";
+import { cueRequest } from "~/lib/cue-rules";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
@@ -65,7 +69,15 @@ export interface AnalyzeProposal {
 }
 
 export type AnalyzeResult =
-  | { ok: true; proposal: AnalyzeProposal }
+  | {
+      ok: true;
+      proposal: AnalyzeProposal;
+      /**
+       * Set when the cue call failed or came back empty. The proposal still
+       * holds call 1's answer, with the plain text as its cue line.
+       */
+      cueError?: string;
+    }
   | { ok: false; error: string };
 
 interface Parsed {
@@ -73,8 +85,6 @@ interface Parsed {
   speaker?: unknown;
   emotion?: unknown;
   text?: unknown;
-  textWithCues?: unknown;
-  text_with_cues?: unknown;
 }
 
 function stripDataPrefix(s: string): { mime: string; data: string } {
@@ -137,11 +147,17 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
     hint
       ? `Reviewer's hint for this bubble, from the person checking the book. Follow it: "${hint}"`
       : undefined,
-    { closedList: true, transcribe, crop: true },
+    { closedList: true, transcribe, crop: true, noCues: true },
   );
+  const meta = {
+    bookId: args.bookId,
+    issueId: args.issueId,
+    pageNumber: args.pageNumber,
+  };
 
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  let proposal: AnalyzeProposal;
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const { mime, data } = stripDataPrefix(args.cropBase64);
     const response = await generateContentLogged(
       ai,
@@ -153,12 +169,7 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
           createPartFromText(prompt),
         ],
       },
-      {
-        step: "review:analyze-bubble",
-        bookId: args.bookId,
-        issueId: args.issueId,
-        pageNumber: args.pageNumber,
-      },
+      { step: "review:analyze-bubble", ...meta },
     );
     const reply = response.text?.trim();
     if (!reply) return { ok: false, error: "Empty Gemini response" };
@@ -179,26 +190,54 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
       return { ok: false, error: "Failed to parse Gemini JSON" };
     }
 
-    const cues = str(parsed.textWithCues) || str(parsed.text_with_cues);
-    // A model that put the words only in the cues still read them.
-    const text = transcribe
-      ? str(parsed.text) || cues.replace(/\[[^\]]*\]\s*/g, "").trim()
-      : current;
+    const text = transcribe ? str(parsed.text) : current;
     const type = TYPES.find((t) => t === str(parsed.type).toUpperCase());
     // The closed list, enforced: a name not on it never reaches the editor.
     const speaker = resolveSpeaker(str(parsed.speaker) || null, args.cast);
 
-    return {
-      ok: true,
-      proposal: {
-        text,
-        textWithCues: text ? cues || text : null,
-        speaker: speaker ?? "",
-        emotion: str(parsed.emotion) || "neutral",
-        type: type ?? "SPEECH",
-      },
+    proposal = {
+      text,
+      textWithCues: null,
+      speaker: speaker ?? "",
+      emotion: str(parsed.emotion) || "neutral",
+      type: type ?? "SPEECH",
     };
   } catch (e) {
     return { ok: false, error: (e as Error).message };
   }
+
+  // A box with no words has nothing to cue.
+  if (!proposal.text) return { ok: true, proposal };
+
+  // The cue line, from the text, speaker and emotion the proposal carries. The
+  // reviewer's hint went to the speaker call; `userFeedback` is feedback on an
+  // earlier cue line, so it stays unset. A failed or empty reply keeps the
+  // speaker proposal, with the plain text as the cue line.
+  let cueError: string;
+  try {
+    const response = await generateContentLogged(
+      ai,
+      cueRequest({
+        text: proposal.text,
+        emotion: proposal.emotion,
+        speaker: proposal.speaker || null,
+      }),
+      { step: "review:analyze-bubble:cues", ...meta },
+    );
+    const cueLine = response.text?.trim();
+    if (cueLine) {
+      return { ok: true, proposal: { ...proposal, textWithCues: cueLine } };
+    }
+    cueError = "Empty Gemini response from the cue call";
+  } catch (e) {
+    cueError = `cue call failed: ${(e as Error).message}`;
+  }
+  console.warn(
+    `[analyze-bubble] ${args.bookId}/${args.issueId} page ${args.pageNumber}: ${cueError}`,
+  );
+  return {
+    ok: true,
+    proposal: { ...proposal, textWithCues: proposal.text },
+    cueError,
+  };
 }
