@@ -9,9 +9,12 @@
  * renders every take (`TTS_MODEL` in `tts-request.ts`).
  *
  * `CUE_RULES` is plain prompt text with no inputs, so any prompt that writes
- * `text_with_cues` includes it: the review editors' Regenerate cues
- * (`buildCuePrompt` below) and the pipeline's cue instruction in
- * `buildContextPrompt` (#213 step 5).
+ * `text_with_cues` includes it. `buildCuePrompt` below is the one home for
+ * writing a cue line: the review editor's Regenerate cues sends it, and so
+ * does the pipeline's get-context step, as a second call after the speaker
+ * call (#437). `buildContextPrompt` still carries the rules for the callers
+ * that ask for the cue line in the same reply as the speaker (the review
+ * editor's Analyze and the legacy scripts); the pipeline passes `noCues`.
  */
 export const CUE_RULES = `## Cue rules
 
