@@ -1,7 +1,7 @@
 /**
  * What the benches under scripts/bench/ share (#441, decisions row 293): the
  * CLI helpers, `--model` tier names, Gemini cost from
- * `GEMINI_USD_PER_1M_TOKENS`, the `--max-calls` ceiling, the `LIVE_API_OK=1`
+ * `GEMINI_USD_PER_1M_TOKENS`, the `--max-calls` and `--max-usd` gate, the `LIVE_API_OK=1`
  * guard and the run-file directory. Plus what a repeated-run bench needs:
  * arms, run files, and the cross-run comparison (`compare-runs.ts` is its
  * CLI), which is #431's `compare.py` method.
@@ -13,7 +13,12 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { GoogleGenAI, type ThinkingLevel } from "@google/genai";
+import {
+  type GenerateContentParameters,
+  type GenerateContentResponse,
+  GoogleGenAI,
+  type ThinkingLevel,
+} from "@google/genai";
 import {
   GEMINI_FAST,
   GEMINI_HIGH,
@@ -169,6 +174,139 @@ export class CallBudget {
     return true;
   }
 }
+
+/** One request a bench sent, as evidence of what went over the wire. */
+export type Attempt = {
+  model: string;
+  thinkingLevel: string | null;
+  latencyMs: number;
+  usage: unknown;
+  /** Null when the request failed, or when the response's `.text` threw. */
+  reply: string | null;
+  status: number | null;
+  /** The request's error, or the `.text` getter's on a 200. */
+  error: string | null;
+  /** From `usage` at the request model's rate; null with no usage or rate. */
+  costUsd: number | null;
+};
+
+/**
+ * One invocation's stop state and spend: `halted` is set once (`--max-usd`,
+ * a refused request, `--max-calls`) and from then on no request is sent,
+ * retries included. `spentUsd` is every completed request's cost, counted
+ * here and nowhere else.
+ *
+ * `usd` is `--max-usd`. A request goes out only if `spentUsd` plus one
+ * reservation for each request in flight and one for itself stays within
+ * `max`. A reservation is the larger of `seed` (the bench's per-call figure
+ * for its dearest arm) and the costliest completed request so far. The limit
+ * can still be passed by at most the amount one call exceeds its
+ * reservation, per request in flight.
+ */
+export type Gate = {
+  budget: CallBudget;
+  halted: string | null;
+  usd?: { max: number; seed: number };
+  spentUsd: number;
+  dearestUsd: number;
+  inFlight: number;
+};
+
+/** A gate on `--max-calls`; a bench sets `usd` when `--max-usd` is given. */
+export const newGate = (maxCalls: number): Gate => ({
+  budget: new CallBudget(maxCalls),
+  halted: null,
+  spentUsd: 0,
+  dearestUsd: 0,
+  inFlight: 0,
+});
+
+/**
+ * A client whose `models.generateContent` checks the gate (`--max-usd`,
+ * then `--max-calls`) before sending, counts the request's cost, and logs it
+ * to `log`. A 200 is returned and logged as one whatever its `.text` getter
+ * does, so the caller's own handling of the getter runs as in production.
+ */
+export function countingClient(
+  real: GoogleGenAI,
+  log: Attempt[],
+  gate: Gate,
+): GoogleGenAI {
+  const generateContent = async (params: GenerateContentParameters) => {
+    const thinkingLevel =
+      (params.config?.thinkingConfig?.thinkingLevel as string | undefined) ??
+      null;
+    // A halt (--max-usd, a refused request) also stops requests already
+    // queued behind it, the 429 retry on the fallback key included.
+    if (gate.halted) throw new Error(gate.halted);
+    // Check and reserve with no await between, so concurrent workers see
+    // each other's reservations.
+    if (gate.usd) {
+      const each = Math.max(gate.usd.seed, gate.dearestUsd);
+      if (!(gate.spentUsd + (gate.inFlight + 1) * each <= gate.usd.max)) {
+        gate.halted ??= `--max-usd ${gate.usd.max} reached ($${gate.spentUsd.toFixed(4)} spent, ${gate.inFlight} in flight at $${each.toFixed(5)} each)`;
+        throw new Error(gate.halted);
+      }
+    }
+    if (!gate.budget.take()) {
+      gate.halted ??= `--max-calls ${gate.budget.max} reached`;
+      throw new Error(`--max-calls ${gate.budget.max} reached`);
+    }
+    gate.inFlight++;
+    const started = Date.now();
+    const attempt = { model: params.model, thinkingLevel };
+    let res: GenerateContentResponse;
+    try {
+      res = await real.models.generateContent(params);
+    } catch (e) {
+      gate.inFlight--;
+      log.push({
+        ...attempt,
+        latencyMs: Date.now() - started,
+        usage: null,
+        reply: null,
+        status: (e as { status?: number } | null)?.status ?? 0,
+        error: e instanceof Error ? e.message : String(e),
+        costUsd: null,
+      });
+      throw e;
+    }
+    const latencyMs = Date.now() - started;
+    const usage = res.usageMetadata ?? null;
+    const costUsd = geminiUsd(usage, geminiRate(params.model));
+    gate.inFlight--;
+    gate.spentUsd += costUsd ?? 0;
+    gate.dearestUsd = Math.max(gate.dearestUsd, costUsd ?? 0);
+    // `.text` is an SDK getter that can throw (a null content part); the
+    // tokens were billed all the same.
+    let reply: string | null = null;
+    let error: string | null = null;
+    try {
+      reply = res.text ?? "";
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e);
+    }
+    log.push({
+      ...attempt,
+      latencyMs,
+      usage,
+      reply,
+      status: 200,
+      error,
+      costUsd,
+    });
+    return res;
+  };
+  return { models: { generateContent } } as unknown as GoogleGenAI;
+}
+
+/** A request the API refused (a bad model or config): 4xx other than 429. */
+export const refused = (a: Attempt | undefined) =>
+  !!a &&
+  a.status !== null &&
+  a.status >= 400 &&
+  a.status < 500 &&
+  a.status !== 429;
 
 /** The median, the two middle values' mean rounded when the count is even. */
 export function median(values: number[]): number | null {
