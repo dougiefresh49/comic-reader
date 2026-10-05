@@ -166,6 +166,7 @@ export async function loadVoices(
     replaces: null,
     candidates: [],
     hasDescription: false,
+    designedVoices: [],
     needsSlot: false,
     outgoing: null,
     choices: [],
@@ -209,6 +210,7 @@ export async function loadVoices(
         .filter((c) => offerable(c.id))
         .map((c) => ({ ...c, clipUrl: null })),
       hasDescription: item.hasDescription,
+      designedVoices: item.designedVoices,
       needsSlot: item.needsSlot,
       outgoing:
         o?.kind === "archive"

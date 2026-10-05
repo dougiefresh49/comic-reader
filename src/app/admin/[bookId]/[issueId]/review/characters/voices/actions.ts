@@ -57,6 +57,8 @@ export interface ItemRef {
   characterId: string;
   action: VoiceWorkAction;
   targetId: string | null;
+  /** The character's active designed voices on the plan the page showed (#458). */
+  designedVoices: string[];
 }
 
 function revalidate({ bookId, issueId }: Scope) {
@@ -247,10 +249,14 @@ export async function runItem(args: {
     const deps = { supabase: supabaseAdmin };
     const plan = await planVoiceWork(deps, scope.bookId, scope.issueId);
     const fresh = plan.items.find((i) => i.characterId === item.characterId);
+    // A designed voice the page did not show was made since it loaded,
+    // perhaps by another issue's run from the same stored row (#458).
+    const seen = new Set(item.designedVoices);
     if (
       !fresh ||
       fresh.action !== item.action ||
-      (fresh.target?.id ?? null) !== item.targetId
+      (fresh.target?.id ?? null) !== item.targetId ||
+      fresh.designedVoices.some((id) => !seen.has(id))
     ) {
       revalidate(scope);
       return {
@@ -283,9 +289,12 @@ export async function runItem(args: {
       );
       stored = true;
     }
-    const result = await carryOut(deps, fresh, {
-      archiveVoiceId: args.archiveVoiceId,
-    });
+    // The guard measures against the plan the owner saw, not this re-plan.
+    const result = await carryOut(
+      deps,
+      { ...fresh, designedVoices: item.designedVoices },
+      { archiveVoiceId: args.archiveVoiceId },
+    );
     // Refused or failed: carryOut released its claim and nothing was made,
     // so the request stored above goes too and the item is "no voice" again.
     if (stored && (result.status === "refused" || result.status === "failed"))

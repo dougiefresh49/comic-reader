@@ -1842,6 +1842,75 @@ async function checkCarryOut() {
     );
   }
 
+  {
+    // Review round 4: the page for book 2 loads, the owner runs the same
+    // character's design in book 1, then clicks Run on the stale book 2
+    // page. `runItem` (a server action, out of this script's reach) re-plans
+    // and passes the page's `designedVoices` to carryOut; this case takes
+    // that path by hand: page plan, competing design, re-plan, carryOut
+    // with the page's list.
+    const w = world({ characters: ["kit"], voices: [], limit: 3 });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
+    const BOOK2 = "check-book-2";
+    w.db.rows("issues").push({
+      book_id: BOOK2,
+      id: "issue-1",
+      number: 1,
+      created_at: "2026-10-02T00:00:00Z",
+    });
+    w.db.rows("bubbles").push({
+      id: "b-kit-book2",
+      book_id: BOOK2,
+      issue_id: "issue-1",
+      character_id: "kit",
+      speaker: "Kit",
+      voice_description: "Kit sounds like a test.",
+      ignored: false,
+      silent: false,
+    });
+    const planIn = async (book: string) =>
+      (await lib.planVoiceWork(w.deps, book, "issue-1")).items.find(
+        (i) => i.characterId === "kit",
+      )!;
+    const page = await planIn(BOOK2);
+    const a = await attempt(async () =>
+      lib.carryOut(w.deps, await itemOf(w.deps, "kit"), {
+        archiveVoiceId: null,
+      }),
+    );
+    const addsAfterA = w.acct.adds;
+    const fresh = await planIn(BOOK2);
+    const seen = new Set(page.designedVoices);
+    const runItemRefuses = fresh.designedVoices.some((id) => !seen.has(id));
+    const b = await attempt(() =>
+      lib.carryOut(
+        w.deps,
+        { ...fresh, designedVoices: page.designedVoices },
+        { archiveVoiceId: null },
+      ),
+    );
+    const active = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit" && v.status === "active");
+    report(
+      "review 4: Run on a page loaded before a competing design is refused, with the page's list",
+      [
+        `page plan in book 2: designed voices [${page.designedVoices.join(", ")}]; book 1 design: ${short(a)}`,
+        `re-plan in book 2: designed voices [${fresh.designedVoices.join(", ")}]; runItem's changed check refuses: ${String(runItemRefuses)}`,
+        `carryOut with the page's list: ${short(b)}`,
+        `kit active rows: ${active.length}; adds by the book 2 run: ${w.acct.adds - addsAfterA} (want 0)`,
+      ],
+      (a as { status?: string }).status === "done" &&
+        page.designedVoices.length === 0 &&
+        fresh.designedVoices.length === 1 &&
+        runItemRefuses &&
+        (b as { status?: string }).status === "refused" &&
+        short(b).includes("already an active designed voice") &&
+        w.acct.adds === addsAfterA &&
+        active.length === 1,
+    );
+  }
+
   const failed = results.filter((r) => !r.pass);
   console.log(
     `\ncarryOut cases: ${results.length - failed.length} of ${results.length} pass; fakes only, no network, no production row`,

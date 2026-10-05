@@ -53,6 +53,8 @@ export interface ItemView {
   replaces: VoiceRef | null;
   candidates: Candidate[];
   hasDescription: boolean;
+  /** The character's active designed voices when the page loaded; Run measures a competing design against them (#458). */
+  designedVoices: string[];
   /** Pending and not refused: takes a slot when it runs. */
   needsSlot: boolean;
   /** The plan's pick: a free slot, or the voice archived for this item. */

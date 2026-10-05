@@ -584,8 +584,14 @@ function classify(err: unknown): Added {
 type ItemKey = Pick<
   VoiceWorkItem,
   "bookId" | "issueId" | "characterId" | "action" | "target"
-> &
-  Partial<Pick<VoiceWorkItem, "designedVoices">>;
+>;
+
+/**
+ * What `carryOut` takes: the key, plus `designedVoices` from the plan the
+ * owner saw (the page load, not a re-plan at click time), which the design
+ * guard measures a competing run's voice against (#458).
+ */
+export type RunKey = ItemKey & Pick<VoiceWorkItem, "designedVoices">;
 
 const taskRow = (client: SupabaseClient, item: ItemKey) =>
   client
@@ -788,7 +794,7 @@ async function recordVoice(
  */
 export async function carryOut(
   deps: VoiceSlotsDeps,
-  item: ItemKey,
+  item: RunKey,
   opts: { archiveVoiceId: string | null },
 ): Promise<CarryOutResult> {
   const sb = deps.supabase;
@@ -946,7 +952,7 @@ async function releaseTaskAt(
 
 async function carryOutClaimed(
   deps: VoiceSlotsDeps,
-  item: ItemKey,
+  item: RunKey,
   opts: { archiveVoiceId: string | null },
   rec: Recorder,
 ): Promise<CarryOutResult> {
@@ -1001,10 +1007,11 @@ async function carryOutClaimed(
    * A design refuses once the character has an active designed voice
    * (appearance null) that did not exist when it was planned: another
    * issue's run made it from the same stored row meanwhile (#458). The
-   * voices the caller's plan already saw (`designedVoices`; this re-plan's
-   * when the caller passed none) are alternatives the owner chose past.
+   * voices the owner's plan already showed (`item.designedVoices`) are
+   * alternatives he chose past; this re-plan's list is not used, since a
+   * competing design may already be in it.
    */
-  const planned = new Set(item.designedVoices ?? fresh.designedVoices);
+  const planned = new Set(item.designedVoices);
   const alreadyDesigned = async (): Promise<CarryOutResult | null> => {
     if (fresh.action !== "design") return null;
     const made = (await readCharacterVoices(sb, [characterId])).find(
