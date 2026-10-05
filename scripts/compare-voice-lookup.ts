@@ -10,6 +10,7 @@
  * `voiceFor` gives them. Calls nothing paid and writes nothing.
  *
  * Usage: tsx --env-file=.env scripts/compare-voice-lookup.ts [--book <id>] [--issue <id>]
+ *        tsx --env-file=.env scripts/compare-voice-lookup.ts --baseline [--book <id>]
  */
 
 import { loadBookCast, voiceFor, type BookCast } from "~/lib/cast";
@@ -38,7 +39,7 @@ type Bubble = BubbleAudioRow & {
   sort_order: number;
 };
 
-async function readBubbles(): Promise<Bubble[]> {
+async function readBubbles(issue = issueId): Promise<Bubble[]> {
   const out: Bubble[] = [];
   for (;;) {
     const { data, error } = await supabase
@@ -47,7 +48,7 @@ async function readBubbles(): Promise<Bubble[]> {
         "id, speaker, character_id, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
       )
       .eq("book_id", bookId)
-      .eq("issue_id", issueId)
+      .eq("issue_id", issue)
       .order("page_number")
       .order("sort_order")
       .order("id")
@@ -58,7 +59,34 @@ async function readBubbles(): Promise<Bubble[]> {
   }
 }
 
+/**
+ * `--baseline` (#429): one line per bubble of issues 1 and 2, the bubble id
+ * and the ElevenLabs voice id the render chain gives it ("none" when it gives
+ * none). The output before and after the switch must match line for line.
+ */
+async function baseline(): Promise<void> {
+  const book = await loadBookCast(supabase, bookId);
+  const aliases = await supabase
+    .from("aliases")
+    .select("alias, canonical")
+    .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`);
+  if (aliases.error)
+    throw new Error(`reading aliases: ${aliases.error.message}`);
+  const aliasRows = (aliases.data ?? []) as {
+    alias: string;
+    canonical: string;
+  }[];
+  for (const issue of ["issue-1", "issue-2"]) {
+    const ctx = voiceLookupContext(book, issue, aliasRows);
+    for (const b of await readBubbles(issue)) {
+      const found = lookupVoice(ctx, b);
+      console.log(`${issue} ${b.id} ${found.ok ? found.voiceId : "none"}`);
+    }
+  }
+}
+
 async function main(): Promise<void> {
+  if (process.argv.includes("--baseline")) return baseline();
   const [book, aliases, bubbles] = await Promise.all([
     loadBookCast(supabase, bookId),
     supabase
