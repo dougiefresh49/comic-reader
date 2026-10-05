@@ -57,7 +57,8 @@ supabase/.temp
 # local AI tooling
 .agents/
 .claude/worktrees/
-.claude/skills/
+.claude/skills/*
+!.claude/skills/autopilot/
 .cursor/mcp.json
 .cursor/mcp.json.*
 .cursor/settings.json
