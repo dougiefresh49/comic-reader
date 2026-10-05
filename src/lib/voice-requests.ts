@@ -26,11 +26,13 @@ import {
   ArchiveRecordError,
   ElevenLabsHeadroomError,
   ElevenLabsRefusedError,
+  activateDesignedVoice,
   archiveRefusals,
   archiveVoice,
   designVoice,
   CLAIM_STALE_MS,
   claimHeld,
+  designDescriptions,
   findOpVoices,
   finishArchive,
   issueNeeds,
@@ -38,16 +40,17 @@ import {
   markRestored,
   planFreeSlots,
   readCastlist,
+  readCharacterVoices,
+  readStoredDesign,
   readVoice,
   readVoices,
-  registerVoice,
   restoreVoice,
   withVoiceOperationClaim,
   type SlotStatus,
+  type VoiceClaimOperation,
   type VoiceRow,
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots";
-import { voiceDesignAppearanceId } from "~/workflows/steps/audio-plan";
 import {
   ownRowStop,
   readSpeakerLines,
@@ -105,12 +108,18 @@ export interface VoiceWorkItem {
   target: VoiceRow | null;
   /** The character's own active voice, which a clone or design replaces. */
   replaces: VoiceRow | null;
-  /** voice-lab clones filed under the character, `lab_default` first. */
+  /** voice-lab clones filed under the character (archived), `starting_pick` first. */
   candidates: { id: string; name: string; labDefault: boolean }[];
   /** The character's non-ignored, non-silent bubbles in the issue. */
   lines: number;
-  /** Design: a description is stored on `<id>-voice-design`. */
+  /** Design: a description is stored on the character's `needs_clip` voice with no appearance. */
   hasDescription: boolean;
+  /**
+   * The character's active designed voices (appearance null) when this item
+   * was planned. A design refuses only a designed voice not in this list: a
+   * competing run made it after the plan (#458).
+   */
+  designedVoices: string[];
   /** Pending, not refused: counted in the slot plan. */
   needsSlot: boolean;
   outgoing: Outgoing | null;
@@ -164,25 +173,13 @@ async function readTasks(
   );
 }
 
+/** Each character's stored design description (#458), by character id. */
 async function readDescriptions(
   client: SupabaseClient,
   ids: string[],
 ): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
-  const { data, error } = await client
-    .from("character_appearances")
-    .select("id, voice_description")
-    .in("id", ids.map(voiceDesignAppearanceId));
-  fail("reading voice descriptions", error);
-  const out = new Map<string, string>();
-  for (const r of (data ?? []) as {
-    id: string;
-    voice_description: string | null;
-  }[]) {
-    const text = r.voice_description?.trim();
-    if (text) out.set(r.id, text);
-  }
-  return out;
+  return designDescriptions(await readCharacterVoices(client, ids));
 }
 
 /**
@@ -267,27 +264,12 @@ export async function planVoiceWork(
     ),
   );
   const voiceById = new Map(voices.map((v) => [v.id, v]));
-  const { data: labRows, error: labErr } = await sb
-    .from("voices")
-    .select("id, character_id, lab_default")
-    .eq("status", "archived")
-    .not("character_id", "is", null);
-  fail("reading voice-lab candidates", labErr);
   const candidatesOf = new Map<string, VoiceWorkItem["candidates"]>();
-  for (const r of (labRows ?? []) as {
-    id: string;
-    character_id: string;
-    lab_default: boolean | null;
-  }[]) {
-    const v = voiceById.get(r.id);
-    if (!v) continue;
-    const list = candidatesOf.get(r.character_id) ?? [];
-    list.push({
-      id: v.id,
-      name: v.display_name,
-      labDefault: Boolean(r.lab_default),
-    });
-    candidatesOf.set(r.character_id, list);
+  for (const v of voices) {
+    if (v.status !== "archived" || !v.character_id) continue;
+    const list = candidatesOf.get(v.character_id) ?? [];
+    list.push({ id: v.id, name: v.display_name, labDefault: v.starting_pick });
+    candidatesOf.set(v.character_id, list);
   }
   for (const list of candidatesOf.values())
     list.sort(
@@ -310,6 +292,14 @@ export async function planVoiceWork(
     candidates: candidatesOf.get(id) ?? [],
     lines: lines.get(id) ?? 0,
     hasDescription: false,
+    designedVoices: voices
+      .filter(
+        (v) =>
+          v.character_id === id &&
+          v.status === "active" &&
+          v.appearance_id === null,
+      )
+      .map((v) => v.id),
     needsSlot: false,
     outgoing: null,
     refusals: [] as string[],
@@ -379,7 +369,7 @@ export async function planVoiceWork(
     const stop = ownRowStop(book, id, issueId);
     if (stop) item.refusals.push(stop);
     if (item.action === "design") {
-      item.hasDescription = descriptions.has(voiceDesignAppearanceId(id));
+      item.hasDescription = descriptions.has(id);
       if (item.lines === 0) item.refusals.push("no lines in this issue");
       if (!item.hasDescription)
         item.warnings.push(
@@ -387,6 +377,11 @@ export async function planVoiceWork(
         );
     } else if (!item.target) {
       item.refusals.push(`${item.action} target not found`);
+    } else if (item.target.status === "needs_clip") {
+      // Never run, takes no slot (#458): voice-lab has not delivered the clip.
+      item.refusals.push(
+        `${item.target.display_name} is waiting for a clip from voice-lab`,
+      );
     } else if (item.target.status === "active") {
       item.refusals.push(
         `${item.target.display_name} is already active: pick it as an active voice, no slot needed`,
@@ -591,6 +586,13 @@ type ItemKey = Pick<
   "bookId" | "issueId" | "characterId" | "action" | "target"
 >;
 
+/**
+ * What `carryOut` takes: the key, plus `designedVoices` from the plan the
+ * owner saw (the page load, not a re-plan at click time), which the design
+ * guard measures a competing run's voice against (#458).
+ */
+export type RunKey = ItemKey & Pick<VoiceWorkItem, "designedVoices">;
+
 const taskRow = (client: SupabaseClient, item: ItemKey) =>
   client
     .from("casting_tasks")
@@ -727,9 +729,10 @@ async function recordVoice(
       .eq("current_elevenlabs_id", elevenLabsId)
       .limit(1);
     fail(`looking up ${elevenLabsId}`, found.error);
+    // The character's stored design row becomes the voice; none, a new row.
     voiceUuid =
       ((found.data ?? []) as { id: string }[])[0]?.id ??
-      (await registerVoice(sb, {
+      (await activateDesignedVoice(sb, {
         display_name: item.name,
         current_elevenlabs_id: elevenLabsId,
         description,
@@ -791,7 +794,7 @@ async function recordVoice(
  */
 export async function carryOut(
   deps: VoiceSlotsDeps,
-  item: ItemKey,
+  item: RunKey,
   opts: { archiveVoiceId: string | null },
 ): Promise<CarryOutResult> {
   const sb = deps.supabase;
@@ -949,7 +952,7 @@ async function releaseTaskAt(
 
 async function carryOutClaimed(
   deps: VoiceSlotsDeps,
-  item: ItemKey,
+  item: RunKey,
   opts: { archiveVoiceId: string | null },
   rec: Recorder,
 ): Promise<CarryOutResult> {
@@ -1000,12 +1003,37 @@ async function carryOutClaimed(
       );
   }
 
+  /**
+   * A design refuses once the character has an active designed voice
+   * (appearance null) that did not exist when it was planned: another
+   * issue's run made it from the same stored row meanwhile (#458). The
+   * voices the owner's plan already showed (`item.designedVoices`) are
+   * alternatives he chose past; this re-plan's list is not used, since a
+   * competing design may already be in it.
+   */
+  const planned = new Set(item.designedVoices);
+  const alreadyDesigned = async (): Promise<CarryOutResult | null> => {
+    if (fresh.action !== "design") return null;
+    const made = (await readCharacterVoices(sb, [characterId])).find(
+      (v) =>
+        v.status === "active" &&
+        v.appearance_id === null &&
+        !planned.has(v.id) &&
+        v.id !== fresh.replaces?.id,
+    );
+    return made
+      ? refuse(
+          `${made.display_name} is already an active designed voice for ${characterId}, made since this plan; nothing was spent, pick it as an active voice`,
+        )
+      : null;
+  };
+
   let description: string | null = null;
   if (fresh.action === "design") {
+    const made = await alreadyDesigned();
+    if (made) return made;
     const read = async () =>
-      (await readDescriptions(sb, [characterId])).get(
-        voiceDesignAppearanceId(characterId),
-      ) ?? null;
+      (await readDescriptions(sb, [characterId])).get(characterId) ?? null;
     description = await read();
     if (!description) {
       const { getGeminiClient } = await import("~/lib/gemini-client");
@@ -1041,6 +1069,9 @@ async function carryOutClaimed(
     : undefined;
 
   const run = async (): Promise<CarryOutResult> => {
+    // Under the claims and before any spend: the voice may exist by now.
+    const made = await alreadyDesigned();
+    if (made) return made;
     const warnings: string[] = [];
     let didArchive = false;
     let deleteConfirmed = false;
@@ -1249,18 +1280,45 @@ async function carryOutClaimed(
     };
   };
 
-  // Claims on the `voices` rows it changes: the voice archived, and the
-  // voice that comes back (or, for a design, the voice it replaces). The
-  // task-row claim above covers a design that changes no existing row.
-  const held =
-    fresh.target ?? (fresh.action === "design" ? fresh.replaces : null);
-  const holdTarget = () =>
-    held && held.id !== archiveRow?.id
-      ? withVoiceOperationClaim(sb, held, fresh.action, run)
-      : run();
-  return archiveRow
-    ? withVoiceOperationClaim(sb, archiveRow, "archive", holdTarget)
-    : holdTarget();
+  // Claims on the `voices` rows it changes, all taken before anything is
+  // spent: the voice archived, the voice that comes back (or, for a design,
+  // the voice it replaces), and a design's stored row (#458), which another
+  // issue's run may be designing from too. The task-row claim above covers
+  // a design that changes no existing row.
+  const stored =
+    fresh.action === "design" ? await readStoredDesign(sb, characterId) : null;
+  const claims: { row: VoiceRow; op: VoiceClaimOperation }[] = [];
+  const hold = (row: VoiceRow | null, op: VoiceClaimOperation) => {
+    if (row && !claims.some((c) => c.row.id === row.id))
+      claims.push({ row, op });
+  };
+  hold(archiveRow, "archive");
+  hold(
+    fresh.target ?? (fresh.action === "design" ? fresh.replaces : null),
+    fresh.action,
+  );
+  hold(stored, "design");
+  let started = false;
+  let claiming: VoiceRow | null = null;
+  const claimed = claims.reduceRight<() => Promise<CarryOutResult>>(
+    (inner, c) => () => {
+      claiming = c.row;
+      return withVoiceOperationClaim(sb, c.row, c.op, inner);
+    },
+    () => {
+      started = true;
+      return run();
+    },
+  );
+  try {
+    return await claimed();
+  } catch (err) {
+    if (started || !claiming) throw err;
+    // Nothing was spent: another run holds the row, or changed it first.
+    return refuse(
+      `${(claiming as VoiceRow).display_name} is held by another run (${message(err)}); nothing was spent, plan again once it finishes`,
+    );
+  }
 }
 
 /** The one voice a lost add made, by its token, name and the inventory before it. */
@@ -1386,7 +1444,7 @@ export async function reconcile(
     const description =
       fresh.action === "design"
         ? ((await readDescriptions(sb, [item.characterId])).get(
-            voiceDesignAppearanceId(item.characterId),
+            item.characterId,
           ) ?? null)
         : null;
     const saved = await recordVoice(

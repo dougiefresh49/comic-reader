@@ -25,6 +25,12 @@ const castlistFrom = restrictFrom(
   "castlist",
   "Read and write castlist through src/lib/cast.ts, keyed on character_id.",
 );
+const voicesFrom = restrictFrom(
+  "voices",
+  "Read and write voices through src/lib/voice-slots/ or src/lib/voice-requests.ts.",
+);
+/** The voices module (#458). */
+const voicesModule = ["src/lib/voice-slots/**", "src/lib/voice-requests.ts"];
 
 export default tseslint.config(
   {
@@ -57,23 +63,37 @@ export default tseslint.config(
     },
   },
   // One `no-restricted-syntax` value wins per file in flat config, so a file
-  // both entries cover gets both selector lists, and each module file keeps
-  // the other entry's list.
+  // every entry covers gets every selector list, and each module file keeps
+  // the other entries' lists.
   {
     // issues has PK (book_id, id): query it only through src/lib/issue-queries.ts (#150).
     // castlist: every read and write lives in src/lib/cast.ts (#429).
-    ignores: ["src/lib/issue-queries.ts", "src/lib/cast.ts"],
+    // voices: every read and write lives in the voices module (#458).
+    ignores: ["src/lib/issue-queries.ts", "src/lib/cast.ts", ...voicesModule],
     rules: {
-      "no-restricted-syntax": ["error", ...issuesFrom, ...castlistFrom],
+      "no-restricted-syntax": [
+        "error",
+        ...issuesFrom,
+        ...castlistFrom,
+        ...voicesFrom,
+      ],
     },
   },
   {
     files: ["src/lib/cast.ts"],
-    rules: { "no-restricted-syntax": ["error", ...issuesFrom] },
+    rules: { "no-restricted-syntax": ["error", ...issuesFrom, ...voicesFrom] },
   },
   {
     files: ["src/lib/issue-queries.ts"],
-    rules: { "no-restricted-syntax": ["error", ...castlistFrom] },
+    rules: {
+      "no-restricted-syntax": ["error", ...castlistFrom, ...voicesFrom],
+    },
+  },
+  {
+    files: voicesModule,
+    rules: {
+      "no-restricted-syntax": ["error", ...issuesFrom, ...castlistFrom],
+    },
   },
   {
     linterOptions: {

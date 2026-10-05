@@ -12,9 +12,9 @@
  *     clone or a restore that the plan lets run.
  *
  *   DRY_RUN=1 pnpm exec tsx --conditions=react-server --env-file=.env scripts/plan-voice-work.ts --check
- *     The three #301 double-failure cases, then `carryOut` and `settle` end
- *     to end (one case per #351 review finding plus the happy path), against
- *     an in-memory Supabase fake whose writes can be made to fail and a fake
+ *     `carryOut` and `settle` end to end (one case per #351 review finding
+ *     plus the happy path), and archive then restore (#458), against an
+ *     in-memory Supabase fake whose writes can be made to fail and a fake
  *     ElevenLabs account. Touches no network and no production row.
  */
 import { createHash, randomUUID } from "node:crypto";
@@ -43,7 +43,7 @@ function parseArgs(argv: string[]): Args {
     if (a === "--book") args.book = value();
     else if (a === "--issue") args.issue = value();
     else if (a === "--carry-out") args.carryOut = value();
-    else if (a === "--check" || a === "--check-301") args.check = true;
+    else if (a === "--check") args.check = true;
     else if (a !== "--") throw new Error(`unknown argument ${a}`);
   }
   return args;
@@ -412,220 +412,7 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
   }
 }
 
-/** Answers Voice Design from fixtures and counts the paid creates. */
-function countingTransport() {
-  const t = {
-    creates: 0,
-    calls: [] as string[],
-    fetch: (path: string, init: RequestInit): Promise<Response> => {
-      t.calls.push(`${init.method ?? "GET"} ${path}`);
-      const json = (body: unknown) =>
-        Promise.resolve(
-          new Response(JSON.stringify(body), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
-      if (path === "/v1/text-to-voice/design")
-        return json({ previews: [{ generated_voice_id: "preview-1" }] });
-      if (path === "/v1/text-to-voice") {
-        t.creates++;
-        return json({ voice_id: `fake-voice-${t.creates}` });
-      }
-      throw new Error(`fake transport: no answer for ${path}`);
-    },
-  };
-  return t;
-}
-
 const BOOK = "check-book";
-
-function seed(characters: string[]): FakeDb {
-  const db = new FakeDb();
-  for (const id of characters) {
-    for (const issue of ["issue-1", "issue-2"])
-      db.rows("bubbles").push({
-        id: `${issue}-${id}`,
-        book_id: BOOK,
-        issue_id: issue,
-        character_id: id,
-        speaker: id[0]!.toUpperCase() + id.slice(1),
-        ignored: false,
-        silent: false,
-      });
-    db.rows("character_appearances").push({
-      id: `${id}-voice-design`,
-      character_id: id,
-      voice_id: null,
-      voice_status: null,
-      voice_description: `A test voice for ${id}.`,
-      voice_created_at: null,
-    });
-  }
-  return db;
-}
-
-const onlyVoiceId = (p: Row) => Object.keys(p).length === 1 && "voice_id" in p;
-const readyUpdate = (p: Row) => p.voice_status === "ready";
-const appearance = (db: FakeDb, id: string) =>
-  db.rows("character_appearances").find((r) => r.id === `${id}-voice-design`)!;
-
-async function check301() {
-  const { isDryRun } = await import("~/lib/fakes/dry-run");
-  if (!isDryRun()) throw new Error("--check-301 runs only under DRY_RUN=1");
-  const { designCharacterVoice, findCharactersNeedingVoices } = await import(
-    "~/lib/voices-registry"
-  );
-  const writes = { dryRun: false };
-  const results: { name: string; pass: boolean }[] = [];
-  const run = async (
-    db: FakeDb,
-    t: ReturnType<typeof countingTransport>,
-    issueId: string,
-    id: string,
-  ) => {
-    try {
-      const r = await designCharacterVoice(
-        db.client(),
-        { bookId: BOOK, issueId, characterId: id },
-        { ...writes, fetch: t.fetch },
-      );
-      return `returned ${r.outcome}${r.voiceId ? ` ${r.voiceId}` : ""}`;
-    } catch (err) {
-      return `threw: ${err instanceof Error ? err.message : String(err)}`;
-    }
-  };
-  const report = (name: string, lines: string[], pass: boolean) => {
-    console.log(`\n${name}: ${pass ? "PASS" : "FAIL"}`);
-    for (const l of lines) console.log(`  ${l}`);
-    results.push({ name, pass });
-  };
-
-  {
-    const db = seed(["rex"]);
-    const t = countingTransport();
-    db.failNext(
-      "character_appearances",
-      "update",
-      onlyVoiceId,
-      "write 1 down",
-      2,
-    );
-    db.failNext("character_appearances", "update", readyUpdate, "write 2 down");
-    const a = await run(db, t, "issue-1", "rex");
-    const castAfterA = db
-      .rows("castlist")
-      .find((r) => r.issue_id === "issue-1" && r.character_id === "rex");
-    const voiceIdAfterA = appearance(db, "rex").voice_id;
-    const found = await findCharactersNeedingVoices(
-      db.client(),
-      BOOK,
-      "issue-1",
-      writes,
-    );
-    const voiceIdAfterB = appearance(db, "rex").voice_id;
-    const other = await findCharactersNeedingVoices(
-      db.client(),
-      BOOK,
-      "issue-2",
-      writes,
-    );
-    const c = other.needDesign.includes("rex")
-      ? await run(db, t, "issue-2", "rex")
-      : "not in issue-2's need-design list";
-    report(
-      "case 1: appearance voice_id write fails twice, castlist row commits",
-      [
-        `run 1 issue-1 (first voice_id write, ready update and its voice_id retry all fail): ${a}`,
-        `after run 1: castlist voice_uuid=${String(castAfterA?.voice_uuid ?? null)}, appearance voice_id=${String(voiceIdAfterA)}`,
-        `run 2 issue-1 get-chars: wrote castlist voice back to [${found.repaired.join(", ")}], need design [${found.needDesign.join(", ")}], appearance voice_id=${String(voiceIdAfterB)}`,
-        `run 3 issue-2 (no castlist row): need design [${other.needDesign.join(", ")}]; design step ${c}`,
-        `paid creates: ${t.creates} (want 1)`,
-      ],
-      t.creates === 1 &&
-        voiceIdAfterA === null &&
-        Boolean(castAfterA?.voice_uuid) &&
-        voiceIdAfterB === "fake-voice-1" &&
-        !found.needDesign.includes("rex") &&
-        c === "returned stored id fake-voice-1",
-    );
-  }
-
-  {
-    const db = seed(["rex"]);
-    const t = countingTransport();
-    db.failNext("castlist", "upsert", () => true, "castlist down");
-    db.failNext("character_appearances", "update", onlyVoiceId, "write 1 down");
-    db.failNext("character_appearances", "update", readyUpdate, "write 2 down");
-    const a = await run(db, t, "issue-1", "rex");
-    const voices = db.rows("voices").length;
-    const castAfterA = db.rows("castlist").length;
-    const voiceIdAfterA = appearance(db, "rex").voice_id;
-    const b = await run(db, t, "issue-1", "rex");
-    const cast = db
-      .rows("castlist")
-      .find((r) => r.issue_id === "issue-1" && r.character_id === "rex");
-    const made = db.rows("voices").find((v) => v.character_id === "rex");
-    report(
-      "case 2: voices insert lands, castlist upsert and both appearance writes fail",
-      [
-        `run 1 issue-1: ${a}`,
-        `after run 1: ${voices} voices row(s), ${castAfterA} castlist row(s), appearance voice_id=${String(voiceIdAfterA)} (the voice_id-only retry)`,
-        `run 2 issue-1 (writes healthy): ${b}`,
-        `after run 2: castlist voice_uuid=${String(cast?.voice_uuid ?? null)} no_audio=${String(cast?.no_audio ?? null)}; voices row ${String(made?.id)} ${String(made?.current_elevenlabs_id)}; ${db.rows("voices").length} voices row(s)`,
-        `paid creates: ${t.creates} (want 1)`,
-      ],
-      t.creates === 1 &&
-        a.startsWith("threw") &&
-        castAfterA === 0 &&
-        voiceIdAfterA === "fake-voice-1" &&
-        b.startsWith("returned stored id") &&
-        db.rows("voices").length === 1 &&
-        made?.current_elevenlabs_id === "fake-voice-1" &&
-        cast?.voice_uuid === made.id &&
-        cast?.no_audio === false,
-    );
-  }
-
-  {
-    const db = seed(["rex", "zed"]);
-    const t = countingTransport();
-    db.failNext(
-      "character_appearances",
-      "update",
-      (p, rows) => onlyVoiceId(p) && rows.some((r) => r.character_id === "rex"),
-      "write 1 down",
-    );
-    const outcomes: string[] = [];
-    for (const id of ["rex", "zed"]) {
-      const r = await run(db, t, "issue-1", id);
-      outcomes.push(`${id}: ${r}`);
-      if (r.startsWith("threw")) break; // the ingest loop stops on a throw
-    }
-    const rex = appearance(db, "rex");
-    const again = await run(db, t, "issue-1", "rex");
-    report(
-      "case 3: first voice_id write fails, the ready update stores it",
-      [
-        ...outcomes.map((o) => `ingest loop ${o}`),
-        `rex appearance after: voice_id=${String(rex.voice_id)} voice_status=${String(rex.voice_status)}`,
-        `rerun rex: ${again}`,
-        `paid creates: ${t.creates} (want 2, one per character)`,
-      ],
-      t.creates === 2 &&
-        outcomes.length === 2 &&
-        outcomes.every((o) => o.includes("returned created")) &&
-        rex.voice_status === "ready" &&
-        again.startsWith("returned registered"),
-    );
-  }
-
-  const failed = results.filter((r) => !r.pass);
-  console.log(
-    `\n#301 cases: ${results.length - failed.length} of ${results.length} pass; no network, no production row`,
-  );
-  if (failed.length > 0) process.exitCode = 1;
-}
 
 // ── carryOut check: a fake world, a fake ElevenLabs account ───────────────
 
@@ -776,7 +563,8 @@ function world(opts: {
       consumers: ["comic"],
       keep_active: false,
       character_id: v.character ?? null,
-      lab_default: true,
+      appearance_id: null,
+      starting_pick: true,
       created_at: "2026-10-01T00:00:00Z",
       archived_at: v.status === "archived" ? "2026-10-01T00:00:00Z" : null,
       operation_claim: null,
@@ -798,6 +586,29 @@ function world(opts: {
     acct.voices.push({ voice_id: `el-unrelated-${name}`, name, labels: {} });
   return { db, acct, deps: { supabase: db.client(), fetch: acct.fetch } };
 }
+
+/** A description stored before its design (#458): a `needs_clip` voice with no appearance. */
+const storedDesign = (db: FakeDb, character: string, text: string) =>
+  db.rows("voices").push({
+    id: randomUUID(),
+    display_name: character[0]!.toUpperCase() + character.slice(1),
+    status: "needs_clip",
+    current_elevenlabs_id: null,
+    source_clip_path: null,
+    source_clip_md5: null,
+    design_prompt: text,
+    description: text,
+    labels: null,
+    consumers: ["comic"],
+    keep_active: false,
+    character_id: character,
+    appearance_id: null,
+    starting_pick: null,
+    created_at: "2026-10-01T00:00:00Z",
+    archived_at: null,
+    operation_claim: null,
+    operation_claimed_at: null,
+  });
 
 const request = (
   db: FakeDb,
@@ -985,11 +796,7 @@ async function checkCarryOut() {
       limit: 3,
     });
     request(w.db, "zed", "clone", "zed-1993");
-    w.db.rows("character_appearances").push({
-      id: "kit-voice-design",
-      character_id: "kit",
-      voice_description: "Kit sounds bright.",
-    });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
     const zed = await itemOf(w.deps, "zed");
     w.acct.addMode = "timeout-lands";
     w.acct.lists = ["ok", "fail"]; // the inventory, then the lookup
@@ -1391,11 +1198,7 @@ async function checkCarryOut() {
     // A design reruns with no target (a clone names one: round 3, finding 3).
     const w = world({ characters: ["zed"], voices: [] });
     request(w.db, "zed", "design");
-    w.db.rows("character_appearances").push({
-      id: "zed-voice-design",
-      character_id: "zed",
-      voice_description: "Zed sounds calm.",
-    });
+    storedDesign(w.db, "zed", "Zed sounds calm.");
     const item = await itemOf(w.deps, "zed");
     await attempt(() => lib.carryOut(w.deps, item, { archiveVoiceId: null }));
     const made = task(w.db, "zed");
@@ -1718,11 +1521,7 @@ async function checkCarryOut() {
 
   {
     const w = world({ characters: ["kit"], voices: [] });
-    w.db.rows("character_appearances").push({
-      id: "kit-voice-design",
-      character_id: "kit",
-      voice_description: "Kit sounds bright.",
-    });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
     let release = () => {};
     w.acct.gate = new Promise<void>((r) => (release = r));
     const item = await itemOf(w.deps, "kit");
@@ -1749,6 +1548,369 @@ async function checkCarryOut() {
     );
   }
 
+  // ── #458 ──
+
+  {
+    // Archive, then restore: the castlist holds the voice's uuid, so a
+    // restored voice is picked up by every row that references it.
+    const w = world({
+      characters: ["rex", "kit"],
+      voices: [
+        {
+          id: "rex-1",
+          name: "Rex",
+          status: "active",
+          character: "rex",
+          castAs: ["rex", "kit"],
+        },
+      ],
+    });
+    const castBefore = JSON.stringify(w.db.rows("castlist"));
+    const before = (await slots.readVoice(w.db.client(), "rex-1"))!;
+    const archived = await attempt(() =>
+      slots.archiveVoice(w.deps, before, { execute: true }),
+    );
+    const mid = (await slots.readVoice(w.db.client(), "rex-1"))!;
+    const midPlays = await plays(w.db, "rex");
+    const restored = await attempt(() =>
+      slots.restoreVoice(w.deps, mid, { execute: true }),
+    );
+    const after = await slots.readVoice(w.db.client(), "rex-1");
+    const castAfter = JSON.stringify(w.db.rows("castlist"));
+    const rexPlays = await plays(w.db, "rex");
+    const kitPlays = await plays(w.db, "kit");
+    report(
+      "#458: archive then restore changes the ElevenLabs id, not the voice uuid or its castlist rows",
+      [
+        `before: rex-1 ${before.status} ${String(before.current_elevenlabs_id)}; castlist rex: ${cast(w.db, "rex")}, kit: ${cast(w.db, "kit")}`,
+        `archive: ${short(archived)}; then ${mid.status} ${String(mid.current_elevenlabs_id)}, rex plays ${midPlays}`,
+        `restore: ${short(restored)}`,
+        `after: ${String(after?.id)} ${String(after?.status)} ${String(after?.current_elevenlabs_id)}; castlist unchanged: ${String(castAfter === castBefore)}; rex plays ${rexPlays}, kit plays ${kitPlays}`,
+        `ElevenLabs: ${w.acct.adds} add(s), ${w.acct.deletes} delete(s)`,
+      ],
+      before.current_elevenlabs_id === "el-rex-1" &&
+        mid.status === "archived" &&
+        mid.current_elevenlabs_id === null &&
+        midPlays === "none (not in a slot)" &&
+        after?.id === "rex-1" &&
+        after.status === "active" &&
+        after.current_elevenlabs_id === "el-new-1" &&
+        castAfter === castBefore &&
+        rexPlays === "el-new-1" &&
+        kitPlays === "el-new-1" &&
+        w.acct.adds === 1 &&
+        w.acct.deletes === 1,
+    );
+  }
+
+  {
+    // A clone request whose target is still waiting for its clip is never
+    // run and takes no slot.
+    const w = world({ characters: ["zed"], voices: [] });
+    const waiting = randomUUID();
+    storedDesign(w.db, "zed", "unused");
+    const row = w.db.rows("voices").at(-1)!;
+    Object.assign(row, {
+      id: waiting,
+      display_name: "Zed (1993)",
+      description: null,
+      design_prompt: null,
+      appearance_id: randomUUID(),
+    });
+    request(w.db, "zed", "clone", waiting);
+    const item = await itemOf(w.deps, "zed");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    report(
+      "#458: a clone of a needs_clip voice is refused and takes no slot",
+      [
+        `plan: ${item.action} ${String(item.target?.display_name)} (${String(item.target?.status)}), needsSlot ${String(item.needsSlot)}, refusals ${item.refusals.join("; ")}`,
+        `carryOut: ${short(r)}; task: ${task(w.db, "zed")}`,
+        `ElevenLabs: ${w.acct.adds} add(s), ${w.acct.deletes} delete(s)`,
+      ],
+      item.target?.status === "needs_clip" &&
+        !item.needsSlot &&
+        item.refusals.some((x) => x.includes("waiting for a clip")) &&
+        (r as { status?: string }).status === "refused" &&
+        task(w.db, "zed") === "pending" &&
+        w.acct.adds === 0 &&
+        w.acct.deletes === 0,
+    );
+  }
+
+  {
+    // Review round 1, finding 1: two issues design one character's stored
+    // row at once. The stored row's claim is taken before the add, so the
+    // second run spends nothing.
+    const w = world({ characters: ["kit"], voices: [] });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
+    w.db.rows("issues").push({
+      book_id: BOOK,
+      id: "issue-2",
+      number: 2,
+      created_at: "2026-10-02T00:00:00Z",
+    });
+    w.db.rows("bubbles").push({
+      id: "b-kit-2",
+      book_id: BOOK,
+      issue_id: "issue-2",
+      character_id: "kit",
+      speaker: "Kit",
+      voice_description: "Kit sounds like a test.",
+      ignored: false,
+      silent: false,
+    });
+    const one = await itemOf(w.deps, "kit");
+    const two = (await lib.planVoiceWork(w.deps, BOOK, "issue-2")).items.find(
+      (i) => i.characterId === "kit",
+    )!;
+    let release = () => {};
+    w.acct.gate = new Promise<void>((r) => (release = r));
+    const aRun = attempt(() =>
+      lib.carryOut(w.deps, one, { archiveVoiceId: null }),
+    );
+    while (w.acct.adds === 0) await new Promise((r) => setImmediate(r));
+    const bRun = attempt(() =>
+      lib.carryOut(w.deps, two, { archiveVoiceId: null }),
+    );
+    const early = await Promise.race([
+      bRun,
+      new Promise((r) => setTimeout(() => r("still running after 2 s"), 2000)),
+    ]);
+    release();
+    const [a, b] = await Promise.all([aRun, bRun]);
+    const kitRows = w.db.rows("voices").filter((v) => v.character_id === "kit");
+    report(
+      "review 1, finding 1: two issues designing one stored row make one add and one voice",
+      [
+        `issue-1 carryOut holds the add; issue-2 carryOut meanwhile: ${short(early)}`,
+        `issue-1: ${short(a)}`,
+        `issue-2: ${short(b)}; task issue-2: ${String(w.db.rows("casting_tasks").find((t) => t.issue_id === "issue-2")?.status ?? "none")}`,
+        `kit voices rows: ${kitRows.length} (${kitRows.map((v) => String(v.status)).join(", ")}); ElevenLabs adds: ${w.acct.adds} (want 1)`,
+      ],
+      (a as { status?: string }).status === "done" &&
+        (b as { status?: string }).status === "refused" &&
+        short(b).includes("held by another run") &&
+        w.acct.adds === 1 &&
+        kitRows.length === 1 &&
+        kitRows[0]!.status === "active",
+    );
+  }
+
+  {
+    // Review rounds 1 and 2, finding 2: two description saves race for a
+    // character with no stored row. The fake runs each query whole, so the
+    // two calls interleave at every await: both read none and both insert.
+    // Nothing deletes the second row (a run may hold its claim); every
+    // reader and the activation take the first by id.
+    const w = world({ characters: ["kit"], voices: [] });
+    const save = (text: string) =>
+      attempt(() =>
+        slots.saveDesignDescription(w.db.client(), {
+          characterId: "kit",
+          displayName: "Kit",
+          description: text,
+        }),
+      );
+    const [x, y] = await Promise.all([save("Kit A."), save("Kit B.")]);
+    const kitRows = () =>
+      w.db.rows("voices").filter((v) => v.character_id === "kit");
+    const stored = kitRows();
+    const read = await slots.readCharacterVoices(w.db.client(), ["kit"]);
+    const first = slots.firstStoredDesign(read, "kit");
+    const described = slots.designDescriptions(read).get("kit");
+    const activated = await attempt(() =>
+      slots.activateDesignedVoice(w.db.client(), {
+        display_name: "Kit",
+        current_elevenlabs_id: "el-kit",
+        description: described ?? null,
+        labels: null,
+        source_clip_path: null,
+        source_clip_md5: null,
+        character_id: "kit",
+        design_prompt: described ?? null,
+      }),
+    );
+    const after = kitRows().map((v) => `${String(v.id)} ${String(v.status)}`);
+    report(
+      "review 2, finding 2: racing description saves leave two stored rows; readers and the activation take the first",
+      [
+        `saves returned ${short(x)} and ${short(y)}; kit stored rows: ${stored.length}`,
+        `first stored row: ${String(first?.id)}; description read: ${String(described)}`,
+        `activation: ${short(activated)}; rows after: ${after.join(", ")}`,
+      ],
+      stored.length === 2 &&
+        first !== undefined &&
+        described === first.description &&
+        activated === first.id &&
+        kitRows().filter((v) => v.status === "active").length === 1 &&
+        kitRows().find((v) => v.status === "active")?.id === first.id &&
+        kitRows().filter((v) => v.status === "needs_clip").length === 1,
+    );
+  }
+
+  {
+    // Review round 2, finding 1: run B plans, then run A designs and
+    // activates the stored row before B reads it. B then finds no stored row
+    // and takes no shared claim; it must still spend nothing. B is in a
+    // second book, so A's castlist write does not give it a voice.
+    const w = world({ characters: ["kit"], voices: [], limit: 3 });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
+    const BOOK2 = "check-book-2";
+    w.db.rows("issues").push({
+      book_id: BOOK2,
+      id: "issue-1",
+      number: 1,
+      created_at: "2026-10-02T00:00:00Z",
+    });
+    w.db.rows("bubbles").push({
+      id: "b-kit-book2",
+      book_id: BOOK2,
+      issue_id: "issue-1",
+      character_id: "kit",
+      speaker: "Kit",
+      voice_description: "Kit sounds like a test.",
+      ignored: false,
+      silent: false,
+    });
+    const b = (await lib.planVoiceWork(w.deps, BOOK2, "issue-1")).items.find(
+      (i) => i.characterId === "kit",
+    )!;
+    const a = await itemOf(w.deps, "kit");
+    const aDone = await attempt(() =>
+      lib.carryOut(w.deps, a, { archiveVoiceId: null }),
+    );
+    const bDone = await attempt(() =>
+      lib.carryOut(w.deps, b, { archiveVoiceId: null }),
+    );
+    const active = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit" && v.status === "active");
+    report(
+      "review 2, finding 1: a run that planned before another made the designed voice spends nothing",
+      [
+        `B planned: ${b.action}, hasDescription ${String(b.hasDescription)}; then A: ${short(aDone)}`,
+        `B: ${short(bDone)}`,
+        `kit active rows: ${active.length}; ElevenLabs adds: ${w.acct.adds} (want 1)`,
+      ],
+      (aDone as { status?: string }).status === "done" &&
+        (bDone as { status?: string }).status === "refused" &&
+        short(bDone).includes("already an active designed voice") &&
+        w.acct.adds === 1 &&
+        active.length === 1,
+    );
+  }
+
+  {
+    // Review round 3: a redesign for a character that already had two
+    // active designed voices when it was planned (it uses one, the other is
+    // unused) runs: only a designed voice made after the plan refuses.
+    const w = world({
+      characters: ["kit"],
+      voices: [
+        {
+          id: "kit-a",
+          name: "Kit",
+          status: "active",
+          character: "kit",
+          castAs: ["kit"],
+        },
+        { id: "kit-b", name: "Kit Two", status: "active", character: "kit" },
+      ],
+    });
+    storedDesign(w.db, "kit", "Kit sounds brighter.");
+    request(w.db, "kit", "design");
+    const item = await itemOf(w.deps, "kit");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    const active = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit" && v.status === "active");
+    report(
+      "review 3: a redesign past two active designed voices that existed at plan time makes one voice",
+      [
+        `plan: ${item.action}, replaces ${String(item.replaces?.id)}, designed voices at plan [${item.designedVoices.join(", ")}], outgoing ${String(item.outgoing?.kind)}`,
+        `carryOut: ${short(r)}`,
+        `kit active rows: ${active.length}; ElevenLabs adds: ${w.acct.adds} (want 1)`,
+      ],
+      (r as { status?: string }).status === "done" &&
+        w.acct.adds === 1 &&
+        item.designedVoices.length === 2 &&
+        active.length === 3,
+    );
+  }
+
+  {
+    // Review round 4: the page for book 2 loads, the owner runs the same
+    // character's design in book 1, then clicks Run on the stale book 2
+    // page. `runItem` (a server action, out of this script's reach) re-plans
+    // and passes the page's `designedVoices` to carryOut; this case takes
+    // that path by hand: page plan, competing design, re-plan, carryOut
+    // with the page's list.
+    const w = world({ characters: ["kit"], voices: [], limit: 3 });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
+    const BOOK2 = "check-book-2";
+    w.db.rows("issues").push({
+      book_id: BOOK2,
+      id: "issue-1",
+      number: 1,
+      created_at: "2026-10-02T00:00:00Z",
+    });
+    w.db.rows("bubbles").push({
+      id: "b-kit-book2",
+      book_id: BOOK2,
+      issue_id: "issue-1",
+      character_id: "kit",
+      speaker: "Kit",
+      voice_description: "Kit sounds like a test.",
+      ignored: false,
+      silent: false,
+    });
+    const planIn = async (book: string) =>
+      (await lib.planVoiceWork(w.deps, book, "issue-1")).items.find(
+        (i) => i.characterId === "kit",
+      )!;
+    const page = await planIn(BOOK2);
+    const a = await attempt(async () =>
+      lib.carryOut(w.deps, await itemOf(w.deps, "kit"), {
+        archiveVoiceId: null,
+      }),
+    );
+    const addsAfterA = w.acct.adds;
+    const fresh = await planIn(BOOK2);
+    const seen = new Set(page.designedVoices);
+    const runItemRefuses = fresh.designedVoices.some((id) => !seen.has(id));
+    const b = await attempt(() =>
+      lib.carryOut(
+        w.deps,
+        { ...fresh, designedVoices: page.designedVoices },
+        { archiveVoiceId: null },
+      ),
+    );
+    const active = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit" && v.status === "active");
+    report(
+      "review 4: Run on a page loaded before a competing design is refused, with the page's list",
+      [
+        `page plan in book 2: designed voices [${page.designedVoices.join(", ")}]; book 1 design: ${short(a)}`,
+        `re-plan in book 2: designed voices [${fresh.designedVoices.join(", ")}]; runItem's changed check refuses: ${String(runItemRefuses)}`,
+        `carryOut with the page's list: ${short(b)}`,
+        `kit active rows: ${active.length}; adds by the book 2 run: ${w.acct.adds - addsAfterA} (want 0)`,
+      ],
+      (a as { status?: string }).status === "done" &&
+        page.designedVoices.length === 0 &&
+        fresh.designedVoices.length === 1 &&
+        runItemRefuses &&
+        (b as { status?: string }).status === "refused" &&
+        short(b).includes("already an active designed voice") &&
+        w.acct.adds === addsAfterA &&
+        active.length === 1,
+    );
+  }
+
   const failed = results.filter((r) => !r.pass);
   console.log(
     `\ncarryOut cases: ${results.length - failed.length} of ${results.length} pass; fakes only, no network, no production row`,
@@ -1756,7 +1918,5 @@ async function checkCarryOut() {
   if (failed.length > 0) process.exitCode = 1;
 }
 
-if (args.check) {
-  await check301();
-  await checkCarryOut();
-} else await planOrCarryOut();
+if (args.check) await checkCarryOut();
+else await planOrCarryOut();

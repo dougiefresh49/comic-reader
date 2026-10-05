@@ -6,8 +6,10 @@
  *
  * Writes only under book_id 'smoke-test' and the `smoke-test/` Storage prefix
  * (decision row 84), plus `characters` rows for the fixtures' `smoke-` ids
- * and any `character_appearances` rows the run writes for them (option B,
- * owner's answers on #92). Every other global table is read, never written.
+ * and any `voices` rows with no real ElevenLabs id or `appearances` rows the
+ * run writes for them (option B, owner's answers on #92; `voices` took over
+ * the design rows the old appearances table held, #458). Every other global
+ * table is read, never written.
  *
  * Usage:
  *   pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --scenario clean|gates [--keep]
@@ -56,6 +58,11 @@ import {
 } from "~/workflows/steps/casting-tasks";
 import { planBubbleVoices } from "~/workflows/steps/audio-plan";
 import type { Json } from "~/types/database";
+import { readCharacterVoices, readVoices } from "~/lib/voice-slots";
+import {
+  deleteFakeCharacterVoices,
+  readVoiceTable,
+} from "~/lib/voice-slots/import";
 import { supabase } from "./lib/supabase";
 
 const BOOK = "smoke-test";
@@ -83,7 +90,6 @@ const BOOK_TABLES = [
   "book_franchises",
   "audio_timestamps",
   "casting_tasks",
-  "speaker_reviews",
   "page_context",
   "pipeline_runs",
   "character_face_exemplars",
@@ -351,10 +357,9 @@ async function snapshot(): Promise<Snapshot> {
       (r) => `${r.book_id as string}/${r.id}`,
     ),
     characters: hashed(await global("characters", "id")),
-    character_appearances: hashed(
-      await global("character_appearances", "character_id"),
-    ),
-    voices: hashed(await global("voices")),
+    appearances: hashed(await global("appearances", "character_id")),
+    works: hashed(await global("works")),
+    voices: hashed((await readVoiceTable(supabase)) as Row[]),
     "global aliases": hashed(await global("aliases", undefined, true)),
   };
 }
@@ -378,22 +383,20 @@ function diffSnapshots(before: Snapshot, after: Snapshot): string[] {
 /**
  * `dry-run-` voice ids in shared rows; outside the smoke ids only, or
  * anywhere. castlist holds no ElevenLabs id since #429 (it points at a
- * `voices` row), so the second read is `voices.current_elevenlabs_id`.
+ * `voices` row), and the old appearances table held voice ids only until
+ * #458, so `voices.current_elevenlabs_id` is the one place to read.
  */
 async function fakeVoiceRows(outsideSmoke: boolean): Promise<string[]> {
-  let q = supabase
-    .from("character_appearances")
-    .select("id, character_id, voice_id")
-    .like("voice_id", "dry-run-%");
-  if (outsideSmoke) q = q.not("character_id", "in", inList(smokeIds()));
-  const appearances = must(await q, "fake voice ids") as unknown[];
-  let v = supabase
-    .from("voices")
-    .select("id, character_id, current_elevenlabs_id")
-    .like("current_elevenlabs_id", "dry-run-%");
-  if (outsideSmoke) v = v.not("character_id", "in", inList(smokeIds()));
-  const voices = must(await v, "voices fake ids") as unknown[];
-  return [...appearances, ...voices].map((r) => JSON.stringify(r));
+  const smoke = new Set(smokeIds());
+  return (await readVoices(supabase))
+    .filter(
+      (v) =>
+        v.current_elevenlabs_id?.startsWith("dry-run-") &&
+        !(outsideSmoke && v.character_id && smoke.has(v.character_id)),
+    )
+    .map(({ id, character_id, current_elevenlabs_id }) =>
+      JSON.stringify({ id, character_id, current_elevenlabs_id }),
+    );
 }
 
 // ── Setup ───────────────────────────────────────────────────────────────
@@ -1342,12 +1345,13 @@ const SMOKE_ROWS: Array<[string, Eqs]> = [
 /**
  * Global rows keyed on a smoke id, deleted after the book rows (bubbles,
  * casting_tasks, character_face_exemplars and panel_character_detections
- * also reference characters.id). The prefix filter is a second guard.
+ * also reference characters.id) and the smoke voices (`smokeVoices`). The
+ * prefix filter is a second guard.
  */
 const smokeGlobal = (del: boolean) =>
   (
     [
-      ["character_appearances", "character_id"],
+      ["appearances", "character_id"],
       ["characters", "id"],
     ] as const
   ).map(([table, column]) => {
@@ -1359,6 +1363,12 @@ const smokeGlobal = (del: boolean) =>
       q.in(column, smokeIds()).like(column, `${PREFIX}%`),
     ] as const;
   });
+
+/** `voices` rows filed under a smoke id; one holding a real ElevenLabs id is never deleted, so it stays here. */
+const smokeVoices = async () =>
+  (await readCharacterVoices(supabase, smokeIds())).filter((v) =>
+    v.character_id.startsWith(PREFIX),
+  );
 
 async function cleanup(): Promise<{ rows: number; objects: number }> {
   // panels.scene_id and music_scenes reference each other.
@@ -1378,6 +1388,7 @@ async function cleanup(): Promise<{ rows: number; objects: number }> {
         : await withEqs(supabase.from(table).delete(), eqs);
     must(res, `delete ${table}`);
   }
+  await deleteFakeCharacterVoices(supabase, smokeIds());
   for (const [table, q] of smokeGlobal(true)) {
     must(await q, `delete ${table} (smoke ids)`);
   }
@@ -1409,6 +1420,7 @@ async function remaining(): Promise<{ rows: number; objects: number }> {
         : await countOf(table, eqs),
     );
   }
+  add("voices (smoke ids)", (await smokeVoices()).length);
   for (const [table, q] of smokeGlobal(false)) {
     const { count, error } = await q;
     if (error) fail(`${table} count: ${error.message}`);

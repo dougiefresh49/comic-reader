@@ -20,6 +20,8 @@ import {
   moveFace,
   nameGroup,
   nameSuggestion,
+  castArchivedVoice,
+  pickAppearance,
   rejectFace,
   rejectGroup,
   removeCharacter,
@@ -37,11 +39,11 @@ import type {
   CharactersData,
   FaceView,
   KnownCharacter,
-  LabCandidate,
   LooseExemplar,
   PageView,
   UnknownGroupView,
   Suggestion,
+  VoicePick,
 } from "./types";
 
 const BUTTON =
@@ -529,11 +531,34 @@ type VoiceOption = "active" | "clone" | "design";
 const VOICE_OPTIONS: { key: VoiceOption | "keep"; label: string }[] = [
   { key: "keep", label: "Keep" },
   { key: "active", label: "Another active voice" },
-  { key: "clone", label: "A voice-lab clone" },
+  { key: "clone", label: "Its voices" },
   { key: "design", label: "A new designed voice" },
 ];
 
-/** The opened card's Change control: keep, another active voice (applied at once), or a request for a clone or a design. */
+/** What the primary button under "Its voices" does for the chosen entry. */
+function pickAction(pick: VoicePick): {
+  label: string;
+  kind: "use" | "cast" | "clone" | "clip" | "design";
+} {
+  if (pick.kind === "appearance")
+    return { label: "Ask voice-lab for a clip", kind: "clip" };
+  if (pick.status === "active") return { label: "Use this voice", kind: "use" };
+  // Already a voice of this book: cast here, and the voices stop restores it.
+  if (pick.status === "archived" && pick.inBook)
+    return { label: "Use in this issue", kind: "cast" };
+  if (pick.status === "archived")
+    return { label: "Request this clone", kind: "clone" };
+  return pick.appearanceId
+    ? { label: "Ask voice-lab for a clip", kind: "clip" }
+    : { label: "Request this design", kind: "design" };
+}
+
+const PICK_STATUS: Record<string, string> = {
+  archived: "archived",
+  needs_clip: "needs a clip",
+};
+
+/** The opened card's Change control: keep, another active voice (applied at once), one of its own voices or appearances, or a request for a design. */
 function VoiceChoices({
   card,
   activeVoices,
@@ -542,6 +567,8 @@ function VoiceChoices({
   onKeep,
   onSetVoice,
   onRequest,
+  onPickAppearance,
+  onCastArchived,
 }: {
   card: CharacterCard;
   activeVoices: ActiveVoice[];
@@ -550,27 +577,46 @@ function VoiceChoices({
   onKeep: () => void;
   onSetVoice: (voice: ActiveVoice) => void;
   onRequest: (request: VoiceRequest) => void;
+  onPickAppearance: (appearanceId: string) => void;
+  onCastArchived: (voiceId: string) => void;
 }) {
   const [option, setOption] = useState<VoiceOption | null>(null);
   const others = activeVoices.filter((v) => v.id !== card.voice?.uuid);
   const [voiceId, setVoiceId] = useState("");
-  const [cloneId, setCloneId] = useState(
-    card.labCandidates.find((c) => c.labDefault)?.id ?? "",
+  const [pickId, setPickId] = useState(
+    card.voicePicks.find((p) => p.kind === "voice" && p.startingPick)?.id ?? "",
   );
   const [pull, setPull] = useState<"copied" | "failed" | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => audio.current?.pause(), []);
 
-  const play = (c: LabCandidate) => {
-    if (!c.clipUrl) return;
+  const play = (name: string, clipUrl: string) => {
     audio.current?.pause();
     setPlayError(null);
-    const a = new Audio(c.clipUrl);
+    const a = new Audio(clipUrl);
     audio.current = a;
-    a.play().catch(() => setPlayError(`Could not play ${c.name}.`));
+    a.play().catch(() => setPlayError(`Could not play ${name}.`));
   };
   const chosen = others.find((v) => v.id === voiceId);
+  const picked = card.voicePicks.find((p) => p.id === pickId);
+  const pickedAction = picked ? pickAction(picked) : null;
+  const usePick = () => {
+    if (!picked || !pickedAction) return;
+    if (picked.kind === "appearance") return onPickAppearance(picked.id);
+    switch (pickedAction.kind) {
+      case "use":
+        return onSetVoice({ id: picked.id, name: picked.name });
+      case "cast":
+        return onCastArchived(picked.id);
+      case "clone":
+        return onRequest({ action: "clone", targetVoiceUuid: picked.id });
+      case "clip":
+        return picked.appearanceId && onPickAppearance(picked.appearanceId);
+      case "design":
+        return onRequest({ action: "design" });
+    }
+  };
 
   return (
     <div className="mt-3 max-w-2xl rounded-md border border-neutral-700 bg-neutral-950/60 p-3">
@@ -634,7 +680,7 @@ function VoiceChoices({
 
       {option === "clone" && (
         <div className="mt-3">
-          {card.labCandidates.length === 0 ? (
+          {card.voicePicks.length === 0 ? (
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-neutral-300">No voice-lab clone on file.</p>
               <button
@@ -663,52 +709,70 @@ function VoiceChoices({
           ) : (
             <>
               <ul className="space-y-1">
-                {card.labCandidates.map((c) => (
-                  <li key={c.id} className="flex items-center gap-3">
-                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
-                      <input
-                        type="radio"
-                        name={`clone-${card.id}`}
-                        value={c.id}
-                        checked={cloneId === c.id}
-                        onChange={() => setCloneId(c.id)}
-                      />
-                      <span className="truncate text-neutral-100">
-                        {c.name}
-                      </span>
-                      {c.labDefault && (
-                        <span className="text-neutral-500">lab default</span>
-                      )}
-                    </label>
-                    {c.clipUrl ? (
-                      <button
-                        type="button"
-                        onClick={() => play(c)}
-                        className={QUIET}
-                        aria-label={`Play ${c.name}`}
-                      >
-                        Play
-                      </button>
-                    ) : (
-                      <span className="text-neutral-600">No clip link</span>
-                    )}
-                  </li>
-                ))}
+                {card.voicePicks.map((p) => {
+                  const name = p.kind === "voice" ? p.name : card.name;
+                  return (
+                    <li key={p.id} className="flex items-center gap-3">
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`pick-${card.id}`}
+                          value={p.id}
+                          checked={pickId === p.id}
+                          onChange={() => setPickId(p.id)}
+                        />
+                        <span className="truncate text-neutral-100">
+                          {name}
+                        </span>
+                        {p.work && (
+                          <span className="truncate text-neutral-400">
+                            {p.work}
+                            {p.kind === "appearance" &&
+                              p.voiceActor &&
+                              `, ${p.voiceActor}`}
+                          </span>
+                        )}
+                        {p.kind === "voice" && p.startingPick && (
+                          <span className="text-neutral-500">lab default</span>
+                        )}
+                        {p.kind === "voice" && PICK_STATUS[p.status] && (
+                          <span className="text-neutral-500">
+                            {PICK_STATUS[p.status]}
+                          </span>
+                        )}
+                      </label>
+                      {p.kind === "voice" &&
+                        p.status === "archived" &&
+                        (p.clipUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => play(p.name, p.clipUrl!)}
+                            className={QUIET}
+                            aria-label={`Play ${p.name}`}
+                          >
+                            Play
+                          </button>
+                        ) : (
+                          <span className="text-neutral-600">No clip link</span>
+                        ))}
+                    </li>
+                  );
+                })}
               </ul>
               {playError && <p className="mt-1 text-amber-300">{playError}</p>}
               <div className="mt-2 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  disabled={busy || !cloneId}
-                  onClick={() =>
-                    onRequest({ action: "clone", targetVoiceUuid: cloneId })
-                  }
+                  disabled={busy || !pickedAction}
+                  onClick={usePick}
                   className={PRIMARY}
                 >
-                  Request this clone
+                  {pickedAction?.label ?? "Request this clone"}
                 </button>
                 <span className="text-neutral-500">
-                  Made at the voices stop.
+                  {pickedAction?.kind === "use"
+                    ? "Applied at once, in every issue of the book."
+                    : "Made at the voices stop."}
                 </span>
               </div>
             </>
@@ -779,6 +843,8 @@ function CharacterCardView({
   onReject,
   onSetVoice,
   onRequestVoice,
+  onPickAppearance,
+  onCastArchived,
   onUndoVoiceRequest,
 }: {
   card: CharacterCard;
@@ -800,6 +866,8 @@ function CharacterCardView({
   onReject: (face: FaceView) => void;
   onSetVoice: (voice: ActiveVoice) => void;
   onRequestVoice: (request: VoiceRequest) => void;
+  onPickAppearance: (appearanceId: string) => void;
+  onCastArchived: (voiceId: string) => void;
   onUndoVoiceRequest: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
@@ -1001,6 +1069,14 @@ function CharacterCardView({
                 onRequest={(request) => {
                   setChanging(false);
                   onRequestVoice(request);
+                }}
+                onPickAppearance={(appearanceId) => {
+                  setChanging(false);
+                  onPickAppearance(appearanceId);
+                }}
+                onCastArchived={(voiceId) => {
+                  setChanging(false);
+                  onCastArchived(voiceId);
                 }}
               />
             )
@@ -1302,6 +1378,9 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     [data.bookId, data.issueId],
   );
 
+  /** Per card, the voice this issue's row had before an appearance pick, for Undo (null: none). */
+  const beforePick = useRef(new Map<string, string | null>());
+
   const run = useCallback(
     (label: string, work: () => Promise<ActionResult>) => {
       setNote({ text: `${label}…`, tone: "plain" });
@@ -1394,7 +1473,9 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
       run(`Dropping the page ${face.page} face`, () =>
         rejectFace({ scope, detectionId: face.id }),
       ),
-    onSetVoice: (voice: ActiveVoice) =>
+    // Any other voice choice ends the appearance pick Undo would revert.
+    onSetVoice: (voice: ActiveVoice) => {
+      beforePick.current.delete(card.id);
       run(`Giving ${card.name} ${voice.name}`, () =>
         setActiveVoice({
           scope,
@@ -1403,8 +1484,10 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
           group: card.group,
           voiceUuid: voice.id,
         }),
-      ),
-    onRequestVoice: (request: VoiceRequest) =>
+      );
+    },
+    onRequestVoice: (request: VoiceRequest) => {
+      beforePick.current.delete(card.id);
       run(`Requesting a voice for ${card.name}`, () =>
         requestVoice({
           scope,
@@ -1412,11 +1495,47 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
           name: card.name,
           request,
         }),
-      ),
+      );
+    },
+    onPickAppearance: (appearanceId: string) =>
+      run(`Asking voice-lab for a clip for ${card.name}`, async () => {
+        const result = await pickAppearance({
+          scope,
+          characterId: card.id,
+          name: card.name,
+          appearanceId,
+        });
+        // The first pick's voice is what Undo puts back; a repeat keeps it.
+        if (
+          result.ok &&
+          result.previousVoiceUuid !== undefined &&
+          !beforePick.current.has(card.id)
+        )
+          beforePick.current.set(card.id, result.previousVoiceUuid);
+        return result;
+      }),
+    onCastArchived: (voiceId: string) => {
+      beforePick.current.delete(card.id);
+      run(`Casting an archived voice for ${card.name}`, () =>
+        castArchivedVoice({
+          scope,
+          characterId: card.id,
+          name: card.name,
+          voiceUuid: voiceId,
+        }),
+      );
+    },
     onUndoVoiceRequest: () =>
-      run(`Undoing the voice request for ${card.name}`, () =>
-        undoVoiceRequest({ scope, characterId: card.id, name: card.name }),
-      ),
+      run(`Undoing the voice request for ${card.name}`, async () => {
+        const result = await undoVoiceRequest({
+          scope,
+          characterId: card.id,
+          name: card.name,
+          restoreVoiceUuid: beforePick.current.get(card.id),
+        });
+        if (result.ok) beforePick.current.delete(card.id);
+        return result;
+      }),
   });
 
   return (

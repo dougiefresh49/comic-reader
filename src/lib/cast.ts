@@ -17,6 +17,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { slugify } from "~/lib/character-id";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
+import {
+  newestActiveVoiceOf,
+  readVoiceStates,
+  voiceExists,
+} from "~/lib/voice-slots/lookup";
 
 type Client = SupabaseClient;
 const db = (client: Client) => client as SupabaseClient<Database>;
@@ -174,24 +179,6 @@ function nameResolver(
 const CAST_COLUMNS =
   "issue_id, character, character_id, voice_uuid, in_issue, no_audio";
 
-/** The `voices` rows these ids name, in chunks that keep the URL short. */
-async function readCastVoices(
-  client: Client,
-  ids: Iterable<string>,
-): Promise<Map<string, CastVoiceRow>> {
-  const list = [...new Set(ids)];
-  const out = new Map<string, CastVoiceRow>();
-  for (let i = 0; i < list.length; i += 200) {
-    const { data, error } = await db(client)
-      .from("voices")
-      .select("id, current_elevenlabs_id, status")
-      .in("id", list.slice(i, i + 200));
-    must("reading the cast's voices", error);
-    for (const v of data ?? []) out.set(v.id, v);
-  }
-  return out;
-}
-
 /** The book's castlist, issue order, the voices it points at, `form_of` links and name resolver, for the render chain and the writers. */
 export async function loadBookCast(
   client: Client,
@@ -211,7 +198,7 @@ export async function loadBookCast(
     readCharacters(client),
   ]);
   must("reading the book's issues", issues.error);
-  const voices = await readCastVoices(
+  const voices = await readVoiceStates(
     client,
     rows.flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : [])),
   );
@@ -522,15 +509,7 @@ async function startingVoice(
 ): Promise<string | null> {
   const latest = latestVoicedRow(book, characterId);
   if (latest) return latest.voice_uuid;
-  const { data, error } = await db(client)
-    .from("voices")
-    .select("id")
-    .eq("character_id", characterId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  must(`reading the voice of ${characterId}`, error);
-  return data?.[0]?.id ?? null;
+  return newestActiveVoiceOf(client, characterId);
 }
 
 type CastPatch = Pick<
@@ -631,13 +610,13 @@ async function writeRow(
   await updateRow(client, book.bookId, issueId, characterId, patch);
 }
 
-/** Points the issue's row for the character at a voice, inserting the row (`in_issue` true) when there is none; other issues' rows are left alone. */
+/** Points the issue's row for the character at a voice (null: none of its own), inserting the row (`in_issue` true) when there is none; other issues' rows are left alone. */
 export async function setIssueVoice(
   client: Client,
   bookId: string,
   issueId: string,
   characterId: string,
-  voiceUuid: string,
+  voiceUuid: string | null,
 ): Promise<void> {
   const patch = { voice_uuid: voiceUuid };
   if ((await updateRow(client, bookId, issueId, characterId, patch)) > 0)
@@ -652,6 +631,56 @@ export async function setIssueVoice(
   );
   // A row another writer inserted first was kept: write the patch on it.
   await updateRow(client, bookId, issueId, characterId, patch);
+}
+
+/**
+ * Compare-and-set on the issue's row for the character: points it at `to`
+ * (null: none of its own, so the chain inherits the book's latest voice)
+ * only while it still holds `from`. Inserts nothing. True when it changed.
+ */
+export async function swapIssueVoice(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+  from: string,
+  to: string | null,
+): Promise<boolean> {
+  const { data, error } = await db(client)
+    .from("castlist")
+    .update({ voice_uuid: to })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId)
+    .eq("voice_uuid", from)
+    .select("issue_id");
+  must(`swapping the voice of castlist ${issueId}/${characterId}`, error);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Deletes the character's settled `casting_tasks` rows for the issue
+ * (`complete` or `skipped`, no `carryOut` record), so the voice-work planner
+ * reads the character afresh. Pending and in-progress rows and any row with
+ * a record are live work and stay. Returns the rows deleted.
+ */
+export async function clearSettledTasks(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+): Promise<number> {
+  const { data, error } = await client
+    .from("casting_tasks")
+    .delete()
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId)
+    .in("status", ["complete", "skipped"])
+    .is("operation", null)
+    .select("character_id");
+  must(`clearing ${characterId}'s settled casting tasks`, error);
+  return (data ?? []).length;
 }
 
 /** The issue's castlist row for one character, read on its own; null when there is none. */
@@ -782,16 +811,11 @@ export async function setVoice(
   characterId: string,
   voiceUuid: string,
 ): Promise<number> {
-  const voice = await db(client)
-    .from("voices")
-    .select("id")
-    .eq("id", voiceUuid)
-    .maybeSingle();
-  must(`reading voice ${voiceUuid}`, voice.error);
-  if (!voice.data) throw new Error(`cast: no voice ${voiceUuid}`);
+  if (!(await voiceExists(client, voiceUuid)))
+    throw new Error(`cast: no voice ${voiceUuid}`);
   const { data, error } = await db(client)
     .from("castlist")
-    .update({ voice_uuid: voice.data.id })
+    .update({ voice_uuid: voiceUuid })
     .eq("book_id", bookId)
     .eq("character_id", characterId)
     .select("issue_id");

@@ -67,18 +67,17 @@ export function voiceLabel(member: CastMember): string | null {
 }
 
 /**
- * The voice a typed name already has: its `characters` row's voice, and only
- * when no row matches, an active voice of the same name.
+ * The voice a typed name already has: the voice of the `characters` row the
+ * name matches, found in `voices` by its uuid. Null when no row matches or
+ * its voice is not in the list; a voice is never matched by its name (#458).
  */
 export function ownVoice(
   name: string,
   known: KnownCharacter[],
   voices: VoiceOption[],
 ): VoiceOption | null {
-  const row = matchKnown(name, known);
-  if (row) return row.voice;
-  const key = slug(name);
-  return key ? (voices.find((v) => slug(v.name) === key) ?? null) : null;
+  const id = matchKnown(name, known)?.voice?.id;
+  return id ? (voices.find((v) => v.id === id) ?? null) : null;
 }
 
 /** The `characters` row a typed name means: its id, display name or a full alias. */

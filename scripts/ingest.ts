@@ -38,7 +38,6 @@ const PIPELINE_STEPS: PipelineStep[] = [
   { id: "extract-foreground-masks" },
   { id: "character-lookahead" },
   { id: "get-context" },
-  { id: "review-speakers" },
   { id: "sort-bubbles-gemini" },
   { id: "add-bubble-styles" },
   { id: "generate-character-voice-descriptions" },
@@ -338,19 +337,14 @@ async function main() {
           const extraArgs: string[] = [];
           if (auto) extraArgs.push("--auto");
           if (
-            (step.id === "review-new-characters" ||
-              step.id === "review-speakers") &&
+            step.id === "review-new-characters" &&
             process.env.STORAGE_MODE === "supabase"
           ) {
             extraArgs.push("--db");
           }
           const exitCode = await runPnpmScript(step.id, book, issue, extraArgs);
 
-          if (
-            (step.id === "review-new-characters" ||
-              step.id === "review-speakers") &&
-            exitCode === 2
-          ) {
+          if (step.id === "review-new-characters" && exitCode === 2) {
             console.log(
               `\n⏸️  Pipeline paused at ${step.id} — complete the browser review, then re-run ingest.`,
             );

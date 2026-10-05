@@ -7,16 +7,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderVoice, type BookCast, type RenderVoice } from "~/lib/cast";
-import type { Database } from "~/types/database";
-
-export interface AppearanceRow {
-  id: string;
-  character_id: string;
-  voice_id: string | null;
-  voice_status: string | null;
-  voice_description: string | null;
-  voice_created_at: string | null;
-}
+import {
+  designDescriptions,
+  readCharacterVoices,
+  type CharacterVoice,
+} from "~/lib/voice-slots/lookup";
 
 export interface BubbleAudioRow {
   id: string;
@@ -56,87 +51,35 @@ export interface SkippedBubble {
 }
 
 /**
- * The character_appearances rows planCharactersNeedingVoices can look up for
- * these speaker keys: rows whose character_id is a key (ready voices), and
- * rows whose id is `<key>-voice-design` (descriptions). The second read is
- * needed because some voice-design rows carry another character_id.
- * Unfiltered, the read stops silently at Supabase's 1,000-row cap. An issue
- * has a few dozen speakers, so each id list stays far below URL limits.
- * Throws on a read error.
+ * The `voices` rows planCharactersNeedingVoices looks up for these speaker
+ * keys (#458): every voice filed under one of them, active ones and stored
+ * design descriptions included. Throws on a read error.
  */
-export async function readPlanningAppearances(
-  client: SupabaseClient<Database>,
+export async function readPlanningVoices(
+  client: SupabaseClient,
   speakerIds: Iterable<string>,
-): Promise<AppearanceRow[]> {
-  const ids = [...new Set(speakerIds)];
-  if (ids.length === 0) return [];
-  const columns =
-    "id, character_id, voice_id, voice_status, voice_description, voice_created_at";
-  const [byCharacter, byDesignId] = await Promise.all([
-    client
-      .from("character_appearances")
-      .select(columns)
-      .in("character_id", ids),
-    client
-      .from("character_appearances")
-      .select(columns)
-      .in("id", ids.map(voiceDesignAppearanceId)),
-  ]);
-  if (byCharacter.error) throw new Error(byCharacter.error.message);
-  if (byDesignId.error) throw new Error(byDesignId.error.message);
-
-  const rows = new Map<string, AppearanceRow>();
-  for (const row of [...(byCharacter.data ?? []), ...(byDesignId.data ?? [])]) {
-    rows.set(row.id, row);
-  }
-  return [...rows.values()];
+): Promise<CharacterVoice[]> {
+  return readCharacterVoices(client, speakerIds);
 }
 
 export function isNarratorKey(key: string): boolean {
   return key === "narrator";
 }
 
-export function voiceDesignAppearanceId(characterId: string): string {
-  return `${characterId}-voice-design`;
-}
-
-/**
- * Among ready appearances for a character (voice_status ready, non-empty
- * voice_id), pick the newest voice_created_at.
- */
-export function pickReadyAppearanceVoice(
-  appearances: AppearanceRow[],
+/** The character's newest active voice with an ElevenLabs id, as its `voices.id`. */
+export function pickActiveVoice(
+  voices: CharacterVoice[],
   characterId: string,
 ): string | null {
-  const ready = appearances.filter(
-    (a) =>
-      a.character_id === characterId &&
-      a.voice_status === "ready" &&
-      !!a.voice_id,
-  );
-  if (ready.length === 0) return null;
-  ready.sort((a, b) => {
-    const aAt = a.voice_created_at ?? "";
-    const bAt = b.voice_created_at ?? "";
-    return bAt.localeCompare(aAt);
-  });
-  return ready[0]!.voice_id;
-}
-
-export function hasVoiceDesignDescription(
-  appearances: AppearanceRow[],
-  characterId: string,
-): boolean {
-  const id = voiceDesignAppearanceId(characterId);
-  const row = appearances.find((a) => a.id === id);
-  return !!row?.voice_description?.trim();
-}
-
-export function getVoiceDesignAppearance(
-  appearances: AppearanceRow[],
-  characterId: string,
-): AppearanceRow | undefined {
-  return appearances.find((a) => a.id === voiceDesignAppearanceId(characterId));
+  const ready = voices
+    .filter(
+      (v) =>
+        v.character_id === characterId &&
+        v.status === "active" &&
+        !!v.current_elevenlabs_id,
+    )
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return ready[0]?.id ?? null;
 }
 
 /** Bubble needs audio when path null, not ignored, and has text. */
@@ -197,30 +140,31 @@ export function normalizeAlignment(
 }
 
 export interface CharactersNeedingVoicesPlan {
-  /** Castlist rows to write from a ready appearance (no ElevenLabs). */
-  reuse: { characterId: string; elevenLabsId: string }[];
-  /** Character ids that need Voice Design (have `<id>-voice-design` description). */
+  /** Castlist rows to write from the character's active voice (no ElevenLabs). */
+  reuse: { characterId: string; voiceUuid: string }[];
+  /** Character ids that need Voice Design (a description is stored for them). */
   needDesign: string[];
 }
 
 /**
  * The issue's speakers (`bubbles.character_id`) with no castlist row in the
  * issue, narrator excluded. Any castlist row, with a voice or not, blocks
- * reuse and Voice Design. Ready appearance voices become reuse writes; the
- * rest need a voice-design description.
+ * reuse and Voice Design. An active voice becomes a reuse write; the rest
+ * need a stored design description.
  */
 export function planCharactersNeedingVoices(
   characterIds: Iterable<string>,
   castMembers: ReadonlySet<string>,
-  appearances: AppearanceRow[],
+  voices: CharacterVoice[],
 ): CharactersNeedingVoicesPlan {
-  const reuse: { characterId: string; elevenLabsId: string }[] = [];
+  const reuse: { characterId: string; voiceUuid: string }[] = [];
   const needDesign: string[] = [];
+  const described = designDescriptions(voices);
   for (const id of [...new Set(characterIds)].sort()) {
     if (isNarratorKey(id) || castMembers.has(id)) continue;
-    const ready = pickReadyAppearanceVoice(appearances, id);
-    if (ready) reuse.push({ characterId: id, elevenLabsId: ready });
-    else if (hasVoiceDesignDescription(appearances, id)) needDesign.push(id);
+    const ready = pickActiveVoice(voices, id);
+    if (ready) reuse.push({ characterId: id, voiceUuid: ready });
+    else if (described.has(id)) needDesign.push(id);
   }
   return { reuse, needDesign };
 }

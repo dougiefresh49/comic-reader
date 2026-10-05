@@ -19,7 +19,7 @@ import {
   normalizeAlignment,
   planBubbleVoices,
   planCharactersNeedingVoices,
-  readPlanningAppearances,
+  readPlanningVoices,
   selectBubblesNeedingAudio,
   type BubbleAudioRow,
 } from "~/workflows/steps/audio-plan";
@@ -188,7 +188,7 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
       r.issue_id === issueId && r.character_id ? [r.character_id] : [],
     ),
   );
-  const appearances = await readPlanningAppearances(supabase, [
+  const voices = await readPlanningVoices(supabase, [
     ...speakers,
     ...castMembers,
   ]);
@@ -201,11 +201,7 @@ async function planIssue(bookId: string, issueId: string): Promise<void> {
   }
   const unassigned = bubbles.filter((b) => !b.character_id).length;
   const sendPlan = planBubbleVoices(bubbles, book, issueId);
-  const voicePlan = planCharactersNeedingVoices(
-    speakers,
-    castMembers,
-    appearances,
-  );
+  const voicePlan = planCharactersNeedingVoices(speakers, castMembers, voices);
 
   console.log(
     `${speakers.length} speakers (character ids), ${byReason.get("voiced")?.length ?? 0} voiced, ${unassigned} unassigned bubbles, ${sendPlan.toSend.length} bubbles to send, ${voicePlan.needDesign.length} need Voice Design`,

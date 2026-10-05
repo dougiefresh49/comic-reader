@@ -12,16 +12,21 @@ import {
   addAlias,
   addToCast,
   cancelVoiceRequest,
+  castRow,
+  clearSettledTasks,
   createCharacter,
   loadBookCast,
   readVoiceRequests,
   removeFromCast,
   renameCharacter as renameCharacterRow,
   seedCast,
+  setIssueVoice,
   setVoice,
   storeVoiceRequest,
+  swapIssueVoice,
   type VoiceRequest,
 } from "~/lib/cast";
+import { readVoice, voiceForAppearance } from "~/lib/voice-slots";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
@@ -32,6 +37,11 @@ import type { CardGroup } from "./types";
 
 export type ActionResult =
   | { ok: true; message: string }
+  | { ok: false; error: string };
+
+/** `pickAppearance`'s answer: on a pick that stored a request, the voice this issue's row had before it, for Undo. */
+export type PickResult =
+  | { ok: true; message: string; previousVoiceUuid?: string | null }
   | { ok: false; error: string };
 
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
@@ -591,13 +601,7 @@ export async function setActiveVoice(args: {
 }): Promise<ActionResult> {
   try {
     const { scope, characterId, voiceUuid } = args;
-    const voice = await supabaseAdmin
-      .from("voices")
-      .select("display_name, status")
-      .eq("id", voiceUuid)
-      .maybeSingle();
-    must("reading the voice", voice.error);
-    const row = voice.data as { display_name: string; status: string } | null;
+    const row = await readVoice(supabaseAdmin, voiceUuid);
     if (row?.status !== "active")
       return { ok: false, error: "That voice is not active any more." };
     const pending = (
@@ -643,18 +647,7 @@ export async function requestVoice(args: {
     let wants: string;
     if (args.request.action === "clone") {
       const target = args.request.targetVoiceUuid;
-      const { data, error } = await supabaseAdmin
-        .from("voices")
-        .select("display_name, status, character_id, source_clip_path")
-        .eq("id", target)
-        .maybeSingle();
-      must("reading the voice-lab clone", error);
-      const row = data as {
-        display_name: string;
-        status: string;
-        character_id: string | null;
-        source_clip_path: string | null;
-      } | null;
+      const row = await readVoice(supabaseAdmin, target);
       if (
         row?.status !== "archived" ||
         row.character_id !== characterId ||
@@ -696,22 +689,214 @@ export async function requestVoice(args: {
   }
 }
 
-/** Undoes a voice request, so the options are back and one can be made again. */
+/**
+ * An appearance from "Its voices" (#458): the voice that holds it, or a new
+ * `needs_clip` voice for it, becomes a clone request and this issue's voice.
+ * Picking the same appearance again creates no second voice and no second
+ * request (`voiceForAppearance`, and the request's upsert).
+ */
+export async function pickAppearance(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+  appearanceId: string;
+}): Promise<PickResult> {
+  try {
+    const { scope, characterId, appearanceId } = args;
+    const { data, error } = await supabaseAdmin
+      .from("appearances")
+      .select("character_id, works(title, year), characters(display_name)")
+      .eq("id", appearanceId)
+      .maybeSingle();
+    must("reading the appearance", error);
+    const row = data as {
+      character_id: string;
+      works: { title: string; year: number } | null;
+      characters: { display_name: string | null } | null;
+    } | null;
+    if (row?.character_id !== characterId || !row.works)
+      return {
+        ok: false,
+        error: `That appearance is not on file for ${args.name}.`,
+      };
+    const { voice } = await voiceForAppearance(supabaseAdmin, {
+      characterId,
+      appearanceId,
+      // The shape the backfill gives a needs_clip voice: "Bulk (1993)".
+      displayName: `${row.characters?.display_name ?? args.name} (${row.works.year})`,
+    });
+    // The appearance's voice moved on since the page loaded: no clone
+    // request. Active, it is this issue's voice; archived, it is chosen as
+    // the picker chooses an archived voice.
+    if (voice.status === "active") {
+      await setIssueVoice(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+        voice.id,
+      );
+      revalidate(scope);
+      return {
+        ok: true,
+        message: `${voice.display_name} is already active: ${args.name} uses it in this issue.`,
+      };
+    }
+    if (voice.status === "archived")
+      return voice.character_id === characterId &&
+        (await loadBookCast(supabaseAdmin, scope.bookId)).rows.some(
+          (r) => r.voice_uuid === voice.id,
+        )
+        ? castArchivedVoice({ ...args, voiceUuid: voice.id })
+        : requestVoice({
+            ...args,
+            request: { action: "clone", targetVoiceUuid: voice.id },
+          });
+    if (voice.status !== "needs_clip")
+      return {
+        ok: false,
+        error: `${voice.display_name} is ${voice.status}; pick it another way.`,
+      };
+    const before = castRow(
+      await loadBookCast(supabaseAdmin, scope.bookId),
+      characterId,
+      scope.issueId,
+    );
+    await storeVoiceRequest(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      { action: "clone", targetVoiceUuid: voice.id },
+    );
+    await setIssueVoice(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      voice.id,
+    );
+    revalidate(scope);
+    const previous = before?.voice_uuid ?? null;
+    return {
+      ok: true,
+      message: `${args.name} wants a voice-lab clone from ${row.works.title} (${row.works.year}). It is made at the voices stop once voice-lab sends the clip.`,
+      // What Undo puts back on this issue's row; a repeat pick has nothing new.
+      ...(previous === voice.id ? {} : { previousVoiceUuid: previous }),
+    };
+  } catch (err) {
+    return fail("asking voice-lab for a clip", err);
+  }
+}
+
+/**
+ * An archived voice of the character that a castlist row of this book
+ * already references (#458): it is cast for this issue and the voices stop
+ * restores it, as it does any cast voice out of a slot. It is not a new
+ * clone, which is why #350 kept such voices out of the clone list.
+ */
+export async function castArchivedVoice(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+  voiceUuid: string;
+}): Promise<ActionResult> {
+  try {
+    const { scope, characterId, voiceUuid } = args;
+    const voice = await readVoice(supabaseAdmin, voiceUuid);
+    if (voice?.status !== "archived" || voice.character_id !== characterId)
+      return {
+        ok: false,
+        error: `That archived voice is not on file for ${args.name}.`,
+      };
+    const pending = (
+      await readVoiceRequests(supabaseAdmin, scope.bookId, scope.issueId)
+    ).some((r) => r.characterId === characterId && r.status === "pending");
+    if (pending)
+      await cancelVoiceRequest(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+      );
+    // A settled task (an old request carried out, or a speaker settled
+    // earlier) would read the restore as settled too: the planner would
+    // skip it. Only complete or skipped rows with no carryOut record go.
+    await clearSettledTasks(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+    );
+    await setIssueVoice(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      voiceUuid,
+    );
+    revalidate(scope);
+    return {
+      ok: true,
+      message: `${args.name} uses ${voice.display_name} in this issue. It is archived, so the voices stop restores it.${pending ? " The voice request is withdrawn." : ""}`,
+    };
+  } catch (err) {
+    return fail("casting an archived voice", err);
+  }
+}
+
+/**
+ * Undoes a voice request, so the options are back and one can be made again.
+ * After an appearance pick, `restoreVoiceUuid` is the voice this issue's
+ * row had before it (null for none), from `pickAppearance`'s answer.
+ * Undefined (the page was reloaded since the pick) means null: the issue
+ * inherits the book's voice for the character. Either goes on the row as a
+ * compare-and-set, only while the row still holds the request's
+ * `needs_clip` voice, so a newer cast voice is never overwritten.
+ */
 export async function undoVoiceRequest(args: {
   scope: Scope;
   characterId: string;
   name: string;
+  restoreVoiceUuid?: string | null;
 }): Promise<ActionResult> {
   try {
     const { scope, characterId } = args;
+    const request = (
+      await readVoiceRequests(supabaseAdmin, scope.bookId, scope.issueId)
+    ).find((r) => r.characterId === characterId);
+    const target =
+      request?.action === "clone" && request.targetVoiceUuid
+        ? await readVoice(supabaseAdmin, request.targetVoiceUuid)
+        : null;
     await cancelVoiceRequest(
       supabaseAdmin,
       scope.bookId,
       scope.issueId,
       characterId,
     );
+    let note = "";
+    if (target?.status === "needs_clip") {
+      const to = args.restoreVoiceUuid ?? null;
+      const swapped = await swapIssueVoice(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+        target.id,
+        to,
+      );
+      note = !swapped
+        ? " Its voice for this issue was left as it is: it is no longer the requested clip."
+        : args.restoreVoiceUuid === undefined
+          ? " This issue now inherits the book's voice for the character."
+          : " Its voice for this issue is back to what it was.";
+    }
     revalidate(scope);
-    return { ok: true, message: `${args.name}'s voice request is undone.` };
+    return {
+      ok: true,
+      message: `${args.name}'s voice request is undone.${note}`,
+    };
   } catch (err) {
     return fail("undoing a voice request", err);
   }

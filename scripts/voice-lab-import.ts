@@ -12,7 +12,8 @@
  * casting/<book>/cast.json row with status "ready to clone" or "approved"
  * into an archived candidate row whose source clip is uploaded to
  * comic-voice-clips. The row's display_name carries its variant, as in
- * "April O'Neil (1990)", and lab_default carries the row's `default`.
+ * "April O'Neil (1990)", and starting_pick carries the row's `default`.
+ * Every `voices` read and write goes through ~/lib/voice-slots (#458).
  *
  * Dry run is the default and makes zero writes. --execute uploads each
  * candidate clip, checks the stored copy against the local md5, then writes
@@ -32,6 +33,12 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { readVoices, type VoiceRow } from "~/lib/voice-slots";
+import {
+  insertCandidateVoice,
+  updateVoiceFacts,
+  type VoiceLabFacts,
+} from "~/lib/voice-slots/import";
 import { supabase } from "./lib/supabase.js";
 
 const BUCKET = "comic-voice-clips";
@@ -90,16 +97,6 @@ interface SnapshotVoice {
   labels: Record<string, string> | null;
 }
 
-interface VoiceRow {
-  id: string;
-  display_name: string;
-  current_elevenlabs_id: string | null;
-  design_prompt: string | null;
-  source_clip_path: string | null;
-  consumers?: string[] | null;
-  character_id?: string | null;
-}
-
 interface Character {
   id: string;
   aliases: string[] | null;
@@ -142,14 +139,6 @@ const md5Of = (buf: Buffer | Uint8Array) =>
 
 async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await readFile(file, "utf8")) as T;
-}
-
-/** True when every column in `cols` exists on voices (42703 = no such column). */
-async function hasColumns(cols: string): Promise<boolean> {
-  const { error } = await supabase.from("voices").select(cols).limit(1);
-  if (!error) return true;
-  if (error.code === "42703") return false;
-  throw new Error(`probe voices(${cols}): ${error.message}`);
 }
 
 /** Resolve a lab name like "Red Ranger (Jason)" via characters.id or aliases. */
@@ -226,35 +215,11 @@ async function main() {
   const inputs = BOOKS[args.book];
   const cloneRoot = path.join(workspace, "clone-sources", args.book);
 
-  const registryCols = await hasColumns(
-    "consumers, description, labels, source_clip_md5",
-  );
-  const characterCol = await hasColumns("character_id");
-  const labDefaultCol = await hasColumns("lab_default");
-  if (args.execute && !registryCols)
-    throw new Error(
-      "voices is missing the registry columns; apply the voices_registry_columns migration before --execute",
-    );
-  // A candidate written without its flag is never revisited: reruns skip it.
-  if (args.execute && !labDefaultCol)
-    throw new Error(
-      "voices.lab_default is missing; apply the voices_lab_default migration before --execute",
-    );
-
-  const select = [
-    "id, display_name, current_elevenlabs_id, design_prompt, source_clip_path",
-    registryCols ? "consumers" : null,
-    characterCol ? "character_id" : null,
-  ]
-    .filter(Boolean)
-    .join(", ");
-  const [voicesRes, charsRes] = await Promise.all([
-    supabase.from("voices").select(select),
+  const [voices, charsRes] = await Promise.all([
+    readVoices(supabase),
     supabase.from("characters").select("id, aliases"),
   ]);
-  if (voicesRes.error) throw new Error(voicesRes.error.message);
   if (charsRes.error) throw new Error(charsRes.error.message);
-  const voices = (voicesRes.data ?? []) as unknown as VoiceRow[];
   const resolve = characterResolver((charsRes.data ?? []) as Character[]);
   const byElId = new Map(
     voices
@@ -268,10 +233,7 @@ async function main() {
   const skips: string[] = [];
   const skip = (what: string, reason: string) =>
     skips.push(`  - ${what}: ${reason}`);
-  const updates = new Map<
-    string,
-    { row: VoiceRow; set: Record<string, unknown> }
-  >();
+  const updates = new Map<string, { row: VoiceRow; set: VoiceLabFacts }>();
   const setFor = (row: VoiceRow) => {
     const u = updates.get(row.id) ?? { row, set: {} };
     updates.set(row.id, u);
@@ -316,8 +278,7 @@ async function main() {
         fields.push("design_prompt");
       }
       const charId = resolve(row.display_name);
-      if (charId && characterCol && row.character_id == null)
-        set.character_id = charId;
+      if (charId && row.character_id == null) set.character_id = charId;
       lines.updates.push(
         `  ~ ${row.display_name} (${s.voice_id}, ${s.category}): ${fields.join(", ")}${desc ? "" : " (no description in the snapshot or a room profile)"}; character ${charId ?? "unmatched"}`,
       );
@@ -391,15 +352,6 @@ async function main() {
   // Plan.
   const mode = args.execute ? "EXECUTE" : "dry run, no writes";
   console.log(`\nvoice-lab-import ${args.book} (${mode})`);
-  console.log(
-    `registry columns: ${registryCols ? "present" : "missing, migration not applied yet (plan only)"}`,
-  );
-  console.log(
-    `voices.character_id: ${characterCol ? "present, filled where null" : "missing (#95), matches print only"}`,
-  );
-  console.log(
-    `voices.lab_default: ${labDefaultCol ? "present" : "missing, migration not applied yet (plan only)"}`,
-  );
   console.log(`\nUpdates from the snapshot (${lines.updates.length}):`);
   lines.updates.forEach((l) => console.log(l));
   console.log(
@@ -430,11 +382,13 @@ async function main() {
   // Execute.
   const failures: string[] = [];
   for (const { row, set } of updates.values()) {
-    const { error } = await supabase
-      .from("voices")
-      .update(set)
-      .eq("id", row.id);
-    if (error) failures.push(`update ${row.display_name}: ${error.message}`);
+    try {
+      await updateVoiceFacts(supabase, row.id, set);
+    } catch (err) {
+      failures.push(
+        `update ${row.display_name}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   for (const c of candidates) {
@@ -460,16 +414,19 @@ async function main() {
       );
       continue;
     }
-    const { error } = await supabase.from("voices").insert({
-      display_name: c.displayName,
-      lab_default: c.isDefault,
-      status: "archived",
-      current_elevenlabs_id: null,
-      source_clip_path: c.objectPath,
-      source_clip_md5: c.md5,
-      ...(characterCol && c.characterId ? { character_id: c.characterId } : {}),
-    });
-    if (error) failures.push(`insert ${c.displayName}: ${error.message}`);
+    try {
+      await insertCandidateVoice(supabase, {
+        display_name: c.displayName,
+        starting_pick: c.isDefault,
+        source_clip_path: c.objectPath,
+        source_clip_md5: c.md5,
+        character_id: c.characterId,
+      });
+    } catch (err) {
+      failures.push(
+        `insert ${c.displayName}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   if (failures.length > 0) {

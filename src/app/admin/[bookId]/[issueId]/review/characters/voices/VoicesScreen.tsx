@@ -56,6 +56,7 @@ const refOf = (item: ItemView): ItemRef => ({
   characterId: item.characterId,
   action: item.action,
   targetId: item.target?.id ?? null,
+  designedVoices: item.designedVoices,
 });
 
 function Avatar({ name, portrait }: { name: string; portrait?: Portrait }) {

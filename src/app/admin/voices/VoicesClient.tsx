@@ -17,7 +17,6 @@ type StatusFilter = "all" | "active" | "archived" | "library";
 export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
   const [voices, setVoices] = useState(initial);
   const [filter, setFilter] = useState<StatusFilter>("all");
-  const [seriesFilter, setSeriesFilter] = useState<string>("all");
   const [updating, setUpdating] = useState<string | null>(null);
   const [plan, setPlan] = useState<VoicePlan | null>(null);
   const confirming = useRef(false);
@@ -29,23 +28,9 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
     setResults((prev) => ({ ...prev, [id]: result }));
   }
 
-  const seriesIds = useMemo(() => {
-    const set = new Set<string>();
-    voices.forEach((v) => {
-      if (v.series_id) set.add(v.series_id);
-    });
-    return Array.from(set).sort();
-  }, [voices]);
-
   const filtered = useMemo(
-    () =>
-      voices.filter((v) => {
-        if (filter !== "all" && v.status !== filter) return false;
-        if (seriesFilter !== "all" && v.series_id !== seriesFilter)
-          return false;
-        return true;
-      }),
-    [voices, filter, seriesFilter],
+    () => voices.filter((v) => filter === "all" || v.status === filter),
+    [voices, filter],
   );
 
   const counts = useMemo(() => {
@@ -137,20 +122,6 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
             </button>
           ))}
         </div>
-        {seriesIds.length > 1 && (
-          <select
-            value={seriesFilter}
-            onChange={(e) => setSeriesFilter(e.target.value)}
-            className="rounded bg-neutral-800 px-2 py-1 text-xs"
-          >
-            <option value="all">All series</option>
-            {seriesIds.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        )}
       </div>
 
       {Object.entries(results)
@@ -173,7 +144,6 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
             <tr>
               <th className="px-3 py-2 font-medium">Name</th>
               <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Series</th>
               <th className="px-3 py-2 font-medium">EL ID</th>
               <th className="px-3 py-2 font-medium">Source</th>
               <th className="px-3 py-2 font-medium">Keep Active</th>
@@ -187,9 +157,6 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
                   <td className="px-3 py-2 font-medium">{v.display_name}</td>
                   <td className="px-3 py-2">
                     <StatusBadge status={v.status} />
-                  </td>
-                  <td className="px-3 py-2 text-xs text-neutral-400">
-                    {v.series_id ?? "None"}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500">
                     {v.current_elevenlabs_id
@@ -261,7 +228,7 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
                 </tr>
                 {plan?.voiceId === v.id && (
                   <tr>
-                    <td colSpan={7} className="bg-neutral-900/50 px-3 py-4">
+                    <td colSpan={6} className="bg-neutral-900/50 px-3 py-4">
                       <div
                         role="region"
                         aria-label={`${plan.operation} plan for ${plan.voiceName}`}
@@ -331,7 +298,7 @@ export function VoicesClient({ voices: initial }: { voices: VoiceRow[] }) {
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={6}
                   className="px-3 py-6 text-center text-sm text-neutral-500"
                 >
                   No voices match the current filters.
