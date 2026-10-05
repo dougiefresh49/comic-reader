@@ -41,11 +41,13 @@ import {
   planFreeSlots,
   readCastlist,
   readCharacterVoices,
+  readStoredDesign,
   readVoice,
   readVoices,
   restoreVoice,
   withVoiceOperationClaim,
   type SlotStatus,
+  type VoiceClaimOperation,
   type VoiceRow,
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots";
@@ -1227,18 +1229,45 @@ async function carryOutClaimed(
     };
   };
 
-  // Claims on the `voices` rows it changes: the voice archived, and the
-  // voice that comes back (or, for a design, the voice it replaces). The
-  // task-row claim above covers a design that changes no existing row.
-  const held =
-    fresh.target ?? (fresh.action === "design" ? fresh.replaces : null);
-  const holdTarget = () =>
-    held && held.id !== archiveRow?.id
-      ? withVoiceOperationClaim(sb, held, fresh.action, run)
-      : run();
-  return archiveRow
-    ? withVoiceOperationClaim(sb, archiveRow, "archive", holdTarget)
-    : holdTarget();
+  // Claims on the `voices` rows it changes, all taken before anything is
+  // spent: the voice archived, the voice that comes back (or, for a design,
+  // the voice it replaces), and a design's stored row (#458), which another
+  // issue's run may be designing from too. The task-row claim above covers
+  // a design that changes no existing row.
+  const stored =
+    fresh.action === "design" ? await readStoredDesign(sb, characterId) : null;
+  const claims: { row: VoiceRow; op: VoiceClaimOperation }[] = [];
+  const hold = (row: VoiceRow | null, op: VoiceClaimOperation) => {
+    if (row && !claims.some((c) => c.row.id === row.id))
+      claims.push({ row, op });
+  };
+  hold(archiveRow, "archive");
+  hold(
+    fresh.target ?? (fresh.action === "design" ? fresh.replaces : null),
+    fresh.action,
+  );
+  hold(stored, "design");
+  let started = false;
+  let claiming: VoiceRow | null = null;
+  const claimed = claims.reduceRight<() => Promise<CarryOutResult>>(
+    (inner, c) => () => {
+      claiming = c.row;
+      return withVoiceOperationClaim(sb, c.row, c.op, inner);
+    },
+    () => {
+      started = true;
+      return run();
+    },
+  );
+  try {
+    return await claimed();
+  } catch (err) {
+    if (started || !claiming) throw err;
+    // Nothing was spent: another run holds the row, or changed it first.
+    return refuse(
+      `${(claiming as VoiceRow).display_name} is held by another run (${message(err)}); nothing was spent, plan again once it finishes`,
+    );
+  }
 }
 
 /** The one voice a lost add made, by its token, name and the inventory before it. */

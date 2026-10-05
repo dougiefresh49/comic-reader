@@ -1639,6 +1639,100 @@ async function checkCarryOut() {
     );
   }
 
+  {
+    // Review round 1, finding 1: two issues design one character's stored
+    // row at once. The stored row's claim is taken before the add, so the
+    // second run spends nothing.
+    const w = world({ characters: ["kit"], voices: [] });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
+    w.db.rows("issues").push({
+      book_id: BOOK,
+      id: "issue-2",
+      number: 2,
+      created_at: "2026-10-02T00:00:00Z",
+    });
+    w.db.rows("bubbles").push({
+      id: "b-kit-2",
+      book_id: BOOK,
+      issue_id: "issue-2",
+      character_id: "kit",
+      speaker: "Kit",
+      voice_description: "Kit sounds like a test.",
+      ignored: false,
+      silent: false,
+    });
+    const one = await itemOf(w.deps, "kit");
+    const two = (await lib.planVoiceWork(w.deps, BOOK, "issue-2")).items.find(
+      (i) => i.characterId === "kit",
+    )!;
+    let release = () => {};
+    w.acct.gate = new Promise<void>((r) => (release = r));
+    const aRun = attempt(() =>
+      lib.carryOut(w.deps, one, { archiveVoiceId: null }),
+    );
+    while (w.acct.adds === 0) await new Promise((r) => setImmediate(r));
+    const bRun = attempt(() =>
+      lib.carryOut(w.deps, two, { archiveVoiceId: null }),
+    );
+    const early = await Promise.race([
+      bRun,
+      new Promise((r) => setTimeout(() => r("still running after 2 s"), 2000)),
+    ]);
+    release();
+    const [a, b] = await Promise.all([aRun, bRun]);
+    const kitRows = w.db.rows("voices").filter((v) => v.character_id === "kit");
+    report(
+      "review 1, finding 1: two issues designing one stored row make one add and one voice",
+      [
+        `issue-1 carryOut holds the add; issue-2 carryOut meanwhile: ${short(early)}`,
+        `issue-1: ${short(a)}`,
+        `issue-2: ${short(b)}; task issue-2: ${String(w.db.rows("casting_tasks").find((t) => t.issue_id === "issue-2")?.status ?? "none")}`,
+        `kit voices rows: ${kitRows.length} (${kitRows.map((v) => String(v.status)).join(", ")}); ElevenLabs adds: ${w.acct.adds} (want 1)`,
+      ],
+      (a as { status?: string }).status === "done" &&
+        (b as { status?: string }).status === "refused" &&
+        short(b).includes("held by another run") &&
+        w.acct.adds === 1 &&
+        kitRows.length === 1 &&
+        kitRows[0]!.status === "active",
+    );
+  }
+
+  {
+    // Review round 1, finding 2: two description saves race for a character
+    // with no stored row. The fake runs each query whole, so the two calls
+    // interleave at every await: both read none and both insert.
+    const w = world({ characters: ["kit"], voices: [] });
+    const save = (text: string) =>
+      attempt(() =>
+        slots.saveDesignDescription(w.db.client(), {
+          characterId: "kit",
+          displayName: "Kit",
+          description: text,
+        }),
+      );
+    const [x, y] = await Promise.all([save("Kit A."), save("Kit B.")]);
+    const inserts = w.db.log.filter((l) =>
+      l.startsWith('insert voices {"description"'),
+    ).length;
+    const stored = w.db.rows("voices").filter((v) => v.character_id === "kit");
+    const described = slots.designDescriptions(
+      await slots.readCharacterVoices(w.db.client(), ["kit"]),
+    );
+    report(
+      "review 1, finding 2: two racing description saves leave one stored row",
+      [
+        `saves returned ${short(x)} and ${short(y)}; inserts: ${inserts}`,
+        `kit stored rows: ${stored.length} (${stored.map((v) => String(v.id)).join(", ")}); description read: ${String(described.get("kit"))}`,
+      ],
+      inserts === 2 &&
+        stored.length === 1 &&
+        x === stored[0]!.id &&
+        y === stored[0]!.id &&
+        stored[0]!.description === described.get("kit"),
+    );
+  }
+
   const failed = results.filter((r) => !r.pass);
   console.log(
     `\ncarryOut cases: ${results.length - failed.length} of ${results.length} pass; fakes only, no network, no production row`,

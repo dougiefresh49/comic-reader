@@ -12,6 +12,7 @@ import {
   addAlias,
   addToCast,
   cancelVoiceRequest,
+  castRow,
   createCharacter,
   loadBookCast,
   readVoiceRequests,
@@ -34,6 +35,11 @@ import type { CardGroup } from "./types";
 
 export type ActionResult =
   | { ok: true; message: string }
+  | { ok: false; error: string };
+
+/** `pickAppearance`'s answer: on a pick that stored a request, the voice this issue's row had before it, for Undo. */
+export type PickResult =
+  | { ok: true; message: string; previousVoiceUuid?: string | null }
   | { ok: false; error: string };
 
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
@@ -692,7 +698,7 @@ export async function pickAppearance(args: {
   characterId: string;
   name: string;
   appearanceId: string;
-}): Promise<ActionResult> {
+}): Promise<PickResult> {
   try {
     const { scope, characterId, appearanceId } = args;
     const { data, error } = await supabaseAdmin
@@ -717,6 +723,43 @@ export async function pickAppearance(args: {
       // The shape the backfill gives a needs_clip voice: "Bulk (1993)".
       displayName: `${row.characters?.display_name ?? args.name} (${row.works.year})`,
     });
+    // The appearance's voice moved on since the page loaded: no clone
+    // request. Active, it is this issue's voice; archived, it is chosen as
+    // the picker chooses an archived voice.
+    if (voice.status === "active") {
+      await setIssueVoice(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+        voice.id,
+      );
+      revalidate(scope);
+      return {
+        ok: true,
+        message: `${voice.display_name} is already active: ${args.name} uses it in this issue.`,
+      };
+    }
+    if (voice.status === "archived")
+      return voice.character_id === characterId &&
+        (await loadBookCast(supabaseAdmin, scope.bookId)).rows.some(
+          (r) => r.voice_uuid === voice.id,
+        )
+        ? castArchivedVoice({ ...args, voiceUuid: voice.id })
+        : requestVoice({
+            ...args,
+            request: { action: "clone", targetVoiceUuid: voice.id },
+          });
+    if (voice.status !== "needs_clip")
+      return {
+        ok: false,
+        error: `${voice.display_name} is ${voice.status}; pick it another way.`,
+      };
+    const before = castRow(
+      await loadBookCast(supabaseAdmin, scope.bookId),
+      characterId,
+      scope.issueId,
+    );
     await storeVoiceRequest(
       supabaseAdmin,
       scope.bookId,
@@ -732,31 +775,118 @@ export async function pickAppearance(args: {
       voice.id,
     );
     revalidate(scope);
+    const previous = before?.voice_uuid ?? null;
     return {
       ok: true,
       message: `${args.name} wants a voice-lab clone from ${row.works.title} (${row.works.year}). It is made at the voices stop once voice-lab sends the clip.`,
+      // What Undo puts back on this issue's row; a repeat pick has nothing new.
+      ...(previous === voice.id ? {} : { previousVoiceUuid: previous }),
     };
   } catch (err) {
     return fail("asking voice-lab for a clip", err);
   }
 }
 
-/** Undoes a voice request, so the options are back and one can be made again. */
+/**
+ * An archived voice of the character that a castlist row of this book
+ * already references (#458): it is cast for this issue and the voices stop
+ * restores it, as it does any cast voice out of a slot. It is not a new
+ * clone, which is why #350 kept such voices out of the clone list.
+ */
+export async function castArchivedVoice(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+  voiceUuid: string;
+}): Promise<ActionResult> {
+  try {
+    const { scope, characterId, voiceUuid } = args;
+    const voice = await readVoice(supabaseAdmin, voiceUuid);
+    if (voice?.status !== "archived" || voice.character_id !== characterId)
+      return {
+        ok: false,
+        error: `That archived voice is not on file for ${args.name}.`,
+      };
+    const pending = (
+      await readVoiceRequests(supabaseAdmin, scope.bookId, scope.issueId)
+    ).some((r) => r.characterId === characterId && r.status === "pending");
+    if (pending)
+      await cancelVoiceRequest(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+      );
+    await setIssueVoice(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      voiceUuid,
+    );
+    revalidate(scope);
+    return {
+      ok: true,
+      message: `${args.name} uses ${voice.display_name} in this issue. It is archived, so the voices stop restores it.${pending ? " The voice request is withdrawn." : ""}`,
+    };
+  } catch (err) {
+    return fail("casting an archived voice", err);
+  }
+}
+
+/**
+ * Undoes a voice request, so the options are back and one can be made again.
+ * After an appearance pick, `restoreVoiceUuid` is the voice this issue's
+ * row had before it (null for none), from `pickAppearance`'s answer: it goes
+ * back on the row while the row still holds the request's `needs_clip`
+ * voice. Undefined (the page was reloaded since the pick) leaves the row.
+ */
 export async function undoVoiceRequest(args: {
   scope: Scope;
   characterId: string;
   name: string;
+  restoreVoiceUuid?: string | null;
 }): Promise<ActionResult> {
   try {
     const { scope, characterId } = args;
+    const request = (
+      await readVoiceRequests(supabaseAdmin, scope.bookId, scope.issueId)
+    ).find((r) => r.characterId === characterId);
+    const target =
+      request?.action === "clone" && request.targetVoiceUuid
+        ? await readVoice(supabaseAdmin, request.targetVoiceUuid)
+        : null;
     await cancelVoiceRequest(
       supabaseAdmin,
       scope.bookId,
       scope.issueId,
       characterId,
     );
+    const row = castRow(
+      await loadBookCast(supabaseAdmin, scope.bookId),
+      characterId,
+      scope.issueId,
+    );
+    let note = "";
+    if (target?.status === "needs_clip" && row?.voice_uuid === target.id) {
+      if (args.restoreVoiceUuid === undefined)
+        note = ` This issue's voice stays ${target.display_name}, waiting for a clip; pick another voice to change it.`;
+      else {
+        await setIssueVoice(
+          supabaseAdmin,
+          scope.bookId,
+          scope.issueId,
+          characterId,
+          args.restoreVoiceUuid,
+        );
+        note = " Its voice for this issue is back to what it was.";
+      }
+    }
     revalidate(scope);
-    return { ok: true, message: `${args.name}'s voice request is undone.` };
+    return {
+      ok: true,
+      message: `${args.name}'s voice request is undone.${note}`,
+    };
   } catch (err) {
     return fail("undoing a voice request", err);
   }

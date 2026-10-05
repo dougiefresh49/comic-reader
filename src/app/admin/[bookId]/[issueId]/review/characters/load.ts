@@ -341,21 +341,17 @@ export async function loadCharacters(
     };
   };
 
-  // The picker's voices (#458): the character's active, archived and
-  // needs_clip rows. An archived one is offered only with a source clip and
-  // no castlist row of this book linking it (#350). Within a status, the
-  // starting pick first, then by name.
+  // The picker's voices (#458): every active, archived and needs_clip row
+  // of the character. An archived one a castlist row of this book links is
+  // marked `inBook`: choosing it casts it for this issue and the voices stop
+  // restores it, where an unlinked one is a new clone request (#350). Within
+  // a status, the starting pick first, then by name.
   const linkedInBook = new Set(
     book.rows.map((r) => r.voice_uuid).filter((u): u is string => !!u),
   );
   const pickRowsOf = new Map<string, (VoiceRow & { status: PickStatus })[]>();
   for (const v of voiceRows) {
     if (!v.character_id || !(v.status in PICK_RANK)) continue;
-    if (
-      v.status === "archived" &&
-      (!v.source_clip_path || linkedInBook.has(v.id))
-    )
-      continue;
     pickRowsOf.set(v.character_id, [
       ...(pickRowsOf.get(v.character_id) ?? []),
       v as VoiceRow & { status: PickStatus },
@@ -485,6 +481,7 @@ export async function loadCharacters(
             id: v.id,
             name: v.display_name,
             status: v.status,
+            inBook: linkedInBook.has(v.id),
             work: v.appearance_id
               ? (workOf.get(v.appearance_id) ?? null)
               : null,

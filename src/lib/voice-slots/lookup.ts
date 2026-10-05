@@ -138,25 +138,51 @@ export const isStoredDesign = (v: {
   appearance_id: string | null;
 }): boolean => v.status === "needs_clip" && v.appearance_id === null;
 
+/** Oldest first, then by id: the order that names a character's one stored design row. */
+const byAge = (
+  a: { created_at: string; id: string },
+  b: { created_at: string; id: string },
+) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
+
+/**
+ * The character's stored design row: the first of its `needs_clip` rows with
+ * no appearance, oldest then by id. Two can exist for a moment when two
+ * description saves race; every reader and writer takes this same one, so
+ * the description, the design claim and the activation land on one row.
+ */
+export function firstStoredDesign<
+  T extends {
+    id: string;
+    character_id: string | null;
+    status: string;
+    appearance_id: string | null;
+    created_at: string;
+  },
+>(voices: T[], characterId: string): T | undefined {
+  return voices
+    .filter((v) => v.character_id === characterId && isStoredDesign(v))
+    .sort(byAge)[0];
+}
+
 /** The stored design description of each character that has one, by character id. */
 export function designDescriptions(
   voices: CharacterVoice[],
 ): Map<string, string> {
   const out = new Map<string, string>();
-  for (const v of [...voices].sort((a, b) =>
-    a.created_at.localeCompare(b.created_at),
-  )) {
-    const text = v.description?.trim();
-    if (isStoredDesign(v) && text) out.set(v.character_id, text);
+  for (const id of new Set(voices.map((v) => v.character_id))) {
+    const text = firstStoredDesign(voices, id)?.description?.trim();
+    if (text) out.set(id, text);
   }
   return out;
 }
 
 /**
  * The description step's write (#458): the character's stored design row
- * takes the text in `description` and `design_prompt`, or is inserted as a
- * `needs_clip` row with no appearance when the character has none. Returns
- * the row's id.
+ * (`firstStoredDesign`) takes the text in `description` and `design_prompt`
+ * by its id, or a `needs_clip` row with no appearance is inserted when the
+ * character has none. When a racing save inserted one too, the first row
+ * keeps the text and this call deletes its own row if that is not the
+ * first (no unique index holds one row per character). Returns the id kept.
  */
 export async function saveDesignDescription(
   client: Client,
@@ -166,20 +192,26 @@ export async function saveDesignDescription(
     description: input.description,
     design_prompt: input.description,
   };
-  const upd = await db(client)
-    .from("voices")
-    .update(text)
-    .eq("character_id", input.characterId)
-    .eq("status", "needs_clip")
-    .is("appearance_id", null)
-    .select("id");
-  if (upd.error) fail(`storing ${input.characterId}'s description`, upd.error);
-  const updated = upd.data ?? [];
-  if (updated.length > 1)
-    throw new Error(
-      `voices: ${input.characterId} has ${updated.length} stored design rows`,
+  const what = `storing ${input.characterId}'s description`;
+  const writeTo = async (id: string) => {
+    const upd = await db(client)
+      .from("voices")
+      .update(text)
+      .eq("id", id)
+      .eq("status", "needs_clip")
+      .select("id");
+    if (upd.error) fail(what, upd.error);
+    if ((upd.data ?? []).length === 0)
+      throw new Error(`voices: ${what}: ${id} is no longer a stored design`);
+    return id;
+  };
+  const first = async () =>
+    firstStoredDesign(
+      await readCharacterVoices(client, [input.characterId]),
+      input.characterId,
     );
-  if (updated[0]) return updated[0].id;
+  const held = await first();
+  if (held) return writeTo(held.id);
   const ins = await db(client)
     .from("voices")
     .insert({
@@ -191,6 +223,16 @@ export async function saveDesignDescription(
     })
     .select("id")
     .single();
-  if (ins.error) fail(`storing ${input.characterId}'s description`, ins.error);
-  return ins.data.id;
+  if (ins.error) fail(what, ins.error);
+  const mine = ins.data.id;
+  const kept = await first();
+  if (!kept || kept.id === mine) return mine;
+  await writeTo(kept.id);
+  const del = await db(client)
+    .from("voices")
+    .delete()
+    .eq("id", mine)
+    .eq("status", "needs_clip");
+  if (del.error) fail(`${what}: removing the duplicate ${mine}`, del.error);
+  return kept.id;
 }

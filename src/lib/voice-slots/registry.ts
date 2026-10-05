@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBookCast, readCastVoiceLinks, voiceFor } from "~/lib/cast";
 import { listAllIssues } from "~/lib/issue-queries";
 import { noActiveVoiceClaimFilter } from "./claim";
+import { firstStoredDesign, readCharacterVoices } from "./lookup";
 import type { CastlistRow, IssueTarget, VoiceRow } from "./types";
 
 const PAGE = 1000;
@@ -298,27 +299,45 @@ export async function registerVoice(
 /**
  * Records a designed voice (#458): the character's stored design row
  * (`needs_clip`, no appearance) becomes the active voice, so a description
- * written before the design and the voice it made are one row. A character
- * with no such row gets a new active row (`registerVoice`).
+ * written before the design and the voice it made are one row. The row is
+ * `firstStoredDesign`'s, updated by its id and only while it is still
+ * `needs_clip`; a row that moved on throws, so two rows never take one
+ * ElevenLabs id. A character with no such row gets a new active row
+ * (`registerVoice`).
  */
 export async function activateDesignedVoice(
   supabase: SupabaseClient,
   input: RegisterVoiceInput & { character_id: string },
 ): Promise<string> {
+  const stored = firstStoredDesign(
+    await readCharacterVoices(supabase, [input.character_id]),
+    input.character_id,
+  );
+  if (!stored) return registerVoice(supabase, input);
   const { data, error } = await supabase
     .from("voices")
     .update({ ...input, status: "active", archived_at: null })
-    .eq("character_id", input.character_id)
+    .eq("id", stored.id)
     .eq("status", "needs_clip")
-    .is("appearance_id", null)
     .select("id");
   if (error) fail("update voices", error);
-  const rows = (data ?? []) as { id: string }[];
-  if (rows.length > 1)
+  if ((data ?? []).length === 0)
     throw new Error(
-      `update voices: ${input.character_id} had ${rows.length} stored design rows`,
+      `update voices: ${input.character_id}'s stored design ${stored.id} is no longer needs_clip`,
     );
-  return rows[0]?.id ?? registerVoice(supabase, input);
+  return stored.id;
+}
+
+/** The character's stored design row (`firstStoredDesign`) as a full row, or null. */
+export async function readStoredDesign(
+  supabase: SupabaseClient,
+  characterId: string,
+): Promise<VoiceRow | null> {
+  const stored = firstStoredDesign(
+    await readCharacterVoices(supabase, [characterId]),
+    characterId,
+  );
+  return stored ? readVoice(supabase, stored.id) : null;
 }
 
 /**

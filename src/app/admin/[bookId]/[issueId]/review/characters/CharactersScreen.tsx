@@ -20,6 +20,7 @@ import {
   moveFace,
   nameGroup,
   nameSuggestion,
+  castArchivedVoice,
   pickAppearance,
   rejectFace,
   rejectGroup,
@@ -537,11 +538,14 @@ const VOICE_OPTIONS: { key: VoiceOption | "keep"; label: string }[] = [
 /** What the primary button under "Its voices" does for the chosen entry. */
 function pickAction(pick: VoicePick): {
   label: string;
-  kind: "use" | "clone" | "clip" | "design";
+  kind: "use" | "cast" | "clone" | "clip" | "design";
 } {
   if (pick.kind === "appearance")
     return { label: "Ask voice-lab for a clip", kind: "clip" };
   if (pick.status === "active") return { label: "Use this voice", kind: "use" };
+  // Already a voice of this book: cast here, and the voices stop restores it.
+  if (pick.status === "archived" && pick.inBook)
+    return { label: "Use in this issue", kind: "cast" };
   if (pick.status === "archived")
     return { label: "Request this clone", kind: "clone" };
   return pick.appearanceId
@@ -564,6 +568,7 @@ function VoiceChoices({
   onSetVoice,
   onRequest,
   onPickAppearance,
+  onCastArchived,
 }: {
   card: CharacterCard;
   activeVoices: ActiveVoice[];
@@ -573,6 +578,7 @@ function VoiceChoices({
   onSetVoice: (voice: ActiveVoice) => void;
   onRequest: (request: VoiceRequest) => void;
   onPickAppearance: (appearanceId: string) => void;
+  onCastArchived: (voiceId: string) => void;
 }) {
   const [option, setOption] = useState<VoiceOption | null>(null);
   const others = activeVoices.filter((v) => v.id !== card.voice?.uuid);
@@ -601,6 +607,8 @@ function VoiceChoices({
     switch (pickedAction.kind) {
       case "use":
         return onSetVoice({ id: picked.id, name: picked.name });
+      case "cast":
+        return onCastArchived(picked.id);
       case "clone":
         return onRequest({ action: "clone", targetVoiceUuid: picked.id });
       case "clip":
@@ -836,6 +844,7 @@ function CharacterCardView({
   onSetVoice,
   onRequestVoice,
   onPickAppearance,
+  onCastArchived,
   onUndoVoiceRequest,
 }: {
   card: CharacterCard;
@@ -858,6 +867,7 @@ function CharacterCardView({
   onSetVoice: (voice: ActiveVoice) => void;
   onRequestVoice: (request: VoiceRequest) => void;
   onPickAppearance: (appearanceId: string) => void;
+  onCastArchived: (voiceId: string) => void;
   onUndoVoiceRequest: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
@@ -1063,6 +1073,10 @@ function CharacterCardView({
                 onPickAppearance={(appearanceId) => {
                   setChanging(false);
                   onPickAppearance(appearanceId);
+                }}
+                onCastArchived={(voiceId) => {
+                  setChanging(false);
+                  onCastArchived(voiceId);
                 }}
               />
             )
@@ -1364,6 +1378,9 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     [data.bookId, data.issueId],
   );
 
+  /** Per card, the voice this issue's row had before an appearance pick, for Undo (null: none). */
+  const beforePick = useRef(new Map<string, string | null>());
+
   const run = useCallback(
     (label: string, work: () => Promise<ActionResult>) => {
       setNote({ text: `${label}…`, tone: "plain" });
@@ -1456,7 +1473,9 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
       run(`Dropping the page ${face.page} face`, () =>
         rejectFace({ scope, detectionId: face.id }),
       ),
-    onSetVoice: (voice: ActiveVoice) =>
+    // Any other voice choice ends the appearance pick Undo would revert.
+    onSetVoice: (voice: ActiveVoice) => {
+      beforePick.current.delete(card.id);
       run(`Giving ${card.name} ${voice.name}`, () =>
         setActiveVoice({
           scope,
@@ -1465,8 +1484,10 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
           group: card.group,
           voiceUuid: voice.id,
         }),
-      ),
-    onRequestVoice: (request: VoiceRequest) =>
+      );
+    },
+    onRequestVoice: (request: VoiceRequest) => {
+      beforePick.current.delete(card.id);
       run(`Requesting a voice for ${card.name}`, () =>
         requestVoice({
           scope,
@@ -1474,20 +1495,47 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
           name: card.name,
           request,
         }),
-      ),
+      );
+    },
     onPickAppearance: (appearanceId: string) =>
-      run(`Asking voice-lab for a clip for ${card.name}`, () =>
-        pickAppearance({
+      run(`Asking voice-lab for a clip for ${card.name}`, async () => {
+        const result = await pickAppearance({
           scope,
           characterId: card.id,
           name: card.name,
           appearanceId,
+        });
+        // The first pick's voice is what Undo puts back; a repeat keeps it.
+        if (
+          result.ok &&
+          result.previousVoiceUuid !== undefined &&
+          !beforePick.current.has(card.id)
+        )
+          beforePick.current.set(card.id, result.previousVoiceUuid);
+        return result;
+      }),
+    onCastArchived: (voiceId: string) => {
+      beforePick.current.delete(card.id);
+      run(`Casting an archived voice for ${card.name}`, () =>
+        castArchivedVoice({
+          scope,
+          characterId: card.id,
+          name: card.name,
+          voiceUuid: voiceId,
         }),
-      ),
+      );
+    },
     onUndoVoiceRequest: () =>
-      run(`Undoing the voice request for ${card.name}`, () =>
-        undoVoiceRequest({ scope, characterId: card.id, name: card.name }),
-      ),
+      run(`Undoing the voice request for ${card.name}`, async () => {
+        const result = await undoVoiceRequest({
+          scope,
+          characterId: card.id,
+          name: card.name,
+          restoreVoiceUuid: beforePick.current.get(card.id),
+        });
+        if (result.ok) beforePick.current.delete(card.id);
+        return result;
+      }),
   });
 
   return (

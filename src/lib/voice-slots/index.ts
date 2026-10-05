@@ -62,6 +62,7 @@ export {
   issueNeeds,
   markRestored,
   readCastlist,
+  readStoredDesign,
   readVoice,
   readVoices,
   registerVoice,
@@ -70,6 +71,7 @@ export {
 } from "./registry";
 export {
   designDescriptions,
+  firstStoredDesign,
   isStoredDesign,
   newestActiveVoiceOf,
   readCharacterVoices,

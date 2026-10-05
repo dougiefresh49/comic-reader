@@ -610,13 +610,13 @@ async function writeRow(
   await updateRow(client, book.bookId, issueId, characterId, patch);
 }
 
-/** Points the issue's row for the character at a voice, inserting the row (`in_issue` true) when there is none; other issues' rows are left alone. */
+/** Points the issue's row for the character at a voice (null: none of its own), inserting the row (`in_issue` true) when there is none; other issues' rows are left alone. */
 export async function setIssueVoice(
   client: Client,
   bookId: string,
   issueId: string,
   characterId: string,
-  voiceUuid: string,
+  voiceUuid: string | null,
 ): Promise<void> {
   const patch = { voice_uuid: voiceUuid };
   if ((await updateRow(client, bookId, issueId, characterId, patch)) > 0)

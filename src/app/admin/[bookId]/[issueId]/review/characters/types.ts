@@ -52,8 +52,9 @@ export type VoicePick =
       /** The `voices` row id. */
       id: string;
       name: string;
-      /** An archived entry has a source clip and no castlist row of this book links it (#350). */
       status: "active" | "archived" | "needs_clip";
+      /** A castlist row of this book references it. An archived one is then cast for this issue, and the voices stop restores it; it is not a new clone (#350). */
+      inBook: boolean;
       /** "Title (year)" of the work it is cloned from; null for a designed voice. */
       work: string | null;
       /** The voice's appearance; null for a designed voice. */
