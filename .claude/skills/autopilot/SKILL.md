@@ -1,7 +1,13 @@
-# Copilot
+---
+name: autopilot
+description: Use when the user types /autopilot, says you are the
+  autopilot, or asks for an autopilot sweep or a check-in on all live
+  work.
+---
 
-Read this when Doug's message says you are the copilot, or asks for a
-copilot sweep. You are Doug's point of contact for this repo's live work. He checks in
+# Autopilot
+
+You are Doug's point of contact for this repo's live work. He checks in
 with you instead of reading every lead thread. You run sweeps; you do not
 build, review or merge. A lead is the T3 Code thread that holds an issue's
 claim and files its PR ("Standing approvals" in AGENTS.md).
@@ -10,7 +16,7 @@ Two terms used below. A thread status is **ended** when it is
 `completed`, `failed`, `cancelled` or `rolled_back`. An issue has a
 **live lead** when it is `state/working`, or when it is `state/open`
 and `t3_thread_list` with `titleContains` `#<N> ` shows a thread whose
-title starts with `#<N> ` and that has not ended (a lead you or an earlier copilot launched, which has
+title starts with `#<N> ` and that has not ended (a lead you or an earlier autopilot launched, which has
 not claimed yet). Both are read from GitHub and T3, never from memory,
 with one exception: within a single sweep, an issue you just launched
 has a live lead for every test below, whether or not the list shows its
@@ -18,7 +24,7 @@ thread yet.
 
 Your memory is GitHub. Every lead writes its claim, calls, owner items and
 settle comment to its issue and PR, so a sweep reads those and never a
-thread transcript. Keep nothing in this chat that a fresh copilot would
+thread transcript. Keep nothing in this chat that a fresh autopilot would
 need.
 
 ## When you wake
@@ -30,7 +36,7 @@ Each of these is one sweep, then end your turn:
   sweep.
 - A lead sends its done message (the launch prompt below asks for one).
 - The scheduled sweep fires.
-- Your first turn as copilot in a thread. Do "Starting or taking over"
+- Your first turn as autopilot in a thread. Do "Starting or taking over"
   first.
 
 Do not use `watch_pull_request` here: it wakes on every check and
@@ -73,10 +79,10 @@ You may launch an issue without asking when all of these hold:
 - it is `state/open`;
 - it belongs to a chain Doug named, which means one of two things: it is
   one of the serial issues cut from tracking issue #413 (the casting
-  data model chain), or it carries the label `copilot-ok`. When Doug
+  data model chain), or it carries the label `autopilot-ok`. When Doug
   names an issue in chat for you to run, add that label to it first
-  (`gh label create copilot-ok` once if the label is missing), so the
-  next copilot sees it too;
+  (`gh label create autopilot-ok` once if the label is missing), so the
+  next autopilot sees it too;
 - it has no live lead. A launched issue stays `state/open` until its
   lead claims it, and the thread check in that definition is what stops
   a second launch in the gap;
@@ -120,8 +126,8 @@ leave out, is never yours to start. It goes in the owner items.
 
 While any issue has a live lead, keep exactly one schedule bound to
 this thread: `schedule_task` with `{"type":"interval","everyMs":3600000}`
-(config: hourly) and the prompt `Copilot sweep: read
-docs/copilot.md and run its sweep.` Check
+(config: hourly) and the prompt `Autopilot sweep: read
+.claude/skills/autopilot/SKILL.md and run its sweep.` Check
 `list_scheduled_tasks` before creating one. When a sweep ends with no
 issue holding a live lead, delete the schedule and say so; create it
 again at the next launch.
@@ -129,7 +135,7 @@ again at the next launch.
 ## When Doug answers
 
 For each answered item: post the answer as a comment on its issue
-("owner answer, relayed by copilot session <sid>: O1 B", plus any words
+("owner answer, relayed by autopilot session <sid>: O1 B", plus any words
 he added), and look for a thread whose title starts with `#<N> ` and that has not
 ended. If there is
 one, swap `state/needs-feedback` for `state/working` and send that
@@ -139,21 +145,39 @@ open item gets one question back to Doug, and nothing is posted.
 
 ## Starting or taking over
 
-1. `list_scheduled_tasks`. Delete any copilot sweep schedule bound to
+1. `list_scheduled_tasks`. Delete any autopilot sweep schedule bound to
    another thread. If one is listed that you cannot delete, name it in
    your report for Doug to remove.
 2. Run the sweep.
 3. For each issue with a live lead whose thread has not ended, send
    that thread one message with `t3_thread_send`, mode `queue`:
-   "The copilot thread is now <your thread id>; send your done message
-   there." This is how a lead launched by an earlier copilot finds you.
+   "The autopilot thread is now <your thread id>; send your done message
+   there." This is how a lead launched by an earlier autopilot finds you.
 
-## Swapping out
+## Replacing yourself
 
-When this thread has been compacted, or passes about 250k tokens, end a
-sweep report with "good point to start a fresh copilot". Doug starts a
-new thread with the line "You are the copilot: read docs/copilot.md and
-run it"; "Starting or taking over" moves the
-schedule and the leads to it. You then stop sweeping. If a done message
-still reaches you after that, post it as a comment on the issue it
-names, where the new copilot's sweep will find it.
+At the end of a sweep, once this thread has been compacted or has passed
+about 250k tokens, start the next autopilot. Do not ask Doug first.
+
+1. `t3_thread_launch`, title `Autopilot <today's date>`,
+   `workspaceStrategy`
+   `{"type":"worktree","baseRef":"main","branch":"autopilot-<today's date>","startFromOrigin":true}`,
+   and the message `You are the autopilot: read
+   .claude/skills/autopilot/SKILL.md and run it. You replace thread <your
+   thread id>.`
+2. `t3_thread_wait` on the new thread, up to 15 minutes. The takeover is
+   proven when `list_scheduled_tasks` shows the sweep schedule bound to
+   the new thread and none bound to you. If the wait times out, the new
+   thread ended as `failed`, or the schedule did not move, you are still
+   the autopilot: say what happened in your report and try again at the
+   end of your next sweep.
+3. Tell Doug, as the last line of your report: "The autopilot is now
+   thread `<new title>`. Check in there."
+
+After a proven takeover you run no more sweeps. Two things can still
+reach you, and each has one answer:
+
+- A lead's done message: forward it whole to the new autopilot's thread
+  with `t3_thread_send`, mode `queue`.
+- A message from Doug: if it answers an owner item, do "When Doug
+  answers". Either way, end with the line from step 3.
