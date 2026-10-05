@@ -238,9 +238,11 @@ export function formatVoiceDecision(d: VoiceDescriptionDecision): string {
 
 /**
  * Who `generate-voice-descriptions` may describe (#351): a speaker with an
- * open design request, or one with no voice. A character whose render chain
- * stops at "removed" or "no audio" in this issue never is (#429). `ids` are
- * the groups' character ids, matched to castlist rows by `character_id`.
+ * open design request, or one with no voice (#429). A character whose own
+ * castlist row in this issue is removed or "no audio" never is; one whose
+ * chain stops only through its `form_of` target is, with a design request.
+ * `ids` are the groups' character ids, matched to castlist rows by
+ * `character_id`.
  */
 export async function loadDescriptionEligibility(
   client: SupabaseClient,
@@ -248,7 +250,7 @@ export async function loadDescriptionEligibility(
   issueId: string,
   ids: string[],
 ): Promise<{ eligible: Set<string>; designRequested: Set<string> }> {
-  const { loadBookCast, readVoiceRequests, renderVoice, voiceFor } =
+  const { castRow, loadBookCast, readVoiceRequests, renderVoice, voiceFor } =
     await import("~/lib/cast");
   const [book, requests] = await Promise.all([
     loadBookCast(client, bookId),
@@ -265,14 +267,21 @@ export async function loadDescriptionEligibility(
   );
   const eligible = new Set<string>();
   for (const id of ids) {
+    // Its own row removes or silences it here: a leftover request buys nothing.
+    const own = castRow(book, id, issueId);
+    if (own && (!own.in_issue || own.no_audio)) continue;
+    if (designRequested.has(id)) {
+      eligible.add(id);
+      continue;
+    }
+    // A stop inherited through `form_of` skips it unless a design is requested.
     const found = renderVoice(book, id, issueId);
     if (
       !found.ok &&
       (found.reason === "removed" || found.reason === "no audio")
     )
       continue;
-    if (designRequested.has(id) || !voiceFor(book, id, issueId))
-      eligible.add(id);
+    if (!voiceFor(book, id, issueId)) eligible.add(id);
   }
   return { eligible, designRequested };
 }

@@ -243,15 +243,13 @@ export function castRow(
   );
 }
 
-/** The latest issue's row in the book that holds a voice for the character; a "no audio" row lends none. */
+/** The latest issue's row in the book that holds a voice for the character. A "no audio" row silences its own issue only and still lends its voice here. */
 function latestVoicedRow(
   book: BookCast,
   characterId: string,
 ): CastRow | undefined {
   return book.rows
-    .filter(
-      (r) => r.character_id === characterId && r.voice_uuid && !r.no_audio,
-    )
+    .filter((r) => r.character_id === characterId && r.voice_uuid)
     .sort(
       (a, b) =>
         (book.issueNumber.get(b.issue_id) ?? 0) -
@@ -566,9 +564,9 @@ async function updateRow(
  *
  * A legacy row with a null `character_id` whose text is that id (character
  * "narrator", for example) holds the old primary key on (book_id, issue_id,
- * character), so the insert would fail: that row is adopted instead, its
- * `character_id` set and its other columns kept. Callers that write a patch
- * update the row after this.
+ * character), so the insert would fail: that row is adopted instead, in one
+ * update that sets its `character_id` and the caller's `patch`, and leaves
+ * its other columns as they are.
  */
 async function insertRow(
   client: Client,
@@ -576,10 +574,11 @@ async function insertRow(
   issueId: string,
   characterId: string,
   row: Required<CastPatch>,
+  patch: CastPatch = {},
 ): Promise<void> {
   const adopted = await db(client)
     .from("castlist")
-    .update({ character_id: characterId })
+    .update({ ...patch, character_id: characterId })
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("character", characterId)
@@ -616,11 +615,18 @@ async function writeRow(
     patch.voice_uuid !== undefined
       ? patch.voice_uuid
       : await startingVoice(client, book, characterId);
-  await insertRow(client, book.bookId, issueId, characterId, {
-    in_issue: patch.in_issue ?? true,
-    no_audio: patch.no_audio ?? false,
-    voice_uuid,
-  });
+  await insertRow(
+    client,
+    book.bookId,
+    issueId,
+    characterId,
+    {
+      in_issue: patch.in_issue ?? true,
+      no_audio: patch.no_audio ?? false,
+      voice_uuid,
+    },
+    patch,
+  );
   // A row another writer inserted first was kept: write the patch on it.
   await updateRow(client, book.bookId, issueId, characterId, patch);
 }
@@ -636,11 +642,15 @@ export async function setIssueVoice(
   const patch = { voice_uuid: voiceUuid };
   if ((await updateRow(client, bookId, issueId, characterId, patch)) > 0)
     return;
-  await insertRow(client, bookId, issueId, characterId, {
-    in_issue: true,
-    no_audio: false,
-    voice_uuid: voiceUuid,
-  });
+  await insertRow(
+    client,
+    bookId,
+    issueId,
+    characterId,
+    { in_issue: true, no_audio: false, voice_uuid: voiceUuid },
+    patch,
+  );
+  // A row another writer inserted first was kept: write the patch on it.
   await updateRow(client, bookId, issueId, characterId, patch);
 }
 
