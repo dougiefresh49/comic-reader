@@ -62,11 +62,10 @@
  *     [--out <dir>, default ~/comic-reader-bench]
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   ApiError,
-  GoogleGenAI,
+  type GoogleGenAI,
   ThinkingLevel,
   createPartFromBase64,
   createPartFromText,
@@ -76,12 +75,6 @@ import { loadBookCast, proposeCast } from "~/lib/cast";
 import { CUE_RULES, buildCuePrompt } from "~/lib/cue-rules";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { selectIssue } from "~/lib/issue-queries";
-import {
-  GEMINI_FAST,
-  GEMINI_HIGH,
-  GEMINI_MEDIUM,
-  GEMINI_USD_PER_1M_TOKENS,
-} from "~/lib/models";
 import { pageStoragePath } from "~/lib/storage";
 import { createTypedStepClient } from "~/workflows/step-utils";
 import {
@@ -93,6 +86,17 @@ import {
   type ClosedCastMember,
   type ContextParsed,
 } from "~/workflows/steps/vision-rows";
+import {
+  CallBudget,
+  DEFAULT_OUT,
+  benchCli,
+  geminiFromEnv,
+  geminiRate,
+  geminiUsd,
+  median,
+  requireLiveApiOk,
+  resolveModel,
+} from "./bench-kit";
 
 const SMOKE_BOOK = "smoke-test";
 const SMOKE_ISSUE = "issue-smoke";
@@ -121,14 +125,6 @@ const SOURCES = ["smoke", "reviewed"] as const;
 type Source = (typeof SOURCES)[number];
 const CAST_MODES = ["closed", "open"] as const;
 type CastMode = (typeof CAST_MODES)[number];
-/** Where run files go without `--out`: outside /tmp, which lost bench files once (#431). */
-const DEFAULT_OUT = join(homedir(), "comic-reader-bench");
-/** `--model` may name a tier; the id comes from `src/lib/models.ts`. */
-const TIERS: Record<string, string> = {
-  GEMINI_HIGH,
-  GEMINI_MEDIUM,
-  GEMINI_FAST,
-};
 const PANEL_PAGE_PREFACE =
   "Two images follow. Image 1 is the full comic page. Image 2 is the one panel that contains the speech bubble, cropped from that page. The bounding box below is in Image 1's pixels. Use Image 2 to trace the bubble's tail to the speaker, and Image 1 to see who else is on the page.";
 /** `box-drawn`: the outline drawn on the page, and the sentence that says so. */
@@ -153,48 +149,9 @@ const SAME_CHARACTER: Record<string, string> = {
 
 // ── Args ────────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
-const opt = (name: string) => {
-  const i = argv.indexOf(name);
-  return i === -1 ? undefined : argv[i + 1];
-};
-const die = (msg: string): never => {
-  console.error(`bench-speaker-model: ${msg}`);
-  process.exit(1);
-};
-const intOpt = (name: string, fallback: number | undefined) => {
-  const raw = opt(name);
-  if (raw === undefined) return fallback;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1) die(`${name} wants a positive integer`);
-  return n;
-};
-const priceOpt = (name: string) => {
-  const raw = opt(name);
-  if (raw === undefined) return undefined;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 0) die(`${name} wants a price in USD per 1M`);
-  return n;
-};
-function oneOf<T extends string>(name: string, all: readonly T[], def: T): T {
-  const v = (opt(name) ?? def) as T;
-  if (!all.includes(v)) die(`${name} takes ${all.join(", ")}, got "${v}"`);
-  return v;
-}
-/** "1,2", "3-13" or a mix, sorted and deduplicated. */
-function parsePages(raw: string): number[] {
-  const out = raw.split(",").flatMap((part) => {
-    const range = /^(\d+)-(\d+)$/.exec(part.trim());
-    if (range) {
-      const [lo, hi] = [Number(range[1]), Number(range[2])];
-      if (lo < 1 || hi < lo) die(`--pages: bad range "${part}"`);
-      return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
-    }
-    const n = Number(part);
-    if (!Number.isInteger(n) || n < 1) die(`--pages: bad page "${part}"`);
-    return [n];
-  });
-  return [...new Set(out)].sort((a, b) => a - b);
-}
+const { opt, die, intOpt, priceOpt, oneOf, parsePages, must } = benchCli(
+  "bench-speaker-model",
+);
 
 const provider = oneOf("--provider", PROVIDERS, "openrouter");
 const source = oneOf("--source", SOURCES, "smoke");
@@ -242,16 +199,15 @@ const modelArg =
   (provider === "openrouter"
     ? "google/gemma-4-31b-it:free"
     : die("--provider gemini needs --model"));
-const model = TIERS[modelArg] ?? modelArg;
+const model = resolveModel(modelArg);
 const pages = parsePages(opt("--pages") ?? "1,2");
 const limit = intOpt("--limit", undefined);
-const maxCalls = intOpt("--max-calls", 40)!;
+const budget = new CallBudget(intOpt("--max-calls", 40)!);
 const concurrency = intOpt("--page-concurrency", 1)!;
 const outDir = opt("--out") ?? DEFAULT_OUT;
 if (twoCall && provider !== "gemini")
   die("--variant two-call needs --provider gemini");
-const tierRate =
-  provider === "gemini" ? GEMINI_USD_PER_1M_TOKENS[model] : undefined;
+const tierRate = provider === "gemini" ? geminiRate(model) : undefined;
 const priceIn = priceOpt("--price-in") ?? tierRate?.input;
 const priceOut = priceOpt("--price-out") ?? tierRate?.output;
 const priced = priceIn !== undefined && priceOut !== undefined;
@@ -262,23 +218,13 @@ if (dryRun) {
   // No model call: no key, no client, no spend gate.
 } else if (provider === "openrouter") {
   // Only ":free" ids cost nothing; every other id is a spend.
-  if (!model.endsWith(":free") && process.env.LIVE_API_OK !== "1") {
-    die(
-      `refusing model "${model}" on OpenRouter: only ":free" ids run without LIVE_API_OK=1 (a spend the owner named)`,
-    );
-  }
+  requireLiveApiOk("openrouter", model, die);
   openRouterKey = process.env.OPENROUTER_API_KEY;
   if (!openRouterKey) die("OPENROUTER_API_KEY is not set in .env");
 } else {
   // Gemma on the Gemini API is free of charge; every other id is a spend.
-  if (!model.startsWith("gemma-") && process.env.LIVE_API_OK !== "1") {
-    die(
-      `refusing model "${model}" on the Gemini API: only "gemma-" ids run without LIVE_API_OK=1 (a spend the owner named)`,
-    );
-  }
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) die("GEMINI_API_KEY is not set in .env");
-  gemini = new GoogleGenAI({ apiKey });
+  requireLiveApiOk("gemini", model, die);
+  gemini = geminiFromEnv(die);
 }
 
 const book = source === "smoke" ? SMOKE_BOOK : opt("--book");
@@ -354,14 +300,6 @@ type Panel = { id: string; label: string; rect: Box };
 
 const supabase = await createTypedStepClient();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function must<T>(
-  res: { data: T | null; error: { message: string } | null },
-  what: string,
-): T {
-  if (res.error) die(`${what}: ${res.error.message}`);
-  return res.data as T;
-}
 
 /** Uppercase, collapse whitespace, first 40 characters (the brief's rule). */
 const textKey = (s: string | null) =>
@@ -742,7 +680,6 @@ async function attemptGemini(
   }
 }
 
-let calls = 0;
 /** Set when the whole run must end (call ceiling, a request the API refuses). */
 let halted: string | null = null;
 type CallResult =
@@ -767,17 +704,16 @@ async function callModel(
       log(`  HTTP ${first!.status}, retrying in 20 s`);
       await sleep(RETRY_WAIT_MS);
     }
-    // Check and count with no await between them: another page may have
-    // sent during the retry wait, and the ceiling has to hold across pages.
-    if (calls >= maxCalls) {
+    // Another page may have sent during the retry wait; the budget's
+    // check-and-count holds the ceiling across pages.
+    if (!budget.take()) {
       return {
         kind: "stop-run",
         detail:
-          `--max-calls ${maxCalls} reached` +
+          `--max-calls ${budget.max} reached` +
           (first ? ` after HTTP ${first.status}: ${first.detail}` : ""),
       };
     }
-    calls++;
     const r =
       provider === "openrouter"
         ? await attemptOpenRouter(images, prompt)
@@ -810,14 +746,8 @@ function rowCost(usage: unknown): number | null {
     const c = (usage as { cost?: unknown } | null)?.cost;
     return typeof c === "number" ? c : null;
   }
-  if (!priced || !usage) return null;
-  const u = usage as {
-    promptTokenCount?: number;
-    candidatesTokenCount?: number;
-    thoughtsTokenCount?: number;
-  };
-  const out = (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
-  return ((u.promptTokenCount ?? 0) * priceIn! + out * priceOut!) / 1e6;
+  if (!priced) return null;
+  return geminiUsd(usage, { input: priceIn!, output: priceOut! });
 }
 
 /** "in/out" tokens, out counting thinking for Gemini. */
@@ -1100,7 +1030,7 @@ async function runPage(
       rows.push(row);
       continue;
     }
-    const callsBefore = calls;
+    const callsBefore = budget.calls;
     const result = await callModel(images, prompt, log, speakerThinking);
     if (result.kind === "stop-page" || result.kind === "stop-run") {
       log(
@@ -1108,7 +1038,7 @@ async function runPage(
       );
       if (result.kind === "stop-run") halted ??= result.detail;
       // A bubble that reached the API stays in the results as an error.
-      if (calls > callsBefore) {
+      if (budget.calls > callsBefore) {
         row.rawReply = `error: ${result.detail}`;
         rows.push(row);
       }
@@ -1430,17 +1360,9 @@ function writeOutputs(rows: Row[], stops: string[]) {
     provider === "gemini" && !priced
       ? "cost not priced"
       : `cost $${costUsd.toFixed(6)}`;
-  const latencies = rows
-    .map((r) => r.latencyMs)
-    .filter((ms): ms is number => ms != null)
-    .sort((a, b) => a - b);
-  const mid = Math.floor(latencies.length / 2);
-  const medianMs =
-    latencies.length === 0
-      ? null
-      : latencies.length % 2
-        ? latencies[mid]!
-        : Math.round((latencies[mid - 1]! + latencies[mid]!) / 2);
+  const medianMs = median(
+    rows.map((r) => r.latencyMs).filter((ms): ms is number => ms != null),
+  );
 
   const columns: [string, (r: Row) => string | number | null | undefined][] = [
     ["page", (r) => r.page],
@@ -1514,7 +1436,7 @@ function writeOutputs(rows: Row[], stops: string[]) {
       `- Null replies: ${nulls.length}`,
       `- Unparsed: ${unparsed.length}${errors.length ? ` (${errors.length} of them API errors)` : ""}`,
       `- Reviewed speaker outside the cast: ${outside.length}`,
-      `- ${cost}, median latency ${medianMs ?? "n/a"} ms, ${calls} requests`,
+      `- ${cost}, median latency ${medianMs ?? "n/a"} ms, ${budget.calls} requests`,
       ...(twoCall
         ? [
             `- two-call: the line above is call 1; call 2 (cues) cost $${cueCostUsd.toFixed(6)}, ${rows.filter((r) => r.cue?.reply).length} cue lines of ${rows.filter((r) => r.cue).length} calls`,
@@ -1548,7 +1470,7 @@ function writeOutputs(rows: Row[], stops: string[]) {
     "",
     `Totals: ${rows.length} bubbles sent, ${rows.filter((r) => r.parsed).length} replies parsed, ` +
       `speaker matches against truth (plain / with aliases): ${smoke ? gem : ""}${bench}. ` +
-      `${cost}, median latency ${medianMs ?? "n/a"} ms. Requests: ${calls}.`,
+      `${cost}, median latency ${medianMs ?? "n/a"} ms. Requests: ${budget.calls}.`,
     ...(stops.length ? ["", `Stopped early: ${stops.join("; ")}`] : []),
     "",
     `| ${columns.map(([name]) => name).join(" | ")} |`,
