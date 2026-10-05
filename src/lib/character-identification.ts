@@ -3,6 +3,7 @@ import {
   createPartFromBase64,
   createPartFromText,
   type Part,
+  type ThinkingLevel,
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ambientLlmMeta, generateContentLogged } from "./llm-usage";
@@ -129,8 +130,16 @@ export async function identifyFace(
   pageImageBase64?: string,
   pageImageMimeType?: string,
   issueContext?: string,
-  /** The ingest step sets this: a failed call must not read as no match. */
-  options?: { throwOnApiError?: boolean },
+  /**
+   * The ingest step sets `throwOnApiError`: a failed call must not read as no
+   * match. The face ID bench (#441) sets `model` and `thinkingLevel`; unset,
+   * the request is today's (GEMINI_MEDIUM, no thinkingConfig).
+   */
+  options?: {
+    throwOnApiError?: boolean;
+    model?: string;
+    thinkingLevel?: ThinkingLevel;
+  },
 ): Promise<FaceIdentification> {
   const hasPage = !!pageImageBase64;
   const prompt = buildIdentifyPrompt(knownCharacters, hasPage, issueContext);
@@ -168,7 +177,17 @@ export async function identifyFace(
   try {
     response = await generateContentLogged(
       gemini,
-      { model: GEMINI_MEDIUM, contents: [{ role: "user", parts }] },
+      {
+        model: options?.model ?? GEMINI_MEDIUM,
+        contents: [{ role: "user", parts }],
+        ...(options?.thinkingLevel
+          ? {
+              config: {
+                thinkingConfig: { thinkingLevel: options.thinkingLevel },
+              },
+            }
+          : {}),
+      },
       ambientLlmMeta("identify-face"),
     );
   } catch (err) {
