@@ -1811,7 +1811,7 @@ export async function getContextPage(
 
       const ocrResponse = await generateContentLogged(
         gemini,
-        { model: GEMINI_MEDIUM, contents: [ocrImagePart, ocrPrompt] },
+        { model: GEMINI_FAST, contents: [ocrImagePart, ocrPrompt] },
         llmMeta,
       );
 
