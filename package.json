@@ -28,7 +28,6 @@
     "voice-rotation": "tsx --env-file=.env scripts/voice-rotation.ts",
     "voice-rotation-checkout": "tsx --env-file=.env scripts/voice-rotation-checkout.ts",
     "voice-rotation-archive": "tsx --env-file=.env scripts/voice-rotation-archive.ts",
-    "backfill-voices": "tsx --env-file=.env scripts/backfill-voices.ts",
     "voice-lab-import": "tsx --env-file=.env scripts/voice-lab-import.ts",
     "consolidate-music-scenes": "tsx --env-file=.env scripts/consolidate-music-scenes.ts",
     "backfill-foreground-polygons": "tsx --env-file=.env scripts/backfill-foreground-polygons.ts",
