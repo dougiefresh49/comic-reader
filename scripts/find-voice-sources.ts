@@ -417,7 +417,7 @@ async function runBookMode(
       pipeline_step: "find-voice-sources",
       pipeline_paused: true,
       pipeline_paused_at: "find-voice-sources",
-      pipeline_paused_url: `/admin/characters/casting?book=${book}&issue=${issue}`,
+      pipeline_paused_url: `/admin/${book}/${issue}/review/characters/voices`,
     });
 
     let charsUpserted = 0;
@@ -526,9 +526,7 @@ async function runBookMode(
     if (pendingCount && pendingCount > 0) {
       console.log(`── Casting paused ─────────────────────────────────────`);
       console.log(`  ${pendingCount} character(s) awaiting casting.`);
-      console.log(
-        `  Open: /admin/characters/casting?book=${book}&issue=${issue}`,
-      );
+      console.log(`  Open: /admin/${book}/${issue}/review/characters/voices`);
       console.log(`  Run again after completing casting to continue.`);
       console.log(`──────────────────────────────────────────────────────`);
       process.exit(2);

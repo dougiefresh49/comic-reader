@@ -1,9 +1,8 @@
 /**
- * Server reads and the writes the voices stop (#353) needs beyond
- * `~/lib/voice-requests`: the issues with open voice work (for
- * `/admin/characters/casting` without a book and issue), "no audio this
- * run" for a speaker no `characters` row knows (which `settle` cannot
- * take), and clearing the marker, which `settle` sets but cannot undo.
+ * The server writes the voices stop (#353) needs beyond
+ * `~/lib/voice-requests`: "no audio this run" for a speaker no
+ * `characters` row knows (which `settle` cannot take), and clearing the
+ * marker, which `settle` sets but cannot undo.
  */
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
@@ -14,33 +13,6 @@ import {
 } from "~/workflows/steps/casting-tasks";
 import { slugify } from "~/lib/character-id";
 import { SKIPPED_VOICE } from "~/lib/voice-settings";
-
-export interface IssueWithVoiceWork {
-  bookId: string;
-  issueId: string;
-  open: number;
-}
-
-/** Issues with a pending or in-progress `casting_tasks` row, most open first. */
-export async function issuesWithVoiceWork(): Promise<IssueWithVoiceWork[]> {
-  const { data, error } = await supabaseAdmin
-    .from("casting_tasks")
-    .select("book_id, issue_id")
-    .in("status", ["pending", "in_progress"]);
-  if (error) throw new Error(`casting: reading open tasks: ${error.message}`);
-  const counts = new Map<string, IssueWithVoiceWork>();
-  for (const r of (data ?? []) as { book_id: string; issue_id: string }[]) {
-    const key = `${r.book_id}/${r.issue_id}`;
-    const entry = counts.get(key) ?? {
-      bookId: r.book_id,
-      issueId: r.issue_id,
-      open: 0,
-    };
-    entry.open++;
-    counts.set(key, entry);
-  }
-  return [...counts.values()].sort((a, b) => b.open - a.open);
-}
 
 /** The issue's castlist rows for a character or speaker key, matched as `cast.ts` matches them. */
 function issueRows(book: BookCast, issueId: string, characterId: string) {
