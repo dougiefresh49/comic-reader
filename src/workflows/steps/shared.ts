@@ -276,10 +276,8 @@ function getPauseUrl(bookId: string, issueId: string, step: string): string {
       return `${base}/admin/${bookId}/${issueId}/review/characters`;
     case "review-pages":
       return `${base}/admin/${bookId}/${issueId}/review/editor`;
-    case "review-new-characters":
-      return `${base}/admin/${bookId}/${issueId}/review/new-characters`;
     case "casting":
-      return `${base}/admin/characters/casting?book=${bookId}&issue=${issueId}`;
+      return `${base}/admin/${bookId}/${issueId}/review/characters/voices`;
     default:
       return `${base}/admin`;
   }
@@ -288,8 +286,7 @@ function getPauseUrl(bookId: string, issueId: string, step: string): string {
 const STEP_LABELS: Record<string, string> = {
   "review-clusters": "Characters",
   "review-pages": "Page & Speaker Review",
-  "review-new-characters": "New Character Review",
-  casting: "Voice Casting",
+  casting: "Voices",
 };
 
 async function notifySlack(

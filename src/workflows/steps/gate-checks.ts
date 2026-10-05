@@ -21,20 +21,6 @@ export type GateWaitRecord = {
   releasedAt?: string;
 };
 
-/** Count pending new-character queue rows for the character gate. */
-export async function countPendingNewCharacters(
-  bookId: string,
-  issueId: string,
-): Promise<number> {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const { countPendingNewCharacters: queryPendingNewCharacters } = await import(
-    "./gate-counts"
-  );
-  const client = await createTypedStepClient();
-  return queryPendingNewCharacters(client, bookId, issueId);
-}
-
 /**
  * Append a skip record to pipeline_runs.steps.skipped on this run's row
  * (updateRunSteps matches it by runId). A missing row or a failed write is

@@ -77,6 +77,30 @@ export async function updateRunSteps(
 }
 
 /**
+ * Record a masks failure as `steps.masksError` on this run's row, the only
+ * place it lands: masks run after the issue is marked ready, so the issue row
+ * keeps `complete` and the run still closes `completed` (#356). Logged, not
+ * thrown, like the other run writes.
+ */
+export async function recordMasksFailure(
+  bookId: string,
+  issueId: string,
+  message: string,
+): Promise<void> {
+  "use step";
+  const { createTypedStepClient } = await import("../step-utils");
+  const client = await createTypedStepClient();
+  await updateRunSteps(
+    client,
+    bookId,
+    issueId,
+    getWorkflowMetadata().workflowRunId,
+    (steps) => ({ ...steps, masksError: message }),
+    "masks",
+  );
+}
+
+/**
  * Close this run's pipeline_runs row. Matches the row by steps->>runId,
  * the run's own id, and only while it still reads 'running', so a row
  * cancel-ingest already marked 'cancelled' is left alone. A run with no

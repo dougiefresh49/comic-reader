@@ -1,6 +1,5 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { analyzeNewCharacterQueue } from "../../../scripts/utils/new-character-queue";
 
 /**
  * Read side of the issue hub (#334): the latest `pipeline_runs` row and the
@@ -38,6 +37,8 @@ export interface PipelineRun {
   gateWaits: GateWait[];
   /** No writer records one today; read in case a later run does. */
   error: string | null;
+  /** Why the masks step failed. Masks run after the issue is ready, so this is the only record of it (#356). */
+  masksError: string | null;
 }
 
 export interface ProgressCounts {
@@ -57,9 +58,6 @@ export interface ProgressCounts {
   castingTasksDone: number;
   castlist: number;
   castlistWithVoice: number;
-  musicScenes: number;
-  /** null when the queue analysis failed; the hub then shows no count. */
-  newCharactersPending: number | null;
 }
 
 export interface PipelineProgress {
@@ -73,6 +71,7 @@ type RawSteps = {
   skipped?: GateSkip[];
   gateWaits?: GateWait[];
   error?: string;
+  masksError?: string;
 };
 
 /**
@@ -118,6 +117,7 @@ async function getLatestRun(
     skipped: Array.isArray(steps.skipped) ? steps.skipped : [],
     gateWaits: Array.isArray(steps.gateWaits) ? steps.gateWaits : [],
     error: typeof steps.error === "string" ? steps.error : null,
+    masksError: typeof steps.masksError === "string" ? steps.masksError : null,
   };
 }
 
@@ -167,8 +167,6 @@ async function getCounts(
     castingTasksDone,
     castlist,
     castlistWithVoice,
-    musicScenes,
-    newCharacters,
   ] = await Promise.all([
     panelsQuery,
     // select count(*) from pages where book_id = $1 and issue_id = $2
@@ -207,15 +205,6 @@ async function getCounts(
     scoped("castlist"),
     // ... and voice_id is not null
     scoped("castlist").not("voice_id", "is", null),
-    // select count(*) from music_scenes where book_id = $1 and issue_id = $2
-    scoped("music_scenes"),
-    // The review-new-characters gate's own count (scripts/utils/new-character-queue).
-    analyzeNewCharacterQueue(supabaseAdmin, bookId, issueId)
-      .then((r) => r.pendingCount)
-      .catch((err: unknown) => {
-        console.error("pipeline-progress newCharactersPending:", err);
-        return null;
-      }),
   ]);
 
   const panelRows = (panelsResult.error ? [] : (panelsResult.data ?? [])) as {
@@ -266,8 +255,6 @@ async function getCounts(
     castingTasksDone: countOf("castingTasksDone", castingTasksDone),
     castlist: countOf("castlist", castlist),
     castlistWithVoice: countOf("castlistWithVoice", castlistWithVoice),
-    musicScenes: countOf("musicScenes", musicScenes),
-    newCharactersPending: newCharacters,
   };
 }
 

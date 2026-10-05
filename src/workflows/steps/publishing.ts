@@ -2,33 +2,8 @@ import { getWorkflowMetadata } from "workflow";
 import { updateIssue } from "~/lib/issue-queries";
 import { bubbleNeedsAudio } from "./audio-plan";
 import { updateRunSteps } from "./pipeline-runs";
-export async function uploadAudio(bookId: string, issueId: string) {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const supabase = await createTypedStepClient();
 
-  const { count: audioCount, error } = await supabase
-    .from("bubbles")
-    .select("id", { count: "exact", head: true })
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .not("audio_storage_path", "is", null);
-
-  if (error) throw new Error(error.message);
-
-  const n = audioCount ?? 0;
-  const { error: upErr } = await updateIssue(supabase, bookId, issueId, {
-    has_audio: n > 0,
-    audio_count: n,
-  });
-
-  if (upErr) throw new Error(upErr.message);
-
-  console.log(
-    `[upload-audio] ${bookId}/${issueId}: verified ${n} bubbles with audio_storage_path`,
-  );
-}
-
+/** Uncalled since #356, which dropped the step from the workflow and kept the function. */
 export async function consolidateMusicScenes(bookId: string, issueId: string) {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");

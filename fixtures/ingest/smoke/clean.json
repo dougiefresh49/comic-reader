@@ -10,10 +10,6 @@
       "expect": "pause"
     },
     {
-      "gate": "review-new-characters",
-      "expect": "skip"
-    },
-    {
       "gate": "casting",
       "expect": "skip"
     }

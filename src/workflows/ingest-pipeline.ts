@@ -1,7 +1,11 @@
 import { createHook } from "workflow";
 import { FatalError } from "workflow";
 
-import { STEP_ORDER } from "~/lib/pipeline-steps";
+import {
+  STEP_ORDER,
+  resolvePipelineStep,
+  type PipelineStep,
+} from "~/lib/pipeline-steps";
 
 import {
   updatePipelineStep,
@@ -22,24 +26,11 @@ import {
 import { sortPageElements, addBubbleStyles } from "./steps/sort";
 import { fetchWikiContextStep } from "./steps/wiki";
 import { generateVoiceDescriptions } from "./steps/voice";
-import {
-  getCharactersNeedingVoices,
-  generateVoiceModel,
-  getBubbleIdsForAudio,
-  generateAudioBatch,
-} from "./steps/generation";
-import {
-  uploadAudio,
-  consolidateMusicScenes,
-  generateManifest,
-} from "./steps/publishing";
+import { getBubbleIdsForAudio, generateAudioBatch } from "./steps/generation";
+import { generateManifest } from "./steps/publishing";
 import { createCastingTasks } from "./steps/casting-tasks";
-import {
-  countPendingNewCharacters,
-  recordGateSkip,
-  recordGateWait,
-} from "./steps/gate-checks";
-import { closePipelineRun } from "./steps/pipeline-runs";
+import { recordGateSkip, recordGateWait } from "./steps/gate-checks";
+import { closePipelineRun, recordMasksFailure } from "./steps/pipeline-runs";
 
 interface IngestInput {
   bookId: string;
@@ -47,20 +38,26 @@ interface IngestInput {
   fromStep?: string;
 }
 
-function shouldRun(step: string, fromStep?: string): boolean {
-  if (!fromStep) return true;
-  const fromIdx = STEP_ORDER.indexOf(fromStep as (typeof STEP_ORDER)[number]);
-  const stepIdx = STEP_ORDER.indexOf(step as (typeof STEP_ORDER)[number]);
-  if (fromIdx === -1) return true;
-  return stepIdx >= fromIdx;
+/** Both arguments are steps the workflow can place, so an unknown name never runs everything. */
+function shouldRun(step: PipelineStep, from: PipelineStep | null): boolean {
+  if (from === null) return true;
+  return STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(from);
 }
 
 export async function ingestPipeline(input: IngestInput) {
   "use workflow";
 
   const { bookId, issueId, fromStep } = input;
-  const run = (step: string) => shouldRun(step, fromStep);
-  let currentStep = fromStep ?? "roboflow-page-analyze";
+  // trigger-ingest resolves fromStep too; this guards any other caller.
+  const from = fromStep === undefined ? null : resolvePipelineStep(fromStep);
+  if (fromStep !== undefined && from === null) {
+    throw new FatalError(`Unknown fromStep "${fromStep}"; nothing was run`);
+  }
+  const run = (step: PipelineStep) => shouldRun(step, from);
+  let currentStep: string = from ?? "roboflow-page-analyze";
+  // Set once the issue is ready. From then on nothing writes pipeline_step,
+  // and a masks-only retry never writes it either (#356).
+  let ready = false;
 
   try {
     const pages = await getPageList(bookId, issueId);
@@ -87,22 +84,6 @@ export async function ingestPipeline(input: IngestInput) {
         throw new FatalError(
           "Roboflow produced 0 panels. API may be down or credentials invalid",
         );
-      }
-      await recordStepEnd(bookId, issueId, currentStep, timing);
-    }
-
-    if (run("extract-foreground-masks")) {
-      currentStep = "extract-foreground-masks";
-      await updatePipelineStep(bookId, issueId, currentStep);
-      const timing = await recordStepStart(
-        bookId,
-        issueId,
-        currentStep,
-        pages.length,
-      );
-      const maskBatches = batchArray(pages, 6);
-      for (const batch of maskBatches) {
-        await extractForegroundMasksBatch(bookId, issueId, batch);
       }
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
@@ -196,37 +177,7 @@ export async function ingestPipeline(input: IngestInput) {
       await recordGateWait(bookId, issueId, currentStep, "close");
     }
 
-    // ── Phase 5: New characters, then voice descriptions ──────────────
-    if (run("review-new-characters")) {
-      currentStep = "review-new-characters";
-      const timing = await recordStepStart(bookId, issueId, currentStep);
-      const pendingCount = await countPendingNewCharacters(bookId, issueId);
-      if (pendingCount === 0) {
-        await updatePipelineStep(bookId, issueId, currentStep);
-        await recordGateSkip(
-          bookId,
-          issueId,
-          "review-new-characters",
-          "no pending new characters",
-          { pendingCount },
-        );
-        console.log(
-          `[review-new-characters] skipped: 0 pending for ${bookId}/${issueId}`,
-        );
-        await recordStepEnd(bookId, issueId, currentStep, timing);
-      } else {
-        // Closes before the gate opens, same shape as review-clusters.
-        await recordStepEnd(bookId, issueId, currentStep, timing);
-        await updatePipelineStep(bookId, issueId, currentStep, true);
-        await recordGateWait(bookId, issueId, currentStep, "open");
-        using characterHook = createHook<{ approved: boolean }>({
-          token: `ingest:${bookId}/${issueId}/character-review`,
-        });
-        await characterHook;
-        await recordGateWait(bookId, issueId, currentStep, "close");
-      }
-    }
-
+    // ── Phase 5: Voice descriptions ───────────────────────────────────
     if (run("generate-voice-descriptions")) {
       currentStep = "generate-voice-descriptions";
       await updatePipelineStep(bookId, issueId, currentStep);
@@ -276,18 +227,7 @@ export async function ingestPipeline(input: IngestInput) {
       }
     }
 
-    // ── Phase 7: Voice Generation ─────────────────────────────────────
-    if (run("generate-voice-models")) {
-      currentStep = "generate-voice-models";
-      await updatePipelineStep(bookId, issueId, currentStep);
-      const timing = await recordStepStart(bookId, issueId, currentStep);
-      const characters = await getCharactersNeedingVoices(bookId, issueId);
-      for (const characterId of characters) {
-        await generateVoiceModel(bookId, issueId, characterId);
-      }
-      await recordStepEnd(bookId, issueId, currentStep, timing);
-    }
-
+    // ── Phase 7: Audio ────────────────────────────────────────────────
     if (run("generate-audio")) {
       currentStep = "generate-audio";
       await updatePipelineStep(bookId, issueId, currentStep);
@@ -301,22 +241,6 @@ export async function ingestPipeline(input: IngestInput) {
     }
 
     // ── Phase 8: Publishing ───────────────────────────────────────────
-    if (run("upload-audio")) {
-      currentStep = "upload-audio";
-      await updatePipelineStep(bookId, issueId, currentStep);
-      const timing = await recordStepStart(bookId, issueId, currentStep);
-      await uploadAudio(bookId, issueId);
-      await recordStepEnd(bookId, issueId, currentStep, timing);
-    }
-
-    if (run("consolidate-music-scenes")) {
-      currentStep = "consolidate-music-scenes";
-      await updatePipelineStep(bookId, issueId, currentStep);
-      const timing = await recordStepStart(bookId, issueId, currentStep);
-      await consolidateMusicScenes(bookId, issueId);
-      await recordStepEnd(bookId, issueId, currentStep, timing);
-    }
-
     if (run("generate-manifest")) {
       currentStep = "generate-manifest";
       await updatePipelineStep(bookId, issueId, currentStep);
@@ -325,17 +249,53 @@ export async function ingestPipeline(input: IngestInput) {
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 
-    await markIssueReady(bookId, issueId);
+    // A masks-only retry leaves the issue row as it found it, so retrying
+    // masks on an issue that failed earlier cannot publish it unfinished.
+    if (from !== "extract-foreground-masks") {
+      await markIssueReady(bookId, issueId);
+    }
+    ready = true;
+
+    // ── Phase 9: Foreground masks, after ready (#356) ─────────────────
+    // The reader opens the issue while this runs and after it fails. It
+    // never writes pipeline_step: a failure lands on the run row only, as
+    // steps.masksError, and the run still closes completed.
+    if (run("extract-foreground-masks")) {
+      try {
+        const timing = await recordStepStart(
+          bookId,
+          issueId,
+          "extract-foreground-masks",
+          pages.length,
+        );
+        try {
+          const maskBatches = batchArray(pages, 6);
+          for (const batch of maskBatches) {
+            await extractForegroundMasksBatch(bookId, issueId, batch);
+          }
+        } finally {
+          await recordStepEnd(
+            bookId,
+            issueId,
+            "extract-foreground-masks",
+            timing,
+          );
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.log(`[masks] ${bookId}/${issueId} failed: ${message}`);
+        await recordMasksFailure(bookId, issueId, message);
+      }
+    }
+
     await closePipelineRun(bookId, issueId, "completed");
 
     return { bookId, issueId, status: "ready" };
   } catch (err) {
     await closePipelineRun(bookId, issueId, "failed");
-    if (err instanceof FatalError) {
+    if (!ready && from !== "extract-foreground-masks") {
       await markPipelineFailed(bookId, issueId, currentStep);
-      throw err;
     }
-    await markPipelineFailed(bookId, issueId, currentStep);
     throw err;
   }
 }

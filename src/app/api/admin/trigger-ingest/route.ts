@@ -5,18 +5,34 @@ import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
+import { resolvePipelineStep } from "~/lib/pipeline-steps";
 import { PAUSE_TO_HOOK_STEP, ingestHookToken } from "../cancel-ingest/hooks";
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
     bookId: string;
     issueId: string;
-    fromStep?: string;
+    fromStep?: unknown;
   };
 
   if (!body.bookId || !body.issueId) {
     return Response.json(
       { error: "missing bookId or issueId" },
+      { status: 400 },
+    );
+  }
+
+  // A retired step resolves to the step that does its work now; a name the
+  // workflow cannot place is refused here, before any write or run (#356).
+  const fromStep =
+    body.fromStep === undefined || body.fromStep === null
+      ? undefined
+      : typeof body.fromStep === "string"
+        ? resolvePipelineStep(body.fromStep)
+        : null;
+  if (fromStep === null) {
+    return Response.json(
+      { error: `unknown fromStep ${JSON.stringify(body.fromStep)}` },
       { status: 400 },
     );
   }
@@ -37,6 +53,19 @@ export async function POST(req: NextRequest) {
 
   if (!issue) {
     return Response.json({ error: "issue not found" }, { status: 404 });
+  }
+
+  // Masks run on a finished issue only (#356).
+  if (
+    fromStep === "extract-foreground-masks" &&
+    issue.pipeline_step !== "complete"
+  ) {
+    return Response.json(
+      {
+        error: `Masks can only be retried on a finished issue; this one reads ${issue.pipeline_step ?? "no step"}.`,
+      },
+      { status: 409 },
+    );
   }
 
   // Every run of an issue shares the gate hook tokens, so a second run dies
@@ -79,7 +108,7 @@ export async function POST(req: NextRequest) {
       : !ended && newest?.status === "running" && newest.steps?.runId === runId;
     const remedy = cancelIngestWorks
       ? "Cancel it first with cancel-ingest"
-      : `cancel-ingest cannot cancel it from this state, so cancel run ${runId} with the Workflow CLI or the Workflow dashboard`;
+      : `Cancel it first with cancel-ingest given its runId (${runId}), which closes the run and leaves the issue row as it is`;
     return Response.json(
       {
         error: `Run ${runId} of ${label} is ${state}. ${remedy}, then trigger again.`,
@@ -138,14 +167,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const pipelineStep = body.fromStep ?? "roboflow-page-analyze";
-
+  // A masks-only retry leaves pipeline_step alone: masks never write it, and
+  // the run leaves the issue row as it found it (#356).
   const { error } = await updateIssue(
     supabaseAdmin,
     body.bookId,
     body.issueId,
     {
-      pipeline_step: pipelineStep,
+      ...(fromStep === "extract-foreground-masks"
+        ? {}
+        : { pipeline_step: fromStep ?? "roboflow-page-analyze" }),
       pipeline_paused: false,
       pipeline_paused_at: null,
       pipeline_paused_url: null,
@@ -160,7 +191,7 @@ export async function POST(req: NextRequest) {
     {
       bookId: body.bookId,
       issueId: body.issueId,
-      fromStep: body.fromStep,
+      fromStep,
     },
   ]);
 
@@ -170,7 +201,7 @@ export async function POST(req: NextRequest) {
     status: "running",
     steps: {
       runId: run.runId,
-      fromStep: body.fromStep ?? null,
+      fromStep: fromStep ?? null,
       skipped: [],
     },
   });
@@ -181,7 +212,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       bookId: body.bookId,
       issueId: body.issueId,
-      fromStep: body.fromStep ?? null,
+      fromStep: fromStep ?? null,
       runId: run.runId,
       status: "started",
       warning: runError.message,
@@ -192,7 +223,7 @@ export async function POST(req: NextRequest) {
     ok: true,
     bookId: body.bookId,
     issueId: body.issueId,
-    fromStep: body.fromStep ?? null,
+    fromStep: fromStep ?? null,
     runId: run.runId,
     status: "started",
   });
