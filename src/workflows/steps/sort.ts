@@ -1,6 +1,8 @@
 import {
+  type GenerateContentParameters,
   type GenerateContentResponse,
   type GoogleGenAI,
+  type ThinkingLevel,
   createPartFromBase64,
   createPartFromText,
 } from "@google/genai";
@@ -78,7 +80,7 @@ async function writeAfterPaidCall(
 
 type BoundingBoxJson = { x: number; y: number; w: number; h: number };
 
-interface SortPanelRow {
+export interface SortPanelRow {
   id: string;
   panel_id: string;
   page_number: number;
@@ -87,7 +89,7 @@ interface SortPanelRow {
   source: string;
 }
 
-interface SortBubbleRow {
+export interface SortBubbleRow {
   id: string;
   legacy_id: string | null;
   panel_id: string | null;
@@ -273,8 +275,31 @@ ${bubbleLines.join("\n") || "(no bubbles)"}
 }
 
 /**
+ * The sort request: page image, prompt, model. Unset, `options` leave it as
+ * the step sends it, GEMINI_MEDIUM and no `config` (the model's default
+ * thinking). The reading order bench (#443) sets `model` and `thinkingLevel`
+ * and sends this same request.
+ */
+export function sortPlanRequest(
+  pageImage: Buffer,
+  prompt: string,
+  options: { model?: string; thinkingLevel?: ThinkingLevel } = {},
+): GenerateContentParameters {
+  return {
+    model: options.model ?? GEMINI_MEDIUM,
+    contents: [
+      createPartFromBase64(pageImage.toString("base64"), "image/webp"),
+      createPartFromText(prompt),
+    ],
+    ...(options.thinkingLevel
+      ? { config: { thinkingConfig: { thinkingLevel: options.thinkingLevel } } }
+      : {}),
+  };
+}
+
+/**
  * The paid call only. The caller reads `.text` (an SDK getter that can throw)
- * and parses it inside its fail-fast block.
+ * and parses it inside its fail-fast block (`sortPlanFromResponse`).
  */
 async function getSortPlanResponseFromGemini(
   gemini: GoogleGenAI,
@@ -282,16 +307,10 @@ async function getSortPlanResponseFromGemini(
   prompt: string,
   llmMeta: LlmCallMeta,
 ): Promise<GenerateContentResponse> {
-  const imagePart = createPartFromBase64(
-    pageImage.toString("base64"),
-    "image/webp",
-  );
-  const textPart = createPartFromText(prompt);
-
   const { generateContentLogged } = await import("~/lib/llm-usage");
   return generateContentLogged(
     gemini,
-    { model: GEMINI_MEDIUM, contents: [imagePart, textPart] },
+    sortPlanRequest(pageImage, prompt),
     llmMeta,
   );
 }
@@ -356,6 +375,45 @@ function validateAndFlattenOrders(
   }
 
   return { panelOrders, bubbleGlobalOrder };
+}
+
+/**
+ * The reply as the step reads it: text, JSON, handles back to UUIDs, then
+ * every panel and bubble exactly once. `plan` is the reply with UUIDs, which
+ * the bench reads for each bubble's panel. Throws a plain Error on any failure;
+ * the step turns it into a FatalError, the reading order bench (#443) into a
+ * failed reply.
+ */
+export function sortPlanFromResponse(
+  response: GenerateContentResponse,
+  panels: SortPanelRow[],
+  bubbles: SortBubbleRow[],
+  handles: PageHandles,
+) {
+  const text = response.text;
+  if (!text) throw new Error("No text response from Gemini");
+  const plan = JSON.parse(extractJsonObject(text)) as GeminiSortResponse;
+  if (!plan.panels || !Array.isArray(plan.panels)) {
+    throw new Error("Invalid response: missing panels array");
+  }
+  const withIds = planWithIds(plan, handles);
+  return {
+    ...validateAndFlattenOrders(panels, bubbles, withIds),
+    plan: withIds,
+  };
+}
+
+/**
+ * No detected panel: none, or a lone full-page panel (#237). Such a page
+ * takes the free heuristic, not the Gemini sort (#306).
+ */
+export function takesHeuristicSort(panels: SortPanelRow[]) {
+  const onlyFullPage =
+    panels.length === 1 && panels[0]!.source === "heuristic-fullpage";
+  return {
+    noDetectedPanels: panels.length === 0 || onlyFullPage,
+    onlyFullPage,
+  };
 }
 
 function sortBubbleRowsHeuristic(
@@ -445,11 +503,7 @@ export async function sortPageElements(
   const panels = (panelRows ?? []) as SortPanelRow[];
   const bubbles = (bubbleRows ?? []) as SortBubbleRow[];
 
-  // A lone full-page panel (#237) is a page with no detected panel: it takes
-  // the free heuristic, not the Gemini sort (#306).
-  const onlyFullPage =
-    panels.length === 1 && panels[0]!.source === "heuristic-fullpage";
-  const noDetectedPanels = panels.length === 0 || onlyFullPage;
+  const { noDetectedPanels, onlyFullPage } = takesHeuristicSort(panels);
 
   if (noDetectedPanels && bubbles.length === 0) {
     console.log(
@@ -490,16 +544,11 @@ export async function sortPageElements(
   // Past the paid call: a Workflow retry would pay for Gemini again, so every
   // failure from here on is a FatalError, including the `.text` getter.
   try {
-    const text = response.text;
-    if (!text) throw new Error("No text response from Gemini");
-    const plan = JSON.parse(extractJsonObject(text)) as GeminiSortResponse;
-    if (!plan.panels || !Array.isArray(plan.panels)) {
-      throw new Error("Invalid response: missing panels array");
-    }
-    const { panelOrders, bubbleGlobalOrder } = validateAndFlattenOrders(
+    const { panelOrders, bubbleGlobalOrder } = sortPlanFromResponse(
+      response,
       panels,
       bubbles,
-      planWithIds(plan, handles),
+      handles,
     );
 
     await writeAfterPaidCall("panels/bubbles", [

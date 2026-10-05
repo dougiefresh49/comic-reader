@@ -40,11 +40,7 @@
  *     [--out <dir>, default ~/comic-reader-bench]
  * Then: pnpm exec tsx --env-file=.env scripts/bench/compare-runs.ts --bench face-id
  */
-import {
-  type GenerateContentParameters,
-  GoogleGenAI,
-  ThinkingLevel,
-} from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import sharp from "sharp";
 import * as characterIdentification from "~/lib/character-identification";
 import * as exemplarStore from "~/lib/exemplar-store";
@@ -62,11 +58,14 @@ import {
 } from "~/workflows/steps/vision";
 import {
   type Arm,
+  type Attempt,
   CallBudget,
   DEFAULT_OUT,
+  type Gate,
   type RunFile,
   type ScoredRow,
   benchCli,
+  countingClient,
   geminiFromEnv,
   geminiRate,
   geminiTokens,
@@ -74,6 +73,7 @@ import {
   median,
   pickArms,
   pool,
+  refused,
   requireLiveApiOk,
   tierOf,
   writeRunFile,
@@ -120,7 +120,10 @@ const { opt, flag, die, intOpt, parsePages, must } = benchCli("bench-face-id");
 const dryRun = flag("--dry-run");
 const arms = pickArms(ARMS, opt("--arm") ?? "all", die);
 const runs = intOpt("--runs", 3)!;
-const budget = new CallBudget(intOpt("--max-calls", 40)!);
+const gate: Gate = {
+  budget: new CallBudget(intOpt("--max-calls", 40)!),
+  halted: null,
+};
 const maxUsdRaw = opt("--max-usd");
 const maxUsd = maxUsdRaw === undefined ? undefined : Number(maxUsdRaw);
 if (maxUsd !== undefined && !(maxUsd > 0)) die("--max-usd wants a USD amount");
@@ -260,16 +263,6 @@ async function loadDetections() {
 }
 
 // ── One detection ───────────────────────────────────────────────────────
-type Attempt = {
-  model: string;
-  thinkingLevel: string | null;
-  latencyMs: number;
-  usage: unknown;
-  reply: string | null;
-  status: number | null;
-  error: string | null;
-};
-
 type Verdict =
   | "right"
   | "wrong"
@@ -311,50 +304,7 @@ type FaceRow = ScoredRow & {
   error: string | null;
 };
 
-let halted: string | null = null;
 let spentUsd = 0;
-
-/** A client that counts each request against `--max-calls` and records it. */
-function benchClient(real: GoogleGenAI, log: Attempt[]): GoogleGenAI {
-  const generateContent = async (params: GenerateContentParameters) => {
-    const thinkingLevel =
-      (params.config?.thinkingConfig?.thinkingLevel as string | undefined) ??
-      null;
-    // A halt (--max-usd, a refused request) also stops requests already
-    // queued behind it, the 429 retry on the fallback key included.
-    if (halted) throw new Error(halted);
-    if (!budget.take()) {
-      halted ??= `--max-calls ${budget.max} reached`;
-      throw new Error(`--max-calls ${budget.max} reached`);
-    }
-    const started = Date.now();
-    try {
-      const res = await real.models.generateContent(params);
-      log.push({
-        model: params.model,
-        thinkingLevel,
-        latencyMs: Date.now() - started,
-        usage: res.usageMetadata ?? null,
-        reply: res.text ?? "",
-        status: 200,
-        error: null,
-      });
-      return res;
-    } catch (e) {
-      log.push({
-        model: params.model,
-        thinkingLevel,
-        latencyMs: Date.now() - started,
-        usage: null,
-        reply: null,
-        status: (e as { status?: number } | null)?.status ?? 0,
-        error: e instanceof Error ? e.message : String(e),
-      });
-      throw e;
-    }
-  };
-  return { models: { generateContent } } as unknown as GoogleGenAI;
-}
 
 function parses(text: string | null) {
   const m = text ? /\{[\s\S]*\}/.exec(text) : null;
@@ -396,9 +346,9 @@ async function identifyOne(
     },
     geminiClient: {
       ...geminiClientLib,
-      getGeminiClient: () => benchClient(primary!, log),
+      getGeminiClient: () => countingClient(primary!, log, gate),
       getFallbackGeminiClient: () =>
-        fallback ? benchClient(fallback, log) : null,
+        fallback ? countingClient(fallback, log, gate) : null,
     },
   };
 
@@ -440,15 +390,9 @@ async function identifyOne(
         : face.outcome === "unnamed"
           ? "unnamed"
           : "dropped";
-  if (
-    error &&
-    last.status !== null &&
-    last.status >= 400 &&
-    last.status < 500 &&
-    last.status !== 429
-  ) {
+  if (error && refused(last)) {
     // A request the API refuses (a bad model or config): stop everything.
-    halted ??= `HTTP ${last.status}: ${last.error}`;
+    gate.halted ??= `HTTP ${last.status}: ${last.error}`;
   }
   return {
     id: d.id,
@@ -635,13 +579,13 @@ if (dryRun) {
 // Under DRY_RUN the Gemini wrapper writes no llm_calls row (see the header).
 process.env.DRY_RUN = "1";
 console.log(
-  `${detections.length} detections; arms ${arms.map((a) => a.name).join(", ")}; ${runs} run(s); --max-calls ${budget.max}${maxUsd !== undefined ? `; --max-usd ${maxUsd}` : ""}; concurrency ${concurrency}`,
+  `${detections.length} detections; arms ${arms.map((a) => a.name).join(", ")}; ${runs} run(s); --max-calls ${gate.budget.max}${maxUsd !== undefined ? `; --max-usd ${maxUsd}` : ""}; concurrency ${concurrency}`,
 );
 const written: string[] = [];
 const summaries: string[] = [];
-for (let run = 1; run <= runs && !halted; run++) {
+for (let run = 1; run <= runs && !gate.halted; run++) {
   for (const arm of arms) {
-    if (halted) break;
+    if (gate.halted) break;
     const startedAt = new Date().toISOString();
     let errorsInARow = 0;
     const rows = (
@@ -653,10 +597,10 @@ for (let run = 1; run <= runs && !halted; run++) {
           if (row) {
             errorsInARow = row.verdict === "error" ? errorsInARow + 1 : 0;
             if (errorsInARow >= MAX_ERRORS_IN_A_ROW) {
-              halted ??= `${MAX_ERRORS_IN_A_ROW} failed detections in a row (last: ${row.error})`;
+              gate.halted ??= `${MAX_ERRORS_IN_A_ROW} failed detections in a row (last: ${row.error})`;
             }
             if (maxUsd !== undefined && spentUsd >= maxUsd) {
-              halted ??= `--max-usd ${maxUsd} reached ($${spentUsd.toFixed(4)})`;
+              gate.halted ??= `--max-usd ${maxUsd} reached ($${spentUsd.toFixed(4)})`;
             }
             console.log(
               `[${arm.name}${run} ${i + 1}/${detections.length}] p${d.page} ${d.id.slice(0, 8)} truth ${d.truth} → ${row.verdict}${row.characterId ? ` ${row.characterId}` : row.characterName ? ` "${row.characterName}"` : ""} (${row.latencyMs ?? "-"} ms, ${row.tokensThinking ?? "-"} thinking)${row.error ? ` error: ${row.error}` : ""}`,
@@ -664,7 +608,7 @@ for (let run = 1; run <= runs && !halted; run++) {
           }
           return row;
         },
-        () => halted !== null,
+        () => gate.halted !== null,
       )
     ).filter((r): r is FaceRow => r != null);
     const file: RunFile<FaceRow> = {
@@ -676,7 +620,7 @@ for (let run = 1; run <= runs && !halted; run++) {
       run,
       runs,
       complete: rows.length === detections.length,
-      stop: halted,
+      stop: gate.halted,
       book,
       issue,
       pages,
@@ -695,6 +639,6 @@ console.log(
     "",
     ...summaries,
     "",
-    `Requests ${budget.calls}, spent $${spentUsd.toFixed(4)}.${halted ? ` Stopped early: ${halted}` : ""}`,
+    `Requests ${gate.budget.calls}, spent $${spentUsd.toFixed(4)}.${gate.halted ? ` Stopped early: ${gate.halted}` : ""}`,
   ].join("\n"),
 );

@@ -13,7 +13,11 @@
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { GoogleGenAI, type ThinkingLevel } from "@google/genai";
+import {
+  type GenerateContentParameters,
+  GoogleGenAI,
+  type ThinkingLevel,
+} from "@google/genai";
 import {
   GEMINI_FAST,
   GEMINI_HIGH,
@@ -169,6 +173,81 @@ export class CallBudget {
     return true;
   }
 }
+
+/** One request a bench sent, as evidence of what went over the wire. */
+export type Attempt = {
+  model: string;
+  thinkingLevel: string | null;
+  latencyMs: number;
+  usage: unknown;
+  reply: string | null;
+  status: number | null;
+  error: string | null;
+};
+
+/**
+ * One invocation's stop state: `halted` is set once (`--max-usd`, a refused
+ * request, `--max-calls`) and from then on no request is sent, retries
+ * included.
+ */
+export type Gate = { budget: CallBudget; halted: string | null };
+
+/**
+ * A client whose `models.generateContent` checks the gate, counts the
+ * request against `--max-calls` and logs it to `log`.
+ */
+export function countingClient(
+  real: GoogleGenAI,
+  log: Attempt[],
+  gate: Gate,
+): GoogleGenAI {
+  const generateContent = async (params: GenerateContentParameters) => {
+    const thinkingLevel =
+      (params.config?.thinkingConfig?.thinkingLevel as string | undefined) ??
+      null;
+    // A halt (--max-usd, a refused request) also stops requests already
+    // queued behind it, the 429 retry on the fallback key included.
+    if (gate.halted) throw new Error(gate.halted);
+    if (!gate.budget.take()) {
+      gate.halted ??= `--max-calls ${gate.budget.max} reached`;
+      throw new Error(`--max-calls ${gate.budget.max} reached`);
+    }
+    const started = Date.now();
+    try {
+      const res = await real.models.generateContent(params);
+      log.push({
+        model: params.model,
+        thinkingLevel,
+        latencyMs: Date.now() - started,
+        usage: res.usageMetadata ?? null,
+        reply: res.text ?? "",
+        status: 200,
+        error: null,
+      });
+      return res;
+    } catch (e) {
+      log.push({
+        model: params.model,
+        thinkingLevel,
+        latencyMs: Date.now() - started,
+        usage: null,
+        reply: null,
+        status: (e as { status?: number } | null)?.status ?? 0,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      throw e;
+    }
+  };
+  return { models: { generateContent } } as unknown as GoogleGenAI;
+}
+
+/** A request the API refused (a bad model or config): 4xx other than 429. */
+export const refused = (a: Attempt | undefined) =>
+  !!a &&
+  a.status !== null &&
+  a.status >= 400 &&
+  a.status < 500 &&
+  a.status !== 429;
 
 /** The median, the two middle values' mean rounded when the count is even. */
 export function median(values: number[]): number | null {
