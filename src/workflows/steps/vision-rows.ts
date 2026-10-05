@@ -34,7 +34,6 @@ export type ContextParsed = {
   characterType?: string;
   side?: string;
   voiceDescription?: string;
-  textWithCues?: string;
 };
 
 /** A page with no panels reports a null panel image size (#221). */
@@ -491,8 +490,26 @@ export function contextSpeakerReply(parsed: ContextParsed): string | null {
 }
 
 /**
+ * What the speaker reply resolves to, before any write: the bubble type, the
+ * cast member `contextSpeakerReply` matches (null when none), and the emotion
+ * as stored. The cue call (#437) is sent this speaker and emotion, and
+ * `buildContextUpdate` writes them, so the two never differ.
+ */
+export function resolveContext(
+  parsed: ContextParsed,
+  cast: ClosedCastMember[],
+): { type: string; match: ClosedCastMember | null; emotion: string } {
+  return {
+    type: parsed.type ?? "SPEECH",
+    match: matchCastSpeaker(contextSpeakerReply(parsed), cast),
+    emotion: parsed.emotion ?? "neutral",
+  };
+}
+
+/**
  * Build the `bubbles` update for OCR + speaker/emotion context.
- * `text_with_cues` is the text column; there is no `text` column.
+ * `text_with_cues` is the text column; there is no `text` column, and its
+ * value is `textWithCues`, the cue call's line (#437).
  * The speaker is `contextSpeakerReply` matched against `cast`: a match writes
  * the member's id to `character_id` and its display name to `speaker`; no
  * match writes null to both, which the review editor flags (#354).
@@ -502,21 +519,21 @@ export function buildContextUpdate(
   ocrText: string,
   aiReasoning: string | null,
   cast: ClosedCastMember[],
+  textWithCues: string,
 ): TablesUpdate<"bubbles"> {
-  const bubbleType = parsed.type ?? "SPEECH";
-  const match = matchCastSpeaker(contextSpeakerReply(parsed), cast);
+  const { type, match, emotion } = resolveContext(parsed, cast);
 
   return {
     ocr_text: ocrText,
-    type: bubbleType,
+    type,
     speaker: match?.name ?? null,
     character_id: match?.id ?? null,
-    emotion: parsed.emotion ?? "neutral",
+    emotion,
     character_type: parsed.characterType ?? null,
     side: parsed.side ?? null,
     voice_description: parsed.voiceDescription ?? null,
-    text_with_cues: parsed.textWithCues ?? ocrText,
+    text_with_cues: textWithCues,
     ai_reasoning: aiReasoning,
-    ignored: bubbleType === "SFX" || bubbleType === "BACKGROUND",
+    ignored: type === "SFX" || type === "BACKGROUND",
   };
 }

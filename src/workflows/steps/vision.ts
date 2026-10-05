@@ -24,6 +24,7 @@ import {
   mapSegmentationRow,
   normalizePanelAudioTags,
   parseRoboflowSam3Output,
+  resolveContext,
   type ClosedCastMember,
   type ContextParsed,
   type ForegroundPrediction,
@@ -1560,6 +1561,8 @@ export async function getContextPage(
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
   const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
+  // The cue call's rows, apart from the OCR and speaker calls' (#437).
+  const cueMeta = { ...llmMeta, step: "get-context:cues" };
 
   // Book and synopsis context for the prompt. The wiki's character names stay
   // out: the speaker comes from the closed cast below, never from an open
@@ -1824,13 +1827,15 @@ export async function getContextPage(
 
     if (!ocrText) continue;
 
+    // The speaker call carries no cue rules; the cue line is the second
+    // call below (#437).
     const { buildContextPrompt } = await import("~/lib/gemini-prompts");
     const contextPrompt = buildContextPrompt(
       ocrText,
       box,
       castLines,
       bookContext,
-      { closedList: true, castNotes: CLOSED_CAST_NOTES },
+      { closedList: true, castNotes: CLOSED_CAST_NOTES, noCues: true },
     );
 
     try {
@@ -1857,7 +1862,35 @@ export async function getContextPage(
       if (!jsonMatch) continue;
 
       const parsed = JSON.parse(jsonMatch[0]) as ContextParsed;
-      const update = buildContextUpdate(parsed, ocrText, aiReasoning, cast);
+      const { match, emotion } = resolveContext(parsed, cast);
+
+      // The cue line: the bubble's text with the speaker and emotion the
+      // update stores, sent through `cueRequest` as Regenerate cues sends it. A
+      // failed or empty reply throws to the catch below, so the bubble gets
+      // no update and a rerun picks it up; the OCR text is never the
+      // fallback cue line.
+      const { cueRequest } = await import("~/lib/cue-rules");
+      let cueLine: string;
+      try {
+        const cueResponse = await generateContentLogged(
+          gemini,
+          cueRequest({ text: ocrText, emotion, speaker: match?.id ?? null }),
+          cueMeta,
+        );
+        cueLine = cueResponse.text?.trim() ?? "";
+      } catch (e) {
+        if (e instanceof FatalError) throw e;
+        throw new Error(`cue call failed: ${errorText(e)}`);
+      }
+      if (!cueLine) throw new Error("cue call returned an empty reply");
+
+      const update = buildContextUpdate(
+        parsed,
+        ocrText,
+        aiReasoning,
+        cast,
+        cueLine,
+      );
 
       if (update.character_id) {
         matched++;
