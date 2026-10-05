@@ -21,7 +21,6 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { env } from "~/env.mjs";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import type { Bubble } from "./utils/gemini-context.js";
-import { SKIPPED_VOICE } from "~/lib/voice-settings.js";
 import { buildTtsRequest } from "~/lib/tts-request.js";
 import { loadVoiceOverrides } from "~/lib/voice-overrides.js";
 import { supabase } from "./lib/supabase.js";
@@ -118,9 +117,7 @@ function findFuzzyMatch(
 }
 
 /**
- * Get voice ID for a character name.
- * Returns voiceId === SKIPPED_VOICE when the character was explicitly skipped
- * from casting — caller should skip the bubble entirely.
+ * Get voice ID for a character name from the legacy castlist.json.
  */
 function getVoiceId(
   characterName: string | null,
@@ -138,7 +135,7 @@ function getVoiceId(
   // Normalize using alias map
   const normalizedName = getCanonicalName(characterName);
 
-  // Direct lookup (may return __SKIPPED__ sentinel)
+  // Direct lookup
   if (castList[normalizedName]) {
     return {
       voiceId: castList[normalizedName]!,
@@ -383,15 +380,6 @@ async function main() {
           bubble.speaker,
           castList,
         );
-
-        // Speaker explicitly skipped via casting UI → don't generate audio
-        if (voiceId === SKIPPED_VOICE) {
-          console.log(
-            `   [skip] ${bubble.id} - ${bubble.speaker} (casting skipped)`,
-          );
-          skipped++;
-          continue;
-        }
 
         // Track no matches (when we had to use Narrator but speaker was not null)
         if (

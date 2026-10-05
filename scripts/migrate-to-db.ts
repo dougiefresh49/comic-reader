@@ -12,6 +12,7 @@ import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { upsertIssue } from "~/lib/issue-queries.js";
+import { importCastJson } from "./lib/cast-json.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -258,18 +259,9 @@ async function migrateIssue(bookId: string, issueDir: string): Promise<void> {
   // ── Castlist ─────────────────────────────────────────────────────────────
   if (fs.existsSync(castlistPath)) {
     const castData = fs.readJsonSync(castlistPath) as Record<string, string>;
-    const castRows = Object.entries(castData).map(([character, voiceId]) => ({
-      book_id: bookId,
-      issue_id: issueId,
-      character,
-      voice_id: voiceId,
-    }));
-
-    const { error: castError } = await supabase
-      .from("castlist")
-      .upsert(castRows, { onConflict: "book_id,issue_id,character" });
-    if (castError) throw new Error(`castlist upsert: ${castError.message}`);
-    console.log(`    ✓ castlist (${castRows.length} entries)`);
+    const cast = await importCastJson(supabase, bookId, issueId, castData);
+    for (const s of cast.skipped) console.warn(`    ⚠ castlist: skipped ${s}`);
+    console.log(`    ✓ castlist (${cast.written} entries)`);
   }
 }
 

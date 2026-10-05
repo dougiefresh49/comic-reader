@@ -39,15 +39,22 @@ import {
 import { pageStoragePath } from "~/lib/storage";
 import { slugify } from "~/lib/character-id";
 import { needsSpeaker } from "~/components/review-editor/model";
-import { loadBookCast } from "~/lib/cast";
+import {
+  deleteBookCast,
+  issueCast,
+  loadBookCast,
+  readCastVoiceLinks,
+  renderVoice,
+  setIssueVoice,
+  setNoAudio,
+  type RenderVoice,
+  type RoleId,
+} from "~/lib/cast";
 import {
   planCastingTasks,
   readSpeakerLines,
 } from "~/workflows/steps/casting-tasks";
-import {
-  planBubbleVoices,
-  voiceLookupContext,
-} from "~/workflows/steps/audio-plan";
+import { planBubbleVoices } from "~/workflows/steps/audio-plan";
 import type { Json } from "~/types/database";
 import { supabase } from "./lib/supabase";
 
@@ -67,12 +74,15 @@ const REQUIRED_KEYS = [
   "ELEVENLABS_API_KEY",
   "VENICE_API_KEY",
 ];
-/** Every table with a book_id column (src/types/database.ts), in FK-safe delete order. */
+/**
+ * Every table with a book_id column (src/types/database.ts) but castlist, in
+ * FK-safe delete order. castlist goes first, through `deleteBookCast`
+ * (src/lib/cast.ts owns every castlist write); no table references it.
+ */
 const BOOK_TABLES = [
   "book_franchises",
   "audio_timestamps",
   "casting_tasks",
-  "castlist",
   "speaker_reviews",
   "page_context",
   "pipeline_runs",
@@ -101,9 +111,10 @@ const RUN_TIMEOUT_MS = 20 * 60_000;
 const REAL_GATE_TIMEOUT_MS = 15 * 60_000;
 const REAL_RUN_TIMEOUT_MS = 60 * 60_000;
 const RESUME_RETRY_MS = 60_000;
-const SKIPPED_VOICE = "__SKIPPED__";
-/** The cast id the editor gives "Smoke Stranger" when the owner adds it (slug of the name). */
+/** The speaker text the owner simulation gives "Smoke Stranger" (slug of the name); it never gets a `characters` row. */
 const STRANGER_ID = "smoke-stranger";
+/** The narrator role's `characters` id (#346), which narration and captions resolve to. */
+const NARRATOR: RoleId = "narrator";
 
 /** "either": a real run may pause or skip the stop (the voices stop). */
 type Expect = { gate: string; expect: "pause" | "skip" | "either" };
@@ -364,7 +375,11 @@ function diffSnapshots(before: Snapshot, after: Snapshot): string[] {
   return out;
 }
 
-/** `dry-run-` voice ids in shared rows; outside the smoke ids only, or anywhere. */
+/**
+ * `dry-run-` voice ids in shared rows; outside the smoke ids only, or
+ * anywhere. castlist holds no ElevenLabs id since #429 (it points at a
+ * `voices` row), so the second read is `voices.current_elevenlabs_id`.
+ */
 async function fakeVoiceRows(outsideSmoke: boolean): Promise<string[]> {
   let q = supabase
     .from("character_appearances")
@@ -372,15 +387,13 @@ async function fakeVoiceRows(outsideSmoke: boolean): Promise<string[]> {
     .like("voice_id", "dry-run-%");
   if (outsideSmoke) q = q.not("character_id", "in", inList(smokeIds()));
   const appearances = must(await q, "fake voice ids") as unknown[];
-  const cast = must(
-    await supabase
-      .from("castlist")
-      .select("book_id, issue_id, character, voice_id")
-      .neq("book_id", BOOK)
-      .like("voice_id", "dry-run-%"),
-    "castlist fake voices",
-  ) as unknown[];
-  return [...appearances, ...cast].map((r) => JSON.stringify(r));
+  let v = supabase
+    .from("voices")
+    .select("id, character_id, current_elevenlabs_id")
+    .like("current_elevenlabs_id", "dry-run-%");
+  if (outsideSmoke) v = v.not("character_id", "in", inList(smokeIds()));
+  const voices = must(await v, "voices fake ids") as unknown[];
+  return [...appearances, ...voices].map((r) => JSON.stringify(r));
 }
 
 // ── Setup ───────────────────────────────────────────────────────────────
@@ -392,11 +405,11 @@ function castSpeakers(omitLegacyId: string | null) {
     : null;
   const speakers = new Set<string>();
   for (const b of bubbles) {
-    // The context step writes "Narrator" for narration, and casting resolves
-    // it to characters.narrator, so it is cast like tmnt-mmpr-iii's issues.
+    // The context step resolves narration and captions to the narrator
+    // role, so it is cast like tmnt-mmpr-iii's issues.
     const narration = b.type === "NARRATION" || b.type === "CAPTION";
     if (narration || normName(b.speaker ?? "") === "narrator") {
-      speakers.add("Narrator");
+      speakers.add(NARRATOR);
     } else if (b.speaker) speakers.add(b.speaker);
   }
   if (omitted) speakers.delete(omitted);
@@ -498,37 +511,29 @@ async function setup(scenario: Scenario) {
     return { insertOmitted: null };
   }
 
-  // Any cast voice works: TTS is faked, so which one does not matter.
-  const voice = must(
-    await supabase
-      .from("castlist")
-      .select("voice_id, voice_uuid")
-      .eq("book_id", SRC_BOOK)
-      .eq("issue_id", SRC_ISSUE)
-      .not("voice_id", "is", null)
-      .neq("voice_id", SKIPPED_VOICE)
-      .limit(1)
-      .single(),
-    "source castlist voice",
-  ) as { voice_id: string; voice_uuid: string | null };
+  // Any voice the render chain plays in the source issue works: TTS is
+  // faked, so which one does not matter. The smoke rows only point at it.
+  const srcCast = await loadBookCast(supabase, SRC_BOOK);
+  const voiceUuid =
+    issueCast(srcCast, SRC_ISSUE)
+      .map((r) => renderVoice(srcCast, r.character_id, SRC_ISSUE))
+      .find((v): v is RenderVoice & { ok: true } => v.ok)?.voiceUuid ??
+    fail(`no castlist row in ${SRC_BOOK}/${SRC_ISSUE} renders with a voice`);
 
-  // castlist.character is the raw bubble speaker: the new-character queue
-  // matches it exactly, casting matches it lowercased, audio by slug.
+  // Each fixture speaker is a character id (the smoke rows above, or the
+  // narrator role), and its castlist row is keyed on it.
   const { speakers, omitted } = castSpeakers(scenario.omitCastForLegacyId);
-  const row = (character: string) => ({
-    book_id: BOOK,
-    issue_id: ISSUE,
-    character,
-    ...voice,
-  });
-  must(
-    await supabase.from("castlist").insert(speakers.map(row)),
-    "castlist seed",
-  );
+  for (const characterId of speakers) {
+    await setIssueVoice(supabase, BOOK, ISSUE, characterId, voiceUuid);
+  }
   console.log(
     `setup: book, ${fixtureIds().length} characters, issue, ${SRC_PAGES.length} pages, castlist ${speakers.length} rows${omitted ? ` (left out: ${omitted})` : ""}`,
   );
-  return { insertOmitted: omitted ? () => row(omitted) : null };
+  return {
+    insertOmitted: omitted
+      ? () => setIssueVoice(supabase, BOOK, ISSUE, omitted, voiceUuid)
+      : null,
+  };
 }
 
 // ── Dev server ──────────────────────────────────────────────────────────
@@ -717,10 +722,10 @@ async function resume(gate: string): Promise<void> {
 /**
  * Owner simulation at the pages stop. In `gates` the context step stores the
  * stranger's bubble with no speaker (not in the closed cast), so the owner
- * does the editor's "Add a character to the cast" with a new voice: that
- * save sets `bubbles.speaker` to the new cast id `smoke-stranger`
- * (no `characters` or castlist row), which leaves the stranger uncast for
- * the voices stop. Then every page is approved as the editor's
+ * names it: `bubbles.speaker` becomes `smoke-stranger`, with no `characters`
+ * row, no castlist row and `character_id` left null. The bubble stays
+ * unassigned, so the voices stop never counts it and the render chain gives
+ * it no audio. Then every page is approved as the editor's
  * setPageApproval does (`pages.reviewed_at`). canResumePages still checks
  * both. In real mode every such bubble, whatever their count, is marked
  * silent instead (#430): no speaker is guessed.
@@ -920,51 +925,18 @@ async function rejectUnknownFaces(scenario: Scenario): Promise<void> {
 
 /**
  * Real mode's owner simulation at the voices stop (#430): every speaker
- * canContinueVoices counts as having no usable voice gets the skip marker on
- * its castlist rows in this issue, as the voices stop's "No audio" writes it
- * (`skipInIssue` for a known character, `markNoAudioUnknown` for a speaker
- * no characters row knows): `voice_id` only, so a `voice_uuid` link is kept.
- * Writes castlist under smoke-test only; never Voice Design, never `voices`.
- * An open voice request or operation cannot be settled without spending, so
- * it fails the run.
+ * canContinueVoices counts as having no usable voice gets "no audio" on its
+ * castlist row in this issue (`setNoAudio`, what the voices stop's "No
+ * audio" writes), which leaves `voice_uuid` alone. Every such speaker is a
+ * `bubbles.character_id`, so a `characters` row. Writes castlist under
+ * smoke-test only; never Voice Design, never `voices`. An open voice request
+ * or operation cannot be settled without spending, so it fails the run.
  */
 async function markNoAudio(): Promise<void> {
   const plan = await planCastingTasks(supabase, BOOK, ISSUE);
-  const book = await loadBookCast(supabase, BOOK);
-  const lines = await readSpeakerLines(supabase, book, BOOK, ISSUE);
+  const lines = await readSpeakerLines(supabase, BOOK, ISSUE);
   for (const id of plan.noVoice) {
-    const known = book.resolve(id)?.id === id;
-    const rows = book.rows.filter(
-      (r) =>
-        r.issue_id === ISSUE &&
-        (r.character_id ??
-          book.resolve(r.character)?.id ??
-          slugify(r.character)) === id,
-    );
-    must(
-      rows.length > 0
-        ? await supabase
-            .from("castlist")
-            .update({
-              voice_id: SKIPPED_VOICE,
-              ...(known ? { character_id: id } : {}),
-            })
-            .eq("book_id", BOOK)
-            .eq("issue_id", ISSUE)
-            .in(
-              "character",
-              rows.map((r) => r.character),
-            )
-        : await supabase.from("castlist").insert({
-            book_id: BOOK,
-            issue_id: ISSUE,
-            character: known ? (book.resolve(id)?.display_name ?? id) : id,
-            character_id: known ? id : null,
-            voice_id: SKIPPED_VOICE,
-            voice_uuid: null,
-          }),
-      `castlist skip marker for ${id}`,
-    );
+    await setNoAudio(supabase, BOOK, ISSUE, id, true);
     for (const l of lines.get(id) ?? []) {
       console.log(
         `  casting: no audio: ${id} page ${l.page} ${l.bubbleId} "${l.text}"`,
@@ -978,7 +950,7 @@ async function markNoAudio(): Promise<void> {
   const left = (await planCastingTasks(supabase, BOOK, ISSUE)).unsettled;
   if (left.length > 0) {
     fail(
-      `casting: ${left.length} item(s) still unsettled after the skip markers (a voice request or operation, which only spending settles): ${left.join(", ")}`,
+      `casting: ${left.length} item(s) still unsettled after marking no audio (a voice request or operation, which only spending settles): ${left.join(", ")}`,
     );
   }
 }
@@ -986,7 +958,7 @@ async function markNoAudio(): Promise<void> {
 async function runPipeline(
   scenario: Scenario,
   logPath: string,
-  insertOmitted: (() => Record<string, unknown>) | null,
+  insertOmitted: (() => Promise<void>) | null,
   resumed: string[],
   run: { id?: string },
 ): Promise<void> {
@@ -1044,36 +1016,13 @@ async function runPipeline(
       if (gate === "review-clusters") await rejectUnknownFaces(scenario);
       if (gate === "review-pages") await approvePages(scenario);
       if (gate === "casting" && real) await markNoAudio();
-      if (gate === "casting" && scenario.strangerBubbles > 0) {
-        // canContinueVoices holds the run while a speaker has no voice and
-        // no skip marker, so the owner marks the stranger "no audio this
-        // run". It stays uncast, as assertRows expects.
-        must(
-          await supabase.from("castlist").upsert(
-            {
-              book_id: BOOK,
-              issue_id: ISSUE,
-              character: "Smoke Stranger",
-              voice_id: SKIPPED_VOICE,
-              voice_uuid: null,
-            },
-            { onConflict: "book_id,issue_id,character" },
-          ),
-          "castlist skip marker for Smoke Stranger",
-        );
-        console.log(
-          "  castlist: Smoke Stranger marked no audio this run (owner simulation)",
-        );
-      }
+      // The stranger needs nothing here: its bubbles have no character_id,
+      // so the voices stop never counts it and it stays uncast, as
+      // assertRows expects.
       if (gate === "casting" && insertOmitted) {
         // The characters stop's seedCast may already have added the row
         // without a voice, so this sets the voice on it (#383).
-        must(
-          await supabase.from("castlist").upsert(insertOmitted(), {
-            onConflict: "book_id,issue_id,character",
-          }),
-          "castlist upsert before casting resume",
-        );
+        await insertOmitted();
         console.log("  castlist: voiced the left-out row (owner simulation)");
       }
       await resume(gate);
@@ -1197,21 +1146,11 @@ async function assertRealRows(): Promise<string[]> {
   console.log(
     `bubbles without ocr_text or style = ${noText.length} (reported, not a failure in real mode)`,
   );
-  const [book, aliases] = await Promise.all([
-    loadBookCast(supabase, BOOK),
-    supabase
-      .from("aliases")
-      .select("alias, canonical")
-      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${BOOK})`),
-  ]);
-  const ctx = voiceLookupContext(
-    book,
-    ISSUE,
-    must(aliases, "aliases") as { alias: string; canonical: string }[],
-  );
+  const book = await loadBookCast(supabase, BOOK);
   const castBubbles = planBubbleVoices(
     bubbles.map((b) => ({ ...b, audio_storage_path: null })),
-    ctx,
+    book,
+    ISSUE,
   ).toSend.map((s) => bubbles.find((b) => b.id === s.bubble.id)!);
   const stamps = new Set(
     (
@@ -1276,12 +1215,13 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
   const bubbles = must(
     await scoped(
       "bubbles",
-      "id, speaker, ignored, ocr_text, style, audio_storage_path",
+      "id, speaker, character_id, ignored, ocr_text, style, audio_storage_path",
     ),
     "bubbles",
   ) as unknown as Array<{
     id: string;
     speaker: string | null;
+    character_id: string | null;
     ignored: boolean | null;
     ocr_text: string | null;
     style: unknown;
@@ -1293,14 +1233,18 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
     bad.push(`${noText.length} bubbles lack ocr_text or style`);
   }
 
-  const cast = must(
-    await scoped("castlist", "character, voice_id"),
-    "castlist",
-  ) as unknown as Array<{ character: string; voice_id: string | null }>;
+  // The issue's castlist rows that hold a voice and are neither removed nor
+  // "no audio", by character id.
   const voiced = new Set(
-    cast
-      .filter((c) => c.voice_id && c.voice_id !== SKIPPED_VOICE)
-      .map((c) => slugify(c.character)),
+    (await loadBookCast(supabase, BOOK)).rows
+      .filter(
+        (r) =>
+          r.issue_id === ISSUE &&
+          r.in_issue &&
+          !r.no_audio &&
+          r.voice_uuid !== null,
+      )
+      .flatMap((r) => (r.character_id ? [r.character_id] : [])),
   );
   const stamps = new Set(
     (
@@ -1316,7 +1260,7 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
     ),
   );
   const castBubbles = bubbles.filter(
-    (b) => !b.ignored && b.speaker && voiced.has(slugify(b.speaker)),
+    (b) => !b.ignored && b.character_id && voiced.has(b.character_id),
   );
   const missing = castBubbles.filter(
     (b) =>
@@ -1344,11 +1288,17 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
   );
   if (stranger.length > 0) {
     const withAudio = stranger.filter((b) => b.audio_storage_path).length;
+    const assigned = stranger.filter((b) => b.character_id).length;
     console.log(
-      `Smoke Stranger bubbles = ${stranger.length}, with audio = ${withAudio} (uncast, so none expected)`,
+      `Smoke Stranger bubbles = ${stranger.length}, with audio = ${withAudio}, with a character_id = ${assigned} (unassigned, so none expected)`,
     );
     if (withAudio > 0) {
       bad.push(`${withAudio} Smoke Stranger bubbles have audio; none expected`);
+    }
+    if (assigned > 0) {
+      bad.push(
+        `${assigned} Smoke Stranger bubbles have a character_id; none expected`,
+      );
     }
   }
 
@@ -1419,6 +1369,7 @@ async function cleanup(): Promise<{ rows: number; objects: number }> {
       .eq("book_id", BOOK),
     "panels.scene_id null",
   );
+  await deleteBookCast(supabase, BOOK);
   // panel_character_detections cascades from panels.
   for (const [table, eqs] of SMOKE_ROWS) {
     const res =
@@ -1449,6 +1400,7 @@ async function remaining(): Promise<{ rows: number; objects: number }> {
     if (n) console.log(`  remaining ${table}: ${n}`);
     rows += n;
   };
+  add("castlist", (await readCastVoiceLinks(supabase, BOOK)).length);
   for (const [table, eqs] of SMOKE_ROWS) {
     add(
       table,

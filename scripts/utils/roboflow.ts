@@ -93,7 +93,7 @@ async function debugPredictions(
 ) {
   if (env.LOG_LEVEL !== "debug" || !pageName || !outDir) {
     console.log(
-      `   🔍 Debug predictions... SKIPPED (LOG_LEVEL: ${env.LOG_LEVEL})`,
+      `   🔍 Debug predictions... skipped (LOG_LEVEL: ${env.LOG_LEVEL})`,
     );
     return;
   }
@@ -301,7 +301,7 @@ function spatialDeduplication(
 ): RoboflowPrediction[] {
   if (shouldSkip || !tolerance) {
     console.log(
-      `\n🔧 Spatial deduplication... SKIPPED (tolerance: ${tolerance})`,
+      `\n🔧 Spatial deduplication... skipped (tolerance: ${tolerance})`,
     );
     return predictions;
   }

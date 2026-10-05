@@ -9,6 +9,8 @@ import { loadRoster, getRosterAliasMap } from "./utils/roster.js";
 import { getCanonicalName, initAliasMap } from "./alias-map.js";
 import { supabase } from "./lib/supabase.js";
 import { updateIssue } from "~/lib/issue-queries.js";
+import { loadBookCast } from "~/lib/cast";
+import { slugify } from "~/lib/character-id";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -206,16 +208,12 @@ async function runDbMode(book: string, issue: string): Promise<void> {
   }
 
   // Check for auto-known speakers via aliases + castlist
-  const [{ data: aliasRows }, { data: castRows }] = await Promise.all([
+  const [{ data: aliasRows }, castBook] = await Promise.all([
     supabase
       .from("aliases")
       .select("alias, canonical")
       .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${book})`),
-    supabase
-      .from("castlist")
-      .select("character")
-      .eq("book_id", book)
-      .eq("issue_id", issue),
+    loadBookCast(supabase, book),
   ]);
 
   const aliasMap = new Map<string, string>();
@@ -226,16 +224,16 @@ async function runDbMode(book: string, issue: string): Promise<void> {
     aliasMap.set(r.alias.toLowerCase().trim(), r.canonical);
   }
   const castedCharacters = new Set<string>();
-  for (const r of (castRows ?? []) as Array<{ character: string }>) {
-    castedCharacters.add(r.character);
-  }
+  for (const r of castBook.rows)
+    if (r.issue_id === issue && r.character_id)
+      castedCharacters.add(r.character_id);
 
   let pendingCount = 0;
   for (const name of uniqueSpeakers) {
     if (resolvedNames.has(name)) continue;
     const aliased = aliasMap.get(name.toLowerCase().trim());
     const canonical = aliased ?? name;
-    if (castedCharacters.has(canonical)) continue;
+    if (castedCharacters.has(slugify(canonical))) continue;
     pendingCount++;
   }
 
