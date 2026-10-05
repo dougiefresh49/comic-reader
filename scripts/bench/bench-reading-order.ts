@@ -40,9 +40,9 @@
  * A page is fully right when no panel and no bubble is out of place. The
  * global play order is not scored: on pages 3 and 8 the stored play order
  * steps back to an earlier panel, which the step's panel-by-panel flatten
- * can never write. A reply the step's validation rejects (no text, bad JSON,
- * an unknown, duplicate or dropped id) is a failed reply: every item on the
- * page is wrong. A request with no reply (an HTTP error) leaves the page's
+ * can never write. A reply the step's validation rejects (no text, a `.text`
+ * getter that throws, bad JSON, an unknown, duplicate or dropped id) is a
+ * failed reply: every item on the page is wrong, its cost counted. A request with no reply (an HTTP error) leaves the page's
  * items unscored. A bubble with no stored `panel_id` is unscored.
  *
  * Rows: one per panel and per bubble (`right` as above), so
@@ -90,9 +90,7 @@ import {
 import {
   type Arm,
   type Attempt,
-  CallBudget,
   DEFAULT_OUT,
-  type Gate,
   type RunFile,
   type ScoredRow,
   benchCli,
@@ -102,6 +100,7 @@ import {
   geminiTokens,
   geminiUsd,
   median,
+  newGate,
   pickArms,
   pool,
   refused,
@@ -150,10 +149,7 @@ const dryRun = flag("--dry-run");
 const armArg = opt("--arm") ?? "all";
 const arms = pickArms(ARMS, armArg === "all" ? "A,B" : armArg, die);
 const runs = intOpt("--runs", 3)!;
-const gate: Gate = {
-  budget: new CallBudget(intOpt("--max-calls", 70)!),
-  halted: null,
-};
+const gate = newGate(intOpt("--max-calls", 70)!);
 const maxUsdRaw = opt("--max-usd");
 const maxUsd = maxUsdRaw === undefined ? undefined : Number(maxUsdRaw);
 if (maxUsd !== undefined && !(maxUsd > 0)) die("--max-usd wants a USD amount");
@@ -416,8 +412,6 @@ type OrderRow = ScoredRow & {
   error: string | null;
 };
 
-let spentUsd = 0;
-
 async function sortOne(
   arm: Arm,
   run: number,
@@ -459,12 +453,9 @@ async function sortOne(
     // A request the API refuses (a bad model or config): stop everything.
     gate.halted ??= `HTTP ${last.status}: ${last.error}`;
   }
-  const ok = [...log].reverse().find((a) => a.reply !== null);
-  const cost = log.reduce(
-    (s, a) => s + (geminiUsd(a.usage, geminiRate(arm.model)) ?? 0),
-    0,
-  );
-  spentUsd += cost;
+  // The last response, even one whose `.text` threw (its reply is null).
+  const ok = [...log].reverse().find((a) => a.status === 200);
+  const cost = log.reduce((s, a) => s + (a.costUsd ?? 0), 0);
   const tokens = ok ? geminiTokens(ok.usage) : null;
   const items = scorePage(
     p,
@@ -589,6 +580,55 @@ function summary(arm: Arm, run: number, rows: OrderRow[]): string {
   ].join(" ");
 }
 
+type Tokens = { input: number; output: number; thinking: number };
+
+const callUsd = (model: string, t: Tokens) =>
+  geminiUsd(
+    {
+      promptTokenCount: t.input,
+      candidatesTokenCount: t.output,
+      thoughtsTokenCount: t.thinking,
+    },
+    geminiRate(model),
+  ) ?? Number.NaN;
+
+/** One call's USD on an arm, low and high, from the measured tokens. */
+function armCallUsd(a: Arm, m: Tokens): [number, number] {
+  if (a.model === GEMINI_MEDIUM && !a.thinkingLevel) {
+    const c = callUsd(a.model, m);
+    return [c, c];
+  }
+  const floor = callUsd(a.model, { ...m, thinking: 0 });
+  return [floor, a.thinkingLevel ? callUsd(a.model, m) : floor];
+}
+
+/** The measured `llm_calls` rows and their mean tokens a call. */
+async function readMeasured() {
+  const rows = must(
+    await supabase
+      .from("llm_calls")
+      .select(
+        "model, tokens_in, tokens_out, tokens_thinking, usd_est, duration_ms",
+      )
+      .eq("provider", "gemini")
+      .eq("book_id", MEASURED.bookId)
+      .eq("step", MEASURED.step)
+      .eq("model", MEASURED.model)
+      .eq("ok", true)
+      .gte("created_at", MEASURED.from)
+      .lt("created_at", MEASURED.to),
+    "llm_calls read",
+  );
+  const mean = (pick: (r: (typeof rows)[number]) => number | null) =>
+    rows.reduce((s, r) => s + (pick(r) ?? 0), 0) / rows.length;
+  const m: Tokens = {
+    input: mean((r) => r.tokens_in),
+    output: mean((r) => r.tokens_out),
+    thinking: mean((r) => r.tokens_thinking),
+  };
+  return { rows, mean, m };
+}
+
 /** `--dry-run`: counts, the echo check, and the estimate from measured rows. */
 async function dryRunReport(sent: Page[], perPage: string[]) {
   const n = sent.length;
@@ -608,21 +648,7 @@ async function dryRunReport(sent: Page[], perPage: string[]) {
     `Calls: one per sent page, ${n} per arm and run, ${calls} per arm for ${runs} run(s), ${calls * arms.length} for arms ${arms.map((a) => a.name).join(", ")}. That needs --max-calls ${calls * arms.length} or more.`,
     "",
   ];
-  const rows = must(
-    await supabase
-      .from("llm_calls")
-      .select(
-        "model, tokens_in, tokens_out, tokens_thinking, usd_est, duration_ms",
-      )
-      .eq("provider", "gemini")
-      .eq("book_id", MEASURED.bookId)
-      .eq("step", MEASURED.step)
-      .eq("model", MEASURED.model)
-      .eq("ok", true)
-      .gte("created_at", MEASURED.from)
-      .lt("created_at", MEASURED.to),
-    "llm_calls read",
-  );
+  const { rows, mean, m } = await readMeasured();
   if (rows.length === 0) {
     out.push(
       `No llm_calls rows for ${MEASURED.step} on ${MEASURED.model} (${MEASURED.bookId}, ${MEASURED.from} to ${MEASURED.to}): no estimate.`,
@@ -630,26 +656,7 @@ async function dryRunReport(sent: Page[], perPage: string[]) {
     console.log(`\n${out.join("\n")}`);
     return;
   }
-  const mean = (pick: (r: (typeof rows)[number]) => number | null) =>
-    rows.reduce((s, r) => s + (pick(r) ?? 0), 0) / rows.length;
-  const m = {
-    input: mean((r) => r.tokens_in),
-    output: mean((r) => r.tokens_out),
-    thinking: mean((r) => r.tokens_thinking),
-  };
   const thinkingSeen = rows.map((r) => r.tokens_thinking ?? 0);
-  const callUsd = (
-    model: string,
-    t: { input: number; output: number; thinking: number },
-  ) =>
-    geminiUsd(
-      {
-        promptTokenCount: t.input,
-        candidatesTokenCount: t.output,
-        thoughtsTokenCount: t.thinking,
-      },
-      geminiRate(model),
-    ) ?? Number.NaN;
   const usdSum = rows.reduce((s, r) => s + Number(r.usd_est ?? 0), 0);
   out.push(
     `Measured: ${rows.length} ${MEASURED.step} llm_calls rows on ${MEASURED.model} (${MEASURED.bookId}, ${MEASURED.from.slice(0, 10)}): ${Math.round(m.input)} in, ${Math.round(m.output)} out, ${Math.round(m.thinking)} thinking tokens a call (mean; thinking ${Math.min(...thinkingSeen)} to ${Math.max(...thinkingSeen)}), usd_est $${usdSum.toFixed(5)} in all, ${Math.round(mean((r) => r.duration_ms))} ms a call (mean).`,
@@ -661,25 +668,18 @@ async function dryRunReport(sent: Page[], perPage: string[]) {
   let hi = 0;
   for (const a of arms) {
     const tier = `${tierOf(a.model) ?? a.model} ${a.model}`;
+    const [floor, ceil] = armCallUsd(a, m);
+    lo += floor * calls;
+    hi += ceil * calls;
     if (a.model === GEMINI_MEDIUM && !a.thinkingLevel) {
-      const c = callUsd(a.model, m);
-      lo += c * calls;
-      hi += c * calls;
       out.push(
-        `  ${a.name} (${tier}, default thinking): $${(c * calls).toFixed(2)} at $${c.toFixed(5)} a call. Measured tokens, priced at ${tier}'s rate.`,
+        `  ${a.name} (${tier}, default thinking): $${(floor * calls).toFixed(2)} at $${floor.toFixed(5)} a call. Measured tokens, priced at ${tier}'s rate.`,
       );
     } else if (!a.thinkingLevel) {
-      const c = callUsd(a.model, { ...m, thinking: 0 });
-      lo += c * calls;
-      hi += c * calls;
       out.push(
-        `  ${a.name} (${tier}, default thinking): $${(c * calls).toFixed(2)} at $${c.toFixed(5)} a call. A guess: no sort-page-elements llm_calls row exists on ${a.model}; the measured input and output tokens, 0 thinking (its default, minimal, thought 0 tokens on the speaker call in #431), at ${tier}'s rate.`,
+        `  ${a.name} (${tier}, default thinking): $${(floor * calls).toFixed(2)} at $${floor.toFixed(5)} a call. A guess: no sort-page-elements llm_calls row exists on ${a.model}; the measured input and output tokens, 0 thinking (its default, minimal, thought 0 tokens on the speaker call in #431), at ${tier}'s rate.`,
       );
     } else {
-      const floor = callUsd(a.model, { ...m, thinking: 0 });
-      const ceil = callUsd(a.model, m);
-      lo += floor * calls;
-      hi += ceil * calls;
       out.push(
         `  ${a.name} (${tier}, thinking ${a.thinkingLevel}): $${(floor * calls).toFixed(2)} to $${(ceil * calls).toFixed(2)}. A guess: the measured input and output tokens, thinking from 0 up to the measured ${Math.round(m.thinking)} a call, at ${tier}'s rate.`,
       );
@@ -698,10 +698,24 @@ if (dryRun) {
   process.exit(0);
 }
 
+if (maxUsd !== undefined) {
+  // Each request reserves the high estimate of the dearest arm in the run.
+  const { rows, m } = await readMeasured();
+  if (rows.length === 0) {
+    die(
+      `--max-usd needs the measured llm_calls rows (${MEASURED.step}, ${MEASURED.bookId}) for its per-call reservation; none found`,
+    );
+  }
+  gate.usd = {
+    max: maxUsd,
+    seed: Math.max(...arms.map((a) => armCallUsd(a, m)[1])),
+  };
+}
+
 // Under DRY_RUN the Gemini wrapper writes no llm_calls row (see the header).
 process.env.DRY_RUN = "1";
 console.log(
-  `${sent.length} pages; arms ${arms.map((a) => a.name).join(", ")}; ${runs} run(s); --max-calls ${gate.budget.max}${maxUsd !== undefined ? `; --max-usd ${maxUsd}` : ""}; concurrency ${concurrency}`,
+  `${sent.length} pages; arms ${arms.map((a) => a.name).join(", ")}; ${runs} run(s); --max-calls ${gate.budget.max}${gate.usd ? `; --max-usd ${gate.usd.max} (reserving $${gate.usd.seed.toFixed(5)} a call)` : ""}; concurrency ${concurrency}`,
 );
 const written: string[] = [];
 const summaries: string[] = [];
@@ -720,9 +734,6 @@ for (let run = 1; run <= runs && !gate.halted; run++) {
           errorsInARow = call.error ? errorsInARow + 1 : 0;
           if (errorsInARow >= MAX_ERRORS_IN_A_ROW) {
             gate.halted ??= `${MAX_ERRORS_IN_A_ROW} pages in a row with no reply (last: ${call.error})`;
-          }
-          if (maxUsd !== undefined && spentUsd >= maxUsd) {
-            gate.halted ??= `--max-usd ${maxUsd} reached ($${spentUsd.toFixed(4)})`;
           }
           const c = counts(rows);
           console.log(
@@ -763,6 +774,6 @@ console.log(
     "",
     ...summaries,
     "",
-    `Requests ${gate.budget.calls}, spent $${spentUsd.toFixed(4)}.${gate.halted ? ` Stopped early: ${gate.halted}` : ""}`,
+    `Requests ${gate.budget.calls}, spent $${gate.spentUsd.toFixed(4)}.${gate.halted ? ` Stopped early: ${gate.halted}` : ""}`,
   ].join("\n"),
 );
