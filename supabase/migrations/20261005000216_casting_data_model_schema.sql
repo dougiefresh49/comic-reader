@@ -1,5 +1,5 @@
 -- Casting data model P1, schema (#414; spec docs/casting-data-model.html,
--- sections Tables and P1 Add; decision log rows 284 to 288).
+-- sections Tables and P1 Add; decision log rows 284 to 289).
 --
 -- Additive only. Every statement adds a table, a column, an index, a
 -- grant or a constraint, or loosens one (aliases.canonical becomes nullable, the
