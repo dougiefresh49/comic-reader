@@ -9,7 +9,7 @@
  * characters stop. Request rows (`action` set) are never written here.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { loadBookCast, renderVoice, type BookCast } from "~/lib/cast";
+import { castRow, loadBookCast, renderVoice, type BookCast } from "~/lib/cast";
 
 const PAGE = 1000;
 
@@ -143,11 +143,29 @@ export function silencedIn(
 }
 
 /**
+ * Why the character's own castlist row in this issue rules out voice work
+ * (#429): removed, or "no audio". A voice request for it buys nothing the
+ * render chain would play, so it is refused and holds no gate. Null when the
+ * row allows voice work (or there is none).
+ */
+export function ownRowStop(
+  book: BookCast,
+  characterId: string,
+  issueId: string,
+): "removed from this issue" | "no audio in this issue" | null {
+  const own = castRow(book, characterId, issueId);
+  if (own?.in_issue === false) return "removed from this issue";
+  if (own?.no_audio) return "no audio in this issue";
+  return null;
+}
+
+/**
  * Read-only: the issue's voice work as the gate counts it. A speaker is
  * settled when it has a usable voice (`hasUsableVoice`), or the issue's
  * castlist row marks it "no audio" or removes it (`silencedIn`). A
  * `casting_tasks` row is open while pending or in progress, when it is a
- * request, carries a `carryOut` record, or its speaker still has no voice; a
+ * request (unless its own row is removed or "no audio", `ownRowStop`),
+ * carries a `carryOut` record, or its speaker still has no voice; a
  * stale row for a speaker who has a voice now is not work the voices stop
  * could show, so it never holds the run.
  */
@@ -184,7 +202,7 @@ export async function planCastingTasks(
     .filter(
       (r) =>
         (r.status === "pending" || r.status === "in_progress") &&
-        (r.action !== null ||
+        ((r.action !== null && !ownRowStop(book, r.character_id, issueId)) ||
           r.operation !== null ||
           noVoice.includes(r.character_id)),
     )

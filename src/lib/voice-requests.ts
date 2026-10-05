@@ -48,7 +48,11 @@ import {
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots";
 import { voiceDesignAppearanceId } from "~/workflows/steps/audio-plan";
-import { readSpeakerLines, silencedIn } from "~/workflows/steps/casting-tasks";
+import {
+  ownRowStop,
+  readSpeakerLines,
+  silencedIn,
+} from "~/workflows/steps/casting-tasks";
 import { describeVoices } from "~/workflows/steps/voice";
 
 export type VoiceWorkAction = "clone" | "design" | "restore";
@@ -370,6 +374,10 @@ export async function planVoiceWork(
     const id = item.characterId;
     if (book.resolve(id)?.id !== id)
       item.refusals.push(`no characters row for ${id}`);
+    // A request for a character its own row removes or silences here takes
+    // no slot and is never run: the render chain would not play its voice.
+    const stop = ownRowStop(book, id, issueId);
+    if (stop) item.refusals.push(stop);
     if (item.action === "design") {
       item.hasDescription = descriptions.has(voiceDesignAppearanceId(id));
       if (item.lines === 0) item.refusals.push("no lines in this issue");

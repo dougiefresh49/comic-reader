@@ -855,25 +855,18 @@ export async function deleteBookCast(
   must(`deleting the castlist of ${bookId}`, error);
 }
 
-/** The issue's castlist `character` texts, as shown to the reader and to Gemini; empty when the issue has no rows. */
+/** The issue's cast (`issueCast`, so removed rows stay out) as its castlist `character` texts, sorted, as shown to the reader and to Gemini; empty when the issue has none. */
 export async function readCastNames(
   client: Client,
   bookId: string,
   issueId: string,
 ): Promise<string[]> {
-  const rows = await readAll<{ character: string }>(
-    "the castlist",
-    (from, to) =>
-      db(client)
-        .from("castlist")
-        .select("character")
-        .eq("book_id", bookId)
-        .eq("issue_id", issueId)
-        .order("character")
-        .range(from, to),
-  );
-  return rows.map((r) => r.character);
+  const book = await loadBookCast(client, bookId);
+  return issueCast(book, issueId)
+    .map((r) => r.character)
+    .sort();
 }
+
 /** Creates a `characters` row; the id must already be in slug form (`slugify`). */
 export async function createCharacter(
   client: Client,

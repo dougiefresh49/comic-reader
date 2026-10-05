@@ -1145,6 +1145,54 @@ async function checkCarryOut() {
   }
 
   {
+    // #429 round 3: a pending clone request for a character whose own row in
+    // this issue is "no audio" or removed is refused, takes no slot, and does
+    // not hold the voices gate.
+    const { planCastingTasks } = await import(
+      "~/workflows/steps/casting-tasks"
+    );
+    const lines: string[] = [];
+    let pass = true;
+    for (const [removed, want] of [
+      [false, "no audio in this issue"],
+      [true, "removed from this issue"],
+    ] as const) {
+      const w = world({
+        characters: ["zed"],
+        voices: [
+          { id: "zed-1993", name: "Zed", status: "archived", character: "zed" },
+        ],
+      });
+      w.db.rows("castlist").push({
+        book_id: BOOK,
+        issue_id: "issue-1",
+        character: "zed",
+        character_id: "zed",
+        voice_uuid: null,
+        in_issue: !removed,
+        no_audio: !removed,
+      });
+      request(w.db, "zed", "clone", "zed-1993");
+      // The database reads a request with no operation as null.
+      for (const t of w.db.rows("casting_tasks")) t.operation ??= null;
+      const item = await itemOf(w.deps, "zed");
+      const gate = await planCastingTasks(w.db.client(), BOOK, "issue-1");
+      lines.push(
+        `zed ${want}: refusals [${item.refusals.join("; ")}], needsSlot ${item.needsSlot}; gate unsettled [${gate.unsettled.join(", ")}]`,
+      );
+      pass &&=
+        item.refusals.includes(want) &&
+        !item.needsSlot &&
+        !gate.unsettled.includes("zed");
+    }
+    report(
+      "#429 round 3: a request for a character its own row silences or removes is refused and holds no gate",
+      lines,
+      pass,
+    );
+  }
+
+  {
     const w = world({
       characters: ["rex", "zed"],
       voices: [
