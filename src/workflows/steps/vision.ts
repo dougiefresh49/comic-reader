@@ -1554,7 +1554,7 @@ export async function getContextPage(
   const { getGeminiClient: getGemini } = await import("~/lib/gemini-client");
   const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const gemini = getGemini();
-  const { GEMINI_SPEAKER } = await import("~/lib/models");
+  const { GEMINI_FAST } = await import("~/lib/models");
   const { generateContentLogged } = await import("~/lib/llm-usage");
 
   const padded = String(pageNumber).padStart(2, "0");
@@ -1842,7 +1842,7 @@ export async function getContextPage(
 
       const contextResponse = await generateContentLogged(
         gemini,
-        { model: GEMINI_SPEAKER, contents: [pageImagePart, contextTextPart] },
+        { model: GEMINI_FAST, contents: [pageImagePart, contextTextPart] },
         llmMeta,
       );
 

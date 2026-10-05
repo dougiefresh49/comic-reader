@@ -3,9 +3,8 @@
 // the boundary the other way — Next's webpack only bundles src/.
 
 export const GEMINI_HIGH = "gemini-3.1-pro-preview"; // deep reasoning, page-level context
-export const GEMINI_MEDIUM = "gemini-3-flash-preview"; // vision tasks, OCR, moderate reasoning
-export const GEMINI_FAST = "gemini-3.1-flash-lite"; // simple formatting/validation, no thinking needed
-export const GEMINI_SPEAKER = "gemini-3.5-flash-lite"; // get-context's speaker call only (#373)
+export const GEMINI_MEDIUM = "gemini-3.8-flash"; // vision tasks, OCR, moderate reasoning
+export const GEMINI_FAST = "gemini-3.5-flash-lite"; // simple formatting/validation, no thinking needed
 
 // ─── Venice image models ───────────────────────────────────────────────────────
 // Phase 1 — character reference images (text-to-image)
@@ -29,14 +28,16 @@ export const VENICE_VIDEO_ATMOSPHERE = "seedance-2-0-image-to-video";
 // ─── Estimated rates for llm_calls.usd_est (#93) ──────────────────────────────
 // Keyed by the tier constants above: when a model string changes (#104),
 // change its rate here too. USD per 1M tokens; thinking bills as output.
+// Rates read from https://ai.google.dev/gemini-api/docs/pricing on 2026-10-05
+// (#436). GEMINI_MEDIUM's is the price through 2026-12-31: from 2027-01-01
+// gemini-3.8-flash is $1.50 in and $7.50 out, and this row must change then.
 export const GEMINI_USD_PER_1M_TOKENS: Record<
   string,
   { input: number; output: number }
 > = {
   [GEMINI_HIGH]: { input: 2.0, output: 12.0 },
-  [GEMINI_MEDIUM]: { input: 0.5, output: 3.0 },
-  [GEMINI_FAST]: { input: 0.25, output: 1.5 },
-  [GEMINI_SPEAKER]: { input: 0.3, output: 2.5 },
+  [GEMINI_MEDIUM]: { input: 0.75, output: 3.75 },
+  [GEMINI_FAST]: { input: 0.3, output: 2.5 },
 };
 
 // gemini-embedding-2, per image embedded. Text embeddings have no rate yet.
