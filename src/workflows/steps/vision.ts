@@ -1879,6 +1879,7 @@ export async function getContextPage(
         );
         cueLine = cueResponse.text?.trim() ?? "";
       } catch (e) {
+        if (e instanceof FatalError) throw e;
         throw new Error(`cue call failed: ${errorText(e)}`);
       }
       if (!cueLine) throw new Error("cue call returned an empty reply");
