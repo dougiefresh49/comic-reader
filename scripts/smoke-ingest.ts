@@ -12,7 +12,14 @@
  * Usage:
  *   pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --scenario clean|gates [--keep]
  *   pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --cleanup-only
- *   ... --real --confirm-spend   (#97 only: no DRY_RUN, paid calls)
+ *   ... --real --confirm-spend   (no DRY_RUN, paid calls; no --scenario)
+ *
+ * Real mode (#430) seeds no `smoke-` characters or castlist rows: the
+ * characters stop's seedCast builds the cast. Each stop is approved without
+ * spending (unnamed faces rejected, speakerless spoken bubbles marked silent,
+ * voiceless speakers marked "no audio this run"), counts are reported rather
+ * than compared with the fixture, retries are counted, and a summary block
+ * prints at the end.
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -32,6 +39,15 @@ import {
 import { pageStoragePath } from "~/lib/storage";
 import { slugify } from "~/lib/character-id";
 import { needsSpeaker } from "~/components/review-editor/model";
+import { loadBookCast } from "~/lib/cast";
+import {
+  planCastingTasks,
+  readSpeakerLines,
+} from "~/workflows/steps/casting-tasks";
+import {
+  planBubbleVoices,
+  voiceLookupContext,
+} from "~/workflows/steps/audio-plan";
 import type { Json } from "~/types/database";
 import { supabase } from "./lib/supabase";
 
@@ -69,11 +85,12 @@ const BOOK_TABLES = [
   "issues",
   "book_parts",
 ];
+const RETRY = /step will be retried/;
 const LOG_FAILURES = [
   /DRY_RUN: no context fixture/,
   /context analysis failed/,
   /DRY_RUN: no Gemini fixture/,
-  /step will be retried/,
+  RETRY,
 ];
 // Poll limits for the fake scenarios. --real gets its own (#280): in the #97
 // run get-context held one pipeline_step for 302 s over two pages and
@@ -88,7 +105,8 @@ const SKIPPED_VOICE = "__SKIPPED__";
 /** The cast id the editor gives "Smoke Stranger" when the owner adds it (slug of the name). */
 const STRANGER_ID = "smoke-stranger";
 
-type Expect = { gate: string; expect: "pause" | "skip" };
+/** "either": a real run may pause or skip the stop (the voices stop). */
+type Expect = { gate: string; expect: "pause" | "skip" | "either" };
 type Scenario = {
   gates: Expect[];
   omitCastForLegacyId: string | null;
@@ -99,6 +117,28 @@ type Scenario = {
   unknownFaces: boolean;
 };
 type Skip = { gate: string; reason: string };
+
+/** Real mode's stops; counts are reported, so the fixture fields stay empty. */
+const REAL_SCENARIO: Scenario = {
+  gates: [
+    { gate: "review-clusters", expect: "pause" },
+    { gate: "review-pages", expect: "pause" },
+    { gate: "casting", expect: "either" },
+  ],
+  omitCastForLegacyId: null,
+  counts: {},
+  strangerBubbles: 0,
+  unknownFaces: false,
+};
+const REAL_COUNTS = ["panels", "page_segmentation", "bubbles"];
+
+/** What real mode's owner simulation did, for the closing summary (#430). */
+const tally = {
+  facesRejected: 0,
+  silent: 0,
+  noAudio: 0,
+  castBubbles: null as { total: number; withAudio: number } | null,
+};
 
 class SmokeFailure extends Error {}
 const fail = (msg: string): never => {
@@ -382,14 +422,17 @@ async function setup(scenario: Scenario) {
     "books insert",
   );
   // Real rows, so faces resolve and casting sees the speakers. smoke-stranger
-  // gets none and stays unresolved in gates.
+  // gets none and stays unresolved in gates. A real run's faces are real
+  // characters, so it seeds none (#430).
   const franchise = src.franchises?.[0] ?? null;
-  must(
-    await supabase
-      .from("characters")
-      .insert(fixtureIds().map((id) => ({ id, franchise, aliases: [] }))),
-    "characters insert",
-  );
+  if (!real) {
+    must(
+      await supabase
+        .from("characters")
+        .insert(fixtureIds().map((id) => ({ id, franchise, aliases: [] }))),
+      "characters insert",
+    );
+  }
   // The cast proposal reads wiki_appearances and lookahead reads
   // wiki_summary, so the smoke issue carries the source issue's values.
   const srcIssue = must(
@@ -444,6 +487,15 @@ async function setup(scenario: Scenario) {
       }),
       `pages insert ${number}`,
     );
+  }
+
+  if (real) {
+    // The characters stop's seedCast builds the cast from faces, wiki and
+    // roles, each with its starting voice.
+    console.log(
+      `setup: book, issue, ${SRC_PAGES.length} pages; no smoke characters or castlist rows (real mode)`,
+    );
+    return { insertOmitted: null };
   }
 
   // Any cast voice works: TTS is faked, so which one does not matter.
@@ -589,9 +641,19 @@ async function post(path: string, body: unknown) {
   return { status: res.status, text: await res.text() };
 }
 
+/** A real run's Gemini calls retry on 503s, so there a retry is counted, not a failure. */
 function logHits(logPath: string): string[] {
   const lines = readFileSync(logPath, "utf8").split("\n");
-  return lines.filter((l) => LOG_FAILURES.some((re) => re.test(l)));
+  const failures = real
+    ? LOG_FAILURES.filter((re) => re !== RETRY)
+    : LOG_FAILURES;
+  return lines.filter((l) => failures.some((re) => re.test(l)));
+}
+
+function retryLines(logPath: string): string[] {
+  return readFileSync(logPath, "utf8")
+    .split("\n")
+    .filter((l) => RETRY.test(l));
 }
 
 /**
@@ -660,23 +722,28 @@ async function resume(gate: string): Promise<void> {
  * (no `characters` or castlist row), which leaves the stranger uncast for
  * the voices stop. Then every page is approved as the editor's
  * setPageApproval does (`pages.reviewed_at`). canResumePages still checks
- * both.
+ * both. In real mode every such bubble, whatever their count, is marked
+ * silent instead (#430): no speaker is guessed.
  */
 async function approvePages(scenario: Scenario): Promise<void> {
   const unvoiced = (
     must(
       await supabase
         .from("bubbles")
-        .select("id, type, speaker, silent, ignored")
+        .select("id, page_number, type, speaker, silent, ignored, ocr_text")
         .eq("book_id", BOOK)
-        .eq("issue_id", ISSUE),
+        .eq("issue_id", ISSUE)
+        .order("page_number")
+        .order("sort_order"),
       "bubbles needing a speaker",
     ) as {
       id: string;
+      page_number: number;
       type: string;
       speaker: string | null;
       silent: boolean | null;
       ignored: boolean | null;
+      ocr_text: string | null;
     }[]
   ).filter((b) =>
     needsSpeaker({
@@ -686,12 +753,41 @@ async function approvePages(scenario: Scenario): Promise<void> {
       ignored: b.ignored ?? false,
     }),
   );
-  if (unvoiced.length !== scenario.strangerBubbles) {
+  if (real && unvoiced.length > 0) {
+    const marked = must(
+      await supabase
+        .from("bubbles")
+        .update({ silent: true })
+        .eq("book_id", BOOK)
+        .eq("issue_id", ISSUE)
+        .in(
+          "id",
+          unvoiced.map((b) => b.id),
+        )
+        .select("id"),
+      "bubbles marked silent",
+    ) as { id: string }[];
+    tally.silent = marked.length;
+    if (marked.length !== unvoiced.length) {
+      fail(
+        `review-pages: marked ${marked.length} of ${unvoiced.length} bubbles silent`,
+      );
+    }
+    for (const b of unvoiced) {
+      console.log(
+        `  review-pages: silent: page ${b.page_number} ${b.id} ${b.type} "${b.ocr_text ?? ""}"`,
+      );
+    }
+    console.log(
+      `  review-pages: marked ${marked.length} spoken bubble(s) with no speaker silent (owner simulation)`,
+    );
+  }
+  if (!real && unvoiced.length !== scenario.strangerBubbles) {
     fail(
       `review-pages: ${unvoiced.length} spoken bubbles have no speaker; the scenario expects ${scenario.strangerBubbles} (the stranger's)`,
     );
   }
-  if (unvoiced.length > 0) {
+  if (!real && unvoiced.length > 0) {
     must(
       await supabase
         .from("bubbles")
@@ -736,19 +832,33 @@ async function approvePages(scenario: Scenario): Promise<void> {
  * rows rejectGroup (review/characters/actions.ts) deletes: exemplars cut
  * from those detections, loose unnamed exemplars under their suggested
  * names, then the detections. Crops go with cleanup(). Fails when the
- * scenario's `unknownFaces` disagrees with what the run produced.
+ * scenario's `unknownFaces` disagrees with what the run produced; real mode
+ * rejects however many there are and prints each (#430).
  */
 async function rejectUnknownFaces(scenario: Scenario): Promise<void> {
   const faces = must(
     await supabase
       .from("panel_character_detections")
-      .select("id, suggested_name, panels!inner(book_id, issue_id)")
+      .select(
+        "id, suggested_name, panels!inner(book_id, issue_id, page_number)",
+      )
       .eq("panels.book_id", BOOK)
       .eq("panels.issue_id", ISSUE)
       .is("character_id", null),
     "unnamed faces",
-  ) as unknown as { id: string; suggested_name: string | null }[];
-  if (scenario.unknownFaces !== faces.length > 0) {
+  ) as unknown as {
+    id: string;
+    suggested_name: string | null;
+    panels: { page_number: number } | null;
+  }[];
+  if (real) {
+    tally.facesRejected = faces.length;
+    for (const f of faces) {
+      console.log(
+        `  review-clusters: not a character: page ${f.panels?.page_number ?? "?"} ${f.id} (${f.suggested_name ?? "no suggested name"})`,
+      );
+    }
+  } else if (scenario.unknownFaces !== faces.length > 0) {
     fail(
       `review-clusters: ${faces.length} unknown faces; the scenario expects ${scenario.unknownFaces ? "at least one" : "none"}`,
     );
@@ -808,6 +918,71 @@ async function rejectUnknownFaces(scenario: Scenario): Promise<void> {
   );
 }
 
+/**
+ * Real mode's owner simulation at the voices stop (#430): every speaker
+ * canContinueVoices counts as having no usable voice gets the skip marker on
+ * its castlist rows in this issue, as the voices stop's "No audio" writes it
+ * (`skipInIssue` for a known character, `markNoAudioUnknown` for a speaker
+ * no characters row knows): `voice_id` only, so a `voice_uuid` link is kept.
+ * Writes castlist under smoke-test only; never Voice Design, never `voices`.
+ * An open voice request or operation cannot be settled without spending, so
+ * it fails the run.
+ */
+async function markNoAudio(): Promise<void> {
+  const plan = await planCastingTasks(supabase, BOOK, ISSUE);
+  const book = await loadBookCast(supabase, BOOK);
+  const lines = await readSpeakerLines(supabase, book, BOOK, ISSUE);
+  for (const id of plan.noVoice) {
+    const known = book.resolve(id)?.id === id;
+    const rows = book.rows.filter(
+      (r) =>
+        r.issue_id === ISSUE &&
+        (r.character_id ??
+          book.resolve(r.character)?.id ??
+          slugify(r.character)) === id,
+    );
+    must(
+      rows.length > 0
+        ? await supabase
+            .from("castlist")
+            .update({
+              voice_id: SKIPPED_VOICE,
+              ...(known ? { character_id: id } : {}),
+            })
+            .eq("book_id", BOOK)
+            .eq("issue_id", ISSUE)
+            .in(
+              "character",
+              rows.map((r) => r.character),
+            )
+        : await supabase.from("castlist").insert({
+            book_id: BOOK,
+            issue_id: ISSUE,
+            character: known ? (book.resolve(id)?.display_name ?? id) : id,
+            character_id: known ? id : null,
+            voice_id: SKIPPED_VOICE,
+            voice_uuid: null,
+          }),
+      `castlist skip marker for ${id}`,
+    );
+    for (const l of lines.get(id) ?? []) {
+      console.log(
+        `  casting: no audio: ${id} page ${l.page} ${l.bubbleId} "${l.text}"`,
+      );
+    }
+  }
+  tally.noAudio = plan.noVoice.length;
+  console.log(
+    `  casting: marked ${plan.noVoice.length} speaker(s) no audio this run (owner simulation)`,
+  );
+  const left = (await planCastingTasks(supabase, BOOK, ISSUE)).unsettled;
+  if (left.length > 0) {
+    fail(
+      `casting: ${left.length} item(s) still unsettled after the skip markers (a voice request or operation, which only spending settles): ${left.join(", ")}`,
+    );
+  }
+}
+
 async function runPipeline(
   scenario: Scenario,
   logPath: string,
@@ -829,7 +1004,6 @@ async function runPipeline(
   console.log(`trigger-ingest: ${trig.text}`);
   run.id = (JSON.parse(trig.text) as { runId?: string }).runId;
 
-  const pauses = scenario.gates.filter((g) => g.expect === "pause");
   const gateTimeoutMs = real ? REAL_GATE_TIMEOUT_MS : GATE_TIMEOUT_MS;
   const runTimeoutMs = real ? REAL_RUN_TIMEOUT_MS : RUN_TIMEOUT_MS;
   const started = Date.now();
@@ -854,12 +1028,22 @@ async function runPipeline(
     }
     const gate = row.pipeline_paused_at;
     if (row.pipeline_paused && gate && !resumed.includes(gate)) {
-      const want = pauses[resumed.length]?.gate;
-      if (gate !== want) {
-        fail(`paused at ${gate}; expected ${want ?? "no more pauses"}`);
+      // The gates that may pause next: up to and including the first
+      // unresumed "pause", with any "either" before it.
+      const allowed: string[] = [];
+      for (const g of scenario.gates) {
+        if (g.expect === "skip" || resumed.includes(g.gate)) continue;
+        allowed.push(g.gate);
+        if (g.expect === "pause") break;
+      }
+      if (!allowed.includes(gate)) {
+        fail(
+          `paused at ${gate}; expected ${allowed.join(" or ") || "no more pauses"}`,
+        );
       }
       if (gate === "review-clusters") await rejectUnknownFaces(scenario);
       if (gate === "review-pages") await approvePages(scenario);
+      if (gate === "casting" && real) await markNoAudio();
       if (gate === "casting" && scenario.strangerBubbles > 0) {
         // canContinueVoices holds the run while a speaker has no voice and
         // no skip marker, so the owner marks the stranger "no audio this
@@ -975,7 +1159,10 @@ function gateReport(
       : skip
         ? `skipped (${skip.reason})`
         : "not reached";
-    const ok = seen.startsWith(expect === "pause" ? "paused" : "skipped");
+    const ok =
+      expect === "either"
+        ? seen !== "not reached"
+        : seen.startsWith(expect === "pause" ? "paused" : "skipped");
     console.log(`gate ${gate}: ${seen}${ok ? "" : `  ✗ expected ${expect}`}`);
     if (!ok) bad.push(`${gate}: ${seen}, expected ${expect}`);
   }
@@ -983,7 +1170,100 @@ function gateReport(
 }
 
 // ── Assert ──────────────────────────────────────────────────────────────
+/**
+ * Real mode (#430): counts are reported, not compared with the fixture.
+ * Cast bubbles are the ones the audio step voices (`planBubbleVoices`, read
+ * as if none had audio yet); the run fails on zero of them or on one
+ * missing its audio path, its audio_timestamps row or its mp3.
+ */
+async function assertRealRows(): Promise<string[]> {
+  const bad: string[] = [];
+  for (const table of REAL_COUNTS) {
+    console.log(
+      `${table} = ${await countOf(table, { book_id: BOOK, issue_id: ISSUE })}`,
+    );
+  }
+  const bubbles = must(
+    await supabase
+      .from("bubbles")
+      .select(
+        "id, speaker, character_id, text_with_cues, ocr_text, audio_storage_path, ignored, silent, style",
+      )
+      .eq("book_id", BOOK)
+      .eq("issue_id", ISSUE),
+    "bubbles",
+  );
+  const noText = bubbles.filter((b) => !b.ocr_text || b.style == null);
+  console.log(
+    `bubbles without ocr_text or style = ${noText.length} (reported, not a failure in real mode)`,
+  );
+  const [book, aliases] = await Promise.all([
+    loadBookCast(supabase, BOOK),
+    supabase
+      .from("aliases")
+      .select("alias, canonical")
+      .or(`scope.eq.global,and(scope.eq.book,scope_id.eq.${BOOK})`),
+  ]);
+  const ctx = voiceLookupContext(
+    book,
+    ISSUE,
+    must(aliases, "aliases") as { alias: string; canonical: string }[],
+  );
+  const castBubbles = planBubbleVoices(
+    bubbles.map((b) => ({ ...b, audio_storage_path: null })),
+    ctx,
+  ).toSend.map((s) => bubbles.find((b) => b.id === s.bubble.id)!);
+  const stamps = new Set(
+    (
+      must(
+        await supabase
+          .from("audio_timestamps")
+          .select("bubble_id")
+          .eq("book_id", BOOK)
+          .eq("issue_id", ISSUE),
+        "audio_timestamps",
+      ) as { bubble_id: string }[]
+    ).map((t) => t.bubble_id),
+  );
+  const files = new Set(
+    (await listObjects("comic-audio", `${BOOK}/${ISSUE}`)).map((p) =>
+      p.split("/").pop(),
+    ),
+  );
+  const missing = castBubbles.filter(
+    (b) =>
+      !b.audio_storage_path ||
+      !stamps.has(b.id) ||
+      !files.has(b.audio_storage_path),
+  );
+  tally.castBubbles = {
+    total: castBubbles.length,
+    withAudio: castBubbles.length - missing.length,
+  };
+  console.log(
+    `cast bubbles = ${castBubbles.length}, with audio + audio_timestamps + mp3 = ${castBubbles.length - missing.length}`,
+  );
+  if (castBubbles.length === 0) bad.push("cast bubbles = 0");
+  for (const b of missing) {
+    bad.push(
+      `cast bubble ${b.id} (${b.speaker ?? "no speaker"}) lacks ${[
+        !b.audio_storage_path && "audio_storage_path",
+        !stamps.has(b.id) && "audio_timestamps",
+        b.audio_storage_path && !files.has(b.audio_storage_path) && "the mp3",
+      ]
+        .filter(Boolean)
+        .join(", ")}`,
+    );
+  }
+
+  const issue = await readIssue();
+  console.log(`issues.status = ${issue.status}`);
+  if (issue.status !== "ready") bad.push(`issues.status = ${issue.status}`);
+  return bad;
+}
+
 async function assertRows(scenario: Scenario): Promise<string[]> {
+  if (real) return assertRealRows();
   const bad: string[] = [];
   for (const [table, want] of Object.entries(scenario.counts)) {
     const n = await countOf(table, { book_id: BOOK, issue_id: ISSUE });
@@ -1208,6 +1488,29 @@ function printEstimate(): void {
   );
 }
 
+/** The block a real run's report quotes (#430); read before cleanup. */
+async function realSummary(
+  runId: string | undefined,
+  logPath: string | null,
+): Promise<string[]> {
+  const retries = logPath ? retryLines(logPath) : [];
+  for (const l of retries) console.log(`retry: ${l.trim()}`);
+  const n = (table: string) =>
+    countOf(table, { book_id: BOOK, issue_id: ISSUE });
+  const cast = tally.castBubbles;
+  return [
+    "real run summary:",
+    `  run id: ${runId ?? "none"}`,
+    `  panels: ${await n("panels")}`,
+    `  bubbles: ${await n("bubbles")}`,
+    `  cast bubbles with audio: ${cast ? `${cast.withAudio} of ${cast.total}` : "not checked (the run failed first)"}`,
+    `  bubbles marked silent: ${tally.silent}`,
+    `  speakers marked no audio: ${tally.noAudio}`,
+    `  faces rejected: ${tally.facesRejected}`,
+    `  retries seen: ${retries.length}`,
+  ];
+}
+
 // ── Main ────────────────────────────────────────────────────────────────
 const CLEANUP_CMD =
   "pnpm exec tsx --env-file=.env scripts/smoke-ingest.ts --cleanup-only";
@@ -1261,22 +1564,27 @@ async function main(): Promise<number> {
       return 1;
     }
   }
-  if (scenarioName !== "clean" && scenarioName !== "gates") {
-    console.error("usage: --scenario clean|gates [--keep] | --cleanup-only");
+  if (!real && scenarioName !== "clean" && scenarioName !== "gates") {
+    console.error(
+      "usage: --scenario clean|gates [--keep] | --real --confirm-spend [--keep] | --cleanup-only",
+    );
     return 1;
   }
-  const scenario = JSON.parse(
-    readFileSync(
-      join(
-        process.cwd(),
-        "fixtures",
-        "ingest",
-        "smoke",
-        `${scenarioName}.json`,
-      ),
-      "utf8",
-    ),
-  ) as Scenario;
+  const name = real ? "real" : scenarioName;
+  const scenario = real
+    ? REAL_SCENARIO
+    : (JSON.parse(
+        readFileSync(
+          join(
+            process.cwd(),
+            "fixtures",
+            "ingest",
+            "smoke",
+            `${scenarioName}.json`,
+          ),
+          "utf8",
+        ),
+      ) as Scenario);
 
   const problems: string[] = [];
   let logPath: string | null = null;
@@ -1285,6 +1593,7 @@ async function main(): Promise<number> {
   let before: Snapshot | null = null;
   let tmp: string | null = null;
   let wrote = false;
+  let summary: string[] = [];
   try {
     await assertSmokeIds();
     await assertPortFree();
@@ -1301,7 +1610,7 @@ async function main(): Promise<number> {
     const { insertOmitted } = await setup(scenario);
     checkStop();
     tmp = mkdtempSync(join(tmpdir(), "smoke-ingest-"));
-    const dev = await startDevServer(tmp, real ? null : scenarioName);
+    const dev = await startDevServer(tmp, real ? null : (scenarioName ?? null));
     logPath = dev.logPath;
     checkStop();
     await waitForServer(dev.child);
@@ -1325,6 +1634,7 @@ async function main(): Promise<number> {
         `pipeline_runs (runId ${runRef.id ?? "none"}): status = ${run?.status ?? "no row"}, completed_at = ${run?.completed_at ?? "null"}`,
       );
       if (!closed) problems.push("pipeline_runs row is not completed");
+      if (real) summary = await realSummary(runRef.id, logPath);
     }
   } catch (err) {
     problems.push(errText(err));
@@ -1359,9 +1669,8 @@ async function main(): Promise<number> {
     console.log(`kept for inspection: ${tmp} (server log and workflow-data)`);
   }
 
-  console.log(
-    `\nsmoke ${scenarioName}: ${problems.length === 0 ? "PASS" : "FAIL"}`,
-  );
+  if (summary.length > 0) console.log(`\n${summary.join("\n")}`);
+  console.log(`\nsmoke ${name}: ${problems.length === 0 ? "PASS" : "FAIL"}`);
   for (const p of problems) console.log(`  ✗ ${p}`);
   return problems.length === 0 ? 0 : 1;
 }
