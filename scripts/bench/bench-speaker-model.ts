@@ -45,9 +45,9 @@
  * `GEMINI_FAST`) from `src/lib/models.ts`; a tier is priced from
  * `GEMINI_USD_PER_1M_TOKENS` unless `--price-in` / `--price-out` are given.
  *
- * `--provider openrouter` (default) refuses ids that do not end in `:free`
- * and are not in PAID_OK. `--provider gemini` runs `gemma-` ids freely and
- * any other id only under LIVE_API_OK=1 (a spend the owner named). It writes
+ * `--provider openrouter` (default) runs `:free` ids freely, and
+ * `--provider gemini` runs `gemma-` ids freely. Any other id runs only under
+ * LIVE_API_OK=1 (a spend the owner named), on either provider. It writes
  * no `llm_calls` row. Read-only on Supabase (select and Storage download).
  *
  * Usage:
@@ -256,16 +256,15 @@ const priceIn = priceOpt("--price-in") ?? tierRate?.input;
 const priceOut = priceOpt("--price-out") ?? tierRate?.output;
 const priced = priceIn !== undefined && priceOut !== undefined;
 
-// Paid ids the owner has named a spend for (#321). Anything else must be free.
-const PAID_OK = ["google/gemma-4-31b-it", "google/gemini-3.8-flash"];
 let openRouterKey: string | undefined;
 let gemini: GoogleGenAI | null = null;
 if (dryRun) {
   // No model call: no key, no client, no spend gate.
 } else if (provider === "openrouter") {
-  if (!model.endsWith(":free") && !PAID_OK.includes(model)) {
+  // Only ":free" ids cost nothing; every other id is a spend.
+  if (!model.endsWith(":free") && process.env.LIVE_API_OK !== "1") {
     die(
-      `refusing model "${model}": only ids ending in ":free" or listed in PAID_OK are allowed`,
+      `refusing model "${model}" on OpenRouter: only ":free" ids run without LIVE_API_OK=1 (a spend the owner named)`,
     );
   }
   openRouterKey = process.env.OPENROUTER_API_KEY;
