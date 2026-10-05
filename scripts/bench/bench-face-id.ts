@@ -18,9 +18,9 @@
  * very faces. The bench stubs the embedding and the lookup instead, so every
  * arm gets the same prompt with no "Confirmed character examples" block.
  *
- * Arms: A is GEMINI_MEDIUM with no thinking level (today's call), B is
- * GEMINI_MEDIUM at thinkingLevel LOW, C is GEMINI_FAST with no thinking
- * level. `--arm all` interleaves them run by run (A1 B1 C1 A2 ...).
+ * Arms: A is GEMINI_MEDIUM with no thinking level (production's call before
+ * #441), B is GEMINI_MEDIUM at thinkingLevel LOW (production's call since,
+ * decisions row 294), C is GEMINI_FAST with no thinking level. `--arm all` interleaves them run by run (A1 B1 C1 A2 ...).
  *
  * Writes: one `RunFile` per arm and run under `--out` (bench-kit.ts), rows
  * per detection. No Supabase write. DRY_RUN is set in this process so
@@ -85,7 +85,7 @@ const STEP = "bench-face-id";
 const ARMS: Arm[] = [
   {
     name: "A",
-    label: "GEMINI_MEDIUM, no thinking level (today's call)",
+    label: "GEMINI_MEDIUM, no thinking level (before #441)",
     model: GEMINI_MEDIUM,
   },
   {
@@ -373,7 +373,8 @@ async function identifyOne(
         return identifyFace(g, face, mime, known, ex, page, pageMime, ctx, {
           ...options,
           model: arm.model,
-          thinkingLevel: arm.thinkingLevel,
+          // null, not undefined: unset would take production's LOW.
+          thinkingLevel: arm.thinkingLevel ?? null,
         });
       },
     },

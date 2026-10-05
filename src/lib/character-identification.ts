@@ -3,7 +3,7 @@ import {
   createPartFromBase64,
   createPartFromText,
   type Part,
-  type ThinkingLevel,
+  ThinkingLevel,
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ambientLlmMeta, generateContentLogged } from "./llm-usage";
@@ -132,13 +132,14 @@ export async function identifyFace(
   issueContext?: string,
   /**
    * The ingest step sets `throwOnApiError`: a failed call must not read as no
-   * match. The face ID bench (#441) sets `model` and `thinkingLevel`; unset,
-   * the request is today's (GEMINI_MEDIUM, no thinkingConfig).
+   * match. Unset, the request is GEMINI_MEDIUM at thinkingLevel LOW
+   * (docs/decisions.md row 294). The face ID bench (#441) sets `model` and
+   * `thinkingLevel`; null sends no thinkingConfig, the model's default.
    */
   options?: {
     throwOnApiError?: boolean;
     model?: string;
-    thinkingLevel?: ThinkingLevel;
+    thinkingLevel?: ThinkingLevel | null;
   },
 ): Promise<FaceIdentification> {
   const hasPage = !!pageImageBase64;
@@ -173,6 +174,10 @@ export async function identifyFace(
     }
   }
 
+  const thinkingLevel =
+    options?.thinkingLevel === undefined
+      ? ThinkingLevel.LOW
+      : options.thinkingLevel;
   let response;
   try {
     response = await generateContentLogged(
@@ -180,12 +185,8 @@ export async function identifyFace(
       {
         model: options?.model ?? GEMINI_MEDIUM,
         contents: [{ role: "user", parts }],
-        ...(options?.thinkingLevel
-          ? {
-              config: {
-                thinkingConfig: { thinkingLevel: options.thinkingLevel },
-              },
-            }
+        ...(thinkingLevel
+          ? { config: { thinkingConfig: { thinkingLevel } } }
           : {}),
       },
       ambientLlmMeta("identify-face"),
