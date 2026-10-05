@@ -9,9 +9,12 @@ claim and files its PR ("Standing approvals" in AGENTS.md).
 Two terms used below. A thread status is **ended** when it is
 `completed`, `failed`, `cancelled` or `rolled_back`. An issue has a
 **live lead** when it is `state/working`, or when it is `state/open`
-and `t3_thread_list` with `titleContains` `#<N> ` shows a thread for it
-that has not ended (a lead you or an earlier copilot launched, which has
-not claimed yet). Both are read from GitHub and T3, never from memory.
+and `t3_thread_list` with `titleContains` `#<N> ` shows a thread whose
+title starts with `#<N> ` and that has not ended (a lead you or an earlier copilot launched, which has
+not claimed yet). Both are read from GitHub and T3, never from memory,
+with one exception: within a single sweep, an issue you just launched
+has a live lead for every test below, whether or not the list shows its
+thread yet.
 
 Your memory is GitHub. Every lead writes its claim, calls, owner items and
 settle comment to its issue and PR, so a sweep reads those and never a
@@ -45,9 +48,9 @@ parts below is either in the report or reported as empty.
    however old, and every O-item or E-item in a done message or in the
    closing comment of an issue that settled since your last sweep.
    Restate in full, with link, options and `Recommend:` as "Owner items
-   I can answer" in AGENTS.md lays out, each item that is new since your
-   last sweep; Doug should not have to open the issue. Items you already
-   reported get one line each: link, title, and the question.
+   I can answer" in AGENTS.md lays out, each item you have not yet reported in
+   this thread; Doug should not have to open the issue. Items you have
+   reported here get one line each: link, title, and the question.
 3. **Live.** Every issue with a live lead: its claim's session, its open
    PR if any, and its last substantive activity (last comment or commit,
    never `updatedAt`). Pair each with its thread from `t3_thread_list`;
@@ -77,8 +80,8 @@ You may launch an issue without asking when all of these hold:
 - it has no live lead. A launched issue stays `state/open` until its
   lead claims it, and the thread check in that definition is what stops
   a second launch in the gap;
-- fewer than five issues have a live lead, counting the ones you
-  launched earlier in this same sweep (config: Doug's cap, 2026-10-04);
+- fewer than five issues have a live lead (config: Doug's cap,
+  2026-10-04);
 - its "Files you own" list overlaps no list of an issue with a live
   lead. When an issue has no such list and you cannot tell, launch it
   and name those issues in its prompt.
@@ -127,7 +130,8 @@ again at the next launch.
 
 For each answered item: post the answer as a comment on its issue
 ("owner answer, relayed by copilot session <sid>: O1 B", plus any words
-he added), and look for a thread titled `#<N> ` that has not ended. If there is
+he added), and look for a thread whose title starts with `#<N> ` and that has not
+ended. If there is
 one, swap `state/needs-feedback` for `state/working` and send that
 thread the same answer with `t3_thread_send`, mode `auto`. If there is
 none, swap the label for `state/open`. An answer you cannot match to one
