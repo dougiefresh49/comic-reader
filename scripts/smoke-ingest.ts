@@ -53,6 +53,7 @@ const REQUIRED_KEYS = [
 ];
 /** Every table with a book_id column (src/types/database.ts), in FK-safe delete order. */
 const BOOK_TABLES = [
+  "book_franchises",
   "audio_timestamps",
   "casting_tasks",
   "castlist",
@@ -655,7 +656,7 @@ async function resume(gate: string): Promise<void> {
  * Owner simulation at the pages stop. In `gates` the context step stores the
  * stranger's bubble with no speaker (not in the closed cast), so the owner
  * does the editor's "Add a character to the cast" with a new voice: that
- * save writes only `bubbles.speaker`, as the new cast id `smoke-stranger`
+ * save sets `bubbles.speaker` to the new cast id `smoke-stranger`
  * (no `characters` or castlist row), which leaves the stranger uncast for
  * the voices stop. Then every page is approved as the editor's
  * setPageApproval does (`pages.reviewed_at`). canResumePages still checks
@@ -1066,6 +1067,9 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
     console.log(
       `Smoke Stranger bubbles = ${stranger.length}, with audio = ${withAudio} (uncast, so none expected)`,
     );
+    if (withAudio > 0) {
+      bad.push(`${withAudio} Smoke Stranger bubbles have audio; none expected`);
+    }
   }
 
   const issue = await readIssue();

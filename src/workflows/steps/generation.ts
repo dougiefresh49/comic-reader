@@ -10,6 +10,9 @@ import {
 } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 
+const fatal = (err: unknown) =>
+  new FatalError(err instanceof Error ? err.message : String(err));
+
 export async function getBubbleIdsForAudio(
   bookId: string,
   issueId: string,
