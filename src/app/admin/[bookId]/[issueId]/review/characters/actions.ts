@@ -18,10 +18,12 @@ import {
   removeFromCast,
   renameCharacter as renameCharacterRow,
   seedCast,
+  setIssueVoice,
   setVoice,
   storeVoiceRequest,
   type VoiceRequest,
 } from "~/lib/cast";
+import { readVoice, voiceForAppearance } from "~/lib/voice-slots";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
@@ -591,13 +593,7 @@ export async function setActiveVoice(args: {
 }): Promise<ActionResult> {
   try {
     const { scope, characterId, voiceUuid } = args;
-    const voice = await supabaseAdmin
-      .from("voices")
-      .select("display_name, status")
-      .eq("id", voiceUuid)
-      .maybeSingle();
-    must("reading the voice", voice.error);
-    const row = voice.data as { display_name: string; status: string } | null;
+    const row = await readVoice(supabaseAdmin, voiceUuid);
     if (row?.status !== "active")
       return { ok: false, error: "That voice is not active any more." };
     const pending = (
@@ -643,18 +639,7 @@ export async function requestVoice(args: {
     let wants: string;
     if (args.request.action === "clone") {
       const target = args.request.targetVoiceUuid;
-      const { data, error } = await supabaseAdmin
-        .from("voices")
-        .select("display_name, status, character_id, source_clip_path")
-        .eq("id", target)
-        .maybeSingle();
-      must("reading the voice-lab clone", error);
-      const row = data as {
-        display_name: string;
-        status: string;
-        character_id: string | null;
-        source_clip_path: string | null;
-      } | null;
+      const row = await readVoice(supabaseAdmin, target);
       if (
         row?.status !== "archived" ||
         row.character_id !== characterId ||
@@ -693,6 +678,66 @@ export async function requestVoice(args: {
     };
   } catch (err) {
     return fail("requesting a voice", err);
+  }
+}
+
+/**
+ * An appearance from "Its voices" (#458): the voice that holds it, or a new
+ * `needs_clip` voice for it, becomes a clone request and this issue's voice.
+ * Picking the same appearance again creates no second voice and no second
+ * request (`voiceForAppearance`, and the request's upsert).
+ */
+export async function pickAppearance(args: {
+  scope: Scope;
+  characterId: string;
+  name: string;
+  appearanceId: string;
+}): Promise<ActionResult> {
+  try {
+    const { scope, characterId, appearanceId } = args;
+    const { data, error } = await supabaseAdmin
+      .from("appearances")
+      .select("character_id, works(title, year), characters(display_name)")
+      .eq("id", appearanceId)
+      .maybeSingle();
+    must("reading the appearance", error);
+    const row = data as {
+      character_id: string;
+      works: { title: string; year: number } | null;
+      characters: { display_name: string | null } | null;
+    } | null;
+    if (row?.character_id !== characterId || !row.works)
+      return {
+        ok: false,
+        error: `That appearance is not on file for ${args.name}.`,
+      };
+    const { voice } = await voiceForAppearance(supabaseAdmin, {
+      characterId,
+      appearanceId,
+      // The shape the backfill gives a needs_clip voice: "Bulk (1993)".
+      displayName: `${row.characters?.display_name ?? args.name} (${row.works.year})`,
+    });
+    await storeVoiceRequest(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      { action: "clone", targetVoiceUuid: voice.id },
+    );
+    await setIssueVoice(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      voice.id,
+    );
+    revalidate(scope);
+    return {
+      ok: true,
+      message: `${args.name} wants a voice-lab clone from ${row.works.title} (${row.works.year}). It is made at the voices stop once voice-lab sends the clip.`,
+    };
+  } catch (err) {
+    return fail("asking voice-lab for a clip", err);
   }
 }
 

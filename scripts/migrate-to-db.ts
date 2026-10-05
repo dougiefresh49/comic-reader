@@ -5,7 +5,7 @@
 // Migrates local JSON files into Supabase. Idempotent — safe to re-run.
 // Migration order respects FK constraints:
 //   books → issues → pages → bubbles (builds legacyIdToUuid map)
-//   → audio_timestamps → castlist → characters → character_appearances → aliases
+//   → audio_timestamps → castlist → characters → works and appearances → aliases
 
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs-extra";
@@ -13,6 +13,10 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { upsertIssue } from "~/lib/issue-queries.js";
 import { importCastJson } from "./lib/cast-json.js";
+import {
+  writeAppearances,
+  type RegistryAppearance,
+} from "./lib/appearances.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -266,27 +270,12 @@ async function migrateIssue(bookId: string, issueDir: string): Promise<void> {
 }
 
 // ── Character registry ─────────────────────────────────────────────────────
+// An entry's `voice` field is not read: the `voices` table is the home of
+// voice state (#458), and voice-lab-import fills it.
 interface CharacterRegistryEntry {
   franchise?: string;
   aliases?: string[];
-  appearances?: AppearanceRaw[];
-}
-
-interface AppearanceRaw {
-  id: string;
-  mediaTitle?: string | null;
-  year?: number | null;
-  voiceActor?: string | null;
-  mediaType?: string | null;
-  youtubeSearchTerms?: string[];
-  notes?: string | null;
-  voice?: {
-    voiceId?: string;
-    voiceType?: string;
-    status?: string;
-    createdAt?: string;
-    voiceDescription?: string;
-  };
+  appearances?: RegistryAppearance[];
 }
 
 async function migrateCharacters(): Promise<void> {
@@ -314,37 +303,19 @@ async function migrateCharacters(): Promise<void> {
   if (charError) throw new Error(`characters upsert: ${charError.message}`);
   console.log(`    ✓ characters (${charRows.length})`);
 
-  // Appearances
-  const appearanceRows = [];
+  // Appearances, as works and appearances rows.
+  let listed = 0;
   for (const [characterId, entry] of Object.entries(registry)) {
-    for (const app of entry.appearances ?? []) {
-      appearanceRows.push({
-        id: app.id,
-        character_id: characterId,
-        media_title: app.mediaTitle ?? null,
-        year: app.year ?? null,
-        voice_actor: app.voiceActor ?? null,
-        media_type: app.mediaType ?? null,
-        youtube_search_terms: app.youtubeSearchTerms ?? [],
-        notes: app.notes ?? null,
-        voice_id: app.voice?.voiceId ?? null,
-        voice_type: app.voice?.voiceType ?? null,
-        voice_status: app.voice?.status ?? null,
-        voice_description: app.voice?.voiceDescription ?? null,
-        voice_created_at: app.voice?.createdAt ?? null,
-        voice_model_status: app.voice?.status === "ready" ? "ready" : "pending",
-      });
-    }
+    const apps = await writeAppearances(
+      supabase,
+      characterId,
+      entry.appearances ?? [],
+    );
+    listed += apps.listed;
+    for (const sk of apps.skipped)
+      console.warn(`    ⚠ appearance ${characterId}: skipped ${sk}`);
   }
-
-  if (appearanceRows.length > 0) {
-    const { error: appError } = await supabase
-      .from("character_appearances")
-      .upsert(appearanceRows, { onConflict: "id" });
-    if (appError)
-      throw new Error(`character_appearances upsert: ${appError.message}`);
-  }
-  console.log(`    ✓ character_appearances (${appearanceRows.length})`);
+  console.log(`    ✓ works and appearances (${listed} appearances)`);
 }
 
 // ── Aliases ────────────────────────────────────────────────────────────────

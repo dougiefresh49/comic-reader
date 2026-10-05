@@ -42,14 +42,34 @@ export interface VoiceView {
   uuid: string | null;
 }
 
-/** A voice-lab clone on file for the character: an archived `voices` row with a source clip, linked to no castlist row of this book. */
-export interface LabCandidate {
-  id: string;
-  name: string;
-  labDefault: boolean;
-  /** A signed URL to the source clip, or null when signing failed (no play button). */
-  clipUrl: string | null;
-}
+/**
+ * One entry of a card's "Its voices" list (#458): a `voices` row of the
+ * character, or an appearance (`appearances` row) that no voice holds yet.
+ */
+export type VoicePick =
+  | {
+      kind: "voice";
+      /** The `voices` row id. */
+      id: string;
+      name: string;
+      /** An archived entry has a source clip and no castlist row of this book links it (#350). */
+      status: "active" | "archived" | "needs_clip";
+      /** "Title (year)" of the work it is cloned from; null for a designed voice. */
+      work: string | null;
+      /** The voice's appearance; null for a designed voice. */
+      appearanceId: string | null;
+      startingPick: boolean;
+      /** A signed URL to an archived entry's source clip; null otherwise, or when signing failed (no play button). */
+      clipUrl: string | null;
+    }
+  | {
+      kind: "appearance";
+      /** The `appearances` row id. */
+      id: string;
+      /** "Title (year)" of the work. */
+      work: string;
+      voiceActor: string | null;
+    };
 
 /** A `casting_tasks` request for this character in this issue with `status = 'pending'`. */
 export interface PendingVoiceRequest {
@@ -80,8 +100,8 @@ export interface CharacterCard {
   /** The issue's castlist row has `no_audio`: the card shows it silent, with no voice (#410). */
   noAudio: boolean;
   voice: VoiceView | null;
-  /** Lab default first, then by name. Empty for a card with no Change control. */
-  labCandidates: LabCandidate[];
+  /** Active, archived, then needs_clip voices, then appearances no voice holds; starting picks first, then by name. Empty for a card with no Change control. */
+  voicePicks: VoicePick[];
   voiceRequest: PendingVoiceRequest | null;
 }
 

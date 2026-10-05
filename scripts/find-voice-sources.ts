@@ -19,6 +19,7 @@ import {
 } from "./utils/registry.js";
 import type { AppearanceEntry, MediaType } from "./types/registry.js";
 import { supabase } from "./lib/supabase.js";
+import { writeAppearances } from "./lib/appearances.js";
 import { updateIssue } from "~/lib/issue-queries.js";
 import { readCastRow } from "~/lib/cast";
 
@@ -443,27 +444,19 @@ async function runBookMode(
       }
       charsUpserted++;
 
-      // 2. Write any cached appearances from registry (from previous runs)
-      for (const app of entry.appearances) {
-        await supabase.from("character_appearances").upsert(
-          {
-            id: app.id,
-            character_id: character,
-            media_title: app.mediaTitle,
-            year: app.year,
-            voice_actor: app.voiceActor,
-            media_type: app.mediaType,
-            youtube_search_terms: app.youtubeSearchTerms,
-            notes: app.notes,
-            voice_id: app.voice?.voiceId ?? null,
-            voice_type: app.voice?.voiceType ?? null,
-            voice_status: app.voice?.status ?? null,
-            voice_description: app.voice?.voiceDescription ?? null,
-            voice_created_at: app.voice?.createdAt ?? null,
-            voice_model_status:
-              app.voice?.status === "ready" ? "ready" : "pending",
-          },
-          { onConflict: "id" },
+      // 2. The registry's cached appearances as works and appearances rows.
+      //    The registry's voice fields are not written: `voices` is their home.
+      try {
+        const apps = await writeAppearances(
+          supabase,
+          character,
+          entry.appearances,
+        );
+        for (const s of apps.skipped)
+          console.warn(`   ⚠ appearance ${character}: skipped ${s}`);
+      } catch (err) {
+        console.warn(
+          `   ⚠ appearances ${character}: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
 

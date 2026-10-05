@@ -16,7 +16,12 @@ import {
   type RoleId,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
-import { clipObjectPath, VOICE_CLIPS_BUCKET } from "~/lib/voice-slots/bucket";
+import {
+  clipObjectPath,
+  readVoices,
+  VOICE_CLIPS_BUCKET,
+  type VoiceRow,
+} from "~/lib/voice-slots";
 import {
   unknownFaceGroups,
   type UnknownDetection,
@@ -27,11 +32,11 @@ import type {
   CharactersData,
   FaceView,
   KnownCharacter,
-  LabCandidate,
   LooseExemplar,
   PageView,
   Rect,
   UnknownGroupView,
+  VoicePick,
   VoiceView,
 } from "./types";
 
@@ -77,15 +82,17 @@ interface CharacterRow {
   aliases: string[] | null;
 }
 
-interface VoiceRow {
+interface AppearanceRow {
   id: string;
-  display_name: string;
-  character_id: string | null;
-  status: string;
-  created_at: string;
-  lab_default: boolean | null;
-  source_clip_path: string | null;
+  character_id: string;
+  work_id: string;
+  voice_actor: string | null;
+  works: { title: string; year: number } | null;
 }
+
+/** The picker's voice statuses, in list order. */
+const PICK_RANK = { active: 0, archived: 1, needs_clip: 2 } as const;
+type PickStatus = keyof typeof PICK_RANK;
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -161,7 +168,7 @@ export async function loadCharacters(
     panelResult,
     exemplarResult,
     charResult,
-    voiceResult,
+    voiceRows,
     voiceRequests,
   ] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
@@ -192,19 +199,13 @@ export async function loadCharacters(
       .from("characters")
       .select("id, display_name, aliases", { count: "exact" })
       .order("id"),
-    supabaseAdmin
-      .from("voices")
-      .select(
-        "id, display_name, character_id, status, created_at, lab_default, source_clip_path",
-        { count: "exact" },
-      ),
+    readVoices(supabaseAdmin),
     readVoiceRequests(supabaseAdmin, bookId, issueId),
   ]);
   const pageRows = rows<PageRow>("pages", pageResult);
   const panelRows = rows<PanelRow>("panels", panelResult);
   const exemplarRows = rows<ExemplarRow>("face exemplars", exemplarResult);
   const charRows = rows<CharacterRow>("characters", charResult);
-  const voiceRows = rows<VoiceRow>("voices", voiceResult);
 
   const detectionRows: DetectionRow[] = [];
   for (const ids of chunk(
@@ -340,31 +341,37 @@ export async function loadCharacters(
     };
   };
 
-  // Voice-lab clones on file: archived, with a source clip, and linked to no
-  // castlist row of this book. Lab default first, then by name.
+  // The picker's voices (#458): the character's active, archived and
+  // needs_clip rows. An archived one is offered only with a source clip and
+  // no castlist row of this book linking it (#350). Within a status, the
+  // starting pick first, then by name.
   const linkedInBook = new Set(
     book.rows.map((r) => r.voice_uuid).filter((u): u is string => !!u),
   );
-  const labRowsOf = new Map<string, VoiceRow[]>();
+  const pickRowsOf = new Map<string, (VoiceRow & { status: PickStatus })[]>();
   for (const v of voiceRows) {
+    if (!v.character_id || !(v.status in PICK_RANK)) continue;
     if (
-      v.status !== "archived" ||
-      !v.source_clip_path ||
-      !v.character_id ||
-      linkedInBook.has(v.id)
+      v.status === "archived" &&
+      (!v.source_clip_path || linkedInBook.has(v.id))
     )
       continue;
-    labRowsOf.set(v.character_id, [
-      ...(labRowsOf.get(v.character_id) ?? []),
-      v,
+    pickRowsOf.set(v.character_id, [
+      ...(pickRowsOf.get(v.character_id) ?? []),
+      v as VoiceRow & { status: PickStatus },
     ]);
   }
-  for (const list of labRowsOf.values())
+  for (const list of pickRowsOf.values())
     list.sort(
       (a, b) =>
-        Number(Boolean(b.lab_default)) - Number(Boolean(a.lab_default)) ||
+        PICK_RANK[a.status] - PICK_RANK[b.status] ||
+        Number(b.starting_pick) - Number(a.starting_pick) ||
         a.display_name.localeCompare(b.display_name),
     );
+  /** Appearances some `voices` row holds; the picker lists the rest. */
+  const heldAppearances = new Set(
+    voiceRows.map((v) => v.appearance_id).filter((a): a is string => !!a),
+  );
   const pendingRequest = new Map(
     voiceRequests
       .filter((r) => r.status === "pending")
@@ -409,10 +416,50 @@ export async function loadCharacters(
       faces: (facesByCharacter.get(m.id) ?? []).sort(byPage),
       looseExemplars: loose.filter((e) => e.character_id === m.id).map(looseOf),
       voice: voiceView(m.id),
-      labCandidates: [],
+      voicePicks: [],
       voiceRequest: null,
     });
   }
+
+  // The appearances of the cards that show the Change control, and of any
+  // voice of theirs whose appearance is filed under another character.
+  const pickerIds = cards
+    .filter((c) => characterIds.has(c.id) && !c.removed)
+    .map((c) => c.id);
+  const appearanceRows: AppearanceRow[] = [];
+  const readAppearances = async (
+    column: "character_id" | "id",
+    ids: string[],
+  ) => {
+    for (const part of chunk(ids, 100)) {
+      const result = await supabaseAdmin
+        .from("appearances")
+        .select("id, character_id, work_id, voice_actor, works(title, year)", {
+          count: "exact",
+        })
+        .in(column, part);
+      appearanceRows.push(...rows<AppearanceRow>("appearances", result));
+    }
+  };
+  await readAppearances("character_id", pickerIds);
+  const readIds = new Set(appearanceRows.map((a) => a.id));
+  await readAppearances("id", [
+    ...new Set(
+      pickerIds.flatMap((id) =>
+        (pickRowsOf.get(id) ?? []).flatMap((v) =>
+          v.appearance_id && !readIds.has(v.appearance_id)
+            ? [v.appearance_id]
+            : [],
+        ),
+      ),
+    ),
+  ]);
+  const workOf = new Map(
+    appearanceRows.map((a) => [
+      a.id,
+      a.works ? `${a.works.title} (${a.works.year})` : a.work_id,
+    ]),
+  );
 
   // The Change control's data, only on cards that are a `characters` row.
   // Clips are signed only for cards that show the control (not removed).
@@ -431,16 +478,35 @@ export async function loadCharacters(
         };
       }
       if (card.removed) return;
-      card.labCandidates = await Promise.all(
-        (labRowsOf.get(card.id) ?? []).map(
-          async (v): Promise<LabCandidate> => ({
+      const voices = await Promise.all(
+        (pickRowsOf.get(card.id) ?? []).map(
+          async (v): Promise<VoicePick> => ({
+            kind: "voice",
             id: v.id,
             name: v.display_name,
-            labDefault: Boolean(v.lab_default),
-            clipUrl: await signedClipUrl(v.source_clip_path!),
+            status: v.status,
+            work: v.appearance_id
+              ? (workOf.get(v.appearance_id) ?? null)
+              : null,
+            appearanceId: v.appearance_id,
+            startingPick: v.starting_pick,
+            clipUrl:
+              v.status === "archived" && v.source_clip_path
+                ? await signedClipUrl(v.source_clip_path)
+                : null,
           }),
         ),
       );
+      const appearances: VoicePick[] = appearanceRows
+        .filter((a) => a.character_id === card.id && !heldAppearances.has(a.id))
+        .map((a) => ({
+          kind: "appearance" as const,
+          id: a.id,
+          work: workOf.get(a.id) ?? a.work_id,
+          voiceActor: a.voice_actor,
+        }))
+        .sort((a, b) => a.work.localeCompare(b.work));
+      card.voicePicks = [...voices, ...appearances];
     }),
   );
   const activeVoices: ActiveVoice[] = voiceRows

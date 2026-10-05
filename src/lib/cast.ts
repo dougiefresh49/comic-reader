@@ -17,6 +17,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { slugify } from "~/lib/character-id";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
+import {
+  newestActiveVoiceOf,
+  readVoiceStates,
+  voiceExists,
+} from "~/lib/voice-slots/lookup";
 
 type Client = SupabaseClient;
 const db = (client: Client) => client as SupabaseClient<Database>;
@@ -174,24 +179,6 @@ function nameResolver(
 const CAST_COLUMNS =
   "issue_id, character, character_id, voice_uuid, in_issue, no_audio";
 
-/** The `voices` rows these ids name, in chunks that keep the URL short. */
-async function readCastVoices(
-  client: Client,
-  ids: Iterable<string>,
-): Promise<Map<string, CastVoiceRow>> {
-  const list = [...new Set(ids)];
-  const out = new Map<string, CastVoiceRow>();
-  for (let i = 0; i < list.length; i += 200) {
-    const { data, error } = await db(client)
-      .from("voices")
-      .select("id, current_elevenlabs_id, status")
-      .in("id", list.slice(i, i + 200));
-    must("reading the cast's voices", error);
-    for (const v of data ?? []) out.set(v.id, v);
-  }
-  return out;
-}
-
 /** The book's castlist, issue order, the voices it points at, `form_of` links and name resolver, for the render chain and the writers. */
 export async function loadBookCast(
   client: Client,
@@ -211,7 +198,7 @@ export async function loadBookCast(
     readCharacters(client),
   ]);
   must("reading the book's issues", issues.error);
-  const voices = await readCastVoices(
+  const voices = await readVoiceStates(
     client,
     rows.flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : [])),
   );
@@ -522,15 +509,7 @@ async function startingVoice(
 ): Promise<string | null> {
   const latest = latestVoicedRow(book, characterId);
   if (latest) return latest.voice_uuid;
-  const { data, error } = await db(client)
-    .from("voices")
-    .select("id")
-    .eq("character_id", characterId)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(1);
-  must(`reading the voice of ${characterId}`, error);
-  return data?.[0]?.id ?? null;
+  return newestActiveVoiceOf(client, characterId);
 }
 
 type CastPatch = Pick<
@@ -782,16 +761,11 @@ export async function setVoice(
   characterId: string,
   voiceUuid: string,
 ): Promise<number> {
-  const voice = await db(client)
-    .from("voices")
-    .select("id")
-    .eq("id", voiceUuid)
-    .maybeSingle();
-  must(`reading voice ${voiceUuid}`, voice.error);
-  if (!voice.data) throw new Error(`cast: no voice ${voiceUuid}`);
+  if (!(await voiceExists(client, voiceUuid)))
+    throw new Error(`cast: no voice ${voiceUuid}`);
   const { data, error } = await db(client)
     .from("castlist")
-    .update({ voice_uuid: voice.data.id })
+    .update({ voice_uuid: voiceUuid })
     .eq("book_id", bookId)
     .eq("character_id", characterId)
     .select("issue_id");

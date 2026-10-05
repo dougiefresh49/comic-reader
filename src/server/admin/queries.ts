@@ -143,14 +143,13 @@ export interface AdminBookRow {
   id: string;
   name: string;
   slug: string | null;
-  seriesId: string | null;
   issueCount: number;
 }
 
 export async function getAdminBooks(): Promise<AdminBookRow[]> {
   const { data, error } = await supabase
     .from("books")
-    .select("id, name, slug, series_id, issues(id)")
+    .select("id, name, slug, issues(id)")
     .order("name");
 
   if (error) {
@@ -163,14 +162,12 @@ export async function getAdminBooks(): Promise<AdminBookRow[]> {
       id: string;
       name: string;
       slug: string | null;
-      series_id: string | null;
       issues: Array<{ id: string }> | null;
     }>
   ).map((b) => ({
     id: b.id,
     name: b.name,
     slug: b.slug,
-    seriesId: b.series_id,
     issueCount: (b.issues ?? []).length,
   }));
 }

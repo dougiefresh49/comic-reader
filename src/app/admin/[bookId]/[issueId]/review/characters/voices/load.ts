@@ -23,12 +23,6 @@ import type {
 
 const SAMPLES = 3;
 
-interface LabRow {
-  id: string;
-  character_id: string;
-  lab_default: boolean | null;
-}
-
 type RawCandidate = { id: string; name: string; labDefault: boolean };
 
 const ref = (v: VoiceRow) => ({ id: v.id, name: v.display_name });
@@ -86,20 +80,13 @@ export async function loadVoices(
     planError = err instanceof Error ? err.message : String(err);
   }
 
-  const [book, voices, castlist, faces, gate, labRes] = await Promise.all([
+  const [book, voices, castlist, faces, gate] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
     readVoices(supabaseAdmin),
     readCastlist(supabaseAdmin),
     portraits(bookId, issueId),
     readVoicesGate(bookId, issueId),
-    supabaseAdmin
-      .from("voices")
-      .select("id, character_id, lab_default")
-      .eq("status", "archived")
-      .not("character_id", "is", null),
   ]);
-  if (labRes.error)
-    throw new Error(`voices stop loader, voice-lab: ${labRes.error.message}`);
   const lines = await readSpeakerLines(supabaseAdmin, bookId, issueId);
   const voiceById = new Map(voices.map((v) => [v.id, v]));
   const linkedHere = new Set(
@@ -113,12 +100,12 @@ export async function loadVoices(
   const offerable = (id: string) =>
     Boolean(voiceById.get(id)?.source_clip_path) && !linkedHere.has(id);
   const labOf = (id: string): RawCandidate[] =>
-    ((labRes.data ?? []) as LabRow[])
-      .filter((r) => r.character_id === id && voiceById.has(r.id))
-      .map((r) => ({
-        id: r.id,
-        name: voiceById.get(r.id)?.display_name ?? r.id,
-        labDefault: Boolean(r.lab_default),
+    voices
+      .filter((v) => v.status === "archived" && v.character_id === id)
+      .map((v) => ({
+        id: v.id,
+        name: v.display_name,
+        labDefault: v.starting_pick,
       }))
       .sort(
         (a, b) =>
@@ -157,8 +144,10 @@ export async function loadVoices(
   const voiceNow = (id: string) => {
     const v = voiceFor(book, id, issueId);
     const row = v?.voiceUuid ? voiceById.get(v.voiceUuid) : undefined;
-    // Active and library voices play; an archived one does not.
-    return row && row.status !== "archived" ? ref(row) : null;
+    // Active and library voices play; an archived or needs_clip one does not.
+    return row && row.status !== "archived" && row.status !== "needs_clip"
+      ? ref(row)
+      : null;
   };
 
   /** The castlist voice `voiceFor` finds is a `voices` row that really is archived. */

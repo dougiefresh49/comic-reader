@@ -26,11 +26,13 @@ import {
   ArchiveRecordError,
   ElevenLabsHeadroomError,
   ElevenLabsRefusedError,
+  activateDesignedVoice,
   archiveRefusals,
   archiveVoice,
   designVoice,
   CLAIM_STALE_MS,
   claimHeld,
+  designDescriptions,
   findOpVoices,
   finishArchive,
   issueNeeds,
@@ -38,16 +40,15 @@ import {
   markRestored,
   planFreeSlots,
   readCastlist,
+  readCharacterVoices,
   readVoice,
   readVoices,
-  registerVoice,
   restoreVoice,
   withVoiceOperationClaim,
   type SlotStatus,
   type VoiceRow,
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots";
-import { voiceDesignAppearanceId } from "~/workflows/steps/audio-plan";
 import {
   ownRowStop,
   readSpeakerLines,
@@ -105,11 +106,11 @@ export interface VoiceWorkItem {
   target: VoiceRow | null;
   /** The character's own active voice, which a clone or design replaces. */
   replaces: VoiceRow | null;
-  /** voice-lab clones filed under the character, `lab_default` first. */
+  /** voice-lab clones filed under the character (archived), `starting_pick` first. */
   candidates: { id: string; name: string; labDefault: boolean }[];
   /** The character's non-ignored, non-silent bubbles in the issue. */
   lines: number;
-  /** Design: a description is stored on `<id>-voice-design`. */
+  /** Design: a description is stored on the character's `needs_clip` voice with no appearance. */
   hasDescription: boolean;
   /** Pending, not refused: counted in the slot plan. */
   needsSlot: boolean;
@@ -164,25 +165,13 @@ async function readTasks(
   );
 }
 
+/** Each character's stored design description (#458), by character id. */
 async function readDescriptions(
   client: SupabaseClient,
   ids: string[],
 ): Promise<Map<string, string>> {
   if (ids.length === 0) return new Map();
-  const { data, error } = await client
-    .from("character_appearances")
-    .select("id, voice_description")
-    .in("id", ids.map(voiceDesignAppearanceId));
-  fail("reading voice descriptions", error);
-  const out = new Map<string, string>();
-  for (const r of (data ?? []) as {
-    id: string;
-    voice_description: string | null;
-  }[]) {
-    const text = r.voice_description?.trim();
-    if (text) out.set(r.id, text);
-  }
-  return out;
+  return designDescriptions(await readCharacterVoices(client, ids));
 }
 
 /**
@@ -267,27 +256,12 @@ export async function planVoiceWork(
     ),
   );
   const voiceById = new Map(voices.map((v) => [v.id, v]));
-  const { data: labRows, error: labErr } = await sb
-    .from("voices")
-    .select("id, character_id, lab_default")
-    .eq("status", "archived")
-    .not("character_id", "is", null);
-  fail("reading voice-lab candidates", labErr);
   const candidatesOf = new Map<string, VoiceWorkItem["candidates"]>();
-  for (const r of (labRows ?? []) as {
-    id: string;
-    character_id: string;
-    lab_default: boolean | null;
-  }[]) {
-    const v = voiceById.get(r.id);
-    if (!v) continue;
-    const list = candidatesOf.get(r.character_id) ?? [];
-    list.push({
-      id: v.id,
-      name: v.display_name,
-      labDefault: Boolean(r.lab_default),
-    });
-    candidatesOf.set(r.character_id, list);
+  for (const v of voices) {
+    if (v.status !== "archived" || !v.character_id) continue;
+    const list = candidatesOf.get(v.character_id) ?? [];
+    list.push({ id: v.id, name: v.display_name, labDefault: v.starting_pick });
+    candidatesOf.set(v.character_id, list);
   }
   for (const list of candidatesOf.values())
     list.sort(
@@ -379,7 +353,7 @@ export async function planVoiceWork(
     const stop = ownRowStop(book, id, issueId);
     if (stop) item.refusals.push(stop);
     if (item.action === "design") {
-      item.hasDescription = descriptions.has(voiceDesignAppearanceId(id));
+      item.hasDescription = descriptions.has(id);
       if (item.lines === 0) item.refusals.push("no lines in this issue");
       if (!item.hasDescription)
         item.warnings.push(
@@ -387,6 +361,11 @@ export async function planVoiceWork(
         );
     } else if (!item.target) {
       item.refusals.push(`${item.action} target not found`);
+    } else if (item.target.status === "needs_clip") {
+      // Never run, takes no slot (#458): voice-lab has not delivered the clip.
+      item.refusals.push(
+        `${item.target.display_name} is waiting for a clip from voice-lab`,
+      );
     } else if (item.target.status === "active") {
       item.refusals.push(
         `${item.target.display_name} is already active: pick it as an active voice, no slot needed`,
@@ -727,9 +706,10 @@ async function recordVoice(
       .eq("current_elevenlabs_id", elevenLabsId)
       .limit(1);
     fail(`looking up ${elevenLabsId}`, found.error);
+    // The character's stored design row becomes the voice; none, a new row.
     voiceUuid =
       ((found.data ?? []) as { id: string }[])[0]?.id ??
-      (await registerVoice(sb, {
+      (await activateDesignedVoice(sb, {
         display_name: item.name,
         current_elevenlabs_id: elevenLabsId,
         description,
@@ -1003,9 +983,7 @@ async function carryOutClaimed(
   let description: string | null = null;
   if (fresh.action === "design") {
     const read = async () =>
-      (await readDescriptions(sb, [characterId])).get(
-        voiceDesignAppearanceId(characterId),
-      ) ?? null;
+      (await readDescriptions(sb, [characterId])).get(characterId) ?? null;
     description = await read();
     if (!description) {
       const { getGeminiClient } = await import("~/lib/gemini-client");
@@ -1386,7 +1364,7 @@ export async function reconcile(
     const description =
       fresh.action === "design"
         ? ((await readDescriptions(sb, [item.characterId])).get(
-            voiceDesignAppearanceId(item.characterId),
+            item.characterId,
           ) ?? null)
         : null;
     const saved = await recordVoice(

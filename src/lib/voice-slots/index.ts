@@ -55,6 +55,7 @@ export type {
 export { orderCandidates, planFreeSlots } from "./plan";
 export type { PlanFreeSlotsOptions } from "./plan";
 export {
+  activateDesignedVoice,
   booksUsingVoice,
   deleteRecorded,
   finishArchive,
@@ -64,7 +65,20 @@ export {
   readVoice,
   readVoices,
   registerVoice,
+  setKeepActive,
+  voiceForAppearance,
 } from "./registry";
+export {
+  designDescriptions,
+  isStoredDesign,
+  newestActiveVoiceOf,
+  readCharacterVoices,
+  readVoiceStates,
+  readVoicesByElevenLabsIds,
+  saveDesignDescription,
+  voiceExists,
+} from "./lookup";
+export type { CharacterVoice, VoiceByElevenLabsId, VoiceState } from "./lookup";
 export type { RegisterVoiceInput } from "./registry";
 export { createVoiceFromSamples, restoreVoice } from "./restore";
 export { snapshotSample } from "./snapshot";

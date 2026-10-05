@@ -7,6 +7,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBookCast, setIssueVoice } from "~/lib/cast";
+import { readVoicesByElevenLabsIds } from "~/lib/voice-slots/lookup";
 
 export async function importCastJson(
   client: SupabaseClient,
@@ -17,15 +18,12 @@ export async function importCastJson(
   const entries = Object.entries(castData);
   if (entries.length === 0) return { written: 0, skipped: [] };
   const book = await loadBookCast(client, bookId);
-  const { data, error } = await client
-    .from("voices")
-    .select("id, current_elevenlabs_id")
-    .in("current_elevenlabs_id", [...new Set(entries.map(([, id]) => id))]);
-  if (error) throw new Error(`castlist.json: reading voices: ${error.message}`);
+  const voices = await readVoicesByElevenLabsIds(
+    client,
+    entries.map(([, id]) => id),
+  );
   const voiceByElevenLabs = new Map(
-    ((data ?? []) as { id: string; current_elevenlabs_id: string }[]).map(
-      (v) => [v.current_elevenlabs_id, v.id],
-    ),
+    voices.map((v) => [v.current_elevenlabs_id, v.id]),
   );
   let written = 0;
   const skipped: string[] = [];

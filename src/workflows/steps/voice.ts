@@ -41,7 +41,6 @@ export type VoiceDescriptionDecision = {
   snippetCount: number;
   snippets: string[];
   decision: VoiceDescriptionDecisionKind;
-  appearanceId: string | null;
 };
 
 export type VoiceDescriptionPlan = {
@@ -60,7 +59,10 @@ export type PlanVoiceDescriptionsInput = {
   groups: VoiceCharacterGroup[];
   readyCharacterIds: ReadonlySet<string>;
   existingCharacterIds: ReadonlySet<string>;
-  /** Map of `<id>-voice-design` appearance id → voice_description (may be null). */
+  /**
+   * Character id → its stored design description (#458): the text on its
+   * `needs_clip` voices row with no appearance (may be null).
+   */
   designDescriptions: ReadonlyMap<string, string | null>;
   /**
    * When set, only these characters are described: a speaker with a design
@@ -126,7 +128,6 @@ export function planVoiceDescriptions(
 
   for (const group of input.groups) {
     const { characterId } = group;
-    const appearanceId = `${characterId}-voice-design`;
     const base = {
       characterId,
       resolvedName: group.resolvedName,
@@ -139,7 +140,6 @@ export function planVoiceDescriptions(
       decisions.push({
         ...base,
         decision: "skip_narrator",
-        appearanceId: null,
       });
       skippedNarrator++;
       continue;
@@ -152,7 +152,6 @@ export function planVoiceDescriptions(
       decisions.push({
         ...base,
         decision: "skip_has_voice",
-        appearanceId: null,
       });
       skippedHasVoice++;
       continue;
@@ -165,18 +164,16 @@ export function planVoiceDescriptions(
       decisions.push({
         ...base,
         decision: "skip_ready",
-        appearanceId: null,
       });
       skippedReady++;
       continue;
     }
 
-    const existingDesc = input.designDescriptions.get(appearanceId);
+    const existingDesc = input.designDescriptions.get(characterId);
     if (existingDesc != null && existingDesc.trim() !== "") {
       decisions.push({
         ...base,
         decision: "skip_has_description",
-        appearanceId,
       });
       skippedHasDescription++;
       continue;
@@ -186,7 +183,6 @@ export function planVoiceDescriptions(
       decisions.push({
         ...base,
         decision: "skip_unresolved",
-        appearanceId: null,
       });
       skippedUnresolved++;
       continue;
@@ -195,7 +191,6 @@ export function planVoiceDescriptions(
     decisions.push({
       ...base,
       decision: "describe",
-      appearanceId,
     });
     toDescribe++;
   }
@@ -226,13 +221,13 @@ export function formatVoiceDecision(d: VoiceDescriptionDecision): string {
     case "skip_ready":
       return `${label}: skip ready`;
     case "skip_has_description":
-      return `${label}: skip has description (${d.appearanceId})`;
+      return `${label}: skip has description (stored on its needs_clip voice)`;
     case "skip_unresolved":
       return `${label}: skip unresolved (no characters row)`;
     case "skip_has_voice":
       return `${label}: skip has a voice and no design request`;
     case "describe":
-      return `${label}: describe → ${d.appearanceId}`;
+      return `${label}: describe → its needs_clip voice`;
   }
 }
 
@@ -322,27 +317,23 @@ export async function loadVoiceDescriptionPlanInput(
   const resolvedIdList = groups.map((g) => g.characterId);
 
   const readyCharacterIds = new Set<string>();
-  const designDescriptions = new Map<string, string | null>();
+  let designDescriptions = new Map<string, string | null>();
   const existingCharacterIds = new Set<string>();
 
   if (resolvedIdList.length > 0) {
-    const { data: caRows, error: caErr } = await client
-      .from("character_appearances")
-      .select(
-        "id, character_id, voice_status, voice_model_status, voice_description",
-      )
-      .in("character_id", resolvedIdList);
-
-    if (caErr) throw new Error(caErr.message);
-
-    for (const r of caRows ?? []) {
-      if (r.voice_status === "ready" || r.voice_model_status === "ready") {
-        readyCharacterIds.add(r.character_id);
-      }
-      if (r.id.endsWith("-voice-design")) {
-        designDescriptions.set(r.id, r.voice_description);
-      }
+    // Voice state lives on `voices` (#458): a character with an active or
+    // archived voice is ready (an archived one comes back by restore or a
+    // clone, never a design); a stored design description is its
+    // `needs_clip` row with no appearance.
+    const { readCharacterVoices, designDescriptions: described } = await import(
+      "~/lib/voice-slots/lookup"
+    );
+    const voices = await readCharacterVoices(client, resolvedIdList);
+    for (const v of voices) {
+      if (v.status === "active" || v.status === "archived")
+        readyCharacterIds.add(v.character_id);
     }
+    designDescriptions = described(voices);
 
     const { data: charRows, error: charErr } = await client
       .from("characters")
@@ -387,8 +378,10 @@ export interface DescribeVoicesOptions {
 }
 
 /**
- * Plans the issue's voice descriptions and writes each one Gemini makes to
- * `<id>-voice-design` (one `GEMINI_MEDIUM` call per character, logged).
+ * Plans the issue's voice descriptions and stores each one Gemini makes on
+ * the character's `needs_clip` voices row with no appearance, upserted by
+ * `saveDesignDescription` (#458; one `GEMINI_MEDIUM` call per character,
+ * logged).
  * `opts.only` limits the writes to those character ids, for `carryOut`'s
  * design of a character with no stored description. Returns the ids
  * described.
@@ -430,6 +423,19 @@ export async function describeVoices(
     (d) => d.decision === "describe" && (!only || only.has(d.characterId)),
   );
   const described: string[] = [];
+  const { saveDesignDescription } = await import("~/lib/voice-slots/lookup");
+  const names = new Map<string, string>();
+  if (toDescribe.length > 0) {
+    const { data: nameRows, error: nameErr } = await client
+      .from("characters")
+      .select("id, display_name")
+      .in(
+        "id",
+        toDescribe.map((d) => d.characterId),
+      );
+    if (nameErr) throw new Error(nameErr.message);
+    for (const r of nameRows ?? []) names.set(r.id, r.display_name ?? r.id);
+  }
   for (const d of toDescribe) {
     const list = d.snippets.map((s, idx) => `${idx + 1}. ${s}`).join("\n");
 
@@ -454,18 +460,11 @@ Return ONLY the consolidated description as plain text — no JSON, no markdown.
       throw new Error(`No Gemini response for ${d.characterId}`);
     }
 
-    const appearanceId = d.appearanceId!;
-    const { error: upErr } = await client.from("character_appearances").upsert(
-      {
-        id: appearanceId,
-        character_id: d.characterId,
-        media_type: "voice_design",
-        voice_description: text,
-      },
-      { onConflict: "id" },
-    );
-
-    if (upErr) throw new Error(upErr.message);
+    await saveDesignDescription(client, {
+      characterId: d.characterId,
+      displayName: names.get(d.characterId) ?? d.characterId,
+      description: text,
+    });
 
     console.log(
       `[voice-desc] ${formatVoiceDecision(d)} (wrote ${text.length} chars)`,
@@ -514,6 +513,6 @@ export async function generateVoiceDescriptions(
 export async function cleanVoiceDescriptions(bookId: string, issueId: string) {
   "use step";
   console.log(
-    `[clean-desc] ${bookId}/${issueId}: no-op (retired; descriptions live on character_appearances)`,
+    `[clean-desc] ${bookId}/${issueId}: no-op (retired; descriptions live on voices)`,
   );
 }

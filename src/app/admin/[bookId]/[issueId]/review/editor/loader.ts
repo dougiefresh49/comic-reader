@@ -13,7 +13,7 @@ import {
   voiceFor,
   type CastVoice,
 } from "~/lib/cast";
-import { NARRATOR_ID, slug, titleCase } from "~/components/review-editor/lib";
+import { NARRATOR_ID, titleCase } from "~/components/review-editor/lib";
 import type {
   BubbleType,
   CastMember,
@@ -26,6 +26,7 @@ import type {
   SrcPanel,
   VoiceOption,
 } from "~/components/review-editor/types";
+import { readVoices, type VoiceRow } from "~/lib/voice-slots";
 import { VOICE_SLOTS_TOTAL } from "~/lib/voice-slots/types";
 
 interface IssueRow {
@@ -88,14 +89,6 @@ interface CharacterRow {
   id: string;
   display_name: string | null;
   aliases: string[] | null;
-}
-
-interface VoiceRow {
-  id: string;
-  display_name: string;
-  status: string;
-  character_id: string | null;
-  current_elevenlabs_id: string | null;
 }
 
 const TYPES: string[] = [
@@ -169,7 +162,7 @@ export async function loadEditor(
     panelResult,
     pageResult,
     charResult,
-    voiceResult,
+    voiceRows,
     castEntries,
     book,
   ] = await Promise.all([
@@ -199,11 +192,8 @@ export async function loadEditor(
     supabaseAdmin
       .from("characters")
       .select("id, display_name, aliases", { count: "exact" }),
-    supabaseAdmin
-      .from("voices")
-      .select("id, display_name, status, character_id, current_elevenlabs_id", {
-        count: "exact",
-      }),
+    // Throws on a failed read, which fails the page like `rows` does.
+    readVoices(supabaseAdmin),
     getCast(supabaseAdmin, bookId, issueId),
     loadBookCast(supabaseAdmin, bookId),
   ]);
@@ -211,7 +201,6 @@ export async function loadEditor(
   const panelRows = rows<PanelRow>("panels", panelResult);
   const pageRows = rows<PageRow>("pages", pageResult);
   const charRows = rows<CharacterRow>("characters", charResult);
-  const voiceRows = rows<VoiceRow>("voices", voiceResult);
 
   const dims = new Map(pageRows.map((p) => [p.number, p]));
 
@@ -315,25 +304,20 @@ export async function loadEditor(
   }
 
   // A character's voice, always an active `voices` row picked by id
-  // (decisions row 153). In order: the cast's voice (`voiceFor` in
-  // `~/lib/cast`), then `voices.character_id`; a voice of the same name only
-  // when neither says.
+  // (decisions row 153), never by its name (#458). In order: the cast's
+  // voice (`voiceFor` in `~/lib/cast`), then `voices.character_id`.
   const active = voiceRows.filter((v) => v.status === "active");
   const activeById = new Map(active.map((v) => [v.id, v]));
   const activeByElevenLabs = new Map<string, VoiceRow>();
   const voiceByCharacter = new Map<string, VoiceRow>();
-  const voiceByName = new Map<string, VoiceRow>();
   for (const v of active) {
     const el = v.current_elevenlabs_id;
     if (el && !activeByElevenLabs.has(el)) activeByElevenLabs.set(el, v);
     if (v.character_id && !voiceByCharacter.has(v.character_id))
       voiceByCharacter.set(v.character_id, v);
-    const key = slug(v.display_name);
-    if (key && !voiceByName.has(key)) voiceByName.set(key, v);
   }
   const voiceOption = (
     id: string,
-    name: string,
     castVoice: CastVoice | null,
   ): VoiceOption | null => {
     const voice =
@@ -343,9 +327,7 @@ export async function loadEditor(
       (castVoice?.elevenLabsId
         ? activeByElevenLabs.get(castVoice.elevenLabsId)
         : undefined) ??
-      voiceByCharacter.get(id) ??
-      voiceByName.get(id) ??
-      voiceByName.get(slug(name));
+      voiceByCharacter.get(id);
     return voice ? { id: voice.id, name: voice.display_name } : null;
   };
 
@@ -403,7 +385,7 @@ export async function loadEditor(
       aliases: own?.aliases ?? [],
       kind: isRoleId(id) ? "role" : "character",
       tint: 0,
-      voice: voiceOption(id, name, voice),
+      voice: voiceOption(id, voice),
       portrait: null,
     };
     if (isRoleId(id)) {
@@ -435,7 +417,7 @@ export async function loadEditor(
       id: row.id,
       name,
       aliases: row.aliases ?? [],
-      voice: voiceOption(row.id, name, voiceFor(book, row.id, issueId)),
+      voice: voiceOption(row.id, voiceFor(book, row.id, issueId)),
     };
   });
 

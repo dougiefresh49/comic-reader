@@ -1,15 +1,21 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Narrow row types, read from `select("*")`. `src/types/database.ts` predates
- * the #91 registry columns (consumers, description, labels, source_clip_md5,
- * lab_default); the
- * lead regenerates it after those apply. Until then these carry the shape.
+ * Narrow row types, read from `select("*")`. `status` is `needs_clip` for a
+ * voice asked for with no clip yet (a voice-lab clone, or a description
+ * stored before its design, #458), `archived` for a sample stored in the
+ * clips bucket and not in a slot, `active` for one in a slot.
  */
 export interface VoiceRow {
   id: string;
   display_name: string;
-  status: "active" | "archived" | "library";
+  status: "active" | "archived" | "needs_clip" | "library";
+  /** The character the voice is for; null for a room-only voice. */
+  character_id: string | null;
+  /** The work it was cloned from; null for a designed voice. */
+  appearance_id: string | null;
+  /** The owner's default pick for the character on the voice-lab cast sheet. */
+  starting_pick: boolean;
   current_elevenlabs_id: string | null;
   /** Object path inside the `comic-voice-clips` bucket. */
   source_clip_path: string | null;

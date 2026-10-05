@@ -14,6 +14,11 @@ import {
   type IngestFixture,
 } from "~/lib/fakes/dry-run";
 import { rdpSimplify } from "~/workflows/steps/shared";
+import {
+  isStoredDesign,
+  readCharacterVoices,
+  type CharacterVoice,
+} from "~/lib/voice-slots/lookup";
 import { supabase } from "./lib/supabase";
 
 const BOOK_ID = "tmnt-mmpr-iii";
@@ -206,22 +211,24 @@ async function main() {
       ),
     ),
   ].sort();
-  const appearances = must(
-    await supabase
-      .from("character_appearances")
-      .select("id, character_id, voice_description")
-      .in("character_id", speakers)
-      .not("voice_description", "is", null)
-      .order("id"),
-  ) as Array<{ id: string; character_id: string; voice_description: string }>;
+  // The description to record per speaker: its stored design row first,
+  // then a designed voice (no appearance), then any voice with one; the
+  // newest wins within a rank.
+  const rank = (v: CharacterVoice) =>
+    isStoredDesign(v) ? 0 : v.appearance_id === null ? 1 : 2;
+  const voices = (await readCharacterVoices(supabase, speakers))
+    .filter((v) => v.description?.trim())
+    .sort(
+      (a, b) =>
+        rank(a) - rank(b) ||
+        b.created_at.localeCompare(a.created_at) ||
+        a.id.localeCompare(b.id),
+    );
 
   const voiceDescriptions: Record<string, string> = {};
-  for (const a of appearances) {
-    const key = fixtureId(a.character_id);
-    const preferred = a.id === `${a.character_id}-voice-design`;
-    if (preferred || !voiceDescriptions[key]) {
-      voiceDescriptions[key] = a.voice_description;
-    }
+  for (const v of voices) {
+    const key = fixtureId(v.character_id);
+    voiceDescriptions[key] ??= v.description!;
   }
 
   const fixture: IngestFixture = {

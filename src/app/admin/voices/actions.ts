@@ -7,13 +7,14 @@ import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   archiveVoice,
-  noActiveVoiceClaimFilter,
   withVoiceOperationClaim,
   restoreVoice,
   snapshotSample,
   slotStatus,
   headroomRefusals,
   readVoice,
+  readVoices,
+  setKeepActive,
   ElevenLabsTimeoutError,
   type SlotStatus,
   type VoiceRow as SlotVoiceRow,
@@ -26,14 +27,16 @@ async function requireAdmin() {
 
 export async function toggleKeepActive(voiceId: string, keepActive: boolean) {
   await requireAdmin();
-  const { data, error } = await supabaseAdmin
-    .from("voices")
-    .update({ keep_active: keepActive })
-    .eq("id", voiceId)
-    .or(noActiveVoiceClaimFilter())
-    .select("id");
-  if (error) return { ok: false, error: error.message };
-  if (!data?.length)
+  let set: boolean;
+  try {
+    set = await setKeepActive(supabaseAdmin, voiceId, keepActive);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+  if (!set)
     return { ok: false, error: "Refused: another operation holds this voice" };
   revalidatePath("/admin/voices", "page");
   return { ok: true };
@@ -42,8 +45,7 @@ export async function toggleKeepActive(voiceId: string, keepActive: boolean) {
 export interface VoiceRow {
   id: string;
   display_name: string;
-  series_id: string | null;
-  status: string;
+  status: SlotVoiceRow["status"];
   current_elevenlabs_id: string | null;
   keep_active: boolean;
   source_clip_path: string | null;
@@ -54,14 +56,17 @@ export interface VoiceRow {
 
 export async function getVoices(): Promise<VoiceRow[]> {
   await requireAdmin();
-  const { data, error } = await supabaseAdmin
-    .from("voices")
-    .select(
-      "id, display_name, series_id, status, current_elevenlabs_id, keep_active, source_clip_path, design_prompt, created_at, archived_at",
-    )
-    .order("display_name");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as VoiceRow[];
+  return (await readVoices(supabaseAdmin)).map((v) => ({
+    id: v.id,
+    display_name: v.display_name,
+    status: v.status,
+    current_elevenlabs_id: v.current_elevenlabs_id,
+    keep_active: v.keep_active,
+    source_clip_path: v.source_clip_path,
+    design_prompt: v.design_prompt,
+    created_at: v.created_at,
+    archived_at: v.archived_at,
+  }));
 }
 
 export type VoiceOperation = "archive" | "restore" | "snapshot";
@@ -167,14 +172,9 @@ export async function executeVoiceOperation(
   let uncertain = false;
   try {
     await requireAdmin();
-    // Read without voice-slots so Confirm claims before any module call.
-    const voiceResult = await supabaseAdmin
-      .from("voices")
-      .select("*")
-      .eq("id", voiceId)
-      .single();
-    if (voiceResult.error) throw new Error(voiceResult.error.message);
-    const previewVoice = voiceResult.data as SlotVoiceRow;
+    // A plain row read, so Confirm claims before any ElevenLabs call.
+    const previewVoice = await readVoice(supabaseAdmin, voiceId);
+    if (!previewVoice) throw new Error("Voice not found");
     if (token !== planToken(previewVoice, operation))
       return {
         ok: false,

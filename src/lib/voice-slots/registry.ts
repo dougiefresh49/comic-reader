@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBookCast, readCastVoiceLinks, voiceFor } from "~/lib/cast";
 import { listAllIssues } from "~/lib/issue-queries";
+import { noActiveVoiceClaimFilter } from "./claim";
 import type { CastlistRow, IssueTarget, VoiceRow } from "./types";
 
 const PAGE = 1000;
@@ -16,6 +17,9 @@ function toVoiceRow(raw: Record<string, unknown>): VoiceRow {
     id: String(raw.id),
     display_name: String(raw.display_name),
     status: raw.status as VoiceRow["status"],
+    character_id: (raw.character_id as string | null) ?? null,
+    appearance_id: (raw.appearance_id as string | null) ?? null,
+    starting_pick: raw.starting_pick === true,
     current_elevenlabs_id: (raw.current_elevenlabs_id as string | null) ?? null,
     source_clip_path: (raw.source_clip_path as string | null) ?? null,
     source_clip_md5: (raw.source_clip_md5 as string | null) ?? null,
@@ -34,15 +38,23 @@ function toVoiceRow(raw: Record<string, unknown>): VoiceRow {
   };
 }
 
+/** Every `voices` row by display name, paged past the 1000-row cap. */
 export async function readVoices(
   supabase: SupabaseClient,
 ): Promise<VoiceRow[]> {
-  const { data, error } = await supabase
-    .from("voices")
-    .select("*")
-    .order("display_name");
-  if (error) fail("read voices", error);
-  return ((data ?? []) as Record<string, unknown>[]).map(toVoiceRow);
+  const rows: VoiceRow[] = [];
+  for (;;) {
+    const { data, error } = await supabase
+      .from("voices")
+      .select("*")
+      .order("display_name")
+      .order("id")
+      .range(rows.length, rows.length + PAGE - 1);
+    if (error) fail("read voices", error);
+    const page = (data ?? []) as Record<string, unknown>[];
+    rows.push(...page.map(toVoiceRow));
+    if (page.length < PAGE) return rows;
+  }
 }
 
 /** By row id only, never by display_name (decisions row 153). */
@@ -281,4 +293,87 @@ export async function registerVoice(
     .single();
   if (error) fail("insert voices", error);
   return String((data as { id: string }).id);
+}
+
+/**
+ * Records a designed voice (#458): the character's stored design row
+ * (`needs_clip`, no appearance) becomes the active voice, so a description
+ * written before the design and the voice it made are one row. A character
+ * with no such row gets a new active row (`registerVoice`).
+ */
+export async function activateDesignedVoice(
+  supabase: SupabaseClient,
+  input: RegisterVoiceInput & { character_id: string },
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("voices")
+    .update({ ...input, status: "active", archived_at: null })
+    .eq("character_id", input.character_id)
+    .eq("status", "needs_clip")
+    .is("appearance_id", null)
+    .select("id");
+  if (error) fail("update voices", error);
+  const rows = (data ?? []) as { id: string }[];
+  if (rows.length > 1)
+    throw new Error(
+      `update voices: ${input.character_id} had ${rows.length} stored design rows`,
+    );
+  return rows[0]?.id ?? registerVoice(supabase, input);
+}
+
+/**
+ * The voice for one appearance (#458): the `voices` row that holds it, or a
+ * new `needs_clip` row for the character and the appearance when none does.
+ * `voices.appearance_id` is unique, so a second pick, or a race, finds the
+ * first row and creates nothing.
+ */
+export async function voiceForAppearance(
+  supabase: SupabaseClient,
+  input: { characterId: string; appearanceId: string; displayName: string },
+): Promise<{ voice: VoiceRow; created: boolean }> {
+  const find = async () => {
+    const { data, error } = await supabase
+      .from("voices")
+      .select("*")
+      .eq("appearance_id", input.appearanceId)
+      .limit(1);
+    if (error) fail("read voices", error);
+    const row = ((data ?? []) as Record<string, unknown>[])[0];
+    return row ? toVoiceRow(row) : null;
+  };
+  const held = await find();
+  if (held) return { voice: held, created: false };
+  const { data, error } = await supabase
+    .from("voices")
+    .upsert(
+      {
+        display_name: input.displayName,
+        status: "needs_clip",
+        character_id: input.characterId,
+        appearance_id: input.appearanceId,
+      },
+      { onConflict: "appearance_id", ignoreDuplicates: true },
+    )
+    .select("id");
+  if (error) fail("insert voices", error);
+  const voice = await find();
+  if (!voice)
+    throw new Error(`insert voices: no row for ${input.appearanceId}`);
+  return { voice, created: (data ?? []).length > 0 };
+}
+
+/** Sets `keep_active`, unless another operation holds the row; false when it does. */
+export async function setKeepActive(
+  supabase: SupabaseClient,
+  voiceId: string,
+  keepActive: boolean,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("voices")
+    .update({ keep_active: keepActive })
+    .eq("id", voiceId)
+    .or(noActiveVoiceClaimFilter())
+    .select("id");
+  if (error) fail("update voices", error);
+  return (data ?? []).length > 0;
 }
