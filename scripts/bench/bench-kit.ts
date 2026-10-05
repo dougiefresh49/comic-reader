@@ -311,6 +311,26 @@ const score = (rows: ScoredRow[]) => {
  * with a sign test on those.
  */
 export function compareRuns(files: RunFile[]): string[] {
+  // Runs of different page sets or configs share no items to compare; mixed
+  // in, they would hide a real difference behind "absent".
+  const scope = (f: RunFile) =>
+    `${f.book}/${f.issue} pages ${f.pages.join(",")}`;
+  const config = (f: RunFile) =>
+    `${f.model}, thinking ${f.thinkingLevel ?? "default"}`;
+  for (const f of files) {
+    const first = files[0]!;
+    if (scope(f) !== scope(first)) {
+      throw new Error(
+        `run files cover different items: ${scope(first)} (${first.path ?? first.startedAt}) and ${scope(f)} (${f.path ?? f.startedAt}). Narrow with --since or --files.`,
+      );
+    }
+    const sameArm = files.find((g) => g.arm === f.arm)!;
+    if (config(f) !== config(sameArm)) {
+      throw new Error(
+        `arm ${f.arm} has runs on different configs: ${config(sameArm)} and ${config(f)}. Narrow with --since or --files.`,
+      );
+    }
+  }
   const byArm = new Map<string, RunFile[]>();
   for (const f of [...files].sort(
     (a, b) =>

@@ -270,7 +270,14 @@ type Attempt = {
   error: string | null;
 };
 
-type Verdict = "right" | "wrong" | "unnamed" | "dropped" | "error";
+type Verdict =
+  | "right"
+  | "wrong"
+  | "unnamed"
+  | "dropped"
+  | "error"
+  /** Named, but the detection has no reviewed identity to score against. */
+  | "unscored";
 
 type FaceRow = ScoredRow & {
   arm: string;
@@ -313,6 +320,9 @@ function benchClient(real: GoogleGenAI, log: Attempt[]): GoogleGenAI {
     const thinkingLevel =
       (params.config?.thinkingConfig?.thinkingLevel as string | undefined) ??
       null;
+    // A halt (--max-usd, a refused request) also stops requests already
+    // queued behind it, the 429 retry on the fallback key included.
+    if (halted) throw new Error(halted);
     if (!budget.take()) {
       halted ??= `--max-calls ${budget.max} reached`;
       throw new Error(`--max-calls ${budget.max} reached`);
@@ -422,9 +432,11 @@ async function identifyOne(
     !face || error
       ? "error"
       : face.outcome === "named"
-        ? face.characterId === d.truth
-          ? "right"
-          : "wrong"
+        ? d.truth === null
+          ? "unscored"
+          : face.characterId === d.truth
+            ? "right"
+            : "wrong"
         : face.outcome === "unnamed"
           ? "unnamed"
           : "dropped";
