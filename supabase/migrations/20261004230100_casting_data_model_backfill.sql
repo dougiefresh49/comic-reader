@@ -147,9 +147,9 @@ on conflict (id) do nothing;
 
 -- No other character is created here. A castlist name that still resolves
 -- to nothing keeps a null character_id and fails the lead's gate, and a
--- person adds the row. This narrows the spec rule (decision rows 286 and
--- 288): a row made from a name's slug outranks every alias and display name
--- in every book. Today the only two such names are in the list above.
+-- person adds the row. Narrower than the spec (decision row 288), because a
+-- row made from a name's slug would outrank every alias and display name in
+-- every book. Today the only two unresolved names are in the list above.
 
 -- Only where character_id is null, so a link seedCast already wrote is kept.
 -- Nothing here stops two rows of one issue resolving to the same character:
