@@ -1839,11 +1839,8 @@ export async function getContextPage(
     );
 
     try {
-      const {
-        createPartFromBase64: cpb64,
-        createPartFromText: cpt,
-        ThinkingLevel,
-      } = await import("@google/genai");
+      const { createPartFromBase64: cpb64, createPartFromText: cpt } =
+        await import("@google/genai");
       const pageImagePart = cpb64(imgBuf.toString("base64"), "image/webp");
       const contextTextPart = cpt(contextPrompt);
 
@@ -1868,24 +1865,16 @@ export async function getContextPage(
       const { match, emotion } = resolveContext(parsed, cast);
 
       // The cue line: the bubble's text with the speaker and emotion the
-      // update stores, sent as the editor's Regenerate cues sends it. A
+      // update stores, sent through `cueRequest` as Regenerate cues sends it. A
       // failed or empty reply throws to the catch below, so the bubble gets
       // no update and a rerun picks it up; the OCR text is never the
       // fallback cue line.
-      const { buildCuePrompt } = await import("~/lib/cue-rules");
+      const { cueRequest } = await import("~/lib/cue-rules");
       let cueLine: string;
       try {
         const cueResponse = await generateContentLogged(
           gemini,
-          {
-            model: GEMINI_FAST,
-            contents: buildCuePrompt({
-              text: ocrText,
-              emotion,
-              speaker: match?.id ?? null,
-            }),
-            config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
-          },
+          cueRequest({ text: ocrText, emotion, speaker: match?.id ?? null }),
           cueMeta,
         );
         cueLine = cueResponse.text?.trim() ?? "";

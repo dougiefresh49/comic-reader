@@ -1,12 +1,11 @@
 "use server";
 
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
-import { buildCuePrompt } from "~/lib/cue-rules";
+import { cueRequest } from "~/lib/cue-rules";
 import { generateContentLogged } from "~/lib/llm-usage";
-import { GEMINI_FAST } from "~/lib/models";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -41,20 +40,12 @@ export async function regenerateCues(args: Args) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const result = await generateContentLogged(
       ai,
-      {
-        model: GEMINI_FAST,
-        contents: buildCuePrompt({
-          text: args.text,
-          emotion: args.emotion,
-          speaker: args.speaker,
-          userFeedback: args.userFeedback,
-        }),
-        // No temperature: Google advises leaving Gemini 3 at its default,
-        // since a low one risks looping (#104 drops it repo-wide). Low
-        // thinking, because sentence case, the capitals to keep and a tag
-        // that fits the emotion are judgment, not formatting.
-        config: { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } },
-      },
+      cueRequest({
+        text: args.text,
+        emotion: args.emotion,
+        speaker: args.speaker,
+        userFeedback: args.userFeedback,
+      }),
       {
         step: "review:regenerate-cues",
         bookId: args.bookId,

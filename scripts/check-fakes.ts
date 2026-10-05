@@ -36,6 +36,7 @@ const { identifyFace } = await import("~/lib/character-identification");
 const { resetFakeCursors } = await import("~/lib/fakes/gemini");
 const { loadIngestFixture } = await import("~/lib/fakes/dry-run");
 const { buildContextPrompt } = await import("~/lib/gemini-prompts");
+const { buildCuePrompt } = await import("~/lib/cue-rules");
 const { parseRoboflowSam3Output } = await import(
   "~/workflows/steps/vision-rows"
 );
@@ -107,6 +108,28 @@ await assert.rejects(
   /no context fixture for "NOT A FIXTURE"/,
 );
 console.log("gemini context unmatched text: threw");
+
+const cueBubble = loadIngestFixture()
+  .pages.flatMap((p) => p.bubbles)
+  .find((b) => b.textWithCues)!;
+const cue = await ask(
+  GEMINI_FAST,
+  buildCuePrompt({
+    text: cueBubble.ocrText,
+    emotion: cueBubble.emotion,
+    speaker: cueBubble.speaker,
+  }),
+);
+assert.equal(cue, cueBubble.textWithCues);
+console.log(`gemini cues: ${JSON.stringify(cue)}`);
+await assert.rejects(
+  ask(
+    GEMINI_FAST,
+    buildCuePrompt({ text: "NOT A FIXTURE", emotion: null, speaker: null }),
+  ),
+  /no cue fixture for "NOT A FIXTURE"/,
+);
+console.log("gemini cues unmatched text: threw");
 
 const face = await identifyFace(gemini, "AAAA", "image/jpeg", ["Raphael"]);
 console.log(

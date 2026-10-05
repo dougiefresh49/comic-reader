@@ -72,7 +72,7 @@ import {
 } from "@google/genai";
 import sharp from "sharp";
 import { loadBookCast, proposeCast } from "~/lib/cast";
-import { CUE_RULES, buildCuePrompt } from "~/lib/cue-rules";
+import { CUE_RULES, buildCuePrompt, cueRequest } from "~/lib/cue-rules";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
@@ -1099,15 +1099,17 @@ async function runPage(
           costUsd: null,
         };
         row.cue = cue;
+        // The step's prompt and thinking level; the model stays `--model`.
+        const cueParams = cueRequest({
+          text: b.text,
+          emotion: emotionSent,
+          speaker: speakerSent,
+        });
         const r2 = await callModel(
           [],
-          buildCuePrompt({
-            text: b.text,
-            emotion: emotionSent,
-            speaker: speakerSent,
-          }),
+          cueParams.contents,
           log,
-          ThinkingLevel.LOW,
+          cueParams.config.thinkingConfig.thinkingLevel,
         );
         if (r2.kind === "ok") {
           // Parsed as regenerateCues does: the trimmed text, empty is a failure.
