@@ -982,8 +982,30 @@ async function carryOutClaimed(
       );
   }
 
+  /**
+   * A design refuses once the character has an active designed voice
+   * (appearance null) other than the one it replaces: another issue's run
+   * made it from the same stored row after this run planned (#458).
+   */
+  const alreadyDesigned = async (): Promise<CarryOutResult | null> => {
+    if (fresh.action !== "design") return null;
+    const made = (await readCharacterVoices(sb, [characterId])).find(
+      (v) =>
+        v.status === "active" &&
+        v.appearance_id === null &&
+        v.id !== fresh.replaces?.id,
+    );
+    return made
+      ? refuse(
+          `${made.display_name} is already an active designed voice for ${characterId}, made since this plan; nothing was spent, pick it as an active voice`,
+        )
+      : null;
+  };
+
   let description: string | null = null;
   if (fresh.action === "design") {
+    const made = await alreadyDesigned();
+    if (made) return made;
     const read = async () =>
       (await readDescriptions(sb, [characterId])).get(characterId) ?? null;
     description = await read();
@@ -1021,6 +1043,9 @@ async function carryOutClaimed(
     : undefined;
 
   const run = async (): Promise<CarryOutResult> => {
+    // Under the claims and before any spend: the voice may exist by now.
+    const made = await alreadyDesigned();
+    if (made) return made;
     const warnings: string[] = [];
     let didArchive = false;
     let deleteConfirmed = false;

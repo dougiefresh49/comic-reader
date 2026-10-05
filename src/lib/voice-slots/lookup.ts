@@ -99,6 +99,8 @@ export async function readVoicesByElevenLabsIds(
 /** One character's voice state, for the description step and the planners. */
 export interface CharacterVoice {
   id: string;
+  /** A label only, never matched on. */
+  display_name: string;
   character_id: string;
   status: string;
   appearance_id: string | null;
@@ -118,7 +120,7 @@ export async function readCharacterVoices(
     const { data, error } = await db(client)
       .from("voices")
       .select(
-        "id, character_id, status, appearance_id, current_elevenlabs_id, description, created_at",
+        "id, display_name, character_id, status, appearance_id, current_elevenlabs_id, description, created_at",
       )
       .in("character_id", ids.slice(i, i + 200));
     if (error) fail("reading the characters' voices", error);
@@ -180,9 +182,11 @@ export function designDescriptions(
  * The description step's write (#458): the character's stored design row
  * (`firstStoredDesign`) takes the text in `description` and `design_prompt`
  * by its id, or a `needs_clip` row with no appearance is inserted when the
- * character has none. When a racing save inserted one too, the first row
- * keeps the text and this call deletes its own row if that is not the
- * first (no unique index holds one row per character). Returns the id kept.
+ * character has none. Two saves that race can both insert: nothing deletes
+ * the second, since a run may already hold its claim (only a partial unique
+ * index could prevent it, a schema change). Both rows are harmless, as
+ * every reader and `activateDesignedVoice` take `firstStoredDesign` by id.
+ * Returns the row written.
  */
 export async function saveDesignDescription(
   client: Client,
@@ -224,15 +228,5 @@ export async function saveDesignDescription(
     .select("id")
     .single();
   if (ins.error) fail(what, ins.error);
-  const mine = ins.data.id;
-  const kept = await first();
-  if (!kept || kept.id === mine) return mine;
-  await writeTo(kept.id);
-  const del = await db(client)
-    .from("voices")
-    .delete()
-    .eq("id", mine)
-    .eq("status", "needs_clip");
-  if (del.error) fail(`${what}: removing the duplicate ${mine}`, del.error);
-  return kept.id;
+  return ins.data.id;
 }

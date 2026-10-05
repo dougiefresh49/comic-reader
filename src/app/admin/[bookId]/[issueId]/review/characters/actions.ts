@@ -13,6 +13,7 @@ import {
   addToCast,
   cancelVoiceRequest,
   castRow,
+  clearSettledTasks,
   createCharacter,
   loadBookCast,
   readVoiceRequests,
@@ -22,6 +23,7 @@ import {
   setIssueVoice,
   setVoice,
   storeVoiceRequest,
+  swapIssueVoice,
   type VoiceRequest,
 } from "~/lib/cast";
 import { readVoice, voiceForAppearance } from "~/lib/voice-slots";
@@ -817,6 +819,15 @@ export async function castArchivedVoice(args: {
         scope.issueId,
         characterId,
       );
+    // A settled task (an old request carried out, or a speaker settled
+    // earlier) would read the restore as settled too: the planner would
+    // skip it. Only complete or skipped rows with no carryOut record go.
+    await clearSettledTasks(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+    );
     await setIssueVoice(
       supabaseAdmin,
       scope.bookId,
@@ -837,9 +848,11 @@ export async function castArchivedVoice(args: {
 /**
  * Undoes a voice request, so the options are back and one can be made again.
  * After an appearance pick, `restoreVoiceUuid` is the voice this issue's
- * row had before it (null for none), from `pickAppearance`'s answer: it goes
- * back on the row while the row still holds the request's `needs_clip`
- * voice. Undefined (the page was reloaded since the pick) leaves the row.
+ * row had before it (null for none), from `pickAppearance`'s answer.
+ * Undefined (the page was reloaded since the pick) means null: the issue
+ * inherits the book's voice for the character. Either goes on the row as a
+ * compare-and-set, only while the row still holds the request's
+ * `needs_clip` voice, so a newer cast voice is never overwritten.
  */
 export async function undoVoiceRequest(args: {
   scope: Scope;
@@ -862,25 +875,22 @@ export async function undoVoiceRequest(args: {
       scope.issueId,
       characterId,
     );
-    const row = castRow(
-      await loadBookCast(supabaseAdmin, scope.bookId),
-      characterId,
-      scope.issueId,
-    );
     let note = "";
-    if (target?.status === "needs_clip" && row?.voice_uuid === target.id) {
-      if (args.restoreVoiceUuid === undefined)
-        note = ` This issue's voice stays ${target.display_name}, waiting for a clip; pick another voice to change it.`;
-      else {
-        await setIssueVoice(
-          supabaseAdmin,
-          scope.bookId,
-          scope.issueId,
-          characterId,
-          args.restoreVoiceUuid,
-        );
-        note = " Its voice for this issue is back to what it was.";
-      }
+    if (target?.status === "needs_clip") {
+      const to = args.restoreVoiceUuid ?? null;
+      const swapped = await swapIssueVoice(
+        supabaseAdmin,
+        scope.bookId,
+        scope.issueId,
+        characterId,
+        target.id,
+        to,
+      );
+      note = !swapped
+        ? " Its voice for this issue was left as it is: it is no longer the requested clip."
+        : args.restoreVoiceUuid === undefined
+          ? " This issue now inherits the book's voice for the character."
+          : " Its voice for this issue is back to what it was.";
     }
     revalidate(scope);
     return {

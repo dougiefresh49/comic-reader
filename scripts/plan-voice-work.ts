@@ -1699,9 +1699,11 @@ async function checkCarryOut() {
   }
 
   {
-    // Review round 1, finding 2: two description saves race for a character
-    // with no stored row. The fake runs each query whole, so the two calls
-    // interleave at every await: both read none and both insert.
+    // Review rounds 1 and 2, finding 2: two description saves race for a
+    // character with no stored row. The fake runs each query whole, so the
+    // two calls interleave at every await: both read none and both insert.
+    // Nothing deletes the second row (a run may hold its claim); every
+    // reader and the activation take the first by id.
     const w = world({ characters: ["kit"], voices: [] });
     const save = (text: string) =>
       attempt(() =>
@@ -1712,24 +1714,91 @@ async function checkCarryOut() {
         }),
       );
     const [x, y] = await Promise.all([save("Kit A."), save("Kit B.")]);
-    const inserts = w.db.log.filter((l) =>
-      l.startsWith('insert voices {"description"'),
-    ).length;
-    const stored = w.db.rows("voices").filter((v) => v.character_id === "kit");
-    const described = slots.designDescriptions(
-      await slots.readCharacterVoices(w.db.client(), ["kit"]),
+    const kitRows = () =>
+      w.db.rows("voices").filter((v) => v.character_id === "kit");
+    const stored = kitRows();
+    const read = await slots.readCharacterVoices(w.db.client(), ["kit"]);
+    const first = slots.firstStoredDesign(read, "kit");
+    const described = slots.designDescriptions(read).get("kit");
+    const activated = await attempt(() =>
+      slots.activateDesignedVoice(w.db.client(), {
+        display_name: "Kit",
+        current_elevenlabs_id: "el-kit",
+        description: described ?? null,
+        labels: null,
+        source_clip_path: null,
+        source_clip_md5: null,
+        character_id: "kit",
+        design_prompt: described ?? null,
+      }),
     );
+    const after = kitRows().map((v) => `${String(v.id)} ${String(v.status)}`);
     report(
-      "review 1, finding 2: two racing description saves leave one stored row",
+      "review 2, finding 2: racing description saves leave two stored rows; readers and the activation take the first",
       [
-        `saves returned ${short(x)} and ${short(y)}; inserts: ${inserts}`,
-        `kit stored rows: ${stored.length} (${stored.map((v) => String(v.id)).join(", ")}); description read: ${String(described.get("kit"))}`,
+        `saves returned ${short(x)} and ${short(y)}; kit stored rows: ${stored.length}`,
+        `first stored row: ${String(first?.id)}; description read: ${String(described)}`,
+        `activation: ${short(activated)}; rows after: ${after.join(", ")}`,
       ],
-      inserts === 2 &&
-        stored.length === 1 &&
-        x === stored[0]!.id &&
-        y === stored[0]!.id &&
-        stored[0]!.description === described.get("kit"),
+      stored.length === 2 &&
+        first !== undefined &&
+        described === first.description &&
+        activated === first.id &&
+        kitRows().filter((v) => v.status === "active").length === 1 &&
+        kitRows().find((v) => v.status === "active")?.id === first.id &&
+        kitRows().filter((v) => v.status === "needs_clip").length === 1,
+    );
+  }
+
+  {
+    // Review round 2, finding 1: run B plans, then run A designs and
+    // activates the stored row before B reads it. B then finds no stored row
+    // and takes no shared claim; it must still spend nothing. B is in a
+    // second book, so A's castlist write does not give it a voice.
+    const w = world({ characters: ["kit"], voices: [], limit: 3 });
+    storedDesign(w.db, "kit", "Kit sounds bright.");
+    const BOOK2 = "check-book-2";
+    w.db.rows("issues").push({
+      book_id: BOOK2,
+      id: "issue-1",
+      number: 1,
+      created_at: "2026-10-02T00:00:00Z",
+    });
+    w.db.rows("bubbles").push({
+      id: "b-kit-book2",
+      book_id: BOOK2,
+      issue_id: "issue-1",
+      character_id: "kit",
+      speaker: "Kit",
+      voice_description: "Kit sounds like a test.",
+      ignored: false,
+      silent: false,
+    });
+    const b = (await lib.planVoiceWork(w.deps, BOOK2, "issue-1")).items.find(
+      (i) => i.characterId === "kit",
+    )!;
+    const a = await itemOf(w.deps, "kit");
+    const aDone = await attempt(() =>
+      lib.carryOut(w.deps, a, { archiveVoiceId: null }),
+    );
+    const bDone = await attempt(() =>
+      lib.carryOut(w.deps, b, { archiveVoiceId: null }),
+    );
+    const active = w.db
+      .rows("voices")
+      .filter((v) => v.character_id === "kit" && v.status === "active");
+    report(
+      "review 2, finding 1: a run that planned before another made the designed voice spends nothing",
+      [
+        `B planned: ${b.action}, hasDescription ${String(b.hasDescription)}; then A: ${short(aDone)}`,
+        `B: ${short(bDone)}`,
+        `kit active rows: ${active.length}; ElevenLabs adds: ${w.acct.adds} (want 1)`,
+      ],
+      (aDone as { status?: string }).status === "done" &&
+        (bDone as { status?: string }).status === "refused" &&
+        short(bDone).includes("already an active designed voice") &&
+        w.acct.adds === 1 &&
+        active.length === 1,
     );
   }
 

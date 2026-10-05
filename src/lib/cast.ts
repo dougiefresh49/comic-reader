@@ -633,6 +633,56 @@ export async function setIssueVoice(
   await updateRow(client, bookId, issueId, characterId, patch);
 }
 
+/**
+ * Compare-and-set on the issue's row for the character: points it at `to`
+ * (null: none of its own, so the chain inherits the book's latest voice)
+ * only while it still holds `from`. Inserts nothing. True when it changed.
+ */
+export async function swapIssueVoice(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+  from: string,
+  to: string | null,
+): Promise<boolean> {
+  const { data, error } = await db(client)
+    .from("castlist")
+    .update({ voice_uuid: to })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId)
+    .eq("voice_uuid", from)
+    .select("issue_id");
+  must(`swapping the voice of castlist ${issueId}/${characterId}`, error);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Deletes the character's settled `casting_tasks` rows for the issue
+ * (`complete` or `skipped`, no `carryOut` record), so the voice-work planner
+ * reads the character afresh. Pending and in-progress rows and any row with
+ * a record are live work and stay. Returns the rows deleted.
+ */
+export async function clearSettledTasks(
+  client: Client,
+  bookId: string,
+  issueId: string,
+  characterId: string,
+): Promise<number> {
+  const { data, error } = await client
+    .from("casting_tasks")
+    .delete()
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("character_id", characterId)
+    .in("status", ["complete", "skipped"])
+    .is("operation", null)
+    .select("character_id");
+  must(`clearing ${characterId}'s settled casting tasks`, error);
+  return (data ?? []).length;
+}
+
 /** The issue's castlist row for one character, read on its own; null when there is none. */
 export async function readCastRow(
   client: Client,
