@@ -63,7 +63,6 @@ export function useAudioPlayback({
       const ts = timestamps[bubble.id];
       const alignment = ts?.normalized_alignment ?? ts?.alignment ?? null;
       const { words } = buildWordTimings(alignment);
-      if (words.length) startHighlight(audio, words);
 
       audio.addEventListener("ended", () => {
         stopHighlight();
@@ -71,7 +70,15 @@ export function useAudioPlayback({
         onBubbleEndedRef.current?.(bubble);
       });
       audio.addEventListener("pause", () => setIsPlaying(false));
-      audio.addEventListener("play", () => setIsPlaying(true));
+      // Every start (first play, replay after `ended`, resume) restarts the
+      // highlight loop. `play` events are queued, so one from a clip that
+      // stopAll already replaced must not take the loop from the current clip.
+      audio.addEventListener("play", () => {
+        setIsPlaying(true);
+        if (words.length && audioRef.current === audio) {
+          startHighlight(audio, words);
+        }
+      });
 
       audio.play().catch((err) => {
         console.error("Audio playback failed", err);
