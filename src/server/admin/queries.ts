@@ -53,8 +53,7 @@ export async function getAdminIssues(): Promise<AdminIssueRow[]> {
     .order("number");
 
   if (error) {
-    console.error("getAdminIssues:", error);
-    return [];
+    throw new Error(`getAdminIssues: ${error.message}`, { cause: error });
   }
 
   return ((data ?? []) as unknown as IssueQueryRow[]).map((row) => ({
@@ -103,8 +102,9 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
     .order("name");
 
   if (error) {
-    console.error("getAdminBooksWithParts:", error);
-    return [];
+    throw new Error(`getAdminBooksWithParts: ${error.message}`, {
+      cause: error,
+    });
   }
 
   return (
@@ -141,38 +141,5 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
         number: p.number,
         totalIssues: p.total_issues,
       })),
-  }));
-}
-
-export interface AdminBookRow {
-  id: string;
-  name: string;
-  slug: string | null;
-  issueCount: number;
-}
-
-export async function getAdminBooks(): Promise<AdminBookRow[]> {
-  const { data, error } = await supabase
-    .from("books")
-    .select("id, name, slug, issues(id)")
-    .order("name");
-
-  if (error) {
-    console.error("getAdminBooks:", error);
-    return [];
-  }
-
-  return (
-    (data ?? []) as unknown as Array<{
-      id: string;
-      name: string;
-      slug: string | null;
-      issues: Array<{ id: string }> | null;
-    }>
-  ).map((b) => ({
-    id: b.id,
-    name: b.name,
-    slug: b.slug,
-    issueCount: (b.issues ?? []).length,
   }));
 }

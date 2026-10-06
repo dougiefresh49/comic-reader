@@ -74,14 +74,13 @@ export async function getPanelsForPage(
     .eq("page_number", pageNumber)
     .order("sort_order");
   if (error) {
-    console.error("getPanelsForPage:", error);
-    return [];
+    throw new Error(`getPanelsForPage: ${error.message}`, { cause: error });
   }
   return ((data ?? []) as unknown as PanelRow[]).map(rowToPanel);
 }
 
 /**
- * Read all panels for an issue at once (for the panel-editing review UI).
+ * Read all panels for an issue at once, for the episode-render page.
  */
 export async function getPanelsForIssue(
   bookId: string,
@@ -95,8 +94,7 @@ export async function getPanelsForIssue(
     .order("page_number")
     .order("sort_order");
   if (error) {
-    console.error("getPanelsForIssue:", error);
-    return [];
+    throw new Error(`getPanelsForIssue: ${error.message}`, { cause: error });
   }
   return ((data ?? []) as unknown as PanelRow[]).map(rowToPanel);
 }
