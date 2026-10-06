@@ -14,6 +14,7 @@
  */
 import path from "node:path";
 import { metadataRefusals } from "~/lib/voice-slots/elevenlabs";
+import type { VoiceLabFacts } from "~/lib/voice-slots/import";
 import { firstStoredDesign } from "~/lib/voice-slots/lookup";
 import type { VoiceRow } from "~/lib/voice-slots/types";
 import type { Database } from "~/types/database";
@@ -82,17 +83,6 @@ export interface NewVoice {
   source_clip_md5: string;
 }
 
-export type VoiceSet = Partial<{
-  description: string;
-  labels: Record<string, string>;
-  design_prompt: string;
-  starting_pick: boolean;
-  consumers: string[];
-  source_clip_path: string;
-  source_clip_md5: string;
-  status: "archived";
-}>;
-
 /** `rows` are the 1-based manifest rows that need the write. */
 export type Write =
   | {
@@ -124,7 +114,7 @@ export type Write =
       rows: number[];
       id: string;
       display_name: string;
-      set: VoiceSet;
+      set: VoiceLabFacts;
       clip?: Clip;
     };
 
@@ -196,6 +186,10 @@ function sameLabels(
     );
   return a !== null && b !== null && flat(a) === flat(b);
 }
+
+/** The same values, ignoring order and repeats. */
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+  a.every((x) => b.includes(x)) && b.every((x) => a.includes(x));
 
 const voiceName = (v: VoiceRow) => `${v.display_name} (${v.id})`;
 
@@ -318,9 +312,20 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         );
       if (!["active", "archived", "needs_clip"].includes(v.status))
         return skip(`voice ${voiceName(v)} has status "${v.status}"`);
+      // A sample write needs the clip unheld elsewhere; a different stored
+      // md5 is the note below instead.
+      const differentSample =
+        v.source_clip_md5 !== null && v.source_clip_md5 !== md5;
+      const needsSample =
+        !differentSample && (!v.source_clip_path || !v.source_clip_md5);
+      const holder = needsSample ? md5Holder(md5, v.id) : null;
+      if (holder)
+        return skip(
+          `md5 ${md5} is already stored on ${holder}; name that voice with voice_uuid`,
+        );
       takenVoice.set(v.id, n);
 
-      const set: VoiceSet = {};
+      const set: VoiceLabFacts = {};
       if (m.description !== v.description) set.description = m.description!;
       if (!sameLabels(m.labels!, v.labels)) set.labels = m.labels!;
       if (present(m.design_prompt) && m.design_prompt !== v.design_prompt)
@@ -329,28 +334,22 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         set.starting_pick = m.starting_pick;
       if (present(m.consumers)) {
         const merged = [...new Set([...v.consumers, ...m.consumers])];
-        if (merged.length !== v.consumers.length) set.consumers = merged;
+        if (!sameSet(merged, v.consumers)) set.consumers = merged;
       }
-      let holdsSample = v.source_clip_md5 === md5;
-      let writeClip = false;
-      if (!v.source_clip_path && !v.source_clip_md5) {
-        const holder = md5Holder(md5, v.id);
-        if (holder)
-          note(
-            `md5 ${md5} is already stored on ${holder}; ${voiceName(v)} gets the facts and no sample`,
-          );
-        else {
-          set.source_clip_path = c.object;
-          set.source_clip_md5 = md5;
-          takenMd5.set(md5, n);
-          holdsSample = writeClip = true;
-        }
-      } else if (!holdsSample)
+      if (needsSample) {
+        if (v.source_clip_path !== c.object) set.source_clip_path = c.object;
+        if (v.source_clip_md5 !== md5) set.source_clip_md5 = md5;
+        takenMd5.set(md5, n);
+      } else if (differentSample)
         note(
-          `${voiceName(v)} stores a different sample (md5 ${v.source_clip_md5 ?? "none"}, manifest ${md5}); the stored sample is left alone, and a new clip is a new voice`,
+          `${voiceName(v)} stores a different sample (md5 ${v.source_clip_md5}, manifest ${md5}); the stored sample is left alone, and a new clip is a new voice`,
         );
-      // archived means a sample is stored; a needs_clip row that holds one moves.
-      if (v.status === "needs_clip" && holdsSample) set.status = "archived";
+      // archived means a sample is stored: a needs_clip row moves once it
+      // holds both a path and an md5.
+      const pathAfter = set.source_clip_path ?? v.source_clip_path;
+      const md5After = set.source_clip_md5 ?? v.source_clip_md5;
+      if (v.status === "needs_clip" && pathAfter && md5After)
+        set.status = "archived";
       if (Object.keys(set).length === 0) return;
       voiceWrites.push({
         kind: "update_voice",
@@ -358,7 +357,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         id: v.id,
         display_name: v.display_name,
         set,
-        ...(writeClip ? { clip: sample } : {}),
+        ...(needsSample ? { clip: sample } : {}),
       });
     };
 

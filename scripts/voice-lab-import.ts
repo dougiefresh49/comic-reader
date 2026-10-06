@@ -489,6 +489,16 @@ async function main() {
   // The client is built only past the version check and never on --check.
   const { supabase } = await import("./lib/supabase.js");
   const current = await readCurrent(supabase);
+  // A typo here would protect nothing, so a missing character id stops the run.
+  const unknownProtected = [...PROTECTED_CHARACTER_IDS].filter(
+    (id) => !current.characters.has(id),
+  );
+  if (unknownProtected.length > 0) {
+    console.error(
+      `PROTECTED_CHARACTER_IDS names ${unknownProtected.join(", ")}, not in characters. Nothing was written.`,
+    );
+    process.exit(1);
+  }
   const protectedVoiceIds = new Set(
     current.voices
       .filter(
@@ -498,6 +508,12 @@ async function main() {
           PROTECTED_CHARACTER_IDS.has(v.character_id),
       )
       .map((v) => v.id),
+  );
+  const unprotected = [...PROTECTED_CHARACTER_IDS].filter(
+    (id) =>
+      !current.voices.some(
+        (v) => v.status === "active" && v.character_id === id,
+      ),
   );
   const plan = planVoiceLabImport({
     folder,
@@ -511,7 +527,7 @@ async function main() {
   console.log(`\nvoice-lab-import ${folder} (${mode})`);
   console.log(`Manifest: ${manifestFile}, ${manifest.voices.length} row(s)`);
   console.log(
-    `Read: ${current.voices.length} voices, ${current.works.length} works, ${current.appearances.length} appearances, ${current.characters.size} characters, ${current.franchiseIds.size} franchises; ${protectedVoiceIds.size} protected voices`,
+    `Read: ${current.voices.length} voices, ${current.works.length} works, ${current.appearances.length} appearances, ${current.characters.size} characters, ${current.franchiseIds.size} franchises; ${protectedVoiceIds.size} protected voices${unprotected.length > 0 ? ` (no active voice to protect for ${unprotected.join(", ")})` : ""}`,
   );
   printPlan(plan);
   console.log(`\nLocal files under clone-sources/${folder}/:`);

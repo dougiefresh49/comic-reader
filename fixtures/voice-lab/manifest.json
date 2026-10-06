@@ -345,6 +345,57 @@
         "age": "young"
       },
       "status": "approved"
+    },
+    {
+      "character_id": "rocksteady",
+      "work": {
+        "id": "space-turtles-1991",
+        "title": "Space Turtles",
+        "year": 1991,
+        "medium": "animated_series",
+        "franchise_id": "tmnt"
+      },
+      "file": "rocksteady/space-turtles-1991-alt.mp3",
+      "md5": "77777777777777777777777777777777",
+      "description": "A gravelly rhino.",
+      "labels": {
+        "age": "middle_aged"
+      },
+      "status": "approved"
+    },
+    {
+      "character_id": "karai",
+      "work": {
+        "id": "shell-shock-2003",
+        "title": "Shell Shock",
+        "year": 2003,
+        "medium": "movie",
+        "franchise_id": "tmnt"
+      },
+      "file": "karai/shell-shock-2003.mp3",
+      "md5": "55555555555555555555555555555555",
+      "description": "A quiet, sharp ninja.",
+      "labels": {
+        "age": "young"
+      },
+      "status": "approved"
+    },
+    {
+      "character_id": "krang",
+      "work": {
+        "id": "space-turtles-1991",
+        "title": "Space Turtles",
+        "year": 1991,
+        "medium": "animated_series",
+        "franchise_id": "tmnt"
+      },
+      "file": "krang/space-turtles-1991.mp3",
+      "md5": "cccccccccccccccccccccccccccccccc",
+      "description": "A squeaky, bossy brain.",
+      "labels": {
+        "age": "old"
+      },
+      "status": "approved"
     }
   ]
 }

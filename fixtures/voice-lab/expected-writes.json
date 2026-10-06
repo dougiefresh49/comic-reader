@@ -448,6 +448,55 @@
         }
       ],
       "notes": []
+    },
+    {
+      "name": "an appearance holder with no sample, whose clip is stored on another voice, is skipped",
+      "row": 21,
+      "writes": [],
+      "skips": [
+        {
+          "row": 21,
+          "label": "row 21 rocksteady, work space-turtles-1991, rocksteady/space-turtles-1991-alt.mp3",
+          "reason": "md5 77777777777777777777777777777777 is already stored on voice Rocksteady (2003) (00000000-0000-4000-8000-000000000007); name that voice with voice_uuid"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "starting_pick true stored and omitted in the manifest, nothing else new: no write",
+      "row": 22,
+      "writes": [],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a needs_clip row holding the manifest md5 and no path gets its path and becomes archived",
+      "row": 23,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            23
+          ],
+          "id": "00000000-0000-4000-8000-000000000020",
+          "display_name": "Krang (1991)",
+          "set": {
+            "description": "A squeaky, bossy brain.",
+            "labels": {
+              "age": "old"
+            },
+            "source_clip_path": "fixture-book__krang__space-turtles-1991.mp3",
+            "status": "archived"
+          },
+          "clip": {
+            "file": "krang/space-turtles-1991.mp3",
+            "object": "fixture-book__krang__space-turtles-1991.mp3",
+            "md5": "cccccccccccccccccccccccccccccccc"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
     }
   ]
 }

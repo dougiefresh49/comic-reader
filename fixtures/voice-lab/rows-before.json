@@ -25,6 +25,14 @@
       "display_name": "Crowd"
     },
     {
+      "id": "karai",
+      "display_name": "Karai"
+    },
+    {
+      "id": "krang",
+      "display_name": "Krang"
+    },
+    {
       "id": "leonardo",
       "display_name": "Leonardo"
     },
@@ -129,6 +137,48 @@
       "archived_at": null
     },
     {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "display_name": "Rocksteady (1991)",
+      "status": "needs_clip",
+      "character_id": "rocksteady",
+      "appearance_id": "a0000000-0000-4000-8000-000000000005",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": null,
+      "source_clip_md5": null,
+      "design_prompt": null,
+      "description": null,
+      "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "display_name": "Karai (2003)",
+      "status": "archived",
+      "character_id": "karai",
+      "appearance_id": "a0000000-0000-4000-8000-000000000006",
+      "starting_pick": true,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__karai__shell-shock-2003.mp3",
+      "source_clip_md5": "55555555555555555555555555555555",
+      "design_prompt": null,
+      "description": "A quiet, sharp ninja.",
+      "labels": {
+        "age": "young"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
       "id": "00000000-0000-4000-8000-000000000007",
       "display_name": "Rocksteady (2003)",
       "status": "archived",
@@ -212,6 +262,26 @@
       "keep_active": false,
       "created_at": "2026-09-29T12:00:00+00:00",
       "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000020",
+      "display_name": "Krang (1991)",
+      "status": "needs_clip",
+      "character_id": "krang",
+      "appearance_id": "a0000000-0000-4000-8000-000000000020",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": null,
+      "source_clip_md5": "cccccccccccccccccccccccccccccccc",
+      "design_prompt": null,
+      "description": null,
+      "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
     }
   ],
   "works": [
@@ -268,6 +338,30 @@
     {
       "id": "a0000000-0000-4000-8000-000000000010",
       "character_id": "leonardo",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000005",
+      "character_id": "rocksteady",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000006",
+      "character_id": "karai",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000020",
+      "character_id": "krang",
       "work_id": "space-turtles-1991",
       "voice_actor": null,
       "search_terms": null,
