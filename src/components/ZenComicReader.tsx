@@ -78,13 +78,18 @@ export default function ZenComicReader({
   const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
   const [panelViewMode, setPanelViewMode] = useState(false);
   const pathname = usePathname();
-  // Pure read so StrictMode's double invoke sees the same value; the mount
-  // effect below clears the carry, so it is one-shot.
+  // Pure read so StrictMode's double invoke sees the same value; the effect
+  // below clears the carry at mount, so it is one-shot. It clears at unmount
+  // too: the next page's reader has read the carry by then (it renders before
+  // this one unmounts), and a turn abandoned mid-load must leave nothing set.
   const [panelAutoPlay, setPanelAutoPlay] = useState(
     () => readAloudCarryTo !== null && readAloudCarryTo === pathname,
   );
   useEffect(() => {
     readAloudCarryTo = null;
+    return () => {
+      readAloudCarryTo = null;
+    };
   }, []);
   const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
 
