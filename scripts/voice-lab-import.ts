@@ -661,7 +661,7 @@ async function describeAll(
     }
     await insertVoiceLookup(supabase, d.key, result.answer, result.model);
     console.log(
-      `  ${key} (${d.character}, ${d.work.title} ${d.work.year}${d.voice_actor ? `, ${d.voice_actor}` : ""})\n      model names the actor: ${result.answer.actor}\n      ${result.answer.description}\n      labels: ${labelText(result.answer.labels)}`,
+      `  ${key} (${d.character}, ${d.work.title} ${d.work.year}${d.voice_actor ? `, ${d.voice_actor}` : ""})\n      model names the actor: ${result.answer.actor}${result.answer.inferred_from ? `\n      inferred from: ${result.answer.inferred_from}` : ""}\n      ${result.answer.description}\n      labels: ${labelText(result.answer.labels)}`,
     );
   }
   return failures;
