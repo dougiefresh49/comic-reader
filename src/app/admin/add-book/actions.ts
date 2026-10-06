@@ -1,12 +1,12 @@
 "use server";
 
-import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { createPartFromText } from "@google/genai";
 import { franchiseSlug } from "~/lib/character-id";
+import { getGeminiClient } from "~/lib/gemini-client";
+import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { requireAdmin } from "~/server/admin/require-admin";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: string };
@@ -59,13 +59,17 @@ Return JSON only, no markdown.`;
 
   try {
     await requireAdmin();
-    const response = await ai.models.generateContent({
-      model: GEMINI_MEDIUM,
-      contents: [createPartFromText(prompt)],
-      config: {
-        tools: [{ googleSearch: {} }],
+    const response = await generateContentLogged(
+      getGeminiClient(),
+      {
+        model: GEMINI_MEDIUM,
+        contents: [createPartFromText(prompt)],
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
       },
-    });
+      { step: "admin:add-book:search" },
+    );
 
     const text = response.text?.trim();
     if (!text) return { ok: false, error: "Empty response from Gemini" };

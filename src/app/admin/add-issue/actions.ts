@@ -2,15 +2,15 @@
 
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { GEMINI_MEDIUM } from "~/lib/models";
-import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { createPartFromText } from "@google/genai";
+import { getGeminiClient } from "~/lib/gemini-client";
+import { generateContentLogged } from "~/lib/llm-usage";
 import { insertIssue, listBookIssues } from "~/lib/issue-queries";
 import { requireAdmin } from "~/server/admin/require-admin";
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: string };
 type Result<T> = Ok<T> | Err;
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // ─── getBookInfo ─────────────────────────────────────────────────────────────
 
@@ -94,13 +94,17 @@ export async function findReadingSource(
 
   try {
     await requireAdmin();
-    const response = await ai.models.generateContent({
-      model: GEMINI_MEDIUM,
-      contents: [createPartFromText(prompt)],
-      config: {
-        tools: [{ googleSearch: {} }],
+    const response = await generateContentLogged(
+      getGeminiClient(),
+      {
+        model: GEMINI_MEDIUM,
+        contents: [createPartFromText(prompt)],
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
       },
-    });
+      { step: "admin:add-issue:find-source" },
+    );
 
     const text = response.text?.trim();
     if (!text) {

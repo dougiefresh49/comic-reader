@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { elevenLabsFetch } from "~/lib/elevenlabs-client";
+import { isDryRun } from "~/lib/fakes/dry-run";
+import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { requireAdmin } from "~/server/admin/require-admin";
 import {
@@ -144,61 +147,75 @@ export async function generateAudioWithElevenLabs(
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) return { ok: false, error: "ELEVENLABS_API_KEY not set" };
+  // Under DRY_RUN the request never leaves: `elevenLabsFetch` has no fixture
+  // for these paths and throws, which the catch below returns.
+  if (!isDryRun() && !process.env.ELEVENLABS_API_KEY)
+    return { ok: false, error: "ELEVENLABS_API_KEY not set" };
 
-  let buf: Buffer;
-  if (args.layer === "music") {
-    // ElevenLabs Music: ~30s loop by default
-    const ms = (args.durationSeconds ?? 30) * 1000;
-    for (const path of ["/v1/music/compose", "/v1/music"]) {
-      const res = await fetch(`https://api.elevenlabs.io${path}`, {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-          Accept: "audio/mpeg",
-        },
-        body: JSON.stringify({
-          prompt: args.prompt,
-          music_length_ms: ms,
-        }),
-      });
-      if (res.status === 404) continue;
+  let buf: Buffer | undefined;
+  try {
+    if (args.layer === "music") {
+      // ElevenLabs Music: ~30s loop by default
+      const ms = (args.durationSeconds ?? 30) * 1000;
+      for (const path of ["/v1/music/compose", "/v1/music"]) {
+        // One row per request sent, so a 404 on the first path logs ok=false.
+        const res = await recordElevenLabsCall(
+          { step: "admin:audio-library:music" },
+          null,
+          () =>
+            elevenLabsFetch(path, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "audio/mpeg",
+              },
+              body: JSON.stringify({
+                prompt: args.prompt,
+                music_length_ms: ms,
+              }),
+            }),
+        );
+        if (res.status === 404) continue;
+        if (!res.ok) {
+          return {
+            ok: false,
+            error: `elevenlabs music ${res.status}: ${(await res.text()).slice(0, 200)}`,
+          };
+        }
+        buf = Buffer.from(await res.arrayBuffer());
+        break;
+      }
+      if (!buf) return { ok: false, error: "music endpoint not found" };
+    } else {
+      // ElevenLabs Sound Generation for sfx + ambience
+      const res = await recordElevenLabsCall(
+        { step: "admin:audio-library:sound" },
+        null,
+        () =>
+          elevenLabsFetch("/v1/sound-generation", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "audio/mpeg",
+            },
+            body: JSON.stringify({
+              text: args.prompt,
+              duration_seconds:
+                args.durationSeconds ?? (args.layer === "sfx" ? 1.5 : 12),
+              prompt_influence: 0.6,
+            }),
+          }),
+      );
       if (!res.ok) {
         return {
           ok: false,
-          error: `elevenlabs music ${res.status}: ${(await res.text()).slice(0, 200)}`,
+          error: `elevenlabs sfx ${res.status}: ${(await res.text()).slice(0, 200)}`,
         };
       }
       buf = Buffer.from(await res.arrayBuffer());
-      break;
     }
-    // @ts-expect-error — buf assigned in the loop above when one of the paths returns 200
-    if (!buf) return { ok: false, error: "music endpoint not found" };
-  } else {
-    // ElevenLabs Sound Generation for sfx + ambience
-    const res = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-        Accept: "audio/mpeg",
-      },
-      body: JSON.stringify({
-        text: args.prompt,
-        duration_seconds:
-          args.durationSeconds ?? (args.layer === "sfx" ? 1.5 : 12),
-        prompt_influence: 0.6,
-      }),
-    });
-    if (!res.ok) {
-      return {
-        ok: false,
-        error: `elevenlabs sfx ${res.status}: ${(await res.text()).slice(0, 200)}`,
-      };
-    }
-    buf = Buffer.from(await res.arrayBuffer());
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 
   const result = await uploadAudio(
