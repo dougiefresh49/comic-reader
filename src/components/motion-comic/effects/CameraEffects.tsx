@@ -12,7 +12,7 @@ import type { EffectProps } from "./types";
  *
  * These components are registered only in `EFFECTS_PREVIEW` (registry.tsx).
  * The reader's `EFFECTS` map leaves them out; there the camera move comes
- * from PanelViewFrame.
+ * from PanelViewFrame, when its `cameraEffects` prop is on.
  */
 
 interface DemoProps {
