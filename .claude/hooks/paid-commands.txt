@@ -28,7 +28,8 @@ script:voice-rotation && --(archive|restore|execute)([^[:alnum:]_-]|$) :: Paid: 
 script:voice-lab-import && --describe([^[:alnum:]_-]|$) :: Paid: --describe makes one Gemini call per voice lookup not stored yet. Re-run it as LIVE_API_OK=1 pnpm voice-lab-import ... only if the task named that spend.
 script:voice-rotation-archive :: Paid: voice-rotation-archive renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-archive ... only if the task named that spend.
 script:voice-rotation-checkout :: Paid: voice-rotation-checkout renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-checkout ... only if the task named that spend.
-script:apply-fixes :: Paid: apply-fixes writes production rows. Re-run it as LIVE_API_OK=1 pnpm apply-fixes ... only if the task named that write.
+script:fix-page-watermarks :: Paid: fix-page-watermarks calls Gemini for every page it cleans. Re-run it as LIVE_API_OK=1 pnpm fix-page-watermarks ... only if the task named that spend.
+script:apply-fixes ::Paid: apply-fixes writes production rows. Re-run it as LIVE_API_OK=1 pnpm apply-fixes ... only if the task named that write.
 
 # A GET is free, so this asks for two things at once: the host is ElevenLabs,
 # and the method is not GET. The method is spelled out in character classes

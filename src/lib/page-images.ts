@@ -2,30 +2,56 @@ import "server-only";
 import sharp from "sharp";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { pageStoragePath } from "~/lib/storage";
+import { cleanPageWatermarks, type WatermarkFix } from "~/lib/page-watermark";
 
 const WEBP_BUCKET = "comic-pages";
-const WEBP_QUALITY = 82;
+export const WEBP_QUALITY = 82;
 
 /**
- * Convert a page image to WebP, upload to the flat comic-pages key, and upsert
- * the matching `pages` row. Throws on any storage or DB error.
+ * How every stored page is encoded, scripts included (#541). smartSubsample
+ * keeps re-encode noise on saturated edges under the 32 the watermark diff
+ * allows: without it 12 of 76 stored pages moved a pixel by up to 42.
+ */
+export function encodePageWebp(buffer: Buffer): Promise<Buffer> {
+  return sharp(buffer)
+    .webp({ quality: WEBP_QUALITY, smartSubsample: true })
+    .toBuffer();
+}
+
+/**
+ * Remove the source watermark (#541), convert the page to WebP, upload to the
+ * flat comic-pages key, and upsert the matching `pages` row. Throws on any
+ * storage or DB error, and when the clean changed the image's size.
  */
 export async function storePageImage(args: {
   bookId: string;
   issueId: string;
   pageNumber: number;
   buffer: Buffer;
-}): Promise<{ width: number; height: number; storagePath: string }> {
-  const { bookId, issueId, pageNumber, buffer } = args;
+}): Promise<{
+  width: number;
+  height: number;
+  storagePath: string;
+  fixes: WatermarkFix[];
+}> {
+  const { bookId, issueId, pageNumber } = args;
   const storagePath = pageStoragePath(bookId, issueId, pageNumber);
 
-  const [webpBuffer, metadata] = await Promise.all([
-    sharp(buffer).webp({ quality: WEBP_QUALITY }).toBuffer(),
-    sharp(buffer).metadata(),
-  ]);
-
+  const metadata = await sharp(args.buffer).metadata();
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
+
+  const { buffer, fixes } = await cleanPageWatermarks(args);
+  if (fixes.length > 0) {
+    const cleaned = await sharp(buffer).metadata();
+    if (cleaned.width !== width || cleaned.height !== height) {
+      throw new Error(
+        `watermark clean changed ${storagePath} from ${width}x${height} to ${cleaned.width}x${cleaned.height}`,
+      );
+    }
+  }
+
+  const webpBuffer = await encodePageWebp(buffer);
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(WEBP_BUCKET)
@@ -56,5 +82,5 @@ export async function storePageImage(args: {
     );
   }
 
-  return { width, height, storagePath };
+  return { width, height, storagePath, fixes };
 }
