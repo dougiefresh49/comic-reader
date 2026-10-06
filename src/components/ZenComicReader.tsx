@@ -162,6 +162,8 @@ export default function ZenComicReader({
 
   const exitPanelView = useCallback(() => {
     clearPanelTimer();
+    // A turn may still be loading the next page; it must mount silent.
+    readAloudCarryTo = null;
     setPanelViewMode(false);
     setPanelAutoPlay(false);
     setPanelViewPreferred(false);
@@ -182,6 +184,8 @@ export default function ZenComicReader({
       // currently playing bubble — the HUD play is the only control in panel mode.
       clearPanelTimer();
       stopAllRef.current();
+      // A turn may still be loading the next page; it must mount silent.
+      readAloudCarryTo = null;
     }
     setPanelAutoPlay(!panelAutoPlay);
   }, [panelAutoPlay, clearPanelTimer]);
