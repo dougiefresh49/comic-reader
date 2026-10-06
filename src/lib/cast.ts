@@ -942,15 +942,14 @@ export async function storeVoiceRequest(
   characterId: string,
   request: VoiceRequest,
 ): Promise<void> {
-  // `operation` (#351) is not in database.ts yet: read it untyped.
-  const open = await client
+  const open = await db(client)
     .from("casting_tasks")
     .select("operation")
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("character_id", characterId);
   must(`reading the voice request for ${characterId}`, open.error);
-  if (((open.data ?? []) as { operation: unknown }[]).some((r) => r.operation))
+  if ((open.data ?? []).some((r) => r.operation))
     throw new Error(`cast: a voice operation is open for ${characterId}`);
   const { error } = await db(client)
     .from("casting_tasks")
