@@ -14,29 +14,14 @@ import { generateContentLogged } from "~/lib/llm-usage";
 import { metadataRefusals } from "~/lib/voice-slots/elevenlabs";
 import type { Database, Json } from "~/types/database";
 import { GEMINI_FAST } from "../utils/models.js";
+import type {
+  LookupKey,
+  LookupSubject,
+  VoiceLookupRow,
+} from "./voice-lab-plan.js";
 
 /** The `llm_calls.step` of every lookup call. */
 export const LOOKUP_STEP = "voice-lab-lookup";
-
-export type VoiceLookupRow =
-  Database["public"]["Tables"]["voice_lookups"]["Row"];
-
-export interface LookupKey {
-  character_id: string;
-  work_id: string;
-}
-
-export const lookupKeyString = (k: LookupKey) =>
-  `${k.character_id}\u0000${k.work_id}`;
-
-/** What the prompt is given about one (character, work). */
-export interface LookupSubject {
-  key: LookupKey;
-  /** The character's display name. */
-  character: string;
-  work: { title: string; year: number; medium: string };
-  voice_actor: string | null;
-}
 
 /**
  * The label vocabulary: the keys and spellings on today's active voices
@@ -108,8 +93,24 @@ export const LOOKUP_SCHEMA = {
 } as const;
 
 /** The answer, or why it is not stored. */
+/** Lowercase letters only: "Pat Fraley" and "pat-fraley" read the same. */
+const personKey = (name: string) =>
+  name.toLowerCase().replace(/[^\p{L}]/gu, "");
+
+/** The same person, loosely: equal, or one name contains the other. */
+export function sameActor(a: string, b: string): boolean {
+  const x = personKey(a);
+  const y = personKey(b);
+  return x !== "" && y !== "" && (x.includes(y) || y.includes(x));
+}
+
+/**
+ * The answer, or why it is not stored. `expectedActor` is the appearance's
+ * voice actor, when it names one: an answer naming another person is refused.
+ */
 export function checkAnswer(
   text: string | undefined,
+  expectedActor: string | null = null,
 ): LookupAnswer | { refused: string } {
   let raw: {
     actor?: unknown;
@@ -127,6 +128,10 @@ export function checkAnswer(
   // Naming the actor is the check that the model knows this version.
   if (typeof raw.actor !== "string" || !raw.actor.trim())
     return { refused: "the model names no voice actor for this version" };
+  if (expectedActor && !sameActor(raw.actor, expectedActor))
+    return {
+      refused: `the model names ${raw.actor.trim()} as the actor, the appearance names ${expectedActor}`,
+    };
   const labels = (raw.labels ?? {}) as Record<string, string>;
   const meta = metadataRefusals({
     description: raw.description as string,
@@ -183,7 +188,7 @@ export async function lookUpVoice(
       },
       { step: LOOKUP_STEP },
     );
-    const answer = checkAnswer(response.text);
+    const answer = checkAnswer(response.text, subject.voice_actor);
     if (!("refused" in answer)) return { ok: true, answer, model: GEMINI_FAST };
     reasons.push(answer.refused);
   }

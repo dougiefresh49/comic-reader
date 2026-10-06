@@ -80,14 +80,15 @@ import {
   type LibraryIndex,
   type Plan,
   type PlanInput,
+  type VoiceLookupRow,
   type WorkRow,
   type Write,
 } from "./lib/voice-lab-plan.js";
 import {
+  checkAnswer,
   insertVoiceLookup,
   lookUpVoice,
   readVoiceLookups,
-  type VoiceLookupRow,
 } from "./lib/voice-lookups.js";
 
 /**
@@ -152,7 +153,19 @@ async function readJson<T>(file: string): Promise<T> {
 
 /** The index, or exit 1 naming the version found and the file. */
 async function readIndex(file: string): Promise<LibraryIndex> {
-  const raw = await readJson<{ version?: unknown; clips?: unknown }>(file);
+  let raw: { version?: unknown; clips?: unknown };
+  try {
+    raw = await readJson<typeof raw>(file);
+  } catch (err) {
+    // fs errors carry the absolute path; print the code, and the path as shown().
+    const why =
+      (err as { code?: string }).code ??
+      (err instanceof Error ? err.message : String(err));
+    console.error(
+      `${shown(file)}: cannot read the index (${why}). Nothing was read or written.`,
+    );
+    process.exit(1);
+  }
   if (raw?.version !== INDEX_VERSION) {
     console.error(
       `${shown(file)}: index version ${JSON.stringify(raw?.version ?? null)}; this import reads version ${INDEX_VERSION} only. Nothing was read or written.`,
@@ -195,6 +208,8 @@ const labelText = (l: Record<string, string>) =>
 
 function describeLine(d: Describe): string {
   const head = `  ${d.voice}: ${d.key.character_id} in ${d.key.work_id} [clip ${d.row}]`;
+  if (d.refused)
+    return `${head}\n      stored lookup refused: ${d.refused.join(", ")}`;
   return d.stored
     ? `${head}\n      ${d.stored.description}\n      labels: ${labelText(d.stored.labels)}`
     : `${head}\n      lookup needed`;
@@ -375,6 +390,35 @@ async function runCheck(): Promise<never> {
   );
   if (ordered) ok("writes ordered appearance, then voice");
   else fail("writes ordered appearance, then voice");
+
+  // The actor rule on canned answers: no Gemini call.
+  const answer = (actor: string) =>
+    JSON.stringify({
+      actor,
+      known: true,
+      description: "A low, steady voice.",
+      labels: {
+        gender: "male",
+        age: "old",
+        accent: "en-american",
+        language: "en",
+      },
+    });
+  const actorCases: [string, string | null, boolean][] = [
+    ["Invented Actor One", "invented actor one", true],
+    ["Actor One", "Invented Actor One", true],
+    ["Someone Else", "Invented Actor One", false],
+    ["Someone Else", null, true],
+  ];
+  const actorWrong = actorCases.filter(
+    ([named, expected, pass]) =>
+      !("refused" in checkAnswer(answer(named), expected)) !== pass,
+  );
+  if (actorWrong.length === 0)
+    ok(
+      "actor check: the same person passes (case, spacing, a shorter name), another person is refused, no appearance actor checks nothing",
+    );
+  else fail(`actor check: wrong on ${JSON.stringify(actorWrong)}`);
 
   const guard = await checkStatusGuard();
   if (guard === null)

@@ -208,6 +208,38 @@
       "seconds": 60,
       "reel": "ignored.mp3",
       "trimmed": true
+    },
+    {
+      "file": "shell-shock/bebop-take-two.mp3",
+      "md5": "ffffffffffffffffffffffffffffffff",
+      "character": "Bebop",
+      "universe": "invented",
+      "work": {
+        "slug": "shell-shock",
+        "title": "Shell Shock",
+        "year": 2003,
+        "kind": "film"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/hun.mp3",
+      "md5": "00000000000000000000000000000000",
+      "character": "Hun",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
     }
   ]
 }

@@ -431,6 +431,110 @@
       ],
       "notes": [],
       "describe": []
+    },
+    {
+      "name": "second new clip for the same appearance in one run: planned as the next run would see it, a new archived voice with no appearance beside clip 5's",
+      "clip": 14,
+      "writes": [
+        {
+          "kind": "insert_voice",
+          "rows": [
+            14
+          ],
+          "appearance": null,
+          "row": {
+            "display_name": "Bebop (2003)",
+            "character_id": "bebop",
+            "status": "archived",
+            "description": "A nasal, mid-pitched male voice with a thick New York accent. It sounds goofy and rough, with a loose, drawling pace.",
+            "labels": {
+              "gender": "male",
+              "age": "young",
+              "accent": "en-new-york",
+              "language": "en"
+            },
+            "design_prompt": null,
+            "starting_pick": false,
+            "consumers": [
+              "comic"
+            ],
+            "source_clip_path": "shell-shock__bebop-take-two.mp3",
+            "source_clip_md5": "ffffffffffffffffffffffffffffffff"
+          },
+          "clip": {
+            "file": "shell-shock/bebop-take-two.mp3",
+            "object": "shell-shock__bebop-take-two.mp3",
+            "md5": "ffffffffffffffffffffffffffffffff"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": [
+        {
+          "row": 14,
+          "text": "bebop in shell-shock-2003 is held by \"Bebop (2003)\" (archived, planned by clip 5); the clip becomes a new archived voice with no appearance"
+        }
+      ],
+      "describe": [
+        {
+          "row": 14,
+          "voice": "new \"Bebop (2003)\"",
+          "key": {
+            "character_id": "bebop",
+            "work_id": "shell-shock-2003"
+          },
+          "character": "Bebop",
+          "work": {
+            "title": "Shell Shock",
+            "year": 2003,
+            "medium": "movie"
+          },
+          "voice_actor": null,
+          "stored": {
+            "description": "A nasal, mid-pitched male voice with a thick New York accent. It sounds goofy and rough, with a loose, drawling pace.",
+            "labels": {
+              "gender": "male",
+              "age": "young",
+              "accent": "en-new-york",
+              "language": "en"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "stored lookup that fails metadataRefusals (labels edited to {}): a skip, nothing copied",
+      "clip": 15,
+      "writes": [],
+      "skips": [
+        {
+          "row": 15,
+          "label": "clip 15 Hun, space-turtles/hun.mp3",
+          "reason": "the stored lookup for hun in space-turtles-1991 is refused (no labels); fix or delete its voice_lookups row, nothing is written for Hun (1991) (00000000-0000-4000-8000-000000000015) until then"
+        }
+      ],
+      "notes": [],
+      "describe": [
+        {
+          "row": 15,
+          "voice": "Hun (1991) (00000000-0000-4000-8000-000000000015)",
+          "key": {
+            "character_id": "hun",
+            "work_id": "space-turtles-1991"
+          },
+          "character": "Hun",
+          "work": {
+            "title": "Space Turtles",
+            "year": 1991,
+            "medium": "animated_series"
+          },
+          "voice_actor": null,
+          "stored": null,
+          "refused": [
+            "no labels"
+          ]
+        }
+      ]
     }
   ]
 }

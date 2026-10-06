@@ -26,16 +26,29 @@ import { metadataRefusals } from "~/lib/voice-slots/elevenlabs";
 import type { VoiceLabFacts } from "~/lib/voice-slots/import";
 import type { VoiceRow } from "~/lib/voice-slots/types";
 import type { Database } from "~/types/database";
-import {
-  lookupKeyString,
-  type LookupKey,
-  type LookupSubject,
-  type VoiceLookupRow,
-} from "./voice-lookups.js";
 
 type Tables = Database["public"]["Tables"];
 export type WorkRow = Tables["works"]["Row"];
 export type AppearanceRow = Tables["appearances"]["Row"];
+export type VoiceLookupRow = Tables["voice_lookups"]["Row"];
+
+/** A voice lookup's key, and an appearance's: one character in one work. */
+export interface LookupKey {
+  character_id: string;
+  work_id: string;
+}
+
+export const lookupKeyString = (k: LookupKey) =>
+  `${k.character_id}\u0000${k.work_id}`;
+
+/** What the lookup prompt is given about one (character, work). */
+export interface LookupSubject {
+  key: LookupKey;
+  /** The character's display name. */
+  character: string;
+  work: { title: string; year: number; medium: string };
+  voice_actor: string | null;
+}
 
 export const INDEX_VERSION = 1;
 /** The bucket's allowed_mime_types: mp3, m4a, wav. */
@@ -125,6 +138,8 @@ export interface Describe extends LookupSubject {
   /** `<display_name> (<id>)`, or `new "<display_name>"`. */
   voice: string;
   stored: { description: string; labels: Record<string, string> } | null;
+  /** Set when a stored lookup fails `metadataRefusals`; `stored` is then null. */
+  refused?: string[];
 }
 
 export interface Plan {
@@ -204,7 +219,8 @@ export function planVoiceLabImport(input: PlanInput): Plan {
   // Targets taken by an earlier clip of this plan, so two clips never write
   // the same voice, appearance or sample.
   const takenVoice = new Map<string, number>();
-  const takenAppearance = new Map<string, number>();
+  /** The voice an earlier clip puts on an appearance, by appearance key. */
+  const plannedHolder = new Map<string, { voice: string; clip: number }>();
   const takenMd5 = new Map<string, number>();
 
   input.clips.forEach((c, i) => {
@@ -251,7 +267,15 @@ export function planVoiceLabImport(input: PlanInput): Plan {
       characterName: string,
     ) => {
       const work = worksById.get(key.work_id)!;
-      const stored = lookupByKey.get(lookupKeyString(key)) ?? null;
+      const row = lookupByKey.get(lookupKeyString(key)) ?? null;
+      // A row edited by SQL is checked again before it is copied.
+      const refused = row
+        ? metadataRefusals({
+            description: row.description,
+            labels: row.labels as Record<string, string>,
+          })
+        : [];
+      const stored = refused.length > 0 ? null : row;
       describe.push({
         row: n,
         voice,
@@ -266,8 +290,13 @@ export function planVoiceLabImport(input: PlanInput): Plan {
               labels: stored.labels as Record<string, string>,
             }
           : null,
+        ...(refused.length > 0 ? { refused } : {}),
       });
-      if (!stored)
+      if (refused.length > 0)
+        skip(
+          `the stored lookup for ${key.character_id} in ${key.work_id} is refused (${refused.join(", ")}); fix or delete its voice_lookups row, nothing is written for ${voice} until then`,
+        );
+      else if (!stored)
         skip(
           `no stored lookup for ${key.character_id} in ${key.work_id}; run --describe first, nothing is written for ${voice} until then`,
         );
@@ -367,12 +396,9 @@ export function planVoiceLabImport(input: PlanInput): Plan {
     const earlierMd5 = takenMd5.get(md5);
     if (earlierMd5) return skip(`md5 ${md5} is also clip ${earlierMd5}`);
     const key: LookupKey = { character_id: r.character.id, work_id: r.work.id };
-    const earlier = takenAppearance.get(lookupKeyString(key));
-    if (earlier)
-      return skip(
-        `clip ${earlier} already imports a voice for ${key.character_id} in ${key.work_id}`,
-      );
-    takenAppearance.set(lookupKeyString(key), n);
+    // An earlier clip of this run puts a voice on this appearance: plan what
+    // the next run would see, an archived voice holding it.
+    const planned = plannedHolder.get(lookupKeyString(key));
     const clip: Clip = {
       file: file.file,
       object: `${slug}__${path.posix.basename(file.file)}`,
@@ -381,7 +407,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
     const appearance = appearanceByKey.get(lookupKeyString(key));
     const holder = appearance ? voiceByAppearance.get(appearance.id) : null;
 
-    if (holder) {
+    if (holder && !planned) {
       // #469 item 3: the holder must be the clip's character.
       if (holder.character_id !== key.character_id)
         return skip(
@@ -392,7 +418,13 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         if (refused) return skip(refused);
         const before = voiceWrites.length;
         update(holder, key, clip);
-        if (voiceWrites.length > before) takenMd5.set(md5, n);
+        if (voiceWrites.length > before) {
+          takenMd5.set(md5, n);
+          plannedHolder.set(lookupKeyString(key), {
+            voice: voiceName(holder),
+            clip: n,
+          });
+        }
         return;
       }
       if (holder.status !== "active" && holder.status !== "archived")
@@ -401,9 +433,14 @@ export function planVoiceLabImport(input: PlanInput): Plan {
 
     // A new archived voice: on the appearance, or beside the voice holding it.
     const displayName = `${r.character.display_name ?? r.character.id} (${r.work.year})`;
-    if (holder)
+    const heldBy = planned
+      ? `${planned.voice} (archived, planned by clip ${planned.clip})`
+      : holder
+        ? `${voiceName(holder)} (${holder.status})`
+        : null;
+    if (heldBy)
       note(
-        `${key.character_id} in ${key.work_id} is held by ${voiceName(holder)} (${holder.status}); the clip becomes a new archived voice with no appearance`,
+        `${key.character_id} in ${key.work_id} is held by ${heldBy}; the clip becomes a new archived voice with no appearance`,
       );
     const lookup = lookupFor(
       key,
@@ -412,7 +449,12 @@ export function planVoiceLabImport(input: PlanInput): Plan {
     );
     if (!lookup) return;
     takenMd5.set(md5, n);
-    if (!holder && !appearance)
+    if (!heldBy)
+      plannedHolder.set(lookupKeyString(key), {
+        voice: `"${displayName}"`,
+        clip: n,
+      });
+    if (!heldBy && !appearance)
       appearanceWrites.push({
         kind: "insert_appearance",
         rows: [n],
@@ -421,7 +463,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
     voiceWrites.push({
       kind: "insert_voice",
       rows: [n],
-      appearance: holder ? null : key,
+      appearance: heldBy ? null : key,
       row: {
         display_name: displayName,
         character_id: key.character_id,
@@ -451,7 +493,7 @@ export function lookupsNeeded(plan: Plan): Describe[] {
   const seen = new Set<string>();
   return plan.describe.filter((d) => {
     const k = lookupKeyString(d.key);
-    if (d.stored || seen.has(k)) return false;
+    if (d.stored || d.refused || seen.has(k)) return false;
     seen.add(k);
     return true;
   });

@@ -66,6 +66,11 @@
       "id": "donatello",
       "display_name": "Donatello",
       "aliases": []
+    },
+    {
+      "id": "hun",
+      "display_name": "Hun",
+      "aliases": []
     }
   ],
   "works": [
@@ -147,6 +152,14 @@
       "id": "a0000000-0000-4000-8000-000000000013",
       "character_id": "donatello",
       "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000015",
+      "character_id": "hun",
+      "work_id": "space-turtles-1991",
       "voice_actor": null,
       "search_terms": [],
       "notes": null
@@ -321,6 +334,26 @@
         "accent": "en-japanese",
         "language": "en"
       },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "display_name": "Hun (1991)",
+      "status": "archived",
+      "character_id": "hun",
+      "appearance_id": "a0000000-0000-4000-8000-000000000015",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "space-turtles__hun.mp3",
+      "source_clip_md5": "00000000000000000000000000000000",
+      "design_prompt": null,
+      "description": null,
+      "labels": null,
       "consumers": [
         "comic"
       ],

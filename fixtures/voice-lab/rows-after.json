@@ -66,6 +66,11 @@
       "id": "donatello",
       "display_name": "Donatello",
       "aliases": []
+    },
+    {
+      "id": "hun",
+      "display_name": "Hun",
+      "aliases": []
     }
   ],
   "works": [
@@ -147,6 +152,14 @@
       "id": "a0000000-0000-4000-8000-000000000013",
       "character_id": "donatello",
       "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000015",
+      "character_id": "hun",
+      "work_id": "space-turtles-1991",
       "voice_actor": null,
       "search_terms": [],
       "notes": null
@@ -352,6 +365,26 @@
       "archived_at": null
     },
     {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "display_name": "Hun (1991)",
+      "status": "archived",
+      "character_id": "hun",
+      "appearance_id": "a0000000-0000-4000-8000-000000000015",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "space-turtles__hun.mp3",
+      "source_clip_md5": "00000000000000000000000000000000",
+      "design_prompt": null,
+      "description": null,
+      "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
       "id": "00000000-0000-4000-8000-000000000013",
       "display_name": "Wrong Holder",
       "status": "archived",
@@ -417,6 +450,31 @@
         "gender": "male",
         "age": "middle-aged",
         "accent": "en-american",
+        "language": "en"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000014",
+      "display_name": "Bebop (2003)",
+      "status": "archived",
+      "character_id": "bebop",
+      "appearance_id": null,
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "shell-shock__bebop-take-two.mp3",
+      "source_clip_md5": "ffffffffffffffffffffffffffffffff",
+      "design_prompt": null,
+      "description": "A nasal, mid-pitched male voice with a thick New York accent. It sounds goofy and rough, with a loose, drawling pace.",
+      "labels": {
+        "gender": "male",
+        "age": "young",
+        "accent": "en-new-york",
         "language": "en"
       },
       "consumers": [
