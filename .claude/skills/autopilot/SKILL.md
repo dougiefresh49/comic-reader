@@ -102,7 +102,7 @@ and this message with the blanks filled:
 ```
 Run issue #<N> "<title>". Read AGENTS.md, then the issue and its comments; the issue is the spec.
 - Claim it, then use the delegate-issue skill: one worktree, one PR, the builder and review lanes CLAUDE.md gives this kind of change.
-- You are the lead. The standing approvals in AGENTS.md "Verifying here" apply; merge when green, reviewed clean and checked with real input.
+- You are the lead. The standing approvals in AGENTS.md "Verifying here" apply; you merge your own PR on the conditions in that section's Merges bullet.
 - Live beside you: <each issue with a live lead as #N "title", and the files to stay out of; or "nothing">.
 - When this merges, re-label what it unblocked.
 - When the issue is settled, or you stop on an owner item, send ONE message to T3 thread <your thread id> with t3_thread_send: the issue, the PR and whether it merged, and your owner items in full. Send nothing before that. If the send fails, carry on; the report on the issue is enough.
