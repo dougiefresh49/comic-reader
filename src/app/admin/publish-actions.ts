@@ -8,9 +8,11 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 type Result = { ok: true } | { ok: false; error: string };
 
 /**
- * Publishes or unpublishes one book, then drops the cached library, book
- * pages and reader pages so the change shows at once
- * rather than after the reader's day-long revalidate.
+ * Publishes or unpublishes one book, then revalidates the library, book pages
+ * and reader pages. Only the library at `/` is cached today, for an hour, so
+ * its call is the one that makes the change show at once. The book and reader
+ * pages render on every request; their calls matter only if those pages are
+ * cached later (#515).
  */
 export async function setBookPublished(
   bookId: string,

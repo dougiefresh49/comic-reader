@@ -8,8 +8,6 @@ import { OfflineDownload } from "~/components/OfflineDownload";
 import { CoverImage } from "~/components/ui/CoverImage";
 import type { IssueManifest } from "~/types/manifest";
 
-export const revalidate = 3600;
-
 interface BookDetailProps {
   params: Promise<{
     bookId: string;
