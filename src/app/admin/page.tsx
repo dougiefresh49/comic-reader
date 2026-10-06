@@ -81,12 +81,20 @@ export default async function AdminDashboardPage() {
                 Pipeline status across all books and issues.
               </p>
             </div>
-            <Link
-              href="/admin/voices"
-              className="shrink-0 rounded bg-neutral-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-600 sm:px-4 sm:py-2 sm:text-sm"
-            >
-              Voices
-            </Link>
+            <div className="flex shrink-0 gap-2">
+              <Link
+                href="/admin/cost"
+                className="rounded bg-neutral-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-600 sm:px-4 sm:py-2 sm:text-sm"
+              >
+                Other costs
+              </Link>
+              <Link
+                href="/admin/voices"
+                className="rounded bg-neutral-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-neutral-600 sm:px-4 sm:py-2 sm:text-sm"
+              >
+                Voices
+              </Link>
+            </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
