@@ -1,10 +1,10 @@
 "use server";
 
-import { GoogleGenAI } from "@google/genai";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { cueRequest } from "~/lib/cue-rules";
+import { getGeminiClient } from "~/lib/gemini-client";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
@@ -29,15 +29,33 @@ interface Args {
 export async function regenerateCues(args: Args) {
   const auth = checkAdminAuth((await headers()).get("authorization"));
   if (!auth.ok) return { ok: false, error: auth.message };
-  if (!process.env.GEMINI_API_KEY) {
-    return { ok: false, error: "GEMINI_API_KEY not configured" };
-  }
   if (!args.text.trim()) {
     return { ok: false, error: "Empty text" };
   }
 
+  // The bubble must be in this book and issue before Gemini is paid for.
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      args.bubbleId,
+    );
+  const bubbleQ = supabaseAdmin
+    .from("bubbles")
+    .select("id")
+    .eq("book_id", args.bookId)
+    .eq("issue_id", args.issueId);
+  const { data: bubble, error: bErr } = await (isUuid
+    ? bubbleQ.eq("id", args.bubbleId).maybeSingle()
+    : bubbleQ.eq("legacy_id", args.bubbleId).maybeSingle());
+  if (bErr) return { ok: false, error: bErr.message };
+  if (!bubble) {
+    return {
+      ok: false,
+      error: `Bubble ${args.bubbleId} not found in book ${args.bookId}, issue ${args.issueId}.`,
+    };
+  }
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = getGeminiClient();
     const result = await generateContentLogged(
       ai,
       cueRequest({
@@ -56,10 +74,6 @@ export async function regenerateCues(args: Args) {
     if (!formatted) return { ok: false, error: "Empty Gemini response" };
 
     // Update the bubble row in DB (mark needs_audio so audio re-gen picks it up)
-    const isUuid =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        args.bubbleId,
-      );
     const query = supabaseAdmin
       .from("bubbles")
       .update({
@@ -75,6 +89,13 @@ export async function regenerateCues(args: Args) {
         : query.eq("legacy_id", args.bubbleId)
     ).select("page_number");
     if (error) return { ok: false, error: error.message };
+    if (!data?.length) {
+      return {
+        ok: false,
+        error:
+          "The cues were generated but not saved: no bubble row matched the update.",
+      };
+    }
 
     revalidatePath(
       `/admin/${args.bookId}/${args.issueId}/review/editor`,
@@ -83,7 +104,7 @@ export async function regenerateCues(args: Args) {
     await revalidateReaderPages(
       args.bookId,
       args.issueId,
-      (data ?? []).map((row) => (row as { page_number: number }).page_number),
+      data.map((row) => (row as { page_number: number }).page_number),
     );
     return { ok: true, textWithCues: formatted };
   } catch (e) {
