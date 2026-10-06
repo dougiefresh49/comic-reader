@@ -6,16 +6,13 @@
 // cues sends) writes the cue line from that text, speaker and emotion. It writes
 // no bubble; the editor shows the proposal and the owner accepts it into the
 // pending edits.
-import {
-  GoogleGenAI,
-  createPartFromBase64,
-  createPartFromText,
-} from "@google/genai";
+import { createPartFromBase64, createPartFromText } from "@google/genai";
 import { headers } from "next/headers";
 import { NARRATOR_ID, resolveSpeaker } from "~/components/review-editor/lib";
 import { BUBBLE_TYPES, type BubbleType } from "~/lib/bubble-types";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { cueRequest } from "~/lib/cue-rules";
+import { getGeminiClient } from "~/lib/gemini-client";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
@@ -148,7 +145,7 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
     pageNumber: args.pageNumber,
   };
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = getGeminiClient();
   let proposal: AnalyzeProposal;
   try {
     const { mime, data } = stripDataPrefix(args.cropBase64);
