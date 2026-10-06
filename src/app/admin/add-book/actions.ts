@@ -4,6 +4,7 @@ import { GoogleGenAI, createPartFromText } from "@google/genai";
 import { franchiseSlug } from "~/lib/character-id";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { requireAdmin } from "~/server/admin/require-admin";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -57,6 +58,7 @@ Return a JSON object with:
 Return JSON only, no markdown.`;
 
   try {
+    await requireAdmin();
     const response = await ai.models.generateContent({
       model: GEMINI_MEDIUM,
       contents: [createPartFromText(prompt)],
@@ -105,6 +107,11 @@ interface CreateBookArgs {
 export async function createBook(
   args: CreateBookArgs,
 ): Promise<Result<{ id: string }>> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const {
     slug,
     title,

@@ -2,9 +2,8 @@
 
 import { createHmac } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { requireAdmin } from "~/server/admin/require-admin";
 import {
   archiveVoice,
   withVoiceOperationClaim,
@@ -19,11 +18,6 @@ import {
   type SlotStatus,
   type VoiceRow as SlotVoiceRow,
 } from "~/lib/voice-slots";
-
-async function requireAdmin() {
-  const auth = checkAdminAuth((await headers()).get("authorization"));
-  if (!auth.ok) throw new Error(auth.message);
-}
 
 export async function toggleKeepActive(voiceId: string, keepActive: boolean) {
   await requireAdmin();
