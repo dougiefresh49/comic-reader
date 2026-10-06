@@ -34,11 +34,14 @@ export function useAudioPlayback({
 }: UseAudioPlaybackOptions) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Bumped by every stopAll. A clip captures the value it started under, so
-  // a load failure that lands after a stop (a page turn, unmount, Reset
-  // View) cannot advance the reader: pausing an element does not cancel its
-  // fetch, and the element stays in audioRef after a stop.
-  const stopGenerationRef = useRef(0);
+  // Whether the current clip may advance the reader when it fails. stopAll
+  // (a page turn, unmount, Reset View) clears it, because pausing an element
+  // does not cancel its fetch and the element stays in audioRef, so a late
+  // failure must not move the reader. Starting a clip or resuming it sets it.
+  const armedRef = useRef(false);
+  // The current clip's failure path, so a resume whose play() rejects in
+  // togglePlayPause ends the clip the same way its first play() would.
+  const failCurrentRef = useRef<((reason: unknown) => void) | null>(null);
   const onBubbleEndedRef = useRef(onBubbleEnded);
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export function useAudioPlayback({
   const { activeWordIndex, startHighlight, stopHighlight } = useWordHighlight();
 
   const stopAll = useCallback(() => {
-    stopGenerationRef.current += 1;
+    armedRef.current = false;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -66,6 +69,7 @@ export function useAudioPlayback({
       // No `ended` either: autoplay never picks such a bubble.
       if (!hasAudio(bubble)) {
         audioRef.current = null;
+        failCurrentRef.current = null;
         return;
       }
 
@@ -75,7 +79,7 @@ export function useAudioPlayback({
       audio.volume = Math.max(0, Math.min(1, volume));
       audio.playbackRate = playbackRate;
       audioRef.current = audio;
-      const generation = stopGenerationRef.current;
+      armedRef.current = true;
       setIsPlaying(true);
 
       const ts = timestamps[bubble.id];
@@ -89,12 +93,7 @@ export function useAudioPlayback({
       // guards below drop a failure from a clip that was replaced or stopped.
       let settled = false;
       const failed = (reason: unknown) => {
-        if (
-          settled ||
-          audioRef.current !== audio ||
-          stopGenerationRef.current !== generation
-        )
-          return;
+        if (settled || audioRef.current !== audio || !armedRef.current) return;
         settled = true;
         console.error(
           `Audio clip failed to load for bubble ${bubble.id} (${audio.src})`,
@@ -104,6 +103,7 @@ export function useAudioPlayback({
         setIsPlaying(false);
         onBubbleEndedRef.current?.(bubble);
       };
+      failCurrentRef.current = failed;
 
       audio.addEventListener("ended", () => {
         settled = true;
@@ -160,10 +160,18 @@ export function useAudioPlayback({
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
+      armedRef.current = true;
       audio
         .play()
         .then(() => setIsPlaying(true))
-        .catch(console.error);
+        .catch((err: unknown) => {
+          const name = err instanceof DOMException ? err.name : undefined;
+          if (name === "AbortError" || name === "NotAllowedError") {
+            console.error("Audio resume failed", err);
+            return;
+          }
+          failCurrentRef.current?.(err);
+        });
     } else {
       audio.pause();
       setIsPlaying(false);
