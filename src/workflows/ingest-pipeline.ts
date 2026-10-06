@@ -294,7 +294,18 @@ export async function ingestPipeline(input: IngestInput) {
   } catch (err) {
     await closePipelineRun(bookId, issueId, "failed");
     if (!ready && from !== "extract-foreground-masks") {
-      await markPipelineFailed(bookId, issueId, currentStep);
+      // A failed failed-mark is logged, not thrown, so the run's own error
+      // still reaches the caller.
+      try {
+        await markPipelineFailed(bookId, issueId, currentStep);
+      } catch (markErr) {
+        const original = err instanceof Error ? err.message : String(err);
+        const message =
+          markErr instanceof Error ? markErr.message : String(markErr);
+        console.log(
+          `[pipeline] ${bookId}/${issueId} failed at ${currentStep} (${original}), and marking the issue row failed did not land: ${message}`,
+        );
+      }
     }
     throw err;
   }

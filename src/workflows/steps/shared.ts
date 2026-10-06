@@ -114,12 +114,13 @@ export async function updatePipelineStep(
 
   const pauseUrl = paused ? getPauseUrl(bookId, issueId, step) : null;
 
-  await updateIssue(supabase, bookId, issueId, {
+  const result = await updateIssue(supabase, bookId, issueId, {
     pipeline_step: step,
     pipeline_paused: paused,
     pipeline_paused_at: paused ? step : null,
     pipeline_paused_url: pauseUrl,
-  });
+  }).select("id");
+  assertIssueRowWritten(result, bookId, issueId, `pipeline_step "${step}"`);
 
   if (paused && pauseUrl) {
     await notifySlack(bookId, issueId, step, pauseUrl);
@@ -258,12 +259,45 @@ export async function markPipelineFailed(
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
 
-  await updateIssue(supabase, bookId, issueId, {
+  const result = await updateIssue(supabase, bookId, issueId, {
     pipeline_step: `failed:${currentStep}`,
     pipeline_paused: false,
     pipeline_paused_at: null,
     pipeline_paused_url: null,
-  });
+  }).select("id");
+  assertIssueRowWritten(
+    result,
+    bookId,
+    issueId,
+    `pipeline_step "failed:${currentStep}"`,
+  );
+}
+
+/**
+ * Throws when an `issues` row write did not land, so the step fails instead
+ * of returning as if it had. The writes are idempotent patches, so both
+ * classes are safe to repeat. A Supabase error throws a plain Error, which the
+ * Workflow runtime retries: the likely cause is a network or server blip. A
+ * write that matched no row throws FatalError: the row is absent, and a
+ * retry would match nothing again. The caller chains `.select("id")` onto
+ * `updateIssue` so a no-row match shows as an empty `data`.
+ */
+function assertIssueRowWritten(
+  result: { data: unknown[] | null; error: { message: string } | null },
+  bookId: string,
+  issueId: string,
+  write: string,
+): void {
+  if (result.error) {
+    throw new Error(
+      `issue row write of ${write} failed for ${bookId}/${issueId}: ${result.error.message}`,
+    );
+  }
+  if (!result.data || result.data.length === 0) {
+    throw new FatalError(
+      `issue row write of ${write} matched no row for ${bookId}/${issueId}; nothing was written`,
+    );
+  }
 }
 
 function getPauseUrl(bookId: string, issueId: string, step: string): string {
@@ -303,14 +337,34 @@ async function notifySlack(
   const text = `📋 *Pipeline paused — ${label}*\n\`${bookId}/${issueId}\` is ready for review.\n<${reviewUrl}|Open review page>`;
 
   try {
-    await globalThis.fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const res = await globalThis.fetch(
+      "https://slack.com/api/chat.postMessage",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ channel, text }),
       },
-      body: JSON.stringify({ channel, text }),
-    });
+    );
+    // Slack answers HTTP 200 with `ok: false` for a bad token or channel, so
+    // the body decides, not the status. Logged only: a Slack failure must not
+    // fail the run.
+    const reply = (await res.json().catch(() => null)) as {
+      ok?: boolean;
+      error?: string;
+    } | null;
+    if (!res.ok || reply?.ok !== true) {
+      const reason =
+        reply?.error ??
+        (reply
+          ? `HTTP ${res.status}`
+          : `unparseable reply, HTTP ${res.status}`);
+      console.warn(
+        `[slack] pause notice for ${step} on ${bookId}/${issueId} not sent: ${reason}`,
+      );
+    }
   } catch {
     console.warn(`[slack] Failed to notify for ${step} — continuing`);
   }
@@ -331,13 +385,19 @@ export async function markIssueReady(bookId: string, issueId: string) {
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
 
-  await updateIssue(supabase, bookId, issueId, {
+  const result = await updateIssue(supabase, bookId, issueId, {
     pipeline_step: "complete",
     status: "ready",
     pipeline_paused: false,
     pipeline_paused_at: null,
     pipeline_paused_url: null,
-  });
+  }).select("id");
+  assertIssueRowWritten(
+    result,
+    bookId,
+    issueId,
+    `pipeline_step "complete" and status "ready"`,
+  );
 }
 
 export async function getPanelCount(

@@ -1870,14 +1870,19 @@ export async function getContextPage(
       );
 
       ocrText = ocrResponse.text?.trim() ?? "";
-    } catch {
+    } catch (e) {
       console.warn(
-        `[context] ${pageLabel} bubble ${bubble.legacy_id}: OCR failed`,
+        `[context] ${pageLabel} bubble ${bubble.legacy_id}: OCR failed: ${e instanceof Error ? e.message : String(e)}`,
       );
       continue;
     }
 
-    if (!ocrText) continue;
+    if (!ocrText) {
+      console.warn(
+        `[context] ${pageLabel} bubble ${bubble.legacy_id}: skipped, empty OCR text`,
+      );
+      continue;
+    }
 
     // The speaker call carries no cue rules; the cue line is the second
     // call below (#437).
@@ -1911,7 +1916,12 @@ export async function getContextPage(
       const aiReasoning = scratchpadMatch?.[1]?.trim() ?? null;
 
       const jsonMatch = /\{[\s\S]*\}/.exec(responseText);
-      if (!jsonMatch) continue;
+      if (!jsonMatch) {
+        console.warn(
+          `[context] ${pageLabel} bubble ${bubble.legacy_id}: skipped, no JSON object in the reply`,
+        );
+        continue;
+      }
 
       const parsed = JSON.parse(jsonMatch[0]) as ContextParsed;
       const { match, emotion } = resolveContext(parsed, cast);
