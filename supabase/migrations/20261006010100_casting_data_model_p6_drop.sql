@@ -22,15 +22,18 @@
 --   tables.
 
 -- Guard: castlist.character is still in castlist_pkey until migration A runs,
--- and dropping the column would take the primary key with it. Refuse instead.
+-- and dropping the column would take the primary key with it. Refuse unless
+-- the primary key is exactly (book_id, issue_id, character_id); a looser
+-- test (any key that mentions character_id) would let a key that also holds
+-- "character" through, and the column drop would then remove it.
 do $$
 begin
   if not exists (
-    select 1 from pg_indexes
-    where schemaname = 'public' and indexname = 'castlist_pkey'
-      and indexdef like '%character_id%'
+    select 1 from pg_constraint
+    where conrelid = 'public.castlist'::regclass and contype = 'p'
+      and pg_get_constraintdef(oid) = 'PRIMARY KEY (book_id, issue_id, character_id)'
   ) then
-    raise exception 'p6 drop refused: castlist_pkey is not keyed on character_id; apply migration A (20261006010000_casting_data_model_p6_keys.sql) first';
+    raise exception 'p6 drop refused: castlist_pkey is not exactly (book_id, issue_id, character_id); apply migration A (20261006010000_casting_data_model_p6_keys.sql) first';
   end if;
 end
 $$;
