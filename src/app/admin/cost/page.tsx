@@ -21,13 +21,14 @@ export default async function OtherCostsPage() {
         <h1 className="mb-2 text-2xl font-semibold">Other costs</h1>
         <p className="mb-6 text-sm text-neutral-400">
           Paid calls recorded with no book or issue: the Add Book search, the
-          Add Issue source search, and audio library sounds and music. Each
-          issue&apos;s own calls are on its Cost page. Credits are what
-          ElevenLabs charges on its subscription, read from the response charge
-          or estimated from characters and a per-model rate. Dollar figures are
-          estimates from the rates in the code, not the invoice. The Add Book
-          and Add Issue searches are priced from tokens only: any fee Google
-          adds for a search-grounded call is not in them.
+          Add Issue source search, audio library sounds and music, and the
+          voice-lab import&apos;s voice lookups. Each issue&apos;s own calls are
+          on its Cost page. Credits are what ElevenLabs charges on its
+          subscription, read from the response charge or estimated from
+          characters and a per-model rate. Dollar figures are estimates from the
+          rates in the code, not the invoice. The Add Book and Add Issue
+          searches are priced from tokens only: any fee Google adds for a
+          search-grounded call is not in them.
         </p>
 
         <CostReport rows={rows} totalLabel="Total" />
