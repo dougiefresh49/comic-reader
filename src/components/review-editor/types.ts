@@ -1,4 +1,7 @@
 // What the review editor's loader hands the browser. Every rect is in page fractions (0..1).
+import type { BubbleType } from "~/lib/bubble-types";
+
+export type { BubbleType };
 
 export interface Rect {
   x: number;
@@ -6,10 +9,6 @@ export interface Rect {
   w: number;
   h: number;
 }
-
-import type { BubbleType } from "~/lib/bubble-types";
-
-export type { BubbleType };
 
 export interface SrcPage {
   number: number;
