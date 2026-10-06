@@ -37,6 +37,7 @@ import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
 import { clearNoAudio as clearNoAudioRows } from "~/server/admin/casting";
 import { canContinueVoices } from "~/server/admin/voices-gate";
 import { requireAdmin } from "~/server/admin/require-admin";
+import { hookToken } from "~/lib/ingest-hooks";
 import {
   executeVoiceOperation,
   planVoiceOperation,
@@ -443,7 +444,7 @@ export async function continueRun(scope: Scope): Promise<ActionResult> {
       revalidate(scope);
       return { ok: false, error: verdict.reason };
     }
-    const token = `ingest:${scope.bookId}/${scope.issueId}/casting`;
+    const token = hookToken(scope.bookId, scope.issueId, "casting");
     try {
       const { resumeHook } = await import(
         /* webpackIgnore: true */

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
-import { GEMINI_MEDIUM } from "~/lib/models";
 import { filterDuplicateBubbles } from "~/lib/bubble-filter";
 import {
   bubbleCenter,
@@ -45,15 +44,6 @@ import type { FaceCropResult } from "~/lib/face-extraction";
 import { groupFaces } from "~/lib/face-groups";
 
 type TypedClient = SupabaseClient<Database>;
-
-export {
-  bubbleHasContext,
-  buildContextUpdate,
-  mapBubbleRows,
-  mapPanelRows,
-  mapSegmentationRow,
-  parseRoboflowSam3Output,
-} from "./vision-rows";
 
 function errorText(err: unknown): string {
   return (err instanceof Error ? err.message : String(err)).slice(0, 160);

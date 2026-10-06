@@ -1,6 +1,7 @@
 import "server-only";
 import { type NextRequest } from "next/server";
 import { resumeHook } from "workflow/api";
+import { hookToken } from "~/lib/ingest-hooks";
 import { canApproveCharacters } from "~/server/admin/characters-gate";
 import { canContinueVoices } from "~/server/admin/voices-gate";
 import { canResumePages } from "~/server/admin/pages-gate";
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const token = `ingest:${body.bookId}/${body.issueId}/${body.step}`;
+  const token = hookToken(body.bookId, body.issueId, body.step);
 
   try {
     const result = await resumeHook(token, { approved: true });

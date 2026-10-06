@@ -2,7 +2,9 @@
 // The v2 editor's Save (/api/apply-fixes/save) is the one writer that uses it.
 import "server-only";
 import { z } from "zod";
+import { BUBBLE_TYPES } from "~/lib/bubble-types";
 import { bubbleSpeaker, type BubbleSpeaker } from "~/lib/bubble-speaker";
+import { chunk } from "~/lib/chunk";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { normalizePanelAudioTags } from "~/workflows/steps/vision-rows";
 
@@ -64,13 +66,6 @@ export interface WriteContext {
   silent: Set<string>;
   /** The named bubbles whose stored row has `ignored = true`. */
   ignored: Set<string>;
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size)
-    out.push(items.slice(i, i + size));
-  return out;
 }
 
 /** Reads what the rules need. Throws on a failed read: nothing has been written yet. */
@@ -375,9 +370,7 @@ const bubbleEdit = z
       .optional(),
     text: z.string().optional(),
     textWithCues: z.string().nullable().optional(),
-    type: z
-      .enum(["SPEECH", "NARRATION", "CAPTION", "SFX", "BACKGROUND"])
-      .optional(),
+    type: z.enum(BUBBLE_TYPES).optional(),
     emotion: z.string().optional(),
     ignored: z.boolean().optional(),
     silent: z.boolean().optional(),

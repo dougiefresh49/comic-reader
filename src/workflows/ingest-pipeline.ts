@@ -1,6 +1,7 @@
 import { createHook } from "workflow";
 import { FatalError } from "workflow";
 
+import { hookToken } from "~/lib/ingest-hooks";
 import {
   STEP_ORDER,
   resolvePipelineStep,
@@ -123,7 +124,7 @@ export async function ingestPipeline(input: IngestInput) {
       await updatePipelineStep(bookId, issueId, currentStep, true);
       await recordGateWait(bookId, issueId, currentStep, "open");
       using clusterHook = createHook<{ approved: boolean }>({
-        token: `ingest:${bookId}/${issueId}/cluster-review`,
+        token: hookToken(bookId, issueId, "cluster-review"),
       });
       await clusterHook;
       await recordGateWait(bookId, issueId, currentStep, "close");
@@ -171,7 +172,7 @@ export async function ingestPipeline(input: IngestInput) {
       await recordStepEnd(bookId, issueId, currentStep, timing);
       await recordGateWait(bookId, issueId, currentStep, "open");
       using pageReviewHook = createHook<{ approved: boolean }>({
-        token: `ingest:${bookId}/${issueId}/page-review`,
+        token: hookToken(bookId, issueId, "page-review"),
       });
       await pageReviewHook;
       await recordGateWait(bookId, issueId, currentStep, "close");
@@ -220,7 +221,7 @@ export async function ingestPipeline(input: IngestInput) {
         await updatePipelineStep(bookId, issueId, currentStep, true);
         await recordGateWait(bookId, issueId, currentStep, "open");
         using castingHook = createHook<{ approved: boolean }>({
-          token: `ingest:${bookId}/${issueId}/casting`,
+          token: hookToken(bookId, issueId, "casting"),
         });
         await castingHook;
         await recordGateWait(bookId, issueId, currentStep, "close");

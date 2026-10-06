@@ -33,6 +33,7 @@ import {
   readUnknownDetections,
 } from "~/server/admin/characters-gate";
 import { requireAdmin } from "~/server/admin/require-admin";
+import { hookToken } from "~/lib/ingest-hooks";
 import type { CardGroup } from "./types";
 
 export type ActionResult =
@@ -938,7 +939,7 @@ export async function approveCharacters(scope: Scope): Promise<ActionResult> {
       revalidate(scope);
       return { ok: false, error: verdict.reason };
     }
-    const token = `ingest:${scope.bookId}/${scope.issueId}/cluster-review`;
+    const token = hookToken(scope.bookId, scope.issueId, "cluster-review");
     try {
       const { resumeHook } = await import(
         /* webpackIgnore: true */
