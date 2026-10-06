@@ -1117,6 +1117,7 @@ export type Database = {
           character_id: string;
           created_at: string;
           description: string;
+          inferred_from: string | null;
           labels: Json;
           model: string;
           work_id: string;
@@ -1125,6 +1126,7 @@ export type Database = {
           character_id: string;
           created_at?: string;
           description: string;
+          inferred_from?: string | null;
           labels: Json;
           model: string;
           work_id: string;
@@ -1133,6 +1135,7 @@ export type Database = {
           character_id?: string;
           created_at?: string;
           description?: string;
+          inferred_from?: string | null;
           labels?: Json;
           model?: string;
           work_id?: string;
