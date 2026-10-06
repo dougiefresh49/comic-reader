@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { requireAdmin } from "~/server/admin/require-admin";
 import type { EffectPositions, PanelAudioTags } from "~/types/panels";
 
 /**
@@ -34,6 +35,15 @@ export interface PanelFixesResult {
 export async function applyPanelFixes(
   payload: PanelFixesPayload,
 ): Promise<PanelFixesResult> {
+  try {
+    await requireAdmin();
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      updated: 0,
+    };
+  }
   const result: PanelFixesResult = { ok: true, updated: 0 };
 
   for (const edit of payload.edits) {
