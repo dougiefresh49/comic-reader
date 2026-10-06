@@ -1,5 +1,5 @@
 // The one home for what a review edit writes: which columns a bubble or panel edit sets, and what an added row starts with.
-// Both writers use it: the old editor's /api/apply-fixes and the v2 editor's Save (/api/apply-fixes/save).
+// The v2 editor's Save (/api/apply-fixes/save) is the one writer that uses it.
 import "server-only";
 import { z } from "zod";
 import { bubbleSpeaker, type BubbleSpeaker } from "~/lib/bubble-speaker";
@@ -62,6 +62,8 @@ export interface WriteContext {
   bubblePage: Map<string, number>;
   /** The named bubbles whose stored row has `silent = true`. */
   silent: Set<string>;
+  /** The named bubbles whose stored row has `ignored = true`. */
+  ignored: Set<string>;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -124,10 +126,11 @@ export async function loadWriteContext(
   const confidence = new Map<string, number>();
   const bubblePage = new Map<string, number>();
   const silent = new Set<string>();
+  const ignored = new Set<string>();
   for (const ids of chunk(Array.from(new Set(need.bubbleIds)), 100)) {
     const { data, error } = await supabaseAdmin
       .from("bubbles")
-      .select("id, page_number, box_2d, silent")
+      .select("id, page_number, box_2d, silent, ignored")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .in("id", ids);
@@ -137,9 +140,11 @@ export async function loadWriteContext(
       page_number: number;
       box_2d: { confidence?: unknown } | null;
       silent: boolean | null;
+      ignored: boolean | null;
     }[]) {
       bubblePage.set(row.id, row.page_number);
       if (row.silent) silent.add(row.id);
+      if (row.ignored) ignored.add(row.id);
       const c = row.box_2d?.confidence;
       if (typeof c === "number") confidence.set(row.id, c);
     }
@@ -151,6 +156,7 @@ export async function loadWriteContext(
     confidence,
     bubblePage,
     silent,
+    ignored,
   };
 }
 
@@ -227,17 +233,18 @@ export function bubbleUpdate(
   if (edit.sortOrder !== undefined) row.sort_order = edit.sortOrder;
   if (edit.box)
     Object.assign(row, boxColumns(edit.box, page, ctx, ctx.confidence.get(id)));
-  // A bubble silent after the edit (as edited, else as stored) plays nothing,
-  // so an audio-field edit never asks for audio on it. Turned silent, its take
-  // is dropped and no new one is wanted; turned back on, it needs audio again.
+  // A bubble silent or ignored after the edit (as edited, else as stored) plays
+  // nothing, so an audio-field edit never asks for audio on it. Turned silent,
+  // its take is dropped and no new one is wanted; turned back on, it needs
+  // audio again unless it is ignored.
   const silentAfter = edit.silent ?? ctx.silent.has(id);
+  const ignoredAfter = edit.ignored ?? ctx.ignored.has(id);
   const affectsAudio = AUDIO_FIELDS.some((f) => edit[f] !== undefined);
-  if (affectsAudio && edit.ignored !== true && !silentAfter)
-    row.needs_audio = true;
+  if (affectsAudio && !ignoredAfter && !silentAfter) row.needs_audio = true;
   if (edit.silent === true) {
     row.audio_storage_path = null;
     row.needs_audio = false;
-  } else if (edit.silent === false && edit.ignored !== true) {
+  } else if (edit.silent === false && !ignoredAfter) {
     row.needs_audio = true;
   }
   return row;
@@ -245,7 +252,8 @@ export function bubbleUpdate(
 
 /**
  * The row for an added bubble. It has no `audio_storage_path`. It needs audio,
- * so the audio step picks it up, unless it is added with `silent: true`.
+ * so the audio step picks it up, unless it is added with `silent: true` or
+ * `ignored: true`.
  */
 export function bubbleInsert(
   bookId: string,
@@ -277,7 +285,7 @@ export function bubbleInsert(
     ignored: bubble.ignored ?? false,
     ...(bubble.silent !== undefined ? { silent: bubble.silent } : {}),
     ...(bubble.kept !== undefined ? { kept: bubble.kept } : {}),
-    needs_audio: bubble.silent !== true,
+    needs_audio: bubble.silent !== true && bubble.ignored !== true,
     needs_ocr: !hasText,
     audio_storage_path: null,
     panel_id: bubble.panelId ?? null,
