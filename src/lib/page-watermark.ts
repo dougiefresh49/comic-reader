@@ -119,6 +119,72 @@ export function paintBlack(img: RgbImage, box: Box): void {
   }
 }
 
+// ─── Overlay: lettering over a flat gutter ──────────────────────────────────
+
+/** How far left and right of a box a row is read to learn the gutter's colour. */
+const GUTTER_MARGIN_PX = 40;
+/** A gutter pixel sits within this of the row's mean, per channel. */
+const GUTTER_FLAT = 12;
+/** Pixels inside the box must be this unsaturated to count as lettering or gutter. */
+const GUTTER_MAX_CHROMA = 16;
+
+/**
+ * Rows of `box` that run across a flat black or white gutter get that colour
+ * painted over the lettering, and the image model is left the rows over art.
+ * On the fixture the model kept returning grey letters over a black gutter
+ * unchanged, three rounds in a row (issue-2 page 20, #541). A row qualifies
+ * when its pixels in the margins beside the box are one unsaturated colour,
+ * and every pixel inside the box is unsaturated too (lettering over black or
+ * white is grey; art inside the box has colour and the row is skipped).
+ * Returns the rows painted, as a box, or null.
+ */
+export function paintGutterRows(img: RgbImage, box: Box): Box | null {
+  const x0 = Math.max(0, box.x - GUTTER_MARGIN_PX);
+  const x1 = Math.min(img.width, box.x + box.width + GUTTER_MARGIN_PX);
+  let top = -1;
+  let bottom = -1;
+  for (let y = box.y; y < box.y + box.height; y++) {
+    let sum = 0;
+    let n = 0;
+    const px = (x: number) => (y * img.width + x) * 3;
+    for (let x = x0; x < x1; x++) {
+      if (x >= box.x && x < box.x + box.width) continue;
+      const o = px(x);
+      sum += img.data[o]! + img.data[o + 1]! + img.data[o + 2]!;
+      n += 3;
+    }
+    if (n === 0) continue;
+    const mean = sum / n;
+    if (mean > 40 && mean < 215) continue; // neither black nor white
+    let flat = true;
+    for (let x = x0; x < x1 && flat; x++) {
+      if (x >= box.x && x < box.x + box.width) continue;
+      const o = px(x);
+      for (let c = 0; c < 3; c++) {
+        if (Math.abs(img.data[o + c]! - mean) > GUTTER_FLAT) flat = false;
+      }
+    }
+    if (!flat) continue;
+    let unsaturated = true;
+    for (let x = box.x; x < box.x + box.width && unsaturated; x++) {
+      const o = px(x);
+      const r = img.data[o]!;
+      const g = img.data[o + 1]!;
+      const b = img.data[o + 2]!;
+      if (Math.max(r, g, b) - Math.min(r, g, b) > GUTTER_MAX_CHROMA) {
+        unsaturated = false;
+      }
+    }
+    if (!unsaturated) continue;
+    const v = Math.round(mean);
+    img.data.fill(v, px(box.x), px(box.x + box.width));
+    if (top < 0) top = y;
+    bottom = y;
+  }
+  if (top < 0) return null;
+  return { x: box.x, y: top, width: box.width, height: bottom - top + 1 };
+}
+
 // ─── Overlay: detect with a vision call ─────────────────────────────────────
 
 /** A detection wider or taller than this share of the page is a failure. */
@@ -238,12 +304,6 @@ const MASK_DILATE_PX = 3;
  * took 65% to 75% of it on the two fixture pages the lead ran (#541).
  */
 const MASK_MAX_SHARE = 0.9;
-/**
- * A mask under this share of the grown box means the model handed the crop
- * back with the lettering still on it (one fixture run changed 3.6% of the
- * box and left the text; the real fixes changed 25% and more).
- */
-const MASK_MIN_SHARE = 0.08;
 /**
  * Rounds per page: each round edits every detected box, then the page is
  * detected again; a round runs only while lettering is still found. The
@@ -508,13 +568,9 @@ async function editOverlay(
       reason: `the edit changed ${(share * 100).toFixed(0)}% of the box (limit ${MASK_MAX_SHARE * 100}%)`,
     };
   }
-  if (share < MASK_MIN_SHARE) {
-    return {
-      ok: false,
-      box: grown,
-      reason: `the edit left the lettering in place (changed ${(share * 100).toFixed(1)}% of the box, under ${MASK_MIN_SHARE * 100}%)`,
-    };
-  }
+  // A small mask is not rejected here: a faint remnant changes little, and
+  // the re-detection after the round is what decides whether lettering is
+  // left (an 8% floor turned two real edits away on the fixture).
   return { ok: true, box: grown, crop: fit.box, mask, edited };
 }
 
@@ -581,6 +637,17 @@ export async function cleanPageWatermarks(args: {
       }
       for (let round = 1; accepted.length > 0; round++) {
         for (const box of accepted) {
+          const gutter = paintGutterRows(img, box);
+          if (gutter) {
+            for (let y = gutter.y; y < gutter.y + gutter.height; y++) {
+              changed.fill(
+                1,
+                y * img.width + gutter.x,
+                y * img.width + gutter.x + gutter.width,
+              );
+            }
+            fixes.push({ kind: "overlay", box: gutter });
+          }
           const outcome = await editOverlay(img, box, editMeta);
           if (!outcome.ok) {
             console.warn(
@@ -595,9 +662,9 @@ export async function cleanPageWatermarks(args: {
             outcome.mask,
             changed,
           );
-          if (!fixes.some((f) => f.kind === "overlay")) {
-            fixes.push({ kind: "overlay", box: outcome.box });
-          }
+          // One fix per round, so the report's fixed region covers every
+          // box the rounds edited, not only the first round's.
+          fixes.push({ kind: "overlay", box: outcome.box });
         }
         // The page as it now is, seen by the detector again: a clean result
         // ends the rounds, lettering that is still there gets another one.
