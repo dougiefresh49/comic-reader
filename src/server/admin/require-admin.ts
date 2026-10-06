@@ -1,7 +1,8 @@
 /**
- * The admin check every admin server action makes first (#480). Next routes
- * an action by its id, not the page path, so the middleware's Basic Auth
- * does not cover it; this does. Throws the auth message on failure.
+ * The admin check every admin server action makes first (#480). The
+ * middleware's Basic Auth covers the admin paths; this one runs inside the
+ * action, so it holds whatever path the request came in on. Throws the auth
+ * message on failure.
  * Needs a request: call it from an action or a page render, never a script.
  */
 import "server-only";
