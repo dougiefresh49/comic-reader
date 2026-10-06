@@ -32,6 +32,7 @@ import {
 import { loadRoster } from "./utils/roster.js";
 import { glob } from "glob";
 import { writeAlias } from "~/lib/character-aliases.js";
+import { withLlmMeta } from "~/lib/llm-usage.js";
 import { selectIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -234,6 +235,21 @@ async function main() {
 
   const dbInfo = await getIssueDbIds(book, issue);
 
+  // Paid face and embedding calls log under this issue when it is in the DB;
+  // with no DB row the ids are unknown and the calls run unwrapped (#546).
+  const logged = <T>(pageNumber: number | null, fn: () => Promise<T>) =>
+    dbInfo
+      ? withLlmMeta(
+          {
+            step: "character-lookahead",
+            bookId: dbInfo.bookId,
+            issueId: dbInfo.issueId,
+            pageNumber,
+          },
+          fn,
+        )
+      : fn();
+
   // ── Seed mode: import existing clusters into exemplar store ────────────
   if (seed) {
     if (!dbInfo) {
@@ -274,8 +290,12 @@ async function main() {
         dbInfo.wikiAppearances,
       );
 
-      const identifications = await Promise.all(
-        crops.map((face) => identifySingleFace(gemini, face, knownCharacters)),
+      const identifications = await logged(pageNum, () =>
+        Promise.all(
+          crops.map((face) =>
+            identifySingleFace(gemini, face, knownCharacters),
+          ),
+        ),
       );
 
       for (let i = 0; i < crops.length; i++) {
@@ -306,7 +326,9 @@ async function main() {
       }
     }
 
-    await seedFromExistingClusters(clusters, dbInfo.bookId, issue);
+    await logged(null, () =>
+      seedFromExistingClusters(clusters, dbInfo.bookId, issue),
+    );
     console.log("\n✅ Seed complete\n");
     return;
   }
@@ -398,8 +420,10 @@ async function main() {
     let exemplarsByFace: Array<ExemplarReference[] | undefined>;
     try {
       exemplarsByFace = useExemplars
-        ? await Promise.all(
-            crops.map((face) => getExemplarsForFace(face, dbInfo!.bookId)),
+        ? await logged(pageNum, () =>
+            Promise.all(
+              crops.map((face) => getExemplarsForFace(face, dbInfo!.bookId)),
+            ),
           )
         : crops.map(() => undefined);
     } catch (err) {
@@ -416,9 +440,11 @@ async function main() {
     }
 
     totalCrops += crops.length;
-    const identifications = await Promise.all(
-      crops.map((face, i) =>
-        identifySingleFace(gemini, face, knownCharacters, exemplarsByFace[i]),
+    const identifications = await logged(pageNum, () =>
+      Promise.all(
+        crops.map((face, i) =>
+          identifySingleFace(gemini, face, knownCharacters, exemplarsByFace[i]),
+        ),
       ),
     );
 
@@ -485,15 +511,17 @@ async function main() {
       if (!cluster.characterName || cluster.confidence < 0.7) continue;
       const charId = cluster.characterName.toLowerCase().replace(/\s+/g, "-");
       try {
-        await storeExemplar({
-          jpegBuffer: cluster.exemplar.jpegBuffer,
-          characterId: charId,
-          bookId: dbInfo!.bookId,
-          sourceIssue: issue,
-          pageNumber: cluster.exemplar.pageNumber,
-          confidence: cluster.confidence,
-          isConfirmed: cluster.confidence >= 0.9,
-        });
+        await logged(cluster.exemplar.pageNumber, () =>
+          storeExemplar({
+            jpegBuffer: cluster.exemplar.jpegBuffer,
+            characterId: charId,
+            bookId: dbInfo!.bookId,
+            sourceIssue: issue,
+            pageNumber: cluster.exemplar.pageNumber,
+            confidence: cluster.confidence,
+            isConfirmed: cluster.confidence >= 0.9,
+          }),
+        );
         stored++;
         console.log(
           `   ✓ ${cluster.characterName} (${(cluster.confidence * 100).toFixed(0)}%)`,
