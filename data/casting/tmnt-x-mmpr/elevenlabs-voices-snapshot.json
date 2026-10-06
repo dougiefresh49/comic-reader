@@ -11,7 +11,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Bebop 2": {
   "voice_id": "FCFJMCa9ZFu4325AUU3w",
@@ -27,7 +27,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Armored Villain": {
   "voice_id": "P70H4nshzpgpGx0vAA3z",
@@ -41,7 +41,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Alpha 5": {
   "voice_id": "G4FycwjZbrUlO5rnrTGm",
@@ -55,7 +55,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Donatello v2": {
   "voice_id": "2sV2XnVqQ2RShkIOGFvZ",
@@ -71,9 +71,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "donnie-audio.mp3"
-  ]
+  "sampleCount": 1
  },
  "Foot Elite": {
   "voice_id": "Uo9kYf3kXKz03qyoPMpG",
@@ -87,7 +85,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Foot Soldier": {
   "voice_id": "8EsHn25qWtDd2mWwmiYQ",
@@ -101,7 +99,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Dr. Boyd": {
   "voice_id": "Zhgd6Vgnj3TFlPqeH2Ke",
@@ -115,7 +113,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Master Splinter v2": {
   "voice_id": "6G3IoJHUBafcI3SyzELE",
@@ -134,9 +132,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "splinter_extracted.mp3"
-  ]
+  "sampleCount": 1
  },
  "Karai v2": {
   "voice_id": "anwrO52UeU1FtcsB1tHj",
@@ -152,9 +148,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "karai_extracted.mp3"
-  ]
+  "sampleCount": 1
  },
  "Mikey v2": {
   "voice_id": "oFMuHQNZ0Bh0jz5SJXQy",
@@ -170,9 +164,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "mikey_extracted-v3.mp3"
-  ]
+  "sampleCount": 1
  },
  "Lord Zedd": {
   "voice_id": "xZHSfy1jtZKEX5ypvdGU",
@@ -186,7 +178,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Green Ranger": {
   "voice_id": "fDCFh0Z04XCcSmBoHT4j",
@@ -200,7 +192,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Leonardo": {
   "voice_id": "1sca4ecJ4XyU7M176Ei0",
@@ -214,7 +206,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Blue Ranger": {
   "voice_id": "eggrlJySU29RodqjhIkX",
@@ -228,7 +220,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Grace Sterling": {
   "voice_id": "CBRFW97Lj0x8Fbaic4x2",
@@ -242,7 +234,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Narrator v2": {
   "voice_id": "l6mRFE6WsbFVDdbMTQyk",
@@ -261,9 +253,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "narrator2.mp3"
-  ]
+  "sampleCount": 1
  },
  "Red Mutant Ranger": {
   "voice_id": "EYiikCfvEGJXIrjaniJV",
@@ -277,7 +267,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Rocksteady": {
   "voice_id": "FBptoKFxS8EhO4XO87xt",
@@ -291,7 +281,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Rita Repulsa": {
   "voice_id": "fpszSg5AsrBuI5R9aidj",
@@ -305,7 +295,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Raph v2": {
   "voice_id": "RbsOf5RuEmcgV4XgAWDA",
@@ -322,9 +312,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "raph.mp3"
-  ]
+  "sampleCount": 1
  },
  "Shredder v2": {
   "voice_id": "zyz29XaJBhGHDfyrCD7d",
@@ -341,9 +329,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "shredder_extracted.mp3"
-  ]
+  "sampleCount": 1
  },
  "Soldier (recreated)": {
   "voice_id": "FNFPPu11NCH75amA044c",
@@ -357,9 +343,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "generated_audio.mp3"
-  ]
+  "sampleCount": 1
  },
  "Zordon": {
   "voice_id": "NvO7pjO09CWuF87LH2iA",
@@ -373,7 +357,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Pink Ranger": {
   "voice_id": "E8CavmYRhEEZqRb2s4nt",
@@ -387,7 +371,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Warbunny": {
   "voice_id": "Ur4iSnAWauOSA2qdwx6b",
@@ -401,7 +385,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Rock Soldier": {
   "voice_id": "Z0QRcWFZLNfSWpPpb0br",
@@ -415,7 +399,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Red Ranger": {
   "voice_id": "R8tHGp6yBIKs45odIPD1",
@@ -429,7 +413,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Yellow Ranger": {
   "voice_id": "hBYwgU1d9wzr397yTscG",
@@ -443,7 +427,7 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": []
+  "sampleCount": 0
  },
  "Raphael 1990 v3": {
   "voice_id": "66KaORPuFP0qLgNZk7im",
@@ -460,8 +444,6 @@
    "style": 0.0,
    "speed": 1.0
   },
-  "samples": [
-   "Raphael-1990__raw.mp3"
-  ]
+  "sampleCount": 1
  }
 }

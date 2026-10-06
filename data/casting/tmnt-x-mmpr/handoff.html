@@ -2,7 +2,7 @@
 <p>Prepared by the voice-lab session. <strong>Nothing in ElevenLabs or the DB has been replaced</strong> except the one test clone (Raphael 1990 v3). The comic-reader agent owns the actual swap (IDs, registry, DB rows) — the owner says there are nuances there that this package does not attempt.</p>
 <h2>Where things are</h2>
 <ul>
-<li>Clone-source audio: <code>~/Movies/library/voice-lab/clone-sources/tmnt-x-mmpr/</code> (<code>TMNT/</code>, <code>MMPR/</code>; all ≤ 1 MB, 31–90 s, owner trim notes already applied; <code>files.json</code> = provenance per file).</li>
+<li>Clone-source audio: in the voice-lab library on the owner's machine, one reel per character (all ≤ 1 MB, 31–90 s, owner trim notes already applied). Paths and file names stay out of this public repo.</li>
 <li><code>elevenlabs-voices-snapshot.json</code> (this folder): every existing own voice — <code>voice_id</code>, category, <strong>description, labels, settings</strong> — fetched 2026-08-21. Replacement voices must carry the same description + labels so they are drop-in (owner rule). Voice-design voices keep their prompt in <code>description</code>, so they can be recreated later (archive-and-restore).</li>
 <li>Audition reels + owner verdicts: labeler <code>the labeler/reels/tmnt</code> and <code>/reels/power-rangers</code> (verdicts in <code>clips/montage-verdicts.json</code>).</li>
 <li>Morphed Ranger voices: <code>docs/morphed-voice-modes.md</code> (one clone per actor; morphed = prompt register + v3 tags + helmet filter).</li>
@@ -21,7 +21,7 @@
 <thead>
 <tr>
 <th>Character</th>
-<th>Clone file (under clone-sources/tmnt-x-mmpr/)</th>
+<th>Source reel</th>
 <th>s</th>
 <th>Replaces</th>
 <th>Carry over</th>
@@ -31,7 +31,7 @@
 </thead>
 <tbody><tr>
 <td>Raphael</td>
-<td><code>TMNT/Raphael__TMNT-1990.mp3</code></td>
+<td>TMNT 1990</td>
 <td>38</td>
 <td><strong>Raph v2</strong> <code>RbsOf5RuEmcgV4XgAWDA</code> (cloned)</td>
 <td>labels: accent=en-new-york, language=en<br>desc: Young adult male. Thick Brooklyn / New York accent. Low-to-mid pitch with significant gravel and rasp. Aggressive, tough, and cynical tone. &#39;Street&#39; tough quality. Sounds physically imposing and muscular. Sarcastic delivery.</td>
@@ -40,7 +40,7 @@
 </tr>
 <tr>
 <td>Leonardo</td>
-<td><code>TMNT/Leonardo__TMNT-1990.mp3</code></td>
+<td>TMNT 1990</td>
 <td>32</td>
 <td><strong>Leonardo</strong> <code>1sca4ecJ4XyU7M176Ei0</code> (generated)</td>
 <td>labels: none<br>desc: A clear, young adult male voice with an American accent. It is disciplined and authoritative, reflecting his leadership role with a generally serious and focused tone.</td>
@@ -49,7 +49,7 @@
 </tr>
 <tr>
 <td>April O&#39;Neil</td>
-<td><code>TMNT/April-ONeil__TMNT-1990.mp3 **or** TMNT/April-ONeil__TMNT-2012.mp3</code></td>
+<td>TMNT 1990 or TMNT 2012</td>
 <td>83</td>
 <td>— (new)</td>
 <td>— write new</td>
@@ -58,7 +58,7 @@
 </tr>
 <tr>
 <td>Bebop</td>
-<td><code>TMNT/Bebop__TMNT-2012.mp3 (fallback)</code></td>
+<td>TMNT 2012 (fallback)</td>
 <td>86</td>
 <td><strong>Bebop 2</strong> <code>FCFJMCa9ZFu4325AUU3w</code> (generated)</td>
 <td>labels: language=en<br>desc: A nasally, medium-pitched Mutated Warthog Humanoid male voice with a thick, exaggerated Brooklyn accent. It sounds like a street-smart but dim-witted punk goon from the 80s, blending roughness with a goofy quality.</td>
@@ -67,7 +67,7 @@
 </tr>
 <tr>
 <td>Rocksteady</td>
-<td><code>TMNT/Rocksteady__TMNT-2012.mp3 (fallback)</code></td>
+<td>TMNT 2012 (fallback)</td>
 <td>46</td>
 <td><strong>Rocksteady</strong> <code>FBptoKFxS8EhO4XO87xt</code> (generated)</td>
 <td>labels: none<br>desc: A deep, gravelly, brutish male voice, characterized by a rough, unintelligent street-thug accent. It projects a tough, aggressive persona, befitting a powerful yet dim-witted henchman.</td>
@@ -76,7 +76,7 @@
 </tr>
 <tr>
 <td>Master Splinter</td>
-<td><code>TMNT/Splinter__TMNT-1990.mp3 (alternate)</code></td>
+<td>TMNT 1990 (alternate)</td>
 <td>81</td>
 <td><strong>Master Splinter v2</strong> <code>6G3IoJHUBafcI3SyzELE</code> (cloned)</td>
 <td>labels: age=middle-aged, accent=en-japanese, language=en, gender=male<br>desc: Middle-aged to older male. Deep bass/baritone range. extremely resonant and chest-heavy. Commanding, stoic, and wise. Very slow, deliberate pacing. Slight Transatlantic or refined Asian-American accent influence. Warm but intimidating.</td>
@@ -85,7 +85,7 @@
 </tr>
 <tr>
 <td>Shredder</td>
-<td><code>TMNT/Shredder__TMNT-1990.mp3 (alternate)</code></td>
+<td>TMNT 1990 (alternate)</td>
 <td>31</td>
 <td><strong>Shredder v2</strong> <code>zyz29XaJBhGHDfyrCD7d</code> (cloned)</td>
 <td>labels: accent=en-japanese, language=en<br>desc: (empty)</td>
@@ -94,7 +94,7 @@
 </tr>
 <tr>
 <td>Casey Jones</td>
-<td><code>TMNT/Casey-Jones__TMNT-1990.mp3</code></td>
+<td>TMNT 1990</td>
 <td>57</td>
 <td>—</td>
 <td>— write new</td>
@@ -103,7 +103,7 @@
 </tr>
 <tr>
 <td>Baxter Stockman</td>
-<td><code>TMNT/Baxter-Stockman__TMNT-2012.mp3</code></td>
+<td>TMNT 2012</td>
 <td>43</td>
 <td>—</td>
 <td>— write new</td>
@@ -112,7 +112,7 @@
 </tr>
 <tr>
 <td>Red Ranger (Jason)</td>
-<td><code>MMPR/Jason__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>88</td>
 <td><strong>Red Ranger</strong> <code>R8tHGp6yBIKs45odIPD1</code> (generated)</td>
 <td>labels: none<br>desc: A heroic and confident young adult male voice with a distinct American accent. It carries a natural leadership tone but is versatile enough to convey a range of emotions from casualness to intense desperation.</td>
@@ -121,7 +121,7 @@
 </tr>
 <tr>
 <td>Blue Ranger (Billy)</td>
-<td><code>MMPR/Billy__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>88</td>
 <td><strong>Blue Ranger</strong> <code>eggrlJySU29RodqjhIkX</code> (generated)</td>
 <td>labels: none<br>desc: A youthful, intelligent male voice, clear and articulate, with a calm and measured delivery. Despite his composed demeanor, an underlying tone of concern often permeates his speech, reflecting his thoughtful and serious nature.</td>
@@ -130,7 +130,7 @@
 </tr>
 <tr>
 <td>Black Ranger (Zack)</td>
-<td><code>MMPR/Zack__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>87</td>
 <td><strong>Black Ranger</strong> <code>cuy9NDFuCyOdZU0vkcym</code> (generated)</td>
 <td>labels: none<br>desc: A young adult male voice with a clear American accent. It has a smooth, confident, and engaging tone, reflecting his heroic and charismatic personality.</td>
@@ -139,7 +139,7 @@
 </tr>
 <tr>
 <td>Pink Ranger (Kimberly)</td>
-<td><code>MMPR/Kimberly__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>90</td>
 <td><strong>Pink Ranger</strong> <code>E8CavmYRhEEZqRb2s4nt</code> (generated)</td>
 <td>labels: none<br>desc: A clear, youthful American female voice. It should sound articulate and natural, capable of conveying a range from calm and conversational to serious or slightly concerned tones.</td>
@@ -148,7 +148,7 @@
 </tr>
 <tr>
 <td>Yellow Ranger (Trini)</td>
-<td><code>MMPR/Trini__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>90</td>
 <td><strong>Yellow Ranger</strong> <code>hBYwgU1d9wzr397yTscG</code> (generated)</td>
 <td>labels: none<br>desc: A young, energetic female voice with a clear American accent. She speaks with a lively and spirited tone, reflecting her youthful enthusiasm.</td>
@@ -157,7 +157,7 @@
 </tr>
 <tr>
 <td>Green Ranger (Tommy)</td>
-<td><code>MMPR/Tommy__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>86</td>
 <td><strong>Green Ranger</strong> <code>fDCFh0Z04XCcSmBoHT4j</code> (generated)</td>
 <td>labels: none<br>desc: A confident, heroic young adult male voice with an American accent. It possesses a strong, disciplined tone, capable of conveying both youthful energy and sincere determination, with a slight underlying rough edge.</td>
@@ -166,7 +166,7 @@
 </tr>
 <tr>
 <td>Zordon</td>
-<td><code>MMPR/Zordon__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>89</td>
 <td><strong>Zordon</strong> <code>NvO7pjO09CWuF87LH2iA</code> (generated)</td>
 <td>labels: none<br>desc: Zordon&#39;s voice is deep, booming, resonant, and authoritative, embodying a wise male presence. It possesses a slight ethereal quality, hinting at his bodiless form, and occasionally carries a subtle electronic echo.</td>
@@ -175,7 +175,7 @@
 </tr>
 <tr>
 <td>Alpha 5</td>
-<td><code>MMPR/Alpha-5__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>85</td>
 <td><strong>Alpha 5</strong> <code>G4FycwjZbrUlO5rnrTGm</code> (generated)</td>
 <td>labels: none<br>desc: A high-pitched, robotic voice with a distinct electronic filter, conveying a neurotic and anxious personality.</td>
@@ -184,7 +184,7 @@
 </tr>
 <tr>
 <td>Rita Repulsa</td>
-<td><code>MMPR/Rita-Repulsa__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>84</td>
 <td><strong>Rita Repulsa</strong> <code>fpszSg5AsrBuI5R9aidj</code> (generated)</td>
 <td>labels: none<br>desc: A shrill, raspy female voice with a strong theatrical quality. It should convey a wicked, commanding, and sharp presence, embodying her villainous authority.</td>
@@ -193,7 +193,7 @@
 </tr>
 <tr>
 <td>Lord Zedd</td>
-<td><code>MMPR/Lord-Zedd__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>84</td>
 <td><strong>Lord Zedd</strong> <code>xZHSfy1jtZKEX5ypvdGU</code> (generated)</td>
 <td>labels: none<br>desc: A deep, gravelly, booming, and terrifying male voice with a commanding and authoritative tone.</td>
@@ -202,7 +202,7 @@
 </tr>
 <tr>
 <td>Goldar</td>
-<td><code>MMPR/Goldar__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>88</td>
 <td>— (new)</td>
 <td>— write new</td>
@@ -211,7 +211,7 @@
 </tr>
 <tr>
 <td>Bulk</td>
-<td><code>MMPR/Bulk__MMPR-1993.mp3</code></td>
+<td>MMPR 1993</td>
 <td>90</td>
 <td>—</td>
 <td>— write new</td>
