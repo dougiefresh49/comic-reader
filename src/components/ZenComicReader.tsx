@@ -6,7 +6,7 @@ import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { useSettings } from "~/hooks/useSettings";
-import { useAudioPlayback } from "~/hooks/useAudioPlayback";
+import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
 import { usePinchZoom } from "~/hooks/usePinchZoom";
 import { usePageNavigation } from "~/hooks/usePageNavigation";
@@ -135,6 +135,13 @@ export default function ZenComicReader({
           b.style,
       ),
     [bubbles],
+  );
+
+  // Autoplay walks only bubbles with audio; tapping and rendering keep the
+  // full visibleBubbles list.
+  const voicedBubbles = useMemo(
+    () => visibleBubbles.filter(hasAudio),
+    [visibleBubbles],
   );
 
   const exitPanelView = useCallback(() => {
@@ -272,7 +279,11 @@ export default function ZenComicReader({
   const panelViewModeRef = useRef(panelViewMode);
   const panelAutoPlayRef = useRef(panelAutoPlay);
   const panelIndexRef = useRef(panelIndex);
-  const orderedPanelBubblesRef = useRef(orderedPanelBubbles);
+  const orderedPanelVoicedBubbles = useMemo(
+    () => orderedPanelBubbles.filter(hasAudio),
+    [orderedPanelBubbles],
+  );
+  const orderedPanelVoicedBubblesRef = useRef(orderedPanelVoicedBubbles);
   const panelsRef = useRef(panels);
   const playBubbleRef = useRef<(b: Bubble) => void | undefined>(undefined);
   const goNextPanelRef = useRef(goNextPanel);
@@ -287,8 +298,8 @@ export default function ZenComicReader({
     panelIndexRef.current = panelIndex;
   }, [panelIndex]);
   useEffect(() => {
-    orderedPanelBubblesRef.current = orderedPanelBubbles;
-  }, [orderedPanelBubbles]);
+    orderedPanelVoicedBubblesRef.current = orderedPanelVoicedBubbles;
+  }, [orderedPanelVoicedBubbles]);
   useEffect(() => {
     panelsRef.current = panels;
   }, [panels]);
@@ -301,7 +312,7 @@ export default function ZenComicReader({
       if (panelViewModeRef.current) {
         if (!panelAutoPlayRef.current) return;
         clearPanelTimer();
-        const list = orderedPanelBubblesRef.current;
+        const list = orderedPanelVoicedBubblesRef.current;
         const idx = list.findIndex((x) => x.id === b.id);
         if (idx >= 0 && idx < list.length - 1) {
           const nextBubble = list[idx + 1];
@@ -366,7 +377,7 @@ export default function ZenComicReader({
   }, [autoAdvancePage]);
 
   const { scheduleNext, cancelPending } = useAutoPlay(
-    visibleBubbles,
+    voicedBubbles,
     autoPlayEnabled,
     playBubble,
     autoAdvancePageCb,
@@ -380,7 +391,7 @@ export default function ZenComicReader({
     const panel = panels[panelIndex];
     if (!panel) return;
     const idSet = new Set(panel.bubbleIds);
-    const list = visibleBubbles.filter((b) => idSet.has(b.id));
+    const list = voicedBubbles.filter((b) => idSet.has(b.id));
     if (!list.length) {
       const ms =
         panel.estimatedDurationSeconds != null
@@ -400,7 +411,7 @@ export default function ZenComicReader({
     panelAutoPlay,
     panelIndex,
     panels,
-    visibleBubbles,
+    voicedBubbles,
     clearPanelTimer,
   ]);
 

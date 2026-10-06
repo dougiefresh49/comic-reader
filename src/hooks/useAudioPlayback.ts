@@ -17,6 +17,13 @@ interface UseAudioPlaybackOptions {
   playbackRate?: number;
 }
 
+/** A bubble has audio exactly when its storage path is set. */
+export function hasAudio(
+  bubble: Bubble,
+): bubble is Bubble & { audioStoragePath: string } {
+  return Boolean(bubble.audioStoragePath);
+}
+
 export function useAudioPlayback({
   bookId,
   issueId,
@@ -48,12 +55,16 @@ export function useAudioPlayback({
     (bubble: Bubble) => {
       stopAll();
 
+      // No audio: stop what was playing and leave no element behind, so a
+      // second tap (togglePlayPause) cannot replay the previous bubble's clip.
+      // No `ended` either: autoplay never picks such a bubble.
+      if (!hasAudio(bubble)) {
+        audioRef.current = null;
+        return;
+      }
+
       const audio = new Audio(
-        audioUrl(
-          bookId,
-          issueId,
-          bubble.audioStoragePath ?? `${bubble.id}.mp3`,
-        ),
+        audioUrl(bookId, issueId, bubble.audioStoragePath),
       );
       audio.volume = Math.max(0, Math.min(1, volume));
       audio.playbackRate = playbackRate;
