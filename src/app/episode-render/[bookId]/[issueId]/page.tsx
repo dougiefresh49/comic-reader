@@ -22,8 +22,8 @@ interface Params {
  * URL: /episode-render/<book>/<issue>?page=<n>
  *      Defaults to all pages if `page` is omitted.
  *
- * The route is hidden from the UI — there's no link to it from the
- * library — so it doesn't need auth.
+ * The route is behind admin auth: the matcher in src/middleware.ts
+ * covers it, and the rules live in src/lib/admin-auth.ts.
  */
 export default async function EpisodeRenderPage({
   params,

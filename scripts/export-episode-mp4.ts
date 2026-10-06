@@ -18,6 +18,12 @@
  *   pnpm export-episode-mp4 -- --book tmnt-mmpr-iii --issue 1
  *   pnpm export-episode-mp4 -- --book ... --issue ... --page 3
  *   pnpm export-episode-mp4 -- ... --upload   # push to Supabase too
+ *
+ * Sign-in: /episode-render sits behind admin auth (src/middleware.ts).
+ * When ADMIN_USERNAME and ADMIN_PASSWORD are both set, they go to
+ * Playwright as httpCredentials, scoped to BASE_URL's origin so they
+ * never reach Supabase Storage or any other host the page loads from.
+ * When either is unset, none are sent (local dev without them).
  */
 
 import { chromium } from "playwright";
@@ -63,6 +69,9 @@ async function main() {
   console.log(`▶  Recording ${RENDER_URL}`);
   console.log(`   Output: ${OUT_DIR}`);
 
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_PASSWORD;
+
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 720, height: 1080 }, // 2:3 portrait
@@ -71,9 +80,30 @@ async function main() {
       dir: OUT_DIR,
       size: { width: 720, height: 1080 },
     },
+    ...(username && password
+      ? {
+          httpCredentials: {
+            username,
+            password,
+            origin: new URL(BASE_URL).origin,
+          },
+        }
+      : {}),
   });
   const page = await context.newPage();
-  await page.goto(RENDER_URL, { waitUntil: "networkidle", timeout: 60000 });
+  const response = await page.goto(RENDER_URL, {
+    waitUntil: "networkidle",
+    timeout: 60000,
+  });
+  if (!response?.ok()) {
+    const status = response ? String(response.status()) : "no response";
+    await browser.close();
+    const hint =
+      response?.status() === 401
+        ? " Check ADMIN_USERNAME and ADMIN_PASSWORD."
+        : "";
+    throw new Error(`${RENDER_URL} answered ${status}.${hint}`);
+  }
 
   // Wait until the render client signals completion.
   console.log("   Recording…");
