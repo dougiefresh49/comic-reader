@@ -50,32 +50,3 @@ export function resolveEffectRect(
     height: `${panelBbox.h * 100}%`,
   };
 }
-
-/**
- * Resolve anchor to a transform-origin string within the panel.
- * Returns CSS transform-origin value like "50% 50%" or "0% 100%".
- */
-export function resolveAnchorOrigin(anchor?: string): string {
-  switch (anchor) {
-    case "top-left":
-      return "0% 0%";
-    case "top-center":
-      return "50% 0%";
-    case "top-right":
-      return "100% 0%";
-    case "left-center":
-      return "0% 50%";
-    case "center":
-      return "50% 50%";
-    case "right-center":
-      return "100% 50%";
-    case "bottom-left":
-      return "0% 100%";
-    case "bottom-center":
-      return "50% 100%";
-    case "bottom-right":
-      return "100% 100%";
-    default:
-      return "50% 50%";
-  }
-}

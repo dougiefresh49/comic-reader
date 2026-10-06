@@ -24,7 +24,7 @@ export type GateWaitRecord = {
 /**
  * Append a skip record to pipeline_runs.steps.skipped on this run's row
  * (updateRunSteps matches it by runId). A missing row or a failed write is
- * logged; the record is returned either way.
+ * logged; nothing is returned.
  */
 async function appendSkipRecord(
   client: Parameters<typeof updateRunSteps>[0],

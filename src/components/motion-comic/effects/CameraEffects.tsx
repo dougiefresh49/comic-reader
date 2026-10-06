@@ -10,9 +10,9 @@ import type { EffectProps } from "./types";
  * eyeball the motion. Each preview wraps a stylised marker box in the
  * same keyframe animation that PanelViewFrame would apply at runtime.
  *
- * In production these components are still registered, but they no-op
- * because the camera transform happens upstream — the visible result
- * the user sees comes from PanelViewFrame, not these stub overlays.
+ * These components are registered only in `EFFECTS_PREVIEW` (registry.tsx).
+ * The reader's `EFFECTS` map leaves them out; there the camera move comes
+ * from PanelViewFrame, when its `cameraEffects` prop is on.
  */
 
 interface DemoProps {

@@ -95,30 +95,19 @@ export async function POST(req: NextRequest) {
   };
   if (runsError) return checkFailed("a run", new Error(runsError.message));
 
-  // Mirrors cancel-ingest/route.ts: with a pause flag it cancels that gate's
-  // hook holder; without one, the newest row's run unless the issue ended.
+  // One remedy fits every state: cancel-ingest given a runId cancels any
+  // live run of the issue (#242).
   const pausedAt = issue.pipeline_paused ? issue.pipeline_paused_at : null;
-  const ended =
-    issue.pipeline_step === "complete" ||
-    (issue.pipeline_step?.startsWith("failed:") ?? false);
-  const refuse = (runId: string, state: string, gate?: string) => {
-    const newest = runs?.[0];
-    const cancelIngestWorks = pausedAt
-      ? gate === pausedAt
-      : !ended && newest?.status === "running" && newest.steps?.runId === runId;
-    const remedy = cancelIngestWorks
-      ? "Cancel it first with cancel-ingest"
-      : `Cancel it first with cancel-ingest given its runId (${runId}), which closes the run and leaves the issue row as it is`;
-    return Response.json(
+  const refuse = (runId: string, state: string) =>
+    Response.json(
       {
-        error: `Run ${runId} of ${label} is ${state}. ${remedy}, then trigger again.`,
+        error: `Run ${runId} of ${label} is ${state}. Cancel that run first, with the Cancel run button in admin or a cancel-ingest request naming its runId, then trigger again.`,
         runId,
         pausedAt,
         pipelineStep: issue.pipeline_step,
       },
       { status: 409 },
     );
-  };
   const stale: string[] = [];
 
   for (const gate of Object.keys(PAUSE_TO_HOOK_STEP)) {
@@ -126,7 +115,7 @@ export async function POST(req: NextRequest) {
       const hook = await getHookByToken(
         ingestHookToken(body.bookId, body.issueId, gate),
       );
-      return refuse(hook.runId, `paused at ${gate}`, gate);
+      return refuse(hook.runId, `paused at ${gate}`);
     } catch (err) {
       if (!HookNotFoundError.is(err)) {
         return checkFailed(`a run paused at ${gate}`, err);
