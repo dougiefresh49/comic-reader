@@ -1112,6 +1112,48 @@ export type Database = {
           },
         ];
       };
+      voice_lookups: {
+        Row: {
+          character_id: string;
+          created_at: string;
+          description: string;
+          labels: Json;
+          model: string;
+          work_id: string;
+        };
+        Insert: {
+          character_id: string;
+          created_at?: string;
+          description: string;
+          labels: Json;
+          model: string;
+          work_id: string;
+        };
+        Update: {
+          character_id?: string;
+          created_at?: string;
+          description?: string;
+          labels?: Json;
+          model?: string;
+          work_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "voice_lookups_character_id_fkey";
+            columns: ["character_id"];
+            isOneToOne: false;
+            referencedRelation: "characters";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "voice_lookups_work_id_fkey";
+            columns: ["work_id"];
+            isOneToOne: false;
+            referencedRelation: "works";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       voices: {
         Row: {
           appearance_id: string | null;

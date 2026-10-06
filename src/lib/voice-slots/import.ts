@@ -15,30 +15,37 @@ function fail(what: string, error: { message: string }): never {
 }
 
 /**
- * The fields voice-lab-import fills on an existing row. `status` moves
+ * The fields voice-lab-import fills on an existing row (#474): a missing
+ * description and labels, and a `needs_clip` row's sample. `status` moves
  * only to `archived`, when a `needs_clip` row receives its sample.
  */
 export type VoiceLabFacts = Partial<{
   description: string;
   labels: Json;
-  design_prompt: string;
-  starting_pick: boolean;
-  consumers: string[];
   source_clip_path: string;
   source_clip_md5: string;
   status: "archived";
 }>;
 
+/**
+ * Updates one row by id. A write that moves `status` also requires the row
+ * to still be `needs_clip` (#469 item 2: the plan was read before the clip
+ * uploads). Throws when no row was updated, so a row that moved or left
+ * since the read fails instead of passing silently.
+ */
 export async function updateVoiceFacts(
   client: SupabaseClient,
   voiceId: string,
   set: VoiceLabFacts,
 ): Promise<void> {
-  const { error } = await db(client)
-    .from("voices")
-    .update(set)
-    .eq("id", voiceId);
+  let query = db(client).from("voices").update(set).eq("id", voiceId);
+  if (set.status) query = query.eq("status", "needs_clip");
+  const { data, error } = await query.select("id");
   if (error) fail(`update voices ${voiceId}`, error);
+  if ((data ?? []).length === 0)
+    throw new Error(
+      `update voices ${voiceId}: no row updated${set.status ? " (it is no longer needs_clip)" : ""}`,
+    );
 }
 
 export interface CandidateVoiceInput {

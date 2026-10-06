@@ -1,68 +1,168 @@
 {
-  "folder": "fixture-book",
   "protected_voice_ids": [
-    "00000000-0000-4000-8000-000000000008"
+    "00000000-0000-4000-8000-000000000007"
   ],
   "characters": [
     {
       "id": "april",
-      "display_name": "April"
-    },
-    {
-      "id": "armored-villain",
-      "display_name": "Armored Villain"
-    },
-    {
-      "id": "baxter",
-      "display_name": "Baxter"
-    },
-    {
-      "id": "bebop",
-      "display_name": "Bebop"
-    },
-    {
-      "id": "crowd",
-      "display_name": "Crowd"
-    },
-    {
-      "id": "karai",
-      "display_name": "Karai"
-    },
-    {
-      "id": "krang",
-      "display_name": "Krang"
-    },
-    {
-      "id": "leonardo",
-      "display_name": "Leonardo"
-    },
-    {
-      "id": "michelangelo",
-      "display_name": "Michelangelo"
-    },
-    {
-      "id": "rocksteady",
-      "display_name": "Rocksteady"
+      "display_name": "April O'Neil",
+      "aliases": []
     },
     {
       "id": "shredder",
-      "display_name": "Shredder"
+      "display_name": "Shredder",
+      "aliases": []
+    },
+    {
+      "id": "leonardo",
+      "display_name": "Leonardo",
+      "aliases": []
+    },
+    {
+      "id": "krang",
+      "display_name": "Krang",
+      "aliases": [
+        "Kraang"
+      ]
+    },
+    {
+      "id": "bebop",
+      "display_name": "Bebop",
+      "aliases": []
+    },
+    {
+      "id": "rocksteady",
+      "display_name": "Rocksteady",
+      "aliases": []
+    },
+    {
+      "id": "michelangelo",
+      "display_name": "Michelangelo",
+      "aliases": []
+    },
+    {
+      "id": "casey-jones",
+      "display_name": "Casey Jones",
+      "aliases": []
+    },
+    {
+      "id": "baxter-stockman",
+      "display_name": "Baxter Stockman",
+      "aliases": []
+    },
+    {
+      "id": "metalhead",
+      "display_name": "Metalhead",
+      "aliases": []
+    },
+    {
+      "id": "master-splinter",
+      "display_name": "Master Splinter",
+      "aliases": [
+        "Splinter"
+      ]
+    },
+    {
+      "id": "donatello",
+      "display_name": "Donatello",
+      "aliases": []
     }
   ],
-  "franchises": [
-    "tmnt"
+  "works": [
+    {
+      "id": "space-turtles-1991",
+      "franchise_id": null,
+      "title": "Space Turtles",
+      "year": 1991,
+      "medium": "animated_series",
+      "universe": null
+    },
+    {
+      "id": "shell-shock-2003",
+      "franchise_id": null,
+      "title": "Shell Shock",
+      "year": 2003,
+      "medium": "movie",
+      "universe": null
+    }
+  ],
+  "appearances": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "character_id": "april",
+      "work_id": "space-turtles-1991",
+      "voice_actor": "Invented Actor One",
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "character_id": "shredder",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000003",
+      "character_id": "leonardo",
+      "work_id": "space-turtles-1991",
+      "voice_actor": "Invented Actor Three",
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000004",
+      "character_id": "krang",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000006",
+      "character_id": "rocksteady",
+      "work_id": "space-turtles-1991",
+      "voice_actor": "Invented Actor Six",
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000007",
+      "character_id": "michelangelo",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000012",
+      "character_id": "master-splinter",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000013",
+      "character_id": "donatello",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": [],
+      "notes": null
+    }
   ],
   "voices": [
     {
       "id": "00000000-0000-4000-8000-000000000001",
       "display_name": "April (1991)",
-      "status": "needs_clip",
+      "status": "archived",
       "character_id": "april",
       "appearance_id": "a0000000-0000-4000-8000-000000000001",
       "starting_pick": false,
       "current_elevenlabs_id": null,
-      "source_clip_path": null,
-      "source_clip_md5": null,
+      "source_clip_path": "space-turtles__april.mp3",
+      "source_clip_md5": "11111111111111111111111111111111",
       "design_prompt": null,
       "description": null,
       "labels": null,
@@ -75,22 +175,19 @@
     },
     {
       "id": "00000000-0000-4000-8000-000000000002",
-      "display_name": "Shredder",
-      "status": "active",
+      "display_name": "Shredder (2003)",
+      "status": "archived",
       "character_id": "shredder",
       "appearance_id": "a0000000-0000-4000-8000-000000000002",
       "starting_pick": false,
-      "current_elevenlabs_id": "el-fixture-shredder",
-      "source_clip_path": null,
-      "source_clip_md5": null,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "shell-shock__shredder.mp3",
+      "source_clip_md5": "22222222222222222222222222222222",
       "design_prompt": null,
-      "description": "An old line.",
-      "labels": {
-        "accent": "american"
-      },
+      "description": null,
+      "labels": null,
       "consumers": [
-        "comic",
-        "room"
+        "comic"
       ],
       "keep_active": false,
       "created_at": "2026-09-29T12:00:00+00:00",
@@ -98,17 +195,42 @@
     },
     {
       "id": "00000000-0000-4000-8000-000000000003",
-      "display_name": "Armored Villain",
+      "display_name": "Leonardo (1991)",
       "status": "archived",
-      "character_id": "armored-villain",
+      "character_id": "leonardo",
       "appearance_id": null,
       "starting_pick": false,
       "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__armored-villain__design-preview.mp3",
+      "source_clip_path": "space-turtles__leonardo.mp3",
       "source_clip_md5": "33333333333333333333333333333333",
-      "design_prompt": "A low metallic growl.",
-      "description": null,
+      "design_prompt": null,
+      "description": "An existing description of a calm, steady voice.",
       "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "display_name": "Leonardo",
+      "status": "active",
+      "character_id": "leonardo",
+      "appearance_id": "a0000000-0000-4000-8000-000000000003",
+      "starting_pick": false,
+      "current_elevenlabs_id": "el-31",
+      "source_clip_path": null,
+      "source_clip_md5": null,
+      "design_prompt": null,
+      "description": "A clear, young adult male voice.",
+      "labels": {
+        "gender": "male",
+        "age": "young",
+        "accent": "en-american",
+        "language": "en"
+      },
       "consumers": [
         "comic"
       ],
@@ -118,30 +240,10 @@
     },
     {
       "id": "00000000-0000-4000-8000-000000000004",
-      "display_name": "Bebop (1991)",
-      "status": "archived",
-      "character_id": "bebop",
-      "appearance_id": null,
-      "starting_pick": false,
-      "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__bebop__space-turtles-1991.mp3",
-      "source_clip_md5": "44444444444444444444444444444444",
-      "design_prompt": null,
-      "description": null,
-      "labels": null,
-      "consumers": [
-        "comic"
-      ],
-      "keep_active": false,
-      "created_at": "2026-09-29T12:00:00+00:00",
-      "archived_at": null
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000005",
-      "display_name": "Rocksteady (1991)",
+      "display_name": "Krang (1991)",
       "status": "needs_clip",
-      "character_id": "rocksteady",
-      "appearance_id": "a0000000-0000-4000-8000-000000000005",
+      "character_id": "krang",
+      "appearance_id": "a0000000-0000-4000-8000-000000000004",
       "starting_pick": false,
       "current_elevenlabs_id": null,
       "source_clip_path": null,
@@ -158,18 +260,21 @@
     },
     {
       "id": "00000000-0000-4000-8000-000000000006",
-      "display_name": "Karai (2003)",
-      "status": "archived",
-      "character_id": "karai",
+      "display_name": "Rocksteady",
+      "status": "active",
+      "character_id": "rocksteady",
       "appearance_id": "a0000000-0000-4000-8000-000000000006",
-      "starting_pick": true,
-      "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__karai__shell-shock-2003.mp3",
-      "source_clip_md5": "55555555555555555555555555555555",
+      "starting_pick": false,
+      "current_elevenlabs_id": "el-6",
+      "source_clip_path": null,
+      "source_clip_md5": null,
       "design_prompt": null,
-      "description": "A quiet, sharp ninja.",
+      "description": "A deep, gravelly male voice.",
       "labels": {
-        "age": "young"
+        "gender": "male",
+        "age": "young",
+        "accent": "en-american",
+        "language": "en"
       },
       "consumers": [
         "comic"
@@ -180,62 +285,17 @@
     },
     {
       "id": "00000000-0000-4000-8000-000000000007",
-      "display_name": "Rocksteady (2003)",
-      "status": "archived",
-      "character_id": "rocksteady",
-      "appearance_id": "a0000000-0000-4000-8000-000000000007",
-      "starting_pick": true,
-      "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__rocksteady__shell-shock-2003.mp3",
-      "source_clip_md5": "77777777777777777777777777777777",
-      "design_prompt": null,
-      "description": "A gravelly rhino.",
-      "labels": {
-        "age": "middle_aged"
-      },
-      "consumers": [
-        "comic"
-      ],
-      "keep_active": false,
-      "created_at": "2026-09-29T12:00:00+00:00",
-      "archived_at": null
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000008",
       "display_name": "Michelangelo",
       "status": "active",
       "character_id": "michelangelo",
-      "appearance_id": "a0000000-0000-4000-8000-000000000008",
+      "appearance_id": "a0000000-0000-4000-8000-000000000007",
       "starting_pick": false,
-      "current_elevenlabs_id": "el-fixture-michelangelo",
-      "source_clip_path": null,
-      "source_clip_md5": null,
+      "current_elevenlabs_id": "el-7",
+      "source_clip_path": "michelangelo/original.mp3",
+      "source_clip_md5": "77777777777777777777777777777777",
       "design_prompt": null,
-      "description": "A protected voice.",
-      "labels": {
-        "age": "young"
-      },
-      "consumers": [
-        "comic",
-        "room"
-      ],
-      "keep_active": false,
-      "created_at": "2026-09-29T12:00:00+00:00",
-      "archived_at": null
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000009",
-      "display_name": "Crowd",
-      "status": "needs_clip",
-      "character_id": "crowd",
-      "appearance_id": null,
-      "starting_pick": false,
-      "current_elevenlabs_id": null,
-      "source_clip_path": null,
-      "source_clip_md5": null,
-      "design_prompt": "A murmuring crowd.",
-      "description": "A murmuring crowd.",
-      "labels": null,
+      "description": "A young, high-energy voice.",
+      "labels": {},
       "consumers": [
         "comic"
       ],
@@ -244,38 +304,23 @@
       "archived_at": null
     },
     {
-      "id": "00000000-0000-4000-8000-000000000010",
-      "display_name": "Leonardo (1991)",
+      "id": "00000000-0000-4000-8000-000000000012",
+      "display_name": "Master Splinter (1991)",
       "status": "archived",
-      "character_id": "leonardo",
-      "appearance_id": "a0000000-0000-4000-8000-000000000010",
+      "character_id": "master-splinter",
+      "appearance_id": "a0000000-0000-4000-8000-000000000012",
       "starting_pick": false,
       "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__leonardo__space-turtles-1991.mp3",
-      "source_clip_md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "design_prompt": null,
-      "description": null,
-      "labels": null,
-      "consumers": [
-        "comic"
-      ],
-      "keep_active": false,
-      "created_at": "2026-09-29T12:00:00+00:00",
-      "archived_at": null
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000020",
-      "display_name": "Krang (1991)",
-      "status": "needs_clip",
-      "character_id": "krang",
-      "appearance_id": "a0000000-0000-4000-8000-000000000020",
-      "starting_pick": false,
-      "current_elevenlabs_id": null,
-      "source_clip_path": null,
+      "source_clip_path": "space-turtles__splinter.mp3",
       "source_clip_md5": "cccccccccccccccccccccccccccccccc",
       "design_prompt": null,
-      "description": null,
-      "labels": null,
+      "description": "A slow, warm, deep voice.",
+      "labels": {
+        "gender": "male",
+        "age": "old",
+        "accent": "en-japanese",
+        "language": "en"
+      },
       "consumers": [
         "comic"
       ],
@@ -284,144 +329,29 @@
       "archived_at": null
     },
     {
-      "id": "00000000-0000-4000-8000-000000000021",
-      "display_name": "Bebop (2003)",
+      "id": "00000000-0000-4000-8000-000000000013",
+      "display_name": "Wrong Holder",
       "status": "archived",
-      "character_id": "bebop",
-      "appearance_id": "a0000000-0000-4000-8000-000000000021",
-      "starting_pick": false,
-      "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__bebop__old-take.mp3",
-      "source_clip_md5": null,
-      "design_prompt": null,
-      "description": null,
-      "labels": null,
-      "consumers": [
-        "comic"
-      ],
-      "keep_active": false,
-      "created_at": "2026-09-29T12:00:00+00:00",
-      "archived_at": null
-    },
-    {
-      "id": "00000000-0000-4000-8000-000000000022",
-      "display_name": "Shredder (1991)",
-      "status": "needs_clip",
-      "character_id": "shredder",
-      "appearance_id": "a0000000-0000-4000-8000-000000000022",
-      "starting_pick": false,
-      "current_elevenlabs_id": null,
-      "source_clip_path": "fixture-book__shredder__space-turtles-1991.mp3",
-      "source_clip_md5": null,
-      "design_prompt": null,
-      "description": null,
-      "labels": null,
-      "consumers": [
-        "comic"
-      ],
-      "keep_active": false,
-      "created_at": "2026-09-29T12:00:00+00:00",
-      "archived_at": null
-    }
-  ],
-  "works": [
-    {
-      "id": "space-turtles-1991",
-      "title": "Space Turtles",
-      "year": 1991,
-      "medium": "animated_series",
-      "franchise_id": "tmnt",
-      "universe": null
-    },
-    {
-      "id": "shell-shock-2003",
-      "title": "Shell Shock",
-      "year": 2003,
-      "medium": "movie",
-      "franchise_id": "tmnt",
-      "universe": null
-    }
-  ],
-  "appearances": [
-    {
-      "id": "a0000000-0000-4000-8000-000000000001",
-      "character_id": "april",
-      "work_id": "space-turtles-1991",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000002",
-      "character_id": "shredder",
-      "work_id": "shell-shock-2003",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000007",
-      "character_id": "rocksteady",
-      "work_id": "shell-shock-2003",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000008",
-      "character_id": "michelangelo",
-      "work_id": "space-turtles-1991",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000010",
       "character_id": "leonardo",
-      "work_id": "space-turtles-1991",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000005",
-      "character_id": "rocksteady",
-      "work_id": "space-turtles-1991",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000006",
-      "character_id": "karai",
-      "work_id": "shell-shock-2003",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000020",
-      "character_id": "krang",
-      "work_id": "space-turtles-1991",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000021",
-      "character_id": "bebop",
-      "work_id": "shell-shock-2003",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
-    },
-    {
-      "id": "a0000000-0000-4000-8000-000000000022",
-      "character_id": "shredder",
-      "work_id": "space-turtles-1991",
-      "voice_actor": null,
-      "search_terms": null,
-      "notes": null
+      "appearance_id": "a0000000-0000-4000-8000-000000000013",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "shell-shock__wrong-holder.mp3",
+      "source_clip_md5": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "design_prompt": null,
+      "description": "A voice filed under the wrong character.",
+      "labels": {
+        "gender": "male",
+        "age": "young",
+        "accent": "en-american",
+        "language": "en"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
     }
   ]
 }

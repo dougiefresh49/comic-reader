@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "clips": [
+    {
+      "file": "lost-tapes/april.mp3",
+      "md5": "11111111111111111111111111111111",
+      "character": "April O'Neil",
+      "universe": "invented",
+      "work": {
+        "slug": "lost-tapes",
+        "title": "Lost Tapes",
+        "year": 1999,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "shell-shock/shredder.mp3",
+      "md5": "22222222222222222222222222222222",
+      "character": "Shredder",
+      "universe": "invented",
+      "work": {
+        "slug": "shell-shock",
+        "title": "Shell Shock",
+        "year": 2003,
+        "kind": "film"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/leonardo.mp3",
+      "md5": "33333333333333333333333333333333",
+      "character": "Leonardo",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/krang.mp3",
+      "md5": "44444444444444444444444444444444",
+      "character": "Kraang",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "shell-shock/bebop.mp3",
+      "md5": "55555555555555555555555555555555",
+      "character": "Bebop",
+      "universe": "invented",
+      "work": {
+        "slug": "shell-shock",
+        "title": "Shell Shock",
+        "year": 2003,
+        "kind": "film"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/rocksteady.mp3",
+      "md5": "66666666666666666666666666666666",
+      "character": "Rocksteady",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/michelangelo.mp3",
+      "md5": "77777777777777777777777777777777",
+      "character": "Michelangelo",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/baboo.mp3",
+      "md5": "88888888888888888888888888888888",
+      "character": "Baboo",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "night-patrol/casey-jones.mp3",
+      "md5": "99999999999999999999999999999999",
+      "character": "Casey Jones",
+      "universe": "invented",
+      "work": {
+        "slug": "night-patrol",
+        "title": "Night Patrol",
+        "year": 1995,
+        "kind": "film"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/baxter-stockman.mp3",
+      "md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "character": "Baxter Stockman",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "casting",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "../outside/metalhead.mp3",
+      "md5": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "character": "Metalhead",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "space-turtles/splinter.mp3",
+      "md5": "cccccccccccccccccccccccccccccccc",
+      "character": "Splinter",
+      "universe": "invented",
+      "work": {
+        "slug": "space-turtles",
+        "title": "Space Turtles",
+        "year": 1991,
+        "kind": "series"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    },
+    {
+      "file": "shell-shock/donatello.mp3",
+      "md5": "dddddddddddddddddddddddddddddddd",
+      "character": "Donatello",
+      "universe": "invented",
+      "work": {
+        "slug": "shell-shock",
+        "title": "Shell Shock",
+        "year": 2003,
+        "kind": "film"
+      },
+      "status": "approved",
+      "seconds": 60,
+      "reel": "ignored.mp3",
+      "trimmed": true
+    }
+  ]
+}
