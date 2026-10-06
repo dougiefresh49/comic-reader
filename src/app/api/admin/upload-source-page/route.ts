@@ -1,5 +1,6 @@
 import "server-only";
 import { type NextRequest } from "next/server";
+import pLimit from "p-limit";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { updateIssue, upsertIssue } from "~/lib/issue-queries";
@@ -131,8 +132,11 @@ export async function POST(req: NextRequest) {
 
     let stored = 0;
     const errors: string[] = [];
+    const warnings: string[] = [];
+    // Each page now costs a Gemini detect call (#541): three at a time.
+    const limit = pLimit(3);
 
-    for (const file of pageFiles) {
+    const storeOne = async (file: { name: string; pageNumber: number }) => {
       const path = `${prefix}/${file.name}`;
       const { data: blob, error: dlError } = await supabaseAdmin.storage
         .from(RAW_BUCKET)
@@ -141,23 +145,30 @@ export async function POST(req: NextRequest) {
         errors.push(
           `page ${file.pageNumber}: download failed (${dlError?.message ?? "no data"})`,
         );
-        continue;
+        return;
       }
       try {
         const buffer = Buffer.from(await blob.arrayBuffer());
-        await storePageImage({
+        const { failures } = await storePageImage({
           bookId: body.bookId,
           issueId: body.issueId,
           pageNumber: file.pageNumber,
           buffer,
         });
         stored++;
+        if (failures.length > 0) {
+          warnings.push(
+            `page ${file.pageNumber}; watermark left: ${failures.map((f) => f.reason).join(", ")}`,
+          );
+        }
       } catch (err) {
         errors.push(
           `page ${file.pageNumber}: ${err instanceof Error ? err.message : "unknown"}`,
         );
       }
-    }
+    };
+
+    await Promise.all(pageFiles.map((file) => limit(() => storeOne(file))));
 
     if (errors.length > 0) {
       return Response.json(
@@ -166,6 +177,7 @@ export async function POST(req: NextRequest) {
           stored,
           total: pageFiles.length,
           errors,
+          ...(warnings.length > 0 ? { warnings } : {}),
         },
         { status: 500 },
       );
@@ -189,6 +201,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       stored,
       total: pageFiles.length,
+      ...(warnings.length > 0 ? { warnings } : {}),
     });
   }
 

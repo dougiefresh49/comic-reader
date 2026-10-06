@@ -3,9 +3,10 @@
  * moving the page's edges, so every panel and bubble box stays put.
  *
  * Two forms: a solid black banner band under the art with white text on it
- * (found by pixel work, painted black), and translucent text laid over the art
- * (found by one GEMINI_MEDIUM call, removed by a GEMINI_IMAGE_EDIT call on a
- * crop and copied back only where the edit changed pixels). Everything outside
+ * (found by pixel work, painted black once the detect call confirms it), and
+ * translucent text laid over the art (found by one GEMINI_MEDIUM call, removed
+ * by a GEMINI_IMAGE_EDIT call on a crop and copied back only where the edit
+ * changed pixels). Everything outside
  * a fix is the input, byte for byte. No "server-only": scripts import this.
  */
 import { ThinkingLevel } from "@google/genai";
@@ -20,7 +21,7 @@ export type Box = { x: number; y: number; width: number; height: number };
 export type WatermarkFix = { kind: "banner" | "overlay"; box: Box };
 
 export type WatermarkFailure = {
-  kind: "overlay";
+  kind: "banner" | "overlay";
   reason: string;
   box?: Box;
 };
@@ -194,7 +195,9 @@ const DETECT_HEIGHT_PX = 1000;
 
 const DETECT_PROMPT = `Find any watermark on this comic book page. A watermark here is a line of translucent, semi-transparent lettering (a website name or similar), usually light grey or white, laid over the artwork so the art shows through it, usually near a corner or an edge of the page. It was added on top of the finished page and is not part of the comic: speech bubbles, captions, sound effects, titles, credits, signatures, page numbers, barcodes, and halftone dots, textures or patterns in the art are not watermarks. Report one only when you can make out its letters.
 
-Return a JSON array with one item per watermark: {"box_2d": [ymin, xmin, ymax, xmax], "label": "<what it looks like>"}, coordinates normalized to 0-1000, the box drawn tight around the watermark's lettering. Return [] when the page has no watermark.`;
+Also report a band: a solid-colour strip added below the artwork, across the page, that carries a website name or a line of promotional lettering. It was added to the finished page too; a black strip that belongs to the art, or a caption or credit inside the art, is not a band.
+
+Return a JSON array with one item per finding: {"kind": "watermark" | "band", "box_2d": [ymin, xmin, ymax, xmax], "label": "<what it looks like>"}, coordinates normalized to 0-1000. Draw a watermark's box tight around its lettering, and a band's box around the whole strip. Return [] when the page has neither.`;
 
 /** Gemini's `box_2d` ([ymin, xmin, ymax, xmax], 0-1000) to page pixels. */
 export function boxFromNormalized(
@@ -239,11 +242,20 @@ function parseDetections(text: string): unknown[] {
   return Array.isArray(parsed) ? parsed : [];
 }
 
+export type Detections = {
+  /** Watermark boxes small enough to edit. */
+  accepted: Box[];
+  /** Watermark boxes too large to be one: a misfire, never edited. */
+  rejected: Box[];
+  /** Added bands under the art, which confirm a `detectBanner` band. */
+  bands: Box[];
+};
+
 /** One GEMINI_MEDIUM call on the page downscaled to ~1000 px tall. */
 export async function detectOverlays(
   img: RgbImage,
   meta: LlmCallMeta,
-): Promise<{ accepted: Box[]; rejected: Box[] }> {
+): Promise<Detections> {
   const jpeg = await sharp(img.data, {
     raw: { width: img.width, height: img.height, channels: 3 },
   })
@@ -275,20 +287,34 @@ export async function detectOverlays(
     },
     meta,
   );
-  const accepted: Box[] = [];
-  const rejected: Box[] = [];
+  const found: Detections = { accepted: [], rejected: [], bands: [] };
   for (const item of parseDetections(response.text ?? "")) {
-    const box = boxFromNormalized(
-      (item as { box_2d?: unknown } | null)?.box_2d,
-      img.width,
-      img.height,
-    );
+    const it = item as { box_2d?: unknown; kind?: unknown } | null;
+    const box = boxFromNormalized(it?.box_2d, img.width, img.height);
     if (!box) continue;
-    (isPlausibleOverlay(box, img.width, img.height) ? accepted : rejected).push(
-      box,
-    );
+    if (it?.kind === "band") found.bands.push(box);
+    else if (isPlausibleOverlay(box, img.width, img.height)) {
+      found.accepted.push(box);
+    } else found.rejected.push(box);
   }
-  return { accepted, rejected };
+  return found;
+}
+
+/**
+ * A detector band confirms the pixel band when it overlaps the band's rows
+ * at all and spans at least half the page width.
+ */
+export function confirmsBanner(band: Box, banner: Box, width: number) {
+  const overlaps =
+    band.y < banner.y + banner.height && band.y + band.height > banner.y;
+  return overlaps && band.width >= width / 2;
+}
+
+/** True when a box's centre row lies in the band: the band's own lettering. */
+function inBanner(box: Box, banner: Box | null): boolean {
+  if (!banner) return false;
+  const cy = box.y + box.height / 2;
+  return cy >= banner.y && cy < banner.y + banner.height;
 }
 
 // ─── Overlay: edit a crop, copy back through a change mask ─────────────────
@@ -311,6 +337,8 @@ const MASK_MAX_SHARE = 0.9;
  * crop, or a half-cleaned one about as often as a clean one.
  */
 const OVERLAY_ROUNDS = 3;
+/** Boxes one round edits; more than this on a page is a misfire, not edited. */
+const OVERLAY_MAX_BOXES_PER_ROUND = 3;
 
 /** Aspect ratios the image model accepts, as width / height. */
 const ASPECT_RATIOS: Array<[string, number]> = [
@@ -598,10 +626,12 @@ function compositeMasked(
 }
 
 /**
- * Cleans one page: paints a banner band black, then edits away any overlay
- * the vision call finds on the banner-painted page. Same width and height
- * out as in. A failed overlay edit leaves the page as it was there and is
- * listed in `failures`. Under DRY_RUN the overlay calls are skipped.
+ * Cleans one page. The detect call looks at the page as it came in: a pixel
+ * band it confirms is painted black (its lettering is never sent for an
+ * edit), and each watermark it finds is edited away in rounds, the page
+ * detected again after each. Same width and height out as in. A fix that
+ * cannot be made leaves that part of the page as it was and is listed in
+ * `failures`. Under DRY_RUN no call is made: a band is reported, not painted.
  */
 export async function cleanPageWatermarks(args: {
   buffer: Buffer;
@@ -614,29 +644,42 @@ export async function cleanPageWatermarks(args: {
   const fixes: WatermarkFix[] = [];
   const failures: WatermarkFailure[] = [];
   const changed = new Uint8Array(img.width * img.height);
+  const warn = (reason: string) =>
+    console.warn(
+      `[page-watermark] ${bookId}/${issueId} p${pageNumber}: ${reason}`,
+    );
 
   const banner = detectBanner(img);
-  if (banner) {
-    paintBlack(img, banner);
-    changed.fill(1, banner.y * img.width, img.width * img.height);
-    fixes.push({ kind: "banner", box: banner });
-  }
+  let bannerPainted = false;
 
   if (!isDryRun()) {
     const where = { bookId, issueId, pageNumber };
     try {
       const detectMeta = { step: "page-watermark-detect", ...where };
       const editMeta = { step: "page-watermark-edit", ...where };
-      let { accepted, rejected } = await detectOverlays(img, detectMeta);
-      for (const box of rejected) {
+      const first = await detectOverlays(img, detectMeta);
+      if (
+        banner &&
+        first.bands.some((b) => confirmsBanner(b, banner, img.width))
+      ) {
+        paintBlack(img, banner);
+        changed.fill(1, banner.y * img.width, img.width * img.height);
+        fixes.push({ kind: "banner", box: banner });
+        bannerPainted = true;
+      }
+      for (const box of first.rejected) {
         const reason = `detection too large to be a watermark (${box.width}x${box.height} on ${img.width}x${img.height})`;
-        console.warn(
-          `[page-watermark] ${bookId}/${issueId} p${pageNumber}: ${reason}`,
-        );
+        warn(reason);
         failures.push({ kind: "overlay", reason, box });
       }
+      let accepted = first.accepted.filter((b) => !inBanner(b, banner));
       for (let round = 1; accepted.length > 0; round++) {
-        for (const box of accepted) {
+        for (const box of accepted.slice(OVERLAY_MAX_BOXES_PER_ROUND)) {
+          const reason = "more boxes than the round edits";
+          warn(`round ${round}: ${reason}`);
+          failures.push({ kind: "overlay", reason, box });
+        }
+        for (const box of accepted.slice(0, OVERLAY_MAX_BOXES_PER_ROUND)) {
           const gutter = paintGutterRows(img, box);
           if (gutter) {
             for (let y = gutter.y; y < gutter.y + gutter.height; y++) {
@@ -650,9 +693,7 @@ export async function cleanPageWatermarks(args: {
           }
           const outcome = await editOverlay(img, box, editMeta);
           if (!outcome.ok) {
-            console.warn(
-              `[page-watermark] ${bookId}/${issueId} p${pageNumber} round ${round}: ${outcome.reason}`,
-            );
+            warn(`round ${round}: ${outcome.reason}`);
             continue;
           }
           compositeMasked(
@@ -668,24 +709,29 @@ export async function cleanPageWatermarks(args: {
         }
         // The page as it now is, seen by the detector again: a clean result
         // ends the rounds, lettering that is still there gets another one.
-        ({ accepted } = await detectOverlays(img, detectMeta));
+        const again = await detectOverlays(img, detectMeta);
+        accepted = again.accepted.filter((b) => !inBanner(b, banner));
         if (accepted.length === 0) break;
         if (round >= OVERLAY_ROUNDS) {
           const reason = `lettering still detected after ${round} rounds`;
-          console.warn(
-            `[page-watermark] ${bookId}/${issueId} p${pageNumber}: ${reason}`,
-          );
+          warn(reason);
           failures.push({ kind: "overlay", reason, box: accepted[0] });
           break;
         }
       }
     } catch (err) {
       const reason = `overlay call failed: ${err instanceof Error ? err.message : String(err)}`;
-      console.warn(
-        `[page-watermark] ${bookId}/${issueId} p${pageNumber}: ${reason}`,
-      );
+      warn(reason);
       failures.push({ kind: "overlay", reason });
     }
+  }
+
+  if (banner && !bannerPainted) {
+    const reason = isDryRun()
+      ? "band found; a dry run makes no detect call to confirm it"
+      : "band found but the detector did not confirm it";
+    warn(reason);
+    failures.push({ kind: "banner", reason, box: banner });
   }
 
   if (fixes.length === 0) return { buffer, fixes, failures };

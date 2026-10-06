@@ -2,7 +2,11 @@ import "server-only";
 import sharp from "sharp";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { pageStoragePath } from "~/lib/storage";
-import { cleanPageWatermarks, type WatermarkFix } from "~/lib/page-watermark";
+import {
+  cleanPageWatermarks,
+  type WatermarkFailure,
+  type WatermarkFix,
+} from "~/lib/page-watermark";
 
 const WEBP_BUCKET = "comic-pages";
 export const WEBP_QUALITY = 82;
@@ -33,6 +37,8 @@ export async function storePageImage(args: {
   height: number;
   storagePath: string;
   fixes: WatermarkFix[];
+  /** Watermarks left on the stored page, with why (#541). */
+  failures: WatermarkFailure[];
 }> {
   const { bookId, issueId, pageNumber } = args;
   const storagePath = pageStoragePath(bookId, issueId, pageNumber);
@@ -41,7 +47,7 @@ export async function storePageImage(args: {
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
 
-  const { buffer, fixes } = await cleanPageWatermarks(args);
+  const { buffer, fixes, failures } = await cleanPageWatermarks(args);
   if (fixes.length > 0) {
     const cleaned = await sharp(buffer).metadata();
     if (cleaned.width !== width || cleaned.height !== height) {
@@ -82,5 +88,5 @@ export async function storePageImage(args: {
     );
   }
 
-  return { width, height, storagePath, fixes };
+  return { width, height, storagePath, fixes, failures };
 }

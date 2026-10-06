@@ -60,6 +60,12 @@ type PageStats = {
   overOutside: number;
   maxOutside: number;
   meanDiff: number;
+  /**
+   * The clean's lossless output against the input, before any encode:
+   * pixels that changed where `changedMask` is 0, plus mask pixels outside
+   * every fix box. Must be 0.
+   */
+  cleanOutsideExact: number;
 };
 
 type PageReport = {
@@ -216,6 +222,37 @@ const inBox = (x: number, y: number, b: Box) =>
   x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height;
 
 /** Per-pixel max channel difference, plus the stats the report carries. */
+/**
+ * Threshold 0: every pixel the mask leaves out is the input exactly, and
+ * every pixel it marks lies inside a fix box.
+ */
+function exactOutside(
+  before: RgbImage,
+  cleaned: RgbImage,
+  mask: Uint8Array,
+  regions: Box[],
+): number {
+  let violations = 0;
+  for (let y = 0; y < before.height; y++) {
+    for (let x = 0; x < before.width; x++) {
+      const p = y * before.width + x;
+      if (mask[p]) {
+        if (!regions.some((r) => inBox(x, y, r))) violations++;
+        continue;
+      }
+      const i = p * 3;
+      if (
+        before.data[i] !== cleaned.data[i] ||
+        before.data[i + 1] !== cleaned.data[i + 1] ||
+        before.data[i + 2] !== cleaned.data[i + 2]
+      ) {
+        violations++;
+      }
+    }
+  }
+  return violations;
+}
+
 function compare(before: RgbImage, after: RgbImage, regions: Box[]) {
   const { width, height } = before;
   const moved = new Uint8Array(width * height);
@@ -224,6 +261,7 @@ function compare(before: RgbImage, after: RgbImage, regions: Box[]) {
     overOutside: 0,
     maxOutside: 0,
     meanDiff: 0,
+    cleanOutsideExact: 0,
   };
   let sum = 0;
   for (let y = 0; y < height; y++) {
@@ -354,6 +392,10 @@ async function cleanPage(src: PageSource, out: string): Promise<PageReport> {
   }
   const regions = result.fixes.map((f) => f.box);
   const { moved, stats } = compare(before, after, regions);
+  const cleaned = await decodeRgb(result.buffer);
+  stats.cleanOutsideExact = result.changedMask
+    ? exactOutside(before, cleaned, result.changedMask.data, regions)
+    : before.width * before.height;
   const region = union(regions);
   const rel = path.join(src.book, src.issue);
   const base = `page-${pad(src.page)}`;
@@ -385,7 +427,7 @@ function summaryLine(r: PageReport): string {
   if (parts.length === 0) return `${head}: no watermark`;
   const s = r.stats;
   const tail = s
-    ? `; >${DIFF_THRESHOLD} inside ${s.overInside}, outside ${s.overOutside}, max outside ${s.maxOutside}, mean ${s.meanDiff}`
+    ? `; >${DIFF_THRESHOLD} inside ${s.overInside}, outside ${s.overOutside}, max outside ${s.maxOutside}, mean ${s.meanDiff}; exact outside ${s.cleanOutsideExact}`
     : "";
   return `${head}: ${parts.join("; ")}${tail}`;
 }
@@ -429,7 +471,27 @@ async function runClean(
     Array.from({ length: CONCURRENCY }, async () => {
       while (next < sources.length) {
         const i = next++;
-        reports[i] = await cleanPage(sources[i]!, args.out);
+        const src = sources[i]!;
+        try {
+          reports[i] = await cleanPage(src, args.out);
+        } catch (err) {
+          // One page's error is that page's failure; the run goes on.
+          reports[i] = {
+            book: src.book,
+            issue: src.issue,
+            page: src.page,
+            source: src.source,
+            width: 0,
+            height: 0,
+            fixes: [],
+            failures: [
+              {
+                kind: "overlay",
+                reason: `error: ${err instanceof Error ? err.message : String(err)}`,
+              },
+            ],
+          };
+        }
         console.log(summaryLine(reports[i]));
       }
     }),
@@ -470,6 +532,21 @@ async function runUpload(dir: string) {
       console.log(`${head}: nothing to upload`);
       continue;
     }
+    const s = r.stats;
+    const why =
+      r.failures.length > 0
+        ? `the report lists ${r.failures.length} failure(s)`
+        : !s || s.cleanOutsideExact === undefined
+          ? "the report has no exact outside check"
+          : s.overOutside > 0
+            ? `${s.overOutside} pixel(s) moved past ${report.diffThreshold} outside the fix`
+            : s.cleanOutsideExact > 0
+              ? `${s.cleanOutsideExact} pixel(s) changed outside the fix before encoding`
+              : null;
+    if (why) {
+      console.log(`${head}: skipped, ${why}`);
+      continue;
+    }
     const webp = fs.readFileSync(path.join(dir, r.files.webp));
     const meta = await sharp(webp).metadata();
     const { data: row, error } = await supabase
@@ -491,13 +568,24 @@ async function runUpload(dir: string) {
       continue;
     }
     const key = pageStoragePath(r.book, r.issue, r.page);
+    // The object as it is now, kept before it is replaced.
+    const current = await supabase.storage.from(BUCKET).download(key);
+    if (current.error) {
+      console.log(
+        `${head}: skipped, could not copy the current ${BUCKET}/${key} first (${current.error.message})`,
+      );
+      continue;
+    }
+    const original = path.join(dir, "originals", key);
+    fs.mkdirSync(path.dirname(original), { recursive: true });
+    fs.writeFileSync(original, Buffer.from(await current.data.arrayBuffer()));
     const { error: upErr } = await supabase.storage
       .from(BUCKET)
       .upload(key, webp, { contentType: "image/webp", upsert: true });
     if (upErr) throw new Error(`upload ${key}: ${upErr.message}`);
     uploaded++;
     console.log(
-      `${head}: uploaded ${BUCKET}/${key} (${meta.width}x${meta.height})`,
+      `${head}: uploaded ${BUCKET}/${key} (${meta.width}x${meta.height}), original kept at ${original}`,
     );
   }
   console.log(`\n${uploaded} pages uploaded. No pages row changed.`);
