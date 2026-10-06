@@ -6,6 +6,7 @@ import type {
   PanelLocalPolygon,
 } from "~/types/panels";
 import type { RoleId } from "~/lib/cast";
+import { bubbleSpeaker } from "~/lib/bubble-speaker";
 import { slugify } from "~/lib/character-id";
 
 export type RoboflowBoxPrediction = {
@@ -394,9 +395,11 @@ export function bubbleHasContext(bubble: BubbleContextFields): boolean {
 export type ClosedCastMember = {
   /** The `characters.id`; what `bubbles.character_id` gets on a match. */
   id: string;
-  /** The display name; what `bubbles.speaker` gets on a match. */
+  /** The name the prompt lists: the display name, else the castlist text. */
   name: string;
-  /** Every other name the character goes by, from `characters.aliases`. */
+  /** `characters.display_name` as read; `bubbleSpeaker` turns it into `bubbles.speaker` on a match. */
+  displayName: string | null;
+  /** Every other name the character goes by, from the `aliases` table (`~/lib/character-aliases`). */
   aliases: string[];
 };
 
@@ -526,8 +529,11 @@ export function buildContextUpdate(
   return {
     ocr_text: ocrText,
     type,
-    speaker: match?.name ?? null,
-    character_id: match?.id ?? null,
+    // An unmatched reply stores no label: null in both columns (#354).
+    ...bubbleSpeaker(
+      match ? { id: match.id, displayName: match.displayName } : null,
+      null,
+    ),
     emotion,
     character_type: parsed.characterType ?? null,
     side: parsed.side ?? null,

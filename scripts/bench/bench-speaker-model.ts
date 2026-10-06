@@ -30,7 +30,7 @@
  *
  * `--cast` picks the prompt. `closed` (the default for `--source reviewed`)
  * is #354's: the speaker must come from the issue's cast, here `proposeCast`
- * held in memory with each member's aliases from its `characters` row, listed
+ * held in memory with each member's aliases from the `aliases` table, listed
  * by `closedCastLines` with that page's face detections marked, and the book
  * context the step sends (name, franchises, synopsis). Scoring maps the
  * reviewed speaker and the reply to a cast id with `matchCastSpeaker`; a
@@ -71,7 +71,7 @@ import {
   createPartFromText,
 } from "@google/genai";
 import sharp from "sharp";
-import { loadBookCast, proposeCast } from "~/lib/cast";
+import { loadBookCast, proposeCast, readBookFranchises } from "~/lib/cast";
 import { CUE_RULES, buildCuePrompt, cueRequest } from "~/lib/cue-rules";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
 import { selectIssue } from "~/lib/issue-queries";
@@ -321,8 +321,9 @@ async function loadBookContext(
   bookId: string,
   issueId: string,
 ): Promise<string | undefined> {
-  const [bookRes, issueRes] = await Promise.all([
-    supabase.from("books").select("name, franchises").eq("id", bookId).single(),
+  const [bookRes, franchises, issueRes] = await Promise.all([
+    supabase.from("books").select("name").eq("id", bookId).single(),
+    readBookFranchises(supabase, bookId),
     selectIssue(
       supabase,
       bookId,
@@ -335,8 +336,8 @@ async function loadBookContext(
   const parts: string[] = [];
   if (bookRow) {
     if (bookRow.name) parts.push(`Book: ${bookRow.name}`);
-    if (bookRow.franchises?.length)
-      parts.push(`Franchises: ${bookRow.franchises.join(", ")}`);
+    if (franchises.length)
+      parts.push(`Franchises: ${franchises.map((f) => f.name).join(", ")}`);
   }
   if (issueRow?.wiki_summary) {
     parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary}`);
@@ -358,7 +359,8 @@ async function loadBookContext(
 
 /**
  * The issue's cast for `--cast closed`: `proposeCast` (read-only), each
- * member's aliases from its `characters` row. Held in memory, never written.
+ * member's aliases from the `aliases` table (`loadBookCast`). Held in memory,
+ * never written.
  */
 async function loadClosedCast(bookId: string, issueId: string) {
   const [proposal, bookCast] = await Promise.all([
@@ -368,6 +370,7 @@ async function loadClosedCast(bookId: string, issueId: string) {
   const cast: ClosedCastMember[] = proposal.members.map((m) => ({
     id: m.id,
     name: m.name,
+    displayName: bookCast.resolve(m.id)?.display_name ?? null,
     aliases: bookCast.resolve(m.id)?.aliases ?? [],
   }));
   return { cast, suggestions: proposal.suggestions };

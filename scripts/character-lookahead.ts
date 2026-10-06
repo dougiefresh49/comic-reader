@@ -31,6 +31,7 @@ import {
 } from "./utils/exemplar-store.js";
 import { loadRoster } from "./utils/roster.js";
 import { glob } from "glob";
+import { writeAlias } from "~/lib/character-aliases.js";
 import { selectIssue } from "~/lib/issue-queries.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -152,14 +153,21 @@ async function ensureCharacterExists(characterName: string): Promise<string> {
 
   if (existing) return id;
 
-  const { error } = await supabase.from("characters").insert({
-    id,
-    aliases: [characterName],
-  });
+  const { error } = await supabase.from("characters").insert({ id });
 
   if (error) {
     if (error.code === "23505") return id;
     console.warn(`   ⚠ Failed to create character ${id}: ${error.message}`);
+    return id;
+  }
+
+  // The name it was found under, as an `aliases` row (~/lib/character-aliases).
+  try {
+    await writeAlias(supabase, id, characterName);
+  } catch (err) {
+    console.warn(
+      `   ⚠ Failed to add alias "${characterName}" to ${id}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   return id;

@@ -31,6 +31,12 @@ const voicesFrom = restrictFrom(
 );
 /** The voices module (#458). */
 const voicesModule = ["src/lib/voice-slots/**", "src/lib/voice-requests.ts"];
+const aliasesFrom = restrictFrom(
+  "aliases",
+  "Read and write aliases through src/lib/character-aliases.ts, keyed on character_id.",
+);
+/** The aliases module (#463). */
+const aliasesModule = "src/lib/character-aliases.ts";
 
 export default tseslint.config(
   {
@@ -69,7 +75,58 @@ export default tseslint.config(
     // issues has PK (book_id, id): query it only through src/lib/issue-queries.ts (#150).
     // castlist: every read and write lives in src/lib/cast.ts (#429).
     // voices: every read and write lives in the voices module (#458).
-    ignores: ["src/lib/issue-queries.ts", "src/lib/cast.ts", ...voicesModule],
+    // aliases: every read and write lives in src/lib/character-aliases.ts (#463).
+    ignores: [
+      "src/lib/issue-queries.ts",
+      "src/lib/cast.ts",
+      ...voicesModule,
+      aliasesModule,
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...issuesFrom,
+        ...castlistFrom,
+        ...voicesFrom,
+        ...aliasesFrom,
+      ],
+    },
+  },
+  {
+    files: ["src/lib/cast.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...issuesFrom,
+        ...voicesFrom,
+        ...aliasesFrom,
+      ],
+    },
+  },
+  {
+    files: ["src/lib/issue-queries.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...castlistFrom,
+        ...voicesFrom,
+        ...aliasesFrom,
+      ],
+    },
+  },
+  {
+    files: voicesModule,
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...issuesFrom,
+        ...castlistFrom,
+        ...aliasesFrom,
+      ],
+    },
+  },
+  {
+    files: [aliasesModule],
     rules: {
       "no-restricted-syntax": [
         "error",
@@ -77,22 +134,6 @@ export default tseslint.config(
         ...castlistFrom,
         ...voicesFrom,
       ],
-    },
-  },
-  {
-    files: ["src/lib/cast.ts"],
-    rules: { "no-restricted-syntax": ["error", ...issuesFrom, ...voicesFrom] },
-  },
-  {
-    files: ["src/lib/issue-queries.ts"],
-    rules: {
-      "no-restricted-syntax": ["error", ...castlistFrom, ...voicesFrom],
-    },
-  },
-  {
-    files: voicesModule,
-    rules: {
-      "no-restricted-syntax": ["error", ...issuesFrom, ...castlistFrom],
     },
   },
   {

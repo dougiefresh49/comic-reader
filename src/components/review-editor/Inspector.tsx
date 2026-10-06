@@ -487,6 +487,13 @@ function BubbleInspector(
         .map((part) => part.trim())
         .filter(Boolean)
     : [];
+  // The cast members the label's parts name: offered as "Use X" buttons, and
+  // the reason the label is "not assigned" rather than "not in the cast".
+  const assignable = candidates.flatMap((name) => {
+    const id = resolveSpeaker(name, cast);
+    const known = id ? castById.get(id) : undefined;
+    return known ? [known] : [];
+  });
   const sameRaw = unknown
     ? Object.values(doc.bubbles).filter(
         (o) =>
@@ -651,7 +658,11 @@ function BubbleInspector(
                 className={`flex-1 ${spoken ? "text-amber-200" : "text-neutral-500"}`}
               >
                 {unknown
-                  ? `"${unknown.raw}" is not in the cast`
+                  ? assignable.length === 0
+                    ? `"${unknown.raw}" is not in the cast`
+                    : candidates.length === 1 && assignable[0]
+                      ? `"${unknown.raw}" is not assigned; use the Use ${assignable[0].name} button below`
+                      : `"${unknown.raw}" is not assigned; use a button below to assign it`
                   : spoken
                     ? "No speaker"
                     : "None needed"}

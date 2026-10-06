@@ -11,8 +11,15 @@ import { createClient } from "@supabase/supabase-js";
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import {
+  loadNameResolver,
+  type NamedCharacter,
+  writeAlias,
+} from "~/lib/character-aliases.js";
+import { franchiseSlug } from "~/lib/character-id.js";
 import { upsertIssue } from "~/lib/issue-queries.js";
 import { importCastJson } from "./lib/cast-json.js";
+import { labelSpeaker } from "./lib/label-speaker.js";
 import {
   writeAppearances,
   type RegistryAppearance,
@@ -80,7 +87,14 @@ async function migrateBook(bookId: string): Promise<void> {
 }
 
 // ── Issue ──────────────────────────────────────────────────────────────────
-async function migrateIssue(bookId: string, issueDir: string): Promise<void> {
+/** The name rule (~/lib/character-aliases) applied to a stored speaker label. */
+type Means = (name: string) => NamedCharacter | undefined;
+
+async function migrateIssue(
+  bookId: string,
+  issueDir: string,
+  means: Means,
+): Promise<void> {
   const issueDirName = issueDir.split("/").pop()!;
   const issueId = issueDirName; // "issue-1"
   const issueNum = parseInt(issueId.replace(/\D/g, ""), 10);
@@ -185,7 +199,7 @@ async function migrateIssue(bookId: string, issueDir: string): Promise<void> {
           ocr_text: bubble.ocr_text ?? null,
           text_with_cues: bubble.textWithCues ?? null,
           type: bubble.type ?? "SPEECH",
-          speaker: bubble.speaker ?? null,
+          ...labelSpeaker(means, bubble.speaker ?? null),
           emotion: bubble.emotion ?? null,
           character_type: bubble.characterType ?? null,
           side: bubble.side ?? null,
@@ -291,10 +305,10 @@ async function migrateCharacters(): Promise<void> {
     CharacterRegistryEntry
   >;
 
+  const franchiseIdOf = await franchiseResolver();
   const charRows = Object.entries(registry).map(([name, entry]) => ({
     id: name,
-    franchise: entry.franchise ?? null,
-    aliases: entry.aliases ?? [],
+    franchise_id: franchiseIdOf(entry.franchise, `character ${name}`),
   }));
 
   const { error: charError } = await supabase
@@ -302,6 +316,16 @@ async function migrateCharacters(): Promise<void> {
     .upsert(charRows, { onConflict: "id" });
   if (charError) throw new Error(`characters upsert: ${charError.message}`);
   console.log(`    ✓ characters (${charRows.length})`);
+
+  // Registry aliases, as `aliases` rows through ~/lib/character-aliases.
+  let aliasCount = 0;
+  for (const [characterId, entry] of Object.entries(registry)) {
+    for (const alias of entry.aliases ?? []) {
+      await writeAlias(supabase, characterId, alias);
+      aliasCount++;
+    }
+  }
+  console.log(`    ✓ registry aliases (${aliasCount})`);
 
   // Appearances, as works and appearances rows.
   let listed = 0;
@@ -328,19 +352,44 @@ async function migrateAliases(): Promise<void> {
 
   console.log("\n  🔤 Aliases");
   const aliasMap = fs.readJsonSync(aliasPath) as Record<string, string>;
+  // Loaded after migrateCharacters, so the registry's rows resolve too.
+  const means = await loadNameResolver(supabase);
 
-  const rows = Object.entries(aliasMap).map(([alias, canonical]) => ({
-    alias: alias.toLowerCase(),
-    canonical,
-    scope: "global" as const,
-    scope_id: null,
-  }));
+  let written = 0;
+  for (const [alias, name] of Object.entries(aliasMap)) {
+    const character = means(name);
+    if (!character) {
+      console.warn(
+        `    ⚠ alias "${alias}": "${name}" is no character — skipping`,
+      );
+      continue;
+    }
+    await writeAlias(supabase, character.id, alias.toLowerCase());
+    written++;
+  }
+  console.log(`    ✓ aliases (${written})`);
+}
 
-  const { error } = await supabase
-    .from("aliases")
-    .upsert(rows, { onConflict: "alias,scope,scope_id" });
-  if (error) throw new Error(`aliases upsert: ${error.message}`);
-  console.log(`    ✓ aliases (${rows.length})`);
+/**
+ * A franchise name to the id of its existing `franchises` row (`franchiseSlug`,
+ * the P1 backfill's rule); null, with a warning naming `what`, when no row
+ * has that id. Never creates a `franchises` row.
+ */
+async function franchiseResolver(): Promise<
+  (name: string | undefined, what: string) => string | null
+> {
+  const { data, error } = await supabase.from("franchises").select("id");
+  if (error) throw new Error(`franchises select: ${error.message}`);
+  const ids = new Set((data ?? []).map((r: { id: string }) => r.id));
+  return (name, what) => {
+    if (!name) return null;
+    const id = franchiseSlug(name);
+    if (ids.has(id)) return id;
+    console.warn(
+      `    ⚠ ${what}: no franchises row "${id}" for "${name}" — franchise_id left null`,
+    );
+    return null;
+  };
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -393,6 +442,9 @@ async function main(): Promise<void> {
     targets.push({ bookId: book!, issueDir: null });
   }
 
+  // Speaker labels resolve to a character id through the name rule.
+  const means = await loadNameResolver(supabase);
+
   for (const { bookId } of targets) {
     await migrateBook(bookId);
 
@@ -411,7 +463,7 @@ async function main(): Promise<void> {
         : issueDirs;
 
     for (const dir of filteredDirs) {
-      await migrateIssue(bookId, dir);
+      await migrateIssue(bookId, dir, means);
     }
   }
 

@@ -1453,7 +1453,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
         addCharacter({
           scope,
           target: { kind: "existing", id: card.id },
-          franchise: data.franchise,
+          franchiseId: data.franchiseId,
         }),
       ),
     onConfirm: () =>
@@ -1466,7 +1466,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
           scope,
           detectionId: face.id,
           target,
-          franchise: data.franchise,
+          franchiseId: data.franchiseId,
         }),
       ),
     onReject: (face: FaceView) =>
@@ -1626,7 +1626,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
                               detectionIds: g.faces.map((f) => f.id),
                               suggestedNames: g.suggestedNames,
                               target,
-                              franchise: data.franchise,
+                              franchiseId: data.franchiseId,
                             }),
                         )
                       }
@@ -1645,7 +1645,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
                             scope,
                             detectionId: face.id,
                             target,
-                            franchise: data.franchise,
+                            franchiseId: data.franchiseId,
                           }),
                         )
                       }
@@ -1672,7 +1672,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
                             scope,
                             name: s.name,
                             target,
-                            franchise: data.franchise,
+                            franchiseId: data.franchiseId,
                           }),
                         )
                       }
@@ -1701,7 +1701,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
                       addCharacter({
                         scope,
                         target,
-                        franchise: data.franchise,
+                        franchiseId: data.franchiseId,
                       }),
                     );
                   }}

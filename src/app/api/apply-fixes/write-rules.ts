@@ -2,7 +2,7 @@
 // Both writers use it: the old editor's /api/apply-fixes and the v2 editor's Save (/api/apply-fixes/save).
 import "server-only";
 import { z } from "zod";
-import { slugify } from "~/lib/character-id";
+import { bubbleSpeaker, type BubbleSpeaker } from "~/lib/bubble-speaker";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { normalizePanelAudioTags } from "~/workflows/steps/vision-rows";
 
@@ -14,9 +14,19 @@ export interface Box {
   h: number;
 }
 
+/**
+ * Who a bubble's edit says speaks: the picked `characters.id`, or no id and
+ * the raw label to keep (null clears it). Written as `character_id` and
+ * `speaker` together, through `bubbleSpeaker`.
+ */
+export interface SpeakerEdit {
+  characterId: string | null;
+  label: string | null;
+}
+
 /** What changed on one bubble. A field left out is not written. */
 export interface BubbleEdit {
-  speaker?: string | null;
+  speaker?: SpeakerEdit;
   /** `ocr_text`. */
   text?: string;
   textWithCues?: string | null;
@@ -44,8 +54,8 @@ type Row = Record<string, unknown>;
 export interface WriteContext {
   /** `pages.width` and `pages.height`, for `box_2d` in pixels. */
   pageSize: (page: number) => { width: number; height: number };
-  /** The `characters` ids among the speakers being written. */
-  characterIds: Set<string>;
+  /** `characters.display_name` as read, for each `characters` row among the picked speakers. */
+  displayNames: Map<string, string | null>;
   /** The detection confidence each named bubble's `box_2d` holds now. */
   confidence: Map<string, number>;
   /** The page of each named bubble, as stored. */
@@ -64,22 +74,27 @@ export async function loadWriteContext(
   bookId: string,
   issueId: string,
   need: {
-    speakers: (string | null | undefined)[];
+    speakers: (SpeakerEdit | undefined)[];
     /** Existing bubbles whose stored page and confidence the caller needs. */
     bubbleIds: string[];
   },
 ): Promise<WriteContext> {
-  const slugs = Array.from(
-    new Set(need.speakers.flatMap((s) => (s ? [slugify(s)] : []))),
-  ).filter(Boolean);
+  const ids = Array.from(
+    new Set(
+      need.speakers.flatMap((s) => (s?.characterId ? [s.characterId] : [])),
+    ),
+  );
   const [pageResult, charResult] = await Promise.all([
     supabaseAdmin
       .from("pages")
       .select("number, width, height")
       .eq("book_id", bookId)
       .eq("issue_id", issueId),
-    slugs.length > 0
-      ? supabaseAdmin.from("characters").select("id").in("id", slugs)
+    ids.length > 0
+      ? supabaseAdmin
+          .from("characters")
+          .select("id, display_name")
+          .in("id", ids)
       : Promise.resolve({ data: [], error: null }),
   ]);
   if (pageResult.error)
@@ -98,8 +113,10 @@ export async function loadWriteContext(
       }[]
     ).map((p) => [p.number, { width: p.width, height: p.height }]),
   );
-  const characterIds = new Set(
-    ((charResult.data ?? []) as { id: string }[]).map((c) => c.id),
+  const displayNames = new Map(
+    (
+      (charResult.data ?? []) as { id: string; display_name: string | null }[]
+    ).map((c) => [c.id, c.display_name]),
   );
 
   const confidence = new Map<string, number>();
@@ -125,20 +142,29 @@ export async function loadWriteContext(
 
   return {
     pageSize: (page) => sizes.get(page) ?? DEFAULT_PAGE,
-    characterIds,
+    displayNames,
     confidence,
     bubblePage,
   };
 }
 
-/** `character_id` for a speaker: its slug when that is a `characters` row, else null. */
-export function characterIdFor(
-  speaker: string | null | undefined,
+/**
+ * `character_id` and `speaker` for a speaker edit, from `bubbleSpeaker`: a
+ * picked `characters` row writes its id and display name. A picked id with
+ * no row (a character added in the editor that the characters stop has not
+ * created) is kept as a label with no id, as before #463.
+ */
+function speakerColumns(
+  edit: SpeakerEdit | undefined,
   ctx: WriteContext,
-): string | null {
-  if (!speaker) return null;
-  const id = slugify(speaker);
-  return ctx.characterIds.has(id) ? id : null;
+): BubbleSpeaker {
+  const id = edit?.characterId ?? null;
+  if (id && ctx.displayNames.has(id))
+    return bubbleSpeaker(
+      { id, displayName: ctx.displayNames.get(id) ?? null },
+      null,
+    );
+  return bubbleSpeaker(null, id ?? edit?.label ?? null);
 }
 
 function percent(n: number): string {
@@ -182,10 +208,8 @@ export function bubbleUpdate(
   ctx: WriteContext,
 ): Row {
   const row: Row = {};
-  if (edit.speaker !== undefined) {
-    row.speaker = edit.speaker;
-    row.character_id = characterIdFor(edit.speaker, ctx);
-  }
+  if (edit.speaker !== undefined)
+    Object.assign(row, speakerColumns(edit.speaker, ctx));
   if (edit.text !== undefined) row.ocr_text = edit.text;
   if (edit.textWithCues !== undefined) row.text_with_cues = edit.textWithCues;
   if (edit.type !== undefined) row.type = edit.type;
@@ -239,8 +263,7 @@ export function bubbleInsert(
     ocr_text: bubble.text ?? null,
     text_with_cues: bubble.textWithCues ?? null,
     type: bubble.type ?? "SPEECH",
-    speaker: bubble.speaker ?? null,
-    character_id: characterIdFor(bubble.speaker, ctx),
+    ...speakerColumns(bubble.speaker, ctx),
     emotion: bubble.emotion ?? null,
     ignored: bubble.ignored ?? false,
     ...(bubble.silent !== undefined ? { silent: bubble.silent } : {}),
@@ -326,7 +349,13 @@ const box = z.object({
 });
 const bubbleEdit = z
   .object({
-    speaker: z.string().nullable().optional(),
+    speaker: z
+      .object({
+        characterId: z.string().min(1).nullable(),
+        label: z.string().nullable(),
+      })
+      .strict()
+      .optional(),
     text: z.string().optional(),
     textWithCues: z.string().nullable().optional(),
     type: z

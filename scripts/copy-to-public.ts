@@ -19,7 +19,12 @@ import pLimit from "p-limit";
 import { join, dirname, basename } from "path";
 import { fileURLToPath } from "url";
 import { upsertIssue } from "~/lib/issue-queries.js";
+import {
+  loadNameResolver,
+  type NamedCharacter,
+} from "~/lib/character-aliases.js";
 import { importCastJson } from "./lib/cast-json.js";
+import { labelSpeaker } from "./lib/label-speaker.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -57,6 +62,7 @@ function bubbleToRow(
   sortOrder: number,
   bubble: BubbleJson,
   withInsertOnly: { audio_storage_path: string } | null,
+  means: (name: string) => NamedCharacter | undefined,
 ) {
   const base = {
     legacy_id: bubble.id,
@@ -67,7 +73,7 @@ function bubbleToRow(
     ocr_text: bubble.ocr_text ?? null,
     text_with_cues: bubble.textWithCues ?? null,
     type: bubble.type ?? "SPEECH",
-    speaker: bubble.speaker ?? null,
+    ...labelSpeaker(means, bubble.speaker ?? null),
     emotion: bubble.emotion ?? null,
     character_type: bubble.characterType ?? null,
     side: bubble.side ?? null,
@@ -350,6 +356,8 @@ async function publishToSupabase(
   const legacyIdToUuid = new Map(
     (existingBubbles ?? []).map((r) => [r.legacy_id as string, r.id as string]),
   );
+  // bubbles.json speakers are outside text: the name rule picks the character.
+  const means = await loadNameResolver(supabase);
 
   for (const [pageKey, bubbles] of Object.entries(bubblesData)) {
     const pageNumber = pageNumFromKey(pageKey);
@@ -364,6 +372,7 @@ async function publishToSupabase(
           sortIndex,
           bubble,
           null,
+          means,
         );
         const { error: ue } = await supabase
           .from("bubbles")
@@ -380,6 +389,7 @@ async function publishToSupabase(
           {
             audio_storage_path: `${bubble.id}.mp3`,
           },
+          means,
         );
         const { data: ins, error: insE } = await supabase
           .from("bubbles")

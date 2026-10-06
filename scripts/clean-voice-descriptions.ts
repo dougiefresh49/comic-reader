@@ -1,5 +1,6 @@
 import fs from "fs-extra";
-import { getCanonicalName, initAliasMap } from "./alias-map.js";
+import { loadNameResolver } from "~/lib/character-aliases";
+import { supabase } from "./lib/supabase.js";
 import { join } from "path";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -50,7 +51,8 @@ function normalizeEntry(value: LegacyOrNewEntry): CharacterVoiceEntry {
 
 async function main() {
   const { book, issue } = parseArgs();
-  await initAliasMap();
+  // The name rule over `characters` and `aliases` (~/lib/character-aliases).
+  const means = await loadNameResolver(supabase);
   const ISSUE_DIR = join(PROJECT_ROOT, "assets", "comics", book, issue);
   const BOOK_DIR = join(PROJECT_ROOT, "assets", "comics", book);
   const INPUT_PATH = join(ISSUE_DIR, "character-voice-descriptions.json");
@@ -63,7 +65,7 @@ async function main() {
   >;
   const cleanedData: NormalizedMap = {};
 
-  // Load roster aliases (take precedence over static alias-map)
+  // Load roster aliases (take precedence over the characters table)
   const roster = await loadRoster(BOOK_DIR);
   const rosterAliasMap = getRosterAliasMap(roster);
 
@@ -72,10 +74,13 @@ async function main() {
   for (const [originalName, rawEntry] of Object.entries(rawData)) {
     const entry = normalizeEntry(rawEntry);
 
-    // Roster aliases take precedence, then fall through to static alias-map
+    // Roster aliases take precedence, then the display name of the character
+    // the name means, then the name as given.
     const lowerName = originalName.toLowerCase().trim();
     const canonicalName =
-      rosterAliasMap[lowerName] ?? getCanonicalName(originalName);
+      rosterAliasMap[lowerName] ??
+      means(originalName)?.display_name ??
+      originalName;
 
     if (cleanedData[canonicalName]) {
       if (

@@ -1,5 +1,6 @@
 // Loads one issue for the characters stop: the proposed cast, every face, the exemplars and the voices. SELECTs only; the writes are in actions.ts.
 import "server-only";
+import { readAliases } from "~/lib/character-aliases";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
 import { DEFAULT_PAGE } from "~/app/api/apply-fixes/write-rules";
@@ -8,6 +9,7 @@ import {
   isRoleId,
   loadBookCast,
   proposeCast,
+  readBookFranchises,
   readVoiceRequests,
   ROLE_IDS,
   voiceFor,
@@ -43,7 +45,7 @@ import type {
 interface IssueRow {
   name: string;
   number: number;
-  books: { name: string; franchises: string[] | null } | null;
+  books: { name: string } | null;
 }
 
 interface PageRow {
@@ -79,7 +81,6 @@ interface ExemplarRow {
 interface CharacterRow {
   id: string;
   display_name: string | null;
-  aliases: string[] | null;
 }
 
 interface AppearanceRow {
@@ -152,7 +153,7 @@ export async function loadCharacters(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, number, books(name, franchises)",
+    "name, number, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("characters stop loader, the issue:", issueResult.error);
@@ -170,6 +171,7 @@ export async function loadCharacters(
     charResult,
     voiceRows,
     voiceRequests,
+    franchises,
   ] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
     proposeCast(supabaseAdmin, bookId, issueId),
@@ -197,15 +199,21 @@ export async function loadCharacters(
       .order("page_number"),
     supabaseAdmin
       .from("characters")
-      .select("id, display_name, aliases", { count: "exact" })
+      .select("id, display_name", { count: "exact" })
       .order("id"),
     readVoices(supabaseAdmin),
     readVoiceRequests(supabaseAdmin, bookId, issueId),
+    readBookFranchises(supabaseAdmin, bookId),
   ]);
   const pageRows = rows<PageRow>("pages", pageResult);
   const panelRows = rows<PanelRow>("panels", panelResult);
   const exemplarRows = rows<ExemplarRow>("face exemplars", exemplarResult);
   const charRows = rows<CharacterRow>("characters", charResult);
+  const aliasesOf = await readAliases(
+    supabaseAdmin,
+    charRows.map((c) => c.id),
+    bookId,
+  );
 
   const detectionRows: DetectionRow[] = [];
   for (const ids of chunk(
@@ -529,7 +537,7 @@ export async function loadCharacters(
   const known: KnownCharacter[] = charRows.map((c) => ({
     id: c.id,
     name: c.display_name ?? c.id,
-    aliases: c.aliases ?? [],
+    aliases: aliasesOf.get(c.id) ?? [],
   }));
 
   const inCast = cards.filter((c) => !c.removed).length;
@@ -546,7 +554,8 @@ export async function loadCharacters(
     issueId,
     bookName: issue.books?.name ?? bookId,
     issueName: issue.name?.trim() ? issue.name : `Issue ${issue.number}`,
-    franchise: issue.books?.franchises?.[0] ?? null,
+    // A character created here takes the book's lowest-position franchise.
+    franchiseId: franchises[0]?.id ?? null,
     pages,
     unknown,
     // Wiki names and castlist texts no `characters` row knows, as

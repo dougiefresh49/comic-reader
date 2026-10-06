@@ -84,7 +84,8 @@ export interface AdminBookInfo {
   name: string;
   totalIssues: number | null;
   publisher: string | null;
-  franchises: string[] | null;
+  /** `franchises.name` through `book_franchises`, lowest `position` first. */
+  franchises: string[];
   parts: {
     id: string;
     name: string;
@@ -97,7 +98,7 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
   const { data, error } = await supabase
     .from("books")
     .select(
-      "id, name, total_issues, publisher, franchises, book_parts(id, name, number, total_issues)",
+      "id, name, total_issues, publisher, book_franchises(position, franchises(name)), book_parts(id, name, number, total_issues)",
     )
     .order("name");
 
@@ -112,7 +113,9 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
       name: string;
       total_issues: number | null;
       publisher: string | null;
-      franchises: string[] | null;
+      book_franchises:
+        | { position: number; franchises: { name: string } | null }[]
+        | null;
       book_parts:
         | {
             id: string;
@@ -127,7 +130,9 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
     name: b.name,
     totalIssues: b.total_issues,
     publisher: b.publisher,
-    franchises: b.franchises,
+    franchises: [...(b.book_franchises ?? [])]
+      .sort((a, z) => a.position - z.position)
+      .flatMap((f) => (f.franchises ? [f.franchises.name] : [])),
     parts: (b.book_parts ?? [])
       .sort((a, z) => a.number - z.number)
       .map((p) => ({

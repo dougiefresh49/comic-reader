@@ -132,7 +132,8 @@ export interface CharactersData {
   issueId: string;
   bookName: string;
   issueName: string;
-  franchise: string | null;
+  /** The `franchises.id` a character created here takes: the book's lowest-position one, or null. */
+  franchiseId: string | null;
   pages: PageView[];
   unknown: UnknownGroupView[];
   suggestions: Suggestion[];

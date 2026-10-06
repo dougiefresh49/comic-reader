@@ -15,6 +15,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
+import { nameResolver, readAliases } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
 import {
@@ -146,34 +147,26 @@ function must(what: string, error: { message: string } | null): void {
   if (error) throw new Error(`cast: ${what}: ${error.message}`);
 }
 
-async function readCharacters(client: Client): Promise<CharacterRow[]> {
-  return readAll<CharacterRow>("characters", (from, to) =>
-    db(client)
-      .from("characters")
-      .select("id, display_name, aliases, form_of")
-      .order("id")
-      .range(from, to),
+/** Every `characters` row, with its aliases from `~/lib/character-aliases`: global ones, and the book's with `bookId`. */
+async function readCharacters(
+  client: Client,
+  bookId?: string,
+): Promise<CharacterRow[]> {
+  const rows = await readAll<Omit<CharacterRow, "aliases">>(
+    "characters",
+    (from, to) =>
+      db(client)
+        .from("characters")
+        .select("id, display_name, form_of")
+        .order("id")
+        .range(from, to),
   );
-}
-
-/**
- * The one name rule for wiki names and new aliases: a name means a
- * `characters` row when, slugified, it is the row's id, display name or an
- * alias. Ids win over display names, display names over aliases (the rule in
- * the review editor's loader).
- */
-function nameResolver(
-  characters: CharacterRow[],
-): (name: string) => CharacterRow | undefined {
-  const rowByKey = new Map<string, CharacterRow>();
-  const index = (key: string, row: CharacterRow) => {
-    if (key && !rowByKey.has(key)) rowByKey.set(key, row);
-  };
-  for (const row of characters) index(row.id, row);
-  for (const row of characters) index(slugify(row.display_name ?? ""), row);
-  for (const row of characters)
-    for (const alias of row.aliases) index(slugify(alias), row);
-  return (name) => rowByKey.get(slugify(name));
+  const aliases = await readAliases(
+    client,
+    rows.map((r) => r.id),
+    bookId,
+  );
+  return rows.map((r) => ({ ...r, aliases: aliases.get(r.id) ?? [] }));
 }
 
 const CAST_COLUMNS =
@@ -195,7 +188,7 @@ export async function loadBookCast(
         .range(from, to),
     ),
     listBookIssues(client, bookId, "id, number"),
-    readCharacters(client),
+    readCharacters(client, bookId),
   ]);
   must("reading the book's issues", issues.error);
   const voices = await readVoiceStates(
@@ -891,17 +884,31 @@ export async function readCastNames(
     .sort();
 }
 
-/** Creates a `characters` row; the id must already be in slug form (`slugify`). */
+/** A book's franchises from `book_franchises`, lowest `position` first; empty when it has none. */
+export async function readBookFranchises(
+  client: Client,
+  bookId: string,
+): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await db(client)
+    .from("book_franchises")
+    .select("position, franchises(id, name)")
+    .eq("book_id", bookId)
+    .order("position");
+  must(`reading the franchises of ${bookId}`, error);
+  return (data ?? []).flatMap((r) => (r.franchises ? [r.franchises] : []));
+}
+
+/** Creates a `characters` row; the id must already be in slug form (`slugify`). `franchiseId` is a `franchises.id` or null. */
 export async function createCharacter(
   client: Client,
-  character: { id: string; displayName: string; franchise: string | null },
+  character: { id: string; displayName: string; franchiseId: string | null },
 ): Promise<void> {
   if (!character.id || slugify(character.id) !== character.id)
     throw new Error(`cast: "${character.id}" is not a slug id`);
   const { error } = await db(client).from("characters").insert({
     id: character.id,
     display_name: character.displayName,
-    franchise: character.franchise,
+    franchise_id: character.franchiseId,
   });
   must(`creating character ${character.id}`, error);
 }
@@ -919,30 +926,6 @@ export async function renameCharacter(
     .select("id");
   must(`renaming character ${characterId}`, error);
   if (!data?.length) throw new Error(`cast: no character ${characterId}`);
-}
-
-/** Makes a name resolve to a character by appending it to `aliases`; false when it already did, a throw when it means another character. */
-export async function addAlias(
-  client: Client,
-  characterId: string,
-  alias: string,
-): Promise<boolean> {
-  const name = alias.trim();
-  if (!slugify(name)) throw new Error(`cast: "${name}" is not a name`);
-  const characters = await readCharacters(client);
-  const means = nameResolver(characters)(name);
-  if (means?.id === characterId) return false;
-  if (means) throw new Error(`cast: "${name}" already means ${means.id}`);
-  const row = characters.find((c) => c.id === characterId);
-  if (!row) throw new Error(`cast: no character ${characterId}`);
-  const { data, error } = await db(client)
-    .from("characters")
-    .update({ aliases: [...row.aliases, name] })
-    .eq("id", characterId)
-    .select("id");
-  must(`adding an alias to ${characterId}`, error);
-  if (!data?.length) throw new Error(`cast: no character ${characterId}`);
-  return true;
 }
 
 /** Records the voice the owner wants for a character in this issue; upserts on (book, issue, character), so a cancelled or carried-out request can be made again. */

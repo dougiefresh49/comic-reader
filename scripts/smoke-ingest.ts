@@ -41,10 +41,16 @@ import {
 import { pageStoragePath } from "~/lib/storage";
 import { slugify } from "~/lib/character-id";
 import { needsSpeaker } from "~/components/review-editor/model";
+import { bubbleSpeaker } from "~/lib/bubble-speaker";
+import {
+  deleteBookAliases,
+  readNamedCharacters,
+} from "~/lib/character-aliases";
 import {
   deleteBookCast,
   issueCast,
   loadBookCast,
+  readBookFranchises,
   readCastVoiceLinks,
   renderVoice,
   setIssueVoice,
@@ -297,11 +303,8 @@ async function assertSmokeIds(): Promise<void> {
       `fixture ids without the "${PREFIX}" prefix (#196); refusing to start: ${unprefixed.join(", ")}`,
     );
   }
-  const rows = await paged<{ id: string; aliases: string[] | null }>(
-    (a, b) =>
-      supabase.from("characters").select("id, aliases").order("id").range(a, b),
-    "characters select",
-  );
+  // Each character with its global aliases, from ~/lib/character-aliases.
+  const rows = await readNamedCharacters(supabase);
   const leftovers = rows.filter((c) => smokeIds().includes(c.id));
   if (leftovers.length > 0) {
     fail(
@@ -313,7 +316,9 @@ async function assertSmokeIds(): Promise<void> {
   const hits: string[] = [];
   for (const id of [...ids, "smoke-stranger", "Smoke Stranger"]) {
     for (const c of rows) {
-      const match = [c.id, ...(c.aliases ?? [])].find((v) => fuzzy(id, v));
+      const match = [c.id, c.display_name ?? "", ...c.aliases].find((v) =>
+        fuzzy(id, v),
+      );
       if (match) hits.push(`${id} ~ characters.${c.id} (${match})`);
     }
   }
@@ -420,32 +425,39 @@ function castSpeakers(omitLegacyId: string | null) {
 }
 
 async function setup(scenario: Scenario) {
-  const src = must(
-    await supabase
-      .from("books")
-      .select("franchises")
-      .eq("id", SRC_BOOK)
-      .single(),
-    "source book",
-  ) as { franchises: string[] | null };
+  const franchises = await readBookFranchises(supabase, SRC_BOOK);
   must(
     await supabase.from("books").insert({
       id: BOOK,
       name: "Smoke Test",
       slug: BOOK,
-      franchises: src.franchises,
     }),
     "books insert",
   );
+  // The source book's franchises, in its order (cleanup deletes them with
+  // the other BOOK_TABLES rows).
+  if (franchises.length > 0) {
+    must(
+      await supabase.from("book_franchises").insert(
+        franchises.map((f, position) => ({
+          book_id: BOOK,
+          franchise_id: f.id,
+          position,
+        })),
+      ),
+      "book_franchises insert",
+    );
+  }
   // Real rows, so faces resolve and casting sees the speakers. smoke-stranger
   // gets none and stays unresolved in gates. A real run's faces are real
-  // characters, so it seeds none (#430).
-  const franchise = src.franchises?.[0] ?? null;
+  // characters, so it seeds none (#430). Each takes the book's
+  // lowest-position franchise, as the characters stop's new characters do.
+  const franchiseId = franchises[0]?.id ?? null;
   if (!real) {
     must(
       await supabase
         .from("characters")
-        .insert(fixtureIds().map((id) => ({ id, franchise, aliases: [] }))),
+        .insert(fixtureIds().map((id) => ({ id, franchise_id: franchiseId }))),
       "characters insert",
     );
   }
@@ -799,7 +811,7 @@ async function approvePages(scenario: Scenario): Promise<void> {
     must(
       await supabase
         .from("bubbles")
-        .update({ speaker: STRANGER_ID })
+        .update(bubbleSpeaker(null, STRANGER_ID))
         .eq("book_id", BOOK)
         .eq("issue_id", ISSUE)
         .in(
@@ -1336,11 +1348,14 @@ async function listObjects(bucket: string, prefix: string): Promise<string[]> {
   }
 }
 
-/** Every smoke-owned book row set, in FK-safe delete order. */
+/**
+ * Every smoke-owned book row set, in FK-safe delete order. The book's
+ * scoped aliases go after these, through `deleteBookAliases`
+ * (src/lib/character-aliases.ts owns every aliases write).
+ */
 const SMOKE_ROWS: Array<[string, Eqs]> = [
   ...BOOK_TABLES.map((t): [string, Eqs] => [t, { book_id: BOOK }]),
   ["books", { id: BOOK }],
-  ["aliases", { scope: "book", scope_id: BOOK }],
 ];
 /**
  * Global rows keyed on a smoke id, deleted after the book rows (bubbles,
@@ -1388,6 +1403,7 @@ async function cleanup(): Promise<{ rows: number; objects: number }> {
         : await withEqs(supabase.from(table).delete(), eqs);
     must(res, `delete ${table}`);
   }
+  await deleteBookAliases(supabase, BOOK);
   await deleteFakeCharacterVoices(supabase, smokeIds());
   for (const [table, q] of smokeGlobal(true)) {
     must(await q, `delete ${table} (smoke ids)`);
@@ -1420,6 +1436,8 @@ async function remaining(): Promise<{ rows: number; objects: number }> {
         : await countOf(table, eqs),
     );
   }
+  // A read through the generic counter, like the snapshot's (#463 decision 7).
+  add("aliases", await countOf("aliases", { scope: "book", scope_id: BOOK }));
   add("voices (smoke ids)", (await smokeVoices()).length);
   for (const [table, q] of smokeGlobal(false)) {
     const { count, error } = await q;

@@ -22,10 +22,18 @@ import os from "os";
 import path from "path";
 import sharp from "sharp";
 import { supabase } from "./lib/supabase.js";
+import { labelSpeaker } from "./lib/label-speaker.js";
+import {
+  loadNameResolver,
+  type NamedCharacter,
+} from "~/lib/character-aliases.js";
 import { selectIssue } from "~/lib/issue-queries.js";
 import { storePageImage } from "~/lib/page-images.js";
 import { pageStoragePath } from "~/lib/storage.js";
 import type { Json } from "~/types/database.js";
+
+/** The name rule from `loadNameResolver`. */
+type Means = (name: string) => NamedCharacter | undefined;
 
 const GIT_REV = "e562181^";
 const RAW_BUCKET = "comic-pages-raw";
@@ -153,6 +161,7 @@ function toBubbleRow(
   page: number,
   sortOrder: number,
   b: SourceBubble,
+  means: Means,
 ) {
   // cropPath is an absolute local path from the old pipeline; it never reaches the DB.
   const { cropPath: _cropPath, ...box } = b.box_2d ?? {};
@@ -166,7 +175,7 @@ function toBubbleRow(
     style: b.style ?? null,
     ocr_text: b.ocr_text ?? null,
     type: b.type ?? "SPEECH",
-    speaker: b.speaker ?? null,
+    ...labelSpeaker(means, b.speaker ?? null),
     emotion: b.emotion ?? null,
     side: b.side ?? null,
     text_with_cues: b.textWithCues ?? null,
@@ -183,6 +192,8 @@ async function planFromGit(
   gitDir: string,
   skip: Set<number>,
 ): Promise<PlannedWrite[]> {
+  // The reviewed speakers are outside text: the name rule picks the character.
+  const means = await loadNameResolver(supabase);
   const dims = JSON.parse(gitShow(`${gitDir}/pages.json`).toString()) as Record<
     string,
     { width: number; height: number }
@@ -231,7 +242,7 @@ async function planFromGit(
     const page = pageNumber(key);
     const planned = skip.has(page)
       ? []
-      : list.map((b, i) => toBubbleRow(bookId, issueId, page, i, b));
+      : list.map((b, i) => toBubbleRow(bookId, issueId, page, i, b, means));
     rows.push(...planned);
     console.log(`  page ${page}: ${list.length} / ${planned.length}`);
   }

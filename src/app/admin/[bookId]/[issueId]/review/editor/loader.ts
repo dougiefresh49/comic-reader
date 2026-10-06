@@ -1,5 +1,6 @@
 // Loads one issue for the review editor: pages, panels, bubbles, face detections and the cast. SELECTs only.
 import "server-only";
+import { readAliases } from "~/lib/character-aliases";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
 import { DEFAULT_PAGE } from "~/app/api/apply-fixes/write-rules";
@@ -50,6 +51,7 @@ interface BubbleRow {
   ocr_text: string | null;
   text_with_cues: string | null;
   type: string;
+  character_id: string | null;
   speaker: string | null;
   emotion: string | null;
   ignored: boolean | null;
@@ -88,7 +90,6 @@ interface DetectionRow {
 interface CharacterRow {
   id: string;
   display_name: string | null;
-  aliases: string[] | null;
 }
 
 const TYPES: string[] = [
@@ -169,7 +170,7 @@ export async function loadEditor(
     supabaseAdmin
       .from("bubbles")
       .select(
-        "id, page_number, panel_id, ocr_text, text_with_cues, type, speaker, emotion, ignored, silent, kept, audio_storage_path, box_2d, style",
+        "id, page_number, panel_id, ocr_text, text_with_cues, type, character_id, speaker, emotion, ignored, silent, kept, audio_storage_path, box_2d, style",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -191,7 +192,7 @@ export async function loadEditor(
       .order("number"),
     supabaseAdmin
       .from("characters")
-      .select("id, display_name, aliases", { count: "exact" }),
+      .select("id, display_name", { count: "exact" }),
     // Throws on a failed read, which fails the page like `rows` does.
     readVoices(supabaseAdmin),
     getCast(supabaseAdmin, bookId, issueId),
@@ -201,6 +202,11 @@ export async function loadEditor(
   const panelRows = rows<PanelRow>("panels", panelResult);
   const pageRows = rows<PageRow>("pages", pageResult);
   const charRows = rows<CharacterRow>("characters", charResult);
+  const aliasesOf = await readAliases(
+    supabaseAdmin,
+    charRows.map((c) => c.id),
+    bookId,
+  );
 
   const dims = new Map(pageRows.map((p) => [p.number, p]));
 
@@ -228,6 +234,7 @@ export async function loadEditor(
       text: b.ocr_text ?? "",
       textWithCues: b.text_with_cues,
       type: TYPES.includes(b.type) ? (b.type as BubbleType) : "SPEECH",
+      characterId: b.character_id,
       speaker: b.speaker,
       emotion: b.emotion ?? "",
       ignored: b.ignored ?? false,
@@ -416,7 +423,7 @@ export async function loadEditor(
     return {
       id: row.id,
       name,
-      aliases: row.aliases ?? [],
+      aliases: aliasesOf.get(row.id) ?? [],
       voice: voiceOption(row.id, voiceFor(book, row.id, issueId)),
     };
   });

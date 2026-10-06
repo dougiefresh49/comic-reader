@@ -9,7 +9,6 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
-  addAlias,
   addToCast,
   cancelVoiceRequest,
   castRow,
@@ -27,6 +26,7 @@ import {
   type VoiceRequest,
 } from "~/lib/cast";
 import { readVoice, voiceForAppearance } from "~/lib/voice-slots";
+import { addAlias } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
@@ -76,7 +76,7 @@ function must(what: string, error: { message: string } | null): void {
 async function resolveTarget(
   bookId: string,
   target: NameTarget,
-  franchise: string | null,
+  franchiseId: string | null,
 ): Promise<{ id: string; name: string; created: boolean }> {
   const book = await loadBookCast(supabaseAdmin, bookId);
   if (target.kind === "existing") {
@@ -91,7 +91,7 @@ async function resolveTarget(
   if (row) {
     return { id: row.id, name: row.display_name ?? row.id, created: false };
   }
-  await createCharacter(supabaseAdmin, { id, displayName: name, franchise });
+  await createCharacter(supabaseAdmin, { id, displayName: name, franchiseId });
   return { id, name, created: true };
 }
 
@@ -243,12 +243,16 @@ export async function nameGroup(args: {
   detectionIds: string[];
   suggestedNames: string[];
   target: NameTarget;
-  franchise: string | null;
+  franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
     const { scope, suggestedNames } = args;
     const detectionIds = await unnamedHere(scope, args.detectionIds);
-    const who = await resolveTarget(scope.bookId, args.target, args.franchise);
+    const who = await resolveTarget(
+      scope.bookId,
+      args.target,
+      args.franchiseId,
+    );
     if (detectionIds.length > 0) {
       const { error } = await supabaseAdmin
         .from("panel_character_detections")
@@ -349,12 +353,16 @@ export async function moveFace(args: {
   scope: Scope;
   detectionId: string;
   target: NameTarget;
-  franchise: string | null;
+  franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
     const { scope, detectionId } = args;
     const face = await readDetection(scope, detectionId);
-    const who = await resolveTarget(scope.bookId, args.target, args.franchise);
+    const who = await resolveTarget(
+      scope.bookId,
+      args.target,
+      args.franchiseId,
+    );
     if (face.characterId === who.id)
       return { ok: true, message: `That face is already ${who.name}.` };
     const moved = await supabaseAdmin
@@ -487,11 +495,15 @@ export async function confirmFaces(args: {
 export async function addCharacter(args: {
   scope: Scope;
   target: NameTarget;
-  franchise: string | null;
+  franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
     const { scope } = args;
-    const who = await resolveTarget(scope.bookId, args.target, args.franchise);
+    const who = await resolveTarget(
+      scope.bookId,
+      args.target,
+      args.franchiseId,
+    );
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
     return {
@@ -553,7 +565,7 @@ export async function nameSuggestion(args: {
   scope: Scope;
   name: string;
   target: NameTarget;
-  franchise: string | null;
+  franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
     const { scope } = args;
@@ -571,7 +583,11 @@ export async function nameSuggestion(args: {
       throw new Error(
         `"${wikiName}" already means ${means.display_name ?? means.id}; reload the page`,
       );
-    const who = await resolveTarget(scope.bookId, args.target, args.franchise);
+    const who = await resolveTarget(
+      scope.bookId,
+      args.target,
+      args.franchiseId,
+    );
     await addAlias(supabaseAdmin, who.id, wikiName);
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
