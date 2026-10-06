@@ -15,8 +15,6 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:types": "supabase gen types typescript --project-id sinmmbxrsbpjneccykwd --schema public > src/types/database.ts && prettier --write src/types/database.ts",
-    "audio-downloader": "node scripts/audio-downloader.js",
-    "video-download": "node scripts/video-download.js",
     "download-comic-images": "python3 scripts/download_comic_images.py",
     "fetch-wiki-context": "tsx --env-file=.env scripts/fetch-wiki-context.ts",
     "get-context": "tsx --env-file=.env scripts/get-context.ts",
@@ -96,7 +94,6 @@
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "workflow": "^4.2.4",
-    "youtube-dl-exec": "^3.0.26",
     "zod": "^3.25.76"
   },
   "devDependencies": {

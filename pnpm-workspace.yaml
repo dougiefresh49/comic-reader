@@ -5,4 +5,3 @@ onlyBuiltDependencies:
   - fluent-ffmpeg
   - sharp
   - unrs-resolver
-  - youtube-dl-exec
