@@ -34,6 +34,11 @@ export function useAudioPlayback({
 }: UseAudioPlaybackOptions) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Bumped by every stopAll. A clip captures the value it started under, so
+  // a load failure that lands after a stop (a page turn, unmount, Reset
+  // View) cannot advance the reader: pausing an element does not cancel its
+  // fetch, and the element stays in audioRef after a stop.
+  const stopGenerationRef = useRef(0);
   const onBubbleEndedRef = useRef(onBubbleEnded);
 
   useEffect(() => {
@@ -43,6 +48,7 @@ export function useAudioPlayback({
   const { activeWordIndex, startHighlight, stopHighlight } = useWordHighlight();
 
   const stopAll = useCallback(() => {
+    stopGenerationRef.current += 1;
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -69,6 +75,7 @@ export function useAudioPlayback({
       audio.volume = Math.max(0, Math.min(1, volume));
       audio.playbackRate = playbackRate;
       audioRef.current = audio;
+      const generation = stopGenerationRef.current;
       setIsPlaying(true);
 
       const ts = timestamps[bubble.id];
@@ -78,10 +85,16 @@ export function useAudioPlayback({
       // A clip that fails to load never fires `ended`, so it is treated as
       // one that ended: the reader moves on through the same callback. A 400
       // or 404 fires both `error` and a NotSupportedError from play(), and
-      // `settled` keeps that to one `onBubbleEnded` per clip.
+      // `settled` keeps that to one `onBubbleEnded` per clip, and the two
+      // guards below drop a failure from a clip that was replaced or stopped.
       let settled = false;
       const failed = (reason: unknown) => {
-        if (settled || audioRef.current !== audio) return;
+        if (
+          settled ||
+          audioRef.current !== audio ||
+          stopGenerationRef.current !== generation
+        )
+          return;
         settled = true;
         console.error(
           `Audio clip failed to load for bubble ${bubble.id} (${audio.src})`,
