@@ -269,7 +269,7 @@ function fuzzyNameMatch(a: string, b: string): boolean {
   return false;
 }
 
-async function buildKnownCharacterListOrFatal(
+export async function buildKnownCharacterListOrFatal(
   supabase: TypedClient,
   bookId: string,
   pageLabel: string,
@@ -1534,36 +1534,17 @@ export async function characterLookaheadPage(
   );
 }
 
-export async function getContextPage(
+/**
+ * The book context and closed cast `getContextPage` sends, read before any
+ * download or Gemini call. Split out so `scripts/compare-prompt-inputs.ts`
+ * prints the same inputs the step builds.
+ */
+export async function contextPromptInputs(
+  supabase: TypedClient,
   bookId: string,
   issueId: string,
-  pageNumber: number,
-) {
-  "use step";
-  const { createTypedStepClient } = await import("../step-utils");
-  const supabase = await createTypedStepClient();
-
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const roboflowKey = process.env.ROBOFLOW_API_KEY;
-  const roboflowUrl = process.env.ROBOFLOW_WORKFLOW_URL;
-  if (!geminiKey || !roboflowKey || !roboflowUrl) {
-    throw new FatalError(
-      "GEMINI_API_KEY, ROBOFLOW_API_KEY, and ROBOFLOW_WORKFLOW_URL required",
-    );
-  }
-
-  const { getGeminiClient: getGemini } = await import("~/lib/gemini-client");
-  const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
-  const gemini = getGemini();
-  const { GEMINI_FAST } = await import("~/lib/models");
-  const { generateContentLogged } = await import("~/lib/llm-usage");
-
-  const padded = String(pageNumber).padStart(2, "0");
-  const pageLabel = `page-${padded}`;
-  const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
-  // The cue call's rows, apart from the OCR and speaker calls' (#437).
-  const cueMeta = { ...llmMeta, step: "get-context:cues" };
-
+  pageLabel: string,
+): Promise<{ bookContext: string | undefined; cast: ClosedCastMember[] }> {
   // Book and synopsis context for the prompt. The wiki's character names stay
   // out: the speaker comes from the closed cast below, never from an open
   // list (#354).
@@ -1637,6 +1618,46 @@ export async function getContextPage(
       `get-context: ${bookId}/${issueId} has no cast. The cast is seeded at the characters stop (review-clusters); confirm it there before running get-context.`,
     );
   }
+
+  return { bookContext, cast };
+}
+
+export async function getContextPage(
+  bookId: string,
+  issueId: string,
+  pageNumber: number,
+) {
+  "use step";
+  const { createTypedStepClient } = await import("../step-utils");
+  const supabase = await createTypedStepClient();
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const roboflowKey = process.env.ROBOFLOW_API_KEY;
+  const roboflowUrl = process.env.ROBOFLOW_WORKFLOW_URL;
+  if (!geminiKey || !roboflowKey || !roboflowUrl) {
+    throw new FatalError(
+      "GEMINI_API_KEY, ROBOFLOW_API_KEY, and ROBOFLOW_WORKFLOW_URL required",
+    );
+  }
+
+  const { getGeminiClient: getGemini } = await import("~/lib/gemini-client");
+  const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
+  const gemini = getGemini();
+  const { GEMINI_FAST } = await import("~/lib/models");
+  const { generateContentLogged } = await import("~/lib/llm-usage");
+
+  const padded = String(pageNumber).padStart(2, "0");
+  const pageLabel = `page-${padded}`;
+  const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
+  // The cue call's rows, apart from the OCR and speaker calls' (#437).
+  const cueMeta = { ...llmMeta, step: "get-context:cues" };
+
+  const { bookContext, cast } = await contextPromptInputs(
+    supabase,
+    bookId,
+    issueId,
+    pageLabel,
+  );
 
   const storagePath = pageStoragePath(bookId, issueId, pageNumber);
   const { data: imageBlob, error: downloadErr } = await supabase.storage
