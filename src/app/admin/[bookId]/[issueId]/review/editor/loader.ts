@@ -16,7 +16,6 @@ import {
 } from "~/lib/cast";
 import { NARRATOR_ID, titleCase } from "~/components/review-editor/lib";
 import type {
-  BubbleType,
   CastMember,
   EditorData,
   Face,
@@ -27,6 +26,8 @@ import type {
   SrcPanel,
   VoiceOption,
 } from "~/components/review-editor/types";
+import { BUBBLE_TYPES, type BubbleType } from "~/lib/bubble-types";
+import { chunk } from "~/lib/chunk";
 import { readVoices, type VoiceRow } from "~/lib/voice-slots";
 import { VOICE_SLOTS_TOTAL } from "~/lib/voice-slots/types";
 
@@ -92,14 +93,6 @@ interface CharacterRow {
   display_name: string | null;
 }
 
-const TYPES: string[] = [
-  "SPEECH",
-  "NARRATION",
-  "CAPTION",
-  "SFX",
-  "BACKGROUND",
-] satisfies BubbleType[];
-
 function pct(value: string | undefined): number | null {
   if (!value) return null;
   const n = parseFloat(value);
@@ -108,13 +101,6 @@ function pct(value: string | undefined): number | null {
 
 function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n));
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size)
-    out.push(items.slice(i, i + size));
-  return out;
 }
 
 /**
@@ -156,8 +142,8 @@ export async function loadEditor(
   const issue = issueResult.data as unknown as IssueRow | null;
   if (!issue) return null;
 
-  // Bubbles and panels are read here, not through `getIssueData` and
-  // `getPanelsForIssue`: those log a failed read and return nothing.
+  // Bubbles and panels are read here directly, not through the
+  // reader's queries in `src/server/pages`.
   const [
     bubbleResult,
     panelResult,
@@ -233,7 +219,9 @@ export async function loadEditor(
       rect,
       text: b.ocr_text ?? "",
       textWithCues: b.text_with_cues,
-      type: TYPES.includes(b.type) ? (b.type as BubbleType) : "SPEECH",
+      type: (BUBBLE_TYPES as readonly string[]).includes(b.type)
+        ? (b.type as BubbleType)
+        : "SPEECH",
       characterId: b.character_id,
       speaker: b.speaker,
       emotion: b.emotion ?? "",

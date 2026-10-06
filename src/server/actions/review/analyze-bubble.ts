@@ -13,7 +13,7 @@ import {
 } from "@google/genai";
 import { headers } from "next/headers";
 import { NARRATOR_ID, resolveSpeaker } from "~/components/review-editor/lib";
-import type { BubbleType } from "~/components/review-editor/types";
+import { BUBBLE_TYPES, type BubbleType } from "~/lib/bubble-types";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { cueRequest } from "~/lib/cue-rules";
 import { buildContextPrompt } from "~/lib/gemini-prompts";
@@ -23,13 +23,6 @@ import { pageStoragePath } from "~/lib/storage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
 const PAGES_BUCKET = "comic-pages";
-const TYPES: BubbleType[] = [
-  "SPEECH",
-  "NARRATION",
-  "CAPTION",
-  "SFX",
-  "BACKGROUND",
-];
 /** Server actions take 1 MB; the editor scales the crop well under this. */
 const MAX_CROP_CHARS = 900_000;
 const MAX_HINT_CHARS = 500;
@@ -191,7 +184,7 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
     }
 
     const text = transcribe ? str(parsed.text) : current;
-    const type = TYPES.find((t) => t === str(parsed.type).toUpperCase());
+    const type = BUBBLE_TYPES.find((t) => t === str(parsed.type).toUpperCase());
     // The closed list, enforced: a name not on it never reaches the editor.
     const resolved = resolveSpeaker(str(parsed.speaker) || null, args.cast);
     // A narration box with no speaker named is the Narrator's: that is what

@@ -1,10 +1,11 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
+import { getElevenLabsClient } from "~/lib/elevenlabs-client";
+import { isDryRun } from "~/lib/fakes/dry-run";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
@@ -79,6 +80,13 @@ export async function regenerateAudio(args: Args) {
   if (!auth.ok) return { ok: false, error: auth.message };
   if (!process.env.ELEVENLABS_API_KEY) {
     return { ok: false, error: "ELEVENLABS_API_KEY not configured" };
+  }
+  if (isDryRun()) {
+    return {
+      ok: false,
+      error:
+        "DRY_RUN is set, so the client would return silent audio. Unset it to regenerate for real.",
+    };
   }
 
   const isUuid =
@@ -178,9 +186,7 @@ export async function regenerateAudio(args: Args) {
 
   let step: Step = "generate";
   try {
-    const client = new ElevenLabsClient({
-      apiKey: process.env.ELEVENLABS_API_KEY,
-    });
+    const client = await getElevenLabsClient();
     const response = await recordElevenLabsCall(
       {
         step: "review:regenerate-audio",

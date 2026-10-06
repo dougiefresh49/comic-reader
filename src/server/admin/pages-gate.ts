@@ -6,7 +6,7 @@
 import "server-only";
 import { selectIssue } from "~/lib/issue-queries";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { SPOKEN, needsSpeaker } from "~/components/review-editor/model";
+import { SPOKEN, needsSpeaker } from "~/lib/bubble-types";
 
 export type ReadyResult =
   | { ok: true }

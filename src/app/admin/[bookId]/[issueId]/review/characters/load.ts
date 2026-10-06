@@ -18,6 +18,7 @@ import {
   type RoleId,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
+import { chunk } from "~/lib/chunk";
 import {
   clipObjectPath,
   readVoices,
@@ -94,13 +95,6 @@ interface AppearanceRow {
 /** The picker's voice statuses, in list order. */
 const PICK_RANK = { active: 0, archived: 1, needs_clip: 2 } as const;
 type PickStatus = keyof typeof PICK_RANK;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size)
-    out.push(items.slice(i, i + size));
-  return out;
-}
 
 /** The rows of one read, or a throw: a cut-short list would hide faces. */
 function rows<T>(

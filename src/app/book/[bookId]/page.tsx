@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getManifest } from "~/server";
+import { monogram } from "~/lib/monogram";
 import { pageImageUrl } from "~/lib/storage";
 import { getIssueOfflineUrls } from "~/server/offline";
 import { OfflineDownload } from "~/components/OfflineDownload";
@@ -13,16 +14,6 @@ interface BookDetailProps {
   params: Promise<{
     bookId: string;
   }>;
-}
-
-/** "TMNT x MMPR" → "TM" — short monogram for cover placeholders. */
-function monogram(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
 }
 
 /** "Issue 3" / "issue-3" → "#3"; falls back to a short monogram. */
