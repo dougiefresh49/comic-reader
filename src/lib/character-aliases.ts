@@ -35,32 +35,56 @@ export async function readAliases(
   bookId?: string,
 ): Promise<Map<string, string[]>> {
   const ids = [...new Set(characterIds)];
-  const scope = bookId
-    ? `scope.eq.global,and(scope.eq.book,scope_id.eq.${bookId})`
-    : "scope.eq.global";
-  const out = new Map<string, string[]>();
+  // Two reads with `.eq()` filters rather than one `.or()` string, so the
+  // book id is never spliced into PostgREST filter syntax.
+  const rows: AliasRow[] = [];
   for (let i = 0; i < ids.length; i += IDS_PER_READ) {
     const chunk = ids.slice(i, i + IDS_PER_READ);
-    for (let from = 0; ; from += PAGE) {
-      const { data, error } = await db(client)
-        .from("aliases")
-        .select("alias, character_id")
-        .in("character_id", chunk)
-        .or(scope)
-        .order("id")
-        .range(from, from + PAGE - 1);
-      must("reading aliases", error);
-      const rows = data ?? [];
-      for (const row of rows) {
-        if (!row.character_id) continue;
-        const list = out.get(row.character_id) ?? [];
-        list.push(row.alias);
-        out.set(row.character_id, list);
-      }
-      if (rows.length < PAGE) break;
-    }
+    rows.push(
+      ...(await readAliasRows(client, chunk, "global", null)),
+      ...(bookId ? await readAliasRows(client, chunk, "book", bookId) : []),
+    );
+  }
+  rows.sort((a, b) => a.id - b.id);
+  const out = new Map<string, string[]>();
+  for (const row of rows) {
+    if (!row.character_id) continue;
+    const list = out.get(row.character_id) ?? [];
+    list.push(row.alias);
+    out.set(row.character_id, list);
   }
   return out;
+}
+
+interface AliasRow {
+  id: number;
+  alias: string;
+  character_id: string | null;
+}
+
+/** One scope's alias rows for a set of character ids, paged past the row cap. */
+async function readAliasRows(
+  client: Client,
+  characterIds: string[],
+  scope: "global" | "book",
+  bookId: string | null,
+): Promise<AliasRow[]> {
+  const out: AliasRow[] = [];
+  for (;;) {
+    let query = db(client)
+      .from("aliases")
+      .select("id, alias, character_id")
+      .in("character_id", characterIds)
+      .eq("scope", scope);
+    if (bookId) query = query.eq("scope_id", bookId);
+    const { data, error } = await query
+      .order("id")
+      .range(out.length, out.length + PAGE - 1);
+    must("reading aliases", error);
+    const page = data ?? [];
+    out.push(...page);
+    if (page.length < PAGE) return out;
+  }
 }
 
 /** A `characters` row as the name rule reads it. */

@@ -15,15 +15,20 @@ export interface BubbleSpeaker {
 
 /**
  * The `character_id` and `speaker` to write. A picked character writes its
- * id and its display name, so `speaker` has one shape wherever an id is set.
- * No character writes a null id and the raw label as given, shown until
- * someone picks a speaker; a null label clears both.
+ * id and its display name, or its id when `characters.display_name` is null,
+ * so `speaker` has one shape wherever an id is set; callers pass the column
+ * as read and apply no fallback of their own. No character writes a null id
+ * and the raw label as given, shown until someone picks a speaker; a null
+ * label clears both.
  */
 export function bubbleSpeaker(
-  character: { id: string; displayName: string } | null,
+  character: { id: string; displayName: string | null } | null,
   label: string | null,
 ): BubbleSpeaker {
   if (character)
-    return { character_id: character.id, speaker: character.displayName };
+    return {
+      character_id: character.id,
+      speaker: character.displayName ?? character.id,
+    };
   return { character_id: null, speaker: label };
 }

@@ -54,8 +54,8 @@ type Row = Record<string, unknown>;
 export interface WriteContext {
   /** `pages.width` and `pages.height`, for `box_2d` in pixels. */
   pageSize: (page: number) => { width: number; height: number };
-  /** The display name of each `characters` row among the picked speakers. */
-  displayNames: Map<string, string>;
+  /** `characters.display_name` as read, for each `characters` row among the picked speakers. */
+  displayNames: Map<string, string | null>;
   /** The detection confidence each named bubble's `box_2d` holds now. */
   confidence: Map<string, number>;
   /** The page of each named bubble, as stored. */
@@ -116,7 +116,7 @@ export async function loadWriteContext(
   const displayNames = new Map(
     (
       (charResult.data ?? []) as { id: string; display_name: string | null }[]
-    ).map((c) => [c.id, c.display_name ?? c.id]),
+    ).map((c) => [c.id, c.display_name]),
   );
 
   const confidence = new Map<string, number>();
@@ -159,9 +159,11 @@ function speakerColumns(
   ctx: WriteContext,
 ): BubbleSpeaker {
   const id = edit?.characterId ?? null;
-  const displayName = id ? ctx.displayNames.get(id) : undefined;
-  if (id && displayName !== undefined)
-    return bubbleSpeaker({ id, displayName }, null);
+  if (id && ctx.displayNames.has(id))
+    return bubbleSpeaker(
+      { id, displayName: ctx.displayNames.get(id) ?? null },
+      null,
+    );
   return bubbleSpeaker(null, id ?? edit?.label ?? null);
 }
 

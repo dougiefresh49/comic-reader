@@ -445,12 +445,16 @@ async function runBookMode(
       const franchiseId = slug && franchiseIds.has(slug) ? slug : null;
       if (entry.franchise && !franchiseId)
         console.warn(
-          `   ⚠ ${character}: no franchises row "${slug}" for "${entry.franchise}" — franchise_id left null`,
+          `   ⚠ ${character}: no franchises row "${slug}" for "${entry.franchise}" — franchise_id not written`,
         );
+      // An unresolved name leaves the key out, so an existing row keeps the
+      // franchise_id it has (a new row gets null).
       const { error: cErr } = await supabase
         .from("characters")
         .upsert(
-          { id: character, franchise_id: franchiseId },
+          franchiseId
+            ? { id: character, franchise_id: franchiseId }
+            : { id: character },
           { onConflict: "id" },
         );
       if (cErr) {

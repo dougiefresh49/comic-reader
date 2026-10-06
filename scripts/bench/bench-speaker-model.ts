@@ -370,6 +370,7 @@ async function loadClosedCast(bookId: string, issueId: string) {
   const cast: ClosedCastMember[] = proposal.members.map((m) => ({
     id: m.id,
     name: m.name,
+    displayName: bookCast.resolve(m.id)?.display_name ?? null,
     aliases: bookCast.resolve(m.id)?.aliases ?? [],
   }));
   return { cast, suggestions: proposal.suggestions };

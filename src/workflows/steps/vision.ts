@@ -1635,6 +1635,7 @@ export async function contextPromptInputs(
     cast.push({
       id: row.id,
       name: row.display_name ?? entry.character,
+      displayName: row.display_name,
       aliases: row.aliases,
     });
   }

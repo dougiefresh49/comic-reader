@@ -24,9 +24,7 @@ export function labelSpeaker(
     ? (means(label) ?? means(stripBrackets(label)))
     : undefined;
   return bubbleSpeaker(
-    match
-      ? { id: match.id, displayName: match.display_name ?? match.id }
-      : null,
+    match ? { id: match.id, displayName: match.display_name } : null,
     label,
   );
 }
