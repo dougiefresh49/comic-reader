@@ -1,36 +1,50 @@
 #!/usr/bin/env node
 
 /**
- * Import a voice-lab handoff, manifest version 2 (#467), into `voices`,
- * `works`, `appearances` and the `comic-voice-clips` bucket.
+ * Import voice-lab's clip library (#474) into `voices`, `appearances`,
+ * `voice_lookups` and the `comic-voice-clips` bucket.
  *
- * The manifest is `casting/<folder>/voices.json` in the voice-lab checkout
- * (or the file --manifest names): `{ "version": 2, "voices": [...] }`, one
- * row per voice, naming its character and work by id. The field rules are
- * the "Voice-lab handoff" section of docs/casting-data-model.html. Any
- * other version is refused before the database is read.
+ * The library is voice-lab's clone sources, organized by the work each clip
+ * came from, with one index: `<library>/index.json`, `{ "version": 1,
+ * "clips": [...] }`. A clip row carries `file` (relative to the library),
+ * `md5`, `character` (voice-lab's display name), `work { slug, title, year,
+ * kind }` and `status`; any other field is ignored. Any other version is
+ * refused before the database is read. The index names no comic-reader id,
+ * description or label: a clip already stored matches its voice by md5, a
+ * new one resolves its character through the name rule and its work as
+ * `slugify(title)-year`, and each voice's description and labels come from a
+ * lookup made here (scripts/lib/voice-lookups.ts).
  *
  * Two halves:
  *   plan   planVoiceLabImport (scripts/lib/voice-lab-plan.ts) turns the
- *          manifest and the current rows into typed writes, skips and
- *          notes. It is pure; a write already true of the rows is not
- *          planned, so a rerun plans nothing.
- *   apply  only with --execute: hashes each row's local clip against the
- *          manifest md5 and uploads it (no overwrite, same-bytes only),
- *          then writes works, appearances and voices in that order. A row
- *          whose clip fails writes nothing. No castlist or casting_tasks
- *          write and no ElevenLabs call; restore puts a voice in a slot.
+ *          index, the current rows and the stored lookups into typed writes,
+ *          skips, notes and the voices to describe. It is pure; a write
+ *          already true of the rows is not planned, so a rerun plans nothing.
+ *   apply  only with --execute: hashes each new clip against the index md5
+ *          and uploads it (no overwrite, same bytes only), then writes
+ *          appearances and voices in that order. A clip whose upload fails
+ *          writes nothing.
  *
- * Without --execute it prints the plan, and for each row whether its file
- * is under clone-sources/<folder>/ and hashes to its md5, and writes nothing.
+ * The three runs:
+ *   (no flag)   no Gemini call and no write. Prints the plan, each voice to
+ *               describe with its stored description and labels or "lookup
+ *               needed", and the count of lookups needed.
+ *   --describe  one GEMINI_FAST call per lookup needed, each stored in
+ *               voice_lookups and printed. Writes that table and nothing else.
+ *   --execute   no Gemini call. Writes the plan: each voice's missing
+ *               description and labels from voice_lookups (never over a value
+ *               it holds) and the new clips. A voice whose lookup is not
+ *               stored takes no write, and a new voice in that state is not
+ *               inserted.
+ * --describe with --execute is refused. No castlist, casting_tasks, works or
+ * characters write, and no ElevenLabs call; restore puts a voice in a slot.
  * --check runs the plan on fixtures/voice-lab/ with no database or network.
  *
- * Inputs, read-only:
- *   VOICE_LAB_REPO  voice-lab repo (default $HOME/projects/voice-lab)
- *   VOICE_LAB       voice-lab workspace (default $HOME/Movies/library/voice-lab)
+ * Input, read-only: --library <dir>, default $VOICE_LAB/clone-sources
+ * (VOICE_LAB defaults to $HOME/Movies/library/voice-lab).
  *
  * Usage:
- *   pnpm voice-lab-import -- --folder <folder> [--manifest <path>] [--execute]
+ *   pnpm voice-lab-import -- [--library <dir>] [--describe] [--execute]
  *   pnpm exec tsx --env-file=.env scripts/voice-lab-import.ts --check
  */
 
@@ -39,6 +53,10 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  readNamedCharacters,
+  type NamedCharacter,
+} from "~/lib/character-aliases";
 import { clipContentType, uploadClip } from "~/lib/voice-slots/bucket";
 import { md5Hex } from "~/lib/voice-slots/elevenlabs";
 import {
@@ -48,27 +66,36 @@ import {
 import type { VoiceRow } from "~/lib/voice-slots/types";
 import {
   insertAppearances,
-  insertWorks,
-  MEDIA,
   readAppearances,
   readWorks,
 } from "./lib/appearances.js";
 import {
-  clipObject,
-  MANIFEST_VERSION,
+  clipFile,
+  clipLabel,
+  failedDependency,
+  INDEX_VERSION,
+  liveWrite,
+  lookupsNeeded,
   planVoiceLabImport,
-  rowLabel,
   type AppearanceRow,
-  type Manifest,
+  type Describe,
+  type LibraryIndex,
   type Plan,
   type PlanInput,
+  type VoiceLookupRow,
   type WorkRow,
   type Write,
 } from "./lib/voice-lab-plan.js";
+import {
+  checkAnswer,
+  insertVoiceLookup,
+  lookUpVoice,
+  readVoiceLookups,
+} from "./lib/voice-lookups.js";
 
 /**
  * The owner's v2 voices (AGENTS.md, "Voice slots"): the active rows of these
- * characters take no import write, whichever route a manifest row takes.
+ * characters take no import write.
  */
 const PROTECTED_CHARACTER_IDS = new Set([
   "michelangelo",
@@ -80,15 +107,15 @@ const PROTECTED_CHARACTER_IDS = new Set([
 const FIXTURES = path.resolve("fixtures/voice-lab");
 
 interface Args {
-  folder: string | null;
-  manifest: string | null;
+  library: string;
+  describe: boolean;
   execute: boolean;
   check: boolean;
 }
 
 function usage(code: number): never {
   console.log(
-    "Usage: pnpm voice-lab-import -- --folder <folder> [--manifest <path>] [--execute]\n" +
+    "Usage: pnpm voice-lab-import -- [--library <dir>] [--describe] [--execute]\n" +
       "       pnpm exec tsx --env-file=.env scripts/voice-lab-import.ts --check",
   );
   process.exit(code);
@@ -97,64 +124,77 @@ function usage(code: number): never {
 function parseArgs(): Args {
   const argv = process.argv.slice(2).filter((a) => a !== "--");
   if (argv.includes("--help") || argv.includes("-h")) usage(0);
-  const valueOf = (flag: string) => {
-    const i = argv.indexOf(flag);
-    return i >= 0 ? (argv[i + 1] ?? null) : null;
-  };
+  const i = argv.indexOf("--library");
+  const workspace =
+    process.env.VOICE_LAB ?? path.join(homedir(), "Movies/library/voice-lab");
   const args = {
-    folder: valueOf("--folder"),
-    manifest: valueOf("--manifest"),
+    library: path.resolve(
+      i >= 0 ? (argv[i + 1] ?? "") : path.join(workspace, "clone-sources"),
+    ),
+    describe: argv.includes("--describe"),
     execute: argv.includes("--execute"),
     check: argv.includes("--check"),
   };
-  if (!args.check && !args.folder) usage(1);
-  if (
-    args.folder &&
-    (!/^[\w.-]+$/.test(args.folder) || /^\.+$/.test(args.folder))
-  ) {
-    console.error(`--folder must be one folder name, got "${args.folder}"`);
+  if (i >= 0 && !argv[i + 1]) usage(1);
+  if (args.describe && args.execute) {
+    console.error(
+      "--describe and --execute are separate runs: describe first, read the output, then execute. Nothing was read or written.",
+    );
     process.exit(1);
   }
   return args;
 }
 
+/** A path as printed: the home directory as ~, so pasted output names no user. */
+const shown = (p: string) =>
+  p.startsWith(homedir() + path.sep) ? `~${p.slice(homedir().length)}` : p;
+
 async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await readFile(file, "utf8")) as T;
 }
 
-/** The manifest, or exit 1 naming the version found and the file. */
-async function readManifest(file: string): Promise<Manifest> {
-  const raw = await readJson<{ version?: unknown; voices?: unknown }>(file);
-  if (raw?.version !== MANIFEST_VERSION) {
+/** The index, or exit 1 naming the version found and the file. */
+async function readIndex(file: string): Promise<LibraryIndex> {
+  let raw: { version?: unknown; clips?: unknown };
+  try {
+    raw = await readJson<typeof raw>(file);
+  } catch (err) {
+    // fs errors carry the absolute path; print the code, and the path as shown().
+    const why =
+      (err as { code?: string }).code ??
+      (err instanceof Error ? err.message : String(err));
     console.error(
-      `${file}: manifest version ${JSON.stringify(raw?.version ?? null)}; this import reads version ${MANIFEST_VERSION} only. Nothing was read or written.`,
+      `${shown(file)}: cannot read the index (${why}). Nothing was read or written.`,
     );
     process.exit(1);
   }
-  if (!Array.isArray(raw.voices)) {
-    console.error(`${file}: "voices" is not a list. Nothing was written.`);
+  if (raw?.version !== INDEX_VERSION) {
+    console.error(
+      `${shown(file)}: index version ${JSON.stringify(raw?.version ?? null)}; this import reads version ${INDEX_VERSION} only. Nothing was read or written.`,
+    );
     process.exit(1);
   }
-  return raw as Manifest;
+  if (!Array.isArray(raw.clips)) {
+    console.error(
+      `${shown(file)}: "clips" is not a list. Nothing was written.`,
+    );
+    process.exit(1);
+  }
+  return raw as LibraryIndex;
 }
 
 function describeWrite(w: Write): string {
-  const rows = `[row ${w.rows.join(", ")}]`;
+  const rows = `[clip ${w.rows.join(", ")}]`;
   switch (w.kind) {
-    case "insert_work":
-      return `  + work ${w.row.id}: "${w.row.title}" (${w.row.year}, ${w.row.medium}, franchise ${w.row.franchise_id ?? "none"}) ${rows}`;
     case "insert_appearance":
-      return `  + appearance ${w.row.character_id} in ${w.row.work_id} (voice actor ${w.row.voice_actor ?? "unknown"}) ${rows}`;
+      return `  + appearance ${w.row.character_id} in ${w.row.work_id} ${rows}`;
     case "insert_voice":
-      return `  + voice "${w.row.display_name}": ${w.row.character_id}, ${w.appearance ? `appearance in ${w.appearance.work_id}` : "designed, no appearance"}, archived, consumers {${w.row.consumers.join(",")}}, starting_pick ${w.row.starting_pick}; sample ${w.clip.object} (md5 ${w.clip.md5}) ${rows}`;
+      return `  + voice "${w.row.display_name}": ${w.row.character_id}, ${w.appearance ? `appearance in ${w.appearance.work_id}` : "no appearance"}, archived, description and labels from voice_lookups; sample ${w.clip.object} (md5 ${w.clip.md5}) ${rows}`;
     case "update_voice": {
       const s = w.set;
       const fields = [
         s.description !== undefined && "description",
         s.labels !== undefined && "labels",
-        s.design_prompt !== undefined && "design_prompt",
-        s.starting_pick !== undefined && `starting_pick ${s.starting_pick}`,
-        s.consumers && `consumers {${s.consumers.join(",")}}`,
         w.clip && `sample ${w.clip.object} (md5 ${w.clip.md5})`,
         s.status && `status ${s.status}`,
       ].filter(Boolean);
@@ -163,29 +203,44 @@ function describeWrite(w: Write): string {
   }
 }
 
+const labelText = (l: Record<string, string>) =>
+  Object.entries(l)
+    .map(([k, v]) => `${k} ${v}`)
+    .join(", ");
+
+function describeLine(d: Describe): string {
+  const head = `  ${d.voice}: ${d.key.character_id} in ${d.key.work_id} [clip ${d.row}]`;
+  if (d.refused)
+    return `${head}\n      stored lookup refused: ${d.refused.join(", ")}`;
+  return d.stored
+    ? `${head}\n      ${d.stored.description}\n      labels: ${labelText(d.stored.labels)}`
+    : `${head}\n      lookup needed`;
+}
+
 function printPlan(plan: Plan) {
   console.log(`\nWrites (${plan.writes.length}), in order:`);
   plan.writes.forEach((w) => console.log(describeWrite(w)));
   console.log(`\nSkips (${plan.skips.length}):`);
   plan.skips.forEach((s) => console.log(`  - ${s.label}: ${s.reason}`));
   console.log(`\nNotes (${plan.notes.length}):`);
-  plan.notes.forEach((n) => console.log(`  * row ${n.row}: ${n.text}`));
+  plan.notes.forEach((n) => console.log(`  * clip ${n.row}: ${n.text}`));
+  console.log(`\nVoices to describe (${plan.describe.length}):`);
+  plan.describe.forEach((d) => console.log(describeLine(d)));
+  console.log(`\nLookups needed: ${lookupsNeeded(plan).length}`);
 }
 
-/** The local copy of a manifest file, guarded to stay under the clone root. */
-function localPath(cloneRoot: string, file: string): string | null {
-  const p = path.resolve(cloneRoot, file);
-  const rel = path.relative(cloneRoot, p);
+/** The local copy of an index file, guarded to stay under the library. */
+function localPath(library: string, file: string): string | null {
+  const p = path.resolve(library, file);
+  const rel = path.relative(library, p);
   return rel.startsWith("..") || path.isAbsolute(rel) ? null : p;
 }
 
 // --- --check: the planning function on the committed fixtures -------------
 
 interface FixtureRows {
-  folder: string;
   protected_voice_ids: string[];
-  characters: { id: string; display_name: string | null }[];
-  franchises: string[];
+  characters: NamedCharacter[];
   voices: VoiceRow[];
   works: WorkRow[];
   appearances: AppearanceRow[];
@@ -193,10 +248,11 @@ interface FixtureRows {
 
 interface ExpectedCase {
   name: string;
-  row: number;
+  clip: number;
   writes: Write[];
   skips: Plan["skips"];
   notes: Plan["notes"];
+  describe: Describe[];
 }
 
 /** Stable JSON: object keys sorted, so key order never counts as a change. */
@@ -212,36 +268,77 @@ function canon(v: unknown): string {
   );
 }
 
-function fixtureInput(manifest: Manifest, rows: FixtureRows): PlanInput {
+function fixtureInput(
+  index: LibraryIndex,
+  rows: FixtureRows,
+  lookups: VoiceLookupRow[],
+): PlanInput {
   return {
-    folder: rows.folder,
-    manifest,
+    clips: index.clips,
     voices: rows.voices,
     works: rows.works,
     appearances: rows.appearances,
-    characters: new Map(rows.characters.map((c) => [c.id, c.display_name])),
-    franchiseIds: new Set(rows.franchises),
-    media: MEDIA,
+    characters: rows.characters,
+    lookups,
     protectedVoiceIds: new Set(rows.protected_voice_ids),
   };
+}
+
+/**
+ * #469 item 2 on a fake client: a write that moves status filters on
+ * `needs_clip`, and zero updated rows fail it.
+ */
+async function checkStatusGuard(): Promise<string | null> {
+  const filters: string[] = [];
+  const builder = {
+    update: () => builder,
+    eq: (col: string, val: string) => {
+      filters.push(`${col}=${val}`);
+      return builder;
+    },
+    select: () => Promise.resolve({ data: [], error: null }),
+  };
+  const fake = { from: () => builder } as unknown as SupabaseClient;
+  try {
+    await updateVoiceFacts(fake, "v-1", {
+      source_clip_path: "x__y.mp3",
+      source_clip_md5: "0".repeat(32),
+      status: "archived",
+    });
+    return "a status move that updated no row did not fail";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!filters.includes("status=needs_clip"))
+      return `no status=needs_clip filter (filters: ${filters.join(", ")})`;
+    if (!/no longer needs_clip/.test(msg)) return `unexpected error: ${msg}`;
+    return null;
+  }
 }
 
 async function runCheck(): Promise<never> {
   globalThis.fetch = (() => {
     throw new Error("--check made a network call");
   }) as typeof fetch;
-  const manifest = await readManifest(path.join(FIXTURES, "manifest.json"));
+  const index = await readIndex(path.join(FIXTURES, "index.json"));
   const before = await readJson<FixtureRows>(
     path.join(FIXTURES, "rows-before.json"),
   );
   const after = await readJson<FixtureRows>(
     path.join(FIXTURES, "rows-after.json"),
   );
+  const lookups = await readJson<VoiceLookupRow[]>(
+    path.join(FIXTURES, "lookups.json"),
+  );
   const expected = await readJson<{ cases: ExpectedCase[] }>(
     path.join(FIXTURES, "expected-writes.json"),
   );
-  const plan = planVoiceLabImport(fixtureInput(manifest, before));
+  const plan = planVoiceLabImport(fixtureInput(index, before, lookups));
   let failed = 0;
+  let passed = 0;
+  const ok = (line: string) => {
+    passed++;
+    console.log(`ok   ${line}`);
+  };
   const fail = (line: string, detail?: string) => {
     failed++;
     console.log(`FAIL ${line}`);
@@ -250,19 +347,25 @@ async function runCheck(): Promise<never> {
 
   const covered = new Set<number>();
   for (const c of expected.cases) {
-    covered.add(c.row);
+    covered.add(c.clip);
     const actual = {
-      writes: plan.writes.filter((w) => w.rows.includes(c.row)),
-      skips: plan.skips.filter((s) => s.row === c.row),
-      notes: plan.notes.filter((n) => n.row === c.row),
+      writes: plan.writes.filter((w) => w.rows.includes(c.clip)),
+      skips: plan.skips.filter((s) => s.row === c.clip),
+      notes: plan.notes.filter((n) => n.row === c.clip),
+      describe: plan.describe.filter((d) => d.row === c.clip),
     };
-    const want = { writes: c.writes, skips: c.skips, notes: c.notes };
-    const summary = `${actual.writes.length} write(s), ${actual.skips.length} skip(s), ${actual.notes.length} note(s)`;
+    const want = {
+      writes: c.writes,
+      skips: c.skips,
+      notes: c.notes,
+      describe: c.describe,
+    };
+    const summary = `${actual.writes.length} write(s), ${actual.skips.length} skip(s), ${actual.notes.length} note(s), ${actual.describe.length} to describe`;
     if (canon(actual) === canon(want))
-      console.log(`ok   row ${c.row} ${c.name}: ${summary}`);
+      ok(`clip ${c.clip} ${c.name}: ${summary}`);
     else
       fail(
-        `row ${c.row} ${c.name}: ${summary}`,
+        `clip ${c.clip} ${c.name}: ${summary}`,
         `  expected ${JSON.stringify(want, null, 2)}\n  actual   ${JSON.stringify(actual, null, 2)}`,
       );
   }
@@ -270,33 +373,99 @@ async function runCheck(): Promise<never> {
     ...plan.writes.flatMap((w) => w.rows),
     ...plan.skips.map((s) => s.row),
     ...plan.notes.map((n) => n.row),
+    ...plan.describe.map((d) => d.row),
   ].filter((r) => !covered.has(r));
   if (stray.length > 0)
     fail(
-      `every planned row is a named case: rows ${[...new Set(stray)].join(", ")} are not`,
+      `every planned clip is a named case: clips ${[...new Set(stray)].join(", ")} are not`,
     );
-  else console.log("ok   every planned row is a named case");
-  if (manifest.voices.length !== covered.size)
+  else ok("every planned clip is a named case");
+  if (index.clips.length !== covered.size)
     fail(
-      `every manifest row is a named case: ${covered.size} cases for ${manifest.voices.length} rows`,
+      `every index clip is a named case: ${covered.size} cases for ${index.clips.length} clips`,
     );
-  const rank = {
-    insert_work: 0,
-    insert_appearance: 1,
-    insert_voice: 2,
-    update_voice: 2,
-  };
   const ordered = plan.writes.every(
-    (w, i, all) => i === 0 || rank[all[i - 1]!.kind] <= rank[w.kind],
+    (w, i, all) =>
+      i === 0 ||
+      w.kind !== "insert_appearance" ||
+      all[i - 1]!.kind === "insert_appearance",
   );
-  if (ordered)
-    console.log("ok   writes ordered work, then appearance, then voice");
-  else fail("writes ordered work, then appearance, then voice");
+  if (ordered) ok("writes ordered appearance, then voice");
+  else fail("writes ordered appearance, then voice");
 
-  const again = planVoiceLabImport(fixtureInput(manifest, after));
+  // The actor rule on canned answers: no Gemini call.
+  const answer = (actor: string) =>
+    JSON.stringify({
+      actor,
+      known: true,
+      description: "A low, steady voice.",
+      labels: {
+        gender: "male",
+        age: "old",
+        accent: "en-american",
+        language: "en",
+      },
+    });
+  const actorCases: [string, string | null, boolean][] = [
+    ["Invented Actor One", "invented actor one", true],
+    ["Actor One", "Invented Actor One", true],
+    ["Someone Else", "Invented Actor One", false],
+    ["Someone Else", null, true],
+  ];
+  const actorWrong = actorCases.filter(
+    ([named, expected, pass]) =>
+      !("refused" in checkAnswer(answer(named), expected)) !== pass,
+  );
+  if (actorWrong.length === 0)
+    ok(
+      "actor check: the same person passes (case, spacing, a shorter name), another person is refused, no appearance actor checks nothing",
+    );
+  else fail(`actor check: wrong on ${JSON.stringify(actorWrong)}`);
+
+  // Apply's "is this write live" decision for a voice planned beside another
+  // clip's: dropped when that clip failed, kept otherwise. No database call.
+  const dependent = plan.writes.find(
+    (w) => w.kind === "insert_voice" && w.depends_on !== undefined,
+  );
+  const first = dependent
+    ? plan.writes.find(
+        (w) =>
+          w.kind === "insert_voice" &&
+          dependent.kind === "insert_voice" &&
+          w.rows.includes(dependent.depends_on!),
+      )
+    : undefined;
+  const dep = dependent?.kind === "insert_voice" ? dependent.depends_on! : 0;
+  const liveWrong = !dependent
+    ? "no planned write carries depends_on"
+    : !first
+      ? `no planned voice write for clip ${dep}`
+      : !liveWrite(dependent, new Set())
+        ? "dropped with no clip failed"
+        : liveWrite(dependent, new Set([dep]))
+          ? `kept after clip ${dep} failed`
+          : failedDependency(dependent, new Set([dep])) !== dep
+            ? "the failure does not name the clip it depends on"
+            : !liveWrite(first, new Set(dependent.rows))
+              ? `clip ${dep} dropped when the dependent clip failed`
+              : null;
+  if (liveWrong === null)
+    ok(
+      `apply's live check: clip ${dependent!.rows[0]}'s voice (planned beside clip ${dep}'s) is dropped when clip ${dep} fails and kept when it is written; clip ${dep} does not wait on it`,
+    );
+  else fail(`apply's live check: ${liveWrong}`);
+
+  const guard = await checkStatusGuard();
+  if (guard === null)
+    ok(
+      "status guard (#469 item 2): updateVoiceFacts moving status filters on needs_clip and fails when no row updates",
+    );
+  else fail(`status guard (#469 item 2): ${guard}`);
+
+  const again = planVoiceLabImport(fixtureInput(index, after, lookups));
   if (again.writes.length === 0)
-    console.log(
-      `ok   rows-after: the whole manifest against rows-after.json plans no write (${again.skips.length} skips and ${again.notes.length} notes repeat)`,
+    ok(
+      `rows-after: the whole index against rows-after.json plans no write (${again.skips.length} skips and ${again.notes.length} notes repeat)`,
     );
   else
     fail(
@@ -306,91 +475,92 @@ async function runCheck(): Promise<never> {
 
   console.log(
     failed === 0
-      ? `\nvoice-lab-import --check: all ${expected.cases.length + 3} checks passed, no database or network call.`
-      : `\nvoice-lab-import --check: ${failed} failed.`,
+      ? `\nvoice-lab-import --check: all ${passed} checks passed, no database or network call.`
+      : `\nvoice-lab-import --check: ${failed} failed, ${passed} passed.`,
   );
   process.exit(failed === 0 ? 0 : 1);
 }
 
-// --- dry run and --execute -------------------------------------------------
+// --- dry run, --describe and --execute -------------------------------------
 
 async function readCurrent(supabase: SupabaseClient) {
   const { readVoices } = await import("~/lib/voice-slots/registry");
-  const [voices, works, appearances, characters, franchises] =
-    await Promise.all([
-      readVoices(supabase),
-      readWorks(supabase),
-      readAppearances(supabase),
-      supabase.from("characters").select("id, display_name"),
-      supabase.from("franchises").select("id"),
-    ]);
-  if (characters.error)
-    throw new Error(`read characters: ${characters.error.message}`);
-  if (franchises.error)
-    throw new Error(`read franchises: ${franchises.error.message}`);
-  return {
-    voices,
-    works,
-    appearances,
-    characters: new Map(
-      (characters.data as { id: string; display_name: string | null }[]).map(
-        (c) => [c.id, c.display_name],
-      ),
-    ),
-    franchiseIds: new Set(
-      (franchises.data as { id: string }[]).map((f) => f.id),
-    ),
-  };
+  const [voices, works, appearances, characters, lookups] = await Promise.all([
+    readVoices(supabase),
+    readWorks(supabase),
+    readAppearances(supabase),
+    readNamedCharacters(supabase),
+    readVoiceLookups(supabase),
+  ]);
+  return { voices, works, appearances, characters, lookups };
 }
 
-/** Per row: is the file under the clone root, and does it hash to md5? */
+/** Each index file: present under the library, and hashing to its md5? */
 async function fileReport(
-  manifest: Manifest,
-  folder: string,
-  cloneRoot: string,
+  index: LibraryIndex,
+  library: string,
 ): Promise<string[]> {
   const lines: string[] = [];
-  for (const [i, m] of manifest.voices.entries()) {
-    const label = rowLabel(i + 1, m);
-    const clip = clipObject(folder, m.file);
-    if ("error" in clip) {
-      lines.push(`  - ${label}: ${clip.error}`);
+  let good = 0;
+  for (const [i, c] of index.clips.entries()) {
+    const label = clipLabel(i + 1, c);
+    const file = clipFile(c.file);
+    if ("error" in file) {
+      lines.push(`  - ${label}: ${file.error}`);
       continue;
     }
-    const p = localPath(cloneRoot, clip.file);
-    if (!p) lines.push(`  - ${label}: file path leaves the clone root`);
+    const p = localPath(library, file.file);
+    if (!p) lines.push(`  - ${label}: file path leaves the library`);
     else if (!existsSync(p)) lines.push(`  - ${label}: file missing`);
     else {
       const md5 = md5Hex(await readFile(p));
-      lines.push(
-        md5 === m.md5
-          ? `  - ${label}: file present, md5 matches`
-          : `  - ${label}: file present, md5 ${md5} differs from the manifest's ${m.md5 ?? "(none)"}`,
-      );
+      if (md5 === c.md5) good++;
+      else
+        lines.push(
+          `  - ${label}: md5 ${md5} differs from the index's ${typeof c.md5 === "string" ? c.md5 : "(none)"}`,
+        );
     }
   }
-  return lines;
+  return [
+    `  ${good} of ${index.clips.length} present with a matching md5`,
+    ...lines,
+  ];
 }
 
 async function apply(
   supabase: SupabaseClient,
   plan: Plan,
-  cloneRoot: string,
+  library: string,
 ): Promise<string[]> {
   const failures: string[] = [];
   const failedRows = new Set<number>();
   const failRow = (row: number, why: string) => {
     failedRows.add(row);
-    failures.push(`row ${row}: ${why}`);
+    failures.push(`clip ${row}: ${why}`);
   };
-  const live = (w: Write) => w.rows.some((r) => !failedRows.has(r));
+  const live = (w: Write) => liveWrite(w, failedRows);
+  /** Fails a write whose dependency failed, naming it; true when it did. */
+  const dependencyFailed = (w: Write) => {
+    const dep = failedDependency(w, failedRows);
+    // Already failed and reported in an earlier loop.
+    if (dep === null || w.rows.every((r) => failedRows.has(r))) return false;
+    failRow(
+      w.rows[0]!,
+      `clip ${dep} failed or was not written, and this clip's voice was planned beside clip ${dep}'s; nothing written for this clip, and the next run plans it again`,
+    );
+    return true;
+  };
 
-  // 1. Each clip: the local file must hash to the manifest md5, then upload.
+  // 1. Each new clip: the local file must hash to the index md5, then upload.
   for (const w of plan.writes) {
     if ((w.kind !== "insert_voice" && w.kind !== "update_voice") || !w.clip)
       continue;
+    if (!live(w)) {
+      dependencyFailed(w);
+      continue;
+    }
     const row = w.rows[0]!;
-    const p = localPath(cloneRoot, w.clip.file);
+    const p = localPath(library, w.clip.file);
     if (!p || !existsSync(p)) {
       failRow(row, `file missing: ${w.clip.file}`);
       continue;
@@ -400,7 +570,7 @@ async function apply(
     if (md5 !== w.clip.md5) {
       failRow(
         row,
-        `${w.clip.file} hashes to ${md5}, the manifest says ${w.clip.md5}; nothing written for this row`,
+        `${w.clip.file} hashes to ${md5}, the index says ${w.clip.md5}; nothing written for this clip`,
       );
       continue;
     }
@@ -416,19 +586,16 @@ async function apply(
     }
   }
 
-  // 2. Works, then appearances, then voices.
-  const pick = <K extends Write["kind"]>(kind: K) =>
-    plan.writes.filter(
-      (w): w is Extract<Write, { kind: K }> => w.kind === kind && live(w),
-    );
+  // 2. Appearances, then voices.
   try {
-    await insertWorks(
-      supabase,
-      pick("insert_work").map((w) => w.row),
-    );
     await insertAppearances(
       supabase,
-      pick("insert_appearance").map((w) => w.row),
+      plan.writes
+        .filter(
+          (w): w is Extract<Write, { kind: "insert_appearance" }> =>
+            w.kind === "insert_appearance" && live(w),
+        )
+        .map((w) => w.row),
     );
   } catch (err) {
     failures.push(err instanceof Error ? err.message : String(err));
@@ -441,7 +608,10 @@ async function apply(
     ]),
   );
   for (const w of plan.writes) {
-    if (!live(w)) continue;
+    if (!live(w)) {
+      dependencyFailed(w);
+      continue;
+    }
     const row = w.rows[0]!;
     try {
       if (w.kind === "insert_voice") {
@@ -471,26 +641,43 @@ async function apply(
   return failures;
 }
 
+/** --describe: one lookup per key with nothing stored, each stored. */
+async function describeAll(
+  supabase: SupabaseClient,
+  plan: Plan,
+): Promise<string[]> {
+  const { getGeminiClient } = await import("~/lib/gemini-client");
+  const gemini = getGeminiClient();
+  const failures: string[] = [];
+  const needed = lookupsNeeded(plan);
+  console.log(`\nDescribing ${needed.length} voice(s):`);
+  for (const d of needed) {
+    const key = `${d.key.character_id} in ${d.key.work_id}`;
+    const result = await lookUpVoice(gemini, d);
+    if (!result.ok) {
+      failures.push(`${key}: ${result.reasons.join("; then ")}`);
+      console.log(`  ! ${key}: not stored (${result.reasons.join("; then ")})`);
+      continue;
+    }
+    await insertVoiceLookup(supabase, d.key, result.answer, result.model);
+    console.log(
+      `  ${key} (${d.character}, ${d.work.title} ${d.work.year}${d.voice_actor ? `, ${d.voice_actor}` : ""})\n      model names the actor: ${result.answer.actor}\n      ${result.answer.description}\n      labels: ${labelText(result.answer.labels)}`,
+    );
+  }
+  return failures;
+}
+
 async function main() {
   const args = parseArgs();
   if (args.check) await runCheck();
-  const folder = args.folder!;
-  const labRepo =
-    process.env.VOICE_LAB_REPO ?? path.join(homedir(), "projects/voice-lab");
-  const workspace =
-    process.env.VOICE_LAB ?? path.join(homedir(), "Movies/library/voice-lab");
-  const cloneRoot = path.join(workspace, "clone-sources", folder);
-  const manifestFile = args.manifest
-    ? path.resolve(args.manifest)
-    : path.join(labRepo, "casting", folder, "voices.json");
-
-  const manifest = await readManifest(manifestFile);
+  const indexFile = path.join(args.library, "index.json");
+  const index = await readIndex(indexFile);
   // The client is built only past the version check and never on --check.
   const { supabase } = await import("./lib/supabase.js");
   const current = await readCurrent(supabase);
   // A typo here would protect nothing, so a missing character id stops the run.
   const unknownProtected = [...PROTECTED_CHARACTER_IDS].filter(
-    (id) => !current.characters.has(id),
+    (id) => !current.characters.some((c) => c.id === id),
   );
   if (unknownProtected.length > 0) {
     console.error(
@@ -515,40 +702,58 @@ async function main() {
       ),
   );
   const plan = planVoiceLabImport({
-    folder,
-    manifest,
-    ...current,
-    media: MEDIA,
+    clips: index.clips,
+    voices: current.voices,
+    works: current.works,
+    appearances: current.appearances,
+    characters: current.characters,
+    lookups: current.lookups.rows,
     protectedVoiceIds,
   });
 
-  const mode = args.execute ? "EXECUTE" : "dry run, no writes";
-  console.log(`\nvoice-lab-import ${folder} (${mode})`);
-  console.log(`Manifest: ${manifestFile}, ${manifest.voices.length} row(s)`);
+  const mode = args.execute
+    ? "EXECUTE"
+    : args.describe
+      ? "describe, writes voice_lookups only"
+      : "dry run, no writes";
+  console.log(`\nvoice-lab-import (${mode})`);
+  console.log(`Index: ${shown(indexFile)}, ${index.clips.length} clip(s)`);
   console.log(
-    `Read: ${current.voices.length} voices, ${current.works.length} works, ${current.appearances.length} appearances, ${current.characters.size} characters, ${current.franchiseIds.size} franchises; ${protectedVoiceIds.size} protected voices${unprotected.length > 0 ? ` (no active voice to protect for ${unprotected.join(", ")})` : ""}`,
+    `Read: ${current.voices.length} voices, ${current.works.length} works, ${current.appearances.length} appearances, ${current.characters.length} characters, ${current.lookups.missing ? "no voice_lookups table (the migration is not applied; every lookup reads as not stored)" : `${current.lookups.rows.length} stored lookups`}; ${protectedVoiceIds.size} protected voices${unprotected.length > 0 ? ` (no active voice to protect for ${unprotected.join(", ")})` : ""}`,
   );
   printPlan(plan);
-  console.log(`\nLocal files under clone-sources/${folder}/:`);
-  (await fileReport(manifest, folder, cloneRoot)).forEach((l) =>
-    console.log(l),
-  );
+  console.log(`\nLocal files under ${shown(args.library)}:`);
+  (await fileReport(index, args.library)).forEach((l) => console.log(l));
   console.log(
-    `\nSummary: ${plan.writes.length} writes, ${plan.skips.length} skips, ${plan.notes.length} notes`,
+    `\nSummary: ${plan.writes.length} writes, ${plan.skips.length} skips, ${plan.notes.length} notes, ${plan.describe.length} voices to describe, ${lookupsNeeded(plan).length} lookups needed`,
   );
 
-  if (!args.execute) {
+  if (!args.execute && !args.describe) {
     console.log("Dry run: nothing written.");
     return;
   }
+  if (current.lookups.missing) {
+    console.error(
+      `\n--${args.execute ? "execute" : "describe"} needs the voice_lookups table; apply its migration first. Nothing was written.`,
+    );
+    process.exit(1);
+  }
 
-  const failures = await apply(supabase, plan, cloneRoot);
+  const failures = args.describe
+    ? await describeAll(supabase, plan)
+    : await apply(supabase, plan, args.library);
   if (failures.length > 0) {
-    console.error(`\n${failures.length} failure(s):`);
+    console.error(
+      `\n${failures.length} ${args.describe ? "failed lookup(s)" : "failure(s)"}:`,
+    );
     failures.forEach((f) => console.error(`  ! ${f}`));
     process.exit(1);
   }
-  console.log(`\nDone: ${plan.writes.length} writes applied.\n`);
+  console.log(
+    args.describe
+      ? `\nDone: ${lookupsNeeded(plan).length} lookups stored.\n`
+      : `\nDone: ${plan.writes.length} writes applied.\n`,
+  );
 }
 
 main().catch((err) => {

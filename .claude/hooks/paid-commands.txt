@@ -25,6 +25,7 @@ script:get-context :: Paid: get-context runs a Gemini call per issue. Re-run it 
 script:motion-comic :: Paid: motion-comic calls Gemini for the motion plan. Re-run it as LIVE_API_OK=1 pnpm motion-comic ... only if the task named that spend.
 script:split-voice :: Paid: split-voice builds a new voice, which takes a voice slot. Re-run it as LIVE_API_OK=1 pnpm split-voice ... only if the task named that spend.
 script:voice-rotation && --(archive|restore|execute)([^[:alnum:]_-]|$) :: Paid: that flag renames or deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation ... only if the task named that spend.
+script:voice-lab-import && --describe([^[:alnum:]_-]|$) :: Paid: --describe makes one Gemini call per voice lookup not stored yet. Re-run it as LIVE_API_OK=1 pnpm voice-lab-import ... only if the task named that spend.
 script:voice-rotation-archive :: Paid: voice-rotation-archive renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-archive ... only if the task named that spend.
 script:voice-rotation-checkout :: Paid: voice-rotation-checkout renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-checkout ... only if the task named that spend.
 script:apply-fixes :: Paid: apply-fixes writes production rows. Re-run it as LIVE_API_OK=1 pnpm apply-fixes ... only if the task named that write.
@@ -38,6 +39,7 @@ cmd:curl.*api\.elevenlabs\.io && .*(-[Xx][[:space:]]*=*[[:space:]]*[\"']?([Pp][O
 # The smoke run has no package script; it runs through pnpm exec tsx, and only
 # --real makes it spend.
 cmd:smoke-ingest\.ts && --real([^[:alnum:]_-]|$) :: Paid: smoke-ingest --real runs the pipeline with real Gemini, ElevenLabs and Roboflow calls. Re-run it as LIVE_API_OK=1 pnpm exec tsx scripts/smoke-ingest.ts --real ... only if the task named that spend.
+cmd:voice-lab-import\.ts && --describe([^[:alnum:]_-]|$) :: Paid: voice-lab-import --describe makes one Gemini call per voice lookup not stored yet. Re-run it as LIVE_API_OK=1 pnpm exec tsx scripts/voice-lab-import.ts --describe ... only if the task named that spend.
 
 file:src/lib/models.ts :: Paid: this file holds the Gemini model ids and caps. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
 file:src/lib/voice-settings.ts :: Paid: this file holds the voice settings for paid synthesis. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.

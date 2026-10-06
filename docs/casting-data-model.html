@@ -311,6 +311,7 @@
 </table>
 
 <h2 id="voicelab">Voice-lab handoff</h2>
+<p><strong>Replaced by #474</strong> (<code>docs/decisions.md</code> row 323): the import no longer reads a version 2 manifest. It reads voice-lab's clip library index, organized by work, matches a stored clip by md5, and looks up each voice's description and labels in this repo (<code>voice_lookups</code>). The rest of this section is history.</p>
 <p>Today the import reads <code>casting/&lt;book&gt;/cast.json</code> from the voice-lab checkout. Rows carry a character name, a variant, a default flag, a file and a status. The import builds a display name "Character (variant)" and detects an already-imported row by its clip path. A second file, the ElevenLabs snapshot, fills description, labels and design prompt. Nothing reads the copies under <code>data/casting/</code> in this repo.</p>
 <p>Version 2 is one file per voice-lab book folder, <code>casting/&lt;folder&gt;/voices.json</code> in the voice-lab checkout. It has one row per voice and names things by id:</p>
 <pre><code>{

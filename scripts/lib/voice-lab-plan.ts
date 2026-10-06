@@ -1,73 +1,87 @@
 /**
- * The planning half of the voice-lab import (#467): a version 2 manifest
- * and the current rows in, an ordered list of typed writes, the skipped
- * rows and the notes out. It reads no file and touches no client; the
- * script's apply code is the only thing that runs the writes.
+ * The planning half of the voice-lab import (#474): voice-lab's clip
+ * library index, the current rows and the stored voice lookups in; the
+ * ordered writes, the skips, the notes and the voices to describe out. It
+ * reads no file, imports no client and makes no network call; the script's
+ * apply code is the only thing that runs the writes.
  *
- * The rule for each manifest row is the field table in
- * docs/casting-data-model.html ("Voice-lab handoff") as #467 settles it:
- * a row with `voice_uuid` updates that voice; a clone (`work`) resolves
- * work, then appearance (character_id, work_id), then the voice holding
- * the appearance; a designed voice (`design_prompt`) matches on
- * (character_id, md5) among voices with no appearance. A write whose every
+ * Each clip resolves in this order:
+ *   stored    its md5 is a voice's source_clip_md5: that voice's. The only
+ *             write is a description and labels the voice lacks.
+ *   new clip  status approved; the character name resolves through the
+ *             name rule, the work id is slugify(title)-year and must be a
+ *             works row. Then the appearance (inserted when missing) and the
+ *             voice holding it: none, a new archived voice; needs_clip, it
+ *             takes the clip; active or archived, a new archived voice with
+ *             no appearance and a note.
+ * A voice the plan leaves without a description or labels needs a lookup,
+ * keyed by its appearance, else by the clip's character and work. With no
+ * stored lookup, nothing is written for that voice. A write whose every
  * value is already true is not emitted, so a second run plans nothing.
  */
 import path from "node:path";
+import { nameResolver, type NamedCharacter } from "~/lib/character-aliases";
+import { slugify } from "~/lib/character-id";
 import { metadataRefusals } from "~/lib/voice-slots/elevenlabs";
 import type { VoiceLabFacts } from "~/lib/voice-slots/import";
-import { firstStoredDesign } from "~/lib/voice-slots/lookup";
 import type { VoiceRow } from "~/lib/voice-slots/types";
 import type { Database } from "~/types/database";
 
 type Tables = Database["public"]["Tables"];
 export type WorkRow = Tables["works"]["Row"];
 export type AppearanceRow = Tables["appearances"]["Row"];
+export type VoiceLookupRow = Tables["voice_lookups"]["Row"];
 
-export const MANIFEST_VERSION = 2;
-const IMPORTED_STATUSES = new Set(["approved", "ready to clone"]);
+/** A voice lookup's key, and an appearance's: one character in one work. */
+export interface LookupKey {
+  character_id: string;
+  work_id: string;
+}
+
+export const lookupKeyString = (k: LookupKey) =>
+  `${k.character_id}\u0000${k.work_id}`;
+
+/** What the lookup prompt is given about one (character, work). */
+export interface LookupSubject {
+  key: LookupKey;
+  /** The character's display name. */
+  character: string;
+  work: { title: string; year: number; medium: string };
+  voice_actor: string | null;
+}
+
+export const INDEX_VERSION = 1;
 /** The bucket's allowed_mime_types: mp3, m4a, wav. */
 const CLIP_EXTENSIONS = new Set([".mp3", ".m4a", ".wav"]);
 const MD5 = /^[a-f0-9]{32}$/;
+const SLUG = /^[\w.-]+$/;
 
-/** One row of `casting/<folder>/voices.json`, untrusted until checked. */
-export interface ManifestRow {
-  character_id?: string;
-  voice_uuid?: string;
+/** One row of `index.json`, untrusted until checked. Other fields are ignored. */
+export interface IndexClip {
+  file?: unknown;
+  md5?: unknown;
+  character?: unknown;
   work?: {
-    id?: string;
-    title?: string;
-    year?: number;
-    medium?: string;
-    franchise_id?: string | null;
+    slug?: unknown;
+    title?: unknown;
+    year?: unknown;
+    kind?: unknown;
   } | null;
-  voice_actor?: string | null;
-  design_prompt?: string | null;
-  file?: string;
-  md5?: string;
-  description?: string;
-  labels?: Record<string, string>;
-  starting_pick?: boolean;
-  consumers?: string[];
-  status?: string;
+  status?: unknown;
 }
 
-export interface Manifest {
+export interface LibraryIndex {
   version: number;
-  voices: ManifestRow[];
+  clips: IndexClip[];
 }
 
 /** A clip the apply code hashes, uploads, then names on the voice row. */
 export interface Clip {
-  /** Relative to clone-sources/<folder>/. */
+  /** Relative to the library directory. */
   file: string;
-  /** Object name in the clips bucket: `<folder>__<file with / as __>`. */
+  /** Object name in the clips bucket: `<work slug>__<file name>`. */
   object: string;
   md5: string;
-}
-
-export interface AppearanceKey {
-  character_id: string;
-  work_id: string;
 }
 
 export interface NewVoice {
@@ -76,38 +90,32 @@ export interface NewVoice {
   status: "archived";
   description: string;
   labels: Record<string, string>;
-  design_prompt: string | null;
-  starting_pick: boolean;
+  design_prompt: null;
+  starting_pick: false;
   consumers: string[];
   source_clip_path: string;
   source_clip_md5: string;
 }
 
-/** `rows` are the 1-based manifest rows that need the write. */
+/** `rows` are the 1-based index clips that need the write. */
 export type Write =
-  | {
-      kind: "insert_work";
-      rows: number[];
-      row: {
-        id: string;
-        title: string;
-        year: number;
-        medium: string;
-        franchise_id: string | null;
-      };
-    }
   | {
       kind: "insert_appearance";
       rows: number[];
-      row: AppearanceKey & { voice_actor: string | null };
+      row: LookupKey & { voice_actor: null };
     }
   | {
       kind: "insert_voice";
       rows: number[];
-      /** Null for a designed voice; apply resolves the key to an id. */
-      appearance: AppearanceKey | null;
+      /** Null beside a voice that holds the appearance; apply resolves the key to an id. */
+      appearance: LookupKey | null;
       row: NewVoice;
       clip: Clip;
+      /**
+       * The earlier clip whose planned voice holds the appearance this voice
+       * is planned beside. Apply writes this one only if that clip was written.
+       */
+      depends_on?: number;
     }
   | {
       kind: "update_voice";
@@ -129,366 +137,393 @@ export interface Note {
   text: string;
 }
 
+/** A voice the plan describes, and the stored lookup it uses, if any. */
+export interface Describe extends LookupSubject {
+  row: number;
+  /** `<display_name> (<id>)`, or `new "<display_name>"`. */
+  voice: string;
+  stored: { description: string; labels: Record<string, string> } | null;
+  /** Set when a stored lookup fails `metadataRefusals`; `stored` is then null. */
+  refused?: string[];
+}
+
 export interface Plan {
   writes: Write[];
   skips: Skip[];
   notes: Note[];
+  describe: Describe[];
 }
 
 export interface PlanInput {
-  folder: string;
-  manifest: Manifest;
+  clips: readonly IndexClip[];
   voices: readonly VoiceRow[];
   works: readonly WorkRow[];
   appearances: readonly AppearanceRow[];
-  /** Every `characters` id, with its display name for a new row's label. */
-  characters: ReadonlyMap<string, string | null>;
-  franchiseIds: ReadonlySet<string>;
-  /** The `works.medium` check set. */
-  media: ReadonlySet<string>;
-  /** Voices no plan may write to, whichever route a row takes. */
+  /** Every `characters` row with its global aliases, for the name rule. */
+  characters: readonly NamedCharacter[];
+  lookups: readonly VoiceLookupRow[];
+  /** Voices no plan may write to. */
   protectedVoiceIds: ReadonlySet<string>;
 }
 
 /**
- * The clip a manifest `file` names, or why it cannot be one: absolute,
- * leaving the folder, or a type the bucket refuses.
+ * The clip an index `file` names, or why it cannot be one: absolute,
+ * leaving the library, or a type the bucket refuses.
  */
-export function clipObject(
-  folder: string,
-  file: unknown,
-): { file: string; object: string } | { error: string } {
+export function clipFile(file: unknown): { file: string } | { error: string } {
   if (typeof file !== "string" || !file.trim())
     return { error: "file missing or empty" };
   if (path.posix.isAbsolute(file) || path.win32.isAbsolute(file))
     return { error: `file is an absolute path: ${file}` };
   const rel = path.posix.normalize(file.replace(/\\/g, "/"));
   if (rel === "." || rel === ".." || rel.startsWith("../"))
-    return { error: `file path leaves the ${folder} folder: ${file}` };
+    return { error: `file path leaves the library: ${file}` };
   if (!CLIP_EXTENSIONS.has(path.posix.extname(rel).toLowerCase()))
     return { error: `bucket takes mp3, m4a or wav only: ${rel}` };
-  return { file: rel, object: `${folder}__${rel.split("/").join("__")}` };
+  return { file: rel };
 }
-
-const present = <T>(v: T | null | undefined): v is T =>
-  v !== undefined && v !== null;
 
 const isText = (v: unknown): v is string =>
   typeof v === "string" && v.trim() !== "";
 
-function sameLabels(
-  a: Record<string, string> | null,
-  b: Record<string, string> | null,
-): boolean {
-  const flat = (l: Record<string, string> | null) =>
-    JSON.stringify(
-      Object.entries(l ?? {}).sort(([x], [y]) => (x < y ? -1 : 1)),
-    );
-  return a !== null && b !== null && flat(a) === flat(b);
-}
-
-/** The same values, ignoring order and repeats. */
-const sameSet = (a: readonly string[], b: readonly string[]) =>
-  a.every((x) => b.includes(x)) && b.every((x) => a.includes(x));
+const lacksDescription = (v: { description: string | null }) =>
+  !isText(v.description);
+const lacksLabels = (v: { labels: Record<string, string> | null }) =>
+  metadataRefusals({ labels: v.labels }).includes("no labels");
 
 const voiceName = (v: VoiceRow) => `${v.display_name} (${v.id})`;
 
-export function rowLabel(n: number, m: ManifestRow): string {
-  const what = present(m.voice_uuid)
-    ? `voice ${m.voice_uuid}`
-    : present(m.work)
-      ? `work ${m.work.id ?? "?"}`
-      : present(m.design_prompt)
-        ? "design"
-        : "no work or design";
-  return `row ${n} ${m.character_id ?? "(no character_id)"}, ${what}, ${m.file ?? "(no file)"}`;
-}
-
-/** Why a row cannot be imported at all, before any matching, or null. */
-function refusal(
-  m: ManifestRow,
-  input: PlanInput,
-  clip: ReturnType<typeof clipObject>,
-): string | null {
-  if (!isText(m.character_id)) return "character_id missing";
-  if (!input.characters.has(m.character_id))
-    return `character_id "${m.character_id}" is not in characters (the import creates no characters)`;
-  if (!IMPORTED_STATUSES.has(m.status ?? ""))
-    return `status "${m.status ?? ""}" (only approved or ready to clone are imported)`;
-  const clone = present(m.work);
-  const design = present(m.design_prompt);
-  if (clone && design)
-    return "both work and design_prompt are present; a row is a clone or a design";
-  if (!clone && !design) return "neither work nor design_prompt is present";
-  if (design && !isText(m.design_prompt)) return "design_prompt is empty";
-  if ("error" in clip) return clip.error;
-  if (typeof m.md5 !== "string" || !MD5.test(m.md5))
-    return "md5 missing or not 32 lowercase hex characters";
-  const meta = metadataRefusals({
-    description: m.description,
-    labels: m.labels,
-  });
-  if (meta.includes("no description")) return "description missing or empty";
-  if (meta.includes("no labels")) return "labels missing or empty";
-  if (present(m.starting_pick) && typeof m.starting_pick !== "boolean")
-    return "starting_pick is not true or false";
-  if (
-    present(m.consumers) &&
-    (!Array.isArray(m.consumers) || !m.consumers.every(isText))
-  )
-    return "consumers is not a list of names";
-  if (clone) {
-    const w = m.work!;
-    if (!isText(w.id) || !isText(w.title) || !Number.isInteger(w.year))
-      return "work.id, work.title or work.year missing";
-    if (!input.media.has(w.medium ?? ""))
-      return `work.medium "${w.medium ?? ""}" is not a works.medium (${[...input.media].join(", ")})`;
-    if (present(w.franchise_id) && !input.franchiseIds.has(w.franchise_id))
-      return `work.franchise_id "${w.franchise_id}" is not in franchises (the import creates no franchises)`;
-  }
-  return null;
+export function clipLabel(n: number, c: IndexClip): string {
+  const name = isText(c.character) ? c.character : "(no character)";
+  const file = isText(c.file) ? c.file : "(no file)";
+  return `clip ${n} ${name}, ${file}`;
 }
 
 export function planVoiceLabImport(input: PlanInput): Plan {
-  const works: Write[] = [];
   const appearanceWrites: Write[] = [];
   const voiceWrites: Write[] = [];
   const skips: Skip[] = [];
   const notes: Note[] = [];
+  const describe: Describe[] = [];
 
-  const voicesById = new Map(input.voices.map((v) => [v.id, v]));
+  const resolve = nameResolver([...input.characters]);
+  const worksById = new Map(input.works.map((w) => [w.id, w]));
+  const appearanceById = new Map(input.appearances.map((a) => [a.id, a]));
+  const appearanceByKey = new Map(
+    input.appearances.map((a) => [lookupKeyString(a), a]),
+  );
   const voiceByAppearance = new Map(
     input.voices
       .filter((v) => v.appearance_id)
       .map((v) => [v.appearance_id!, v]),
   );
-  const worksById = new Map(input.works.map((w) => [w.id, w]));
-  const appKey = (k: AppearanceKey) => `${k.character_id}\u0000${k.work_id}`;
-  const appearanceByKey = new Map(input.appearances.map((a) => [appKey(a), a]));
+  const lookupByKey = new Map(
+    input.lookups.map((l) => [lookupKeyString(l), l]),
+  );
 
-  // Targets taken by an earlier row of this plan, so two rows never write
-  // the same voice, appearance or clip.
+  // Targets taken by an earlier clip of this plan, so two clips never write
+  // the same voice, appearance or sample.
   const takenVoice = new Map<string, number>();
-  const takenAppearance = new Map<string, number>();
+  /** The voice an earlier clip puts on an appearance, by appearance key. */
+  const plannedHolder = new Map<string, { voice: string; clip: number }>();
   const takenMd5 = new Map<string, number>();
-  const plannedWork = new Map<
-    string,
-    Extract<Write, { kind: "insert_work" }>
-  >();
 
-  /** The voice or earlier row already holding this md5, other than `self`. */
-  const md5Holder = (md5: string, self?: string): string | null => {
-    const v = input.voices.find(
-      (x) => x.source_clip_md5 === md5 && x.id !== self,
-    );
-    if (v) return `voice ${voiceName(v)}`;
-    const n = takenMd5.get(md5);
-    return n ? `row ${n} of this manifest` : null;
-  };
-
-  input.manifest.voices.forEach((m, i) => {
+  input.clips.forEach((c, i) => {
     const n = i + 1;
-    const label = rowLabel(n, m);
+    const label = clipLabel(n, c);
     const skip = (reason: string) => skips.push({ row: n, label, reason });
     const note = (text: string) => notes.push({ row: n, text });
-    const clip = clipObject(input.folder, m.file);
-    const refused = refusal(m, input, clip);
-    if (refused) return skip(refused);
-    const c = clip as { file: string; object: string };
-    const md5 = m.md5!;
-    const characterId = m.character_id!;
-    const sample: Clip = { file: c.file, object: c.object, md5 };
 
-    /** The facts update on an existing row; a skip when it may take none. */
-    const update = (v: VoiceRow) => {
-      if (input.protectedVoiceIds.has(v.id))
-        return skip(
-          `protected voice ${voiceName(v)}: the owner's v2 voices take no import writes`,
-        );
-      const earlier = takenVoice.get(v.id);
-      if (earlier)
-        return skip(
-          `voice ${voiceName(v)} is already the target of row ${earlier}`,
-        );
-      if (!["active", "archived", "needs_clip"].includes(v.status))
-        return skip(`voice ${voiceName(v)} has status "${v.status}"`);
-      // A sample write needs the clip unheld elsewhere; a different stored
-      // md5 is the note below instead.
-      // Different: another md5, or (older rows, md5 never filled) a path
-      // that is not this row's object name. A matching path with no md5
-      // takes the md5 only; uploadClip's byte check guards it.
-      const differentSample =
-        v.source_clip_md5 !== null
-          ? v.source_clip_md5 !== md5
-          : v.source_clip_path !== null && v.source_clip_path !== c.object;
-      const needsSample =
-        !differentSample && (!v.source_clip_path || !v.source_clip_md5);
-      const holder = needsSample ? md5Holder(md5, v.id) : null;
-      if (holder)
-        return skip(
-          `md5 ${md5} is already stored on ${holder}; name that voice with voice_uuid`,
-        );
-      takenVoice.set(v.id, n);
+    const file = clipFile(c.file);
+    if ("error" in file) return skip(file.error);
+    if (typeof c.md5 !== "string" || !MD5.test(c.md5))
+      return skip("md5 missing or not 32 lowercase hex characters");
+    const md5 = c.md5;
 
+    /** The clip's character and work, or the reason one does not resolve. */
+    const resolveClip = ():
+      | { character: NamedCharacter; work: WorkRow }
+      | { error: string } => {
+      const name = isText(c.character) ? c.character : "";
+      const character = name ? resolve(name) : undefined;
+      if (!character)
+        return {
+          error: `character "${name}" matches no characters row (the import creates no characters)`,
+        };
+      const w = c.work ?? {};
+      if (!isText(w.title) || !Number.isInteger(w.year))
+        return { error: "work.title or work.year missing" };
+      const workId = `${slugify(w.title)}-${w.year as number}`;
+      const work = worksById.get(workId);
+      if (!work)
+        return {
+          error: `work "${w.title}" (${w.year as number}) is not a works row: tried id ${workId} (the import creates no works)`,
+        };
+      return { character, work };
+    };
+
+    /**
+     * The stored lookup for `key`, recorded as a voice to describe. Null
+     * (after a skip naming --describe) when none is stored yet.
+     */
+    const lookupFor = (
+      key: LookupKey,
+      voice: string,
+      characterName: string,
+    ) => {
+      const work = worksById.get(key.work_id)!;
+      const row = lookupByKey.get(lookupKeyString(key)) ?? null;
+      // A row edited by SQL is checked again before it is copied.
+      const refused = row
+        ? metadataRefusals({
+            description: row.description,
+            labels: row.labels as Record<string, string>,
+          })
+        : [];
+      const stored = refused.length > 0 ? null : row;
+      describe.push({
+        row: n,
+        voice,
+        key,
+        character: characterName,
+        work: { title: work.title, year: work.year, medium: work.medium },
+        voice_actor:
+          appearanceByKey.get(lookupKeyString(key))?.voice_actor ?? null,
+        stored: stored
+          ? {
+              description: stored.description,
+              labels: stored.labels as Record<string, string>,
+            }
+          : null,
+        ...(refused.length > 0 ? { refused } : {}),
+      });
+      if (refused.length > 0)
+        skip(
+          `the stored lookup for ${key.character_id} in ${key.work_id} is refused (${refused.join(", ")}); fix or delete its voice_lookups row, nothing is written for ${voice} until then`,
+        );
+      else if (!stored)
+        skip(
+          `no stored lookup for ${key.character_id} in ${key.work_id}; run --describe first, nothing is written for ${voice} until then`,
+        );
+      return stored;
+    };
+
+    const characterName = (id: string) =>
+      input.characters.find((x) => x.id === id)?.display_name ?? id;
+
+    /** The facts write on an existing row, with what it lacks from the lookup. */
+    const update = (v: VoiceRow, key: LookupKey, clip?: Clip) => {
       const set: VoiceLabFacts = {};
-      if (m.description !== v.description) set.description = m.description!;
-      if (!sameLabels(m.labels!, v.labels)) set.labels = m.labels!;
-      if (present(m.design_prompt) && m.design_prompt !== v.design_prompt)
-        set.design_prompt = m.design_prompt;
-      if (present(m.starting_pick) && m.starting_pick !== v.starting_pick)
-        set.starting_pick = m.starting_pick;
-      if (present(m.consumers)) {
-        const merged = [...new Set([...v.consumers, ...m.consumers])];
-        if (!sameSet(merged, v.consumers)) set.consumers = merged;
-      }
-      if (needsSample) {
-        if (v.source_clip_path !== c.object) set.source_clip_path = c.object;
-        if (v.source_clip_md5 !== md5) set.source_clip_md5 = md5;
-        takenMd5.set(md5, n);
-      } else if (differentSample)
-        note(
-          `${voiceName(v)} stores a different sample (${v.source_clip_md5 !== null ? `md5 ${v.source_clip_md5}` : `path ${v.source_clip_path}, no md5`}, manifest ${md5}); the stored sample is left alone, and a new clip is a new voice`,
-        );
-      // archived means a sample is stored: a needs_clip row moves once it
-      // holds both a path and an md5.
-      const pathAfter = set.source_clip_path ?? v.source_clip_path;
-      const md5After = set.source_clip_md5 ?? v.source_clip_md5;
-      if (v.status === "needs_clip" && pathAfter && md5After)
+      if (clip) {
+        set.source_clip_path = clip.object;
+        set.source_clip_md5 = clip.md5;
         set.status = "archived";
+      }
+      if (lacksDescription(v) || lacksLabels(v)) {
+        const stored = lookupFor(
+          key,
+          voiceName(v),
+          characterName(key.character_id),
+        );
+        if (!stored) return;
+        if (lacksDescription(v)) set.description = stored.description;
+        if (lacksLabels(v)) set.labels = stored.labels;
+      }
       if (Object.keys(set).length === 0) return;
+      takenVoice.set(v.id, n);
       voiceWrites.push({
         kind: "update_voice",
         rows: [n],
         id: v.id,
         display_name: v.display_name,
         set,
-        ...(needsSample ? { clip: sample } : {}),
+        ...(clip ? { clip } : {}),
       });
     };
 
-    /** A new archived row with the sample; a skip when the clip is held. */
-    const insert = (
-      appearance: AppearanceKey | null,
-      displayName: string,
-      before?: () => void,
-    ) => {
-      const holder = md5Holder(md5);
-      if (holder)
-        return skip(
-          `md5 ${md5} is already stored on ${holder}; name that voice with voice_uuid`,
-        );
-      before?.();
-      takenMd5.set(md5, n);
-      voiceWrites.push({
-        kind: "insert_voice",
-        rows: [n],
-        appearance,
-        row: {
-          display_name: displayName,
-          character_id: characterId,
-          status: "archived",
-          description: m.description!,
-          labels: m.labels!,
-          design_prompt: present(m.design_prompt) ? m.design_prompt : null,
-          starting_pick: m.starting_pick ?? false,
-          consumers: present(m.consumers)
-            ? [...new Set(m.consumers)]
-            : ["comic"],
-          source_clip_path: c.object,
-          source_clip_md5: md5,
-        },
-        clip: sample,
-      });
-    };
-
-    const characterName = input.characters.get(characterId) ?? characterId;
-
-    // 1. voice_uuid: that row and no other matching.
-    if (present(m.voice_uuid)) {
-      const v = voicesById.get(m.voice_uuid);
-      if (!v) return skip(`voice_uuid ${m.voice_uuid} is not a voices row`);
-      if (v.character_id !== characterId)
-        return skip(
-          `voice_uuid names ${voiceName(v)}, a voice of ${v.character_id ?? "no character"}, not ${characterId}`,
-        );
-      return update(v);
-    }
-
-    // 2. A clone: work, then appearance, then the voice holding it.
-    if (present(m.work)) {
-      const w = m.work as Required<NonNullable<ManifestRow["work"]>>;
-      const work = worksById.get(w.id);
-      if (work) {
-        const diffs = (["title", "year", "medium"] as const)
-          .filter((k) => work[k] !== w[k])
-          .map((k) => `${k} "${work[k]}" (manifest "${w[k]}")`);
-        if (diffs.length > 0)
-          note(
-            `work ${w.id} is stored with ${diffs.join(", ")}; the works row is left as it is`,
-          );
-      }
-      const key = { character_id: characterId, work_id: w.id };
-      const earlier = takenAppearance.get(appKey(key));
+    /** Why this voice takes no write at all, or null. */
+    const refuseVoice = (v: VoiceRow): string | null => {
+      if (input.protectedVoiceIds.has(v.id))
+        return `protected voice ${voiceName(v)}: the owner's v2 voices take no import writes`;
+      const earlier = takenVoice.get(v.id);
       if (earlier)
+        return `voice ${voiceName(v)} is already the target of clip ${earlier}`;
+      if (!["active", "archived", "needs_clip"].includes(v.status))
+        return `voice ${voiceName(v)} has status "${v.status}"`;
+      return null;
+    };
+
+    // 1. Stored already: the voice holding this md5.
+    const holders = input.voices.filter((v) => v.source_clip_md5 === md5);
+    if (holders.length > 1)
+      return skip(
+        `md5 ${md5} is stored on ${holders.length} voices: ${holders.map(voiceName).join(", ")}`,
+      );
+    const stored = holders[0];
+    if (stored) {
+      const refused = refuseVoice(stored);
+      if (refused) return skip(refused);
+      if (!lacksDescription(stored) && !lacksLabels(stored)) return;
+      // The key: the voice's own appearance, else the clip's character and work.
+      if (stored.appearance_id) {
+        const a = appearanceById.get(stored.appearance_id);
+        if (!a)
+          return skip(
+            `${voiceName(stored)} names appearance ${stored.appearance_id}, which is not an appearances row`,
+          );
+        return update(stored, {
+          character_id: a.character_id,
+          work_id: a.work_id,
+        });
+      }
+      const r = resolveClip();
+      if ("error" in r) return skip(`lookup key: ${r.error}`);
+      if (r.character.id !== stored.character_id)
         return skip(
-          `row ${earlier} already imports a voice for ${characterId} in ${w.id}`,
+          `lookup key: the clip's character ${r.character.id} is not ${voiceName(stored)}'s character ${stored.character_id ?? "(none)"}`,
         );
-      const appearance = appearanceByKey.get(appKey(key));
-      const holder = appearance ? voiceByAppearance.get(appearance.id) : null;
-      takenAppearance.set(appKey(key), n);
-      if (holder) return update(holder);
-      return insert(key, `${characterName} (${w.year})`, () => {
-        if (!work) {
-          const planned = plannedWork.get(w.id);
-          if (planned) planned.rows.push(n);
-          else {
-            const write = {
-              kind: "insert_work" as const,
-              rows: [n],
-              row: {
-                id: w.id,
-                title: w.title,
-                year: w.year,
-                medium: w.medium,
-                franchise_id: present(w.franchise_id) ? w.franchise_id : null,
-              },
-            };
-            plannedWork.set(w.id, write);
-            works.push(write);
-          }
-        }
-        if (!appearance)
-          appearanceWrites.push({
-            kind: "insert_appearance",
-            rows: [n],
-            row: {
-              ...key,
-              voice_actor: isText(m.voice_actor) ? m.voice_actor : null,
-            },
-          });
+      return update(stored, {
+        character_id: r.character.id,
+        work_id: r.work.id,
       });
     }
 
-    // 3. A designed voice: (character_id, md5) among voices with no appearance.
-    const match = input.voices.find(
-      (v) =>
-        v.character_id === characterId &&
-        v.appearance_id === null &&
-        v.source_clip_md5 === md5,
-    );
-    if (match) return update(match);
-    const stored = firstStoredDesign([...input.voices], characterId);
-    return insert(null, characterName, () => {
-      if (stored)
-        note(
-          `${characterId} also has the stored design row ${voiceName(stored)} (needs_clip); the designed voice is written as a new row beside it`,
+    // 2. A new clip.
+    if (c.status !== "approved")
+      return skip(
+        `status "${typeof c.status === "string" ? c.status : ""}" (only approved clips are imported)`,
+      );
+    const r = resolveClip();
+    if ("error" in r) return skip(r.error);
+    const slug = c.work?.slug;
+    if (typeof slug !== "string" || !SLUG.test(slug) || /^\.+$/.test(slug))
+      return skip(`work.slug "${String(slug ?? "")}" is not one folder name`);
+    const earlierMd5 = takenMd5.get(md5);
+    if (earlierMd5) return skip(`md5 ${md5} is also clip ${earlierMd5}`);
+    const key: LookupKey = { character_id: r.character.id, work_id: r.work.id };
+    // An earlier clip of this run puts a voice on this appearance: plan what
+    // the next run would see, an archived voice holding it.
+    const planned = plannedHolder.get(lookupKeyString(key));
+    const clip: Clip = {
+      file: file.file,
+      object: `${slug}__${path.posix.basename(file.file)}`,
+      md5,
+    };
+    const appearance = appearanceByKey.get(lookupKeyString(key));
+    const holder = appearance ? voiceByAppearance.get(appearance.id) : null;
+
+    if (holder && !planned) {
+      // #469 item 3: the holder must be the clip's character.
+      if (holder.character_id !== key.character_id)
+        return skip(
+          `appearance ${key.character_id} in ${key.work_id} is held by ${voiceName(holder)}, a voice of ${holder.character_id ?? "no character"}`,
         );
+      if (holder.status === "needs_clip") {
+        const refused = refuseVoice(holder);
+        if (refused) return skip(refused);
+        const before = voiceWrites.length;
+        update(holder, key, clip);
+        if (voiceWrites.length > before) {
+          takenMd5.set(md5, n);
+          plannedHolder.set(lookupKeyString(key), {
+            voice: voiceName(holder),
+            clip: n,
+          });
+        }
+        return;
+      }
+      if (holder.status !== "active" && holder.status !== "archived")
+        return skip(`voice ${voiceName(holder)} has status "${holder.status}"`);
+    }
+
+    // A new archived voice: on the appearance, or beside the voice holding it.
+    const displayName = `${r.character.display_name ?? r.character.id} (${r.work.year})`;
+    const heldBy = planned
+      ? `${planned.voice} (archived, planned by clip ${planned.clip})`
+      : holder
+        ? `${voiceName(holder)} (${holder.status})`
+        : null;
+    if (heldBy)
+      note(
+        `${key.character_id} in ${key.work_id} is held by ${heldBy}; the clip becomes a new archived voice with no appearance`,
+      );
+    const lookup = lookupFor(
+      key,
+      `new "${displayName}"`,
+      characterName(key.character_id),
+    );
+    if (!lookup) return;
+    takenMd5.set(md5, n);
+    if (!heldBy)
+      plannedHolder.set(lookupKeyString(key), {
+        voice: `"${displayName}"`,
+        clip: n,
+      });
+    if (!heldBy && !appearance)
+      appearanceWrites.push({
+        kind: "insert_appearance",
+        rows: [n],
+        row: { ...key, voice_actor: null },
+      });
+    voiceWrites.push({
+      kind: "insert_voice",
+      rows: [n],
+      appearance: heldBy ? null : key,
+      ...(planned ? { depends_on: planned.clip } : {}),
+      row: {
+        display_name: displayName,
+        character_id: key.character_id,
+        status: "archived",
+        description: lookup.description,
+        labels: lookup.labels as Record<string, string>,
+        design_prompt: null,
+        starting_pick: false,
+        consumers: ["comic"],
+        source_clip_path: clip.object,
+        source_clip_md5: md5,
+      },
+      clip,
     });
   });
 
   return {
-    writes: [...works, ...appearanceWrites, ...voiceWrites],
+    writes: [...appearanceWrites, ...voiceWrites],
     skips,
     notes,
+    describe,
   };
+}
+
+/**
+ * The clip `w` depends on, when that clip has failed, else null. Apply runs
+ * writes in plan order, so the clip a write depends on is decided first.
+ */
+export function failedDependency(
+  w: Write,
+  failedClips: ReadonlySet<number>,
+): number | null {
+  return w.kind === "insert_voice" &&
+    w.depends_on !== undefined &&
+    failedClips.has(w.depends_on)
+    ? w.depends_on
+    : null;
+}
+
+/** Apply's "is this write live" decision: its clip and its dependency stand. */
+export function liveWrite(w: Write, failedClips: ReadonlySet<number>): boolean {
+  return (
+    w.rows.some((r) => !failedClips.has(r)) &&
+    failedDependency(w, failedClips) === null
+  );
+}
+
+/** The lookups `--describe` makes: one per key with nothing stored. */
+export function lookupsNeeded(plan: Plan): Describe[] {
+  const seen = new Set<string>();
+  return plan.describe.filter((d) => {
+    const k = lookupKeyString(d.key);
+    if (d.stored || d.refused || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
