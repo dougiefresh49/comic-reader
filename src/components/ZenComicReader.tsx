@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
@@ -38,6 +39,13 @@ import {
   usePrefersReducedMotion,
 } from "./zen-comic-reader/PanelView";
 
+/**
+ * The page a panel-view page turn is headed for while "Read to me" is on, or
+ * null (#530). A page turn remounts the reader, so this carries read-aloud
+ * across it. Module scope only: a reload or cold load starts silent.
+ */
+let readAloudCarryTo: string | null = null;
+
 interface ZenComicReaderProps {
   pageImage: string;
   bubbles: Bubble[];
@@ -69,7 +77,15 @@ export default function ZenComicReader({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
   const [panelViewMode, setPanelViewMode] = useState(false);
-  const [panelAutoPlay, setPanelAutoPlay] = useState(false);
+  const pathname = usePathname();
+  // Pure read so StrictMode's double invoke sees the same value; the mount
+  // effect below clears the carry, so it is one-shot.
+  const [panelAutoPlay, setPanelAutoPlay] = useState(
+    () => readAloudCarryTo !== null && readAloudCarryTo === pathname,
+  );
+  useEffect(() => {
+    readAloudCarryTo = null;
+  }, []);
   const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
@@ -255,13 +271,26 @@ export default function ZenComicReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { navigatePrev, navigateNext } = usePageNavigation({
-    prevPageLink,
-    nextPageLink,
-    // Panel mode has its own arrow-key handler; sheets and the onboarding
-    // overlay own the keyboard while open.
-    keyboardEnabled: !panelViewMode && !anySheetOpen && !isOnboardingOpen,
-  });
+  const { navigatePrev: rawNavigatePrev, navigateNext: rawNavigateNext } =
+    usePageNavigation({
+      prevPageLink,
+      nextPageLink,
+      // Panel mode has its own arrow-key handler; sheets and the onboarding
+      // overlay own the keyboard while open.
+      keyboardEnabled: !panelViewMode && !anySheetOpen && !isOnboardingOpen,
+    });
+  // Every page turn in this file goes through these, so an autoplay turn and a
+  // manual one (HUD arrow, key, swipe) both carry read-aloud on (#530).
+  const navigatePrev = useCallback(() => {
+    readAloudCarryTo =
+      panelViewMode && panelAutoPlay && prevPageLink ? prevPageLink : null;
+    rawNavigatePrev();
+  }, [panelViewMode, panelAutoPlay, prevPageLink, rawNavigatePrev]);
+  const navigateNext = useCallback(() => {
+    readAloudCarryTo =
+      panelViewMode && panelAutoPlay && nextPageLink ? nextPageLink : null;
+    rawNavigateNext();
+  }, [panelViewMode, panelAutoPlay, nextPageLink, rawNavigateNext]);
   navigateNextRef.current = navigateNext;
   navigatePrevRef.current = navigatePrev;
   const {
