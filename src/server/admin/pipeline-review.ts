@@ -30,7 +30,9 @@ export async function getPipelineReviewIssue(
 
   if (error) {
     console.error("getPipelineReviewIssue:", error);
-    return null;
+    throw new Error(`getPipelineReviewIssue: ${error.message}`, {
+      cause: error,
+    });
   }
   if (!data) return null;
 

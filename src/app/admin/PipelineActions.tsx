@@ -58,15 +58,6 @@ function toRelativePath(url: string): string {
 /** Masks retry only on a complete issue (trigger-ingest answers 409 otherwise), so a failed issue never offers them. */
 const MASKS_STEP = "extract-foreground-masks";
 
-function nextStepAfter(pausedAt: string | null): string | null {
-  if (!pausedAt) return null;
-  // Restarting after casting would run audio without the voices check.
-  if (pausedAt === "casting") return "casting";
-  const idx = (STEP_ORDER as readonly string[]).indexOf(pausedAt);
-  if (idx < 0) return pausedAt;
-  return STEP_ORDER[idx + 1] ?? pausedAt;
-}
-
 export interface TriggerRefusal {
   error: string;
   runId?: string;
@@ -327,8 +318,11 @@ function PausedActions({
   const [error, setError] = useState<string | null>(null);
 
   const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
-  const nextStep = nextStepAfter(pipelinePausedAt);
-  const offerRestart = status !== "ready" && nextStep !== null;
+  // Restart from the stop itself, never the step after it: the new run pauses
+  // there again and Resume runs the stop's check, so no restart reaches a paid
+  // step without that check (#428).
+  const restartStep = pipelinePausedAt;
+  const offerRestart = status !== "ready" && restartStep !== null;
   const busy = loading !== null || triggerLoading;
 
   async function handleResume() {
@@ -394,12 +388,12 @@ function PausedActions({
   }
 
   function handleRestart() {
-    if (!nextStep) return;
+    if (!restartStep) return;
     const ok = window.confirm(
-      `Restart from ${nextStep}? This starts a new run and re-runs paid steps.`,
+      `Restart from ${restartStep}? This starts a new run and re-runs paid steps.`,
     );
     if (!ok) return;
-    onTrigger(nextStep);
+    onTrigger(restartStep);
   }
 
   if (resumed) {
@@ -422,7 +416,7 @@ function PausedActions({
             disabled={busy}
             className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
           >
-            Restart from {nextStep}
+            Restart from {restartStep}
           </button>
         )}
         {error && (

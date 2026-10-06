@@ -12,8 +12,6 @@
  * call), Restore (an ElevenLabs add), and a sample play (short TTS).
  */
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { checkAdminAuth } from "~/lib/admin-auth";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   cancelVoiceRequest,
@@ -38,6 +36,7 @@ import { readVoice } from "~/lib/voice-slots";
 import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
 import { clearNoAudio as clearNoAudioRows } from "~/server/admin/casting";
 import { canContinueVoices } from "~/server/admin/voices-gate";
+import { requireAdmin } from "~/server/admin/require-admin";
 import {
   executeVoiceOperation,
   planVoiceOperation,
@@ -72,11 +71,6 @@ function fail(what: string, err: unknown): ActionResult {
   const message = err instanceof Error ? err.message : String(err);
   console.error(`voices stop, ${what}:`, err);
   return { ok: false, error: message };
-}
-
-async function requireAdmin() {
-  const auth = checkAdminAuth((await headers()).get("authorization"));
-  if (!auth.ok) throw new Error(auth.message);
 }
 
 /** The key `settle` and `reconcile` take; the target is read by id. */

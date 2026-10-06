@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { requireAdmin } from "~/server/admin/require-admin";
 
 export interface SceneSaveEntry {
   musicMood: string;
@@ -21,6 +22,16 @@ export async function saveScenes(
   issueId: string,
   scenes: SceneSaveEntry[],
 ): Promise<SceneSaveResult> {
+  try {
+    await requireAdmin();
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      sceneCount: 0,
+    };
+  }
+
   // 1. Clear existing scene assignments
   const { error: clearErr } = await supabaseAdmin
     .from("panels")
