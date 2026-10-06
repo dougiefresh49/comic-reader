@@ -39,12 +39,8 @@ export type LlmCallMeta = {
 
 /**
  * The insert payload for one `llm_calls` row. `id` and `created_at` are defaults.
- *
- * `credits` is the one field wider than the generated type: it arrives with
- * migration 20260930010000_llm_calls_credits.sql (#251) and `database.ts` is
- * regenerated once the orchestrator applies it. Drop the extension then.
  */
-type LlmCallInsert = TablesInsert<"llm_calls"> & { credits?: number | null };
+type LlmCallInsert = TablesInsert<"llm_calls">;
 
 const ambient = new AsyncLocalStorage<LlmCallMeta>();
 

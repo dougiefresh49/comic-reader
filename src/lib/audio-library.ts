@@ -39,10 +39,6 @@ export function parseTag(s: string): ParsedTag {
   return { base: s.slice(0, at), variant: s.slice(at + 1) || null };
 }
 
-export function formatTag(base: string, variant: string | null): string {
-  return variant ? `${base}@${variant}` : base;
-}
-
 /**
  * Build the bucket path for a tag (with or without an `@variant` suffix).
  * Default: `library/<layer>/<tag>.mp3`
