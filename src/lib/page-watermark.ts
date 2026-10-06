@@ -230,10 +230,27 @@ export async function detectOverlays(
 /** Padding around a detected box; the edit may only change pixels inside. */
 export const OVERLAY_GROW_PX = 16;
 const MASK_BLUR_SIGMA = 2;
-const MASK_DIFF = 24;
+const MASK_DIFF = 12;
 const MASK_DILATE_PX = 3;
-/** A mask over more of the grown box than this means the edit redrew the art. */
-const MASK_MAX_SHARE = 0.6;
+/**
+ * A mask over more of the grown box than this means the edit redrew the
+ * art. The lettering fills most of its box, and at MASK_DIFF 12 the mask
+ * took 65% to 75% of it on the two fixture pages the lead ran (#541).
+ */
+const MASK_MAX_SHARE = 0.9;
+/**
+ * A mask under this share of the grown box means the model handed the crop
+ * back with the lettering still on it (one fixture run changed 3.6% of the
+ * box and left the text; the real fixes changed 25% and more).
+ */
+const MASK_MIN_SHARE = 0.08;
+/**
+ * Rounds per page: each round edits every detected box, then the page is
+ * detected again; a round runs only while lettering is still found. The
+ * model is stochastic: on the fixture it returned no image, an unchanged
+ * crop, or a half-cleaned one about as often as a clean one.
+ */
+const OVERLAY_ROUNDS = 3;
 
 /** Aspect ratios the image model accepts, as width / height. */
 const ASPECT_RATIOS: Array<[string, number]> = [
@@ -249,7 +266,22 @@ const ASPECT_RATIOS: Array<[string, number]> = [
   ["21:9", 21 / 9],
 ];
 
-const EDIT_PROMPT = `This is a crop from a comic book page. Remove the translucent text overlay: the semi-transparent light lettering of a watermark laid over the artwork. Restore the artwork underneath it as it would look without the lettering. Change nothing else: keep every other line, color, shape and texture, and the framing and size, exactly as they are.`;
+/** A crop of `w` x `h` centred on `inner`, shifted to stay on the page. */
+function placeCrop(
+  inner: Box,
+  w: number,
+  h: number,
+  width: number,
+  height: number,
+): Box {
+  const cx = inner.x + inner.width / 2;
+  const cy = inner.y + inner.height / 2;
+  const x = Math.min(Math.max(0, Math.round(cx - w / 2)), width - w);
+  const y = Math.min(Math.max(0, Math.round(cy - h / 2)), height - h);
+  return { x, y, width: w, height: h };
+}
+
+const EDIT_PROMPT = `This is a crop from a comic book page. A line of semi-transparent light grey lettering was accidentally laid over the artwork. Paint the lettering out and restore the artwork underneath it, continuing the lines, colors and shading around it. Change nothing else: keep every other line, color, shape and texture, and the framing and size, exactly as they are. Return the edited image.`;
 
 export function growBox(box: Box, pad: number, width: number, height: number) {
   const x0 = Math.max(0, box.x - pad);
@@ -261,7 +293,10 @@ export function growBox(box: Box, pad: number, width: number, height: number) {
 
 /**
  * The smallest crop at a supported aspect ratio that contains `inner`,
- * centred on it and shifted to stay on the page. Null when none fits.
+ * centred on it and shifted to stay on the page. Null when none fits. The
+ * model returns its own size (1584x672 for 21:9) and the result is resized
+ * back; a crop at that native size was tried on 2026-10-06 and the model
+ * then left the lettering mostly in place, so the small crop stays (#541).
  */
 export function cropForAspect(
   inner: Box,
@@ -273,15 +308,16 @@ export function cropForAspect(
     const w = Math.ceil(Math.max(inner.width, inner.height * r));
     const h = Math.ceil(w / r);
     if (w > width || h > height) continue;
-    const cx = inner.x + inner.width / 2;
-    const cy = inner.y + inner.height / 2;
-    const x = Math.min(Math.max(0, Math.round(cx - w / 2)), width - w);
-    const y = Math.min(Math.max(0, Math.round(cy - h / 2)), height - h);
     if (!best || w * h < best.area) {
-      best = { box: { x, y, width: w, height: h }, aspectRatio, area: w * h };
+      best = {
+        box: placeCrop(inner, w, h, width, height),
+        aspectRatio,
+        area: w * h,
+      };
     }
   }
-  return best && { box: best.box, aspectRatio: best.aspectRatio };
+  if (!best) return null;
+  return { box: best.box, aspectRatio: best.aspectRatio };
 }
 
 function cropRgb(img: RgbImage, box: Box): RgbImage {
@@ -327,7 +363,9 @@ function dilate(mask: Uint8Array, w: number, h: number, r: number) {
 
 /**
  * Where the edit changed the crop: both blurred with sigma 2, any channel
- * moved by more than 24, dilated by 3 px, cleared outside `keep` (crop
+ * moved by more than 12 (24 left the faint edges of the lettering as a
+ * ghost: the lead's template score on the fixed page stayed at 0.21
+ * against 0.001 for a clean page), dilated by 3 px, cleared outside `keep` (crop
  * coordinates).
  */
 export async function buildChangeMask(
@@ -362,16 +400,39 @@ export async function buildChangeMask(
   return mask;
 }
 
-function imageFromResponse(response: {
+type ImageResponse = {
   candidates?: Array<{
-    content?: { parts?: Array<{ inlineData?: { data?: string } }> };
+    finishReason?: string;
+    content?: {
+      parts?: Array<{ inlineData?: { data?: string }; text?: string }>;
+    };
   }>;
-}): Buffer | null {
+  promptFeedback?: { blockReason?: string };
+};
+
+function imageFromResponse(response: ImageResponse): Buffer | null {
   for (const part of response.candidates?.[0]?.content?.parts ?? []) {
     if (part.inlineData?.data)
       return Buffer.from(part.inlineData.data, "base64");
   }
   return null;
+}
+
+/** Why a response carried no image, for the log and the report. */
+function noImageReason(response: ImageResponse): string {
+  const c = response.candidates?.[0];
+  const text = (c?.content?.parts ?? [])
+    .map((p) => p.text?.trim())
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 200);
+  const bits = [
+    c?.finishReason && `finishReason ${c.finishReason}`,
+    response.promptFeedback?.blockReason &&
+      `blockReason ${response.promptFeedback.blockReason}`,
+    text && `text: ${JSON.stringify(text)}`,
+  ].filter(Boolean);
+  return `the model returned no image${bits.length ? ` (${bits.join("; ")})` : ""}`;
 }
 
 type OverlayOutcome =
@@ -419,8 +480,11 @@ async function editOverlay(
     meta,
   );
   const out = imageFromResponse(response);
-  if (!out)
-    return { ok: false, box: grown, reason: "the model returned no image" };
+  if (!out) return { ok: false, box: grown, reason: noImageReason(response) };
+  const outMeta = await sharp(out).metadata();
+  console.log(
+    `[page-watermark] edit returned ${outMeta.width}x${outMeta.height} for a ${fit.box.width}x${fit.box.height} crop (${fit.aspectRatio})`,
+  );
   const edited = await decodeRgb(
     await sharp(out)
       .resize(fit.box.width, fit.box.height, { fit: "fill" })
@@ -444,8 +508,12 @@ async function editOverlay(
       reason: `the edit changed ${(share * 100).toFixed(0)}% of the box (limit ${MASK_MAX_SHARE * 100}%)`,
     };
   }
-  if (set === 0) {
-    return { ok: false, box: grown, reason: "the edit changed no pixel" };
+  if (share < MASK_MIN_SHARE) {
+    return {
+      ok: false,
+      box: grown,
+      reason: `the edit left the lettering in place (changed ${(share * 100).toFixed(1)}% of the box, under ${MASK_MIN_SHARE * 100}%)`,
+    };
   }
   return { ok: true, box: grown, crop: fit.box, mask, edited };
 }
@@ -501,10 +569,9 @@ export async function cleanPageWatermarks(args: {
   if (!isDryRun()) {
     const where = { bookId, issueId, pageNumber };
     try {
-      const { accepted, rejected } = await detectOverlays(img, {
-        step: "page-watermark-detect",
-        ...where,
-      });
+      const detectMeta = { step: "page-watermark-detect", ...where };
+      const editMeta = { step: "page-watermark-edit", ...where };
+      let { accepted, rejected } = await detectOverlays(img, detectMeta);
       for (const box of rejected) {
         const reason = `detection too large to be a watermark (${box.width}x${box.height} on ${img.width}x${img.height})`;
         console.warn(
@@ -512,30 +579,38 @@ export async function cleanPageWatermarks(args: {
         );
         failures.push({ kind: "overlay", reason, box });
       }
-      for (const box of accepted) {
-        const outcome = await editOverlay(img, box, {
-          step: "page-watermark-edit",
-          ...where,
-        });
-        if (!outcome.ok) {
-          console.warn(
-            `[page-watermark] ${bookId}/${issueId} p${pageNumber}: overlay left as is, ${outcome.reason}`,
+      for (let round = 1; accepted.length > 0; round++) {
+        for (const box of accepted) {
+          const outcome = await editOverlay(img, box, editMeta);
+          if (!outcome.ok) {
+            console.warn(
+              `[page-watermark] ${bookId}/${issueId} p${pageNumber} round ${round}: ${outcome.reason}`,
+            );
+            continue;
+          }
+          compositeMasked(
+            img,
+            outcome.crop,
+            outcome.edited,
+            outcome.mask,
+            changed,
           );
-          failures.push({
-            kind: "overlay",
-            reason: outcome.reason,
-            box: outcome.box,
-          });
-          continue;
+          if (!fixes.some((f) => f.kind === "overlay")) {
+            fixes.push({ kind: "overlay", box: outcome.box });
+          }
         }
-        compositeMasked(
-          img,
-          outcome.crop,
-          outcome.edited,
-          outcome.mask,
-          changed,
-        );
-        fixes.push({ kind: "overlay", box: outcome.box });
+        // The page as it now is, seen by the detector again: a clean result
+        // ends the rounds, lettering that is still there gets another one.
+        ({ accepted } = await detectOverlays(img, detectMeta));
+        if (accepted.length === 0) break;
+        if (round >= OVERLAY_ROUNDS) {
+          const reason = `lettering still detected after ${round} rounds`;
+          console.warn(
+            `[page-watermark] ${bookId}/${issueId} p${pageNumber}: ${reason}`,
+          );
+          failures.push({ kind: "overlay", reason, box: accepted[0] });
+          break;
+        }
       }
     } catch (err) {
       const reason = `overlay call failed: ${err instanceof Error ? err.message : String(err)}`;
