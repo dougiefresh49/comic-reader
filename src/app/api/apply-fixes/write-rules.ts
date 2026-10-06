@@ -60,6 +60,8 @@ export interface WriteContext {
   confidence: Map<string, number>;
   /** The page of each named bubble, as stored. */
   bubblePage: Map<string, number>;
+  /** The named bubbles whose stored row has `silent = true`. */
+  silent: Set<string>;
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -121,10 +123,11 @@ export async function loadWriteContext(
 
   const confidence = new Map<string, number>();
   const bubblePage = new Map<string, number>();
+  const silent = new Set<string>();
   for (const ids of chunk(Array.from(new Set(need.bubbleIds)), 100)) {
     const { data, error } = await supabaseAdmin
       .from("bubbles")
-      .select("id, page_number, box_2d")
+      .select("id, page_number, box_2d, silent")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .in("id", ids);
@@ -133,8 +136,10 @@ export async function loadWriteContext(
       id: string;
       page_number: number;
       box_2d: { confidence?: unknown } | null;
+      silent: boolean | null;
     }[]) {
       bubblePage.set(row.id, row.page_number);
+      if (row.silent) silent.add(row.id);
       const c = row.box_2d?.confidence;
       if (typeof c === "number") confidence.set(row.id, c);
     }
@@ -145,6 +150,7 @@ export async function loadWriteContext(
     displayNames,
     confidence,
     bubblePage,
+    silent,
   };
 }
 
@@ -221,10 +227,13 @@ export function bubbleUpdate(
   if (edit.sortOrder !== undefined) row.sort_order = edit.sortOrder;
   if (edit.box)
     Object.assign(row, boxColumns(edit.box, page, ctx, ctx.confidence.get(id)));
+  // A bubble silent after the edit (as edited, else as stored) plays nothing,
+  // so an audio-field edit never asks for audio on it. Turned silent, its take
+  // is dropped and no new one is wanted; turned back on, it needs audio again.
+  const silentAfter = edit.silent ?? ctx.silent.has(id);
   const affectsAudio = AUDIO_FIELDS.some((f) => edit[f] !== undefined);
-  if (affectsAudio && edit.ignored !== true) row.needs_audio = true;
-  // A silent bubble plays nothing: its take is dropped and no new one is
-  // wanted. Turned back on, it needs audio again.
+  if (affectsAudio && edit.ignored !== true && !silentAfter)
+    row.needs_audio = true;
   if (edit.silent === true) {
     row.audio_storage_path = null;
     row.needs_audio = false;
@@ -235,8 +244,8 @@ export function bubbleUpdate(
 }
 
 /**
- * The row for an added bubble. It needs audio and has none: no
- * `audio_storage_path`, so the audio step picks it up.
+ * The row for an added bubble. It has no `audio_storage_path`. It needs audio,
+ * so the audio step picks it up, unless it is added with `silent: true`.
  */
 export function bubbleInsert(
   bookId: string,
@@ -268,7 +277,7 @@ export function bubbleInsert(
     ignored: bubble.ignored ?? false,
     ...(bubble.silent !== undefined ? { silent: bubble.silent } : {}),
     ...(bubble.kept !== undefined ? { kept: bubble.kept } : {}),
-    needs_audio: true,
+    needs_audio: bubble.silent !== true,
     needs_ocr: !hasText,
     audio_storage_path: null,
     panel_id: bubble.panelId ?? null,
