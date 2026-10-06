@@ -1,0 +1,381 @@
+{
+  "folder": "fixture-book",
+  "protected_voice_ids": [
+    "00000000-0000-4000-8000-000000000008"
+  ],
+  "characters": [
+    {
+      "id": "april",
+      "display_name": "April"
+    },
+    {
+      "id": "armored-villain",
+      "display_name": "Armored Villain"
+    },
+    {
+      "id": "baxter",
+      "display_name": "Baxter"
+    },
+    {
+      "id": "bebop",
+      "display_name": "Bebop"
+    },
+    {
+      "id": "crowd",
+      "display_name": "Crowd"
+    },
+    {
+      "id": "leonardo",
+      "display_name": "Leonardo"
+    },
+    {
+      "id": "michelangelo",
+      "display_name": "Michelangelo"
+    },
+    {
+      "id": "rocksteady",
+      "display_name": "Rocksteady"
+    },
+    {
+      "id": "shredder",
+      "display_name": "Shredder"
+    }
+  ],
+  "franchises": [
+    "tmnt"
+  ],
+  "voices": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "display_name": "April (1991)",
+      "status": "archived",
+      "character_id": "april",
+      "appearance_id": "a0000000-0000-4000-8000-000000000001",
+      "starting_pick": true,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__april__space-turtles-1991.mp3",
+      "source_clip_md5": "11111111111111111111111111111111",
+      "design_prompt": null,
+      "description": "A bright, quick newsroom voice.",
+      "labels": {
+        "accent": "american",
+        "age": "young"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "display_name": "Shredder",
+      "status": "active",
+      "character_id": "shredder",
+      "appearance_id": "a0000000-0000-4000-8000-000000000002",
+      "starting_pick": false,
+      "current_elevenlabs_id": "el-fixture-shredder",
+      "source_clip_path": "fixture-book__shredder__shell-shock-2003.mp3",
+      "source_clip_md5": "22222222222222222222222222222222",
+      "design_prompt": null,
+      "description": "A cold, commanding growl.",
+      "labels": {
+        "accent": "neutral",
+        "age": "middle_aged"
+      },
+      "consumers": [
+        "comic",
+        "room"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "display_name": "Armored Villain",
+      "status": "archived",
+      "character_id": "armored-villain",
+      "appearance_id": null,
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__armored-villain__design-preview.mp3",
+      "source_clip_md5": "33333333333333333333333333333333",
+      "design_prompt": "A low metallic growl.",
+      "description": "A metallic growl through a visor.",
+      "labels": {
+        "age": "middle_aged",
+        "gender": "male"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "display_name": "Bebop (1991)",
+      "status": "archived",
+      "character_id": "bebop",
+      "appearance_id": null,
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__bebop__space-turtles-1991.mp3",
+      "source_clip_md5": "44444444444444444444444444444444",
+      "design_prompt": null,
+      "description": "A goofy, nasal laugh.",
+      "labels": {
+        "age": "young"
+      },
+      "consumers": [
+        "comic",
+        "room"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "display_name": "Rocksteady (2003)",
+      "status": "archived",
+      "character_id": "rocksteady",
+      "appearance_id": "a0000000-0000-4000-8000-000000000007",
+      "starting_pick": true,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__rocksteady__shell-shock-2003.mp3",
+      "source_clip_md5": "77777777777777777777777777777777",
+      "design_prompt": null,
+      "description": "A gravelly rhino.",
+      "labels": {
+        "age": "middle_aged"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "display_name": "Michelangelo",
+      "status": "active",
+      "character_id": "michelangelo",
+      "appearance_id": "a0000000-0000-4000-8000-000000000008",
+      "starting_pick": false,
+      "current_elevenlabs_id": "el-fixture-michelangelo",
+      "source_clip_path": null,
+      "source_clip_md5": null,
+      "design_prompt": null,
+      "description": "A protected voice.",
+      "labels": {
+        "age": "young"
+      },
+      "consumers": [
+        "comic",
+        "room"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "display_name": "Crowd",
+      "status": "needs_clip",
+      "character_id": "crowd",
+      "appearance_id": null,
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": null,
+      "source_clip_md5": null,
+      "design_prompt": "A murmuring crowd.",
+      "description": "A murmuring crowd.",
+      "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "display_name": "Leonardo (1991)",
+      "status": "archived",
+      "character_id": "leonardo",
+      "appearance_id": "a0000000-0000-4000-8000-000000000010",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__leonardo__space-turtles-1991.mp3",
+      "source_clip_md5": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "design_prompt": null,
+      "description": "A young, earnest leader.",
+      "labels": {
+        "age": "young"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "display_name": "Leonardo (2010)",
+      "status": "archived",
+      "character_id": "leonardo",
+      "appearance_id": "a0000000-0000-4000-8000-000000000011",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__leonardo__pizza-quest-2010.mp3",
+      "source_clip_md5": "66666666666666666666666666666666",
+      "design_prompt": null,
+      "description": "A calm, steady leader.",
+      "labels": {
+        "accent": "american",
+        "age": "young"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-10-06T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "display_name": "Crowd",
+      "status": "archived",
+      "character_id": "crowd",
+      "appearance_id": null,
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__crowd__design-preview.mp3",
+      "source_clip_md5": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "design_prompt": "A cheering crowd.",
+      "description": "A cheering stadium crowd.",
+      "labels": {
+        "age": "mixed"
+      },
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-10-06T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "display_name": "Baxter (2003)",
+      "status": "archived",
+      "character_id": "baxter",
+      "appearance_id": "a0000000-0000-4000-8000-000000000012",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__baxter__shell-shock-2003.mp3",
+      "source_clip_md5": "88888888888888888888888888888888",
+      "design_prompt": null,
+      "description": "A nervous, nasal scientist.",
+      "labels": {
+        "age": "middle_aged"
+      },
+      "consumers": [
+        "comic",
+        "room"
+      ],
+      "keep_active": false,
+      "created_at": "2026-10-06T12:00:00+00:00",
+      "archived_at": null
+    }
+  ],
+  "works": [
+    {
+      "id": "space-turtles-1991",
+      "title": "Space Turtles",
+      "year": 1991,
+      "medium": "animated_series",
+      "franchise_id": "tmnt",
+      "universe": null
+    },
+    {
+      "id": "shell-shock-2003",
+      "title": "Shell Shock",
+      "year": 2003,
+      "medium": "movie",
+      "franchise_id": "tmnt",
+      "universe": null
+    },
+    {
+      "id": "pizza-quest-2010",
+      "title": "Pizza Quest",
+      "year": 2010,
+      "medium": "video_game",
+      "franchise_id": "tmnt",
+      "universe": null
+    }
+  ],
+  "appearances": [
+    {
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "character_id": "april",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "character_id": "shredder",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000007",
+      "character_id": "rocksteady",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000008",
+      "character_id": "michelangelo",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000010",
+      "character_id": "leonardo",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000011",
+      "character_id": "leonardo",
+      "work_id": "pizza-quest-2010",
+      "voice_actor": "Invented Actor Two",
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000012",
+      "character_id": "baxter",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    }
+  ]
+}
