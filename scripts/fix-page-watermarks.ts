@@ -568,17 +568,27 @@ async function runUpload(dir: string) {
       continue;
     }
     const key = pageStoragePath(r.book, r.issue, r.page);
-    // The object as it is now, kept before it is replaced.
-    const current = await supabase.storage.from(BUCKET).download(key);
-    if (current.error) {
-      console.log(
-        `${head}: skipped, could not copy the current ${BUCKET}/${key} first (${current.error.message})`,
-      );
-      continue;
-    }
+    // The object as it is now, kept before it is replaced. A copy from an
+    // earlier run stays: after a run that stopped halfway, the stored object
+    // for an uploaded page is already the cleaned one.
     const original = path.join(dir, "originals", key);
-    fs.mkdirSync(path.dirname(original), { recursive: true });
-    fs.writeFileSync(original, Buffer.from(await current.data.arrayBuffer()));
+    if (fs.existsSync(original)) {
+      console.log(`${head}: original already kept at ${original}`);
+    } else {
+      const current = await supabase.storage.from(BUCKET).download(key);
+      if (current.error) {
+        console.log(
+          `${head}: skipped, could not copy the current ${BUCKET}/${key} first (${current.error.message})`,
+        );
+        continue;
+      }
+      fs.mkdirSync(path.dirname(original), { recursive: true });
+      fs.writeFileSync(
+        original,
+        Buffer.from(await current.data.arrayBuffer()),
+        { flag: "wx" },
+      );
+    }
     const { error: upErr } = await supabase.storage
       .from(BUCKET)
       .upload(key, webp, { contentType: "image/webp", upsert: true });

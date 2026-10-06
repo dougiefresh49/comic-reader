@@ -186,6 +186,8 @@ export async function POST(req: NextRequest) {
         });
 
         let uploaded = 0;
+        // Pages finish out of order under the pool; `current` counts finished pages.
+        let finished = 0;
         // Each page now costs a Gemini detect call (#541): three at a time.
         const limit = pLimit(3);
 
@@ -202,7 +204,7 @@ export async function POST(req: NextRequest) {
               send({
                 type: "page",
                 message: `Failed to download page ${num}: HTTP ${imgResponse.status}`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
               return;
@@ -221,7 +223,7 @@ export async function POST(req: NextRequest) {
               send({
                 type: "page",
                 message: `Raw upload failed for page ${num}: ${rawResult.error.message}`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
               return;
@@ -238,14 +240,14 @@ export async function POST(req: NextRequest) {
               send({
                 type: "page",
                 message: `Uploaded page ${num} (${width}×${height})${watermarkLeft(failures)}`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
             } catch (err) {
               send({
                 type: "page",
                 message: `WebP/pages failed for page ${num}: ${err instanceof Error ? err.message : "unknown"} (raw OK)`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
             }
@@ -253,7 +255,7 @@ export async function POST(req: NextRequest) {
             send({
               type: "page",
               message: `Error on page ${num}: ${err instanceof Error ? err.message : "unknown"}`,
-              current: pageNumber,
+              current: ++finished,
               total: collectedUrls.length,
             });
           }

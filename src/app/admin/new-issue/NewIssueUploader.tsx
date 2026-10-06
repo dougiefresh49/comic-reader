@@ -171,6 +171,7 @@ export function NewIssueUploader() {
       const finBody = (await finRes.json()) as {
         error?: string;
         errors?: string[];
+        warnings?: string[];
       };
       if (!finRes.ok) {
         const detail =
@@ -180,6 +181,9 @@ export function NewIssueUploader() {
         throw new Error(`finalize: ${detail}`);
       }
 
+      if (finBody.warnings && finBody.warnings.length > 0) {
+        setError(`Finished, with warnings: ${finBody.warnings.join("; ")}`);
+      }
       setStep("done");
     } catch (e) {
       setError((e as Error).message);

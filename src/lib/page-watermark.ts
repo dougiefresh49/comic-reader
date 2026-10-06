@@ -337,7 +337,7 @@ const MASK_MAX_SHARE = 0.9;
  * crop, or a half-cleaned one about as often as a clean one.
  */
 const OVERLAY_ROUNDS = 3;
-/** Boxes one round edits; more than this on a page is a misfire, not edited. */
+/** Boxes one round edits; the rest wait for the next round's re-detection. */
 const OVERLAY_MAX_BOXES_PER_ROUND = 3;
 
 /** Aspect ratios the image model accepts, as width / height. */
@@ -651,6 +651,7 @@ export async function cleanPageWatermarks(args: {
 
   const banner = detectBanner(img);
   let bannerPainted = false;
+  let detectFailed = false;
 
   if (!isDryRun()) {
     const where = { bookId, issueId, pageNumber };
@@ -674,11 +675,6 @@ export async function cleanPageWatermarks(args: {
       }
       let accepted = first.accepted.filter((b) => !inBanner(b, banner));
       for (let round = 1; accepted.length > 0; round++) {
-        for (const box of accepted.slice(OVERLAY_MAX_BOXES_PER_ROUND)) {
-          const reason = "more boxes than the round edits";
-          warn(`round ${round}: ${reason}`);
-          failures.push({ kind: "overlay", reason, box });
-        }
         for (const box of accepted.slice(0, OVERLAY_MAX_BOXES_PER_ROUND)) {
           const gutter = paintGutterRows(img, box);
           if (gutter) {
@@ -723,13 +719,16 @@ export async function cleanPageWatermarks(args: {
       const reason = `overlay call failed: ${err instanceof Error ? err.message : String(err)}`;
       warn(reason);
       failures.push({ kind: "overlay", reason });
+      detectFailed = true;
     }
   }
 
   if (banner && !bannerPainted) {
     const reason = isDryRun()
       ? "band found; a dry run makes no detect call to confirm it"
-      : "band found but the detector did not confirm it";
+      : detectFailed
+        ? "band found; the detect call failed"
+        : "band found but the detector did not confirm it";
     warn(reason);
     failures.push({ kind: "banner", reason, box: banner });
   }
