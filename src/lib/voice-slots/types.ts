@@ -120,6 +120,34 @@ export interface SnapshotResult {
   manifestWritten?: boolean;
 }
 
+/** How a kept clip lines up with the voice's ElevenLabs samples, best first. */
+export type SourceClipMatch =
+  | "md5 equals the sample hash"
+  | "bytes equal the sample size"
+  | "no match";
+
+/** What `snapshotFromFile` found and, with `execute`, wrote (#475). */
+export interface SnapshotFromFileResult {
+  /** The row read fresh; after a write, the row read back. */
+  voice: VoiceRow;
+  ok: boolean;
+  refusals: string[];
+  /** Reported, never refusals: a second sample, no sample, no ElevenLabs id. */
+  flags: string[];
+  samples: { fileName: string; sizeBytes: number; hash: string }[];
+  fileName: string;
+  bytes: number;
+  md5: string;
+  match: SourceClipMatch;
+  objectPath: string;
+  /** The bucket already holds these bytes under this path. */
+  alreadyStored: boolean;
+  archiveRefusalsBefore: ArchiveRefusal[];
+  executed: boolean;
+  archiveRefusalsAfter?: ArchiveRefusal[];
+  snapshotStatus?: "ok" | "missing" | "mismatch";
+}
+
 export interface SnapshotManifestSample {
   fileName: string;
   objectPath: string;

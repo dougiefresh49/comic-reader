@@ -84,4 +84,5 @@ export type { CharacterVoice, VoiceByElevenLabsId, VoiceState } from "./lookup";
 export type { RegisterVoiceInput } from "./registry";
 export { createVoiceFromSamples, restoreVoice } from "./restore";
 export { snapshotSample } from "./snapshot";
+export { snapshotFromFile } from "./snapshot-from-file";
 export type * from "./types";

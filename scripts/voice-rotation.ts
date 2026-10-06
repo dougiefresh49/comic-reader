@@ -13,6 +13,11 @@
  *     against the hash ElevenLabs reports. Free GETs; uploads and the row
  *     write need --execute.
  *
+ *   pnpm voice-rotation -- --snapshot --voice <uuid|el_id> --from-file <path> --md5 <md5> [--execute]
+ *     Store a clip the owner kept and confirmed as the voice's source clip
+ *     (#475), for a clone whose ElevenLabs sample comes back re-encoded.
+ *     --md5 is the md5 the owner confirmed; the file must hash to it.
+ *
  *   pnpm voice-rotation -- --archive (--book <id> [--issue <id>] | --voice <uuid|el_id>...)
  *                          [--exclude-ids <el_id,...>|none] [--execute] [--dry-run]
  *     --book: active voices used only by that book. --issue refuses the
@@ -27,6 +32,8 @@
  * (decisions row 153). --dry-run still parses and adds nothing.
  */
 
+import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { supabase } from "./lib/supabase.js";
 import {
   archiveVoice,
@@ -39,6 +46,7 @@ import {
   readVoices,
   restoreVoice,
   slotStatus,
+  snapshotFromFile,
   snapshotSample,
   type ArchiveResult,
   type CastlistRow,
@@ -57,18 +65,22 @@ interface Args {
   execute: boolean;
   excludeIdsRaw?: string;
   planFree?: number;
+  fromFile?: string;
+  md5?: string;
 }
 
 const USAGE = `
 Usage:
   pnpm voice-rotation -- --check
   pnpm voice-rotation -- --snapshot [--voice <uuid|el_id>] [--execute]
+  pnpm voice-rotation -- --snapshot --voice <uuid|el_id> --from-file <path> --md5 <md5> [--execute]
   pnpm voice-rotation -- --archive (--book <id> [--issue <id>] | --voice <uuid|el_id>...) [--exclude-ids <el_id,...>|none] [--execute] [--dry-run]
   pnpm voice-rotation -- --restore (--book <id> | --voice <uuid|el_id>...) [--execute] [--dry-run]
   pnpm voice-rotation -- --plan-free <n> --book <id> --issue <id> [--exclude-ids <el_id,...>|none]
 
 Plan is the default. Pass --execute to mutate ElevenLabs, the DB and the bucket.
 --archive --book ... --execute requires --exclude-ids (use none if there are none).
+--from-file needs --snapshot, exactly one --voice and --md5 (the md5 the owner confirmed).
 `;
 
 function die(message: string): never {
@@ -120,6 +132,12 @@ function parseArgs(): Args {
       case "--exclude-ids":
         args.excludeIdsRaw = next();
         break;
+      case "--from-file":
+        args.fromFile = next();
+        break;
+      case "--md5":
+        args.md5 = next().toLowerCase();
+        break;
       case "--execute":
         args.execute = true;
         break;
@@ -146,6 +164,14 @@ function parseArgs(): Args {
     if (!args.book || !args.issue) die("--plan-free needs --book and --issue");
   }
   if (args.issue && !args.book) die("--issue needs --book");
+  if (args.fromFile !== undefined) {
+    if (mode !== "snapshot" || args.voices.length !== 1 || !args.md5)
+      die(
+        `--from-file needs --snapshot, exactly one --voice and --md5${USAGE}`,
+      );
+    if (!/^[a-f0-9]{32}$/.test(args.md5))
+      die(`--md5 must be 32 hex characters${USAGE}`);
+  } else if (args.md5 !== undefined) die(`--md5 needs --from-file${USAGE}`);
   return args;
 }
 
@@ -259,6 +285,58 @@ async function runSnapshot(deps: VoiceSlotsDeps, args: Args) {
   }
   console.log(
     `\n${ok} of ${targets.length} md5-checked${args.execute ? " and stored" : "; pass --execute to upload and write the rows"}.\n`,
+  );
+}
+
+async function runSnapshotFromFile(deps: VoiceSlotsDeps, args: Args) {
+  const [voice] = selectVoices(await readVoices(deps.supabase), args.voices);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(readFileSync(args.fromFile!));
+  } catch {
+    die("--from-file: the file cannot be read");
+  }
+  const r = await snapshotFromFile(
+    deps,
+    voice!,
+    { fileName: basename(args.fromFile!), bytes },
+    args.md5!,
+    { execute: args.execute },
+  );
+  const list = (xs: string[]) => (xs.length ? xs.join(", ") : "none");
+  console.log(
+    `\n📸 Snapshot from file ${args.execute ? "EXECUTE" : "plan"}: ${short(r.voice)}\n`,
+  );
+  console.log(`   File:       ${r.fileName} ${r.bytes} bytes, md5 ${r.md5}`);
+  console.log(`   ElevenLabs: ${r.samples.length} sample(s)`);
+  for (const s of r.samples)
+    console.log(`     • ${s.fileName} ${s.sizeBytes} bytes, hash ${s.hash}`);
+  console.log(`   Match:      ${r.match}`);
+  console.log(`   Flags:      ${list(r.flags)}`);
+  console.log(
+    `   Bucket:     ${r.objectPath} ${r.alreadyStored ? "already holds it" : "is empty"}`,
+  );
+  console.log(
+    `   Refused:    ${r.refusals.length ? r.refusals.join("; ") : "none"}`,
+  );
+  console.log(
+    `   Archive refusals${r.executed ? " before" : ""}: ${list(r.archiveRefusalsBefore)}`,
+  );
+  if (!r.ok) {
+    process.exitCode = 1;
+    console.log(`\n❌ Refused. Nothing was written.`);
+    return;
+  }
+  if (!r.executed) {
+    console.log(
+      `\nPlan only; pass --execute to upload and write the row. Nothing was written.`,
+    );
+    return;
+  }
+  console.log(`   Archive refusals after:  ${list(r.archiveRefusalsAfter!)}`);
+  console.log(`   checkSnapshot: ${r.snapshotStatus}`);
+  console.log(
+    `\n✓ ${r.objectPath} ${r.alreadyStored ? "was already stored" : "uploaded"}; source_clip_path and source_clip_md5 written.\n`,
   );
 }
 
@@ -450,6 +528,8 @@ async function main() {
   const args = parseArgs();
   const deps: VoiceSlotsDeps = { supabase };
   if (args.mode === "check") await runCheck(deps);
+  else if (args.mode === "snapshot" && args.fromFile !== undefined)
+    await runSnapshotFromFile(deps, args);
   else if (args.mode === "snapshot") await runSnapshot(deps, args);
   else if (args.mode === "archive") await runArchive(deps, args);
   else if (args.mode === "restore") await runRestore(deps, args);
