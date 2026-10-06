@@ -1,5 +1,6 @@
 // The editor's document: plain data plus pure operations, so undo is a stack of snapshots.
 import { NARRATOR_ID, slug } from "./lib";
+import { SPOKEN, needsSpeaker } from "~/lib/bubble-types";
 import type {
   BubbleType,
   CastMember,
@@ -8,6 +9,8 @@ import type {
   Rect,
   SrcBubble,
 } from "./types";
+
+export { SPOKEN, needsSpeaker };
 
 export interface BubbleDoc {
   id: string;
@@ -85,29 +88,6 @@ export type Flag =
   | { kind: "no-speaker" }
   | { kind: "unknown-speaker"; raw: string }
   | { kind: "duplicate"; ofId: string };
-
-export const SPOKEN: BubbleType[] = ["SPEECH", "NARRATION", "CAPTION"];
-
-/**
- * A bubble that keeps its page from being approved (decisions row 228): a
- * spoken type, read aloud (not ignored, not silent), and no speaker at all.
- * A speaker string outside the cast still counts as a speaker here; the
- * casting gate deals with those. The editor and the approval action both ask
- * this, so the rule has one home.
- */
-export function needsSpeaker(b: {
-  type: string;
-  speaker: string | null;
-  silent: boolean;
-  ignored: boolean;
-}): boolean {
-  return (
-    (SPOKEN as string[]).includes(b.type) &&
-    !b.silent &&
-    !b.ignored &&
-    !b.speaker?.trim()
-  );
-}
 
 /** The page's live bubbles that keep it from being approved, in play order. */
 export function unvoicedBubbles(doc: Doc, pageNumber: number): BubbleDoc[] {

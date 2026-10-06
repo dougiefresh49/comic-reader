@@ -2,6 +2,8 @@
  * Shared type definitions for comic-related data structures
  */
 
+import type { BubbleType } from "~/lib/bubble-types";
+
 export interface Bubble {
   id: string;
   box_2d: {
@@ -11,7 +13,7 @@ export interface Bubble {
     height?: number;
   };
   ocr_text: string;
-  type: "SPEECH" | "NARRATION" | "CAPTION" | "SFX" | "BACKGROUND";
+  type: BubbleType;
   speaker: string | null;
   /** The reader's caption: `characters.display_name` for the bubble's `character_id`, else `speaker`. */
   speakerName?: string | null;

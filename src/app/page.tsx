@@ -1,20 +1,11 @@
 import Link from "next/link";
 import { getManifest } from "~/server";
+import { monogram } from "~/lib/monogram";
 import { pageImageUrl } from "~/lib/storage";
 import { CoverImage } from "~/components/ui/CoverImage";
 import type { BookManifest } from "~/types/manifest";
 
 export const revalidate = 3600;
-
-/** "TMNT x MMPR" → "TM" — short monogram for cover placeholders. */
-function monogram(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
-}
 
 function bookCover(book: BookManifest): string | null {
   const firstIssue = book.issues[0];

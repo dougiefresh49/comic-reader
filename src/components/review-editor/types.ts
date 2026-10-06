@@ -7,12 +7,9 @@ export interface Rect {
   h: number;
 }
 
-export type BubbleType =
-  | "SPEECH"
-  | "NARRATION"
-  | "CAPTION"
-  | "SFX"
-  | "BACKGROUND";
+import type { BubbleType } from "~/lib/bubble-types";
+
+export type { BubbleType };
 
 export interface SrcPage {
   number: number;

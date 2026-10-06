@@ -40,7 +40,7 @@ import {
 } from "~/lib/issue-queries";
 import { pageStoragePath } from "~/lib/storage";
 import { slugify } from "~/lib/character-id";
-import { needsSpeaker } from "~/components/review-editor/model";
+import { needsSpeaker } from "~/lib/bubble-types";
 import { bubbleSpeaker } from "~/lib/bubble-speaker";
 import {
   deleteBookAliases,
