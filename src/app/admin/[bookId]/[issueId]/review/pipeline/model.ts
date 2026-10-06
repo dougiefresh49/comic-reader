@@ -51,6 +51,47 @@ export const RUN_WORDS: Record<RunState, string> = {
   "not-started": "Not started",
 };
 
+/**
+ * The admin dashboard's badge per state. `word: null` shows the raw
+ * `issues.status`. The dashboard has no run row, so "cancelled" never comes
+ * up there; a cancelled run reads "Failed", as it did before #484.
+ */
+export const DASHBOARD_BADGES: Record<
+  RunState,
+  { word: string | null; className: string }
+> = {
+  waiting: {
+    word: "Paused",
+    className:
+      "shrink-0 rounded bg-yellow-700/30 px-2 py-0.5 text-xs font-medium text-yellow-300",
+  },
+  ready: {
+    word: "Ready",
+    className:
+      "shrink-0 rounded bg-emerald-700/30 px-2 py-0.5 text-xs font-medium text-emerald-300",
+  },
+  failed: {
+    word: "Failed",
+    className:
+      "rounded bg-red-700/30 px-2 py-0.5 text-xs font-medium text-red-300",
+  },
+  cancelled: {
+    word: "Failed",
+    className:
+      "rounded bg-red-700/30 px-2 py-0.5 text-xs font-medium text-red-300",
+  },
+  running: {
+    word: "Running",
+    className:
+      "rounded bg-cyan-700/30 px-2 py-0.5 text-xs font-medium text-cyan-300",
+  },
+  "not-started": {
+    word: null,
+    className:
+      "shrink-0 rounded bg-neutral-700/30 px-2 py-0.5 text-xs font-medium text-neutral-400",
+  },
+};
+
 /** Poll interval per state: fast while a step works, slow while the hub waits for a button or a person, none when done. */
 const REFRESH_MS: Record<RunState, number | null> = {
   running: 5000,
@@ -112,10 +153,13 @@ export interface HubView {
  * Live states win over `issues.status`, because nothing resets `status` when
  * a ready issue re-runs: a re-run from casting is "waiting", not "ready".
  * A cancel leaves `pipeline_step` at `failed:<step>`; the run row tells the
- * two apart.
+ * two apart. The admin dashboard reads its badge from this too (#484).
  */
 export function runState(
-  issue: PipelineReviewIssue,
+  issue: Pick<
+    PipelineReviewIssue,
+    "status" | "pipelineStep" | "pipelinePaused" | "pipelinePausedAt"
+  >,
   run: PipelineRun | null,
 ): RunState {
   const step = issue.pipelineStep;

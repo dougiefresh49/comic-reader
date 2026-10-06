@@ -9,6 +9,10 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { getBookPublishedFlags, getStoredPageCounts } from "~/server";
 import { PipelineActions, type SkippedGate } from "./PipelineActions";
 import BookPublishToggle from "./BookPublishToggle";
+import {
+  DASHBOARD_BADGES,
+  runState,
+} from "~/app/admin/[bookId]/[issueId]/review/pipeline/model";
 
 export const dynamic = "force-dynamic";
 
@@ -393,44 +397,10 @@ function IssueCard({
   );
 }
 
+/** The hub's rule names the state. No run row here, so a cancelled run reads "Failed". */
 function StatusBadge({ issue }: { issue: AdminIssueRow }) {
-  if (issue.pipelinePaused) {
-    return (
-      <span className="shrink-0 rounded bg-yellow-700/30 px-2 py-0.5 text-xs font-medium text-yellow-300">
-        Paused
-      </span>
-    );
-  }
-  if (issue.status === "ready") {
-    return (
-      <span className="shrink-0 rounded bg-emerald-700/30 px-2 py-0.5 text-xs font-medium text-emerald-300">
-        Ready
-      </span>
-    );
-  }
-  if (issue.pipelineStep?.startsWith("failed:")) {
-    return (
-      <span className="rounded bg-red-700/30 px-2 py-0.5 text-xs font-medium text-red-300">
-        Failed
-      </span>
-    );
-  }
-  if (
-    issue.pipelineStep &&
-    issue.pipelineStep !== "pages-downloaded" &&
-    issue.pipelineStep !== "complete"
-  ) {
-    return (
-      <span className="rounded bg-cyan-700/30 px-2 py-0.5 text-xs font-medium text-cyan-300">
-        Running
-      </span>
-    );
-  }
-  return (
-    <span className="shrink-0 rounded bg-neutral-700/30 px-2 py-0.5 text-xs font-medium text-neutral-400">
-      {issue.status}
-    </span>
-  );
+  const badge = DASHBOARD_BADGES[runState(issue, null)];
+  return <span className={badge.className}>{badge.word ?? issue.status}</span>;
 }
 
 function ActionButtons({
