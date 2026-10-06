@@ -35,8 +35,21 @@ export function usePanelNavigation({
   onPastEnd,
   onBeforeStart,
 }: UsePanelNavigationOptions): UsePanelNavigationResult {
-  const [panelIndex, setPanelIndex] = useState(0);
+  const [panelIndex, setPanelIndexState] = useState(0);
+  // The index as of the last set, read synchronously. React may defer a
+  // useState updater to the next render, so a past-the-end decision made
+  // inside one can be read too early and dropped (#514).
+  const panelIndexRef = useRef(0);
   const panelContainerRef = useRef<HTMLDivElement | null>(null);
+
+  const setPanelIndex = useCallback<
+    React.Dispatch<React.SetStateAction<number>>
+  >((action) => {
+    const next =
+      typeof action === "function" ? action(panelIndexRef.current) : action;
+    panelIndexRef.current = next;
+    setPanelIndexState(next);
+  }, []);
 
   const clampIndex = useCallback(
     (i: number) => Math.max(0, Math.min(panelCount - 1, i)),
@@ -44,32 +57,20 @@ export function usePanelNavigation({
   );
 
   const goNext = useCallback(() => {
-    let crossedEnd = false;
-    setPanelIndex((i) => {
-      if (i >= panelCount - 1) {
-        crossedEnd = true;
-        return i;
-      }
-      return clampIndex(i + 1);
-    });
-    if (crossedEnd) onPastEnd?.();
-  }, [clampIndex, panelCount, onPastEnd]);
+    const i = panelIndexRef.current;
+    if (i >= panelCount - 1) onPastEnd?.();
+    else setPanelIndex(clampIndex(i + 1));
+  }, [clampIndex, panelCount, onPastEnd, setPanelIndex]);
 
   const goPrev = useCallback(() => {
-    let crossedStart = false;
-    setPanelIndex((i) => {
-      if (i <= 0) {
-        crossedStart = true;
-        return i;
-      }
-      return clampIndex(i - 1);
-    });
-    if (crossedStart) onBeforeStart?.();
-  }, [clampIndex, onBeforeStart]);
+    const i = panelIndexRef.current;
+    if (i <= 0) onBeforeStart?.();
+    else setPanelIndex(clampIndex(i - 1));
+  }, [clampIndex, onBeforeStart, setPanelIndex]);
 
   useEffect(() => {
     setPanelIndex((i) => clampIndex(i));
-  }, [panelCount, clampIndex]);
+  }, [panelCount, clampIndex, setPanelIndex]);
 
   useEffect(() => {
     if (!enabled) return;
