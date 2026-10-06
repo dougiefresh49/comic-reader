@@ -61,11 +61,11 @@ const MEDIUM_WORDS: Record<string, string> = {
   podcast: "podcast",
 };
 
-/** The prompt's head: what to describe, and who in which work. */
-function subjectLines(s: LookupSubject): string {
+/** The prompt's head: its opening line, then who in which work. */
+function subjectLines(s: LookupSubject, opening: string): string {
   const medium = MEDIUM_WORDS[s.work.medium] ?? s.work.medium;
   const actor = s.voice_actor ? `\nVoice actor: ${s.voice_actor}` : "";
-  return `Describe the speaking voice of one character as it sounds in one work.
+  return `${opening}
 
 Character: ${s.character}
 Work: ${s.work.title} (${s.work.year} ${medium})${actor}`;
@@ -80,7 +80,7 @@ const DESCRIPTION_FIELDS = `- description: two to four sentences about the voice
 
 /** The direct prompt: the voice in this work, from what the model knows of it. */
 export function lookupPrompt(s: LookupSubject): string {
-  return `${subjectLines(s)}
+  return `${subjectLines(s, "Describe the speaking voice of one character as it sounds in one work.")}
 
 Describe this version of the character only. Other films, series and games may give the same character a different voice.
 
@@ -93,20 +93,21 @@ ${DESCRIPTION_FIELDS}`;
 /**
  * The fallback prompt, sent only after the direct prompt was refused because
  * the model did not know the voice: the voice from the character's other
- * works in the same franchise, where the same actor plays them.
+ * works in the franchise this work belongs to, where the same actor plays
+ * them. It never asks about this work itself.
  */
 export function inferencePrompt(s: LookupSubject): string {
   const who = s.voice_actor
     ? `as ${s.voice_actor}, the voice actor named above, performs it.`
     : "as the actor who voices them there performs it. A new work usually keeps the character's current voice actor, so go by that actor's recent performances as this character.";
-  return `${subjectLines(s)}
+  return `${subjectLines(s, "Describe the speaking voice of one character from a work you do not know well enough.")}
 
-This work may be newer than what you know. If you do not know it, describe the voice this character has in the other films, series and games of the same franchise, ${who}
+You do not know this work well enough to describe how the character sounds in it, so do not try. Describe instead the voice this character has in the other films, series and games of the franchise this work belongs to, ${who}
 
 Return JSON:
 - actor: the name of the person whose performances as this character you describe. Leave it empty if you do not know.
-- inferred_from: one short phrase naming that actor, the character and the works the voice comes from, such as "Jane Doe as Captain Vega in Star Patrol (2015 film) and Star Patrol Rising (2019 video game)". Leave it empty if you do not know.
-- known: true only if this character belongs to the same franchise or series as this work and you know how they sound in its other works. If you are not sure, or the character is from another franchise, set it to false and leave the other fields empty.
+- inferred_from: one short phrase naming that actor, the character and the other works the voice comes from, such as "Jane Doe as Captain Vega in Star Patrol (2015 film) and Star Patrol Rising (2019 video game)". Name only works other than this one. Leave it empty if you do not know.
+- known: true only if this character belongs to the franchise this work belongs to and you know how they sound in its other works. If you are not sure, or the character is from another franchise, set it to false and leave the other fields empty. If you know this work and this character is not in it, set known to false.
 ${DESCRIPTION_FIELDS}`;
 }
 
@@ -156,13 +157,15 @@ export function sameActor(a: string, b: string): boolean {
  * The answer, or why it is not stored. `expectedActor` is the appearance's
  * voice actor, when it names one: an answer naming another person is refused.
  * `inferred` checks a fallback answer, which must also name what it was
- * inferred from. `unknown` marks the two refusals that send a key on to the
- * fallback: the model does not know the voice, or names no actor for it.
+ * inferred from, and never `title`, the work under lookup. `unknown` marks the
+ * refusals that send a key on to the fallback: an answer that is not JSON,
+ * the model does not know the voice, or it names no actor for it.
  */
 export function checkAnswer(
   text: string | undefined,
   expectedActor: string | null = null,
   inferred = false,
+  title = "",
 ): LookupAnswer | { refused: string; unknown?: true } {
   let raw: {
     actor?: unknown;
@@ -174,7 +177,7 @@ export function checkAnswer(
   try {
     raw = JSON.parse(text ?? "") as typeof raw;
   } catch {
-    return { refused: "the answer is not JSON" };
+    return { refused: "the answer is not JSON", unknown: true };
   }
   if (raw.known !== true)
     return {
@@ -195,6 +198,14 @@ export function checkAnswer(
     typeof raw.inferred_from === "string" ? raw.inferred_from.trim() : "";
   if (inferred && !inferredFrom)
     return { refused: "the model names no works the voice is inferred from" };
+  if (
+    inferred &&
+    title.trim() &&
+    inferredFrom.toLowerCase().includes(title.trim().toLowerCase())
+  )
+    return {
+      refused: `the model infers the voice from this work itself: ${inferredFrom}`,
+    };
   const labels = (raw.labels ?? {}) as Record<string, string>;
   const meta = metadataRefusals({
     description: raw.description as string,
@@ -251,7 +262,12 @@ async function askTwice(
       },
       { step: LOOKUP_STEP },
     );
-    const answer = checkAnswer(response.text, subject.voice_actor, inferred);
+    const answer = checkAnswer(
+      response.text,
+      subject.voice_actor,
+      inferred,
+      subject.work.title,
+    );
     if (!("refused" in answer)) return { ok: true, answer, model: GEMINI_FAST };
     reasons.push(answer.refused);
     unknown &&= answer.unknown === true;
@@ -288,8 +304,9 @@ export async function lookUpVoice(
 ): Promise<LookupResult> {
   const direct = await askTwice(gemini, subject, false);
   if (direct.ok) return direct;
-  // An actor contradicting the appearance, or a malformed answer, is not
-  // a gap in what the model knows, so the fallback would not fix it.
+  // An actor contradicting the appearance, or a known voice whose description
+  // or labels fail the checks, is not a gap in what the model knows, so the
+  // fallback would not fix it.
   if (!direct.unknown) return { ok: false, reasons: direct.reasons };
   const inferred = await inferVoice(gemini, subject);
   if (inferred.ok) return inferred;

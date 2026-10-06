@@ -422,6 +422,28 @@ async function runCheck(): Promise<never> {
     );
   else fail(`actor check: wrong on ${JSON.stringify(actorWrong)}`);
 
+  // The fallback's mark on canned answers: it must name other works.
+  const title = "Invented Work";
+  const inferredAnswer = (inferred_from: string) =>
+    JSON.stringify({ ...JSON.parse(answer("Actor One")), inferred_from });
+  const inferredCases: [string, string | null][] = [
+    ["", null],
+    ["Actor One as Hero in invented work (2026 podcast)", null],
+    [
+      "Actor One as Hero in Other Work (2019 video game)",
+      "Actor One as Hero in Other Work (2019 video game)",
+    ],
+  ];
+  const inferredWrong = inferredCases.filter(([named, kept]) => {
+    const result = checkAnswer(inferredAnswer(named), null, true, title);
+    return "refused" in result ? kept !== null : result.inferred_from !== kept;
+  });
+  if (inferredWrong.length === 0)
+    ok(
+      "inferred check: an empty inferred_from is refused, one naming the work under lookup is refused, one naming other works is kept on the answer",
+    );
+  else fail(`inferred check: wrong on ${JSON.stringify(inferredWrong)}`);
+
   // Apply's "is this write live" decision for a voice planned beside another
   // clip's: dropped when that clip failed, kept otherwise. No database call.
   const dependent = plan.writes.find(
