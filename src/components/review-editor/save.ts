@@ -1,5 +1,5 @@
 // What a Save sends: the pending edits between the baseline (the rows as last loaded or saved) and the document.
-import type { SaveEdits } from "~/app/api/apply-fixes/write-rules";
+import type { SaveEdits, SpeakerEdit } from "~/app/api/apply-fixes/write-rules";
 import {
   pageBubbleIds,
   pagePanels,
@@ -8,9 +8,19 @@ import {
   type Doc,
 } from "./model";
 
-/** The speaker string a bubble stores: its cast id, or the unmatched string it was loaded with. */
-function speakerOf(b: BubbleDoc): string | null {
-  return b.speakerId ?? b.rawSpeaker;
+/**
+ * Who a bubble's Save says speaks: the picked cast id, or no id and the
+ * label it was loaded with. The Save route turns it into `character_id` and
+ * `speaker` with `bubbleSpeaker`, the display name beside a picked id.
+ */
+function speakerOf(b: BubbleDoc): SpeakerEdit {
+  return b.speakerId
+    ? { characterId: b.speakerId, label: null }
+    : { characterId: null, label: b.rawSpeaker };
+}
+
+function sameSpeaker(a: SpeakerEdit, b: SpeakerEdit): boolean {
+  return a.characterId === b.characterId && a.label === b.label;
 }
 
 /** The cues a bubble stores: its `cues` while its text is the text they were written for. */
@@ -121,7 +131,8 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
       const was = base.bubbles[id];
       if (!was) return;
       const set: SaveEdits["bubbles"]["update"][number]["set"] = {};
-      if (speakerOf(was) !== speakerOf(b)) set.speaker = speakerOf(b);
+      if (!sameSpeaker(speakerOf(was), speakerOf(b)))
+        set.speaker = speakerOf(b);
       if (was.text !== b.text) set.text = b.text;
       if (was.text !== b.text || cuesOf(was) !== cuesOf(b))
         set.textWithCues = cuesOf(b);

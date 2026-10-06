@@ -22,6 +22,8 @@ import { supabase } from "./lib/supabase.js";
 import { writeAppearances } from "./lib/appearances.js";
 import { updateIssue } from "~/lib/issue-queries.js";
 import { readCastRow } from "~/lib/cast";
+import { writeAlias } from "~/lib/character-aliases";
+import { franchiseSlug } from "~/lib/character-id";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -424,25 +426,46 @@ async function runBookMode(
 
     let charsUpserted = 0;
     let tasksUpserted = 0;
+    // A registry franchise name means the existing `franchises` row whose id
+    // is its slug (the P1 backfill's rule); none is ever created here.
+    const { data: franchiseRows, error: fErr } = await supabase
+      .from("franchises")
+      .select("id");
+    if (fErr) throw new Error(`franchises select: ${fErr.message}`);
+    const franchiseIds = new Set(
+      (franchiseRows ?? []).map((r: { id: string }) => r.id),
+    );
 
     for (const character of allNewCharNames) {
       const entry = registry[character];
       if (!entry) continue;
 
       // 1. characters table — id is the canonical character name
-      const { error: cErr } = await supabase.from("characters").upsert(
-        {
-          id: character,
-          franchise: entry.franchise,
-          aliases: entry.aliases ?? [],
-        },
-        { onConflict: "id" },
-      );
+      const slug = entry.franchise ? franchiseSlug(entry.franchise) : null;
+      const franchiseId = slug && franchiseIds.has(slug) ? slug : null;
+      if (entry.franchise && !franchiseId)
+        console.warn(
+          `   ⚠ ${character}: no franchises row "${slug}" for "${entry.franchise}" — franchise_id left null`,
+        );
+      const { error: cErr } = await supabase
+        .from("characters")
+        .upsert(
+          { id: character, franchise_id: franchiseId },
+          { onConflict: "id" },
+        );
       if (cErr) {
         console.warn(`   ⚠ characters upsert ${character}: ${cErr.message}`);
         continue;
       }
       charsUpserted++;
+      try {
+        for (const alias of entry.aliases ?? [])
+          await writeAlias(supabase, character, alias);
+      } catch (err) {
+        console.warn(
+          `   ⚠ aliases ${character}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
 
       // 2. The registry's cached appearances as works and appearances rows.
       //    The registry's voice fields are not written: `voices` is their home.

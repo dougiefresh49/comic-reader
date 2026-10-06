@@ -6,6 +6,7 @@ import type {
   PanelLocalPolygon,
 } from "~/types/panels";
 import type { RoleId } from "~/lib/cast";
+import { bubbleSpeaker } from "~/lib/bubble-speaker";
 import { slugify } from "~/lib/character-id";
 
 export type RoboflowBoxPrediction = {
@@ -396,7 +397,7 @@ export type ClosedCastMember = {
   id: string;
   /** The display name; what `bubbles.speaker` gets on a match. */
   name: string;
-  /** Every other name the character goes by, from `characters.aliases`. */
+  /** Every other name the character goes by, from the `aliases` table (`~/lib/character-aliases`). */
   aliases: string[];
 };
 
@@ -526,8 +527,11 @@ export function buildContextUpdate(
   return {
     ocr_text: ocrText,
     type,
-    speaker: match?.name ?? null,
-    character_id: match?.id ?? null,
+    // An unmatched reply stores no label: null in both columns (#354).
+    ...bubbleSpeaker(
+      match ? { id: match.id, displayName: match.name } : null,
+      null,
+    ),
     emotion,
     character_type: parsed.characterType ?? null,
     side: parsed.side ?? null,

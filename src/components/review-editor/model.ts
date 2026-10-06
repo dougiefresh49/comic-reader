@@ -1,5 +1,5 @@
 // The editor's document: plain data plus pure operations, so undo is a stack of snapshots.
-import { NARRATOR_ID, resolveSpeaker, slug } from "./lib";
+import { NARRATOR_ID, slug } from "./lib";
 import type {
   BubbleType,
   CastMember,
@@ -20,9 +20,9 @@ export interface BubbleDoc {
    */
   cues: { forText: string; value: string } | null;
   type: BubbleType;
-  /** A cast id from the closed list, or null. */
+  /** A cast id from the closed list, or null. Loaded from `bubbles.character_id`. */
   speakerId: string | null;
-  /** The stored speaker string when it did not match the closed list. */
+  /** The stored `speaker` label while the bubble has no cast id: shown, flagged, never matched to the cast. */
   rawSpeaker: string | null;
   emotion: string;
   silent: boolean;
@@ -184,8 +184,17 @@ export function comesBefore(a: Rect, b: Rect): boolean {
 
 // ------------------------------------------------------------------- init
 
+/**
+ * The row as the editor holds it. `character_id` decides the speaker (rule
+ * R5): a null id is unassigned and flagged, even when its label reads like a
+ * cast member, and an id the issue's cast does not hold is shown the same
+ * way, by its label.
+ */
 function toBubble(src: SrcBubble, cast: CastMember[]): BubbleDoc {
-  const speakerId = resolveSpeaker(src.speaker, cast);
+  const speakerId =
+    src.characterId && cast.some((c) => c.id === src.characterId)
+      ? src.characterId
+      : null;
   return {
     id: src.id,
     page: src.page,

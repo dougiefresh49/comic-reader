@@ -269,72 +269,84 @@ function fuzzyNameMatch(a: string, b: string): boolean {
   return false;
 }
 
+/**
+ * The names the face step offers Gemini: each character's id read as words,
+ * its display name and its aliases (`~/lib/character-aliases`, global and
+ * this book's), first spelling of each kept. The characters are those whose
+ * `franchise_id` is one of the book's `book_franchises` rows, plus those with
+ * none; every character when the book has no rows.
+ */
 export async function buildKnownCharacterListOrFatal(
   supabase: TypedClient,
   bookId: string,
   pageLabel: string,
 ): Promise<string[]> {
-  const { data: book, error: bookErr } = await supabase
-    .from("books")
-    .select("franchises")
-    .eq("id", bookId)
-    .single();
+  const { data: bookFranchises, error: bookErr } = await supabase
+    .from("book_franchises")
+    .select("franchise_id")
+    .eq("book_id", bookId);
   if (bookErr) {
     throw new FatalError(
-      `books read failed for ${pageLabel}: ${bookErr.message}`,
+      `book_franchises read failed for ${pageLabel}: ${bookErr.message}`,
     );
   }
 
-  const franchises = book?.franchises ?? [];
-  let chars: Array<{ id: string; aliases: string[] | null }>;
-  if (franchises.length > 0) {
-    const franchiseFilter = franchises
-      .map((f) => `franchise.eq.${f}`)
-      .join(",");
-    const { data, error } = await supabase
-      .from("characters")
-      .select("id, aliases")
-      .or(`${franchiseFilter},franchise.is.null`);
-    if (error) {
-      throw new FatalError(
-        `characters read failed for ${pageLabel}: ${error.message}`,
-      );
-    }
-    chars = data ?? [];
-  } else {
-    const { data, error } = await supabase
-      .from("characters")
-      .select("id, aliases");
-    if (error) {
-      throw new FatalError(
-        `characters read failed for ${pageLabel}: ${error.message}`,
-      );
-    }
-    chars = data ?? [];
+  const franchiseIds = (bookFranchises ?? []).map((r) => r.franchise_id);
+  let query = supabase.from("characters").select("id, display_name");
+  if (franchiseIds.length > 0) {
+    query = query.or(
+      `franchise_id.in.(${franchiseIds.join(",")}),franchise_id.is.null`,
+    );
   }
+  const { data, error } = await query;
+  if (error) {
+    throw new FatalError(
+      `characters read failed for ${pageLabel}: ${error.message}`,
+    );
+  }
+  const chars = data ?? [];
+  const aliases = await readAliasesOrFatal(
+    supabase,
+    chars.map((c) => c.id),
+    bookId,
+    pageLabel,
+  );
 
   const names: string[] = [];
   const seen = new Set<string>();
+  const add = (name: string) => {
+    if (seen.has(name.toLowerCase())) return;
+    names.push(name);
+    seen.add(name.toLowerCase());
+  };
   for (const c of chars) {
-    const readable = c.id.replace(/-/g, " ");
-    if (!seen.has(readable.toLowerCase())) {
-      names.push(readable);
-      seen.add(readable.toLowerCase());
-    }
-    if (c.aliases) {
-      for (const a of c.aliases) {
-        if (!seen.has(a.toLowerCase())) {
-          names.push(a);
-          seen.add(a.toLowerCase());
-        }
-      }
-    }
+    add(c.id.replace(/-/g, " "));
+    if (c.display_name) add(c.display_name);
+    for (const a of aliases.get(c.id) ?? []) add(a);
   }
   return names;
 }
 
+/** `readAliases`, with a failed read fatal for the page. */
+async function readAliasesOrFatal(
+  supabase: TypedClient,
+  characterIds: string[],
+  bookId: string | undefined,
+  pageLabel: string,
+): Promise<Map<string, string[]>> {
+  const { readAliases } = await import("~/lib/character-aliases");
+  try {
+    return await readAliases(supabase, characterIds, bookId);
+  } catch (err: unknown) {
+    throw new FatalError(
+      `aliases read failed for ${pageLabel}: ${errorText(err)}`,
+    );
+  }
+}
+
 async function resolveCharacterIdOrFatal(
   supabase: TypedClient,
+  bookId: string,
   name: string,
   pageLabel: string,
 ): Promise<string | null> {
@@ -353,7 +365,7 @@ async function resolveCharacterIdOrFatal(
 
   const { data: allChars, error: allErr } = await supabase
     .from("characters")
-    .select("id, aliases")
+    .select("id, display_name")
     .limit(200);
   if (allErr) {
     throw new FatalError(
@@ -362,11 +374,18 @@ async function resolveCharacterIdOrFatal(
   }
 
   if (allChars) {
+    const aliases = await readAliasesOrFatal(
+      supabase,
+      allChars.map((c) => c.id),
+      bookId,
+      pageLabel,
+    );
     for (const row of allChars) {
       const id = row.id;
-      const aliases = row.aliases ?? [];
       if (fuzzyNameMatch(name, id)) return id;
-      if (aliases.some((a) => fuzzyNameMatch(name, a))) return id;
+      if (row.display_name && fuzzyNameMatch(name, row.display_name)) return id;
+      if ((aliases.get(id) ?? []).some((a) => fuzzyNameMatch(name, a)))
+        return id;
     }
   }
 
@@ -1199,6 +1218,7 @@ export async function identifyLookaheadFacesOrFatal(
       outcome === "named" && result.characterName
         ? await resolveCharacterIdOrFatal(
             supabase,
+            bookId,
             result.characterName,
             pageLabel,
           )
@@ -1553,7 +1573,7 @@ export async function contextPromptInputs(
     { data: bookRow, error: bookErr },
     { data: issueRow, error: issueErr },
   ] = await Promise.all([
-    supabase.from("books").select("name, franchises").eq("id", bookId).single(),
+    supabase.from("books").select("name").eq("id", bookId).single(),
     selectIssue(supabase, bookId, issueId, "wiki_summary").single(),
   ]);
   if (bookErr) {
@@ -1566,14 +1586,25 @@ export async function contextPromptInputs(
       `issues read failed for ${pageLabel}: ${issueErr.message}`,
     );
   }
+  const { issueCast, loadBookCast, readBookFranchises } = await import(
+    "~/lib/cast"
+  );
+  let franchises: string[];
+  try {
+    franchises = (await readBookFranchises(supabase, bookId)).map(
+      (f) => f.name,
+    );
+  } catch (err: unknown) {
+    throw new FatalError(
+      `book_franchises read failed for ${pageLabel}: ${errorText(err)}`,
+    );
+  }
   {
     const parts: string[] = [];
     if (bookRow) {
       const bookName = bookRow.name;
-      const franchises = bookRow.franchises;
       if (bookName) parts.push(`Book: ${bookName}`);
-      if (franchises?.length)
-        parts.push(`Franchises: ${franchises.join(", ")}`);
+      if (franchises.length) parts.push(`Franchises: ${franchises.join(", ")}`);
     }
     if (issueRow?.wiki_summary) {
       parts.push(`\nIssue Synopsis:\n${issueRow.wiki_summary}`);
@@ -1586,7 +1617,6 @@ export async function contextPromptInputs(
   // accepts. One `loadBookCast` read; `issueCast` is the rule `getCast` uses.
   // Both throws come before any download or Gemini call, so a bad cast
   // fails here and spends nothing.
-  const { issueCast, loadBookCast } = await import("~/lib/cast");
   const bookCast = await loadBookCast(supabase, bookId);
   const castRows = issueCast(bookCast, issueId);
   const cast: ClosedCastMember[] = [];

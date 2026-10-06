@@ -6,6 +6,7 @@ import {
   ThinkingLevel,
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAliases } from "./character-aliases";
 import { ambientLlmMeta, generateContentLogged } from "./llm-usage";
 import { GEMINI_MEDIUM } from "./models";
 
@@ -336,64 +337,23 @@ export async function resolveCharacterId(
 
   const { data: allChars } = await supabase
     .from("characters")
-    .select("id, aliases")
+    .select("id, display_name")
     .limit(200);
 
   if (allChars) {
-    for (const row of allChars) {
-      const id = row.id as string;
-      const aliases = (row.aliases as string[]) ?? [];
+    const rows = allChars as { id: string; display_name: string | null }[];
+    const aliases = await readAliases(
+      supabase,
+      rows.map((r) => r.id),
+    );
+    for (const row of rows) {
+      const id = row.id;
       if (fuzzyNameMatch(name, id)) return id;
-      if (aliases.some((a) => fuzzyNameMatch(name, a))) return id;
+      if (row.display_name && fuzzyNameMatch(name, row.display_name)) return id;
+      if ((aliases.get(id) ?? []).some((a) => fuzzyNameMatch(name, a)))
+        return id;
     }
   }
 
   return null;
-}
-
-export async function buildKnownCharacterList(
-  supabase: SupabaseClient,
-  bookId: string,
-): Promise<string[]> {
-  const { data: book } = await supabase
-    .from("books")
-    .select("franchises")
-    .eq("id", bookId)
-    .single();
-
-  const franchises = (book?.franchises as string[] | null) ?? [];
-
-  let chars: Array<{ id: string; aliases: string[] | null }>;
-  if (franchises.length > 0) {
-    const franchiseFilter = franchises
-      .map((f) => `franchise.eq.${f}`)
-      .join(",");
-    const { data } = await supabase
-      .from("characters")
-      .select("id, aliases")
-      .or(`${franchiseFilter},franchise.is.null`);
-    chars = (data ?? []) as Array<{ id: string; aliases: string[] | null }>;
-  } else {
-    const { data } = await supabase.from("characters").select("id, aliases");
-    chars = (data ?? []) as Array<{ id: string; aliases: string[] | null }>;
-  }
-
-  const names: string[] = [];
-  const seen = new Set<string>();
-  for (const c of chars) {
-    const readable = c.id.replace(/-/g, " ");
-    if (!seen.has(readable.toLowerCase())) {
-      names.push(readable);
-      seen.add(readable.toLowerCase());
-    }
-    if (c.aliases) {
-      for (const a of c.aliases) {
-        if (!seen.has(a.toLowerCase())) {
-          names.push(a);
-          seen.add(a.toLowerCase());
-        }
-      }
-    }
-  }
-  return names;
 }

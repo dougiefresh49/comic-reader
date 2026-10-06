@@ -526,7 +526,6 @@ function world(opts: {
     db.rows("characters").push({
       id: c,
       display_name: name,
-      aliases: [],
       form_of: null,
     });
     db.rows("bubbles").push({

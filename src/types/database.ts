@@ -18,7 +18,7 @@ export type Database = {
         Row: {
           alias: string;
           alias_norm: string | null;
-          canonical: string;
+          canonical: string | null;
           character_id: string | null;
           created_at: string | null;
           id: number;
@@ -28,7 +28,7 @@ export type Database = {
         Insert: {
           alias: string;
           alias_norm?: string | null;
-          canonical: string;
+          canonical?: string | null;
           character_id?: string | null;
           created_at?: string | null;
           id?: number;
@@ -38,7 +38,7 @@ export type Database = {
         Update: {
           alias?: string;
           alias_norm?: string | null;
-          canonical?: string;
+          canonical?: string | null;
           character_id?: string | null;
           created_at?: string | null;
           id?: number;

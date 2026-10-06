@@ -13,6 +13,8 @@
 import fs from "fs-extra";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { loadNameResolver } from "~/lib/character-aliases.js";
+import { labelSpeaker } from "./lib/label-speaker.js";
 import { supabase } from "./lib/supabase.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -263,6 +265,9 @@ async function main() {
 
     // Step 5 — sync changed bubbles to DB
     const changedUuids = new Set<string>();
+    // A fixes-file speaker is outside text: the name rule picks its character.
+    const means = await loadNameResolver(supabase);
+    const speakerOf = (label: string | null) => labelSpeaker(means, label);
 
     for (const fix of fixes) {
       if (fix.action === "update") {
@@ -288,7 +293,8 @@ async function main() {
         const merged = findBubbleInCache(cache, fix.bubbleId);
         const { bounds, ...rest } = fix.changes;
         const patch: Record<string, unknown> = {};
-        if (rest.speaker !== undefined) patch.speaker = rest.speaker;
+        if (rest.speaker !== undefined)
+          Object.assign(patch, speakerOf(rest.speaker));
         if (rest.ocr_text !== undefined) patch.ocr_text = rest.ocr_text;
         if (rest.textWithCues !== undefined) {
           patch.text_with_cues = rest.textWithCues;
@@ -370,7 +376,7 @@ async function main() {
             ocr_text: bubble.ocr_text ?? null,
             text_with_cues: bubble.textWithCues ?? null,
             type: bubble.type ?? "SPEECH",
-            speaker: bubble.speaker ?? null,
+            ...speakerOf(bubble.speaker ?? null),
             emotion: bubble.emotion ?? null,
             character_type: typeof charT === "string" ? charT : null,
             side:

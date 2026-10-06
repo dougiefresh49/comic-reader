@@ -39,6 +39,9 @@ export interface SrcBubble {
   /** `text_with_cues`: the text as the audio step reads it, emotion cues and all. */
   textWithCues: string | null;
   type: BubbleType;
+  /** `bubbles.character_id`: who speaks. Null is unassigned, whatever `speaker` says. */
+  characterId: string | null;
+  /** `bubbles.speaker`: the label, shown while `characterId` is null. */
   speaker: string | null;
   emotion: string;
   ignored: boolean;

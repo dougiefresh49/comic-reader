@@ -1,6 +1,7 @@
 "use server";
 
 import { GoogleGenAI, createPartFromText } from "@google/genai";
+import { franchiseSlug } from "~/lib/character-id";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 
@@ -124,7 +125,6 @@ export async function createBook(
     wiki_host: wikiHost,
     wiki_title_template: wikiTitleTemplate,
     publisher,
-    franchises,
     total_issues: totalIssues,
     // #131: a book is a draft until the owner publishes it from /admin, so a
     // book added ahead of the pipeline never shows kids an empty cover.
@@ -132,6 +132,34 @@ export async function createBook(
   });
 
   if (bookError) return { ok: false, error: bookError.message };
+
+  // One `franchises` row per name (an existing id is left as it is) and one
+  // `book_franchises` row per name, `position` its index; the first name is
+  // the default franchise for a character created in this book.
+  const named = new Map<string, { name: string; position: number }>();
+  franchises.forEach((name, position) => {
+    const id = franchiseSlug(name);
+    if (id && !named.has(id)) named.set(id, { name: name.trim(), position });
+  });
+  if (named.size > 0) {
+    const { error: franchiseError } = await supabaseAdmin
+      .from("franchises")
+      .upsert(
+        [...named].map(([id, f]) => ({ id, name: f.name })),
+        { onConflict: "id", ignoreDuplicates: true },
+      );
+    if (franchiseError) return { ok: false, error: franchiseError.message };
+    const { error: linkError } = await supabaseAdmin
+      .from("book_franchises")
+      .insert(
+        [...named].map(([id, f]) => ({
+          book_id: slug,
+          franchise_id: id,
+          position: f.position,
+        })),
+      );
+    if (linkError) return { ok: false, error: linkError.message };
+  }
 
   if (parts?.length) {
     const partRows = parts.map((p) => ({

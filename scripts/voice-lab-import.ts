@@ -33,6 +33,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
+import { loadNameResolver } from "~/lib/character-aliases";
 import { readVoices, type VoiceRow } from "~/lib/voice-slots";
 import {
   insertCandidateVoice,
@@ -97,11 +98,6 @@ interface SnapshotVoice {
   labels: Record<string, string> | null;
 }
 
-interface Character {
-  id: string;
-  aliases: string[] | null;
-}
-
 interface RoomProfile {
   personality?: string | null;
   speechStyle?: string | null;
@@ -133,7 +129,6 @@ interface Candidate {
   characterId: string | null;
 }
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const md5Of = (buf: Buffer | Uint8Array) =>
   createHash("md5").update(buf).digest("hex");
 
@@ -141,19 +136,20 @@ async function readJson<T>(file: string): Promise<T> {
   return JSON.parse(await readFile(file, "utf8")) as T;
 }
 
-/** Resolve a lab name like "Red Ranger (Jason)" via characters.id or aliases. */
-function characterResolver(chars: Character[]) {
-  const byKey = new Map<string, string>();
-  for (const c of chars) {
-    byKey.set(norm(c.id), c.id);
-    for (const a of c.aliases ?? []) byKey.set(norm(a), c.id);
-  }
+/**
+ * Resolve a lab name like "Red Ranger (Jason)" through the name rule in
+ * ~/lib/character-aliases: the whole name, then without the parenthetical,
+ * then the parenthetical alone.
+ */
+function characterResolver(
+  means: (name: string) => { id: string } | undefined,
+) {
   return (name: string): string | null => {
     const inner = /\(([^)]+)\)/.exec(name)?.[1];
     const tries = [name, name.replace(/\s*\([^)]*\)/g, ""), inner ?? ""];
     for (const t of tries) {
-      const hit = t ? byKey.get(norm(t)) : undefined;
-      if (hit) return hit;
+      const hit = t ? means(t) : undefined;
+      if (hit) return hit.id;
     }
     return null;
   };
@@ -215,12 +211,11 @@ async function main() {
   const inputs = BOOKS[args.book];
   const cloneRoot = path.join(workspace, "clone-sources", args.book);
 
-  const [voices, charsRes] = await Promise.all([
+  const [voices, means] = await Promise.all([
     readVoices(supabase),
-    supabase.from("characters").select("id, aliases"),
+    loadNameResolver(supabase),
   ]);
-  if (charsRes.error) throw new Error(charsRes.error.message);
-  const resolve = characterResolver((charsRes.data ?? []) as Character[]);
+  const resolve = characterResolver(means);
   const byElId = new Map(
     voices
       .filter((v) => v.current_elevenlabs_id)
