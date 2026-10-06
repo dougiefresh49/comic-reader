@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { pageImageUrl } from "~/lib/storage";
 import { SheetShell } from "~/components/ui/SheetShell";
 
@@ -24,6 +25,11 @@ export function PageSheet({
   onClose,
 }: PageSheetProps) {
   const activeThumbRef = useRef<HTMLAnchorElement | null>(null);
+  // The reader mounts under /book and /admin/preview; thumbnails stay on
+  // whichever route opened it (an unpublished book 404s under /book).
+  const basePath = usePathname().startsWith("/admin/preview/")
+    ? "/admin/preview"
+    : "/book";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -50,7 +56,7 @@ export function PageSheet({
     >
       <div className="flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-1 py-3">
         {pages.map((page) => {
-          const href = `/book/${bookId}/${issueId}/${page}`;
+          const href = `${basePath}/${bookId}/${issueId}/${page}`;
           const isActive = page === currentPage;
 
           return (

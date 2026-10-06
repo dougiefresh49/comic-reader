@@ -8,7 +8,7 @@ interface Props {
   panel: PageDirectedPanel | null;
   /** True only in panel-view auto-play mode; otherwise everything is paused. */
   active: boolean;
-  /** Mute the entire layer (settings toggle). Defaults true since the audio library may be empty. */
+  /** Mute the entire layer (settings toggle). Defaults false. */
   muted?: boolean;
   /** Optional per-layer volume overrides (0..1). */
   volume?: { ambience?: number; sfx?: number; music?: number };
@@ -102,6 +102,9 @@ export function PanelAudioLayer({
     const url = audioLibraryUrl("music", musicTag);
 
     if (continuePlaying) {
+      // A cleanup mid-fade-in leaves the volume partway up the ramp; land on
+      // the target rather than staying quieter than the settings ask for.
+      el.volume = targetVol;
       if (el.paused) el.play().catch(() => undefined);
       lastSceneIdRef.current = sceneId;
       lastMusicTagRef.current = musicTag;
@@ -113,6 +116,7 @@ export function PanelAudioLayer({
     const fadeOutSteps = 16;
     const stepMs = FADE_MS / fadeOutSteps;
     let i = 0;
+    let fadeIn: ReturnType<typeof setInterval> | undefined;
     const fadeOut = setInterval(() => {
       i++;
       el.volume = Math.max(0, startVol * (1 - i / fadeOutSteps));
@@ -127,7 +131,7 @@ export function PanelAudioLayer({
         lastSceneIdRef.current = sceneId;
 
         let j = 0;
-        const fadeIn = setInterval(() => {
+        fadeIn = setInterval(() => {
           j++;
           el.volume = Math.min(targetVol, targetVol * (j / fadeOutSteps));
           if (j >= fadeOutSteps) clearInterval(fadeIn);
@@ -136,6 +140,7 @@ export function PanelAudioLayer({
     }, stepMs);
     return () => {
       clearInterval(fadeOut);
+      clearInterval(fadeIn);
     };
   }, [musicTag, active, muted, newScene, sceneId, volume.music]);
 
