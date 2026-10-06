@@ -651,7 +651,8 @@ export async function cleanPageWatermarks(args: {
 
   const banner = detectBanner(img);
   let bannerPainted = false;
-  let detectFailed = false;
+  /** True once the first detect call answered; a later throw is an edit or re-detect. */
+  let detected = false;
 
   if (!isDryRun()) {
     const where = { bookId, issueId, pageNumber };
@@ -659,6 +660,7 @@ export async function cleanPageWatermarks(args: {
       const detectMeta = { step: "page-watermark-detect", ...where };
       const editMeta = { step: "page-watermark-edit", ...where };
       const first = await detectOverlays(img, detectMeta);
+      detected = true;
       if (
         banner &&
         first.bands.some((b) => confirmsBanner(b, banner, img.width))
@@ -719,14 +721,13 @@ export async function cleanPageWatermarks(args: {
       const reason = `overlay call failed: ${err instanceof Error ? err.message : String(err)}`;
       warn(reason);
       failures.push({ kind: "overlay", reason });
-      detectFailed = true;
     }
   }
 
   if (banner && !bannerPainted) {
     const reason = isDryRun()
       ? "band found; a dry run makes no detect call to confirm it"
-      : detectFailed
+      : !detected
         ? "band found; the detect call failed"
         : "band found but the detector did not confirm it";
     warn(reason);
