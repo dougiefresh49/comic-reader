@@ -465,7 +465,8 @@
             "file": "shell-shock/bebop-take-two.mp3",
             "object": "shell-shock__bebop-take-two.mp3",
             "md5": "ffffffffffffffffffffffffffffffff"
-          }
+          },
+          "depends_on": 5
         }
       ],
       "skips": [],

@@ -92,7 +92,6 @@ export const LOOKUP_SCHEMA = {
   required: ["actor", "known", "description", "labels"],
 } as const;
 
-/** The answer, or why it is not stored. */
 /** Lowercase letters only: "Pat Fraley" and "pat-fraley" read the same. */
 const personKey = (name: string) =>
   name.toLowerCase().replace(/[^\p{L}]/gu, "");

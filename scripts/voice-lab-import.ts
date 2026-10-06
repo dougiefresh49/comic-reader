@@ -72,7 +72,9 @@ import {
 import {
   clipFile,
   clipLabel,
+  failedDependency,
   INDEX_VERSION,
+  liveWrite,
   lookupsNeeded,
   planVoiceLabImport,
   type AppearanceRow,
@@ -420,6 +422,39 @@ async function runCheck(): Promise<never> {
     );
   else fail(`actor check: wrong on ${JSON.stringify(actorWrong)}`);
 
+  // Apply's "is this write live" decision for a voice planned beside another
+  // clip's: dropped when that clip failed, kept otherwise. No database call.
+  const dependent = plan.writes.find(
+    (w) => w.kind === "insert_voice" && w.depends_on !== undefined,
+  );
+  const first = dependent
+    ? plan.writes.find(
+        (w) =>
+          w.kind === "insert_voice" &&
+          dependent.kind === "insert_voice" &&
+          w.rows.includes(dependent.depends_on!),
+      )
+    : undefined;
+  const dep = dependent?.kind === "insert_voice" ? dependent.depends_on! : 0;
+  const liveWrong = !dependent
+    ? "no planned write carries depends_on"
+    : !first
+      ? `no planned voice write for clip ${dep}`
+      : !liveWrite(dependent, new Set())
+        ? "dropped with no clip failed"
+        : liveWrite(dependent, new Set([dep]))
+          ? `kept after clip ${dep} failed`
+          : failedDependency(dependent, new Set([dep])) !== dep
+            ? "the failure does not name the clip it depends on"
+            : !liveWrite(first, new Set(dependent.rows))
+              ? `clip ${dep} dropped when the dependent clip failed`
+              : null;
+  if (liveWrong === null)
+    ok(
+      `apply's live check: clip ${dependent!.rows[0]}'s voice (planned beside clip ${dep}'s) is dropped when clip ${dep} fails and kept when it is written; clip ${dep} does not wait on it`,
+    );
+  else fail(`apply's live check: ${liveWrong}`);
+
   const guard = await checkStatusGuard();
   if (guard === null)
     ok(
@@ -503,12 +538,27 @@ async function apply(
     failedRows.add(row);
     failures.push(`clip ${row}: ${why}`);
   };
-  const live = (w: Write) => w.rows.some((r) => !failedRows.has(r));
+  const live = (w: Write) => liveWrite(w, failedRows);
+  /** Fails a write whose dependency failed, naming it; true when it did. */
+  const dependencyFailed = (w: Write) => {
+    const dep = failedDependency(w, failedRows);
+    // Already failed and reported in an earlier loop.
+    if (dep === null || w.rows.every((r) => failedRows.has(r))) return false;
+    failRow(
+      w.rows[0]!,
+      `clip ${dep} failed or was not written, and this clip's voice was planned beside clip ${dep}'s; nothing written for this clip, and the next run plans it again`,
+    );
+    return true;
+  };
 
   // 1. Each new clip: the local file must hash to the index md5, then upload.
   for (const w of plan.writes) {
     if ((w.kind !== "insert_voice" && w.kind !== "update_voice") || !w.clip)
       continue;
+    if (!live(w)) {
+      dependencyFailed(w);
+      continue;
+    }
     const row = w.rows[0]!;
     const p = localPath(library, w.clip.file);
     if (!p || !existsSync(p)) {
@@ -558,7 +608,10 @@ async function apply(
     ]),
   );
   for (const w of plan.writes) {
-    if (!live(w)) continue;
+    if (!live(w)) {
+      dependencyFailed(w);
+      continue;
+    }
     const row = w.rows[0]!;
     try {
       if (w.kind === "insert_voice") {

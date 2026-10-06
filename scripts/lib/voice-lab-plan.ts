@@ -111,6 +111,11 @@ export type Write =
       appearance: LookupKey | null;
       row: NewVoice;
       clip: Clip;
+      /**
+       * The earlier clip whose planned voice holds the appearance this voice
+       * is planned beside. Apply writes this one only if that clip was written.
+       */
+      depends_on?: number;
     }
   | {
       kind: "update_voice";
@@ -464,6 +469,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
       kind: "insert_voice",
       rows: [n],
       appearance: heldBy ? null : key,
+      ...(planned ? { depends_on: planned.clip } : {}),
       row: {
         display_name: displayName,
         character_id: key.character_id,
@@ -486,6 +492,29 @@ export function planVoiceLabImport(input: PlanInput): Plan {
     notes,
     describe,
   };
+}
+
+/**
+ * The clip `w` depends on, when that clip has failed, else null. Apply runs
+ * writes in plan order, so the clip a write depends on is decided first.
+ */
+export function failedDependency(
+  w: Write,
+  failedClips: ReadonlySet<number>,
+): number | null {
+  return w.kind === "insert_voice" &&
+    w.depends_on !== undefined &&
+    failedClips.has(w.depends_on)
+    ? w.depends_on
+    : null;
+}
+
+/** Apply's "is this write live" decision: its clip and its dependency stand. */
+export function liveWrite(w: Write, failedClips: ReadonlySet<number>): boolean {
+  return (
+    w.rows.some((r) => !failedClips.has(r)) &&
+    failedDependency(w, failedClips) === null
+  );
 }
 
 /** The lookups `--describe` makes: one per key with nothing stored. */
