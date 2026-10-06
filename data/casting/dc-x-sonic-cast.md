@@ -2,10 +2,10 @@
 
 Source of truth: `dc-x-sonic-cast.json` (generated from the voice-lab labeler's
 owner verdicts — only reels marked **good** are listed). Clone-ready sample
-files, with the owner's trim notes already applied, live at
-`~/Movies/library/voice-lab/clone-sources/dc-x-sonic/<Universe>/<Name>__<source>.mp3`
-(all well under ElevenLabs' 10 MB / 25-sample limits). Reels are auditionable
-on the labeler at `/reels/dc` and `/reels/sonic`.
+files, with the owner's trim notes already applied, live in the voice-lab
+library on the owner's machine (all well under ElevenLabs' 10 MB / 25-sample
+limits); paths and file names stay out of this public repo. Reels are
+auditionable on the labeler at `/reels/dc` and `/reels/sonic`.
 
 Creating the ElevenLabs IVCs is **owner-gated** (voice slots — see
 `specs/research/voice-cloning-and-ingest-lookahead.md`, archive-and-restore).

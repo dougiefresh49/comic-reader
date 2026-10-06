@@ -1,10 +1,9 @@
 {
  "generated": "2026-08-21",
- "cloneSourceRoot": "/Users/dougiefresh49/Movies/library/voice-lab/clone-sources/tmnt-x-mmpr",
  "cast": [
   {
    "character": "Raphael",
-   "file": "TMNT/Raphael__TMNT-1990.mp3",
+   "source": "TMNT 1990",
    "replaces": "RbsOf5RuEmcgV4XgAWDA",
    "replacesName": "Raph v2",
    "status": "cloned",
@@ -14,7 +13,7 @@
   },
   {
    "character": "Leonardo",
-   "file": "TMNT/Leonardo__TMNT-1990.mp3",
+   "source": "TMNT 1990",
    "replaces": "1sca4ecJ4XyU7M176Ei0",
    "replacesName": "Leonardo",
    "status": "ready to clone",
@@ -22,7 +21,7 @@
   },
   {
    "character": "April O'Neil",
-   "file": "TMNT/April-ONeil__TMNT-1990.mp3 **or** TMNT/April-ONeil__TMNT-2012.mp3",
+   "source": "TMNT 1990 or TMNT 2012",
    "replaces": null,
    "replacesName": null,
    "status": "casting",
@@ -30,7 +29,7 @@
   },
   {
    "character": "Bebop",
-   "file": "TMNT/Bebop__TMNT-2012.mp3 (fallback)",
+   "source": "TMNT 2012 (fallback)",
    "replaces": "FCFJMCa9ZFu4325AUU3w",
    "replacesName": "Bebop 2",
    "status": "casting",
@@ -38,7 +37,7 @@
   },
   {
    "character": "Rocksteady",
-   "file": "TMNT/Rocksteady__TMNT-2012.mp3 (fallback)",
+   "source": "TMNT 2012 (fallback)",
    "replaces": "FBptoKFxS8EhO4XO87xt",
    "replacesName": "Rocksteady",
    "status": "casting",
@@ -46,7 +45,7 @@
   },
   {
    "character": "Master Splinter",
-   "file": "TMNT/Splinter__TMNT-1990.mp3 (alternate)",
+   "source": "TMNT 1990 (alternate)",
    "replaces": "6G3IoJHUBafcI3SyzELE",
    "replacesName": "Master Splinter v2",
    "status": "approved",
@@ -54,7 +53,7 @@
   },
   {
    "character": "Shredder",
-   "file": "TMNT/Shredder__TMNT-1990.mp3 (alternate)",
+   "source": "TMNT 1990 (alternate)",
    "replaces": "zyz29XaJBhGHDfyrCD7d",
    "replacesName": "Shredder v2",
    "status": "approved",
@@ -62,7 +61,7 @@
   },
   {
    "character": "Casey Jones",
-   "file": "TMNT/Casey-Jones__TMNT-1990.mp3",
+   "source": "TMNT 1990",
    "replaces": null,
    "replacesName": "\u2014",
    "status": "approved",
@@ -70,7 +69,7 @@
   },
   {
    "character": "Baxter Stockman",
-   "file": "TMNT/Baxter-Stockman__TMNT-2012.mp3",
+   "source": "TMNT 2012",
    "replaces": null,
    "replacesName": "\u2014",
    "status": "casting",
@@ -78,7 +77,7 @@
   },
   {
    "character": "Red Ranger (Jason)",
-   "file": "MMPR/Jason__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "R8tHGp6yBIKs45odIPD1",
    "replacesName": "Red Ranger",
    "status": "ready to clone",
@@ -86,7 +85,7 @@
   },
   {
    "character": "Blue Ranger (Billy)",
-   "file": "MMPR/Billy__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "eggrlJySU29RodqjhIkX",
    "replacesName": "Blue Ranger",
    "status": "ready to clone",
@@ -94,7 +93,7 @@
   },
   {
    "character": "Black Ranger (Zack)",
-   "file": "MMPR/Zack__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "cuy9NDFuCyOdZU0vkcym",
    "replacesName": "Black Ranger",
    "status": "ready to clone",
@@ -102,7 +101,7 @@
   },
   {
    "character": "Pink Ranger (Kimberly)",
-   "file": "MMPR/Kimberly__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "E8CavmYRhEEZqRb2s4nt",
    "replacesName": "Pink Ranger",
    "status": "ready to clone",
@@ -110,7 +109,7 @@
   },
   {
    "character": "Yellow Ranger (Trini)",
-   "file": "MMPR/Trini__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "hBYwgU1d9wzr397yTscG",
    "replacesName": "Yellow Ranger",
    "status": "ready to clone",
@@ -118,7 +117,7 @@
   },
   {
    "character": "Green Ranger (Tommy)",
-   "file": "MMPR/Tommy__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "fDCFh0Z04XCcSmBoHT4j",
    "replacesName": "Green Ranger",
    "status": "ready to clone",
@@ -126,7 +125,7 @@
   },
   {
    "character": "Zordon",
-   "file": "MMPR/Zordon__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "NvO7pjO09CWuF87LH2iA",
    "replacesName": "Zordon",
    "status": "ready to clone",
@@ -134,7 +133,7 @@
   },
   {
    "character": "Alpha 5",
-   "file": "MMPR/Alpha-5__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "G4FycwjZbrUlO5rnrTGm",
    "replacesName": "Alpha 5",
    "status": "ready to clone",
@@ -142,7 +141,7 @@
   },
   {
    "character": "Rita Repulsa",
-   "file": "MMPR/Rita-Repulsa__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "fpszSg5AsrBuI5R9aidj",
    "replacesName": "Rita Repulsa",
    "status": "ready to clone",
@@ -150,7 +149,7 @@
   },
   {
    "character": "Lord Zedd",
-   "file": "MMPR/Lord-Zedd__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": "xZHSfy1jtZKEX5ypvdGU",
    "replacesName": "Lord Zedd",
    "status": "ready to clone",
@@ -158,7 +157,7 @@
   },
   {
    "character": "Goldar",
-   "file": "MMPR/Goldar__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": null,
    "replacesName": null,
    "status": "ready to clone",
@@ -166,7 +165,7 @@
   },
   {
    "character": "Bulk",
-   "file": "MMPR/Bulk__MMPR-1993.mp3",
+   "source": "MMPR 1993",
    "replaces": null,
    "replacesName": "\u2014",
    "status": "casting",
@@ -174,7 +173,7 @@
   },
   {
    "character": "Skull / Squatt",
-   "file": "\u2014",
+   "source": "\u2014",
    "replaces": null,
    "replacesName": "\u2014",
    "status": "casting",
@@ -182,7 +181,7 @@
   },
   {
    "character": "Krang",
-   "file": "\u2014",
+   "source": "\u2014",
    "replaces": null,
    "replacesName": "\u2014",
    "status": "casting",
