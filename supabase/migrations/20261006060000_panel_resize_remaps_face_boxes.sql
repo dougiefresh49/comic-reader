@@ -13,7 +13,10 @@
 -- one and f the stored face box, in float8 and with no rounding:
 --   x' = (O.x + f.x * O.w - N.x) / N.w      w' = f.w * O.w / N.w
 --   y' = (O.y + f.y * O.h - N.y) / N.h      h' = f.h * O.h / N.h
--- Any other key the face box holds is kept.
+-- Any other key the face box holds is kept. The function pins
+-- extra_float_digits, so the numbers are written back at full float8
+-- precision whatever the caller's session has; at 0, which some sessions run
+-- with, a float8 becomes a 15-digit JSON number.
 --
 -- No clamp. A face that ends up partly or wholly outside the new box keeps
 -- fractions below 0 or above 1. That is what face extraction already stores
@@ -31,6 +34,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = public
+SET extra_float_digits = 1
 AS $$
 DECLARE
   o jsonb := OLD.bounding_box;
