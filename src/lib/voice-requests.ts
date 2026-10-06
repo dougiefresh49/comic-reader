@@ -222,7 +222,8 @@ export interface OpRecord {
 }
 
 /**
- * The task row fields this module reads. `database.ts` types `operation` as `Json`; this narrows it to `OpRecord`.
+ * The task row fields this module reads. `database.ts` types `operation` as
+ * `Json`; this narrows it to `OpRecord`.
  */
 interface TaskRow {
   status: string;

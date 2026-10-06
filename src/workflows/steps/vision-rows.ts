@@ -389,7 +389,8 @@ export function bubbleHasContext(bubble: BubbleContextFields): boolean {
  * One member of the closed cast get-context chooses the speaker from (#354):
  * a `characters` row the issue's castlist holds, or one of the three roles.
  * The step builds them from the issue's castlist rows and the book's
- * `characters` rows; `scripts/bench/bench-speaker-model.ts` builds them from `proposeCast`.
+ * `characters` rows; `scripts/bench/bench-speaker-model.ts` builds them from
+ * `proposeCast`.
  */
 export type ClosedCastMember = {
   /** The `characters.id`; what `bubbles.character_id` gets on a match. */

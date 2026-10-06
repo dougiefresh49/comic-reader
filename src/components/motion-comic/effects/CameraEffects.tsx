@@ -10,7 +10,9 @@ import type { EffectProps } from "./types";
  * eyeball the motion. Each preview wraps a stylised marker box in the
  * same keyframe animation that PanelViewFrame would apply at runtime.
  *
- * These components are registered only in `EFFECTS_PREVIEW` (registry.tsx). The reader's `EFFECTS` map leaves them out; there the camera move comes from PanelViewFrame.
+ * These components are registered only in `EFFECTS_PREVIEW` (registry.tsx).
+ * The reader's `EFFECTS` map leaves them out; there the camera move comes
+ * from PanelViewFrame.
  */
 
 interface DemoProps {

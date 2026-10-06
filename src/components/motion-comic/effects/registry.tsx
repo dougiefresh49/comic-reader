@@ -46,7 +46,8 @@ export const EFFECTS: Record<string, ComponentType<EffectProps>> = {
   lens_flare_cool: LensFlareCool,
   speed_lines_horizontal: SpeedLinesHorizontal,
   speed_lines_diagonal: SpeedLinesDiagonal,
-  // Smoke and the center-spiral radial are left out of this map; `EFFECTS_PREVIEW` below still shows them.
+  // Smoke and the center-spiral radial are left out of this map;
+  // `EFFECTS_PREVIEW` below still shows them.
   fire_flicker: FireFlickerShader,
   energy_portal_blue: EnergyPortalBlueShader,
   energy_portal_red: EnergyPortalRedShader,
