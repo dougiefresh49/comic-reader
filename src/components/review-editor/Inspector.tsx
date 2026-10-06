@@ -661,7 +661,7 @@ function BubbleInspector(
                   ? assignable.length === 0
                     ? `"${unknown.raw}" is not in the cast`
                     : candidates.length === 1 && assignable[0]
-                      ? `"${unknown.raw}" is not assigned; use the button to assign ${assignable[0].name}`
+                      ? `"${unknown.raw}" is not assigned; use the Use ${assignable[0].name} button below`
                       : `"${unknown.raw}" is not assigned; use a button below to assign it`
                   : spoken
                     ? "No speaker"
