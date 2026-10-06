@@ -171,15 +171,23 @@ export function NewIssueUploader() {
       const finBody = (await finRes.json()) as {
         error?: string;
         errors?: string[];
+        warnings?: string[];
       };
       if (!finRes.ok) {
         const detail =
           finBody.errors && finBody.errors.length > 0
             ? finBody.errors.join("; ")
             : (finBody.error ?? `HTTP ${finRes.status}`);
-        throw new Error(`finalize: ${detail}`);
+        const warnings =
+          finBody.warnings && finBody.warnings.length > 0
+            ? `; warnings: ${finBody.warnings.join("; ")}`
+            : "";
+        throw new Error(`finalize: ${detail}${warnings}`);
       }
 
+      if (finBody.warnings && finBody.warnings.length > 0) {
+        setError(`Finished, with warnings: ${finBody.warnings.join("; ")}`);
+      }
       setStep("done");
     } catch (e) {
       setError((e as Error).message);

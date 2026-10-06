@@ -1,5 +1,6 @@
 import "server-only";
 import { type NextRequest } from "next/server";
+import pLimit from "p-limit";
 import { z } from "zod";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
@@ -13,6 +14,12 @@ interface ProgressEvent {
   message: string;
   current?: number;
   total?: number;
+}
+
+/** "; watermark left: <reason>" when the clean left one, else "" (#541). */
+function watermarkLeft(failures: Array<{ reason: string }>): string {
+  if (failures.length === 0) return "";
+  return `; watermark left: ${failures.map((f) => f.reason).join(", ")}`;
 }
 
 function encodeEvent(event: ProgressEvent): string {
@@ -179,9 +186,12 @@ export async function POST(req: NextRequest) {
         });
 
         let uploaded = 0;
+        // Pages finish out of order under the pool; `current` counts finished pages.
+        let finished = 0;
+        // Each page now costs a Gemini detect call (#541): three at a time.
+        const limit = pLimit(3);
 
-        for (let i = 0; i < collectedUrls.length; i++) {
-          const imgUrl = collectedUrls[i]!;
+        const storeOne = async (imgUrl: string, i: number) => {
           const num = String(i + 1).padStart(2, "0");
           const pageNumber = i + 1;
           const ext = extFromUrl(imgUrl);
@@ -194,10 +204,10 @@ export async function POST(req: NextRequest) {
               send({
                 type: "page",
                 message: `Failed to download page ${num}: HTTP ${imgResponse.status}`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
-              continue;
+              return;
             }
 
             const buffer = Buffer.from(await imgResponse.arrayBuffer());
@@ -213,14 +223,14 @@ export async function POST(req: NextRequest) {
               send({
                 type: "page",
                 message: `Raw upload failed for page ${num}: ${rawResult.error.message}`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
-              continue;
+              return;
             }
 
             try {
-              const { width, height } = await storePageImage({
+              const { width, height, failures } = await storePageImage({
                 bookId: body.bookId,
                 issueId: body.issueId,
                 pageNumber,
@@ -229,15 +239,15 @@ export async function POST(req: NextRequest) {
               uploaded++;
               send({
                 type: "page",
-                message: `Uploaded page ${num} (${width}×${height})`,
-                current: pageNumber,
+                message: `Uploaded page ${num} (${width}×${height})${watermarkLeft(failures)}`,
+                current: ++finished,
                 total: collectedUrls.length,
               });
             } catch (err) {
               send({
                 type: "page",
                 message: `WebP/pages failed for page ${num}: ${err instanceof Error ? err.message : "unknown"} (raw OK)`,
-                current: pageNumber,
+                current: ++finished,
                 total: collectedUrls.length,
               });
             }
@@ -245,11 +255,15 @@ export async function POST(req: NextRequest) {
             send({
               type: "page",
               message: `Error on page ${num}: ${err instanceof Error ? err.message : "unknown"}`,
-              current: pageNumber,
+              current: ++finished,
               total: collectedUrls.length,
             });
           }
-        }
+        };
+
+        await Promise.all(
+          collectedUrls.map((imgUrl, i) => limit(() => storeOne(imgUrl, i))),
+        );
 
         const { error: issueErr } = await updateIssue(
           supabaseAdmin,

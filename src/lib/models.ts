@@ -5,6 +5,9 @@
 export const GEMINI_HIGH = "gemini-3.1-pro-preview"; // deep reasoning, page-level context
 export const GEMINI_MEDIUM = "gemini-3.8-flash"; // vision tasks, OCR, moderate reasoning
 export const GEMINI_FAST = "gemini-3.5-flash-lite"; // simple formatting/validation, no thinking needed
+// image in, image out: removes a watermark from a page crop (#541). The
+// cheapest image-output model in `models.list()` on 2026-10-06.
+export const GEMINI_IMAGE_EDIT = "gemini-3.1-flash-lite-image";
 
 // ─── Venice image models ───────────────────────────────────────────────────────
 // Phase 1 — character reference images (text-to-image)
@@ -38,7 +41,13 @@ export const GEMINI_USD_PER_1M_TOKENS: Record<
   [GEMINI_HIGH]: { input: 2.0, output: 12.0 },
   [GEMINI_MEDIUM]: { input: 0.75, output: 3.75 },
   [GEMINI_FAST]: { input: 0.3, output: 2.5 },
+  // output is image tokens: 1120 per 1K image (#541)
+  [GEMINI_IMAGE_EDIT]: { input: 0.25, output: 30.0 },
 };
+
+// GEMINI_IMAGE_EDIT, per 1K output image (pricing page, 2026-10-06). The
+// llm_calls row prices from the token rate above; this is for estimates.
+export const GEMINI_IMAGE_EDIT_USD_PER_IMAGE = 0.0336;
 
 // gemini-embedding-2, per image embedded. Text embeddings have no rate yet.
 export const GEMINI_EMBEDDING_USD_PER_IMAGE = 0.00012;
