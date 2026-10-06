@@ -25,7 +25,10 @@ import {
 } from "./zen-comic-reader/OnboardingOverlay";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
-import { buildSpeechContent } from "./zen-comic-reader/text-utils";
+import {
+  bubbleAccessibleName,
+  buildSpeechContent,
+} from "./zen-comic-reader/text-utils";
 import { PanelViewFrame } from "./zen-comic-reader/PanelView";
 import {
   styleToNormRect,
@@ -644,7 +647,7 @@ export default function ZenComicReader({
                       width: bubble.style.width,
                       height: bubble.style.height,
                     }}
-                    aria-label={`Bubble ${bubble.id}`}
+                    aria-label={bubbleAccessibleName(bubble)}
                   />
                 );
               })}

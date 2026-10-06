@@ -1,4 +1,4 @@
-import type { AudioTimestamps, CharacterAlignment } from "~/types";
+import type { AudioTimestamps, Bubble, CharacterAlignment } from "~/types";
 
 export interface WordTiming {
   word: string;
@@ -142,4 +142,43 @@ export function buildSpeechContent(
 
   const cleanedFallback = stripAudioTags(fallbackText);
   return { cleanText: cleanedFallback, words: [] };
+}
+
+/** Longest run of bubble text a bubble button's accessible name carries. */
+const ACCESSIBLE_NAME_TEXT_LIMIT = 80;
+
+/** What a bubble is called when it has no text to speak, by its type. */
+const BUBBLE_KIND_LABEL: Partial<Record<string, string>> = {
+  SPEECH: "Speech bubble",
+  NARRATION: "Narration box",
+  CAPTION: "Caption",
+  SFX: "Sound effect",
+  BACKGROUND: "Background text",
+};
+
+/** Cuts `text` to at most `limit` characters, at a word break when one falls in the second half. */
+function shortenAtWord(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > limit / 2 ? cut.slice(0, lastSpace) : cut).trimEnd();
+}
+
+/**
+ * The accessible name of a bubble button: what a screen reader speaks when
+ * a kid lands on it (#550). The speaker and the start of the text when the
+ * bubble has them, else the kind of bubble, and never the database id.
+ */
+export function bubbleAccessibleName(
+  bubble: Pick<Bubble, "speakerName" | "speaker" | "ocr_text" | "type">,
+): string {
+  const speaker = (bubble.speakerName ?? bubble.speaker ?? "").trim();
+  const text = shortenAtWord(
+    stripAudioTags(bubble.ocr_text ?? ""),
+    ACCESSIBLE_NAME_TEXT_LIMIT,
+  );
+  if (speaker && text) return `${speaker}: ${text}`;
+  if (text) return text;
+  const kind = BUBBLE_KIND_LABEL[bubble.type] ?? "Bubble";
+  return speaker ? `${speaker}'s ${kind.toLowerCase()}` : kind;
 }
