@@ -952,7 +952,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     issueId: data.issueId,
     bubbles: data.bubbles,
     selectedId: sel?.id ?? null,
-    saveRunning: () => savingRef.current,
+    saveOrApprovalRunning: () =>
+      savingRef.current || approvalRef.current !== null,
     saveFirst,
     onCues: (id, forText, value) =>
       dispatch({ type: "cuesWritten", id, cues: { forText, value } }),

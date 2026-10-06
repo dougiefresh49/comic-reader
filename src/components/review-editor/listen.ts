@@ -25,8 +25,8 @@ interface UseListenArgs {
   bubbles: SrcBubble[];
   /** The selected bubble: choosing another one stops playback. */
   selectedId: string | null;
-  /** A Save is in flight: the editor is locked and no regenerate may start. */
-  saveRunning: () => boolean;
+  /** A Save or an approval is in flight: the editor is locked and no regenerate may start. */
+  saveOrApprovalRunning: () => boolean;
   /** Save when this bubble has a pending edit (part 2's Save), then the row as saved. */
   saveFirst: (id: string) => Promise<SavedRow>;
   /** Regenerate cues wrote the row's cues for this text. */
@@ -38,7 +38,7 @@ export function useListen({
   issueId,
   bubbles,
   selectedId,
-  saveRunning,
+  saveOrApprovalRunning,
   saveFirst,
   onCues,
 }: UseListenArgs) {
@@ -65,12 +65,12 @@ export function useListen({
   // Calls land long after the click, so they read the latest through refs.
   const pathsRef = useRef(paths);
   const playingRef = useRef(playing);
-  const saveRunningRef = useRef(saveRunning);
+  const saveOrApprovalRunningRef = useRef(saveOrApprovalRunning);
   const saveFirstRef = useRef(saveFirst);
   const onCuesRef = useRef(onCues);
   useEffect(() => {
     pathsRef.current = paths;
-    saveRunningRef.current = saveRunning;
+    saveOrApprovalRunningRef.current = saveOrApprovalRunning;
     saveFirstRef.current = saveFirst;
     onCuesRef.current = onCues;
   });
@@ -143,11 +143,11 @@ export function useListen({
   /**
    * Regenerate the bubble's cues or audio: Save first when it has pending
    * edits, and call the action only once that Save has landed. Refused, and
-   * false, while a Save or another regenerate holds the editor.
+   * false, while a Save, an approval or another regenerate holds the editor.
    */
   const regenerate = useCallback(
     (id: string, job: ListenJob): boolean => {
-      if (activeRef.current || saveRunningRef.current()) return false;
+      if (activeRef.current || saveOrApprovalRunningRef.current()) return false;
       activeRef.current = { id, job };
       setActive(activeRef.current);
       note(id, null);
