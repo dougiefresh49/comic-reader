@@ -173,7 +173,10 @@ export async function regenerateAudio(args: Args) {
   // A concrete URL with no type: its tag is the page's own pathname tag.
   const readerRoute = `/book/${args.bookId}/${args.issueId}/${b.page_number}`;
 
-  /** The switch may have saved: refresh the reader page so it shows which. */
+  /**
+   * The switch may have saved: revalidate the reader page, so a cached one
+   * would show which.
+   */
   function unconfirmed(message: string) {
     try {
       revalidatePath(readerRoute);
