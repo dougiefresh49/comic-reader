@@ -14,11 +14,13 @@ import { GEMINI_FAST } from "./models";
  * `CUE_RULES` is plain prompt text with no inputs, so any prompt that writes
  * `text_with_cues` includes it. Two prompts write cue lines today:
  * - `buildCuePrompt` below, sent through `cueRequest`: the pipeline's
- *   get-context step, as a second call after the speaker call (#437), and the
- *   review editor's Regenerate cues.
+ *   get-context step and the review editor's Analyze, each as a second call
+ *   after the speaker call (#437, #460), and the review editor's Regenerate
+ *   cues.
  * - `buildContextPrompt` without `noCues`, which asks for the cue line in the
- *   same reply as the speaker: the review editor's Analyze and the legacy
- *   scripts, until #460 moves Analyze to `buildCuePrompt`.
+ *   same reply as the speaker: only the legacy scripts
+ *   (`scripts/utils/gemini-context.ts`, `scripts/check-fakes.ts`) and the
+ *   bench's one-call variants in `scripts/bench/bench-speaker-model.ts`.
  */
 export const CUE_RULES = `## Cue rules
 

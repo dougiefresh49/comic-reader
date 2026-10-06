@@ -3,8 +3,8 @@ import { CUE_RULES } from "./cue-rules";
 /**
  * Switches for the get-context prompt. The pipeline passes `closedList`,
  * `castNotes` (#354) and `noCues` (#437); the review editor's analyze call
- * passes `closedList`, `transcribe` and `crop`. With none passed, the prompt
- * is the old open-list one, which only scripts still use
+ * passes `closedList`, `transcribe`, `crop` and `noCues` (#460). With none
+ * passed, the prompt is the old open-list one, which only scripts still use
  * (`scripts/utils/gemini-context.ts` and `scripts/check-fakes.ts`).
  */
 export interface ContextPromptOptions {
