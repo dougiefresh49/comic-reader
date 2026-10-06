@@ -12,7 +12,7 @@ import {
   createPartFromText,
 } from "@google/genai";
 import { headers } from "next/headers";
-import { resolveSpeaker } from "~/components/review-editor/lib";
+import { NARRATOR_ID, resolveSpeaker } from "~/components/review-editor/lib";
 import type { BubbleType } from "~/components/review-editor/types";
 import { checkAdminAuth } from "~/lib/admin-auth";
 import { cueRequest } from "~/lib/cue-rules";
@@ -193,7 +193,11 @@ export async function analyzeBubble(args: AnalyzeArgs): Promise<AnalyzeResult> {
     const text = transcribe ? str(parsed.text) : current;
     const type = TYPES.find((t) => t === str(parsed.type).toUpperCase());
     // The closed list, enforced: a name not on it never reaches the editor.
-    const speaker = resolveSpeaker(str(parsed.speaker) || null, args.cast);
+    const resolved = resolveSpeaker(str(parsed.speaker) || null, args.cast);
+    // A narration box with no speaker named is the Narrator's: that is what
+    // Accept stores (`patchBubble` in the editor's model) and what get-context
+    // sends to the cue call, so the cue line is written for that voice.
+    const speaker = resolved ?? (type === "NARRATION" ? NARRATOR_ID : null);
 
     proposal = {
       text,
