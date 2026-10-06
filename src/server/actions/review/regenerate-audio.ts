@@ -164,15 +164,19 @@ export async function regenerateAudio(args: Args) {
   // touches what the reader plays. switch_bubble_audio_take then changes the
   // timings row and bubbles.audio_storage_path in one transaction: until it
   // commits, the reader has the old take and its own timings. The old object
-  // is never removed: a page cached before the switch still carries the old
-  // path with the old timings, and that pair keeps playing correctly.
+  // is never removed: a reader page a kid loaded before the switch is still
+  // open in the browser with the old path and the old timings, and that pair
+  // keeps playing correctly.
   const hadAudio = b.audio_storage_path != null;
   const storagePath = `${b.id}-take-${randomUUID().slice(0, 8)}.mp3`;
   const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
   // A concrete URL with no type: its tag is the page's own pathname tag.
   const readerRoute = `/book/${args.bookId}/${args.issueId}/${b.page_number}`;
 
-  /** The switch may have saved: refresh the reader page so it shows which. */
+  /**
+   * The switch may have saved: revalidate the reader page, so a cached one
+   * would show which.
+   */
   function unconfirmed(message: string) {
     try {
       revalidatePath(readerRoute);

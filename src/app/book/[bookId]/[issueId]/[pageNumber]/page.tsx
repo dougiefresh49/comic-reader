@@ -2,8 +2,6 @@ import { notFound } from "next/navigation";
 import { getReaderPage } from "~/server";
 import ZenComicReader from "~/components/ZenComicReader";
 
-export const revalidate = 86400;
-
 interface BookPageProps {
   params: Promise<{
     bookId: string;
