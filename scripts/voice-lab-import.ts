@@ -422,27 +422,49 @@ async function runCheck(): Promise<never> {
     );
   else fail(`actor check: wrong on ${JSON.stringify(actorWrong)}`);
 
-  // The fallback's mark on canned answers: it must name other works.
-  const title = "Invented Work";
+  // The fallback's mark on canned answers: it must name other works. A
+  // phrase naming this title under another year is another work.
+  const work = { title: "Invented Work", year: 2026 };
   const inferredAnswer = (inferred_from: string) =>
     JSON.stringify({ ...JSON.parse(answer("Actor One")), inferred_from });
   const inferredCases: [string, string | null][] = [
     ["", null],
     ["Actor One as Hero in invented work (2026 podcast)", null],
     [
+      "Actor One as Hero in Invented Work (1990 film)",
+      "Actor One as Hero in Invented Work (1990 film)",
+    ],
+    [
       "Actor One as Hero in Other Work (2019 video game)",
       "Actor One as Hero in Other Work (2019 video game)",
     ],
   ];
   const inferredWrong = inferredCases.filter(([named, kept]) => {
-    const result = checkAnswer(inferredAnswer(named), null, true, title);
+    const result = checkAnswer(inferredAnswer(named), null, true, work);
     return "refused" in result ? kept !== null : result.inferred_from !== kept;
   });
   if (inferredWrong.length === 0)
     ok(
-      "inferred check: an empty inferred_from is refused, one naming the work under lookup is refused, one naming other works is kept on the answer",
+      "inferred check: an empty inferred_from is refused, one naming the work under lookup is refused, one naming its title under another year or other works is kept on the answer",
     );
   else fail(`inferred check: wrong on ${JSON.stringify(inferredWrong)}`);
+  const direct = checkAnswer(
+    inferredAnswer("Invented Work (2026)"),
+    null,
+    false,
+    work,
+  );
+  const notJson = checkAnswer("not json");
+  if (
+    !("refused" in direct) &&
+    direct.inferred_from === null &&
+    "refused" in notJson &&
+    notJson.unknown === true
+  )
+    ok(
+      "stage check: the direct stage stores no inferred_from and ignores the title, and a non-JSON answer counts as unknown so the fallback runs",
+    );
+  else fail("stage check: direct answer or non-JSON refusal is wrong");
 
   // Apply's "is this write live" decision for a voice planned beside another
   // clip's: dropped when that clip failed, kept otherwise. No database call.
