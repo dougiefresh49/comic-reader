@@ -9,9 +9,9 @@
  * Every function takes the Supabase client, like `issue-queries.ts`: server
  * code passes `supabaseAdmin`, a workflow step its step client, a script its
  * own. Every `castlist` and `casting_tasks` query filters by book, and by issue
- * when it is about one issue. Every `castlist` row is found by
- * `character_id`; the text `character` is only shown, and an insert fills it
- * with the character id until P6 drops it.
+ * when it is about one issue. Every `castlist` row is keyed and found by
+ * `character_id`; the name shown for it is the character's `display_name`,
+ * read through that key.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
@@ -45,15 +45,15 @@ export interface ProposedMember {
   faces: number;
   /** The wiki names that brought it in, "Kimberly Hart (Pink Ranger)" style. */
   wikiNames: string[];
-  /** The book's `castlist.character` texts that brought it in. */
+  /** The display names of the book's castlist rows that brought it in. */
   castNames: string[];
 }
 
-/** A name that matches no `characters` row: shown to the owner, never seeded. */
+/** A wiki name that matches no `characters` row: shown to the owner, never seeded. A castlist row always has a character, so it is never one. */
 export interface CastSuggestion {
   name: string;
   qualifier: string;
-  source: "wiki" | "cast before";
+  source: "wiki";
 }
 
 export interface CastProposal {
@@ -73,9 +73,9 @@ export interface CastVoice {
 
 export interface CastRow {
   issue_id: string;
-  /** Shown only, never matched on; P6 drops it. */
-  character: string;
-  character_id: string | null;
+  character_id: string;
+  /** The character's `display_name`, or its id when that is null. Shown only, never matched on. */
+  display_name: string;
   voice_uuid: string | null;
   in_issue: boolean;
   no_audio: boolean;
@@ -169,28 +169,43 @@ async function readCharacters(
   return rows.map((r) => ({ ...r, aliases: aliases.get(r.id) ?? [] }));
 }
 
+/** The castlist columns `CastRow` holds; the display name is read through `castlist_character_id_fkey`. */
 const CAST_COLUMNS =
-  "issue_id, character, character_id, voice_uuid, in_issue, no_audio";
+  "issue_id, character_id, voice_uuid, in_issue, no_audio, characters(display_name)";
+
+/** The `characters` row a castlist select embeds for the name. */
+type WithCharacter = { characters: { display_name: string | null } | null };
+
+/** The one rule for the name a castlist row shows: its character's `display_name`, or the id when that is null. */
+function named<T extends { character_id: string }>({
+  characters,
+  ...row
+}: T & WithCharacter) {
+  return { ...row, display_name: characters?.display_name ?? row.character_id };
+}
 
 /** The book's castlist, issue order, the voices it points at, `form_of` links and name resolver, for the render chain and the writers. */
 export async function loadBookCast(
   client: Client,
   bookId: string,
 ): Promise<BookCast> {
-  const [rows, issues, characters] = await Promise.all([
-    readAll<CastRow>("the castlist", (from, to) =>
-      db(client)
-        .from("castlist")
-        .select(CAST_COLUMNS)
-        .eq("book_id", bookId)
-        .order("issue_id")
-        .order("character")
-        .range(from, to),
+  const [read, issues, characters] = await Promise.all([
+    readAll<Omit<CastRow, "display_name"> & WithCharacter>(
+      "the castlist",
+      (from, to) =>
+        db(client)
+          .from("castlist")
+          .select(CAST_COLUMNS)
+          .eq("book_id", bookId)
+          .order("issue_id")
+          .order("character_id")
+          .range(from, to),
     ),
     listBookIssues(client, bookId, "id, number"),
     readCharacters(client, bookId),
   ]);
   must("reading the book's issues", issues.error);
+  const rows = read.map(named);
   const voices = await readVoiceStates(
     client,
     rows.flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : [])),
@@ -470,12 +485,12 @@ async function proposeFrom(
     const row = f.character_id ? resolve(f.character_id) : undefined;
     if (row) member(row, "faces").faces++;
   }
+  // `castlist.character_id` references `characters`, so every row resolves.
   for (const c of book.rows) {
-    const row = c.character_id ? resolve(c.character_id) : undefined;
-    if (row) {
-      const m = member(row, "cast before");
-      if (!m.castNames.includes(c.character)) m.castNames.push(c.character);
-    } else suggest({ name: c.character, qualifier: "", source: "cast before" });
+    const row = resolve(c.character_id);
+    if (!row) continue;
+    const m = member(row, "cast before");
+    if (!m.castNames.includes(c.display_name)) m.castNames.push(c.display_name);
   }
   for (const { name, qualifier } of wikiNames(issue.data.wiki_appearances)) {
     // "Kimberly Hart (Pink Ranger)": a name no row knows joins the row its
@@ -530,15 +545,9 @@ async function updateRow(
 }
 
 /**
- * Inserts the issue's row for the character, `character` filled with the id
- * (P6 drops that column). Upserts on `(book_id, issue_id, character_id)`
- * ignoring a duplicate, so a row another writer added first is kept as it is.
- *
- * A legacy row with a null `character_id` whose text is that id (character
- * "narrator", for example) holds the old primary key on (book_id, issue_id,
- * character), so the insert would fail: that row is adopted instead, in one
- * update that sets its `character_id` and the caller's `patch`, and leaves
- * its other columns as they are.
+ * Inserts the issue's row for the character. Upserts on the primary key
+ * `(book_id, issue_id, character_id)` ignoring a duplicate, so a row another
+ * writer added first is kept as it is.
  */
 async function insertRow(
   client: Client,
@@ -546,25 +555,13 @@ async function insertRow(
   issueId: string,
   characterId: string,
   row: Required<CastPatch>,
-  patch: CastPatch = {},
 ): Promise<void> {
-  const adopted = await db(client)
-    .from("castlist")
-    .update({ ...patch, character_id: characterId })
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("character", characterId)
-    .is("character_id", null)
-    .select("issue_id");
-  must(`adopting castlist ${issueId}/${characterId}`, adopted.error);
-  if (adopted.data?.length) return;
   const { error } = await db(client)
     .from("castlist")
     .upsert(
       {
         book_id: bookId,
         issue_id: issueId,
-        character: characterId,
         character_id: characterId,
         ...row,
       },
@@ -587,18 +584,11 @@ async function writeRow(
     patch.voice_uuid !== undefined
       ? patch.voice_uuid
       : await startingVoice(client, book, characterId);
-  await insertRow(
-    client,
-    book.bookId,
-    issueId,
-    characterId,
-    {
-      in_issue: patch.in_issue ?? true,
-      no_audio: patch.no_audio ?? false,
-      voice_uuid,
-    },
-    patch,
-  );
+  await insertRow(client, book.bookId, issueId, characterId, {
+    in_issue: patch.in_issue ?? true,
+    no_audio: patch.no_audio ?? false,
+    voice_uuid,
+  });
   // A row another writer inserted first was kept: write the patch on it.
   await updateRow(client, book.bookId, issueId, characterId, patch);
 }
@@ -614,14 +604,11 @@ export async function setIssueVoice(
   const patch = { voice_uuid: voiceUuid };
   if ((await updateRow(client, bookId, issueId, characterId, patch)) > 0)
     return;
-  await insertRow(
-    client,
-    bookId,
-    issueId,
-    characterId,
-    { in_issue: true, no_audio: false, voice_uuid: voiceUuid },
-    patch,
-  );
+  await insertRow(client, bookId, issueId, characterId, {
+    in_issue: true,
+    no_audio: false,
+    voice_uuid: voiceUuid,
+  });
   // A row another writer inserted first was kept: write the patch on it.
   await updateRow(client, bookId, issueId, characterId, patch);
 }
@@ -691,7 +678,8 @@ export async function readCastRow(
     .eq("character_id", characterId)
     .limit(1);
   must(`reading castlist ${issueId}/${characterId}`, error);
-  return data?.[0] ?? null;
+  const row = data?.[0];
+  return row ? named(row) : null;
 }
 
 export interface SeedResult {
@@ -725,8 +713,9 @@ export async function seedCast(
 }
 
 export interface CastEntry {
-  character: string;
-  characterId: string | null;
+  /** The character's display name, or its id when that is null. */
+  displayName: string;
+  characterId: string;
   voice: CastVoice | null;
 }
 
@@ -738,9 +727,9 @@ export async function getCast(
 ): Promise<CastEntry[]> {
   const book = await loadBookCast(client, bookId);
   return issueCast(book, issueId).map((r) => ({
-    character: r.character,
+    displayName: r.display_name,
     characterId: r.character_id,
-    voice: r.character_id ? voiceFor(book, r.character_id, issueId) : null,
+    voice: voiceFor(book, r.character_id, issueId),
   }));
 }
 
@@ -837,8 +826,9 @@ export async function castVoiceInBook(
 export interface CastVoiceLink {
   book_id: string;
   issue_id: string;
-  character: string;
-  character_id: string | null;
+  character_id: string;
+  /** The character's display name, or its id when that is null. */
+  display_name: string;
   voice_uuid: string | null;
 }
 
@@ -847,17 +837,22 @@ export async function readCastVoiceLinks(
   client: Client,
   bookId?: string,
 ): Promise<CastVoiceLink[]> {
-  return readAll<CastVoiceLink>("the castlist", (from, to) => {
+  const read = await readAll<
+    Omit<CastVoiceLink, "display_name"> & WithCharacter
+  >("the castlist", (from, to) => {
     let q = db(client)
       .from("castlist")
-      .select("book_id, issue_id, character, character_id, voice_uuid");
+      .select(
+        "book_id, issue_id, character_id, voice_uuid, characters(display_name)",
+      );
     if (bookId) q = q.eq("book_id", bookId);
     return q
       .order("book_id")
       .order("issue_id")
-      .order("character")
+      .order("character_id")
       .range(from, to);
   });
+  return read.map(named);
 }
 
 /** Deletes every castlist row of a book; for a scratch book's cleanup (`scripts/smoke-ingest.ts`), never a real one. */
@@ -872,7 +867,7 @@ export async function deleteBookCast(
   must(`deleting the castlist of ${bookId}`, error);
 }
 
-/** The issue's cast (`issueCast`, so removed rows stay out) as its castlist `character` texts, sorted, as shown to the reader and to Gemini; empty when the issue has none. */
+/** The issue's cast (`issueCast`, so removed rows stay out) as its characters' display names, sorted, as shown to the reader and to Gemini; empty when the issue has none. */
 export async function readCastNames(
   client: Client,
   bookId: string,
@@ -880,7 +875,7 @@ export async function readCastNames(
 ): Promise<string[]> {
   const book = await loadBookCast(client, bookId);
   return issueCast(book, issueId)
-    .map((r) => r.character)
+    .map((r) => r.display_name)
     .sort();
 }
 
@@ -913,7 +908,7 @@ export async function createCharacter(
   must(`creating character ${character.id}`, error);
 }
 
-/** Changes a character's display name only; its id and the castlist texts stay as they are. */
+/** Changes a character's display name only; its id and its castlist rows stay as they are, and the rows show the new name. */
 export async function renameCharacter(
   client: Client,
   characterId: string,

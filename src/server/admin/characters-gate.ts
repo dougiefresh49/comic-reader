@@ -134,7 +134,7 @@ export async function canApproveCharacters(
 ): Promise<GateVerdict> {
   const orphans = issueCast(await loadBookCast(supabaseAdmin, bookId), issueId)
     .filter((r) => !r.character_id)
-    .map((r) => r.character);
+    .map((r) => r.display_name);
   if (orphans.length > 0) {
     return {
       ok: false,

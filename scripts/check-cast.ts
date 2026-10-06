@@ -55,7 +55,7 @@ async function main(): Promise<void> {
       ? `${e.voice.voiceUuid ?? "-"} via ${e.voice.from}`
       : "no voice";
     console.log(
-      `  ${e.character.padEnd(18)} id=${e.characterId ?? "null"}  ${v}`,
+      `  ${e.displayName.padEnd(18)} id=${e.characterId ?? "null"}  ${v}`,
     );
   }
 }

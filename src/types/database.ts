@@ -18,8 +18,7 @@ export type Database = {
         Row: {
           alias: string;
           alias_norm: string | null;
-          canonical: string | null;
-          character_id: string | null;
+          character_id: string;
           created_at: string | null;
           id: number;
           scope: Database["public"]["Enums"]["alias_scope"];
@@ -28,8 +27,7 @@ export type Database = {
         Insert: {
           alias: string;
           alias_norm?: string | null;
-          canonical?: string | null;
-          character_id?: string | null;
+          character_id: string;
           created_at?: string | null;
           id?: number;
           scope?: Database["public"]["Enums"]["alias_scope"];
@@ -38,8 +36,7 @@ export type Database = {
         Update: {
           alias?: string;
           alias_norm?: string | null;
-          canonical?: string | null;
-          character_id?: string | null;
+          character_id?: string;
           created_at?: string | null;
           id?: number;
           scope?: Database["public"]["Enums"]["alias_scope"];
@@ -209,12 +206,10 @@ export type Database = {
       books: {
         Row: {
           created_at: string | null;
-          franchises: string[] | null;
           id: string;
           name: string;
           published: boolean;
           publisher: string | null;
-          series_id: string | null;
           slug: string;
           total_issues: number | null;
           wiki_host: string | null;
@@ -222,12 +217,10 @@ export type Database = {
         };
         Insert: {
           created_at?: string | null;
-          franchises?: string[] | null;
           id: string;
           name: string;
           published?: boolean;
           publisher?: string | null;
-          series_id?: string | null;
           slug: string;
           total_issues?: number | null;
           wiki_host?: string | null;
@@ -235,26 +228,16 @@ export type Database = {
         };
         Update: {
           created_at?: string | null;
-          franchises?: string[] | null;
           id?: string;
           name?: string;
           published?: boolean;
           publisher?: string | null;
-          series_id?: string | null;
           slug?: string;
           total_issues?: number | null;
           wiki_host?: string | null;
           wiki_title_template?: string | null;
         };
-        Relationships: [
-          {
-            foreignKeyName: "books_series_id_fkey";
-            columns: ["series_id"];
-            isOneToOne: false;
-            referencedRelation: "series";
-            referencedColumns: ["id"];
-          },
-        ];
+        Relationships: [];
       };
       bubbles: {
         Row: {
@@ -374,21 +357,6 @@ export type Database = {
           },
         ];
       };
-      bubbles_character_id_backup_v1: {
-        Row: {
-          character_id: string | null;
-          id: string | null;
-        };
-        Insert: {
-          character_id?: string | null;
-          id?: string | null;
-        };
-        Update: {
-          character_id?: string | null;
-          id?: string | null;
-        };
-        Relationships: [];
-      };
       casting_tasks: {
         Row: {
           action: string | null;
@@ -453,32 +421,26 @@ export type Database = {
       castlist: {
         Row: {
           book_id: string;
-          character: string;
-          character_id: string | null;
+          character_id: string;
           in_issue: boolean;
           issue_id: string;
           no_audio: boolean;
-          voice_id: string | null;
           voice_uuid: string | null;
         };
         Insert: {
           book_id: string;
-          character: string;
-          character_id?: string | null;
+          character_id: string;
           in_issue?: boolean;
           issue_id: string;
           no_audio?: boolean;
-          voice_id?: string | null;
           voice_uuid?: string | null;
         };
         Update: {
           book_id?: string;
-          character?: string;
-          character_id?: string | null;
+          character_id?: string;
           in_issue?: boolean;
           issue_id?: string;
           no_audio?: boolean;
-          voice_id?: string | null;
           voice_uuid?: string | null;
         };
         Relationships: [
@@ -501,83 +463,6 @@ export type Database = {
             columns: ["voice_uuid"];
             isOneToOne: false;
             referencedRelation: "voices";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      character_appearances: {
-        Row: {
-          character_id: string;
-          clip_duration_secs: number | null;
-          clip_source_url: string | null;
-          clip_storage_path: string | null;
-          created_at: string | null;
-          id: string;
-          media_title: string | null;
-          media_type: string | null;
-          notes: string | null;
-          voice_actor: string | null;
-          voice_created_at: string | null;
-          voice_description: string | null;
-          voice_id: string | null;
-          voice_model_error: string | null;
-          voice_model_started_at: string | null;
-          voice_model_status: string;
-          voice_status: string | null;
-          voice_type: string | null;
-          year: number | null;
-          youtube_search_terms: string[] | null;
-        };
-        Insert: {
-          character_id: string;
-          clip_duration_secs?: number | null;
-          clip_source_url?: string | null;
-          clip_storage_path?: string | null;
-          created_at?: string | null;
-          id: string;
-          media_title?: string | null;
-          media_type?: string | null;
-          notes?: string | null;
-          voice_actor?: string | null;
-          voice_created_at?: string | null;
-          voice_description?: string | null;
-          voice_id?: string | null;
-          voice_model_error?: string | null;
-          voice_model_started_at?: string | null;
-          voice_model_status?: string;
-          voice_status?: string | null;
-          voice_type?: string | null;
-          year?: number | null;
-          youtube_search_terms?: string[] | null;
-        };
-        Update: {
-          character_id?: string;
-          clip_duration_secs?: number | null;
-          clip_source_url?: string | null;
-          clip_storage_path?: string | null;
-          created_at?: string | null;
-          id?: string;
-          media_title?: string | null;
-          media_type?: string | null;
-          notes?: string | null;
-          voice_actor?: string | null;
-          voice_created_at?: string | null;
-          voice_description?: string | null;
-          voice_id?: string | null;
-          voice_model_error?: string | null;
-          voice_model_started_at?: string | null;
-          voice_model_status?: string;
-          voice_status?: string | null;
-          voice_type?: string | null;
-          year?: number | null;
-          youtube_search_terms?: string[] | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "character_appearances_character_id_fkey";
-            columns: ["character_id"];
-            isOneToOne: false;
-            referencedRelation: "characters";
             referencedColumns: ["id"];
           },
         ];
@@ -644,40 +529,31 @@ export type Database = {
       };
       characters: {
         Row: {
-          aliases: string[];
           created_at: string | null;
           display_name: string | null;
           form_of: string | null;
-          franchise: string | null;
           franchise_id: string | null;
           id: string;
           updated_at: string | null;
           voice_mode: string | null;
-          voice_of: string | null;
         };
         Insert: {
-          aliases?: string[];
           created_at?: string | null;
           display_name?: string | null;
           form_of?: string | null;
-          franchise?: string | null;
           franchise_id?: string | null;
           id: string;
           updated_at?: string | null;
           voice_mode?: string | null;
-          voice_of?: string | null;
         };
         Update: {
-          aliases?: string[];
           created_at?: string | null;
           display_name?: string | null;
           form_of?: string | null;
-          franchise?: string | null;
           franchise_id?: string | null;
           id?: string;
           updated_at?: string | null;
           voice_mode?: string | null;
-          voice_of?: string | null;
         };
         Relationships: [
           {
@@ -692,13 +568,6 @@ export type Database = {
             columns: ["franchise_id"];
             isOneToOne: false;
             referencedRelation: "franchises";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "characters_voice_of_fkey";
-            columns: ["voice_of"];
-            isOneToOne: false;
-            referencedRelation: "characters";
             referencedColumns: ["id"];
           },
         ];
@@ -1082,39 +951,6 @@ export type Database = {
           },
         ];
       };
-      panel_character_detections_backup_v1: {
-        Row: {
-          character_id: string | null;
-          cluster_id: number | null;
-          created_at: string | null;
-          face_bbox: Json | null;
-          human_verified: boolean | null;
-          id: string | null;
-          identification_confidence: number | null;
-          panel_id: string | null;
-        };
-        Insert: {
-          character_id?: string | null;
-          cluster_id?: number | null;
-          created_at?: string | null;
-          face_bbox?: Json | null;
-          human_verified?: boolean | null;
-          id?: string | null;
-          identification_confidence?: number | null;
-          panel_id?: string | null;
-        };
-        Update: {
-          character_id?: string | null;
-          cluster_id?: number | null;
-          created_at?: string | null;
-          face_bbox?: Json | null;
-          human_verified?: boolean | null;
-          id?: string | null;
-          identification_confidence?: number | null;
-          panel_id?: string | null;
-        };
-        Relationships: [];
-      };
       panels: {
         Row: {
           audio_tags: Json;
@@ -1244,83 +1080,6 @@ export type Database = {
           },
         ];
       };
-      series: {
-        Row: {
-          created_at: string | null;
-          id: string;
-          name: string;
-        };
-        Insert: {
-          created_at?: string | null;
-          id: string;
-          name: string;
-        };
-        Update: {
-          created_at?: string | null;
-          id?: string;
-          name?: string;
-        };
-        Relationships: [];
-      };
-      speaker_reviews: {
-        Row: {
-          alias_scope: string | null;
-          auto_accepted: boolean;
-          book_id: string;
-          bubble_count: number;
-          created_at: string | null;
-          id: string;
-          issue_id: string;
-          original_name: string;
-          page_numbers: number[] | null;
-          resolved_name: string | null;
-          reviewed_at: string | null;
-          sample_text: string | null;
-          save_as_alias: boolean;
-          status: string;
-        };
-        Insert: {
-          alias_scope?: string | null;
-          auto_accepted?: boolean;
-          book_id: string;
-          bubble_count?: number;
-          created_at?: string | null;
-          id?: string;
-          issue_id: string;
-          original_name: string;
-          page_numbers?: number[] | null;
-          resolved_name?: string | null;
-          reviewed_at?: string | null;
-          sample_text?: string | null;
-          save_as_alias?: boolean;
-          status?: string;
-        };
-        Update: {
-          alias_scope?: string | null;
-          auto_accepted?: boolean;
-          book_id?: string;
-          bubble_count?: number;
-          created_at?: string | null;
-          id?: string;
-          issue_id?: string;
-          original_name?: string;
-          page_numbers?: number[] | null;
-          resolved_name?: string | null;
-          reviewed_at?: string | null;
-          sample_text?: string | null;
-          save_as_alias?: boolean;
-          status?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "speaker_reviews_book_id_issue_id_fkey";
-            columns: ["book_id", "issue_id"];
-            isOneToOne: false;
-            referencedRelation: "issues";
-            referencedColumns: ["book_id", "id"];
-          },
-        ];
-      };
       voice_archives: {
         Row: {
           archived_at: string;
@@ -1366,11 +1125,9 @@ export type Database = {
           display_name: string;
           id: string;
           keep_active: boolean;
-          lab_default: boolean | null;
           labels: Json | null;
           operation_claim: string | null;
           operation_claimed_at: string | null;
-          series_id: string | null;
           source_clip_md5: string | null;
           source_clip_path: string | null;
           starting_pick: boolean | null;
@@ -1389,11 +1146,9 @@ export type Database = {
           display_name: string;
           id?: string;
           keep_active?: boolean;
-          lab_default?: boolean | null;
           labels?: Json | null;
           operation_claim?: string | null;
           operation_claimed_at?: string | null;
-          series_id?: string | null;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
           starting_pick?: boolean | null;
@@ -1412,11 +1167,9 @@ export type Database = {
           display_name?: string;
           id?: string;
           keep_active?: boolean;
-          lab_default?: boolean | null;
           labels?: Json | null;
           operation_claim?: string | null;
           operation_claimed_at?: string | null;
-          series_id?: string | null;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
           starting_pick?: boolean | null;

@@ -133,7 +133,7 @@ async function main(): Promise<void> {
   const donor = donorRow.character_id;
   const form = (id: string, patch: Partial<CastRow> = {}): CastRow => ({
     issue_id: issueId,
-    character: id,
+    display_name: id,
     character_id: id,
     voice_uuid: null,
     in_issue: true,
