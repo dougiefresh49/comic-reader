@@ -32,6 +32,7 @@ import {
   canApproveCharacters,
   readUnknownDetections,
 } from "~/server/admin/characters-gate";
+import { requireAdmin } from "~/server/admin/require-admin";
 import type { CardGroup } from "./types";
 
 export type ActionResult =
@@ -245,6 +246,7 @@ export async function nameGroup(args: {
   franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, suggestedNames } = args;
     const detectionIds = await unnamedHere(scope, args.detectionIds);
     const who = await resolveTarget(
@@ -304,6 +306,7 @@ export async function rejectGroup(args: {
   suggestedNames: string[];
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, suggestedNames } = args;
     const detectionIds = await unnamedHere(scope, args.detectionIds);
     const warnings: string[] = [];
@@ -355,6 +358,7 @@ export async function moveFace(args: {
   franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, detectionId } = args;
     const face = await readDetection(scope, detectionId);
     const who = await resolveTarget(
@@ -409,6 +413,7 @@ export async function rejectFace(args: {
   detectionId: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, detectionId } = args;
     const face = await readDetection(scope, detectionId);
     const warnings: string[] = [];
@@ -449,6 +454,7 @@ export async function confirmFaces(args: {
   characterId: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, characterId } = args;
     const faces = await detectionsOf(scope, characterId);
     let confirmed = 0;
@@ -497,6 +503,7 @@ export async function addCharacter(args: {
   franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope } = args;
     const who = await resolveTarget(
       scope.bookId,
@@ -521,6 +528,7 @@ export async function removeCharacter(args: {
   name: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, characterId } = args;
     await removeFromCast(
       supabaseAdmin,
@@ -541,6 +549,7 @@ export async function renameCharacter(args: {
   name: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const name = args.name.trim();
     if (!name) return { ok: false, error: "A name is needed." };
     await renameCharacterRow(supabaseAdmin, args.characterId, name);
@@ -564,6 +573,7 @@ export async function nameSuggestion(args: {
   franchiseId: string | null;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope } = args;
     const wikiName = args.name.trim();
     if (!slugify(wikiName)) throw new Error("a name is needed");
@@ -612,6 +622,7 @@ export async function setActiveVoice(args: {
   voiceUuid: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, characterId, voiceUuid } = args;
     const row = await readVoice(supabaseAdmin, voiceUuid);
     if (row?.status !== "active")
@@ -654,6 +665,7 @@ export async function requestVoice(args: {
   request: VoiceRequest;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, characterId } = args;
     let request: VoiceRequest;
     let wants: string;
@@ -714,6 +726,7 @@ export async function pickAppearance(args: {
   appearanceId: string;
 }): Promise<PickResult> {
   try {
+    await requireAdmin();
     const { scope, characterId, appearanceId } = args;
     const { data, error } = await supabaseAdmin
       .from("appearances")
@@ -814,6 +827,7 @@ export async function castArchivedVoice(args: {
   voiceUuid: string;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, characterId, voiceUuid } = args;
     const voice = await readVoice(supabaseAdmin, voiceUuid);
     if (voice?.status !== "archived" || voice.character_id !== characterId)
@@ -873,6 +887,7 @@ export async function undoVoiceRequest(args: {
   restoreVoiceUuid?: string | null;
 }): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const { scope, characterId } = args;
     const request = (
       await readVoiceRequests(supabaseAdmin, scope.bookId, scope.issueId)
@@ -917,6 +932,7 @@ export async function undoVoiceRequest(args: {
 /** Approve: the gate first (it seeds the cast), then the `cluster-review` hook resumes. */
 export async function approveCharacters(scope: Scope): Promise<ActionResult> {
   try {
+    await requireAdmin();
     const verdict = await canApproveCharacters(scope.bookId, scope.issueId);
     if (!verdict.ok) {
       revalidate(scope);

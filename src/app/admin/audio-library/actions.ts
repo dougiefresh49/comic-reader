@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { requireAdmin } from "~/server/admin/require-admin";
 import {
   audioLibraryStoragePath,
   slugifyVariant,
@@ -46,6 +47,15 @@ export async function searchFreesound(
   layer: AudioLayer,
   query: string,
 ): Promise<{ ok: boolean; results: FreesoundHit[]; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return {
+      ok: false,
+      results: [],
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
   const apiKey = process.env.FREESOUND_API_KEY;
   if (!apiKey) {
     return { ok: false, results: [], error: "FREESOUND_API_KEY not set" };
@@ -110,6 +120,11 @@ interface SaveCommonArgs {
 export async function saveFromFreesound(
   args: SaveCommonArgs & { previewUrl: string },
 ): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const res = await fetch(args.previewUrl);
   if (!res.ok) return { ok: false, error: `download ${res.status}` };
   const buf = Buffer.from(await res.arrayBuffer());
@@ -124,6 +139,11 @@ export async function saveFromFreesound(
 export async function generateAudioWithElevenLabs(
   args: SaveCommonArgs & { prompt: string; durationSeconds?: number },
 ): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return { ok: false, error: "ELEVENLABS_API_KEY not set" };
 
@@ -192,6 +212,11 @@ export async function generateAudioWithElevenLabs(
 export async function uploadAudioBytes(
   args: SaveCommonArgs & { base64: string },
 ): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const buf = Buffer.from(args.base64, "base64");
   if (buf.length === 0) return { ok: false, error: "empty file" };
   if (buf.length > 10 * 1024 * 1024)
@@ -208,6 +233,11 @@ export async function deleteAudioVariant(args: {
   layer: AudioLayer;
   filename: string;
 }): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const path = `library/${args.layer}/${args.filename}`;
   const { error } = await supabaseAdmin.storage
     .from("comic-audio")

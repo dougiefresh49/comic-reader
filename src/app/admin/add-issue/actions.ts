@@ -4,6 +4,7 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { GoogleGenAI, createPartFromText } from "@google/genai";
 import { insertIssue, listBookIssues } from "~/lib/issue-queries";
+import { requireAdmin } from "~/server/admin/require-admin";
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: string };
@@ -23,6 +24,11 @@ interface BookInfo {
 }
 
 export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const { data: book, error: bookErr } = (await supabaseAdmin
     .from("books")
     .select("id, name, total_issues, wiki_host, wiki_title_template")
@@ -72,56 +78,6 @@ export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
   };
 }
 
-// ─── lookupNextIssue ─────────────────────────────────────────────────────────
-
-interface NextIssueInfo {
-  nextNumber: number;
-  suggestedWikiUrl: string | null;
-}
-
-export async function lookupNextIssue(
-  bookId: string,
-  partId?: string,
-): Promise<Result<NextIssueInfo>> {
-  let query = listBookIssues(supabaseAdmin, bookId, "number")
-    .order("number", { ascending: false })
-    .limit(1);
-
-  if (partId) {
-    query = query.eq("part_id", partId);
-  }
-
-  const { data: maxIssue } = (await query.single()) as {
-    data: { number: number } | null;
-  };
-  const nextNumber = (maxIssue?.number ?? 0) + 1;
-
-  const { data: book } = (await supabaseAdmin
-    .from("books")
-    .select("wiki_host, wiki_title_template")
-    .eq("id", bookId)
-    .single()) as {
-    data: {
-      wiki_host: string | null;
-      wiki_title_template: string | null;
-    } | null;
-  };
-
-  let suggestedWikiUrl: string | null = null;
-  if (book?.wiki_host && book?.wiki_title_template) {
-    const title = book.wiki_title_template.replace(
-      "{number}",
-      String(nextNumber),
-    );
-    const host = book.wiki_host.startsWith("http")
-      ? book.wiki_host
-      : `https://${book.wiki_host}`;
-    suggestedWikiUrl = `${host}/wiki/${title}`;
-  }
-
-  return { ok: true, data: { nextNumber, suggestedWikiUrl } };
-}
-
 // ─── findReadingSource ───────────────────────────────────────────────────────
 
 interface ReadingSource {
@@ -137,6 +93,7 @@ export async function findReadingSource(
   const prompt = `Find a URL where I can read "${bookTitle}" issue #${issueNumber} online for free. Return ONLY a JSON object with these fields: { "url": string, "siteName": string, "confidence": "high" | "medium" | "low" }. No explanation, no markdown fences.`;
 
   try {
+    await requireAdmin();
     const response = await ai.models.generateContent({
       model: GEMINI_MEDIUM,
       contents: [createPartFromText(prompt)],
@@ -180,6 +137,11 @@ interface CreateIssueArgs {
 export async function createIssue(
   args: CreateIssueArgs,
 ): Promise<Result<{ id: string }>> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
   const issueId = `issue-${args.issueNumber}`;
   const { data, error } = (await insertIssue(supabaseAdmin, {
     id: issueId,

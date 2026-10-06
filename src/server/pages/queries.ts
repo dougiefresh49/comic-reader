@@ -3,7 +3,6 @@ import type { ComponentProps } from "react";
 import { supabase } from "~/lib/supabase";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { pageImageUrl } from "~/lib/storage";
-import { readCastNames } from "~/lib/cast";
 import type ZenComicReader from "~/components/ZenComicReader";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { BookManifest, Manifest } from "~/types/manifest";
@@ -107,100 +106,41 @@ export async function getPageData(
     return { bubbles: [], timestamps: {} };
   }
 
-  try {
-    const { data: bubbleRows, error: bubbleError } = await supabase
-      .from("bubbles")
-      .select(
-        "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
-      )
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .eq("page_number", pageNum)
-      .order("sort_order");
-
-    if (bubbleError) {
-      console.error("getPageData bubbles:", bubbleError);
-      return { bubbles: [], timestamps: {} };
-    }
-
-    const rows = (bubbleRows ?? []) as BubbleRow[];
-
-    const timestamps: Record<string, AudioTimestamps> = {};
-    for (const row of rows) {
-      const embedded = row.audio_timestamps;
-      if (!embedded) continue;
-      const ts = Array.isArray(embedded) ? embedded[0] : embedded;
-      if (!ts) continue;
-      timestamps[row.id] = {
-        alignment: ts.alignment ?? null,
-        normalized_alignment: ts.normalized_alignment ?? null,
-      };
-    }
-
-    return {
-      bubbles: rows.map(rowToBubble),
-      timestamps,
-    };
-  } catch (error) {
-    console.error("Error fetching page data:", error);
-    return { bubbles: [], timestamps: {} };
-  }
-}
-
-export interface IssueData {
-  allBubbles: Record<string, Bubble[]>;
-  characters: string[];
-}
-
-export async function getIssueData(
-  bookId: string,
-  issueId: string,
-): Promise<IssueData> {
   const { data: bubbleRows, error: bubbleError } = await supabase
     .from("bubbles")
     .select(
-      "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order",
+      "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .order("page_number")
+    .eq("page_number", pageNum)
     .order("sort_order");
 
   if (bubbleError) {
-    console.error("getIssueData bubbles:", bubbleError);
-    return { allBubbles: {}, characters: [] };
+    console.error("getPageData:", bubbleError);
+    throw new Error(`getPageData: ${bubbleError.message}`, {
+      cause: bubbleError,
+    });
   }
 
-  const allBubbles: Record<string, Bubble[]> = {};
-  for (const row of (bubbleRows ?? []) as BubbleRow[]) {
-    const key = `page-${String(row.page_number).padStart(2, "0")}.jpg`;
-    allBubbles[key] ??= [];
-    allBubbles[key].push(rowToBubble(row));
+  const rows = (bubbleRows ?? []) as BubbleRow[];
+
+  const timestamps: Record<string, AudioTimestamps> = {};
+  for (const row of rows) {
+    const embedded = row.audio_timestamps;
+    if (!embedded) continue;
+    const ts = Array.isArray(embedded) ? embedded[0] : embedded;
+    if (!ts) continue;
+    timestamps[row.id] = {
+      alignment: ts.alignment ?? null,
+      normalized_alignment: ts.normalized_alignment ?? null,
+    };
   }
 
-  let castNames: string[] = [];
-  let castError: unknown = null;
-  try {
-    castNames = await readCastNames(supabase, bookId, issueId);
-  } catch (e) {
-    castError = e;
-  }
-
-  let characters: string[] = [];
-  if (!castError && castNames.length) {
-    characters = [...castNames].sort();
-  } else {
-    if (castError) console.error("getIssueData castlist:", castError);
-    const seen = new Set<string>();
-    for (const bubbles of Object.values(allBubbles)) {
-      for (const b of bubbles) {
-        if (b.speaker) seen.add(b.speaker);
-      }
-    }
-    characters = Array.from(seen).sort();
-  }
-
-  return { allBubbles, characters };
+  return {
+    bubbles: rows.map(rowToBubble),
+    timestamps,
+  };
 }
 
 /**
@@ -208,8 +148,9 @@ export async function getIssueData(
  * draft book stays out of the library and 404s on `/book/...`, and so does
  * an issue still at `status = 'pending'`: the pipeline sets `ready` only
  * when it finishes, and a pending issue may hold pages nobody has reviewed
- * (#374). The default keeps both because the admin callers (the review
- * editor, the preview route) need them.
+ * (#374). The default keeps both; its one caller is the episode-render
+ * page. The admin preview route reaches this through `getReaderPage`, which
+ * passes `publishedOnly` itself.
  */
 export async function getManifest({
   publishedOnly = false,
@@ -228,7 +169,7 @@ export async function getManifest({
 
   if (error) {
     console.error("getManifest:", error);
-    return { books: [], generatedAt: new Date().toISOString() };
+    throw new Error(`getManifest: ${error.message}`, { cause: error });
   }
 
   const books: BookManifest[] = ((data ?? []) as BookRow[]).map((book) => ({
@@ -265,7 +206,9 @@ export async function getBookPublishedFlags(): Promise<
     .select("id, published");
   if (error) {
     console.error("getBookPublishedFlags:", error);
-    return {};
+    throw new Error(`getBookPublishedFlags: ${error.message}`, {
+      cause: error,
+    });
   }
   return Object.fromEntries(
     ((data ?? []) as Array<{ id: string; published: boolean | null }>).map(
@@ -312,7 +255,9 @@ export async function getStoredPageCounts(
     const { data, error } = await query;
     if (error) {
       console.error("getStoredPageCounts:", error);
-      return byBook;
+      throw new Error(`getStoredPageCounts: ${error.message}`, {
+        cause: error,
+      });
     }
 
     for (const row of (data ?? []) as Array<{
