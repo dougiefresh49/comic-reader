@@ -11,7 +11,7 @@ import { slugify } from "~/lib/character-id";
 import type { Database } from "~/types/database";
 
 /** The `works.medium` check constraint. */
-const MEDIA = new Set([
+export const MEDIA: ReadonlySet<string> = new Set([
   "movie",
   "animated_series",
   "live_action",
@@ -74,15 +74,70 @@ export async function writeAppearances(
       });
   }
   if (works.size === 0) return { listed: 0, skipped };
-  const sb = client as SupabaseClient<Database>;
-  const w = await sb
-    .from("works")
-    .upsert([...works.values()], { onConflict: "id", ignoreDuplicates: true });
-  if (w.error) throw new Error(`works upsert: ${w.error.message}`);
-  const a = await sb.from("appearances").upsert([...appearances.values()], {
-    onConflict: "character_id,work_id",
-    ignoreDuplicates: true,
-  });
-  if (a.error) throw new Error(`appearances upsert: ${a.error.message}`);
+  await insertWorks(client, [...works.values()]);
+  await insertAppearances(client, [...appearances.values()]);
   return { listed: appearances.size, skipped };
+}
+
+/** Inserts works by id; a row already there is left as it is. */
+export async function insertWorks(
+  client: SupabaseClient,
+  rows: Work[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await (client as SupabaseClient<Database>)
+    .from("works")
+    .upsert(rows, { onConflict: "id", ignoreDuplicates: true });
+  if (error) throw new Error(`works upsert: ${error.message}`);
+}
+
+/** Inserts appearances on (character_id, work_id); one already there is left. */
+export async function insertAppearances(
+  client: SupabaseClient,
+  rows: Appearance[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await (client as SupabaseClient<Database>)
+    .from("appearances")
+    .upsert(rows, {
+      onConflict: "character_id,work_id",
+      ignoreDuplicates: true,
+    });
+  if (error) throw new Error(`appearances upsert: ${error.message}`);
+}
+
+const PAGE = 1000;
+
+/** Every `works` row, ordered by id. */
+export async function readWorks(
+  client: SupabaseClient,
+): Promise<Database["public"]["Tables"]["works"]["Row"][]> {
+  const rows: Database["public"]["Tables"]["works"]["Row"][] = [];
+  for (;;) {
+    const { data, error } = await (client as SupabaseClient<Database>)
+      .from("works")
+      .select("*")
+      .order("id")
+      .range(rows.length, rows.length + PAGE - 1);
+    if (error) throw new Error(`read works: ${error.message}`);
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) return rows;
+  }
+}
+
+/** Every `appearances` row, ordered by id. */
+export async function readAppearances(
+  client: SupabaseClient,
+): Promise<Database["public"]["Tables"]["appearances"]["Row"][]> {
+  const rows: Database["public"]["Tables"]["appearances"]["Row"][] = [];
+  for (;;) {
+    const { data, error } = await (client as SupabaseClient<Database>)
+      .from("appearances")
+      .select("*")
+      .order("id")
+      .range(rows.length, rows.length + PAGE - 1);
+    if (error) throw new Error(`read appearances: ${error.message}`);
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) return rows;
+  }
 }

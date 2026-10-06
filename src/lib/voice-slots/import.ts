@@ -14,13 +14,19 @@ function fail(what: string, error: { message: string }): never {
   throw new Error(`${what}: ${error.message}`);
 }
 
-/** The fields voice-lab-import fills on an existing row. */
+/**
+ * The fields voice-lab-import fills on an existing row. `status` moves
+ * only to `archived`, when a `needs_clip` row receives its sample.
+ */
 export type VoiceLabFacts = Partial<{
   description: string;
   labels: Json;
   design_prompt: string;
-  character_id: string;
+  starting_pick: boolean;
   consumers: string[];
+  source_clip_path: string;
+  source_clip_md5: string;
+  status: "archived";
 }>;
 
 export async function updateVoiceFacts(
@@ -37,10 +43,16 @@ export async function updateVoiceFacts(
 
 export interface CandidateVoiceInput {
   display_name: string;
+  character_id: string;
+  /** Null for a designed voice. */
+  appearance_id: string | null;
+  description: string;
+  labels: Json;
+  design_prompt: string | null;
   starting_pick: boolean;
+  consumers: string[];
   source_clip_path: string;
   source_clip_md5: string;
-  character_id: string | null;
 }
 
 /** An archived row for a clip stored in the clips bucket and not in a slot. */

@@ -1,0 +1,558 @@
+{
+  "cases": [
+    {
+      "name": "a needs_clip clone row receives its clip: facts, sample, status to archived",
+      "row": 1,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            1
+          ],
+          "id": "00000000-0000-4000-8000-000000000001",
+          "display_name": "April (1991)",
+          "set": {
+            "description": "A bright, quick newsroom voice.",
+            "labels": {
+              "accent": "american",
+              "age": "young"
+            },
+            "starting_pick": true,
+            "source_clip_path": "fixture-book__april__space-turtles-1991.mp3",
+            "source_clip_md5": "11111111111111111111111111111111",
+            "status": "archived"
+          },
+          "clip": {
+            "file": "april/space-turtles-1991.mp3",
+            "object": "fixture-book__april__space-turtles-1991.mp3",
+            "md5": "11111111111111111111111111111111"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "an active voice whose consumers hold room, manifest omits consumers: room stays",
+      "row": 2,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            2
+          ],
+          "id": "00000000-0000-4000-8000-000000000002",
+          "display_name": "Shredder",
+          "set": {
+            "description": "A cold, commanding growl.",
+            "labels": {
+              "accent": "neutral",
+              "age": "middle_aged"
+            },
+            "source_clip_path": "fixture-book__shredder__shell-shock-2003.mp3",
+            "source_clip_md5": "22222222222222222222222222222222"
+          },
+          "clip": {
+            "file": "shredder/shell-shock-2003.mp3",
+            "object": "fixture-book__shredder__shell-shock-2003.mp3",
+            "md5": "22222222222222222222222222222222"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a designed voice with its preview sample, matched on (character_id, md5)",
+      "row": 3,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            3
+          ],
+          "id": "00000000-0000-4000-8000-000000000003",
+          "display_name": "Armored Villain",
+          "set": {
+            "description": "A metallic growl through a visor.",
+            "labels": {
+              "age": "middle_aged",
+              "gender": "male"
+            }
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a row with voice_uuid updates that voice, consumers merged",
+      "row": 4,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            4
+          ],
+          "id": "00000000-0000-4000-8000-000000000004",
+          "display_name": "Bebop (1991)",
+          "set": {
+            "description": "A goofy, nasal laugh.",
+            "labels": {
+              "age": "young"
+            },
+            "consumers": [
+              "comic",
+              "room"
+            ]
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "an unknown character_id is skipped",
+      "row": 5,
+      "writes": [],
+      "skips": [
+        {
+          "row": 5,
+          "label": "row 5 casey, work shell-shock-2003, casey/shell-shock-2003.mp3",
+          "reason": "character_id \"casey\" is not in characters (the import creates no characters)"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a new work, a new appearance and a new voice",
+      "row": 6,
+      "writes": [
+        {
+          "kind": "insert_work",
+          "rows": [
+            6
+          ],
+          "row": {
+            "id": "pizza-quest-2010",
+            "title": "Pizza Quest",
+            "year": 2010,
+            "medium": "video_game",
+            "franchise_id": "tmnt"
+          }
+        },
+        {
+          "kind": "insert_appearance",
+          "rows": [
+            6
+          ],
+          "row": {
+            "character_id": "leonardo",
+            "work_id": "pizza-quest-2010",
+            "voice_actor": "Invented Actor Two"
+          }
+        },
+        {
+          "kind": "insert_voice",
+          "rows": [
+            6
+          ],
+          "appearance": {
+            "character_id": "leonardo",
+            "work_id": "pizza-quest-2010"
+          },
+          "row": {
+            "display_name": "Leonardo (2010)",
+            "character_id": "leonardo",
+            "status": "archived",
+            "description": "A calm, steady leader.",
+            "labels": {
+              "accent": "american",
+              "age": "young"
+            },
+            "design_prompt": null,
+            "starting_pick": false,
+            "consumers": [
+              "comic"
+            ],
+            "source_clip_path": "fixture-book__leonardo__pizza-quest-2010.mp3",
+            "source_clip_md5": "66666666666666666666666666666666"
+          },
+          "clip": {
+            "file": "leonardo/pizza-quest-2010.mp3",
+            "object": "fixture-book__leonardo__pizza-quest-2010.mp3",
+            "md5": "66666666666666666666666666666666"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a row already imported plans no write",
+      "row": 7,
+      "writes": [],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a clone row whose appearance a protected active voice holds is skipped",
+      "row": 8,
+      "writes": [],
+      "skips": [
+        {
+          "row": 8,
+          "label": "row 8 michelangelo, work space-turtles-1991, michelangelo/space-turtles-1991.mp3",
+          "reason": "protected voice Michelangelo (00000000-0000-4000-8000-000000000008): the owner's v2 voices take no import writes"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a voice_uuid row naming a protected active voice is skipped",
+      "row": 9,
+      "writes": [],
+      "skips": [
+        {
+          "row": 9,
+          "label": "row 9 michelangelo, voice 00000000-0000-4000-8000-000000000008, michelangelo/shell-shock-2003.mp3",
+          "reason": "protected voice Michelangelo (00000000-0000-4000-8000-000000000008): the owner's v2 voices take no import writes"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a new work with an unknown franchise_id is skipped",
+      "row": 10,
+      "writes": [],
+      "skips": [
+        {
+          "row": 10,
+          "label": "row 10 leonardo, work ooze-verse-2020, leonardo/ooze-verse-2020.mp3",
+          "reason": "work.franchise_id \"ooze-verse\" is not in franchises (the import creates no franchises)"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a designed voice with no md5 match is a new row beside the stored design row, with a note",
+      "row": 11,
+      "writes": [
+        {
+          "kind": "insert_voice",
+          "rows": [
+            11
+          ],
+          "appearance": null,
+          "row": {
+            "display_name": "Crowd",
+            "character_id": "crowd",
+            "status": "archived",
+            "description": "A cheering stadium crowd.",
+            "labels": {
+              "age": "mixed"
+            },
+            "design_prompt": "A cheering crowd.",
+            "starting_pick": false,
+            "consumers": [
+              "comic"
+            ],
+            "source_clip_path": "fixture-book__crowd__design-preview.mp3",
+            "source_clip_md5": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "clip": {
+            "file": "crowd/design-preview.mp3",
+            "object": "fixture-book__crowd__design-preview.mp3",
+            "md5": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": [
+        {
+          "row": 11,
+          "text": "crowd also has the stored design row Crowd (00000000-0000-4000-8000-000000000009) (needs_clip); the designed voice is written as a new row beside it"
+        }
+      ]
+    },
+    {
+      "name": "a status other than approved or ready to clone is skipped",
+      "row": 12,
+      "writes": [],
+      "skips": [
+        {
+          "row": 12,
+          "label": "row 12 leonardo, work pizza-quest-2010, leonardo/pizza-quest-2010-alt.mp3",
+          "reason": "status \"draft\" (only approved or ready to clone are imported)"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a row with both work and design_prompt is skipped",
+      "row": 13,
+      "writes": [],
+      "skips": [
+        {
+          "row": 13,
+          "label": "row 13 armored-villain, work space-turtles-1991, armored-villain/space-turtles-1991.mp3",
+          "reason": "both work and design_prompt are present; a row is a clone or a design"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a file that leaves the folder is skipped",
+      "row": 14,
+      "writes": [],
+      "skips": [
+        {
+          "row": 14,
+          "label": "row 14 leonardo, work space-turtles-1991, ../other-book/leonardo.mp3",
+          "reason": "file path leaves the fixture-book folder: ../other-book/leonardo.mp3"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "empty labels are skipped",
+      "row": 15,
+      "writes": [],
+      "skips": [
+        {
+          "row": 15,
+          "label": "row 15 leonardo, work space-turtles-1991, leonardo/space-turtles-1991.mp3",
+          "reason": "labels missing or empty"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a clip already stored on another voice is skipped",
+      "row": 16,
+      "writes": [],
+      "skips": [
+        {
+          "row": 16,
+          "label": "row 16 april, work shell-shock-2003, april/shell-shock-2003.mp3",
+          "reason": "md5 77777777777777777777777777777777 is already stored on voice Rocksteady (2003) (00000000-0000-4000-8000-000000000007); name that voice with voice_uuid"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "a voice_uuid naming another character's voice is skipped",
+      "row": 17,
+      "writes": [],
+      "skips": [
+        {
+          "row": 17,
+          "label": "row 17 rocksteady, voice 00000000-0000-4000-8000-000000000004, rocksteady/space-turtles-1991.mp3",
+          "reason": "voice_uuid names Bebop (1991) (00000000-0000-4000-8000-000000000004), a voice of bebop, not rocksteady"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "an existing work with a different title: a note, a new appearance and a new voice",
+      "row": 18,
+      "writes": [
+        {
+          "kind": "insert_appearance",
+          "rows": [
+            18
+          ],
+          "row": {
+            "character_id": "baxter",
+            "work_id": "shell-shock-2003",
+            "voice_actor": null
+          }
+        },
+        {
+          "kind": "insert_voice",
+          "rows": [
+            18
+          ],
+          "appearance": {
+            "character_id": "baxter",
+            "work_id": "shell-shock-2003"
+          },
+          "row": {
+            "display_name": "Baxter (2003)",
+            "character_id": "baxter",
+            "status": "archived",
+            "description": "A nervous, nasal scientist.",
+            "labels": {
+              "age": "middle_aged"
+            },
+            "design_prompt": null,
+            "starting_pick": false,
+            "consumers": [
+              "comic",
+              "room"
+            ],
+            "source_clip_path": "fixture-book__baxter__shell-shock-2003.mp3",
+            "source_clip_md5": "88888888888888888888888888888888"
+          },
+          "clip": {
+            "file": "baxter/shell-shock-2003.mp3",
+            "object": "fixture-book__baxter__shell-shock-2003.mp3",
+            "md5": "88888888888888888888888888888888"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": [
+        {
+          "row": 18,
+          "text": "work shell-shock-2003 is stored with title \"Shell Shock\" (manifest \"Shell Shocked\"); the works row is left as it is"
+        }
+      ]
+    },
+    {
+      "name": "an archived voice holding a different sample keeps it: facts only, and a note",
+      "row": 19,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            19
+          ],
+          "id": "00000000-0000-4000-8000-000000000010",
+          "display_name": "Leonardo (1991)",
+          "set": {
+            "description": "A young, earnest leader.",
+            "labels": {
+              "age": "young"
+            }
+          }
+        }
+      ],
+      "skips": [],
+      "notes": [
+        {
+          "row": 19,
+          "text": "Leonardo (1991) (00000000-0000-4000-8000-000000000010) stores a different sample (md5 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, manifest 99999999999999999999999999999999); the stored sample is left alone, and a new clip is a new voice"
+        }
+      ]
+    },
+    {
+      "name": "a work.medium outside the works.medium check is skipped",
+      "row": 20,
+      "writes": [],
+      "skips": [
+        {
+          "row": 20,
+          "label": "row 20 leonardo, work glow-tapes-1999, leonardo/glow-tapes-1999.mp3",
+          "reason": "work.medium \"radio_play\" is not a works.medium (movie, animated_series, live_action, video_game, comic, podcast)"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "an appearance holder with no sample, whose clip is stored on another voice, is skipped",
+      "row": 21,
+      "writes": [],
+      "skips": [
+        {
+          "row": 21,
+          "label": "row 21 rocksteady, work space-turtles-1991, rocksteady/space-turtles-1991-alt.mp3",
+          "reason": "md5 77777777777777777777777777777777 is already stored on voice Rocksteady (2003) (00000000-0000-4000-8000-000000000007); name that voice with voice_uuid"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "name": "starting_pick true stored and omitted in the manifest, nothing else new: no write",
+      "row": 22,
+      "writes": [],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a needs_clip row holding the manifest md5 and no path gets its path and becomes archived",
+      "row": 23,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            23
+          ],
+          "id": "00000000-0000-4000-8000-000000000020",
+          "display_name": "Krang (1991)",
+          "set": {
+            "description": "A squeaky, bossy brain.",
+            "labels": {
+              "age": "old"
+            },
+            "source_clip_path": "fixture-book__krang__space-turtles-1991.mp3",
+            "status": "archived"
+          },
+          "clip": {
+            "file": "krang/space-turtles-1991.mp3",
+            "object": "fixture-book__krang__space-turtles-1991.mp3",
+            "md5": "cccccccccccccccccccccccccccccccc"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    },
+    {
+      "name": "a stored path that differs and no stored md5: facts only and a note, no sample write",
+      "row": 24,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            24
+          ],
+          "id": "00000000-0000-4000-8000-000000000021",
+          "display_name": "Bebop (2003)",
+          "set": {
+            "description": "A goofy warthog laugh.",
+            "labels": {
+              "age": "young"
+            }
+          }
+        }
+      ],
+      "skips": [],
+      "notes": [
+        {
+          "row": 24,
+          "text": "Bebop (2003) (00000000-0000-4000-8000-000000000021) stores a different sample (path fixture-book__bebop__old-take.mp3, no md5, manifest 00000000000000000000000000000000); the stored sample is left alone, and a new clip is a new voice"
+        }
+      ]
+    },
+    {
+      "name": "a stored path equal to the object name and no stored md5: md5 set only, needs_clip to archived",
+      "row": 25,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            25
+          ],
+          "id": "00000000-0000-4000-8000-000000000022",
+          "display_name": "Shredder (1991)",
+          "set": {
+            "description": "A cold, metallic command.",
+            "labels": {
+              "age": "middle_aged"
+            },
+            "source_clip_md5": "12121212121212121212121212121212",
+            "status": "archived"
+          },
+          "clip": {
+            "file": "shredder/space-turtles-1991.mp3",
+            "object": "fixture-book__shredder__space-turtles-1991.mp3",
+            "md5": "12121212121212121212121212121212"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
+    }
+  ]
+}
