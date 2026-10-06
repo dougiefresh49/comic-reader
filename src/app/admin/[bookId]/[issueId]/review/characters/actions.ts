@@ -18,7 +18,6 @@ import {
   readVoiceRequests,
   removeFromCast,
   renameCharacter as renameCharacterRow,
-  seedCast,
   setIssueVoice,
   setVoice,
   storeVoiceRequest,
@@ -515,7 +514,7 @@ export async function addCharacter(args: {
   }
 }
 
-/** Takes a character out of this issue. The cast is seeded first, so a member the proposal brought in has a row to say no on. */
+/** Takes a character out of this issue. Only that character's castlist row is written: updated, or inserted with `in_issue` false when it has none (#417). */
 export async function removeCharacter(args: {
   scope: Scope;
   characterId: string;
@@ -523,17 +522,14 @@ export async function removeCharacter(args: {
 }): Promise<ActionResult> {
   try {
     const { scope, characterId } = args;
-    await seedCast(supabaseAdmin, scope.bookId, scope.issueId);
-    const n = await removeFromCast(
+    await removeFromCast(
       supabaseAdmin,
       scope.bookId,
       scope.issueId,
       characterId,
     );
     revalidate(scope);
-    return n === 0
-      ? { ok: false, error: `${args.name} has no castlist row here to remove.` }
-      : { ok: true, message: `${args.name} is out of this issue.` };
+    return { ok: true, message: `${args.name} is out of this issue.` };
   } catch (err) {
     return fail("removing a character", err);
   }

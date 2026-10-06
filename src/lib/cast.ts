@@ -749,14 +749,25 @@ export async function addToCast(
   await writeRow(client, book, issueId, characterId, { in_issue: true });
 }
 
-/** Takes a character out of the issue's cast: `in_issue` false on its row, which is never deleted, so the voice is kept. Returns the rows changed. */
+/**
+ * Takes a character out of the issue's cast: `in_issue` false on its row,
+ * which is never deleted, so the voice is kept. A character with no row in
+ * the issue gets one inserted with `in_issue` false and its starting voice,
+ * so a later Add brings it back with that voice. Writes no other row.
+ */
 export async function removeFromCast(
   client: Client,
   bookId: string,
   issueId: string,
   characterId: string,
-): Promise<number> {
-  return updateRow(client, bookId, issueId, characterId, { in_issue: false });
+): Promise<void> {
+  const book = await loadBookCast(client, bookId);
+  if (!castRow(book, characterId, issueId)) {
+    const character = book.resolve(characterId);
+    if (character?.id !== characterId)
+      throw new Error(`cast: no character ${characterId}`);
+  }
+  await writeRow(client, book, issueId, characterId, { in_issue: false });
 }
 
 /**
