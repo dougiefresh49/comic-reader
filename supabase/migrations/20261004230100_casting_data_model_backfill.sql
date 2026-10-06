@@ -497,3 +497,7 @@ from (
 ) r
 where b.id = r.id
   and r.character_id is not null;
+
+-- A preview branch replays every migration in one session, and the P6 drop of
+-- character_appearances fails while this view exists.
+drop view if exists old_appearance_works;
