@@ -1,4 +1,5 @@
 import type { AudioTimestamps, Bubble, CharacterAlignment } from "~/types";
+import type { BubbleType } from "~/lib/bubble-types";
 
 export interface WordTiming {
   word: string;
@@ -147,21 +148,24 @@ export function buildSpeechContent(
 /** Longest run of bubble text a bubble button's accessible name carries. */
 const ACCESSIBLE_NAME_TEXT_LIMIT = 80;
 
-/** What a bubble is called when it has no text to speak, by its type. */
-const BUBBLE_KIND_LABEL: Partial<Record<string, string>> = {
+/**
+ * What a bubble is called when it has no text to speak, by its type. Only
+ * the spoken types reach a bubble button (`visibleBubbles` in the reader).
+ */
+const BUBBLE_KIND_LABEL: Partial<Record<BubbleType, string>> = {
   SPEECH: "Speech bubble",
   NARRATION: "Narration box",
   CAPTION: "Caption",
-  SFX: "Sound effect",
-  BACKGROUND: "Background text",
 };
 
 /** Cuts `text` to at most `limit` characters, at a word break when one falls in the second half. */
 function shortenAtWord(text: string, limit: number): string {
   if (text.length <= limit) return text;
-  const cut = text.slice(0, limit);
-  const lastSpace = cut.lastIndexOf(" ");
-  return (lastSpace > limit / 2 ? cut.slice(0, lastSpace) : cut).trimEnd();
+  // One past the limit, so a word that ends exactly at the limit is kept.
+  const lastSpace = text.slice(0, limit + 1).lastIndexOf(" ");
+  return (
+    lastSpace > limit / 2 ? text.slice(0, lastSpace) : text.slice(0, limit)
+  ).trimEnd();
 }
 
 /**
@@ -174,7 +178,7 @@ export function bubbleAccessibleName(
 ): string {
   const speaker = (bubble.speakerName ?? bubble.speaker ?? "").trim();
   const text = shortenAtWord(
-    stripAudioTags(bubble.ocr_text ?? ""),
+    stripAudioTags(bubble.ocr_text),
     ACCESSIBLE_NAME_TEXT_LIMIT,
   );
   if (speaker && text) return `${speaker}: ${text}`;
