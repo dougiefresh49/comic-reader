@@ -157,9 +157,9 @@ export function sameActor(a: string, b: string): boolean {
  * The answer, or why it is not stored. `expectedActor` is the appearance's
  * voice actor, when it names one: an answer naming another person is refused.
  * `inferred` checks a fallback answer, which must also name what it was
- * inferred from, and never `work`, the one under lookup: a phrase naming its
- * title beside its year, since a title alone recurs across years ("Teenage
- * Mutant Ninja Turtles" is a 1990 film and a 2012 series). `unknown` marks the
+ * inferred from, and never `work`, the one under lookup: a phrase holding
+ * both its title and its year, since a title alone recurs across years
+ * ("Teenage Mutant Ninja Turtles" is a 1990 film and a 2012 series). `unknown` marks the
  * refusals that send a key on to the fallback: an answer that is not JSON,
  * the model does not know the voice, or it names no actor for it.
  */
