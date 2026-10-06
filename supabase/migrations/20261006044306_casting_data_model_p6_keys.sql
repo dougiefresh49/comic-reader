@@ -4,7 +4,7 @@
 -- Drops nothing: no table, column or row is removed. The castlist primary key
 -- moves from the text column to character_id, and castlist.character becomes
 -- nullable so the code that stops writing it can deploy. Migration B
--- (20261006010100_casting_data_model_p6_drop.sql) drops the old columns and
+-- (20261006044902_casting_data_model_p6_drop.sql) drops the old columns and
 -- tables later, after the deploy and owner sign-off O4; it never runs in the
 -- same transaction as this file. The P2 unique index
 -- castlist_book_id_issue_id_character_id_key stays until migration B.
