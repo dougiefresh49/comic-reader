@@ -282,6 +282,46 @@
       "keep_active": false,
       "created_at": "2026-09-29T12:00:00+00:00",
       "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "display_name": "Bebop (2003)",
+      "status": "archived",
+      "character_id": "bebop",
+      "appearance_id": "a0000000-0000-4000-8000-000000000021",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__bebop__old-take.mp3",
+      "source_clip_md5": null,
+      "design_prompt": null,
+      "description": null,
+      "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "display_name": "Shredder (1991)",
+      "status": "needs_clip",
+      "character_id": "shredder",
+      "appearance_id": "a0000000-0000-4000-8000-000000000022",
+      "starting_pick": false,
+      "current_elevenlabs_id": null,
+      "source_clip_path": "fixture-book__shredder__space-turtles-1991.mp3",
+      "source_clip_md5": null,
+      "design_prompt": null,
+      "description": null,
+      "labels": null,
+      "consumers": [
+        "comic"
+      ],
+      "keep_active": false,
+      "created_at": "2026-09-29T12:00:00+00:00",
+      "archived_at": null
     }
   ],
   "works": [
@@ -362,6 +402,22 @@
     {
       "id": "a0000000-0000-4000-8000-000000000020",
       "character_id": "krang",
+      "work_id": "space-turtles-1991",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000021",
+      "character_id": "bebop",
+      "work_id": "shell-shock-2003",
+      "voice_actor": null,
+      "search_terms": null,
+      "notes": null
+    },
+    {
+      "id": "a0000000-0000-4000-8000-000000000022",
+      "character_id": "shredder",
       "work_id": "space-turtles-1991",
       "voice_actor": null,
       "search_terms": null,

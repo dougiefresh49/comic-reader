@@ -497,6 +497,62 @@
       ],
       "skips": [],
       "notes": []
+    },
+    {
+      "name": "a stored path that differs and no stored md5: facts only and a note, no sample write",
+      "row": 24,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            24
+          ],
+          "id": "00000000-0000-4000-8000-000000000021",
+          "display_name": "Bebop (2003)",
+          "set": {
+            "description": "A goofy warthog laugh.",
+            "labels": {
+              "age": "young"
+            }
+          }
+        }
+      ],
+      "skips": [],
+      "notes": [
+        {
+          "row": 24,
+          "text": "Bebop (2003) (00000000-0000-4000-8000-000000000021) stores a different sample (path fixture-book__bebop__old-take.mp3, no md5, manifest 00000000000000000000000000000000); the stored sample is left alone, and a new clip is a new voice"
+        }
+      ]
+    },
+    {
+      "name": "a stored path equal to the object name and no stored md5: md5 set only, needs_clip to archived",
+      "row": 25,
+      "writes": [
+        {
+          "kind": "update_voice",
+          "rows": [
+            25
+          ],
+          "id": "00000000-0000-4000-8000-000000000022",
+          "display_name": "Shredder (1991)",
+          "set": {
+            "description": "A cold, metallic command.",
+            "labels": {
+              "age": "middle_aged"
+            },
+            "source_clip_md5": "12121212121212121212121212121212",
+            "status": "archived"
+          },
+          "clip": {
+            "file": "shredder/space-turtles-1991.mp3",
+            "object": "fixture-book__shredder__space-turtles-1991.mp3",
+            "md5": "12121212121212121212121212121212"
+          }
+        }
+      ],
+      "skips": [],
+      "notes": []
     }
   ]
 }

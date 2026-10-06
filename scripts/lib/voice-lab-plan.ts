@@ -314,8 +314,13 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         return skip(`voice ${voiceName(v)} has status "${v.status}"`);
       // A sample write needs the clip unheld elsewhere; a different stored
       // md5 is the note below instead.
+      // Different: another md5, or (older rows, md5 never filled) a path
+      // that is not this row's object name. A matching path with no md5
+      // takes the md5 only; uploadClip's byte check guards it.
       const differentSample =
-        v.source_clip_md5 !== null && v.source_clip_md5 !== md5;
+        v.source_clip_md5 !== null
+          ? v.source_clip_md5 !== md5
+          : v.source_clip_path !== null && v.source_clip_path !== c.object;
       const needsSample =
         !differentSample && (!v.source_clip_path || !v.source_clip_md5);
       const holder = needsSample ? md5Holder(md5, v.id) : null;
@@ -342,7 +347,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         takenMd5.set(md5, n);
       } else if (differentSample)
         note(
-          `${voiceName(v)} stores a different sample (md5 ${v.source_clip_md5}, manifest ${md5}); the stored sample is left alone, and a new clip is a new voice`,
+          `${voiceName(v)} stores a different sample (${v.source_clip_md5 !== null ? `md5 ${v.source_clip_md5}` : `path ${v.source_clip_path}, no md5`}, manifest ${md5}); the stored sample is left alone, and a new clip is a new voice`,
         );
       // archived means a sample is stored: a needs_clip row moves once it
       // holds both a path and an md5.

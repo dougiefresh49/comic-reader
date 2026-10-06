@@ -155,8 +155,7 @@ function describeWrite(w: Write): string {
         s.design_prompt !== undefined && "design_prompt",
         s.starting_pick !== undefined && `starting_pick ${s.starting_pick}`,
         s.consumers && `consumers {${s.consumers.join(",")}}`,
-        s.source_clip_path &&
-          `sample ${s.source_clip_path} (md5 ${s.source_clip_md5})`,
+        w.clip && `sample ${w.clip.object} (md5 ${w.clip.md5})`,
         s.status && `status ${s.status}`,
       ].filter(Boolean);
       return `  ~ voice "${w.display_name}" (${w.id}): ${fields.join(", ")} ${rows}`;
