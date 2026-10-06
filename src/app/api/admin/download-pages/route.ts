@@ -70,88 +70,97 @@ export async function POST(req: NextRequest) {
           logger: () => undefined,
         });
 
-        await stagehand.init();
-
-        const page = stagehand.context.pages()[0];
-        if (!page) throw new Error("No browser page after init");
-
-        send({ type: "status", message: "Navigating to source URL..." });
-        await page.goto(body.sourceUrl, { waitUntil: "load" });
-
-        // Try setting "All pages" reading mode
-        const modeSet = await page.evaluate(() => {
-          const sel =
-            document.querySelector<HTMLSelectElement>("#selectReadType");
-          if (!sel) return false;
-          sel.value = "1";
-          sel.dispatchEvent(new Event("change", { bubbles: true }));
-          return true;
-        });
-        if (modeSet) {
-          send({ type: "status", message: "Set reading mode to All Pages" });
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-
-        send({ type: "status", message: "Scrolling to load all images..." });
-        await scrollToLoadImages(page);
-
-        send({ type: "status", message: "Extracting page image URLs..." });
-
-        const pageSchema = z.object({
-          pages: z
-            .array(
-              z.object({
-                url: z
-                  .string()
-                  .url()
-                  .describe("Full URL of the comic page image"),
-                pageNumber: z
-                  .number()
-                  .optional()
-                  .describe("Page number if visible"),
-              }),
-            )
-            .describe("All comic book page images found on this page"),
-        });
-
         const collectedUrls: string[] = [];
-        const seenUrls = new Set<string>();
-        let paginationAttempts = 0;
-        const MAX_PAGINATION = 50;
+        try {
+          await stagehand.init();
 
-        while (paginationAttempts <= MAX_PAGINATION) {
-          const result = await stagehand.extract(
-            "Extract all comic book page image URLs from this page. Include only the full-size page images, not thumbnails, icons, ads, navigation buttons, or UI elements.",
-            pageSchema,
-          );
+          const page = stagehand.context.pages()[0];
+          if (!page) throw new Error("No browser page after init");
 
-          for (const p of result.pages) {
-            if (!seenUrls.has(p.url)) {
-              seenUrls.add(p.url);
-              collectedUrls.push(p.url);
-            }
+          send({ type: "status", message: "Navigating to source URL..." });
+          await page.goto(body.sourceUrl, { waitUntil: "load" });
+
+          // Try setting "All pages" reading mode
+          const modeSet = await page.evaluate(() => {
+            const sel =
+              document.querySelector<HTMLSelectElement>("#selectReadType");
+            if (!sel) return false;
+            sel.value = "1";
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+            return true;
+          });
+          if (modeSet) {
+            send({ type: "status", message: "Set reading mode to All Pages" });
+            await new Promise((r) => setTimeout(r, 1500));
           }
 
-          send({
-            type: "status",
-            message: `Found ${collectedUrls.length} page image(s)...`,
+          send({ type: "status", message: "Scrolling to load all images..." });
+          await scrollToLoadImages(page);
+
+          send({ type: "status", message: "Extracting page image URLs..." });
+
+          const pageSchema = z.object({
+            pages: z
+              .array(
+                z.object({
+                  url: z
+                    .string()
+                    .url()
+                    .describe("Full URL of the comic page image"),
+                  pageNumber: z
+                    .number()
+                    .optional()
+                    .describe("Page number if visible"),
+                }),
+              )
+              .describe("All comic book page images found on this page"),
           });
 
-          if (result.pages.length >= 3) break;
+          const seenUrls = new Set<string>();
+          let paginationAttempts = 0;
+          const MAX_PAGINATION = 50;
 
-          const observed = await stagehand.observe(
-            "Is there a next page button, next arrow, or pagination control to navigate to more comic pages?",
-          );
-          if (!observed || observed.length === 0) break;
+          while (paginationAttempts <= MAX_PAGINATION) {
+            const result = await stagehand.extract(
+              "Extract all comic book page image URLs from this page. Include only the full-size page images, not thumbnails, icons, ads, navigation buttons, or UI elements.",
+              pageSchema,
+            );
 
-          await stagehand.act(
-            "click the next page button or arrow to go to the next comic page",
-          );
-          await page.waitForLoadState("load");
-          paginationAttempts++;
+            for (const p of result.pages) {
+              if (!seenUrls.has(p.url)) {
+                seenUrls.add(p.url);
+                collectedUrls.push(p.url);
+              }
+            }
+
+            send({
+              type: "status",
+              message: `Found ${collectedUrls.length} page image(s)...`,
+            });
+
+            if (result.pages.length >= 3) break;
+
+            const observed = await stagehand.observe(
+              "Is there a next page button, next arrow, or pagination control to navigate to more comic pages?",
+            );
+            if (!observed || observed.length === 0) break;
+
+            await stagehand.act(
+              "click the next page button or arrow to go to the next comic page",
+            );
+            await page.waitForLoadState("load");
+            paginationAttempts++;
+          }
+        } finally {
+          try {
+            await stagehand.close();
+          } catch (closeErr) {
+            console.error(
+              "download-pages: stagehand.close() failed:",
+              closeErr,
+            );
+          }
         }
-
-        await stagehand.close();
 
         if (collectedUrls.length === 0) {
           send({
