@@ -352,6 +352,8 @@ interface PanelViewHudProps {
   onClose: () => void;
   onPrev: () => void;
   onNext: () => void;
+  /** At the last panel, next turns the page; it is disabled only when there is no next page. */
+  hasNextPage: boolean;
   panelAutoPlay: boolean;
   onTogglePanelAutoPlay: () => void;
   announceText: string;
@@ -365,6 +367,7 @@ export function PanelViewHud({
   onClose,
   onPrev,
   onNext,
+  hasNextPage,
   panelAutoPlay,
   onTogglePanelAutoPlay,
   announceText,
@@ -486,7 +489,7 @@ export function PanelViewHud({
           <button
             type="button"
             onClick={onNext}
-            disabled={panelIndex >= panelCount - 1}
+            disabled={panelIndex >= panelCount - 1 && !hasNextPage}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
             aria-label="Next panel"
           >
