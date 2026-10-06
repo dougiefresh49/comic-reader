@@ -91,22 +91,6 @@ function DimRects({
   );
 }
 
-/** Page-space dim, for a page plane child. It stops at the page edges. */
-export function PanelDimOverlay({
-  bbox,
-}: {
-  bbox: PageDirectedPanel["boundingBox"];
-}) {
-  return (
-    <DimRects
-      x={`${bbox.x * 100}%`}
-      y={`${bbox.y * 100}%`}
-      w={`${bbox.w * 100}%`}
-      h={`${bbox.h * 100}%`}
-    />
-  );
-}
-
 interface PanelViewFrameProps {
   panelViewMode: boolean;
   panels: PageDirectedPanel[];
@@ -122,8 +106,7 @@ interface PanelViewFrameProps {
   focusBounds?: PageDirectedPanel["boundingBox"] | null;
   /**
    * Dim everything outside the focus rect in viewport space, letterbox
-   * strips beyond the page edges included. Callers that render a
-   * page-space `PanelDimOverlay` child leave this off.
+   * strips beyond the page edges included.
    */
   dimOutsideFocus?: boolean;
   /** Animate the page plane from panel camera tags. Reader callers disable this. */

@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  PanelDimOverlay,
-  PanelViewFrame,
-} from "~/components/zen-comic-reader/PanelView";
+import { PanelViewFrame } from "~/components/zen-comic-reader/PanelView";
 import { PanelEffectsOverlay } from "~/components/motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "~/components/motion-comic/PanelAudioLayer";
 import type { PageDirectedPanel } from "~/types/panels";
@@ -84,6 +81,7 @@ export function EpisodeRenderClient({ panels, pageImages }: Props) {
           panelIndex={localIndex >= 0 ? localIndex : 0}
           reducedMotion={false}
           pageSize={pageNaturalSize}
+          dimOutsideFocus
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -91,7 +89,6 @@ export function EpisodeRenderClient({ panels, pageImages }: Props) {
             alt=""
             className="absolute inset-0 h-full w-full object-contain"
           />
-          <PanelDimOverlay bbox={activePanel.boundingBox} />
           <PanelEffectsOverlay
             panel={activePanel}
             active
