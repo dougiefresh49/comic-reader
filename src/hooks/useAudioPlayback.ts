@@ -75,11 +75,30 @@ export function useAudioPlayback({
       const alignment = ts?.normalized_alignment ?? ts?.alignment ?? null;
       const { words } = buildWordTimings(alignment);
 
+      // A clip that fails to load never fires `ended`, so it is treated as
+      // one that ended: the reader moves on through the same callback. A 400
+      // or 404 fires both `error` and a NotSupportedError from play(), and
+      // `settled` keeps that to one `onBubbleEnded` per clip.
+      let settled = false;
+      const failed = (reason: unknown) => {
+        if (settled || audioRef.current !== audio) return;
+        settled = true;
+        console.error(
+          `Audio clip failed to load for bubble ${bubble.id} (${audio.src})`,
+          reason,
+        );
+        stopHighlight();
+        setIsPlaying(false);
+        onBubbleEndedRef.current?.(bubble);
+      };
+
       audio.addEventListener("ended", () => {
+        settled = true;
         stopHighlight();
         setIsPlaying(false);
         onBubbleEndedRef.current?.(bubble);
       });
+      audio.addEventListener("error", () => failed(audio.error));
       audio.addEventListener("pause", () => setIsPlaying(false));
       // Every start (first play, replay after `ended`, resume) restarts the
       // highlight loop. `play` events are queued, so one from a clip that
@@ -91,9 +110,17 @@ export function useAudioPlayback({
         }
       });
 
-      audio.play().catch((err) => {
-        console.error("Audio playback failed", err);
-        setIsPlaying(false);
+      audio.play().catch((err: unknown) => {
+        const name = err instanceof DOMException ? err.name : undefined;
+        // stopAll paused this clip before play() resolved: it was replaced.
+        if (name === "AbortError") return;
+        // Autoplay blocked for lack of a gesture. Skipping here would race
+        // through the page in silence, so only drop the play state.
+        if (name === "NotAllowedError") {
+          if (audioRef.current === audio) setIsPlaying(false);
+          return;
+        }
+        failed(err);
       });
     },
     [
