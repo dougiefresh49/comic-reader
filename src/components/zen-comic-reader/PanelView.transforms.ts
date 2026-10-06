@@ -1,7 +1,5 @@
 import type { PanelBoundingBox } from "~/types/panels";
 
-export const PANEL_VIEW_TRANSITION_MS = 380;
-export const PANEL_VIEW_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 export const PANEL_VIEW_MARGIN = 0.02;
 /** Most device pixels one source pixel may span at the resting panel scale. */
 export const PANEL_MAX_UPSCALE = 2;

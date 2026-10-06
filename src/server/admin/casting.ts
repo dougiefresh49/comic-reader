@@ -26,7 +26,6 @@ export async function clearNoAudio(
     characterId,
     false,
   );
-  // `operation` (#351) is not in database.ts yet, so the filter goes untyped.
   const { error } = await supabaseAdmin
     .from("casting_tasks")
     .update({ status: "pending", completed_at: null })
@@ -34,7 +33,7 @@ export async function clearNoAudio(
     .eq("issue_id", issueId)
     .eq("character_id", characterId)
     .in("status", ["complete", "skipped"])
-    .filter("operation", "is", null);
+    .is("operation", null);
   if (error)
     throw new Error(
       `casting: reopening ${characterId}'s casting task: ${error.message}`,

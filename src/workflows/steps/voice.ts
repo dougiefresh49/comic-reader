@@ -509,10 +509,3 @@ export async function generateVoiceDescriptions(
     `[voice-desc] ${bookId}/${issueId}: consolidated ${described.length} character(s)`,
   );
 }
-
-export async function cleanVoiceDescriptions(bookId: string, issueId: string) {
-  "use step";
-  console.log(
-    `[clean-desc] ${bookId}/${issueId}: no-op (retired; descriptions live on voices)`,
-  );
-}

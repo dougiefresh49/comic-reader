@@ -222,8 +222,8 @@ export interface OpRecord {
 }
 
 /**
- * The task row fields this module reads. `operation` arrives with migration
- * 20261002192559_casting_tasks_operation; `database.ts` is regenerated later.
+ * The task row fields this module reads. `database.ts` types `operation` as
+ * `Json`; this narrows it to `OpRecord`.
  */
 interface TaskRow {
   status: string;

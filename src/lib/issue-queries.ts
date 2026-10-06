@@ -28,15 +28,6 @@ export function selectIssue<Q extends string>(
     .eq("id", issueId);
 }
 
-/** Head-only count of one issue row; chain filters, then read `count`. */
-export function countIssue(client: Client, bookId: string, issueId: string) {
-  return db(client)
-    .from("issues")
-    .select("id", { count: "exact", head: true })
-    .eq("book_id", bookId)
-    .eq("id", issueId);
-}
-
 export function updateIssue(
   client: Client,
   bookId: string,
