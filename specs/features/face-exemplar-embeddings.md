@@ -98,7 +98,7 @@ CREATE INDEX face_exemplars_embedding_idx
   WHERE is_confirmed = true;
 ```
 
-The `character_face_exemplars` table already exists (migration `20260505000000`). This migration adds the vector column to it.
+The `character_face_exemplars` table already exists (migration `20260506210511`). This migration adds the vector column to it.
 
 ### Supabase Storage
 

@@ -1,0 +1,12 @@
+-- Production's migration history holds this version, and until #472 no
+-- file did. The history row recorded the statements quoted below. They
+-- created a camp_schedules table that has nothing to do with this app,
+-- and production no longer has that table, so this file runs nothing.
+-- It exists so the file versions match the history.
+--
+--   CREATE TABLE camp_schedules (id TEXT PRIMARY KEY DEFAULT 'default',
+--     schedule JSONB NOT NULL DEFAULT '{}'::jsonb,
+--     updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+--   ALTER TABLE camp_schedules ENABLE ROW LEVEL SECURITY;
+--   CREATE POLICY "Allow public read write" ON camp_schedules
+--     FOR ALL USING (true) WITH CHECK (true);

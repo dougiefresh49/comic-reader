@@ -2,7 +2,7 @@
 -- sections Tables and P6 Drop; rules R1, R2, R4, R6 and R7).
 --
 -- Destructive. Applied by the lead after migration A
--- (20261006010000_casting_data_model_p6_keys.sql), the merge, the deploy, the
+-- (20261006044306_casting_data_model_p6_keys.sql), the merge, the deploy, the
 -- pre-B name gate, the copy of every affected table under
 -- ~/comic-reader-backups/p6-before-drop-<date>/, and owner sign-off O4. Never
 -- in the same transaction as migration A.
@@ -33,7 +33,7 @@ begin
     where conrelid = 'public.castlist'::regclass and contype = 'p'
       and pg_get_constraintdef(oid) = 'PRIMARY KEY (book_id, issue_id, character_id)'
   ) then
-    raise exception 'p6 drop refused: castlist_pkey is not exactly (book_id, issue_id, character_id); apply migration A (20261006010000_casting_data_model_p6_keys.sql) first';
+    raise exception 'p6 drop refused: castlist_pkey is not exactly (book_id, issue_id, character_id); apply migration A (20261006044306_casting_data_model_p6_keys.sql) first';
   end if;
 end
 $$;
