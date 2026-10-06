@@ -29,6 +29,7 @@ export async function getPipelineReviewIssue(
   ).maybeSingle();
 
   if (error) {
+    console.error("getPipelineReviewIssue:", error);
     throw new Error(`getPipelineReviewIssue: ${error.message}`, {
       cause: error,
     });

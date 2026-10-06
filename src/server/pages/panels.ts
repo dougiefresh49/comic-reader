@@ -74,6 +74,7 @@ export async function getPanelsForPage(
     .eq("page_number", pageNumber)
     .order("sort_order");
   if (error) {
+    console.error("getPanelsForPage:", error);
     throw new Error(`getPanelsForPage: ${error.message}`, { cause: error });
   }
   return ((data ?? []) as unknown as PanelRow[]).map(rowToPanel);
@@ -94,6 +95,7 @@ export async function getPanelsForIssue(
     .order("page_number")
     .order("sort_order");
   if (error) {
+    console.error("getPanelsForIssue:", error);
     throw new Error(`getPanelsForIssue: ${error.message}`, { cause: error });
   }
   return ((data ?? []) as unknown as PanelRow[]).map(rowToPanel);

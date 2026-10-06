@@ -53,6 +53,7 @@ export async function getAdminIssues(): Promise<AdminIssueRow[]> {
     .order("number");
 
   if (error) {
+    console.error("getAdminIssues:", error);
     throw new Error(`getAdminIssues: ${error.message}`, { cause: error });
   }
 
@@ -102,6 +103,7 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
     .order("name");
 
   if (error) {
+    console.error("getAdminBooksWithParts:", error);
     throw new Error(`getAdminBooksWithParts: ${error.message}`, {
       cause: error,
     });

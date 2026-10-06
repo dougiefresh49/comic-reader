@@ -117,6 +117,7 @@ export async function getPageData(
     .order("sort_order");
 
   if (bubbleError) {
+    console.error("getPageData:", bubbleError);
     throw new Error(`getPageData: ${bubbleError.message}`, {
       cause: bubbleError,
     });
@@ -167,6 +168,7 @@ export async function getManifest({
   const { data, error } = await query;
 
   if (error) {
+    console.error("getManifest:", error);
     throw new Error(`getManifest: ${error.message}`, { cause: error });
   }
 
@@ -203,6 +205,7 @@ export async function getBookPublishedFlags(): Promise<
     .from("books")
     .select("id, published");
   if (error) {
+    console.error("getBookPublishedFlags:", error);
     throw new Error(`getBookPublishedFlags: ${error.message}`, {
       cause: error,
     });
@@ -251,6 +254,7 @@ export async function getStoredPageCounts(
 
     const { data, error } = await query;
     if (error) {
+      console.error("getStoredPageCounts:", error);
       throw new Error(`getStoredPageCounts: ${error.message}`, {
         cause: error,
       });
