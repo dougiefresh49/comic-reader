@@ -497,6 +497,10 @@ export default function ZenComicReader({
           tabIndex={panelViewMode ? 0 : -1}
           className="relative flex h-full w-full touch-none items-center justify-center outline-none"
           {...(panelViewMode ? gestureProps : pinchHandlers)}
+          // A mouse drag on the page <img> starts the browser's image
+          // drag-and-drop, which fires pointercancel and ends the swipe the
+          // panel gesture reads (#514).
+          onDragStart={panelViewMode ? (e) => e.preventDefault() : undefined}
         >
           <div
             {...doubleTapProps}
@@ -620,6 +624,7 @@ export default function ZenComicReader({
               onClose={exitPanelView}
               onPrev={goPrevPanel}
               onNext={goNextPanel}
+              hasNextPage={!!nextPageLink}
               panelAutoPlay={panelAutoPlay}
               onTogglePanelAutoPlay={togglePanelAutoPlay}
               announceText={announceText}
