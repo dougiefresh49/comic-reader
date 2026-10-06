@@ -26,9 +26,9 @@ export default async function OtherCostsPage() {
           issue. Each issue&apos;s own calls are on its Cost page. Credits are
           what ElevenLabs charges on its subscription, read from the response
           charge or estimated from characters and a per-model rate. Dollar
-          figures are estimates from the rates in the code, not the invoice.
-          Gemini figures price tokens only: any fee Google adds for a
-          search-grounded call is not in them.
+          figures are estimates from the rates in the code, not the invoice. The
+          Add Book and Add Issue searches are priced from tokens only: any fee
+          Google adds for a search-grounded call is not in them.
         </p>
 
         <CostReport rows={rows} totalLabel="Total" />
