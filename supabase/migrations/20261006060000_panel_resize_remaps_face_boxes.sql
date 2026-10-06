@@ -2,10 +2,11 @@
 --
 -- Rule: a face keeps its place on the page when its panel's box changes.
 -- panel_character_detections.face_bbox is stored as fractions of its panel's
--- bounding_box, so a moved or resized panel (the review editor's Save is the
--- writer today) left every face box describing a different part of the page.
--- A row trigger on panels holds the rule for every writer, and
--- save_review_edits stays the plain executor its header says it is.
+-- bounding_box, so a moved or resized panel left every face box describing a
+-- different part of the page. A row trigger on panels holds the rule for
+-- every writer (the review editor's Save, and the panels upserts in
+-- scripts/generate-episode.ts), and save_review_edits stays the plain
+-- executor its header says it is.
 --
 -- remap_panel_face_boxes: after a panel's bounding_box changes, each of that
 -- panel's face boxes is turned into page coordinates with the old panel box
@@ -23,11 +24,17 @@
 -- (src/lib/face-extraction.ts does not clamp either), and resizing the panel
 -- back restores the face box.
 --
--- Left alone: when the remap cannot be computed, the face row stays as it was
--- and the panel update still succeeds. That is when any of x, y, w, h is
--- missing or not a JSON number in the old box, the new box or the face box,
--- or when the new box's w or h is not above 0. A face box is never written
--- with a null or a non-number in x, y, w, h.
+-- A box is usable when x, y, w and h are all JSON numbers and w and h are
+-- above 0. What happens when one is not:
+--   - The new box is not usable and the panel has face rows: the write is
+--     refused. Letting it through would leave the faces as fractions of a box
+--     the panel no longer has, and the next change would re-map them from the
+--     wrong one. A panel with no face rows is not this trigger's business.
+--   - The old box is not usable: it gave the faces no place on the page to
+--     keep, so they stay as they were.
+--   - A face box without all four numbers stays as it was.
+-- A face box is never written with a null or a non-number in x, y, w, h.
+-- Numbers that overflow float8 fail the write too.
 
 CREATE FUNCTION remap_panel_face_boxes()
 RETURNS trigger
@@ -39,15 +46,28 @@ AS $$
 DECLARE
   o jsonb := OLD.bounding_box;
   nb jsonb := NEW.bounding_box;
+  old_ok boolean;
+  new_ok boolean;
 BEGIN
-  IF NOT COALESCE(
-    (SELECT bool_and(jsonb_typeof(o -> k) = 'number' AND jsonb_typeof(nb -> k) = 'number')
-       FROM unnest(ARRAY['x', 'y', 'w', 'h']) AS k),
-    false
-  ) THEN
+  SELECT count(*) FILTER (WHERE jsonb_typeof(o -> k) = 'number') = 4,
+         count(*) FILTER (WHERE jsonb_typeof(nb -> k) = 'number') = 4
+    INTO old_ok, new_ok
+    FROM unnest(ARRAY['x', 'y', 'w', 'h']) AS k;
+  -- The casts run only on values already known to be numbers.
+  IF new_ok THEN
+    new_ok := (nb ->> 'w')::float8 > 0 AND (nb ->> 'h')::float8 > 0;
+  END IF;
+  IF old_ok THEN
+    old_ok := (o ->> 'w')::float8 > 0 AND (o ->> 'h')::float8 > 0;
+  END IF;
+
+  IF NOT new_ok THEN
+    IF EXISTS (SELECT 1 FROM panel_character_detections WHERE panel_id = NEW.id) THEN
+      RAISE EXCEPTION 'panel % has stored face boxes, and they cannot be re-mapped into bounding_box %: x, y, w and h must be numbers, with w and h above 0', NEW.id, nb;
+    END IF;
     RETURN NULL;
   END IF;
-  IF (nb ->> 'w')::float8 <= 0 OR (nb ->> 'h')::float8 <= 0 THEN
+  IF NOT old_ok THEN
     RETURN NULL;
   END IF;
 
