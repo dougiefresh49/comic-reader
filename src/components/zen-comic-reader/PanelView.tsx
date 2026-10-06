@@ -354,6 +354,8 @@ interface PanelViewHudProps {
   onNext: () => void;
   /** At the last panel, next turns the page; it is disabled only when there is no next page. */
   hasNextPage: boolean;
+  /** At the first panel, previous turns the page; it is disabled only when there is no previous page. */
+  hasPrevPage: boolean;
   panelAutoPlay: boolean;
   onTogglePanelAutoPlay: () => void;
   announceText: string;
@@ -368,6 +370,7 @@ export function PanelViewHud({
   onPrev,
   onNext,
   hasNextPage,
+  hasPrevPage,
   panelAutoPlay,
   onTogglePanelAutoPlay,
   announceText,
@@ -375,6 +378,8 @@ export function PanelViewHud({
 }: PanelViewHudProps) {
   const humanIndex = panelCount > 0 ? panelIndex + 1 : 0;
   const progress = panelCount > 0 ? humanIndex / panelCount : 0;
+  const prevTurnsPage = panelIndex <= 0 && hasPrevPage;
+  const nextTurnsPage = panelIndex >= panelCount - 1 && hasNextPage;
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-2">
@@ -417,9 +422,9 @@ export function PanelViewHud({
           <button
             type="button"
             onClick={onPrev}
-            disabled={panelIndex <= 0}
+            disabled={panelIndex <= 0 && !hasPrevPage}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
-            aria-label="Previous panel"
+            aria-label={prevTurnsPage ? "Previous page" : "Previous panel"}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -491,7 +496,7 @@ export function PanelViewHud({
             onClick={onNext}
             disabled={panelIndex >= panelCount - 1 && !hasNextPage}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/15 disabled:opacity-40"
-            aria-label="Next panel"
+            aria-label={nextTurnsPage ? "Next page" : "Next panel"}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

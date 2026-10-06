@@ -46,6 +46,13 @@ import {
  */
 let readAloudCarryTo: string | null = null;
 
+/**
+ * The page a backward panel-view page turn is headed for, or null (#531). The
+ * reader there opens panel view on its last panel instead of its first. Same
+ * module-scope, one-shot shape as readAloudCarryTo.
+ */
+let lastPanelLandingTo: string | null = null;
+
 interface ZenComicReaderProps {
   pageImage: string;
   bubbles: Bubble[];
@@ -85,10 +92,15 @@ export default function ZenComicReader({
   const [panelAutoPlay, setPanelAutoPlay] = useState(
     () => readAloudCarryTo !== null && readAloudCarryTo === pathname,
   );
+  const [landOnLastPanel] = useState(
+    () => lastPanelLandingTo !== null && lastPanelLandingTo === pathname,
+  );
   useEffect(() => {
     readAloudCarryTo = null;
+    lastPanelLandingTo = null;
     return () => {
       readAloudCarryTo = null;
+      lastPanelLandingTo = null;
     };
   }, []);
   const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
@@ -169,6 +181,7 @@ export default function ZenComicReader({
     clearPanelTimer();
     // A turn may still be loading the next page; it must mount silent.
     readAloudCarryTo = null;
+    lastPanelLandingTo = null;
     setPanelViewMode(false);
     setPanelAutoPlay(false);
     setPanelViewPreferred(false);
@@ -274,7 +287,9 @@ export default function ZenComicReader({
   useEffect(() => {
     if (panelViewPreferred && panels.length > 0 && !panelViewMode) {
       focusBeforePanelRef.current = document.activeElement;
-      setPanelIndex(0);
+      // Same tick as entering panel view: the play effect starts a bubble as
+      // soon as panel view and read-aloud are both on (#531).
+      setPanelIndex(landOnLastPanel ? panels.length - 1 : 0);
       setPanelViewMode(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,14 +305,18 @@ export default function ZenComicReader({
     });
   // Every page turn in this file goes through these, so an autoplay turn and a
   // manual one (HUD arrow, key, swipe) both carry read-aloud on (#530).
+  // A backward turn in panel view lands on the previous page's last panel
+  // (#531).
   const navigatePrev = useCallback(() => {
     readAloudCarryTo =
       panelViewMode && panelAutoPlay && prevPageLink ? prevPageLink : null;
+    lastPanelLandingTo = panelViewMode && prevPageLink ? prevPageLink : null;
     rawNavigatePrev();
   }, [panelViewMode, panelAutoPlay, prevPageLink, rawNavigatePrev]);
   const navigateNext = useCallback(() => {
     readAloudCarryTo =
       panelViewMode && panelAutoPlay && nextPageLink ? nextPageLink : null;
+    lastPanelLandingTo = null;
     rawNavigateNext();
   }, [panelViewMode, panelAutoPlay, nextPageLink, rawNavigateNext]);
   navigateNextRef.current = navigateNext;
@@ -663,6 +682,7 @@ export default function ZenComicReader({
               onPrev={goPrevPanel}
               onNext={goNextPanel}
               hasNextPage={!!nextPageLink}
+              hasPrevPage={!!prevPageLink}
               panelAutoPlay={panelAutoPlay}
               onTogglePanelAutoPlay={togglePanelAutoPlay}
               announceText={announceText}
