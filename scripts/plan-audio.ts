@@ -43,8 +43,8 @@ function syntheticBook(rows: Partial<CastRow>[]): BookCast {
     bookId: "synthetic",
     rows: rows.map((r) => ({
       issue_id: "issue-1",
-      character: r.character_id ?? "",
-      character_id: null,
+      character_id: "",
+      display_name: r.character_id ?? "",
       voice_uuid: null,
       in_issue: true,
       no_audio: false,

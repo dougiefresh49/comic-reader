@@ -1628,13 +1628,13 @@ export async function contextPromptInputs(
     if (!row) {
       // `bubbles.character_id` references `characters`, so a row with no
       // character could never be a match. Nothing is created for it.
-      unresolved.push(entry.character);
+      unresolved.push(entry.display_name);
       continue;
     }
     if (cast.some((m) => m.id === row.id)) continue;
     cast.push({
       id: row.id,
-      name: row.display_name ?? entry.character,
+      name: row.display_name ?? entry.display_name,
       displayName: row.display_name,
       aliases: row.aliases,
     });

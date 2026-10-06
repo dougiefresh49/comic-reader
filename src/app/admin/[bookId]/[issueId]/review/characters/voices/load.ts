@@ -132,7 +132,7 @@ export async function loadVoices(
       .map((c) => ({
         bookId: c.book_id,
         issueId: c.issue_id,
-        character: c.character,
+        character: c.display_name,
       }));
 
   const samplesOf = (id: string) =>

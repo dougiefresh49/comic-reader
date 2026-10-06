@@ -574,7 +574,6 @@ function world(opts: {
       db.rows("castlist").push({
         book_id: BOOK,
         issue_id: "issue-1",
-        character: c,
         character_id: c,
         voice_uuid: v.id,
         in_issue: true,
@@ -972,7 +971,6 @@ async function checkCarryOut() {
       w.db.rows("castlist").push({
         book_id: BOOK,
         issue_id: "issue-1",
-        character: "zed",
         character_id: "zed",
         voice_uuid: null,
         in_issue: !removed,

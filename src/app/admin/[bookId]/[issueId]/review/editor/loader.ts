@@ -352,7 +352,7 @@ export async function loadEditor(
     issueRows.length > 0
       ? castEntries.flatMap((e) =>
           e.characterId
-            ? [{ id: e.characterId, voice: e.voice, label: e.character }]
+            ? [{ id: e.characterId, voice: e.voice, label: e.displayName }]
             : [],
         )
       : (await proposeCast(supabaseAdmin, bookId, issueId)).members.map(
