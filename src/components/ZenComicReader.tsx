@@ -560,16 +560,22 @@ export default function ZenComicReader({
     if (!panelViewMode || !panels.length || !activePanel) return "";
     const idx = panelIndex + 1;
     const total = panels.length;
-    const speaker = activePanel.primarySpeaker ?? "Speaker";
-    const firstBubble = orderedPanelBubbles[0];
-    const snippet = firstBubble?.ocr_text?.slice(0, 120) ?? "";
-    return `Panel ${idx} of ${total}. ${speaker} speaks: ${snippet}`;
+    // Quote the bubble the reader is on, and name that bubble's speaker.
+    const bubble =
+      orderedPanelBubbles.find((b) => b.id === selectedBubble?.id) ??
+      orderedPanelBubbles[0];
+    const speaker = (bubble?.speakerName ?? bubble?.speaker)?.trim();
+    const snippet = bubble?.ocr_text?.slice(0, 120) ?? "";
+    return speaker
+      ? `Panel ${idx} of ${total}. ${speaker} speaks: ${snippet}`
+      : `Panel ${idx} of ${total}. ${snippet}`;
   }, [
     panelViewMode,
     panels.length,
     panelIndex,
     activePanel,
     orderedPanelBubbles,
+    selectedBubble,
   ]);
 
   useEffect(() => {
@@ -593,6 +599,7 @@ export default function ZenComicReader({
       showWordPill={!(wordMatch && wordHighlightMode === "bubble")}
       isPlaying={isPlaying}
       onTogglePlay={panelViewMode ? undefined : togglePlayPause}
+      voiced={selectedBubble ? hasAudio(selectedBubble) : true}
     />
   ) : (
     <div className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 p-3 text-sm text-neutral-400">
