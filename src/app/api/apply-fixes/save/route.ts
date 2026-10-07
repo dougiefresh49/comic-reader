@@ -329,24 +329,23 @@ export async function POST(req: NextRequest) {
   // The rows are committed; a page whose word boxes fail to refresh is
   // reported in the answer and never fails the Save. Under DRY_RUN the
   // engine returns no lines and the refresh would write null word boxes over
-  // every candidate on the page, so the pages are reported instead of run.
+  // every candidate on the page, so the page is reported instead of run; the
+  // check sits inside the settled promise so that its own throw (DRY_RUN on
+  // a deployment) is reported the same way.
   const refreshPages = wordBoxPages(boxRows, updateIds, ctx);
-  const refreshed: PromiseSettledResult<unknown>[] = isDryRun()
-    ? refreshPages.map(() => ({
-        status: "rejected" as const,
-        reason: new Error("DRY_RUN is set, so the word boxes were left alone"),
-      }))
-    : await Promise.allSettled(
-        refreshPages.map((page) =>
-          wordGeometryForPage(
-            // supabaseAdmin is untyped; the bubbles schema is the generated one.
-            supabaseAdmin as SupabaseClient<Database>,
-            bookId,
-            issueId,
-            page,
-          ),
-        ),
+  const refreshed = await Promise.allSettled(
+    refreshPages.map(async (page) => {
+      if (isDryRun())
+        throw new Error("DRY_RUN is set, so the word boxes were left alone");
+      return wordGeometryForPage(
+        // supabaseAdmin is untyped; the bubbles schema is the generated one.
+        supabaseAdmin as SupabaseClient<Database>,
+        bookId,
+        issueId,
+        page,
       );
+    }),
+  );
   const wordBoxesFailed: SaveResult["wordBoxesFailed"] = [];
   refreshPages.forEach((page, i) => {
     const r = refreshed[i];
