@@ -63,14 +63,16 @@ export function StartConfirmDialog({
           {issueId} already has {counted(bubbles, "bubble")} on{" "}
           {counted(pages, "page")}. Starting from the beginning rewrites the
           reading order of every panel and bubble and the word boxes of every
-          bubble, fills in speaker, emotion and cues on any bubble that has
-          none, and renders audio for any bubble without it. It spends Gemini
-          and Cloud Vision on every page and ElevenLabs credits on every bubble
-          it renders. Roboflow runs only on pages it has not segmented yet.
+          spoken bubble, fills in speaker, emotion and cues on any bubble that
+          has none, and renders audio for any bubble without it. It spends
+          Gemini on every page&apos;s reading order, Cloud Vision on every page
+          with spoken bubbles, and ElevenLabs credits on each bubble it renders.
+          Roboflow segments only pages it has not segmented yet, and runs text
+          detection on any page with no bubble rows.
         </p>
         <p className="font-mono text-xs text-neutral-500">
-          Columns rewritten: panels.sort_order, bubbles.sort_order,
-          bubbles.text_geometry, bubbles.fill_color
+          Columns rewritten: panels.sort_order, panels.foreground_polygons,
+          bubbles.sort_order, bubbles.text_geometry, bubbles.fill_color
         </p>
         <div className="space-y-1">
           <label htmlFor={inputId} className="block text-xs text-neutral-300">
