@@ -1546,6 +1546,13 @@ async function main(): Promise<number> {
       );
       return 1;
     }
+    const missing = REQUIRED_KEYS.filter((key) => !process.env[key]?.trim());
+    if (missing.length > 0) {
+      console.error(
+        `refusing: a real run needs these keys set and non-empty: ${missing.join(", ")}`,
+      );
+      return 1;
+    }
   }
   if (!real && scenarioName !== "clean" && scenarioName !== "gates") {
     console.error(
