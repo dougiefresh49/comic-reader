@@ -745,7 +745,13 @@ export default function ZenComicReader({
                         width: bubble.style.width,
                         height: bubble.style.height,
                       }}
-                      aria-label={bubbleAccessibleName(bubble)}
+                      aria-label={bubbleAccessibleName(
+                        bubble,
+                        buildSpeechContent(
+                          timestamps[bubble.id],
+                          bubble.ocr_text,
+                        ).cleanText,
+                      )}
                     />
                   );
                 })}

@@ -182,17 +182,17 @@ export function bubbleSpeaker(
  * The accessible name of a bubble button: what a screen reader speaks when
  * a kid lands on it (#550). The speaker and the start of the text when the
  * bubble has them, else the kind of bubble, and never the database id.
+ * `text` is the caption box's text for the bubble, already cleaned: the
+ * alignment text when it has audio, else its stripped OCR text (#605).
  */
 export function bubbleAccessibleName(
-  bubble: Pick<Bubble, "speakerName" | "speaker" | "ocr_text" | "type">,
+  bubble: Pick<Bubble, "speakerName" | "speaker" | "type">,
+  text: string,
 ): string {
   const speaker = bubbleSpeaker(bubble);
-  const text = shortenAtWord(
-    stripAudioTags(bubble.ocr_text),
-    ACCESSIBLE_NAME_TEXT_LIMIT,
-  );
-  if (speaker && text) return `${speaker}: ${text}`;
-  if (text) return text;
+  const shortText = shortenAtWord(text, ACCESSIBLE_NAME_TEXT_LIMIT);
+  if (speaker && shortText) return `${speaker}: ${shortText}`;
+  if (shortText) return shortText;
   const kind = BUBBLE_KIND_LABEL[bubble.type] ?? "Bubble";
   return speaker ? `${speaker}'s ${kind.toLowerCase()}` : kind;
 }
