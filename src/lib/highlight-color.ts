@@ -86,7 +86,8 @@ function seenOver(fill: Rgb, marker: Rgb): Rgb {
  * The marker colour for a bubble with this fill. Unknown or near-white
  * fill: `DEFAULT_MARKER`. Otherwise the candidate whose blend stands out
  * most from the fill (largest ΔE) among those that keep black lettering at
- * 4.5:1. When none does, the fill is too dark for black lettering, so the
+ * 4.5:1, or, when none does, the one that keeps it most readable. A fill
+ * itself under 4.5:1 with black is too dark for black lettering, so the
  * lettering is light (white on a teal or blue caption box), the marker
  * shows on the letters themselves, and `DEFAULT_MARKER` is the candidate
  * that stands out most on white.
@@ -98,16 +99,25 @@ export function highlightColorFor(fill: string | null | undefined): string {
   if (luminance(rgb) >= NEAR_WHITE_LUMINANCE && spread <= NEAR_WHITE_MAX_SPREAD)
     return DEFAULT_MARKER;
 
-  let best: string = DEFAULT_MARKER;
+  if (contrastWithBlack(rgb) < MIN_CONTRAST_WITH_BLACK) return DEFAULT_MARKER;
+
+  let best: string | null = null;
   let bestDelta = -1;
+  let fallback: string = DEFAULT_MARKER;
+  let fallbackContrast = -1;
   for (const candidate of CANDIDATES) {
     const seen = seenOver(rgb, parseHex(candidate)!);
-    if (contrastWithBlack(seen) < MIN_CONTRAST_WITH_BLACK) continue;
+    const contrast = contrastWithBlack(seen);
+    if (contrast > fallbackContrast) {
+      fallback = candidate;
+      fallbackContrast = contrast;
+    }
+    if (contrast < MIN_CONTRAST_WITH_BLACK) continue;
     const delta = deltaE(rgb, seen);
     if (delta > bestDelta) {
       best = candidate;
       bestDelta = delta;
     }
   }
-  return best;
+  return best ?? fallback;
 }
