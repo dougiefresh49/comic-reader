@@ -203,9 +203,10 @@ function marginMean(img: RgbImage, y: number, a: number, b: number) {
   return n === 0 ? null : m.map((v) => v / n);
 }
 
-/** The grey of a margin colour, when it is black or white; else null. */
+/** The grey of an unsaturated black or white margin colour; else null. */
 function blackOrWhite(m: number[]): number | null {
   const mean = (m[0]! + m[1]! + m[2]!) / 3;
+  if (Math.max(...m) - Math.min(...m) > GUTTER_MAX_CHROMA) return null;
   return mean <= 40 || mean >= 215 ? mean : null;
 }
 
@@ -244,20 +245,27 @@ function marginsFlat(
  *   on page 25 also qualified the gap between two lines of it, and the
  *   anti-aliased tops of the letters below that gap.
  * Returns the rows filled, as a box spanning the widest row, and how many
- * pixels the fill moved by more than GUTTER_FLAT, or null when none
- * qualified. That count is 0 once a past round filled the rows: a refill
- * over margins a widened fill reached shifts the colour by a level or two.
+ * pixels the colour rule's fill moved by more than GUTTER_FLAT, or null when
+ * none qualified. A refill of the same box moves none: it shifts the colour
+ * by a level or two at most. A box detected elsewhere in a later round can
+ * move pixels again, which ends at the latest at the round limit.
  */
 export function paintGutterRows(
   img: RgbImage,
   box: Box,
-): { rows: Box; changed: number } | null {
+): { rows: Box; colourMoved: number } | null {
   let top = Infinity;
   let bottom = -1;
   let left = Infinity;
   let right = -1;
-  let changed = 0;
-  const paint = (y: number, a: number, b: number, fill: number[]) => {
+  let colourMoved = 0;
+  const paint = (
+    y: number,
+    a: number,
+    b: number,
+    fill: number[],
+    colour = false,
+  ) => {
     for (let x = a; x < b; x++) {
       const o = (y * img.width + x) * 3;
       let moved = false;
@@ -265,7 +273,7 @@ export function paintGutterRows(
         if (Math.abs(img.data[o + c]! - fill[c]!) > GUTTER_FLAT) moved = true;
         img.data[o + c] = fill[c]!;
       }
-      if (moved) changed++;
+      if (moved && colour) colourMoved++;
     }
     top = Math.min(top, y);
     bottom = Math.max(bottom, y);
@@ -316,11 +324,11 @@ export function paintGutterRows(
       break;
     }
   }
-  for (const r of best) paint(r.y, r.a, r.b, r.fill);
+  for (const r of best) paint(r.y, r.a, r.b, r.fill, true);
   if (bottom < 0) return null;
   return {
     rows: { x: left, y: top, width: right - left, height: bottom - top + 1 },
-    changed,
+    colourMoved,
   };
 }
 
@@ -827,14 +835,15 @@ export async function cleanPageWatermarks(args: {
               );
             }
             fixes.push({ kind: "overlay", box: gutter });
-            // A fill that changed pixels ends this box's turn: the
+            // A colour fill that moved pixels ends this box's turn: the
             // re-detection below decides whether lettering is left, and a
             // later round edits the box once the fill changes nothing.
             // Editing now would send the filled rows, and whatever else the
             // box reaches (the credits text above the lettering on issue-1
             // page 25), to an image model that kept rewriting crops on that
             // page (#564).
-            if (painted.changed > 0) continue;
+            // A black or white fill is followed by the edit, as in #560.
+            if (painted.colourMoved > 0) continue;
           }
           const outcome = await editOverlay(img, box, editMeta);
           if (!outcome.ok) {
