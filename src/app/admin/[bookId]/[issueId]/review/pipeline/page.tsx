@@ -21,9 +21,9 @@ export default async function PipelineReviewPage({ params }: Params) {
   const { bookId, issueId } = await params;
   // Before the issue read: trigger-ingest writes the issue row before it
   // inserts the run row, so the issue below never predates this run id.
-  const latestRunId =
-    (await getLatestRunIds({ bookId, issueId })).get(`${bookId}/${issueId}`) ??
-    null;
+  const latestRun = (await getLatestRunIds({ bookId, issueId })).get(
+    `${bookId}/${issueId}`,
+  );
   const [issue, progress] = await Promise.all([
     getPipelineReviewIssue(bookId, issueId),
     getPipelineProgress(bookId, issueId),
@@ -89,7 +89,8 @@ export default async function PipelineReviewPage({ params }: Params) {
                 pageCount={issue.pageCount}
                 status={issue.status}
                 skippedGates={run?.status === "running" ? run.skipped : []}
-                latestRunId={latestRunId}
+                latestRunId={latestRun?.runId ?? null}
+                openGateWaitAt={latestRun?.openGateWaitAt ?? null}
               />
               {view.refreshMs !== null && (
                 <span className="text-sm text-neutral-500">

@@ -31,9 +31,11 @@ interface PipelineActionsProps {
   skippedGates?: SkippedGate[];
   /** `steps.runId` of the issue's newest `pipeline_runs` row, any status. */
   latestRunId: string | null;
+  /** `waitedAt` of the open gate wait on that same row, or null. */
+  openGateWaitAt: string | null;
 }
 
-/** How often the row refreshes while it follows a run this tab triggered. */
+/** How often the row refreshes while it follows a run this tab triggered or resumed. */
 const TRACK_POLL_MS = 5000;
 
 const REVIEW_STEPS: Record<string, string> = {
@@ -165,6 +167,7 @@ export function PipelineActions({
   status,
   skippedGates,
   latestRunId,
+  openGateWaitAt,
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
   // The run this tab started, until the props catch up with it and it leaves
@@ -174,6 +177,12 @@ export function PipelineActions({
   // A trigger with no run row to match: follow the props from the first
   // refresh after it, which are post-trigger, until the row stops running.
   const [followUntracked, setFollowUntracked] = useState(false);
+  // The pause this tab resumed, until the props leave it and stop running.
+  // Resume keeps the run id, so the pause fields tell old props from new.
+  const [resumedFrom, setResumedFrom] = useState<{
+    pausedAt: string;
+    gateWaitAt: string | null;
+  } | null>(null);
   const [refreshPending, startRefresh] = useTransition();
   const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -200,15 +209,33 @@ export function PipelineActions({
   // trigger-ingest writes the issue row before it inserts the run row, so once
   // the latest run is ours the other props are from after the trigger.
   const caughtUp = trackedRunId !== null && latestRunId === trackedRunId;
+  // The run releases the gate before it clears the issue row's pause, so the
+  // same pause with no open wait is still the old pause. The wait key counts
+  // only when both sides have one: with no key at Resume (the wait write is
+  // best effort), a re-pause at the same stop keeps the row on "Resumed",
+  // polling, rather than letting a stale null settle it onto the old pause.
+  // Only a newer wait counts: an earlier stop's wait whose close never landed
+  // stays open, and once this gate is released it becomes the newest open one.
+  // ISO timestamps, so string order is time order.
+  const leftPause =
+    resumedFrom !== null &&
+    (!isPaused ||
+      pipelinePausedAt !== resumedFrom.pausedAt ||
+      (resumedFrom.gateWaitAt !== null &&
+        openGateWaitAt !== null &&
+        openGateWaitAt > resumedFrom.gateWaitAt));
   const settled =
-    (caughtUp || (followUntracked && !refreshPending)) && !isRunning;
-  const following = trackedRunId !== null || followUntracked;
+    (caughtUp || (followUntracked && !refreshPending) || leftPause) &&
+    !isRunning;
+  const following =
+    trackedRunId !== null || followUntracked || resumedFrom !== null;
   const pollMs = following && !settled ? TRACK_POLL_MS : null;
 
   useEffect(() => {
     if (!settled) return;
     setTrackedRunId(null);
     setFollowUntracked(false);
+    setResumedFrom(null);
   }, [settled]);
 
   async function handleTrigger(fromStep?: string) {
@@ -292,6 +319,15 @@ export function PipelineActions({
     );
   }
 
+  if (resumedFrom !== null && !leftPause) {
+    return (
+      <span className="inline-flex items-center rounded bg-emerald-700/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
+        <LiveRefresh intervalMs={pollMs} />
+        Resumed
+      </span>
+    );
+  }
+
   if (isPaused) {
     return withRefusal(
       <PausedActions
@@ -302,6 +338,9 @@ export function PipelineActions({
         status={status}
         triggerLoading={busy}
         onTrigger={handleTrigger}
+        onResumed={(pausedAt) =>
+          setResumedFrom({ pausedAt, gateWaitAt: openGateWaitAt })
+        }
         onSettled={() => router.refresh()}
       />,
     );
@@ -349,6 +388,7 @@ function PausedActions({
   status,
   triggerLoading,
   onTrigger,
+  onResumed,
   onSettled,
 }: {
   bookId: string;
@@ -358,11 +398,15 @@ function PausedActions({
   status: string;
   triggerLoading: boolean;
   onTrigger: (fromStep?: string) => void;
+  /**
+   * The resume hook answered ok for this pause. The parent follows the run
+   * from here, keyed on the props of the render where Resume was pressed.
+   */
+  onResumed: (pausedAt: string) => void;
   onSettled: () => void;
 }) {
   const [loading, setLoading] = useState<"resume" | "cancel" | null>(null);
   const [resumeMissing, setResumeMissing] = useState(false);
-  const [resumed, setResumed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const label = REVIEW_STEPS[pipelinePausedAt ?? ""] ?? "Review";
@@ -393,7 +437,7 @@ function PausedActions({
         return;
       }
       if (res.ok) {
-        setResumed(true);
+        onResumed(pipelinePausedAt);
         return;
       }
       let message = "Failed to resume";
@@ -442,14 +486,6 @@ function PausedActions({
     );
     if (!ok) return;
     onTrigger(restartStep);
-  }
-
-  if (resumed) {
-    return (
-      <span className="inline-flex items-center rounded bg-emerald-700/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
-        Resumed
-      </span>
-    );
   }
 
   if (resumeMissing) {
