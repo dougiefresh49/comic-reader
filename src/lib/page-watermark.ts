@@ -203,11 +203,18 @@ function marginMean(img: RgbImage, y: number, a: number, b: number) {
   return n === 0 ? null : m.map((v) => v / n);
 }
 
-/** The grey of an unsaturated black or white margin colour; else null. */
+/**
+ * The grey of a black or white margin colour; else null. Every dark margin
+ * counts as black, whatever its hue: ink sits less than FLAT_BELOW under it,
+ * so the colour rule could not tell ink or dim art from lettering there. A
+ * bright margin counts as white only when unsaturated; pale yellow takes the
+ * colour rule, where ink sits far below it (#564).
+ */
 function blackOrWhite(m: number[]): number | null {
   const mean = (m[0]! + m[1]! + m[2]!) / 3;
-  if (Math.max(...m) - Math.min(...m) > GUTTER_MAX_CHROMA) return null;
-  return mean <= 40 || mean >= 215 ? mean : null;
+  if (mean <= 40) return mean;
+  const unsaturated = Math.max(...m) - Math.min(...m) <= GUTTER_MAX_CHROMA;
+  return mean >= 215 && unsaturated ? mean : null;
 }
 
 /** True when every margin pixel beside [a, b) is within GUTTER_FLAT of `ref`. */
