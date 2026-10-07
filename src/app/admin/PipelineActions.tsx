@@ -228,6 +228,13 @@ export function PipelineActions({
     pipelineStep !== null;
   const isPaused = pipelinePaused && pipelinePausedAt !== null;
 
+  // A refresh that moves the issue to running or complete (another tab
+  // started it) unmounts the dialog; drop its counts so it cannot reopen
+  // later with stale numbers.
+  useEffect(() => {
+    if (isRunning || isComplete) setConfirmCounts(null);
+  }, [isRunning, isComplete]);
+
   // trigger-ingest writes the issue row before it inserts the run row, so once
   // the latest run is ours the other props are from after the trigger.
   const caughtUp = trackedRunId !== null && latestRunId === trackedRunId;
