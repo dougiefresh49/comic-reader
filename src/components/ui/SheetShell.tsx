@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 interface SheetShellProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,6 +30,18 @@ export function SheetShell({
   panelClassName = "",
   children,
 }: SheetShellProps) {
+  // The open sheet owns Escape; usePanelNavigation stands down while one is open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
