@@ -1,0 +1,2673 @@
+{
+  "bench": "joined-balloons",
+  "arm": "hint-none",
+  "armLabel": "GEMINI_FAST, thinkingLevel LOW, hint none, gap 40 px",
+  "model": "gemini-3.5-flash-lite",
+  "thinkingLevel": "LOW",
+  "run": 1,
+  "runs": 1,
+  "complete": true,
+  "stop": null,
+  "book": "tmnt-mmpr-iii",
+  "issue": "issue-1",
+  "pages": [
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13
+  ],
+  "startedAt": "2026-10-07T21:35:18.389Z",
+  "finishedAt": "2026-10-07T21:35:34.782Z",
+  "rows": [
+    {
+      "id": "7105ff89-9471-499e-81a1-721bf812578e:c78247e8-d1b1-403a-b523-9d46be8bfdc0",
+      "label": "p3 p03-01 c78247e8 -> 7105ff89 \"THE END.\" / \"There is no greater loss than the loss o\"",
+      "right": true,
+      "costUsd": null,
+      "page": 3,
+      "panel": "p03-01",
+      "index": 0,
+      "a": "c78247e8-d1b1-403a-b523-9d46be8bfdc0",
+      "b": "7105ff89-9471-499e-81a1-721bf812578e",
+      "textA": "THE END.",
+      "textB": "There is no greater loss than the loss of faith.",
+      "gap": 4,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate caption boxes side by side"
+    },
+    {
+      "id": "7105ff89-9471-499e-81a1-721bf812578e:9a8a1e04-cfca-4f2c-abe6-215f4268ed1c",
+      "label": "p3 p03-01 7105ff89 -> 9a8a1e04 \"There is no greater loss than the loss o\" / \"NOT IN THE BELIEF OF A POWER BEYOND YOUR\"",
+      "right": false,
+      "costUsd": null,
+      "page": 3,
+      "panel": "p03-01",
+      "index": 1,
+      "a": "7105ff89-9471-499e-81a1-721bf812578e",
+      "b": "9a8a1e04-cfca-4f2c-abe6-215f4268ed1c",
+      "textA": "There is no greater loss than the loss of faith.",
+      "textB": "NOT IN THE BELIEF OF A POWER BEYOND YOUR OWN PERCEPTION...",
+      "gap": 1,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate caption boxes"
+    },
+    {
+      "id": "9a8a1e04-cfca-4f2c-abe6-215f4268ed1c:f2749b1f-803b-47d9-b9a0-5b89fca23873",
+      "label": "p3 p03-01 9a8a1e04 -> f2749b1f \"NOT IN THE BELIEF OF A POWER BEYOND YOUR\" / \"...BUT IN THE ABILITY TO TRUST IN ONE'S \"",
+      "right": false,
+      "costUsd": null,
+      "page": 3,
+      "panel": "p03-01",
+      "index": 2,
+      "a": "9a8a1e04-cfca-4f2c-abe6-215f4268ed1c",
+      "b": "f2749b1f-803b-47d9-b9a0-5b89fca23873",
+      "textA": "NOT IN THE BELIEF OF A POWER BEYOND YOUR OWN PERCEPTION...",
+      "textB": "...BUT IN THE ABILITY TO TRUST IN ONE'S SELF AND IN OTHERS.",
+      "gap": 7,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate caption boxes"
+    },
+    {
+      "id": "7c95318c-b64d-4ab9-a87e-10f6fd49016c:e950eefd-3742-4c8f-aa9d-84aa3567b163",
+      "label": "p3 p03-05 e950eefd -> 7c95318c \"ONE CAN FEEL ALONE.\" / \"TARGETED AND HUMILIATED.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 3,
+      "panel": "p03-05",
+      "index": 3,
+      "a": "e950eefd-3742-4c8f-aa9d-84aa3567b163",
+      "b": "7c95318c-b64d-4ab9-a87e-10f6fd49016c",
+      "textA": "ONE CAN FEEL ALONE.",
+      "textB": "TARGETED AND HUMILIATED.",
+      "gap": 14,
+      "predicted": true,
+      "labeled": true,
+      "reason": "vertically stacked narrative caption boxes belonging to the same text block"
+    },
+    {
+      "id": "9e41899f-1f79-4ee4-9b03-e1469616e26d:a7b68cc0-30a7-47a4-b3eb-0fff3a1cda3d",
+      "label": "p4 p04-01 9e41899f -> a7b68cc0 \"COME ON! IS THIS ALL YOU'VE GOT?\" / \"KEE-YAH!\"",
+      "right": false,
+      "costUsd": null,
+      "page": 4,
+      "panel": "p04-01",
+      "index": 0,
+      "a": "9e41899f-1f79-4ee4-9b03-e1469616e26d",
+      "b": "a7b68cc0-30a7-47a4-b3eb-0fff3a1cda3d",
+      "textA": "COME ON! IS THIS ALL YOU'VE GOT?",
+      "textB": "KEE-YAH!",
+      "gap": 5,
+      "predicted": false,
+      "labeled": true,
+      "reason": "they are separate speech balloons without a connecting tail or merged outline"
+    },
+    {
+      "id": "2d085b3b-c5f5-47ea-a20f-90e7e721df25:df85af73-e596-459a-b826-5ee740a0fe46",
+      "label": "p4 p04-01 df85af73 -> 2d085b3b \"YOU'VE NEVER BEATEN ME BEFORE AND YOU WO\" / \"POWERED UP OR NOT, YOU'RE STILL NOTHING \"",
+      "right": false,
+      "costUsd": null,
+      "page": 4,
+      "panel": "p04-01",
+      "index": 1,
+      "a": "df85af73-e596-459a-b826-5ee740a0fe46",
+      "b": "2d085b3b-c5f5-47ea-a20f-90e7e721df25",
+      "textA": "YOU'VE NEVER BEATEN ME BEFORE AND YOU WON'T START TODAY.",
+      "textB": "POWERED UP OR NOT, YOU'RE STILL NOTHING MORE THAN...",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "they are separate speech bubbles for the same speaker"
+    },
+    {
+      "id": "2d085b3b-c5f5-47ea-a20f-90e7e721df25:bdea6455-1028-4ede-9c9f-c5afc02bc62a",
+      "label": "p4 p04-01 2d085b3b -> bdea6455 \"POWERED UP OR NOT, YOU'RE STILL NOTHING \" / \"...PRACTICE.\"",
+      "right": false,
+      "costUsd": null,
+      "page": 4,
+      "panel": "p04-01",
+      "index": 2,
+      "a": "2d085b3b-c5f5-47ea-a20f-90e7e721df25",
+      "b": "bdea6455-1028-4ede-9c9f-c5afc02bc62a",
+      "textA": "POWERED UP OR NOT, YOU'RE STILL NOTHING MORE THAN...",
+      "textB": "...PRACTICE.",
+      "gap": 21,
+      "predicted": false,
+      "labeled": true,
+      "reason": "they are separate speech bubbles continuing the sentence"
+    },
+    {
+      "id": "908200c2-86b3-4c1f-b5d0-5ba6252e410e:c8475f90-58a0-46d9-ac61-cafbdacfa06c",
+      "label": "p5 p05-02 908200c2 -> c8475f90 \"LEO, YOU SHOULD MAKE A RUN FOR IT. IF JU\" / \"TOMMY, YOU DON'T GET IT, DO YOU?\"",
+      "right": true,
+      "costUsd": null,
+      "page": 5,
+      "panel": "p05-02",
+      "index": 0,
+      "a": "908200c2-86b3-4c1f-b5d0-5ba6252e410e",
+      "b": "c8475f90-58a0-46d9-ac61-cafbdacfa06c",
+      "textA": "LEO, YOU SHOULD MAKE A RUN FOR IT. IF JUST ONE OF US--",
+      "textB": "TOMMY, YOU DON'T GET IT, DO YOU?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate balloons for different speakers"
+    },
+    {
+      "id": "6d10cfc7-c2a7-4160-8978-16e88ec83692:da733415-5146-4d17-adc1-440cf26a4ca7",
+      "label": "p5 p05-03 6d10cfc7 -> da733415 \"WE ALWAYS KNEW THIS WAS A ONE WAY TRIP.\" / \"THAT'S WHY ZORDON SENT US.\"",
+      "right": false,
+      "costUsd": null,
+      "page": 5,
+      "panel": "p05-03",
+      "index": 1,
+      "a": "6d10cfc7-c2a7-4160-8978-16e88ec83692",
+      "b": "da733415-5146-4d17-adc1-440cf26a4ca7",
+      "textA": "WE ALWAYS KNEW THIS WAS A ONE WAY TRIP.",
+      "textB": "THAT'S WHY ZORDON SENT US.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "4e8180de-98ec-4688-91ab-6e3e37b2f2fa:da733415-5146-4d17-adc1-440cf26a4ca7",
+      "label": "p5 p05-03 da733415 -> 4e8180de \"THAT'S WHY ZORDON SENT US.\" / \"THIS IS OUR PUNISHMENT. FOR FAILING. OUR\"",
+      "right": false,
+      "costUsd": null,
+      "page": 5,
+      "panel": "p05-03",
+      "index": 2,
+      "a": "da733415-5146-4d17-adc1-440cf26a4ca7",
+      "b": "4e8180de-98ec-4688-91ab-6e3e37b2f2fa",
+      "textA": "THAT'S WHY ZORDON SENT US.",
+      "textB": "THIS IS OUR PUNISHMENT. FOR FAILING. OUR FRIENDS. OUR FAMILY.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "1886ccc9-2d37-403f-99e3-13f92c3f882b:23f69edd-46d3-4b36-8efe-2d26843233ef",
+      "label": "p5 p05-04 1886ccc9 -> 23f69edd \"WE LET EVERYONE DOWN.\" / \"AND IT'S ONLY A MATTER OF TIME BEFORE--\"",
+      "right": true,
+      "costUsd": null,
+      "page": 5,
+      "panel": "p05-04",
+      "index": 3,
+      "a": "1886ccc9-2d37-403f-99e3-13f92c3f882b",
+      "b": "23f69edd-46d3-4b36-8efe-2d26843233ef",
+      "textA": "WE LET EVERYONE DOWN.",
+      "textB": "AND IT'S ONLY A MATTER OF TIME BEFORE--",
+      "gap": 2,
+      "predicted": true,
+      "labeled": true,
+      "reason": "connected sequence from one speaker"
+    },
+    {
+      "id": "3618fc65-df81-414c-b057-ecd1ac72e01f:98d41abb-2fb6-4eeb-aac2-651939b891cd",
+      "label": "p5 p05-05 3618fc65 -> 98d41abb \"...AND YOU WILL SEE THE LIGHT UPON YOUR \" / \"EVEN THE END IS NOT THE END.\"",
+      "right": false,
+      "costUsd": null,
+      "page": 5,
+      "panel": "p05-05",
+      "index": 4,
+      "a": "3618fc65-df81-414c-b057-ecd1ac72e01f",
+      "b": "98d41abb-2fb6-4eeb-aac2-651939b891cd",
+      "textA": "...AND YOU WILL SEE THE LIGHT UPON YOUR FACE.",
+      "textB": "EVEN THE END IS NOT THE END.",
+      "gap": 20,
+      "predicted": true,
+      "labeled": false,
+      "reason": "connected narrator boxes"
+    },
+    {
+      "id": "98d41abb-2fb6-4eeb-aac2-651939b891cd:e5a7f682-45bc-43ba-830f-1aaf84bf9dd3",
+      "label": "p5 p05-05 98d41abb -> e5a7f682 \"EVEN THE END IS NOT THE END.\" / \"OH MY GOD.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 5,
+      "panel": "p05-05",
+      "index": 5,
+      "a": "98d41abb-2fb6-4eeb-aac2-651939b891cd",
+      "b": "e5a7f682-45bc-43ba-830f-1aaf84bf9dd3",
+      "textA": "EVEN THE END IS NOT THE END.",
+      "textB": "OH MY GOD.",
+      "gap": 19,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate caption and dialogue balloon"
+    },
+    {
+      "id": "0934810d-1324-479d-833f-9d1ebf4c8950:de884906-d477-4040-bdb7-308855770afe",
+      "label": "p6 p06-01 de884906 -> 0934810d \"HOP AND SKIP ALL YOU WANT.\" / \"YOU WILL FEEL THE WRATH OF WARBUNNY!\"",
+      "right": false,
+      "costUsd": null,
+      "page": 6,
+      "panel": "p06-01",
+      "index": 0,
+      "a": "de884906-d477-4040-bdb7-308855770afe",
+      "b": "0934810d-1324-479d-833f-9d1ebf4c8950",
+      "textA": "HOP AND SKIP ALL YOU WANT.",
+      "textB": "YOU WILL FEEL THE WRATH OF WARBUNNY!",
+      "gap": 12,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech balloons from different speakers"
+    },
+    {
+      "id": "3aee6e32-3eea-419c-ade0-887fe365cd1a:6e8389c5-4933-490d-bb0d-21abc071712a",
+      "label": "p6 p06-01 3aee6e32 -> 6e8389c5 \"FIGURES MY FIRST TIME IN PARIS IS BATTLI\" / \"I GUESS THAT'S THE ONE BRIGHT SIDE OF SH\"",
+      "right": false,
+      "costUsd": null,
+      "page": 6,
+      "panel": "p06-01",
+      "index": 1,
+      "a": "3aee6e32-3eea-419c-ade0-887fe365cd1a",
+      "b": "6e8389c5-4933-490d-bb0d-21abc071712a",
+      "textA": "FIGURES MY FIRST TIME IN PARIS IS BATTLING A BARBARIAN BUNNY RABBIT.",
+      "textB": "I GUESS THAT'S THE ONE BRIGHT SIDE OF SHREDDER AND ZEDD'S ENDLESS ATTACKS, RIGHT?",
+      "gap": 0,
+      "predicted": true,
+      "labeled": false,
+      "reason": "two speech balloons connected for the same speaker"
+    },
+    {
+      "id": "8053bdd2-77dd-4001-bf99-80344f823f8b:c86644ce-3885-4242-9625-11cc44440d58",
+      "label": "p6 p06-02 c86644ce -> 8053bdd2 \"I AM NO MONSTER! I AM THE CONEY CRUSADER\" / \"ALL THOSE WHO FACE ME SHALL QUAKE AT MY \"",
+      "right": true,
+      "costUsd": null,
+      "page": 6,
+      "panel": "p06-02",
+      "index": 2,
+      "a": "c86644ce-3885-4242-9625-11cc44440d58",
+      "b": "8053bdd2-77dd-4001-bf99-80344f823f8b",
+      "textA": "I AM NO MONSTER! I AM THE CONEY CRUSADER! I AM THE MARCH MARAUDER!",
+      "textB": "ALL THOSE WHO FACE ME SHALL QUAKE AT MY MIGHT!",
+      "gap": 12,
+      "predicted": true,
+      "labeled": true,
+      "reason": "two speech balloons connected for the same speaker"
+    },
+    {
+      "id": "5dc9add7-0592-42fa-a58c-18c879415009:a55475c2-9ba7-4540-bd50-ec1d2aa8e3f5",
+      "label": "p6 p06-03 5dc9add7 -> a55475c2 \"I GOTTA SAY, I ADMIRE YOUR CONFIDENCE.\" / \"YEAH. MAYBE HE'LL GO EASY ON YOU.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 6,
+      "panel": "p06-03",
+      "index": 3,
+      "a": "5dc9add7-0592-42fa-a58c-18c879415009",
+      "b": "a55475c2-9ba7-4540-bd50-ec1d2aa8e3f5",
+      "textA": "I GOTTA SAY, I ADMIRE YOUR CONFIDENCE.",
+      "textB": "YEAH. MAYBE HE'LL GO EASY ON YOU.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech balloons from different characters"
+    },
+    {
+      "id": "15907927-ac3d-42f4-97b7-23deafcd831a:5b80e2a5-e92d-4799-be22-d8c2dfa5e1c0",
+      "label": "p6 p06-04 15907927 -> 5b80e2a5 \"EASY ON ME? WHAT FOOL DO YOU SPEAK OF?\" / \"THAT \"FOOL\" WOULD BE ME, FLOPPY...\"",
+      "right": false,
+      "costUsd": null,
+      "page": 6,
+      "panel": "p06-04",
+      "index": 4,
+      "a": "15907927-ac3d-42f4-97b7-23deafcd831a",
+      "b": "5b80e2a5-e92d-4799-be22-d8c2dfa5e1c0",
+      "textA": "EASY ON ME? WHAT FOOL DO YOU SPEAK OF?",
+      "textB": "THAT \"FOOL\" WOULD BE ME, FLOPPY...",
+      "gap": 0,
+      "predicted": true,
+      "labeled": false,
+      "reason": "two speech balloons connected for the same speaker"
+    },
+    {
+      "id": "9aaa2db3-dc8d-490b-8c85-fcb3e2813215:e1e87bd0-91fa-4350-9d61-3a1f27ba5f40",
+      "label": "p7 p07-02 e1e87bd0 -> 9aaa2db3 \"YOU FLEET-FOOTED TORTOISES ARE MY IMMORT\" / \"WARBUNNY WILL SILENCE THE CRITIQUES ONCE\"",
+      "right": false,
+      "costUsd": null,
+      "page": 7,
+      "panel": "p07-02",
+      "index": 0,
+      "a": "e1e87bd0-91fa-4350-9d61-3a1f27ba5f40",
+      "b": "9aaa2db3-dc8d-490b-8c85-fcb3e2813215",
+      "textA": "YOU FLEET-FOOTED TORTOISES ARE MY IMMORTAL FOES.",
+      "textB": "WARBUNNY WILL SILENCE THE CRITIQUES ONCE AND FOR ALL.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech balloons"
+    },
+    {
+      "id": "32140dda-15d0-41da-a8ac-68263377b681:e85e676b-087c-4f7b-b33f-cee53bdc868b",
+      "label": "p7 p07-02 e85e676b -> 32140dda \"BRING THE SWING, BUNNY BOY!\" / \"THE GOOD NEWS IS, A RABBIT'S TEETH NEVER\"",
+      "right": true,
+      "costUsd": null,
+      "page": 7,
+      "panel": "p07-02",
+      "index": 1,
+      "a": "e85e676b-087c-4f7b-b33f-cee53bdc868b",
+      "b": "32140dda-15d0-41da-a8ac-68263377b681",
+      "textA": "BRING THE SWING, BUNNY BOY!",
+      "textB": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT.",
+      "gap": 16,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech balloons"
+    },
+    {
+      "id": "32140dda-15d0-41da-a8ac-68263377b681:5dfa9ec4-7dbc-4d1d-8530-e1843d9c94a8",
+      "label": "p7 p07-02 32140dda -> 5dfa9ec4 \"THE GOOD NEWS IS, A RABBIT'S TEETH NEVER\" / \"YOU'RE WORSE THAN BILLY.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 7,
+      "panel": "p07-02",
+      "index": 2,
+      "a": "32140dda-15d0-41da-a8ac-68263377b681",
+      "b": "5dfa9ec4-7dbc-4d1d-8530-e1843d9c94a8",
+      "textA": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT.",
+      "textB": "YOU'RE WORSE THAN BILLY.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech balloons"
+    },
+    {
+      "id": "5d18e240-25c0-4728-ae4f-448e6037a9b3:6c5db43e-404e-46ee-91a2-5d3a5e28864e",
+      "label": "p7 p07-03 6c5db43e -> 5d18e240 \"AYE-YI-YI! ROGER THAT, TRINI.\" / \"ARE YOU ALRIGHT?\"",
+      "right": false,
+      "costUsd": null,
+      "page": 7,
+      "panel": "p07-03",
+      "index": 3,
+      "a": "6c5db43e-404e-46ee-91a2-5d3a5e28864e",
+      "b": "5d18e240-25c0-4728-ae4f-448e6037a9b3",
+      "textA": "AYE-YI-YI! ROGER THAT, TRINI.",
+      "textB": "ARE YOU ALRIGHT?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech balloons"
+    },
+    {
+      "id": "5d18e240-25c0-4728-ae4f-448e6037a9b3:c625ae04-4e2e-4269-a954-a90213124cf0",
+      "label": "p7 p07-03 5d18e240 -> c625ae04 \"ARE YOU ALRIGHT?\" / \"WE'RE NEARLY DONE FIGHTING ONE OF ZEDD'S\"",
+      "right": true,
+      "costUsd": null,
+      "page": 7,
+      "panel": "p07-03",
+      "index": 4,
+      "a": "5d18e240-25c0-4728-ae4f-448e6037a9b3",
+      "b": "c625ae04-4e2e-4269-a954-a90213124cf0",
+      "textA": "ARE YOU ALRIGHT?",
+      "textB": "WE'RE NEARLY DONE FIGHTING ONE OF ZEDD'S MOST ADORABLE MONSTERS.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech balloons"
+    },
+    {
+      "id": "6710438e-0324-48d4-9a7b-ff8029400bee:b67afd89-3df0-4968-8f5b-e5cc092ff3c8",
+      "label": "p8 p08-01 b67afd89 -> 6710438e \"DUDES, DOESN'T THIS KINDA FEEL LIKE ONE \" / \"YOU MEAN THE KIND WHERE IF YOU FALL OFF.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 8,
+      "panel": "p08-01",
+      "index": 0,
+      "a": "b67afd89-3df0-4968-8f5b-e5cc092ff3c8",
+      "b": "6710438e-0324-48d4-9a7b-ff8029400bee",
+      "textA": "DUDES, DOESN'T THIS KINDA FEEL LIKE ONE OF THOSE CRAZY AWESOME VINTAGE SIDE SCROLLER VIDEO GAMES?",
+      "textB": "YOU MEAN THE KIND WHERE IF YOU FALL OFF... YOU DIE?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles with different tails"
+    },
+    {
+      "id": "6710438e-0324-48d4-9a7b-ff8029400bee:ffec5423-9c67-45b1-88a0-ddaf9b83cfb4",
+      "label": "p8 p08-01 6710438e -> ffec5423 \"YOU MEAN THE KIND WHERE IF YOU FALL OFF.\" / \"EXACTLY!\"",
+      "right": true,
+      "costUsd": null,
+      "page": 8,
+      "panel": "p08-01",
+      "index": 1,
+      "a": "6710438e-0324-48d4-9a7b-ff8029400bee",
+      "b": "ffec5423-9c67-45b1-88a0-ddaf9b83cfb4",
+      "textA": "YOU MEAN THE KIND WHERE IF YOU FALL OFF... YOU DIE?",
+      "textB": "EXACTLY!",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles between different speakers"
+    },
+    {
+      "id": "2c024472-3cf8-4ee7-a104-fdec95628187:ffec5423-9c67-45b1-88a0-ddaf9b83cfb4",
+      "label": "p8 p08-01 ffec5423 -> 2c024472 \"EXACTLY!\" / \"WE GOTTA WORK ON YOUR DEFINITION OF \"AWE\"",
+      "right": true,
+      "costUsd": null,
+      "page": 8,
+      "panel": "p08-01",
+      "index": 2,
+      "a": "ffec5423-9c67-45b1-88a0-ddaf9b83cfb4",
+      "b": "2c024472-3cf8-4ee7-a104-fdec95628187",
+      "textA": "EXACTLY!",
+      "textB": "WE GOTTA WORK ON YOUR DEFINITION OF \"AWESOME,\" MICHELANGELO.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles between different speakers"
+    },
+    {
+      "id": "4c93babc-ab2e-42d7-a0c5-73f756b16aa2:503bb4b5-6b84-45e8-953e-adeaa47d38d5",
+      "label": "p8 p08-03 4c93babc -> 503bb4b5 \"WE LIVE FOR THE FOOT.\" / \"WE DIE FOR THE FOOT.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 8,
+      "panel": "p08-03",
+      "index": 3,
+      "a": "4c93babc-ab2e-42d7-a0c5-73f756b16aa2",
+      "b": "503bb4b5-6b84-45e8-953e-adeaa47d38d5",
+      "textA": "WE LIVE FOR THE FOOT.",
+      "textB": "WE DIE FOR THE FOOT.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles with distinct tails"
+    },
+    {
+      "id": "c6699400-813e-424b-9a34-7fc4c893fb10:d981e66b-95a7-4484-83ae-350dcc156710",
+      "label": "p8 p08-04 d981e66b -> c6699400 \"Among other things.\" / \"I wanna throw fireballs.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 8,
+      "panel": "p08-04",
+      "index": 4,
+      "a": "d981e66b-95a7-4484-83ae-350dcc156710",
+      "b": "c6699400-813e-424b-9a34-7fc4c893fb10",
+      "textA": "Among other things.",
+      "textB": "I wanna throw fireballs.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles between different speakers"
+    },
+    {
+      "id": "3e6b9cfa-1c39-4f49-973b-7d7be7acfe88:8ccadb5e-0c6b-43c2-81ac-908df90f74f6",
+      "label": "p10 p10-02 3e6b9cfa -> 8ccadb5e \"I GOTTA BE HONEST, MAN. SOMETIMES I JUST\" / \"OH, DON'T WORRY.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 10,
+      "panel": "p10-02",
+      "index": 0,
+      "a": "3e6b9cfa-1c39-4f49-973b-7d7be7acfe88",
+      "b": "8ccadb5e-0c6b-43c2-81ac-908df90f74f6",
+      "textA": "I GOTTA BE HONEST, MAN. SOMETIMES I JUST SMILE AND NOD.",
+      "textB": "OH, DON'T WORRY.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speakers"
+    },
+    {
+      "id": "0f02c882-895b-46f1-8133-4b9b4c3bb8a4:8ccadb5e-0c6b-43c2-81ac-908df90f74f6",
+      "label": "p10 p10-02 8ccadb5e -> 0f02c882 \"OH, DON'T WORRY.\" / \"I TOTALLY DO THE SAME THING WITH DONATEL\"",
+      "right": false,
+      "costUsd": null,
+      "page": 10,
+      "panel": "p10-02",
+      "index": 1,
+      "a": "8ccadb5e-0c6b-43c2-81ac-908df90f74f6",
+      "b": "0f02c882-895b-46f1-8133-4b9b4c3bb8a4",
+      "textA": "OH, DON'T WORRY.",
+      "textB": "I TOTALLY DO THE SAME THING WITH DONATELLO.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speakers"
+    },
+    {
+      "id": "a66513bc-f4f5-42d7-bb2e-e6740b26e073:ef5c046e-f118-4656-a4ed-cb65263470e4",
+      "label": "p10 p10-03 ef5c046e -> a66513bc \"BE QUICK, FOOT CLAN. THE MASTERS DEMAND \" / \"COLLECT ALL YOU CAN OR--\"",
+      "right": true,
+      "costUsd": null,
+      "page": 10,
+      "panel": "p10-03",
+      "index": 2,
+      "a": "ef5c046e-f118-4656-a4ed-cb65263470e4",
+      "b": "a66513bc-f4f5-42d7-bb2e-e6740b26e073",
+      "textA": "BE QUICK, FOOT CLAN. THE MASTERS DEMAND SUCCESS.",
+      "textB": "COLLECT ALL YOU CAN OR--",
+      "gap": 0,
+      "predicted": true,
+      "labeled": true,
+      "reason": "interrupted sentence"
+    },
+    {
+      "id": "2d35754f-8c4b-47a5-89f3-b04ab21750e4:f518b8ee-c77b-458f-9dca-08ea60019fae",
+      "label": "p10 p10-04 2d35754f -> f518b8ee \"--OR SHREDDER WILL JUST DROP YOU AND BRA\" / \"Honestly, how does he fill out his purpl\"",
+      "right": true,
+      "costUsd": null,
+      "page": 10,
+      "panel": "p10-04",
+      "index": 3,
+      "a": "2d35754f-8c4b-47a5-89f3-b04ab21750e4",
+      "b": "f518b8ee-c77b-458f-9dca-08ea60019fae",
+      "textA": "--OR SHREDDER WILL JUST DROP YOU AND BRAINWASH SOME OTHER MORONS.",
+      "textB": "Honestly, how does he fill out his purple pajama posse?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speakers"
+    },
+    {
+      "id": "60c3f689-a717-43ca-b395-caa4516ca570:da86ee96-0ba0-4fd2-b263-59b3fe2edc2f",
+      "label": "p11 p11-01 da86ee96 -> 60c3f689 \"UMPH!\" / \"OH NO.\"",
+      "right": false,
+      "costUsd": null,
+      "page": 11,
+      "panel": "p11-01",
+      "index": 0,
+      "a": "da86ee96-0ba0-4fd2-b263-59b3fe2edc2f",
+      "b": "60c3f689-a717-43ca-b395-caa4516ca570",
+      "textA": "UMPH!",
+      "textB": "OH NO.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech bubbles with distinct tails"
+    },
+    {
+      "id": "9cdba38c-12a3-40e9-b5af-f462c62eeb34:c135e042-1832-4d16-9029-666a9b0fac90",
+      "label": "p11 p11-02 c135e042 -> 9cdba38c \"Kim stretch out your --\" / \"GOOD CATCH!\"",
+      "right": true,
+      "costUsd": null,
+      "page": 11,
+      "panel": "p11-02",
+      "index": 1,
+      "a": "c135e042-1832-4d16-9029-666a9b0fac90",
+      "b": "9cdba38c-12a3-40e9-b5af-f462c62eeb34",
+      "textA": "Kim stretch out your --",
+      "textB": "GOOD CATCH!",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "two separate speakers"
+    },
+    {
+      "id": "57210da0-a2a0-4a08-8cc2-bc2f108ac4d2:dc8a774c-1bbe-449f-8e31-dd5861d4961e",
+      "label": "p11 p11-02 57210da0 -> dc8a774c \"OUCH. Sorry.\" / \"I WANT A BOOM STICK.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 11,
+      "panel": "p11-02",
+      "index": 2,
+      "a": "57210da0-a2a0-4a08-8cc2-bc2f108ac4d2",
+      "b": "dc8a774c-1bbe-449f-8e31-dd5861d4961e",
+      "textA": "OUCH. Sorry.",
+      "textB": "I WANT A BOOM STICK.",
+      "gap": 1,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "c4e249ef-6f8a-42d7-a321-401bfd1826e2:dca709c3-1bab-4e88-9938-433476fe013f",
+      "label": "p11 p11-05 dca709c3 -> c4e249ef \"Perfect.\" / \"ANY GOOD PIZZA JOINTS IN NORTH DAKOTA?\"",
+      "right": true,
+      "costUsd": null,
+      "page": 11,
+      "panel": "p11-05",
+      "index": 3,
+      "a": "dca709c3-1bab-4e88-9938-433476fe013f",
+      "b": "c4e249ef-6f8a-42d7-a321-401bfd1826e2",
+      "textA": "Perfect.",
+      "textB": "ANY GOOD PIZZA JOINTS IN NORTH DAKOTA?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles for different speakers"
+    },
+    {
+      "id": "647d70dc-e2ac-44d2-88c9-e1ae97da2501:ef7b4282-e7a8-424d-a8ee-1032f84f916f",
+      "label": "p12 p12-01 647d70dc -> ef7b4282 \"BUT IT'S NOT THAT SIMPLE, ZORDON.\" / \"THE TURTLES HAVE DEALT WITH SHREDDER FOR\"",
+      "right": false,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-01",
+      "index": 0,
+      "a": "647d70dc-e2ac-44d2-88c9-e1ae97da2501",
+      "b": "ef7b4282-e7a8-424d-a8ee-1032f84f916f",
+      "textA": "BUT IT'S NOT THAT SIMPLE, ZORDON.",
+      "textB": "THE TURTLES HAVE DEALT WITH SHREDDER FOR YEARS.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "1a7df11e-6c8a-4824-9344-ff46029ee53e:ceb718bb-c5ce-4c58-87cf-b96a8ac90a37",
+      "label": "p12 p12-02 ceb718bb -> 1a7df11e \"JASON'S RIGHT. BY THE TIME WE FINISH WIT\" / \"I mean, even with double duty... it's ex\"",
+      "right": true,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-02",
+      "index": 1,
+      "a": "ceb718bb-c5ce-4c58-87cf-b96a8ac90a37",
+      "b": "1a7df11e-6c8a-4824-9344-ff46029ee53e",
+      "textA": "JASON'S RIGHT. BY THE TIME WE FINISH WITH ONE MONSTER, ANOTHER ONE POPS UP SOMEWHERE ELSE.",
+      "textB": "I mean, even with double duty... it's exhausting.",
+      "gap": 40,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles for different characters"
+    },
+    {
+      "id": "0bf8a371-055c-4644-98af-a90245e9310e:a563493f-1f6e-42d3-a2fb-ab0137f896c3",
+      "label": "p12 p12-03 0bf8a371 -> a563493f \"FOOT SOLDIERS AND PUTTIES HAVE NEVER BEE\" / \"NOW, SUDDENLY THEY'RE FASTER AND STRONGE\"",
+      "right": false,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-03",
+      "index": 2,
+      "a": "0bf8a371-055c-4644-98af-a90245e9310e",
+      "b": "a563493f-1f6e-42d3-a2fb-ab0137f896c3",
+      "textA": "FOOT SOLDIERS AND PUTTIES HAVE NEVER BEEN A PROBLEM.",
+      "textB": "NOW, SUDDENLY THEY'RE FASTER AND STRONGER AND CAN THROW FIREBALLS?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "a563493f-1f6e-42d3-a2fb-ab0137f896c3:c66f20c7-9407-42c0-bb42-5ece5244bf56",
+      "label": "p12 p12-03 a563493f -> c66f20c7 \"NOW, SUDDENLY THEY'RE FASTER AND STRONGE\" / \"THEY GET MORE POWERFUL... WE STAY THE SA\"",
+      "right": true,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-03",
+      "index": 3,
+      "a": "a563493f-1f6e-42d3-a2fb-ab0137f896c3",
+      "b": "c66f20c7-9407-42c0-bb42-5ece5244bf56",
+      "textA": "NOW, SUDDENLY THEY'RE FASTER AND STRONGER AND CAN THROW FIREBALLS?",
+      "textB": "THEY GET MORE POWERFUL... WE STAY THE SAME.",
+      "gap": 39,
+      "predicted": false,
+      "labeled": false,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "b8bad1b4-fa2d-4113-ab0a-194821180bfc:c66f20c7-9407-42c0-bb42-5ece5244bf56",
+      "label": "p12 p12-03 c66f20c7 -> b8bad1b4 \"THEY GET MORE POWERFUL... WE STAY THE SA\" / \"WHAT'RE WE SUPPOSED TO DO?\"",
+      "right": false,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-03",
+      "index": 4,
+      "a": "c66f20c7-9407-42c0-bb42-5ece5244bf56",
+      "b": "b8bad1b4-fa2d-4113-ab0a-194821180bfc",
+      "textA": "THEY GET MORE POWERFUL... WE STAY THE SAME.",
+      "textB": "WHAT'RE WE SUPPOSED TO DO?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "separate speech bubbles"
+    },
+    {
+      "id": "bb801321-4cbe-40cf-bf03-d23c9f1a6e7f:d3fea0ba-2c83-42d6-855e-0af8bbba270d",
+      "label": "p12 p12-04 bb801321 -> d3fea0ba \"YOU MUST BE PATIENT, MY SON.\" / \"FOCUS ON THE ENEMY AND CONTINUE TO PROTE\"",
+      "right": true,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-04",
+      "index": 5,
+      "a": "bb801321-4cbe-40cf-bf03-d23c9f1a6e7f",
+      "b": "d3fea0ba-2c83-42d6-855e-0af8bbba270d",
+      "textA": "YOU MUST BE PATIENT, MY SON.",
+      "textB": "FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY.",
+      "gap": 5,
+      "predicted": true,
+      "labeled": true,
+      "reason": "connected speech bubbles"
+    },
+    {
+      "id": "ae790db0-2e71-429e-ac97-d9272698a8fa:d3fea0ba-2c83-42d6-855e-0af8bbba270d",
+      "label": "p12 p12-04 d3fea0ba -> ae790db0 \"FOCUS ON THE ENEMY AND CONTINUE TO PROTE\" / \"ALL WILL BE REVEALED IN TIME.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-04",
+      "index": 6,
+      "a": "d3fea0ba-2c83-42d6-855e-0af8bbba270d",
+      "b": "ae790db0-2e71-429e-ac97-d9272698a8fa",
+      "textA": "FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY.",
+      "textB": "ALL WILL BE REVEALED IN TIME.",
+      "gap": 0,
+      "predicted": true,
+      "labeled": true,
+      "reason": "connected speech bubbles"
+    },
+    {
+      "id": "26ce1739-de7e-48d8-9ffd-3213210ac91a:c662344e-2df4-471b-8ef1-5c11b2947de6",
+      "label": "p12 p12-05 c662344e -> 26ce1739 \"Master Splinter is correct.\" / \"WE HAVE DEALT WITH MANY FOES TOGETHER. B\"",
+      "right": true,
+      "costUsd": null,
+      "page": 12,
+      "panel": "p12-05",
+      "index": 7,
+      "a": "c662344e-2df4-471b-8ef1-5c11b2947de6",
+      "b": "26ce1739-de7e-48d8-9ffd-3213210ac91a",
+      "textA": "Master Splinter is correct.",
+      "textB": "WE HAVE DEALT WITH MANY FOES TOGETHER. BUT I PROMISE YOU...",
+      "gap": 0,
+      "predicted": true,
+      "labeled": true,
+      "reason": "connected speech bubbles"
+    },
+    {
+      "id": "6f9d836d-76fd-432c-a6a7-90168ccdc13c:c415e61c-6e61-4878-a7fb-ae464da3e859",
+      "label": "p13 p13-01 6f9d836d -> c415e61c \"PIZZA IS BOTH FOR CELEBRATORY AND REMORS\" / \"IT'S A VERY VERSATILE FOOD.\"",
+      "right": false,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-01",
+      "index": 0,
+      "a": "6f9d836d-76fd-432c-a6a7-90168ccdc13c",
+      "b": "c415e61c-6e61-4878-a7fb-ae464da3e859",
+      "textA": "PIZZA IS BOTH FOR CELEBRATORY AND REMORSEFUL OCCASIONS, TRINI.",
+      "textB": "IT'S A VERY VERSATILE FOOD.",
+      "gap": 0,
+      "predicted": true,
+      "labeled": false,
+      "reason": "two balloons connected by a stem"
+    },
+    {
+      "id": "09507ad7-095c-49a0-bf2b-3eff8837afc5:870caed9-bbfc-4e93-bb74-c747f582a9c0",
+      "label": "p13 p13-02 09507ad7 -> 870caed9 \"HOW'S THE SEARCH GOING, BILLY?\" / \"YOU FIGURE OUT THAT PORTAL TECHNOLOGY YE\"",
+      "right": false,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-02",
+      "index": 1,
+      "a": "09507ad7-095c-49a0-bf2b-3eff8837afc5",
+      "b": "870caed9-bbfc-4e93-bb74-c747f582a9c0",
+      "textA": "HOW'S THE SEARCH GOING, BILLY?",
+      "textB": "YOU FIGURE OUT THAT PORTAL TECHNOLOGY YET?",
+      "gap": 1,
+      "predicted": false,
+      "labeled": true,
+      "reason": "two separate speech bubbles"
+    },
+    {
+      "id": "2dd28116-9757-4d5d-8368-be4ec5fdc687:870caed9-bbfc-4e93-bb74-c747f582a9c0",
+      "label": "p13 p13-02 870caed9 -> 2dd28116 \"YOU FIGURE OUT THAT PORTAL TECHNOLOGY YE\" / \"I'M STARTING TO GET THE HANG OF IT. PRET\"",
+      "right": true,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-02",
+      "index": 2,
+      "a": "870caed9-bbfc-4e93-bb74-c747f582a9c0",
+      "b": "2dd28116-9757-4d5d-8368-be4ec5fdc687",
+      "textA": "YOU FIGURE OUT THAT PORTAL TECHNOLOGY YET?",
+      "textB": "I'M STARTING TO GET THE HANG OF IT. PRETTY SURE I'VE ONLY ALMOST BLOWN UP THE COMMAND CENTER TWICE.",
+      "gap": 4,
+      "predicted": false,
+      "labeled": false,
+      "reason": "two separate speech bubbles"
+    },
+    {
+      "id": "2dd28116-9757-4d5d-8368-be4ec5fdc687:8d96872b-4324-4eef-9053-ec3a47a46998",
+      "label": "p13 p13-02 2dd28116 -> 8d96872b \"I'M STARTING TO GET THE HANG OF IT. PRET\" / \"OKAY... THREE TIMES.\"",
+      "right": true,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-02",
+      "index": 3,
+      "a": "2dd28116-9757-4d5d-8368-be4ec5fdc687",
+      "b": "8d96872b-4324-4eef-9053-ec3a47a46998",
+      "textA": "I'M STARTING TO GET THE HANG OF IT. PRETTY SURE I'VE ONLY ALMOST BLOWN UP THE COMMAND CENTER TWICE.",
+      "textB": "OKAY... THREE TIMES.",
+      "gap": 7,
+      "predicted": true,
+      "labeled": true,
+      "reason": "two balloons connected by a stem"
+    },
+    {
+      "id": "6ab87abf-710c-4768-8f0c-51171a6a2d3d:ac580355-a253-43c6-a1c1-95231597ce18",
+      "label": "p13 p13-03 6ab87abf -> ac580355 \"I've stumbled onto a few strange worlds \" / \"WE MIGHT BE ON OUR OWN.\"",
+      "right": false,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-03",
+      "index": 4,
+      "a": "6ab87abf-710c-4768-8f0c-51171a6a2d3d",
+      "b": "ac580355-a253-43c6-a1c1-95231597ce18",
+      "textA": "I've stumbled onto a few strange worlds here and there, but outside of Dimension X... I haven't found any other Rangers.",
+      "textB": "WE MIGHT BE ON OUR OWN.",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "two separate speech bubbles"
+    },
+    {
+      "id": "a0d82dde-8f7a-4d41-a7fe-70ad4e3406b8:ac580355-a253-43c6-a1c1-95231597ce18",
+      "label": "p13 p13-03 ac580355 -> a0d82dde \"WE MIGHT BE ON OUR OWN.\" / \"SPEAKING OF WHICH, HOW ARE CASEY AND APR\"",
+      "right": false,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-03",
+      "index": 5,
+      "a": "ac580355-a253-43c6-a1c1-95231597ce18",
+      "b": "a0d82dde-8f7a-4d41-a7fe-70ad4e3406b8",
+      "textA": "WE MIGHT BE ON OUR OWN.",
+      "textB": "SPEAKING OF WHICH, HOW ARE CASEY AND APRIL DOING?",
+      "gap": 0,
+      "predicted": false,
+      "labeled": true,
+      "reason": "two separate speech bubbles"
+    },
+    {
+      "id": "0ed55c14-b9d0-47e0-9350-b26a94b4190c:804bcac7-40bb-49eb-8e2a-e4e872c13c59",
+      "label": "p13 p13-04 804bcac7 -> 0ed55c14 \"FINE LAST TIME WE TALKED. THEY'RE STILL \" / \"I TOLD THEM TO GIVE US A CALL IF THEY NE\"",
+      "right": true,
+      "costUsd": null,
+      "page": 13,
+      "panel": "p13-04",
+      "index": 6,
+      "a": "804bcac7-40bb-49eb-8e2a-e4e872c13c59",
+      "b": "0ed55c14-b9d0-47e0-9350-b26a94b4190c",
+      "textA": "FINE LAST TIME WE TALKED. THEY'RE STILL HELPING THE NEUTRINOS CLEAR OUT THE REST OF KRANG'S FORCES.",
+      "textB": "I TOLD THEM TO GIVE US A CALL IF THEY NEEDED HELP.",
+      "gap": 0,
+      "predicted": true,
+      "labeled": true,
+      "reason": "two balloons connected by a stem"
+    }
+  ],
+  "hint": "none",
+  "gapPx": 40,
+  "labels": "tmp/joined-balloons/labels.json",
+  "pairs": [
+    {
+      "page": 3,
+      "panel": "p03-01",
+      "a": "c78247e8-d1b1-403a-b523-9d46be8bfdc0",
+      "b": "7105ff89-9471-499e-81a1-721bf812578e",
+      "gap": 4
+    },
+    {
+      "page": 3,
+      "panel": "p03-01",
+      "a": "7105ff89-9471-499e-81a1-721bf812578e",
+      "b": "9a8a1e04-cfca-4f2c-abe6-215f4268ed1c",
+      "gap": 1
+    },
+    {
+      "page": 3,
+      "panel": "p03-01",
+      "a": "9a8a1e04-cfca-4f2c-abe6-215f4268ed1c",
+      "b": "f2749b1f-803b-47d9-b9a0-5b89fca23873",
+      "gap": 7
+    },
+    {
+      "page": 3,
+      "panel": "p03-03",
+      "a": "dbfd0b7b-3733-4cd3-b73e-3198adef3d26",
+      "b": "a5a72467-8915-4b77-9d58-b1b3ff6ff2fc",
+      "gap": 301
+    },
+    {
+      "page": 3,
+      "panel": "p03-05",
+      "a": "e950eefd-3742-4c8f-aa9d-84aa3567b163",
+      "b": "7c95318c-b64d-4ab9-a87e-10f6fd49016c",
+      "gap": 14
+    },
+    {
+      "page": 4,
+      "panel": "p04-01",
+      "a": "31f419cb-bdcc-4bb9-8245-ee62a42c953d",
+      "b": "9e41899f-1f79-4ee4-9b03-e1469616e26d",
+      "gap": 1085
+    },
+    {
+      "page": 4,
+      "panel": "p04-01",
+      "a": "9e41899f-1f79-4ee4-9b03-e1469616e26d",
+      "b": "a7b68cc0-30a7-47a4-b3eb-0fff3a1cda3d",
+      "gap": 5
+    },
+    {
+      "page": 4,
+      "panel": "p04-01",
+      "a": "a7b68cc0-30a7-47a4-b3eb-0fff3a1cda3d",
+      "b": "df85af73-e596-459a-b826-5ee740a0fe46",
+      "gap": 217
+    },
+    {
+      "page": 4,
+      "panel": "p04-01",
+      "a": "df85af73-e596-459a-b826-5ee740a0fe46",
+      "b": "2d085b3b-c5f5-47ea-a20f-90e7e721df25",
+      "gap": 0
+    },
+    {
+      "page": 4,
+      "panel": "p04-01",
+      "a": "2d085b3b-c5f5-47ea-a20f-90e7e721df25",
+      "b": "bdea6455-1028-4ede-9c9f-c5afc02bc62a",
+      "gap": 21
+    },
+    {
+      "page": 5,
+      "panel": "p05-01",
+      "a": "5d5624ad-3fb8-4d9a-863f-00b3d9629ad6",
+      "b": "d57d4bb3-4431-4312-9e92-f8720d95b242",
+      "gap": 322
+    },
+    {
+      "page": 5,
+      "panel": "p05-02",
+      "a": "908200c2-86b3-4c1f-b5d0-5ba6252e410e",
+      "b": "c8475f90-58a0-46d9-ac61-cafbdacfa06c",
+      "gap": 0
+    },
+    {
+      "page": 5,
+      "panel": "p05-03",
+      "a": "6d10cfc7-c2a7-4160-8978-16e88ec83692",
+      "b": "da733415-5146-4d17-adc1-440cf26a4ca7",
+      "gap": 0
+    },
+    {
+      "page": 5,
+      "panel": "p05-03",
+      "a": "da733415-5146-4d17-adc1-440cf26a4ca7",
+      "b": "4e8180de-98ec-4688-91ab-6e3e37b2f2fa",
+      "gap": 0
+    },
+    {
+      "page": 5,
+      "panel": "p05-04",
+      "a": "1886ccc9-2d37-403f-99e3-13f92c3f882b",
+      "b": "23f69edd-46d3-4b36-8efe-2d26843233ef",
+      "gap": 2
+    },
+    {
+      "page": 5,
+      "panel": "p05-04",
+      "a": "23f69edd-46d3-4b36-8efe-2d26843233ef",
+      "b": "91096298-e680-4f80-b683-c5638bf1641b",
+      "gap": 640
+    },
+    {
+      "page": 5,
+      "panel": "p05-05",
+      "a": "3618fc65-df81-414c-b057-ecd1ac72e01f",
+      "b": "98d41abb-2fb6-4eeb-aac2-651939b891cd",
+      "gap": 20
+    },
+    {
+      "page": 5,
+      "panel": "p05-05",
+      "a": "98d41abb-2fb6-4eeb-aac2-651939b891cd",
+      "b": "e5a7f682-45bc-43ba-830f-1aaf84bf9dd3",
+      "gap": 19
+    },
+    {
+      "page": 6,
+      "panel": "p06-01",
+      "a": "f0083d84-2be7-4055-bfe8-7f8f7a74d584",
+      "b": "de884906-d477-4040-bdb7-308855770afe",
+      "gap": 278
+    },
+    {
+      "page": 6,
+      "panel": "p06-01",
+      "a": "de884906-d477-4040-bdb7-308855770afe",
+      "b": "0934810d-1324-479d-833f-9d1ebf4c8950",
+      "gap": 12
+    },
+    {
+      "page": 6,
+      "panel": "p06-01",
+      "a": "0934810d-1324-479d-833f-9d1ebf4c8950",
+      "b": "3aee6e32-3eea-419c-ade0-887fe365cd1a",
+      "gap": 490
+    },
+    {
+      "page": 6,
+      "panel": "p06-01",
+      "a": "3aee6e32-3eea-419c-ade0-887fe365cd1a",
+      "b": "6e8389c5-4933-490d-bb0d-21abc071712a",
+      "gap": 0
+    },
+    {
+      "page": 6,
+      "panel": "p06-02",
+      "a": "09d10f4b-a392-4173-a809-781ef7533b39",
+      "b": "c86644ce-3885-4242-9625-11cc44440d58",
+      "gap": 66
+    },
+    {
+      "page": 6,
+      "panel": "p06-02",
+      "a": "c86644ce-3885-4242-9625-11cc44440d58",
+      "b": "8053bdd2-77dd-4001-bf99-80344f823f8b",
+      "gap": 12
+    },
+    {
+      "page": 6,
+      "panel": "p06-03",
+      "a": "5dc9add7-0592-42fa-a58c-18c879415009",
+      "b": "a55475c2-9ba7-4540-bd50-ec1d2aa8e3f5",
+      "gap": 0
+    },
+    {
+      "page": 6,
+      "panel": "p06-03",
+      "a": "a55475c2-9ba7-4540-bd50-ec1d2aa8e3f5",
+      "b": "175216c2-c2e3-440f-acc1-eadaaac601f1",
+      "gap": 425
+    },
+    {
+      "page": 6,
+      "panel": "p06-04",
+      "a": "15907927-ac3d-42f4-97b7-23deafcd831a",
+      "b": "5b80e2a5-e92d-4799-be22-d8c2dfa5e1c0",
+      "gap": 0
+    },
+    {
+      "page": 7,
+      "panel": "p07-02",
+      "a": "e1e87bd0-91fa-4350-9d61-3a1f27ba5f40",
+      "b": "9aaa2db3-dc8d-490b-8c85-fcb3e2813215",
+      "gap": 0
+    },
+    {
+      "page": 7,
+      "panel": "p07-02",
+      "a": "9aaa2db3-dc8d-490b-8c85-fcb3e2813215",
+      "b": "e85e676b-087c-4f7b-b33f-cee53bdc868b",
+      "gap": 232
+    },
+    {
+      "page": 7,
+      "panel": "p07-02",
+      "a": "e85e676b-087c-4f7b-b33f-cee53bdc868b",
+      "b": "32140dda-15d0-41da-a8ac-68263377b681",
+      "gap": 16
+    },
+    {
+      "page": 7,
+      "panel": "p07-02",
+      "a": "32140dda-15d0-41da-a8ac-68263377b681",
+      "b": "5dfa9ec4-7dbc-4d1d-8530-e1843d9c94a8",
+      "gap": 0
+    },
+    {
+      "page": 7,
+      "panel": "p07-03",
+      "a": "e74e467d-ab87-401f-b1e2-df20de978c12",
+      "b": "6c5db43e-404e-46ee-91a2-5d3a5e28864e",
+      "gap": 407
+    },
+    {
+      "page": 7,
+      "panel": "p07-03",
+      "a": "6c5db43e-404e-46ee-91a2-5d3a5e28864e",
+      "b": "5d18e240-25c0-4728-ae4f-448e6037a9b3",
+      "gap": 0
+    },
+    {
+      "page": 7,
+      "panel": "p07-03",
+      "a": "5d18e240-25c0-4728-ae4f-448e6037a9b3",
+      "b": "c625ae04-4e2e-4269-a954-a90213124cf0",
+      "gap": 0
+    },
+    {
+      "page": 8,
+      "panel": "p08-01",
+      "a": "35e3efe5-754f-4c92-8a78-f10db4063e99",
+      "b": "b67afd89-3df0-4968-8f5b-e5cc092ff3c8",
+      "gap": 1072
+    },
+    {
+      "page": 8,
+      "panel": "p08-01",
+      "a": "b67afd89-3df0-4968-8f5b-e5cc092ff3c8",
+      "b": "6710438e-0324-48d4-9a7b-ff8029400bee",
+      "gap": 0
+    },
+    {
+      "page": 8,
+      "panel": "p08-01",
+      "a": "6710438e-0324-48d4-9a7b-ff8029400bee",
+      "b": "ffec5423-9c67-45b1-88a0-ddaf9b83cfb4",
+      "gap": 0
+    },
+    {
+      "page": 8,
+      "panel": "p08-01",
+      "a": "ffec5423-9c67-45b1-88a0-ddaf9b83cfb4",
+      "b": "2c024472-3cf8-4ee7-a104-fdec95628187",
+      "gap": 0
+    },
+    {
+      "page": 8,
+      "panel": "p08-03",
+      "a": "4c93babc-ab2e-42d7-a0c5-73f756b16aa2",
+      "b": "503bb4b5-6b84-45e8-953e-adeaa47d38d5",
+      "gap": 0
+    },
+    {
+      "page": 8,
+      "panel": "p08-03",
+      "a": "503bb4b5-6b84-45e8-953e-adeaa47d38d5",
+      "b": "4c0c8e70-9823-4427-9852-5de9ec463119",
+      "gap": 176
+    },
+    {
+      "page": 8,
+      "panel": "p08-04",
+      "a": "5259bfa6-38da-43f2-903c-749e028c7a15",
+      "b": "d981e66b-95a7-4484-83ae-350dcc156710",
+      "gap": 137
+    },
+    {
+      "page": 8,
+      "panel": "p08-04",
+      "a": "d981e66b-95a7-4484-83ae-350dcc156710",
+      "b": "c6699400-813e-424b-9a34-7fc4c893fb10",
+      "gap": 0
+    },
+    {
+      "page": 10,
+      "panel": "p10-01",
+      "a": "44dca180-fb5e-4ec4-9111-bd89a717e11a",
+      "b": "9bcccf00-8193-488a-8fbe-5ed26edc8269",
+      "gap": 613
+    },
+    {
+      "page": 10,
+      "panel": "p10-02",
+      "a": "3e6b9cfa-1c39-4f49-973b-7d7be7acfe88",
+      "b": "8ccadb5e-0c6b-43c2-81ac-908df90f74f6",
+      "gap": 0
+    },
+    {
+      "page": 10,
+      "panel": "p10-02",
+      "a": "8ccadb5e-0c6b-43c2-81ac-908df90f74f6",
+      "b": "0f02c882-895b-46f1-8133-4b9b4c3bb8a4",
+      "gap": 0
+    },
+    {
+      "page": 10,
+      "panel": "p10-03",
+      "a": "ef5c046e-f118-4656-a4ed-cb65263470e4",
+      "b": "a66513bc-f4f5-42d7-bb2e-e6740b26e073",
+      "gap": 0
+    },
+    {
+      "page": 10,
+      "panel": "p10-04",
+      "a": "2d35754f-8c4b-47a5-89f3-b04ab21750e4",
+      "b": "f518b8ee-c77b-458f-9dca-08ea60019fae",
+      "gap": 0
+    },
+    {
+      "page": 11,
+      "panel": "p11-01",
+      "a": "da86ee96-0ba0-4fd2-b263-59b3fe2edc2f",
+      "b": "60c3f689-a717-43ca-b395-caa4516ca570",
+      "gap": 0
+    },
+    {
+      "page": 11,
+      "panel": "p11-01",
+      "a": "60c3f689-a717-43ca-b395-caa4516ca570",
+      "b": "c420fe90-0357-4fb0-929d-77f2f70428c1",
+      "gap": 227
+    },
+    {
+      "page": 11,
+      "panel": "p11-02",
+      "a": "c135e042-1832-4d16-9029-666a9b0fac90",
+      "b": "9cdba38c-12a3-40e9-b5af-f462c62eeb34",
+      "gap": 0
+    },
+    {
+      "page": 11,
+      "panel": "p11-02",
+      "a": "9cdba38c-12a3-40e9-b5af-f462c62eeb34",
+      "b": "57210da0-a2a0-4a08-8cc2-bc2f108ac4d2",
+      "gap": 245
+    },
+    {
+      "page": 11,
+      "panel": "p11-02",
+      "a": "57210da0-a2a0-4a08-8cc2-bc2f108ac4d2",
+      "b": "dc8a774c-1bbe-449f-8e31-dd5861d4961e",
+      "gap": 1
+    },
+    {
+      "page": 11,
+      "panel": "p11-03",
+      "a": "8ac977c1-c586-4194-a080-4c0f23aa6856",
+      "b": "fc0bd36b-3818-42a2-8432-fb9072e73ae8",
+      "gap": 360
+    },
+    {
+      "page": 11,
+      "panel": "p11-05",
+      "a": "dca709c3-1bab-4e88-9938-433476fe013f",
+      "b": "c4e249ef-6f8a-42d7-a321-401bfd1826e2",
+      "gap": 0
+    },
+    {
+      "page": 11,
+      "panel": "p11-05",
+      "a": "c4e249ef-6f8a-42d7-a321-401bfd1826e2",
+      "b": "af7dae11-5b0b-4e9b-8546-4acdeb7b506f",
+      "gap": 585
+    },
+    {
+      "page": 12,
+      "panel": "p12-01",
+      "a": "0de938ff-695e-452a-930b-6366ef512fea",
+      "b": "16d1f932-803f-4ffd-a5cd-a1ca5fd43992",
+      "gap": 538
+    },
+    {
+      "page": 12,
+      "panel": "p12-01",
+      "a": "16d1f932-803f-4ffd-a5cd-a1ca5fd43992",
+      "b": "1b6f7cb8-3adb-4750-9afb-bcea1df837e9",
+      "gap": 835
+    },
+    {
+      "page": 12,
+      "panel": "p12-01",
+      "a": "1b6f7cb8-3adb-4750-9afb-bcea1df837e9",
+      "b": "647d70dc-e2ac-44d2-88c9-e1ae97da2501",
+      "gap": 755
+    },
+    {
+      "page": 12,
+      "panel": "p12-01",
+      "a": "647d70dc-e2ac-44d2-88c9-e1ae97da2501",
+      "b": "ef7b4282-e7a8-424d-a8ee-1032f84f916f",
+      "gap": 0
+    },
+    {
+      "page": 12,
+      "panel": "p12-01",
+      "a": "ef7b4282-e7a8-424d-a8ee-1032f84f916f",
+      "b": "9f6a7b3a-a8ad-48d1-a141-c3866b39a0b6",
+      "gap": 42
+    },
+    {
+      "page": 12,
+      "panel": "p12-02",
+      "a": "ceb718bb-c5ce-4c58-87cf-b96a8ac90a37",
+      "b": "1a7df11e-6c8a-4824-9344-ff46029ee53e",
+      "gap": 40
+    },
+    {
+      "page": 12,
+      "panel": "p12-03",
+      "a": "0bf8a371-055c-4644-98af-a90245e9310e",
+      "b": "a563493f-1f6e-42d3-a2fb-ab0137f896c3",
+      "gap": 0
+    },
+    {
+      "page": 12,
+      "panel": "p12-03",
+      "a": "a563493f-1f6e-42d3-a2fb-ab0137f896c3",
+      "b": "c66f20c7-9407-42c0-bb42-5ece5244bf56",
+      "gap": 39
+    },
+    {
+      "page": 12,
+      "panel": "p12-03",
+      "a": "c66f20c7-9407-42c0-bb42-5ece5244bf56",
+      "b": "b8bad1b4-fa2d-4113-ab0a-194821180bfc",
+      "gap": 0
+    },
+    {
+      "page": 12,
+      "panel": "p12-04",
+      "a": "bb801321-4cbe-40cf-bf03-d23c9f1a6e7f",
+      "b": "d3fea0ba-2c83-42d6-855e-0af8bbba270d",
+      "gap": 5
+    },
+    {
+      "page": 12,
+      "panel": "p12-04",
+      "a": "d3fea0ba-2c83-42d6-855e-0af8bbba270d",
+      "b": "ae790db0-2e71-429e-ac97-d9272698a8fa",
+      "gap": 0
+    },
+    {
+      "page": 12,
+      "panel": "p12-05",
+      "a": "c662344e-2df4-471b-8ef1-5c11b2947de6",
+      "b": "26ce1739-de7e-48d8-9ffd-3213210ac91a",
+      "gap": 0
+    },
+    {
+      "page": 13,
+      "panel": "p13-01",
+      "a": "f1c52c5b-e404-4b81-88a0-442a8f91a83e",
+      "b": "8c6e2383-5d6e-4b44-be13-601d3d53de4e",
+      "gap": 444
+    },
+    {
+      "page": 13,
+      "panel": "p13-01",
+      "a": "8c6e2383-5d6e-4b44-be13-601d3d53de4e",
+      "b": "6f9d836d-76fd-432c-a6a7-90168ccdc13c",
+      "gap": 371
+    },
+    {
+      "page": 13,
+      "panel": "p13-01",
+      "a": "6f9d836d-76fd-432c-a6a7-90168ccdc13c",
+      "b": "c415e61c-6e61-4878-a7fb-ae464da3e859",
+      "gap": 0
+    },
+    {
+      "page": 13,
+      "panel": "p13-02",
+      "a": "09507ad7-095c-49a0-bf2b-3eff8837afc5",
+      "b": "870caed9-bbfc-4e93-bb74-c747f582a9c0",
+      "gap": 1
+    },
+    {
+      "page": 13,
+      "panel": "p13-02",
+      "a": "870caed9-bbfc-4e93-bb74-c747f582a9c0",
+      "b": "2dd28116-9757-4d5d-8368-be4ec5fdc687",
+      "gap": 4
+    },
+    {
+      "page": 13,
+      "panel": "p13-02",
+      "a": "2dd28116-9757-4d5d-8368-be4ec5fdc687",
+      "b": "8d96872b-4324-4eef-9053-ec3a47a46998",
+      "gap": 7
+    },
+    {
+      "page": 13,
+      "panel": "p13-03",
+      "a": "6ab87abf-710c-4768-8f0c-51171a6a2d3d",
+      "b": "ac580355-a253-43c6-a1c1-95231597ce18",
+      "gap": 0
+    },
+    {
+      "page": 13,
+      "panel": "p13-03",
+      "a": "ac580355-a253-43c6-a1c1-95231597ce18",
+      "b": "a0d82dde-8f7a-4d41-a7fe-70ad4e3406b8",
+      "gap": 0
+    },
+    {
+      "page": 13,
+      "panel": "p13-04",
+      "a": "804bcac7-40bb-49eb-8e2a-e4e872c13c59",
+      "b": "0ed55c14-b9d0-47e0-9350-b26a94b4190c",
+      "gap": 0
+    }
+  ],
+  "calls": [
+    {
+      "page": 3,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 137,
+              "y": 61,
+              "width": 260,
+              "height": 117
+            },
+            "text": "THE END."
+          },
+          "b": {
+            "box": {
+              "x": 401,
+              "y": 83,
+              "width": 531,
+              "height": 93
+            },
+            "text": "There is no greater loss than the loss of faith."
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 401,
+              "y": 83,
+              "width": 531,
+              "height": 93
+            },
+            "text": "There is no greater loss than the loss of faith."
+          },
+          "b": {
+            "box": {
+              "x": 560,
+              "y": 178,
+              "width": 422,
+              "height": 140
+            },
+            "text": "NOT IN THE BELIEF OF A POWER BEYOND YOUR OWN PERCEPTION..."
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 560,
+              "y": 178,
+              "width": 422,
+              "height": 140
+            },
+            "text": "NOT IN THE BELIEF OF A POWER BEYOND YOUR OWN PERCEPTION..."
+          },
+          "b": {
+            "box": {
+              "x": 676,
+              "y": 325,
+              "width": 307,
+              "height": 179
+            },
+            "text": "...BUT IN THE ABILITY TO TRUST IN ONE'S SELF AND IN OTHERS."
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 761,
+              "y": 1753,
+              "width": 255,
+              "height": 109
+            },
+            "text": "ONE CAN FEEL ALONE."
+          },
+          "b": {
+            "box": {
+              "x": 782,
+              "y": 1876,
+              "width": 291,
+              "height": 105
+            },
+            "text": "TARGETED AND HUMILIATED."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate caption boxes side by side\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"separate caption boxes\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"separate caption boxes\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": true,\n      \"reason\": \"vertically stacked narrative caption boxes belonging to the same text block\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1665,
+      "tokensOut": 148,
+      "tokensThinking": 0,
+      "costUsd": 0.0008695,
+      "latencyMs": 2947
+    },
+    {
+      "page": 4,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 1515,
+              "y": 532,
+              "width": 239,
+              "height": 157
+            },
+            "text": "COME ON! IS THIS ALL YOU'VE GOT?"
+          },
+          "b": {
+            "box": {
+              "x": 1546,
+              "y": 695,
+              "width": 304,
+              "height": 164
+            },
+            "text": "KEE-YAH!"
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 1572,
+              "y": 1075,
+              "width": 327,
+              "height": 190
+            },
+            "text": "YOU'VE NEVER BEATEN ME BEFORE AND YOU WON'T START TODAY."
+          },
+          "b": {
+            "box": {
+              "x": 1510,
+              "y": 1255,
+              "width": 323,
+              "height": 176
+            },
+            "text": "POWERED UP OR NOT, YOU'RE STILL NOTHING MORE THAN..."
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 1510,
+              "y": 1255,
+              "width": 323,
+              "height": 176
+            },
+            "text": "POWERED UP OR NOT, YOU'RE STILL NOTHING MORE THAN..."
+          },
+          "b": {
+            "box": {
+              "x": 1138,
+              "y": 1453,
+              "width": 412,
+              "height": 138
+            },
+            "text": "...PRACTICE."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"they are separate speech balloons without a connecting tail or merged outline\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"they are separate speech bubbles for the same speaker\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"they are separate speech bubbles continuing the sentence\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1590,
+      "tokensOut": 125,
+      "tokensThinking": 0,
+      "costUsd": 0.0007895,
+      "latencyMs": 3636
+    },
+    {
+      "page": 5,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 687,
+              "y": 878,
+              "width": 364,
+              "height": 143
+            },
+            "text": "LEO, YOU SHOULD MAKE A RUN FOR IT. IF JUST ONE OF US--"
+          },
+          "b": {
+            "box": {
+              "x": 610,
+              "y": 1016,
+              "width": 270,
+              "height": 151
+            },
+            "text": "TOMMY, YOU DON'T GET IT, DO YOU?"
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 1098,
+              "y": 966,
+              "width": 232,
+              "height": 143
+            },
+            "text": "WE ALWAYS KNEW THIS WAS A ONE WAY TRIP."
+          },
+          "b": {
+            "box": {
+              "x": 1310,
+              "y": 905,
+              "width": 280,
+              "height": 119
+            },
+            "text": "THAT'S WHY ZORDON SENT US."
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 1310,
+              "y": 905,
+              "width": 280,
+              "height": 119
+            },
+            "text": "THAT'S WHY ZORDON SENT US."
+          },
+          "b": {
+            "box": {
+              "x": 1472,
+              "y": 1001,
+              "width": 321,
+              "height": 202
+            },
+            "text": "THIS IS OUR PUNISHMENT. FOR FAILING. OUR FRIENDS. OUR FAMILY."
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 556,
+              "y": 1901,
+              "width": 319,
+              "height": 123
+            },
+            "text": "WE LET EVERYONE DOWN."
+          },
+          "b": {
+            "box": {
+              "x": 691,
+              "y": 2026,
+              "width": 231,
+              "height": 183
+            },
+            "text": "AND IT'S ONLY A MATTER OF TIME BEFORE--"
+          }
+        },
+        {
+          "index": 4,
+          "a": {
+            "box": {
+              "x": 1438,
+              "y": 2258,
+              "width": 338,
+              "height": 121
+            },
+            "text": "...AND YOU WILL SEE THE LIGHT UPON YOUR FACE."
+          },
+          "b": {
+            "box": {
+              "x": 1562,
+              "y": 2399,
+              "width": 322,
+              "height": 108
+            },
+            "text": "EVEN THE END IS NOT THE END."
+          }
+        },
+        {
+          "index": 5,
+          "a": {
+            "box": {
+              "x": 1562,
+              "y": 2399,
+              "width": 322,
+              "height": 108
+            },
+            "text": "EVEN THE END IS NOT THE END."
+          },
+          "b": {
+            "box": {
+              "x": 1422,
+              "y": 2526,
+              "width": 298,
+              "height": 112
+            },
+            "text": "OH MY GOD."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate balloons for different speakers\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": true,\n      \"reason\": \"connected sequence from one speaker\"\n    },\n    {\n      \"index\": 4,\n      \"joined\": true,\n      \"reason\": \"connected narrator boxes\"\n    },\n    {\n      \"index\": 5,\n      \"joined\": false,\n      \"reason\": \"separate caption and dialogue balloon\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1856,
+      "tokensOut": 205,
+      "tokensThinking": 0,
+      "costUsd": 0.0010693,
+      "latencyMs": 3690
+    },
+    {
+      "page": 6,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 729,
+              "y": 60,
+              "width": 193,
+              "height": 142
+            },
+            "text": "HOP AND SKIP ALL YOU WANT."
+          },
+          "b": {
+            "box": {
+              "x": 934,
+              "y": 57,
+              "width": 296,
+              "height": 139
+            },
+            "text": "YOU WILL FEEL THE WRATH OF WARBUNNY!"
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 646,
+              "y": 687,
+              "width": 341,
+              "height": 184
+            },
+            "text": "FIGURES MY FIRST TIME IN PARIS IS BATTLING A BARBARIAN BUNNY RABBIT."
+          },
+          "b": {
+            "box": {
+              "x": 881,
+              "y": 824,
+              "width": 351,
+              "height": 223
+            },
+            "text": "I GUESS THAT'S THE ONE BRIGHT SIDE OF SHREDDER AND ZEDD'S ENDLESS ATTACKS, RIGHT?"
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 757,
+              "y": 1353,
+              "width": 329,
+              "height": 201
+            },
+            "text": "I AM NO MONSTER! I AM THE CONEY CRUSADER! I AM THE MARCH MARAUDER!"
+          },
+          "b": {
+            "box": {
+              "x": 854,
+              "y": 1565,
+              "width": 275,
+              "height": 160
+            },
+            "text": "ALL THOSE WHO FACE ME SHALL QUAKE AT MY MIGHT!"
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 340,
+              "y": 2333,
+              "width": 376,
+              "height": 149
+            },
+            "text": "I GOTTA SAY, I ADMIRE YOUR CONFIDENCE."
+          },
+          "b": {
+            "box": {
+              "x": 246,
+              "y": 2468,
+              "width": 306,
+              "height": 133
+            },
+            "text": "YEAH. MAYBE HE'LL GO EASY ON YOU."
+          }
+        },
+        {
+          "index": 4,
+          "a": {
+            "box": {
+              "x": 1453,
+              "y": 1793,
+              "width": 362,
+              "height": 147
+            },
+            "text": "EASY ON ME? WHAT FOOL DO YOU SPEAK OF?"
+          },
+          "b": {
+            "box": {
+              "x": 1589,
+              "y": 1920,
+              "width": 307,
+              "height": 183
+            },
+            "text": "THAT \"FOOL\" WOULD BE ME, FLOPPY..."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons from different speakers\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": true,\n      \"reason\": \"two speech balloons connected for the same speaker\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": true,\n      \"reason\": \"two speech balloons connected for the same speaker\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons from different characters\"\n    },\n    {\n      \"index\": 4,\n      \"joined\": true,\n      \"reason\": \"two speech balloons connected for the same speaker\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1808,
+      "tokensOut": 188,
+      "tokensThinking": 0,
+      "costUsd": 0.0010123999999999999,
+      "latencyMs": 2901
+    },
+    {
+      "page": 7,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 1565,
+              "y": 230,
+              "width": 311,
+              "height": 180
+            },
+            "text": "YOU FLEET-FOOTED TORTOISES ARE MY IMMORTAL FOES."
+          },
+          "b": {
+            "box": {
+              "x": 1582,
+              "y": 409,
+              "width": 302,
+              "height": 191
+            },
+            "text": "WARBUNNY WILL SILENCE THE CRITIQUES ONCE AND FOR ALL."
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 1065,
+              "y": 668,
+              "width": 294,
+              "height": 94
+            },
+            "text": "BRING THE SWING, BUNNY BOY!"
+          },
+          "b": {
+            "box": {
+              "x": 1375,
+              "y": 659,
+              "width": 507,
+              "height": 157
+            },
+            "text": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT."
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 1375,
+              "y": 659,
+              "width": 507,
+              "height": 157
+            },
+            "text": "THE GOOD NEWS IS, A RABBIT'S TEETH NEVER STOP GROWING, SO WE DON'T HAVE TO FEEL BAD ABOUT KNOCKING ANY OUT."
+          },
+          "b": {
+            "box": {
+              "x": 1697,
+              "y": 810,
+              "width": 190,
+              "height": 149
+            },
+            "text": "YOU'RE WORSE THAN BILLY."
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 1483,
+              "y": 1751,
+              "width": 227,
+              "height": 132
+            },
+            "text": "AYE-YI-YI! ROGER THAT, TRINI."
+          },
+          "b": {
+            "box": {
+              "x": 1598,
+              "y": 1872,
+              "width": 189,
+              "height": 83
+            },
+            "text": "ARE YOU ALRIGHT?"
+          }
+        },
+        {
+          "index": 4,
+          "a": {
+            "box": {
+              "x": 1598,
+              "y": 1872,
+              "width": 189,
+              "height": 83
+            },
+            "text": "ARE YOU ALRIGHT?"
+          },
+          "b": {
+            "box": {
+              "x": 1438,
+              "y": 1936,
+              "width": 366,
+              "height": 184
+            },
+            "text": "WE'RE NEARLY DONE FIGHTING ONE OF ZEDD'S MOST ADORABLE MONSTERS."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons\"\n    },\n    {\n      \"index\": 4,\n      \"joined\": false,\n      \"reason\": \"separate speech balloons\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1825,
+      "tokensOut": 167,
+      "tokensThinking": 0,
+      "costUsd": 0.000965,
+      "latencyMs": 3355
+    },
+    {
+      "page": 8,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 1251,
+              "y": 1108,
+              "width": 460,
+              "height": 227
+            },
+            "text": "DUDES, DOESN'T THIS KINDA FEEL LIKE ONE OF THOSE CRAZY AWESOME VINTAGE SIDE SCROLLER VIDEO GAMES?"
+          },
+          "b": {
+            "box": {
+              "x": 1108,
+              "y": 1306,
+              "width": 326,
+              "height": 201
+            },
+            "text": "YOU MEAN THE KIND WHERE IF YOU FALL OFF... YOU DIE?"
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 1108,
+              "y": 1306,
+              "width": 326,
+              "height": 201
+            },
+            "text": "YOU MEAN THE KIND WHERE IF YOU FALL OFF... YOU DIE?"
+          },
+          "b": {
+            "box": {
+              "x": 1371,
+              "y": 1475,
+              "width": 193,
+              "height": 90
+            },
+            "text": "EXACTLY!"
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 1371,
+              "y": 1475,
+              "width": 193,
+              "height": 90
+            },
+            "text": "EXACTLY!"
+          },
+          "b": {
+            "box": {
+              "x": 1057,
+              "y": 1525,
+              "width": 328,
+              "height": 186
+            },
+            "text": "WE GOTTA WORK ON YOUR DEFINITION OF \"AWESOME,\" MICHELANGELO."
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 78,
+              "y": 2192,
+              "width": 209,
+              "height": 222
+            },
+            "text": "WE LIVE FOR THE FOOT."
+          },
+          "b": {
+            "box": {
+              "x": 251,
+              "y": 2265,
+              "width": 202,
+              "height": 152
+            },
+            "text": "WE DIE FOR THE FOOT."
+          }
+        },
+        {
+          "index": 4,
+          "a": {
+            "box": {
+              "x": 1146,
+              "y": 2702,
+              "width": 172,
+              "height": 134
+            },
+            "text": "Among other things."
+          },
+          "b": {
+            "box": {
+              "x": 1014,
+              "y": 2835,
+              "width": 234,
+              "height": 129
+            },
+            "text": "I wanna throw fireballs."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles with different tails\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles between different speakers\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles between different speakers\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles with distinct tails\"\n    },\n    {\n      \"index\": 4,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles between different speakers\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1766,
+      "tokensOut": 182,
+      "tokensThinking": 0,
+      "costUsd": 0.0009847999999999999,
+      "latencyMs": 2456
+    },
+    {
+      "page": 10,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 1616,
+              "y": 525,
+              "width": 290,
+              "height": 194
+            },
+            "text": "I GOTTA BE HONEST, MAN. SOMETIMES I JUST SMILE AND NOD."
+          },
+          "b": {
+            "box": {
+              "x": 1528,
+              "y": 717,
+              "width": 221,
+              "height": 91
+            },
+            "text": "OH, DON'T WORRY."
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 1528,
+              "y": 717,
+              "width": 221,
+              "height": 91
+            },
+            "text": "OH, DON'T WORRY."
+          },
+          "b": {
+            "box": {
+              "x": 1595,
+              "y": 773,
+              "width": 276,
+              "height": 166
+            },
+            "text": "I TOTALLY DO THE SAME THING WITH DONATELLO."
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 676,
+              "y": 1345,
+              "width": 275,
+              "height": 180
+            },
+            "text": "BE QUICK, FOOT CLAN. THE MASTERS DEMAND SUCCESS."
+          },
+          "b": {
+            "box": {
+              "x": 933,
+              "y": 1422,
+              "width": 308,
+              "height": 151
+            },
+            "text": "COLLECT ALL YOU CAN OR--"
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 778,
+              "y": 1644,
+              "width": 575,
+              "height": 132
+            },
+            "text": "--OR SHREDDER WILL JUST DROP YOU AND BRAINWASH SOME OTHER MORONS."
+          },
+          "b": {
+            "box": {
+              "x": 734,
+              "y": 1770,
+              "width": 383,
+              "height": 151
+            },
+            "text": "Honestly, how does he fill out his purple pajama posse?"
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate speakers\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"separate speakers\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": true,\n      \"reason\": \"interrupted sentence\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": false,\n      \"reason\": \"separate speakers\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1712,
+      "tokensOut": 133,
+      "tokensThinking": 0,
+      "costUsd": 0.0008461,
+      "latencyMs": 3354
+    },
+    {
+      "page": 11,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 587,
+              "y": 90,
+              "width": 196,
+              "height": 115
+            },
+            "text": "UMPH!"
+          },
+          "b": {
+            "box": {
+              "x": 699,
+              "y": 179,
+              "width": 162,
+              "height": 110
+            },
+            "text": "OH NO."
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 867,
+              "y": 632,
+              "width": 220,
+              "height": 159
+            },
+            "text": "Kim stretch out your --"
+          },
+          "b": {
+            "box": {
+              "x": 1073,
+              "y": 648,
+              "width": 254,
+              "height": 94
+            },
+            "text": "GOOD CATCH!"
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 809,
+              "y": 986,
+              "width": 339,
+              "height": 157
+            },
+            "text": "OUCH. Sorry."
+          },
+          "b": {
+            "box": {
+              "x": 865,
+              "y": 1144,
+              "width": 198,
+              "height": 140
+            },
+            "text": "I WANT A BOOM STICK."
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 867,
+              "y": 2230,
+              "width": 411,
+              "height": 109
+            },
+            "text": "Perfect."
+          },
+          "b": {
+            "box": {
+              "x": 746,
+              "y": 2327,
+              "width": 312,
+              "height": 150
+            },
+            "text": "ANY GOOD PIZZA JOINTS IN NORTH DAKOTA?"
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles with distinct tails\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"two separate speakers\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles for different speakers\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 1625,
+      "tokensOut": 142,
+      "tokensThinking": 0,
+      "costUsd": 0.0008425,
+      "latencyMs": 2325
+    },
+    {
+      "page": 12,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 516,
+              "y": 399,
+              "width": 265,
+              "height": 137
+            },
+            "text": "BUT IT'S NOT THAT SIMPLE, ZORDON."
+          },
+          "b": {
+            "box": {
+              "x": 601,
+              "y": 525,
+              "width": 336,
+              "height": 161
+            },
+            "text": "THE TURTLES HAVE DEALT WITH SHREDDER FOR YEARS."
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 538,
+              "y": 1408,
+              "width": 406,
+              "height": 213
+            },
+            "text": "JASON'S RIGHT. BY THE TIME WE FINISH WITH ONE MONSTER, ANOTHER ONE POPS UP SOMEWHERE ELSE."
+          },
+          "b": {
+            "box": {
+              "x": 985,
+              "y": 1399,
+              "width": 284,
+              "height": 166
+            },
+            "text": "I mean, even with double duty... it's exhausting."
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 240,
+              "y": 1641,
+              "width": 329,
+              "height": 168
+            },
+            "text": "FOOT SOLDIERS AND PUTTIES HAVE NEVER BEEN A PROBLEM."
+          },
+          "b": {
+            "box": {
+              "x": 478,
+              "y": 1781,
+              "width": 334,
+              "height": 173
+            },
+            "text": "NOW, SUDDENLY THEY'RE FASTER AND STRONGER AND CAN THROW FIREBALLS?"
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 478,
+              "y": 1781,
+              "width": 334,
+              "height": 173
+            },
+            "text": "NOW, SUDDENLY THEY'RE FASTER AND STRONGER AND CAN THROW FIREBALLS?"
+          },
+          "b": {
+            "box": {
+              "x": 852,
+              "y": 1877,
+              "width": 284,
+              "height": 180
+            },
+            "text": "THEY GET MORE POWERFUL... WE STAY THE SAME."
+          }
+        },
+        {
+          "index": 4,
+          "a": {
+            "box": {
+              "x": 852,
+              "y": 1877,
+              "width": 284,
+              "height": 180
+            },
+            "text": "THEY GET MORE POWERFUL... WE STAY THE SAME."
+          },
+          "b": {
+            "box": {
+              "x": 1124,
+              "y": 1903,
+              "width": 277,
+              "height": 153
+            },
+            "text": "WHAT'RE WE SUPPOSED TO DO?"
+          }
+        },
+        {
+          "index": 5,
+          "a": {
+            "box": {
+              "x": 570,
+              "y": 2571,
+              "width": 301,
+              "height": 131
+            },
+            "text": "YOU MUST BE PATIENT, MY SON."
+          },
+          "b": {
+            "box": {
+              "x": 519,
+              "y": 2706,
+              "width": 351,
+              "height": 165
+            },
+            "text": "FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY."
+          }
+        },
+        {
+          "index": 6,
+          "a": {
+            "box": {
+              "x": 519,
+              "y": 2706,
+              "width": 351,
+              "height": 165
+            },
+            "text": "FOCUS ON THE ENEMY AND CONTINUE TO PROTECT THOSE IN HARM'S WAY."
+          },
+          "b": {
+            "box": {
+              "x": 586,
+              "y": 2865,
+              "width": 271,
+              "height": 123
+            },
+            "text": "ALL WILL BE REVEALED IN TIME."
+          }
+        },
+        {
+          "index": 7,
+          "a": {
+            "box": {
+              "x": 951,
+              "y": 2135,
+              "width": 235,
+              "height": 124
+            },
+            "text": "Master Splinter is correct."
+          },
+          "b": {
+            "box": {
+              "x": 905,
+              "y": 2256,
+              "width": 251,
+              "height": 289
+            },
+            "text": "WE HAVE DEALT WITH MANY FOES TOGETHER. BUT I PROMISE YOU..."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles for different characters\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 4,\n      \"joined\": false,\n      \"reason\": \"separate speech bubbles\"\n    },\n    {\n      \"index\": 5,\n      \"joined\": true,\n      \"reason\": \"connected speech bubbles\"\n    },\n    {\n      \"index\": 6,\n      \"joined\": true,\n      \"reason\": \"connected speech bubbles\"\n    },\n    {\n      \"index\": 7,\n      \"joined\": true,\n      \"reason\": \"connected speech bubbles\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 2098,
+      "tokensOut": 263,
+      "tokensThinking": 0,
+      "costUsd": 0.0012869000000000001,
+      "latencyMs": 3607
+    },
+    {
+      "page": 13,
+      "sent": [
+        {
+          "index": 0,
+          "a": {
+            "box": {
+              "x": 1213,
+              "y": 610,
+              "width": 360,
+              "height": 159
+            },
+            "text": "PIZZA IS BOTH FOR CELEBRATORY AND REMORSEFUL OCCASIONS, TRINI."
+          },
+          "b": {
+            "box": {
+              "x": 1423,
+              "y": 752,
+              "width": 246,
+              "height": 130
+            },
+            "text": "IT'S A VERY VERSATILE FOOD."
+          }
+        },
+        {
+          "index": 1,
+          "a": {
+            "box": {
+              "x": 304,
+              "y": 952,
+              "width": 374,
+              "height": 204
+            },
+            "text": "HOW'S THE SEARCH GOING, BILLY?"
+          },
+          "b": {
+            "box": {
+              "x": 678,
+              "y": 964,
+              "width": 296,
+              "height": 126
+            },
+            "text": "YOU FIGURE OUT THAT PORTAL TECHNOLOGY YET?"
+          }
+        },
+        {
+          "index": 2,
+          "a": {
+            "box": {
+              "x": 678,
+              "y": 964,
+              "width": 296,
+              "height": 126
+            },
+            "text": "YOU FIGURE OUT THAT PORTAL TECHNOLOGY YET?"
+          },
+          "b": {
+            "box": {
+              "x": 837,
+              "y": 1095,
+              "width": 399,
+              "height": 204
+            },
+            "text": "I'M STARTING TO GET THE HANG OF IT. PRETTY SURE I'VE ONLY ALMOST BLOWN UP THE COMMAND CENTER TWICE."
+          }
+        },
+        {
+          "index": 3,
+          "a": {
+            "box": {
+              "x": 837,
+              "y": 1095,
+              "width": 399,
+              "height": 204
+            },
+            "text": "I'M STARTING TO GET THE HANG OF IT. PRETTY SURE I'VE ONLY ALMOST BLOWN UP THE COMMAND CENTER TWICE."
+          },
+          "b": {
+            "box": {
+              "x": 971,
+              "y": 1305,
+              "width": 176,
+              "height": 158
+            },
+            "text": "OKAY... THREE TIMES."
+          }
+        },
+        {
+          "index": 4,
+          "a": {
+            "box": {
+              "x": 1322,
+              "y": 939,
+              "width": 408,
+              "height": 231
+            },
+            "text": "I've stumbled onto a few strange worlds here and there, but outside of Dimension X... I haven't found any other Rangers."
+          },
+          "b": {
+            "box": {
+              "x": 1649,
+              "y": 1136,
+              "width": 223,
+              "height": 124
+            },
+            "text": "WE MIGHT BE ON OUR OWN."
+          }
+        },
+        {
+          "index": 5,
+          "a": {
+            "box": {
+              "x": 1649,
+              "y": 1136,
+              "width": 223,
+              "height": 124
+            },
+            "text": "WE MIGHT BE ON OUR OWN."
+          },
+          "b": {
+            "box": {
+              "x": 1436,
+              "y": 1237,
+              "width": 322,
+              "height": 201
+            },
+            "text": "SPEAKING OF WHICH, HOW ARE CASEY AND APRIL DOING?"
+          }
+        },
+        {
+          "index": 6,
+          "a": {
+            "box": {
+              "x": 421,
+              "y": 2121,
+              "width": 564,
+              "height": 159
+            },
+            "text": "FINE LAST TIME WE TALKED. THEY'RE STILL HELPING THE NEUTRINOS CLEAR OUT THE REST OF KRANG'S FORCES."
+          },
+          "b": {
+            "box": {
+              "x": 494,
+              "y": 2259,
+              "width": 308,
+              "height": 196
+            },
+            "text": "I TOLD THEM TO GIVE US A CALL IF THEY NEEDED HELP."
+          }
+        }
+      ],
+      "reply": "{\n  \"candidates\": [\n    {\n      \"index\": 0,\n      \"joined\": true,\n      \"reason\": \"two balloons connected by a stem\"\n    },\n    {\n      \"index\": 1,\n      \"joined\": false,\n      \"reason\": \"two separate speech bubbles\"\n    },\n    {\n      \"index\": 2,\n      \"joined\": false,\n      \"reason\": \"two separate speech bubbles\"\n    },\n    {\n      \"index\": 3,\n      \"joined\": true,\n      \"reason\": \"two balloons connected by a stem\"\n    },\n    {\n      \"index\": 4,\n      \"joined\": false,\n      \"reason\": \"two separate speech bubbles\"\n    },\n    {\n      \"index\": 5,\n      \"joined\": false,\n      \"reason\": \"two separate speech bubbles\"\n    },\n    {\n      \"index\": 6,\n      \"joined\": true,\n      \"reason\": \"two balloons connected by a stem\"\n    }\n  ]\n}",
+      "failure": null,
+      "error": null,
+      "modelVersion": "gemini-3.5-flash-lite",
+      "tokensIn": 2029,
+      "tokensOut": 242,
+      "tokensThinking": 0,
+      "costUsd": 0.0012136999999999998,
+      "latencyMs": 2392
+    }
+  ],
+  "scores": {
+    "adjacentPairs": 76,
+    "candidates": 51,
+    "labeledPairs": 28,
+    "trueJoins": 9,
+    "falseJoins": 4,
+    "misses": 18,
+    "noAnswer": 0,
+    "geometryMisses": [
+      {
+        "page": 12,
+        "a": "ef7b4282-e7a8-424d-a8ee-1032f84f916f",
+        "b": "9f6a7b3a-a8ad-48d1-a141-c3866b39a0b6",
+        "why": "gap 42 px > 40"
+      }
+    ],
+    "precision": 0.6923076923076923,
+    "recall": 0.32142857142857145,
+    "recallOnCandidates": 0.3333333333333333
+  },
+  "tokens": {
+    "input": 17974,
+    "output": 1795,
+    "thinking": 0
+  },
+  "usd": 0.0098797
+}
