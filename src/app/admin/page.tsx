@@ -439,6 +439,7 @@ function ActionButtons({
         status={issue.status}
         skippedGates={skippedGates}
         latestRunId={issue.latestRunId}
+        openGateWaitAt={issue.openGateWaitAt}
       />
       {draft && canPreview && (
         <Link
