@@ -130,9 +130,18 @@ const GUTTER_FLAT = 12;
 const GUTTER_MAX_CHROMA = 16;
 /**
  * Over a flat colour, how far below the margin colour a channel inside the
- * box may sit and still count as that colour or the lettering: encode noise.
+ * box may sit and still count as that colour or the lettering. On issue-1
+ * page 25 the lettering's rows dip to 28 below in blue, a dark fringe or
+ * encode ringing beside its strokes (#564); dark art lines sit far lower.
  */
-const FLAT_BELOW = 12;
+const FLAT_BELOW = 32;
+/**
+ * Over a flat colour, when a row's margins are not flat at the box's edges
+ * (a detected box that cuts through the lettering's first or last letter),
+ * both are stepped outward this far at a time, up to the most.
+ */
+const FLAT_WIDEN_STEP_PX = 8;
+const FLAT_WIDEN_MAX_PX = 48;
 /**
  * Over a flat colour, a pixel's blend weight toward white, per channel, is
  * (pixel - margin) / (255 - margin). The lettering is grey-white, so it lifts
@@ -168,6 +177,55 @@ function isFlatOrLettering(data: Buffer, o: number, m: number[]): boolean {
   return near || (hi - lo <= FLAT_WEIGHT_SPREAD && hi <= FLAT_MAX_WEIGHT);
 }
 
+/** Calls `fn` on row `y`'s margin pixels: up to GUTTER_MARGIN_PX beside [a, b). */
+function forMargins(
+  img: RgbImage,
+  y: number,
+  a: number,
+  b: number,
+  fn: (o: number) => void,
+) {
+  const x0 = Math.max(0, a - GUTTER_MARGIN_PX);
+  const x1 = Math.min(img.width, b + GUTTER_MARGIN_PX);
+  for (let x = x0; x < x1; x++) {
+    if (x < a || x >= b) fn((y * img.width + x) * 3);
+  }
+}
+
+/** Per-channel mean of row `y`'s margins beside [a, b), or null if none. */
+function marginMean(img: RgbImage, y: number, a: number, b: number) {
+  const m = [0, 0, 0];
+  let n = 0;
+  forMargins(img, y, a, b, (o) => {
+    for (let c = 0; c < 3; c++) m[c]! += img.data[o + c]!;
+    n++;
+  });
+  return n === 0 ? null : m.map((v) => v / n);
+}
+
+/** The grey of a margin colour, when it is black or white; else null. */
+function blackOrWhite(m: number[]): number | null {
+  const mean = (m[0]! + m[1]! + m[2]!) / 3;
+  return mean <= 40 || mean >= 215 ? mean : null;
+}
+
+/** True when every margin pixel beside [a, b) is within GUTTER_FLAT of `ref`. */
+function marginsFlat(
+  img: RgbImage,
+  y: number,
+  a: number,
+  b: number,
+  ref: number[],
+) {
+  let flat = true;
+  forMargins(img, y, a, b, (o) => {
+    for (let c = 0; c < 3; c++) {
+      if (Math.abs(img.data[o + c]! - ref[c]!) > GUTTER_FLAT) flat = false;
+    }
+  });
+  return flat;
+}
+
 /**
  * Rows of `box` that run across a flat gutter get its colour painted over the
  * lettering, and the image model is left the rows over art. On the fixture
@@ -179,70 +237,89 @@ function isFlatOrLettering(data: Buffer, o: number, m: number[]): boolean {
  *   grey; art has colour), and the row is filled with the margins' grey;
  * - over any other colour, every pixel is that colour or a lighter blend of
  *   it no stronger than the lettering (`isFlatOrLettering`), and the row is
- *   filled with the margins' mean colour.
- * Returns the rows that qualified, as a box, and how many pixels the fill
- * changed (0 once a past round filled them), or null when none qualified.
+ *   filled with the margins' mean colour. Margins that are not flat at the
+ *   box's edges are stepped outward (FLAT_WIDEN_STEP_PX) and the row is
+ *   tested and filled over the wider span. Only the longest run of
+ *   consecutive such rows is filled: a box reaching up into the credits text
+ *   on page 25 also qualified the gap between two lines of it, and the
+ *   anti-aliased tops of the letters below that gap.
+ * Returns the rows filled, as a box spanning the widest row, and how many
+ * pixels the fill moved by more than GUTTER_FLAT, or null when none
+ * qualified. That count is 0 once a past round filled the rows: a refill
+ * over margins a widened fill reached shifts the colour by a level or two.
  */
 export function paintGutterRows(
   img: RgbImage,
   box: Box,
 ): { rows: Box; changed: number } | null {
-  const x0 = Math.max(0, box.x - GUTTER_MARGIN_PX);
-  const x1 = Math.min(img.width, box.x + box.width + GUTTER_MARGIN_PX);
-  let top = -1;
+  let top = Infinity;
   let bottom = -1;
+  let left = Infinity;
+  let right = -1;
   let changed = 0;
-  for (let y = box.y; y < box.y + box.height; y++) {
-    const m = [0, 0, 0];
-    let n = 0;
-    const px = (x: number) => (y * img.width + x) * 3;
-    for (let x = x0; x < x1; x++) {
-      if (x >= box.x && x < box.x + box.width) continue;
-      const o = px(x);
-      for (let c = 0; c < 3; c++) m[c]! += img.data[o + c]!;
-      n++;
-    }
-    if (n === 0) continue;
-    for (let c = 0; c < 3; c++) m[c]! /= n;
-    const mean = (m[0]! + m[1]! + m[2]!) / 3;
-    const grey = mean <= 40 || mean >= 215;
-    let flat = true;
-    for (let x = x0; x < x1 && flat; x++) {
-      if (x >= box.x && x < box.x + box.width) continue;
-      const o = px(x);
-      for (let c = 0; c < 3; c++) {
-        const ref = grey ? mean : m[c]!;
-        if (Math.abs(img.data[o + c]! - ref) > GUTTER_FLAT) flat = false;
-      }
-    }
-    if (!flat) continue;
-    let inside = true;
-    for (let x = box.x; x < box.x + box.width && inside; x++) {
-      const o = px(x);
-      if (grey) {
-        const r = img.data[o]!;
-        const g = img.data[o + 1]!;
-        const b = img.data[o + 2]!;
-        inside = Math.max(r, g, b) - Math.min(r, g, b) <= GUTTER_MAX_CHROMA;
-      } else inside = isFlatOrLettering(img.data, o, m);
-    }
-    if (!inside) continue;
-    const fill = grey ? [0, 0, 0].fill(Math.round(mean)) : m.map(Math.round);
-    for (let x = box.x; x < box.x + box.width; x++) {
-      const o = px(x);
+  const paint = (y: number, a: number, b: number, fill: number[]) => {
+    for (let x = a; x < b; x++) {
+      const o = (y * img.width + x) * 3;
       let moved = false;
       for (let c = 0; c < 3; c++) {
-        if (img.data[o + c] !== fill[c]) moved = true;
+        if (Math.abs(img.data[o + c]! - fill[c]!) > GUTTER_FLAT) moved = true;
         img.data[o + c] = fill[c]!;
       }
       if (moved) changed++;
     }
-    if (top < 0) top = y;
-    bottom = y;
+    top = Math.min(top, y);
+    bottom = Math.max(bottom, y);
+    left = Math.min(left, a);
+    right = Math.max(right, b);
+  };
+  type Row = { y: number; a: number; b: number; fill: number[] };
+  let run: Row[] = [];
+  let best: Row[] = [];
+  const end = box.x + box.width;
+  for (let y = box.y; y < box.y + box.height; y++) {
+    const m = marginMean(img, y, box.x, end);
+    if (!m) continue;
+    const mean = blackOrWhite(m);
+    if (mean !== null) {
+      // Black or white: lettering there is grey, art has colour.
+      if (!marginsFlat(img, y, box.x, end, [mean, mean, mean])) continue;
+      let unsaturated = true;
+      for (let x = box.x; x < end && unsaturated; x++) {
+        const o = (y * img.width + x) * 3;
+        const r = img.data[o]!;
+        const g = img.data[o + 1]!;
+        const b = img.data[o + 2]!;
+        unsaturated =
+          Math.max(r, g, b) - Math.min(r, g, b) <= GUTTER_MAX_CHROMA;
+      }
+      if (unsaturated) paint(y, box.x, end, [0, 0, 0].fill(Math.round(mean)));
+      continue;
+    }
+    for (let s = 0; s <= FLAT_WIDEN_MAX_PX; s += FLAT_WIDEN_STEP_PX) {
+      const a = Math.max(0, box.x - s);
+      const b = Math.min(img.width, end + s);
+      const mc = marginMean(img, y, a, b);
+      // Margins that turn black or white further out are the black/white
+      // rule's, never this one's: over near-black, dim art passes the
+      // blend test (issue-1 page 4, #564).
+      if (!mc || blackOrWhite(mc) !== null) continue;
+      if (!marginsFlat(img, y, a, b, mc)) continue;
+      let inside = true;
+      for (let x = a; x < b && inside; x++) {
+        inside = isFlatOrLettering(img.data, (y * img.width + x) * 3, mc);
+      }
+      if (inside) {
+        if (run.at(-1)?.y !== y - 1) run = [];
+        run.push({ y, a, b, fill: mc.map(Math.round) });
+        if (run.length > best.length) best = run;
+      }
+      break;
+    }
   }
-  if (top < 0) return null;
+  for (const r of best) paint(r.y, r.a, r.b, r.fill);
+  if (bottom < 0) return null;
   return {
-    rows: { x: box.x, y: top, width: box.width, height: bottom - top + 1 },
+    rows: { x: left, y: top, width: right - left, height: bottom - top + 1 },
     changed,
   };
 }
