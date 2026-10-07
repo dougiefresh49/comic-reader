@@ -214,13 +214,16 @@ export function PipelineActions({
   // only when both sides have one: with no key at Resume (the wait write is
   // best effort), a re-pause at the same stop keeps the row on "Resumed",
   // polling, rather than letting a stale null settle it onto the old pause.
+  // Only a newer wait counts: an earlier stop's wait whose close never landed
+  // stays open, and once this gate is released it becomes the newest open one.
+  // ISO timestamps, so string order is time order.
   const leftPause =
     resumedFrom !== null &&
     (!isPaused ||
       pipelinePausedAt !== resumedFrom.pausedAt ||
       (resumedFrom.gateWaitAt !== null &&
         openGateWaitAt !== null &&
-        openGateWaitAt !== resumedFrom.gateWaitAt));
+        openGateWaitAt > resumedFrom.gateWaitAt));
   const settled =
     (caughtUp || (followUntracked && !refreshPending) || leftPause) &&
     !isRunning;
