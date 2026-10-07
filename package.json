@@ -43,7 +43,6 @@
     "regenerate-timestamps": "tsx --env-file=.env scripts/regenerate-timestamps.ts",
     "generate-pages-metadata": "tsx --env-file=.env scripts/generate-pages-metadata.ts",
     "add-bubble-styles": "tsx --env-file=.env scripts/add-bubble-styles.ts",
-    "repair-cues": "tsx --env-file=.env scripts/repair-cues.ts",
     "clip-audio-segments": "tsx scripts/clip-audio-segments.ts",
     "find-voice-sources": "tsx --env-file=.env scripts/find-voice-sources.ts",
     "split-voice": "tsx --env-file=.env scripts/split-voice-clip.ts",

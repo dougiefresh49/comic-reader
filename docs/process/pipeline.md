@@ -183,7 +183,6 @@ pnpm ingest -- --book tmnt-mmpr-iii --issue 3 --auto
 
 | Script | When to use |
 |--------|------------|
-| `pnpm repair-cues` | Fix ElevenLabs `textWithCues` formatting on existing bubbles |
 | `pnpm backfill-context` | Add missing `aiReasoning` fields to an existing `bubbles.json` |
 | `pnpm regenerate-timestamps` | Re-fetch word timing data without re-generating audio |
 | `pnpm apply-fixes` | Apply speaker/emotion corrections exported from the web review UI |
@@ -200,7 +199,7 @@ All model strings are centralized in `src/lib/models.ts` (re-exported via `scrip
 |--------|-------|---------|
 | `GEMINI_HIGH` | `gemini-3.1-pro-preview` | `get-context` (context analysis), `find-voice-sources` (research) |
 | `GEMINI_MEDIUM` | `gemini-3-flash-preview` | OCR, `sort-bubbles-gemini`, `character-lookahead`, `scrape-pages`, `split-voice` (speaker ID) |
-| `GEMINI_FAST` | `gemini-3.1-flash-lite` | `repair-cues`, `regenerate-cues` (simple rule-based fixes) |
+| `GEMINI_FAST` | `gemini-3.1-flash-lite` | `regenerate-cues` (simple rule-based fixes) |
 
 ---
 
