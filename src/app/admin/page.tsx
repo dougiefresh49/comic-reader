@@ -39,8 +39,12 @@ async function getLatestSkippedByIssue(): Promise<Map<string, SkippedGate[]>> {
 
   if (error) {
     console.error("getLatestSkippedByIssue:", error);
+    throw new Error(`getLatestSkippedByIssue: ${error.message}`, {
+      cause: error,
+    });
   }
 
+  // No running run is not an error: the map comes back empty.
   const map = new Map<string, SkippedGate[]>();
   for (const row of data ?? []) {
     const key = `${row.book_id}/${row.issue_id}`;
