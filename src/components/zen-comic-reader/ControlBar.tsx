@@ -1,11 +1,21 @@
 "use client";
 
 interface ControlBarProps {
-  children: React.ReactNode;
+  /** The row above the progress strip. Omit it and the row takes no height. */
+  children?: React.ReactNode;
   pageNumber: number;
   pageCount: number;
   /** Panel mode shows its own cyan panel-progress bar — keep ONE progress story. */
   hidePageProgress?: boolean;
+  /**
+   * Panel view draws the bar over the page and slides it away with the top
+   * bar (#607). Page view leaves it in the flex column, always shown.
+   */
+  overlay?: boolean;
+  /** Only read when `overlay` is set; the bar stays mounted while hidden. */
+  visible?: boolean;
+  /** Skip the slide when the reader's motion setting is off. */
+  reducedMotion?: boolean;
 }
 
 export function ControlBar({
@@ -13,12 +23,26 @@ export function ControlBar({
   pageNumber,
   pageCount,
   hidePageProgress = false,
+  overlay = false,
+  visible = true,
+  reducedMotion = false,
 }: ControlBarProps) {
   const progress = pageCount > 0 ? pageNumber / pageCount : 0;
+  const placement = overlay
+    ? `absolute inset-x-0 bottom-0 ${
+        reducedMotion ? "transition-none" : "transition-transform duration-300"
+      } ${visible ? "translate-y-0" : "translate-y-full"}`
+    : "shrink-0";
 
   return (
-    <div className="z-50 flex shrink-0 flex-col border-t border-white/5 bg-neutral-950/95 backdrop-blur">
-      <div className="flex min-h-[72px] items-center px-4 py-2">{children}</div>
+    <div
+      className={`z-50 flex flex-col border-t border-white/5 bg-neutral-950/95 backdrop-blur ${placement}`}
+    >
+      {children != null && (
+        <div className="flex min-h-[72px] items-center px-4 py-2">
+          {children}
+        </div>
+      )}
       {!hidePageProgress && (
         <div className="relative h-1 w-full bg-white/5">
           <div

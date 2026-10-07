@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 const AUTOPLAY_KEY = "zen-reader-autoplay";
 const VOLUMES_KEY = "zen-reader-volumes";
@@ -11,6 +11,7 @@ const MUTE_ALL_KEY = "zen-reader-mute-all";
 const VOICES_ONLY_KEY = "zen-reader-voices-only";
 const AUTO_ADVANCE_PAGE_KEY = "zen-reader-auto-advance-page";
 const WORD_HIGHLIGHT_KEY = "zen-reader-word-highlight";
+const CAPTION_BAR_KEY = "zen-reader-caption-bar";
 
 export type MotionIntensity = "off" | "reduced" | "full";
 
@@ -37,6 +38,21 @@ const DEFAULT_VOLUMES: LayerVolumes = {
 const DEFAULT_PLAYBACK_RATE = 1.0;
 export const PLAYBACK_RATE_MIN = 0.75;
 export const PLAYBACK_RATE_MAX = 2.0;
+
+function readWordHighlightMode(): WordHighlightMode {
+  if (typeof window === "undefined") return "both";
+  const stored = window.localStorage.getItem(WORD_HIGHLIGHT_KEY);
+  if (stored === "bubble" || stored === "caption" || stored === "both")
+    return stored;
+  return "both";
+}
+
+const subscribeToNothing = () => () => undefined;
+
+/** The caption bar follows the highlight mode until the user sets it apart (#607). */
+function captionBarFor(mode: WordHighlightMode): boolean {
+  return mode !== "bubble";
+}
 
 function readVolumes(): LayerVolumes {
   if (typeof window === "undefined") return DEFAULT_VOLUMES;
@@ -82,15 +98,27 @@ export function useSettings() {
     return window.localStorage.getItem(AUTO_ADVANCE_PAGE_KEY) === "true";
   });
 
-  const [wordHighlightMode, setWordHighlightMode] = useState<WordHighlightMode>(
-    () => {
-      if (typeof window === "undefined") return "both";
-      const stored = window.localStorage.getItem(WORD_HIGHLIGHT_KEY);
-      if (stored === "bubble" || stored === "caption" || stored === "both")
-        return stored;
-      return "both";
-    },
+  const [wordHighlightMode, setWordHighlightModeState] =
+    useState<WordHighlightMode>(readWordHighlightMode);
+
+  // Nothing stored: derive from the highlight mode, so an existing reader on
+  // "Both" (or nothing) sees no change and "In bubble" starts with the bar off.
+  const [storedCaptionBar, setCaptionBar] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(CAPTION_BAR_KEY);
+    if (stored === "true" || stored === "false") return stored === "true";
+    return captionBarFor(readWordHighlightMode());
+  });
+  // Unlike the other settings, the bar changes the reader's markup, so the
+  // server's render (bar on) must hydrate as is. The stored value takes over
+  // on the first client render; page turns never hydrate, so only a hard
+  // load with the bar off shows it for one frame.
+  const hydrated = useSyncExternalStore(
+    subscribeToNothing,
+    () => true,
+    () => false,
   );
+  const captionBar = hydrated ? storedCaptionBar : true;
 
   const [muteAll, setMuteAll] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -135,6 +163,10 @@ export function useSettings() {
   }, [wordHighlightMode]);
 
   useEffect(() => {
+    window.localStorage.setItem(CAPTION_BAR_KEY, String(storedCaptionBar));
+  }, [storedCaptionBar]);
+
+  useEffect(() => {
     window.localStorage.setItem(MUTE_ALL_KEY, String(muteAll));
   }, [muteAll]);
 
@@ -148,6 +180,13 @@ export function useSettings() {
       String(panelViewPreferred),
     );
   }, [panelViewPreferred]);
+
+  // Choosing a highlight mode also sets the bar; the bar's own toggle then
+  // stands on its own until the next mode change.
+  const setWordHighlightMode = useCallback((mode: WordHighlightMode) => {
+    setWordHighlightModeState(mode);
+    setCaptionBar(captionBarFor(mode));
+  }, []);
 
   const toggleAutoPlay = useCallback(() => {
     setAutoPlayEnabled((prev) => !prev);
@@ -207,5 +246,7 @@ export function useSettings() {
     setMotionIntensity,
     wordHighlightMode,
     setWordHighlightMode,
+    captionBar,
+    setCaptionBar,
   };
 }

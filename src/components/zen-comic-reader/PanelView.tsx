@@ -359,7 +359,10 @@ interface PanelViewHudProps {
   panelAutoPlay: boolean;
   onTogglePanelAutoPlay: () => void;
   announceText: string;
-  /** Caption slot (SpeechBox / empty state) — content sits below the chrome row, above the progress bar. */
+  /**
+   * Caption slot (SpeechBox / empty state) — content sits below the chrome
+   * row, above the progress bar. Omitted when the caption bar is off (#607).
+   */
   children?: React.ReactNode;
 }
 
@@ -521,7 +524,7 @@ export function PanelViewHud({
 
       {/* Caption is content; it sits below the chrome row, stretched to a
           slim gutter (ControlBar px-4 minus 4px → 12px each side). */}
-      <div className="-mx-1 min-w-0">{children}</div>
+      {children != null && <div className="-mx-1 min-w-0">{children}</div>}
 
       {/* Single progress story in panel mode (page tick hidden in ControlBar). */}
       <div
