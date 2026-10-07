@@ -170,7 +170,15 @@ function VariantRow({
             if (!confirm(`Delete variant ${tagString}?`)) return;
             setError(null);
             setBusy(true);
-            const r = await deleteAudioVariant({ layer, filename: v.filename });
+            // A stale Basic Auth password is refused by the middleware before
+            // the action runs, so the call throws instead of returning ok: false.
+            const r = await deleteAudioVariant({
+              layer,
+              filename: v.filename,
+            }).catch((e: unknown) => ({
+              ok: false as const,
+              error: e instanceof Error ? e.message : String(e),
+            }));
             setBusy(false);
             if (!r.ok) {
               setError(r.error ?? "delete failed");
