@@ -148,6 +148,7 @@ function VariantRow({
   v: TagVariants;
 }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const label = v.variant === null ? "default" : `@${v.variant}`;
   const tagString = v.variant === null ? base : `${base}@${v.variant}`;
   return (
@@ -167,9 +168,22 @@ function VariantRow({
           disabled={busy}
           onClick={async () => {
             if (!confirm(`Delete variant ${tagString}?`)) return;
+            setError(null);
             setBusy(true);
-            await deleteAudioVariant({ layer, filename: v.filename });
+            // A stale Basic Auth password is refused by the middleware before
+            // the action runs, so the call throws instead of returning ok: false.
+            const r = await deleteAudioVariant({
+              layer,
+              filename: v.filename,
+            }).catch((e: unknown) => ({
+              ok: false as const,
+              error: e instanceof Error ? e.message : String(e),
+            }));
             setBusy(false);
+            if (!r.ok) {
+              setError(r.error ?? "delete failed");
+              return;
+            }
             location.reload();
           }}
           className="text-xs text-red-400 hover:text-red-300 disabled:opacity-30"
@@ -177,6 +191,7 @@ function VariantRow({
           Delete
         </button>
       )}
+      {error && <span className="text-xs text-red-200">{error}</span>}
     </div>
   );
 }
