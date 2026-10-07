@@ -27,6 +27,7 @@ import {
 import { sortPageElements, addBubbleStyles } from "./steps/sort";
 import { fetchWikiContextStep } from "./steps/wiki";
 import { generateVoiceDescriptions } from "./steps/voice";
+import { wordGeometryPage } from "./steps/word-geometry";
 import { getBubbleIdsForAudio, generateAudioBatch } from "./steps/generation";
 import { generateManifest } from "./steps/publishing";
 import { createCastingTasks } from "./steps/casting-tasks";
@@ -176,6 +177,22 @@ export async function ingestPipeline(input: IngestInput) {
       });
       await pageReviewHook;
       await recordGateWait(bookId, issueId, currentStep, "close");
+    }
+
+    // ── Phase 4b: Word boxes, after the owner's page review (#573) ───────
+    if (run("word-geometry")) {
+      currentStep = "word-geometry";
+      await updatePipelineStep(bookId, issueId, currentStep);
+      const timing = await recordStepStart(
+        bookId,
+        issueId,
+        currentStep,
+        pages.length,
+      );
+      for (const page of pages) {
+        await wordGeometryPage(bookId, issueId, page.pageNumber);
+      }
+      await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 
     // ── Phase 5: Voice descriptions ───────────────────────────────────

@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { countIssueCast } from "~/lib/cast";
+import { whereWordGeometryCandidate } from "~/lib/word-geometry-assign";
 
 /**
  * Read side of the issue hub (#334): the latest `pipeline_runs` row and the
@@ -52,6 +53,10 @@ export interface ProgressCounts {
   /** Bubbles with a speaker that are not ignored: the ones audio is made for. */
   spokenBubbles: number;
   bubblesWithAudio: number;
+  /** Bubbles that get word boxes: `whereWordGeometryCandidate` (#572). */
+  wordGeometryCandidates: number;
+  /** Candidates with a non-null `text_geometry`. */
+  wordGeometryDone: number;
   /** Face detections on this issue's panels plus face exemplars from it. */
   faces: number;
   facesNamed: number;
@@ -162,6 +167,8 @@ async function getCounts(
     bubblesWithSpeaker,
     spokenBubbles,
     bubblesWithAudio,
+    wordGeometryCandidates,
+    wordGeometryDone,
     exemplars,
     exemplarsNamed,
     castingTasks,
@@ -183,6 +190,16 @@ async function getCounts(
       .not("speaker", "is", null)
       .eq("ignored", false)
       .not("audio_storage_path", "is", null),
+    // select count(*) from bubbles where book_id = $1 and issue_id = $2
+    //   and ignored = false and type in ('SPEECH', 'NARRATION', 'CAPTION')
+    //   and style is not null
+    whereWordGeometryCandidate(scoped("bubbles")),
+    // ... and text_geometry is not null
+    whereWordGeometryCandidate(scoped("bubbles")).not(
+      "text_geometry",
+      "is",
+      null,
+    ),
     // select count(*) from character_face_exemplars
     //   where book_id = $1 and source_issue = $2
     supabaseAdmin
@@ -254,6 +271,11 @@ async function getCounts(
     bubblesWithSpeaker: countOf("bubblesWithSpeaker", bubblesWithSpeaker),
     spokenBubbles: countOf("spokenBubbles", spokenBubbles),
     bubblesWithAudio: countOf("bubblesWithAudio", bubblesWithAudio),
+    wordGeometryCandidates: countOf(
+      "wordGeometryCandidates",
+      wordGeometryCandidates,
+    ),
+    wordGeometryDone: countOf("wordGeometryDone", wordGeometryDone),
     faces: detections + countOf("exemplars", exemplars),
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
     castingTasks: countOf("castingTasks", castingTasks),

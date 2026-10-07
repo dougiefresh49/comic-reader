@@ -86,6 +86,7 @@ const REQUIRED_KEYS = [
   "GEMINI_API_KEY_2",
   "ELEVENLABS_API_KEY",
   "VENICE_API_KEY",
+  "GOOGLE_CLOUD_VISION_API_KEY",
 ];
 /**
  * Every table with a book_id column (src/types/database.ts) but castlist, in
