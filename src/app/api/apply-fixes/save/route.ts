@@ -2,6 +2,7 @@
 // A route handler, not a server action: an action that revalidates re-renders the page it was called from,
 // and the editor must keep its place after a Save.
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { type NextRequest } from "next/server";
 import { adminAuthFailure, checkAdminAuth } from "~/lib/admin-auth";
@@ -10,9 +11,13 @@ import {
   pixelBoxOf,
   sampleFillColorRaw,
 } from "~/lib/bubble-fill";
+import { isDryRun } from "~/lib/fakes/dry-run";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { pageStoragePath } from "~/lib/storage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { CANDIDATE_TYPES } from "~/lib/word-geometry-assign";
+import { wordGeometryForPage } from "~/lib/word-geometry-page";
+import type { Database } from "~/types/database";
 import {
   bubbleInsert,
   bubbleUpdate,
@@ -106,6 +111,50 @@ async function setFillColors(
       }
     }),
   );
+}
+
+/**
+ * The pages whose word boxes this Save makes stale (#620). A bubble's
+ * `text_geometry` is assigned from the lines its box covered when the page was
+ * OCR'd, and its `fill_color` is sampled with those word boxes skipped. A box
+ * that moves or grows keeps the old boxes, so the reader's highlight lands on
+ * the old lettering; a bubble drawn new has none, so the reader falls back to
+ * the caption highlight. So a page re-runs its word boxes when this Save writes
+ * the box of a row that is a word-geometry candidate after the Save
+ * (`whereWordGeometryCandidate`): a candidate type, not ignored, with a style.
+ * Each field comes from the row being written, else as stored; a box row always
+ * writes `style`, and an insert row carries all three.
+ */
+function wordBoxPages(
+  boxRows: Map<number, Record<string, unknown>[]>,
+  updateIds: Map<Record<string, unknown>, string>,
+  ctx: WriteContext,
+): number[] {
+  const candidateTypes: readonly string[] = CANDIDATE_TYPES;
+  return Array.from(boxRows)
+    .filter(([, rows]) =>
+      rows.some((row) => {
+        const id = updateIds.get(row);
+        const type =
+          "type" in row
+            ? row.type
+            : id === undefined
+              ? undefined
+              : ctx.type.get(id);
+        const ignored =
+          "ignored" in row
+            ? row.ignored
+            : id !== undefined && ctx.ignored.has(id);
+        return (
+          typeof type === "string" &&
+          candidateTypes.includes(type) &&
+          ignored === false &&
+          row.style != null
+        );
+      }),
+    )
+    .map(([page]) => page)
+    .sort((a, b) => a - b);
 }
 
 export async function POST(req: NextRequest) {
@@ -242,23 +291,23 @@ export async function POST(req: NextRequest) {
   }
 
   if (ops.length === 0) {
-    return Response.json({ written: 0, needsAudio: 0 } satisfies SaveResult);
+    return Response.json({
+      written: 0,
+      needsAudio: 0,
+      wordBoxesFailed: [],
+    } satisfies SaveResult);
   }
 
   // The rows are shared with `ops`, so this lands in the RPC payload. An
   // update row carries no id, so its op names it.
-  await setFillColors(
-    bookId,
-    issueId,
-    boxRows,
-    new Map(
-      ops.flatMap((op) =>
-        op.op === "update" && op.table === "bubbles"
-          ? [[op.row, op.id] as const]
-          : [],
-      ),
+  const updateIds = new Map(
+    ops.flatMap((op) =>
+      op.op === "update" && op.table === "bubbles"
+        ? [[op.row, op.id] as const]
+        : [],
     ),
   );
+  await setFillColors(bookId, issueId, boxRows, updateIds);
 
   const { error, status } = await supabaseAdmin.rpc("save_review_edits", {
     p_book_id: bookId,
@@ -276,6 +325,36 @@ export async function POST(req: NextRequest) {
         )
       : fail(`Nothing was saved: ${error.message}`, 409);
   }
+
+  // The rows are committed; a page whose word boxes fail to refresh is
+  // reported in the answer and never fails the Save. Under DRY_RUN the
+  // engine returns no lines and the refresh would write null word boxes over
+  // every candidate on the page, so the page is reported instead of run; the
+  // check sits inside the settled promise so that its own throw (DRY_RUN on
+  // a deployment) is reported the same way.
+  const refreshPages = wordBoxPages(boxRows, updateIds, ctx);
+  const refreshed = await Promise.allSettled(
+    refreshPages.map(async (page) => {
+      if (isDryRun())
+        throw new Error("DRY_RUN is set, so the word boxes were left alone");
+      return wordGeometryForPage(
+        // supabaseAdmin is untyped; the bubbles schema is the generated one.
+        supabaseAdmin as SupabaseClient<Database>,
+        bookId,
+        issueId,
+        page,
+      );
+    }),
+  );
+  const wordBoxesFailed: SaveResult["wordBoxesFailed"] = [];
+  refreshPages.forEach((page, i) => {
+    const r = refreshed[i];
+    if (r?.status !== "rejected") return;
+    const error =
+      r.reason instanceof Error ? r.reason.message : String(r.reason);
+    console.warn(`[save] page ${page}: word boxes not refreshed (${error})`);
+    wordBoxesFailed.push({ page, error });
+  });
 
   const pages = [
     ...bubbles.add,
@@ -296,5 +375,6 @@ export async function POST(req: NextRequest) {
       (op) =>
         op.table === "bubbles" && op.op !== "delete" && op.row.needs_audio,
     ).length,
+    wordBoxesFailed,
   } satisfies SaveResult);
 }
