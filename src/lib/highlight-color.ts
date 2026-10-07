@@ -10,7 +10,7 @@
  * colour from a fixed list is picked.
  */
 
-/** The marker on white and cream balloons, and whenever the fill is unknown (#75, owner call O70). */
+/** The marker on white balloons, on fills too dark for black lettering, and whenever the fill is unknown (#75, owner call O70). */
 export const DEFAULT_MARKER = "#FDE047";
 
 /** The active word's marker opacity; the blend maths below and the overlay share it. */
@@ -86,7 +86,10 @@ function seenOver(fill: Rgb, marker: Rgb): Rgb {
  * The marker colour for a bubble with this fill. Unknown or near-white
  * fill: `DEFAULT_MARKER`. Otherwise the candidate whose blend stands out
  * most from the fill (largest ΔE) among those that keep black lettering at
- * 4.5:1, or, when none does, the one with the most contrast with black.
+ * 4.5:1. When none does, the fill is too dark for black lettering, so the
+ * lettering is light (white on a teal or blue caption box), the marker
+ * shows on the letters themselves, and `DEFAULT_MARKER` is the candidate
+ * that stands out most on white.
  */
 export function highlightColorFor(fill: string | null | undefined): string {
   const rgb = fill ? parseHex(fill) : null;
@@ -95,23 +98,16 @@ export function highlightColorFor(fill: string | null | undefined): string {
   if (luminance(rgb) >= NEAR_WHITE_LUMINANCE && spread <= NEAR_WHITE_MAX_SPREAD)
     return DEFAULT_MARKER;
 
-  let best: string | null = null;
+  let best: string = DEFAULT_MARKER;
   let bestDelta = -1;
-  let fallback: string = DEFAULT_MARKER;
-  let fallbackContrast = -1;
   for (const candidate of CANDIDATES) {
     const seen = seenOver(rgb, parseHex(candidate)!);
-    const contrast = contrastWithBlack(seen);
-    if (contrast > fallbackContrast) {
-      fallback = candidate;
-      fallbackContrast = contrast;
-    }
-    if (contrast < MIN_CONTRAST_WITH_BLACK) continue;
+    if (contrastWithBlack(seen) < MIN_CONTRAST_WITH_BLACK) continue;
     const delta = deltaE(rgb, seen);
     if (delta > bestDelta) {
       best = candidate;
       bestDelta = delta;
     }
   }
-  return best ?? fallback;
+  return best;
 }

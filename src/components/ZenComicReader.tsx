@@ -692,7 +692,7 @@ export default function ZenComicReader({
                     boxesByTimingIndex={wordMatch.boxesByTimingIndex}
                     aspect={pageAspect}
                     reducedMotion={cameraOff}
-                    color={highlightColorFor(selectedBubble?.fillColor)}
+                    color={highlightColorFor(selectedBubble.fillColor)}
                   />
                 ) : null}
                 {displayBubbles.map((bubble) => {

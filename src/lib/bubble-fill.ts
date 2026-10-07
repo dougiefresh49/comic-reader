@@ -29,8 +29,13 @@ export interface RawImage {
 
 /** The ellipse's share of the box's width and height. */
 const ELLIPSE_SCALE = 0.8;
-/** Below this WCAG relative luminance a pixel is lettering or outline. */
-const DARK_LUMINANCE = 0.25;
+/**
+ * Below this WCAG relative luminance a pixel is black ink (lettering or
+ * outline). Kept this low so red, blue and purple fills (luminance 0.1-0.25)
+ * still count as fill; anti-aliased glyph edges spread over many buckets, so
+ * the fill's bucket outvotes them.
+ */
+const DARK_LUMINANCE = 0.03;
 /** Fewer surviving pixels than this is no fill to trust. */
 const MIN_PIXELS = 20;
 
