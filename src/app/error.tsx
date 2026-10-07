@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect } from "react";
+import { useEffect, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +17,7 @@ export default function AppError({
   reset: () => void;
 }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     console.error("[app-error]", error.digest ?? "", error);
@@ -25,6 +26,7 @@ export default function AppError({
   // reset() alone re-renders the failed server payload already in the
   // client cache. refresh() refetches it; one transition keeps this page
   // up until the new payload lands, so a second failure lands back here.
+  // isPending holds for that whole wait, so the button shows the retry.
   function retry() {
     startTransition(() => {
       router.refresh();
@@ -46,9 +48,11 @@ export default function AppError({
       <div className="flex gap-3">
         <button
           onClick={retry}
-          className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none"
+          disabled={isPending}
+          aria-busy={isPending}
+          className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none disabled:cursor-wait disabled:opacity-70 disabled:hover:bg-cyan-600"
         >
-          Try again
+          {isPending ? "Trying…" : "Try again"}
         </button>
         <Link
           href="/"
