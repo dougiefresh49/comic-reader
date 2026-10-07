@@ -11,6 +11,7 @@ export const STEP_ORDER = [
   "get-context",
   "sort-page-elements",
   "review-pages",
+  "word-geometry",
   "generate-voice-descriptions",
   "casting",
   "generate-audio",

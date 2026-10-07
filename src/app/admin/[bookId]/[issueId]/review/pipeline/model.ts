@@ -252,6 +252,12 @@ function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
         : ratio(c.facesNamed, c.faces, "faces named");
     case "get-context":
       return ratio(c.bubblesWithSpeaker, c.bubbles, "bubbles have a speaker");
+    case "word-geometry":
+      return ratio(
+        c.wordGeometryDone,
+        c.wordGeometryCandidates,
+        "bubbles have word boxes",
+      );
     case "casting":
       return c.castingTasks > 0
         ? ratio(c.castingTasksDone, c.castingTasks, "casting tasks done")

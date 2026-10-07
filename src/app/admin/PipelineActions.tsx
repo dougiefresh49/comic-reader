@@ -39,6 +39,7 @@ const STEP_LABELS: Record<string, string> = {
   "get-context": "Get context",
   "sort-page-elements": "Sort elements",
   "review-pages": "Page review",
+  "word-geometry": "Word boxes",
   "generate-voice-descriptions": "Voice descriptions",
   casting: "Voices",
   "generate-audio": "Generate audio",
