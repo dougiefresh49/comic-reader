@@ -1,12 +1,12 @@
 /**
- * The voice lookup (#474): one `GEMINI_FAST` call per (character, work) that
+ * The voice lookup (#474): a `GEMINI_FAST` call per (character, work) that
  * describes how the character sounds in that work, for a voice that has no
  * description or labels. The answer is stored in `voice_lookups`, and the
  * voice-lab import copies it onto the voice row with `--execute`. This module
  * holds the prompt, the answer check and every `voice_lookups` query.
  *
  * The prompt gets the character's name, the work's title, year and medium,
- * and the voice actor when the appearance names one. No audio, no wiki text.
+ * and the voice actor when the appearance names one. No wiki text.
  *
  * When the model says it does not know the voice (#552), a second prompt asks
  * it to describe the character's voice from the same franchise's other works,
@@ -141,7 +141,7 @@ ${DESCRIPTION_FIELDS}`;
 export function clipPrompt(s: LookupSubject): string {
   return `${subjectLines({ ...s, voice_actor: null }, "Describe the speaking voice heard in this audio clip.")}
 
-The clip is this character speaking in this work. If more than one voice speaks in it, describe this character's voice only. Describe what you hear in the clip, not what you know of the character.
+The clip is this character speaking in this work. If more than one voice speaks in it, describe this character's voice only; if you cannot tell which voice is the character's, describe the voice that speaks the most. Describe what you hear in the clip, not what you know of the character.
 
 Return JSON:
 ${DESCRIPTION_FIELDS}`;
