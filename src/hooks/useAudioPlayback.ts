@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Bubble, AudioTimestamps } from "~/types";
 import { audioUrl } from "~/lib/storage";
+import { applyLevel, ensureConnected } from "~/lib/audio-graph";
 import { buildWordTimings } from "~/components/zen-comic-reader/text-utils";
 import { useWordHighlight } from "./useWordHighlight";
 
@@ -11,7 +12,11 @@ interface UseAudioPlaybackOptions {
   issueId: string;
   timestamps: Record<string, AudioTimestamps>;
   onBubbleEnded?: (bubble: Bubble) => void;
-  /** 0..1 — applied as audio.volume on every bubble playback. */
+  /**
+   * 0..1, applied through the shared Web Audio gain on every bubble
+   * playback (`~/lib/audio-graph`), never as `audio.volume`, which iOS
+   * WebKit ignores (#611).
+   */
   volume?: number;
   /** HTMLMediaElement.playbackRate; pitch-preserved up to ~1.5x in Safari. */
   playbackRate?: number;
@@ -79,10 +84,14 @@ export function useAudioPlayback({
         return;
       }
 
-      const audio = new Audio(
-        audioUrl(bookId, issueId, bubble.audioStoragePath),
-      );
-      audio.volume = Math.max(0, Math.min(1, volume));
+      // crossOrigin before src, so the fetch is a CORS request from the
+      // start: createMediaElementSource needs it to route the clip.
+      const audio = new Audio();
+      audio.crossOrigin = "anonymous";
+      audio.src = audioUrl(bookId, issueId, bubble.audioStoragePath);
+      const level = Math.max(0, Math.min(1, volume));
+      ensureConnected(audio, level);
+      applyLevel(audio, level);
       audio.playbackRate = playbackRate;
       audioRef.current = audio;
       armedRef.current = true;
@@ -157,7 +166,7 @@ export function useAudioPlayback({
   // Live-update an in-flight audio element when volume/rate change mid-playback.
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = Math.max(0, Math.min(1, volume));
+      applyLevel(audioRef.current, Math.max(0, Math.min(1, volume)));
       audioRef.current.playbackRate = playbackRate;
     }
   }, [volume, playbackRate]);
