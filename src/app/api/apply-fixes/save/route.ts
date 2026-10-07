@@ -46,14 +46,37 @@ function fail(error: string, status: number) {
 
 /**
  * Sets `fill_color` on each box-writing bubble row from its page image, one
- * download per page (#575). A page that fails to download or decode logs a
- * warning and writes null on its rows; the Save still goes through.
+ * download per page (#575). An updated row skips its stored `text_geometry`
+ * word boxes, read in one query (#597); an inserted row has none. A failed
+ * geometry read logs a warning and samples unmasked. A page that fails to
+ * download or decode logs a warning and writes null on its rows; the Save
+ * still goes through.
  */
 async function setFillColors(
   bookId: string,
   issueId: string,
   byPage: Map<number, Record<string, unknown>[]>,
+  updateIds: Map<Record<string, unknown>, string>,
 ) {
+  const ids = [...byPage.values()]
+    .flat()
+    .flatMap((row) => updateIds.get(row) ?? []);
+  const geometry = new Map<string, unknown>();
+  if (ids.length > 0) {
+    const { data, error } = await supabaseAdmin
+      .from("bubbles")
+      .select("id, text_geometry")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .in("id", ids);
+    if (error)
+      console.warn(
+        `[save] word boxes not read, fill colours sampled unmasked (${error.message})`,
+      );
+    for (const b of (data ?? []) as { id: string; text_geometry: unknown }[])
+      geometry.set(b.id, b.text_geometry);
+  }
+
   await Promise.all(
     Array.from(byPage, async ([page, rows]) => {
       try {
@@ -66,7 +89,14 @@ async function setFillColors(
         );
         for (const row of rows) {
           const box = pixelBoxOf(row.box_2d);
-          row.fill_color = box ? sampleFillColorRaw(image, box) : null;
+          const id = updateIds.get(row);
+          row.fill_color = box
+            ? sampleFillColorRaw(
+                image,
+                box,
+                id === undefined ? null : geometry.get(id),
+              )
+            : null;
         }
       } catch (e) {
         console.warn(
@@ -215,8 +245,20 @@ export async function POST(req: NextRequest) {
     return Response.json({ written: 0, needsAudio: 0 } satisfies SaveResult);
   }
 
-  // The rows are shared with `ops`, so this lands in the RPC payload.
-  await setFillColors(bookId, issueId, boxRows);
+  // The rows are shared with `ops`, so this lands in the RPC payload. An
+  // update row carries no id, so its op names it.
+  await setFillColors(
+    bookId,
+    issueId,
+    boxRows,
+    new Map(
+      ops.flatMap((op) =>
+        op.op === "update" && op.table === "bubbles"
+          ? [[op.row, op.id] as const]
+          : [],
+      ),
+    ),
+  );
 
   const { error, status } = await supabaseAdmin.rpc("save_review_edits", {
     p_book_id: bookId,

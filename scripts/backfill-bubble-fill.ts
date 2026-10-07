@@ -10,6 +10,7 @@
  * The pixel box is `box_2d` when it holds numeric x, y, width and height,
  * else the `style` percents times the decoded image's size (some issue-1
  * rows carry only `{"index":N}` in `box_2d`). A row with neither is skipped.
+ * Its stored `text_geometry` word boxes are left out of the sample (#597).
  *
  * Rows are read with `select("*")` and the colour is filtered here, so a dry
  * run also works before the column's migration is applied.
@@ -37,6 +38,7 @@ type BubbleRow = {
   box_2d: unknown;
   style: unknown;
   ocr_text: string | null;
+  text_geometry?: unknown;
   fill_color?: string | null;
 };
 
@@ -139,7 +141,9 @@ for (const { issue_id: issueId, number: pageNumber } of pages as {
   for (const row of rows) {
     const box =
       pixelBoxOf(row.box_2d) ?? styleBox(row.style, image.width, image.height);
-    const color = box ? sampleFillColorRaw(image, box) : null;
+    const color = box
+      ? sampleFillColorRaw(image, box, row.text_geometry)
+      : null;
     if (opts.dryRun) {
       const text = (row.ocr_text ?? "").replace(/\s+/g, " ").slice(0, 60);
       console.log(

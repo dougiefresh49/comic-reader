@@ -5,9 +5,11 @@
  *
  * Comic balloons are ovals, so the box corners are page art and the box edge
  * is the balloon outline: only pixels inside the ellipse inscribed in the
- * box, shrunk to 80%, are read. Dark pixels (lettering, outline) are dropped,
- * and the most common remaining colour, bucketed at 4 bits per channel, is
- * the fill.
+ * box, shrunk to 80%, are read. Pixels inside the bubble's word boxes
+ * (`text_geometry`, padded) are skipped, so big coloured lettering is not
+ * read as the fill (#597); too few pixels left falls back to the whole
+ * ellipse. Dark pixels (lettering, outline) are dropped, and the most common
+ * remaining colour, bucketed at 4 bits per channel, is the fill.
  */
 import sharp from "sharp";
 
@@ -38,6 +40,13 @@ const ELLIPSE_SCALE = 0.8;
 const DARK_LUMINANCE = 0.03;
 /** Fewer surviving pixels than this is no fill to trust. */
 const MIN_PIXELS = 20;
+/**
+ * Page pixels added on each side of a word box before its pixels are
+ * skipped, for glyph edges just outside the OCR box. Kept at 1: at 4 the
+ * pad ate the gaps between lines on cream-to-orange gradient captions, and
+ * their orange margins outvoted the cream behind the words (#597 dry run).
+ */
+const WORD_PAD_PX = 1;
 
 /** sRGB 0-255 to linear light, by table: this runs for every sampled pixel. */
 const LINEAR = Array.from({ length: 256 }, (_, i) => {
@@ -61,6 +70,36 @@ export function pixelBoxOf(box2d: unknown): PixelBox | null {
     : null;
 }
 
+type NormBox = [number, number, number, number];
+
+/**
+ * The word boxes of a stored `text_geometry` (page-normalized x, y, w, h),
+ * or none when the value is not that shape. A malformed word is left out.
+ */
+function wordBoxesOf(textGeometry: unknown): NormBox[] {
+  const field = (v: unknown, key: string) =>
+    v !== null && typeof v === "object"
+      ? (v as Record<string, unknown>)[key]
+      : undefined;
+  const lines = field(textGeometry, "lines");
+  if (!Array.isArray(lines)) return [];
+  const boxes: NormBox[] = [];
+  for (const line of lines as unknown[]) {
+    const words = field(line, "words");
+    if (!Array.isArray(words)) continue;
+    for (const word of words as unknown[]) {
+      const box = field(word, "box");
+      if (
+        Array.isArray(box) &&
+        box.length === 4 &&
+        box.every((n) => typeof n === "number" && Number.isFinite(n))
+      )
+        boxes.push(box as NormBox);
+    }
+  }
+  return boxes;
+}
+
 /** Decodes a page image to raw sRGB, three channels, alpha dropped. */
 export async function decodeRawImage(
   image: Buffer | Uint8Array,
@@ -78,10 +117,15 @@ export async function decodeRawImage(
   };
 }
 
-/** The fill colour under `box` in an already-decoded image, lowercase `#rrggbb`, or null. */
+/**
+ * The fill colour under `box` in an already-decoded image, lowercase
+ * `#rrggbb`, or null. `textGeometry` is the bubble's stored `text_geometry`;
+ * pixels inside its word boxes are skipped.
+ */
 export function sampleFillColorRaw(
   image: RawImage,
   box: PixelBox,
+  textGeometry?: unknown,
 ): string | null {
   const x0 = Math.max(0, Math.floor(box.x));
   const y0 = Math.max(0, Math.floor(box.y));
@@ -89,10 +133,45 @@ export function sampleFillColorRaw(
   const y1 = Math.min(image.height, Math.ceil(box.y + box.height));
   if (!(x1 > x0 && y1 > y0)) return null;
 
+  // 1 marks a padded word-box pixel, row-major from (x0, y0).
+  const span = x1 - x0;
+  let skip: Uint8Array | null = null;
+  for (const [wx, wy, ww, wh] of wordBoxesOf(textGeometry)) {
+    const sx0 = Math.max(x0, Math.floor(wx * image.width) - WORD_PAD_PX);
+    const sy0 = Math.max(y0, Math.floor(wy * image.height) - WORD_PAD_PX);
+    const sx1 = Math.min(x1, Math.ceil((wx + ww) * image.width) + WORD_PAD_PX);
+    const sy1 = Math.min(y1, Math.ceil((wy + wh) * image.height) + WORD_PAD_PX);
+    if (!(sx1 > sx0 && sy1 > sy0)) continue;
+    skip ??= new Uint8Array(span * (y1 - y0));
+    for (let py = sy0; py < sy1; py++) {
+      const row = (py - y0) * span - x0;
+      skip.fill(1, row + sx0, row + sx1);
+    }
+  }
+
+  return (
+    (skip && voteFill(image, x0, y0, x1, y1, skip)) ??
+    voteFill(image, x0, y0, x1, y1, null)
+  );
+}
+
+/**
+ * The most common non-dark colour in the ellipse of [x0, x1) by [y0, y1),
+ * leaving out pixels `skip` marks, or null below `MIN_PIXELS`.
+ */
+function voteFill(
+  image: RawImage,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  skip: Uint8Array | null,
+): string | null {
   const cx = (x0 + x1) / 2;
   const cy = (y0 + y1) / 2;
   const rx = ((x1 - x0) / 2) * ELLIPSE_SCALE;
   const ry = ((y1 - y0) / 2) * ELLIPSE_SCALE;
+  const span = x1 - x0;
 
   const count = new Uint32Array(4096);
   const sumR = new Float64Array(4096);
@@ -105,6 +184,7 @@ export function sampleFillColorRaw(
     for (let px = x0; px < x1; px++) {
       const dx = (px + 0.5 - cx) / rx;
       if (dx * dx + dy * dy > 1) continue;
+      if (skip?.[(py - y0) * span + px - x0]) continue;
       const i = (py * width + px) * channels;
       const r = data[i]!;
       const g = data[i + 1]!;
