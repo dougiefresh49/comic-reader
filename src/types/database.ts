@@ -250,6 +250,7 @@ export type Database = {
           created_at: string | null;
           crop_storage_path: string | null;
           emotion: string | null;
+          fill_color: string | null;
           id: string;
           ignored: boolean;
           issue_id: string;
@@ -281,6 +282,7 @@ export type Database = {
           created_at?: string | null;
           crop_storage_path?: string | null;
           emotion?: string | null;
+          fill_color?: string | null;
           id?: string;
           ignored?: boolean;
           issue_id: string;
@@ -312,6 +314,7 @@ export type Database = {
           created_at?: string | null;
           crop_storage_path?: string | null;
           emotion?: string | null;
+          fill_color?: string | null;
           id?: string;
           ignored?: boolean;
           issue_id?: string;

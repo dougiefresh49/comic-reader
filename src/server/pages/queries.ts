@@ -26,6 +26,7 @@ interface BubbleRow {
   box_2d: Bubble["box_2d"] | null;
   style: Bubble["style"] | null;
   text_geometry: TextGeometry | null;
+  fill_color: string | null;
   audio_storage_path: string | null;
   page_number: number;
   sort_order: number;
@@ -88,6 +89,7 @@ function rowToBubble(row: BubbleRow): Bubble {
     ignored: row.ignored ?? undefined,
     style: row.style ?? undefined,
     textGeometry: row.text_geometry ?? null,
+    fillColor: row.fill_color ?? null,
     audioStoragePath: row.audio_storage_path ?? undefined,
   };
 }
@@ -112,7 +114,7 @@ export async function getPageData(
   const { data: bubbleRows, error: bubbleError } = await supabase
     .from("bubbles")
     .select(
-      "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, text_geometry, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
+      "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, text_geometry, fill_color, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)

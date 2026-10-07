@@ -290,6 +290,24 @@ export function bubbleInsert(
   };
 }
 
+/**
+ * The bubble rows of a Save that write a box, by page, so each page image is
+ * read once to set their `fill_color` (#575). A row with no box write is left
+ * out, and its stored fill colour stays as it is.
+ */
+export function boxRowsByPage(
+  rows: { page: number; row: Row }[],
+): Map<number, Row[]> {
+  const byPage = new Map<number, Row[]>();
+  for (const { page, row } of rows) {
+    if (!row.box_2d) continue;
+    const list = byPage.get(page) ?? [];
+    list.push(row);
+    byPage.set(page, list);
+  }
+  return byPage;
+}
+
 /** The row for an added panel, under a `panel_id` label from `newPanelLabels`. */
 export function panelInsert(
   bookId: string,
