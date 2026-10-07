@@ -18,6 +18,8 @@ interface SpeechBoxProps {
   showWordPill?: boolean;
   isPlaying?: boolean;
   onTogglePlay?: () => void;
+  /** False: the bubble has no clip, so a "No voice yet" note replaces Play. */
+  voiced?: boolean;
 }
 
 export function SpeechBox({
@@ -29,6 +31,7 @@ export function SpeechBox({
   showWordPill = true,
   isPlaying,
   onTogglePlay,
+  voiced = true,
 }: SpeechBoxProps) {
   // Subscribed here, not in the reader, so a word change re-renders only
   // this caption (#87).
@@ -136,14 +139,18 @@ export function SpeechBox({
 
   return (
     <div className="relative flex min-h-[78px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/70 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
-          {speaker?.trim() ?? "Narrator"}
-        </span>
-        {onTogglePlay && (
+      <div className="mb-1 flex min-h-6 items-center justify-between">
+        {speaker && (
+          <span className="text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
+            {speaker}
+          </span>
+        )}
+        {!voiced ? (
+          <span className="ml-auto text-xs text-white/50">No voice yet</span>
+        ) : onTogglePlay ? (
           <button
             onClick={onTogglePlay}
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? (
@@ -173,7 +180,7 @@ export function SpeechBox({
               </svg>
             )}
           </button>
-        )}
+        ) : null}
       </div>
       <div
         ref={containerRef}

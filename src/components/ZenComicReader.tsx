@@ -29,6 +29,7 @@ import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import {
   bubbleAccessibleName,
+  bubbleSpeaker,
   buildSpeechContent,
 } from "./zen-comic-reader/text-utils";
 import { PanelViewFrame } from "./zen-comic-reader/PanelView";
@@ -560,16 +561,28 @@ export default function ZenComicReader({
     if (!panelViewMode || !panels.length || !activePanel) return "";
     const idx = panelIndex + 1;
     const total = panels.length;
-    const speaker = activePanel.primarySpeaker ?? "Speaker";
-    const firstBubble = orderedPanelBubbles[0];
-    const snippet = firstBubble?.ocr_text?.slice(0, 120) ?? "";
-    return `Panel ${idx} of ${total}. ${speaker} speaks: ${snippet}`;
+    // Quote the bubble the reader is on, and name that bubble's speaker.
+    const bubble =
+      orderedPanelBubbles.find((b) => b.id === selectedBubble?.id) ??
+      orderedPanelBubbles[0];
+    const speaker = bubble ? bubbleSpeaker(bubble) : "";
+    const snippet = bubble?.ocr_text?.slice(0, 120) ?? "";
+    // Says what the caption box shows sighted readers for a silent bubble.
+    const silent = bubble && !hasAudio(bubble) ? "No voice yet." : "";
+    return [
+      `Panel ${idx} of ${total}.`,
+      speaker ? `${speaker} speaks: ${snippet}` : snippet,
+      silent,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }, [
     panelViewMode,
     panels.length,
     panelIndex,
     activePanel,
     orderedPanelBubbles,
+    selectedBubble,
   ]);
 
   useEffect(() => {
@@ -585,7 +598,7 @@ export default function ZenComicReader({
   const caption = speech ? (
     <SpeechBox
       bubbleId={selectedBubble?.id ?? ""}
-      speaker={selectedBubble?.speakerName ?? selectedBubble?.speaker}
+      speaker={selectedBubble ? bubbleSpeaker(selectedBubble) : undefined}
       text={speech.cleanText}
       words={speech.words}
       wordHighlight={wordHighlight}
@@ -593,6 +606,7 @@ export default function ZenComicReader({
       showWordPill={!(wordMatch && wordHighlightMode === "bubble")}
       isPlaying={isPlaying}
       onTogglePlay={panelViewMode ? undefined : togglePlayPause}
+      voiced={selectedBubble ? hasAudio(selectedBubble) : true}
     />
   ) : (
     <div className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 p-3 text-sm text-neutral-400">
