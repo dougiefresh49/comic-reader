@@ -25,6 +25,8 @@ export interface Bubble {
   ignored?: boolean;
   /** Lettered word boxes (`bubbles.text_geometry`, #61); null when none were read. */
   textGeometry?: TextGeometry | null;
+  /** Balloon fill colour (`bubbles.fill_color`, #575), `#rrggbb`; null when not sampled. */
+  fillColor?: string | null;
   style?: {
     left: string;
     top: string;

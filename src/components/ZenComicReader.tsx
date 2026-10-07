@@ -5,6 +5,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
+import { highlightColorFor } from "~/lib/highlight-color";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
@@ -691,6 +692,7 @@ export default function ZenComicReader({
                     boxesByTimingIndex={wordMatch.boxesByTimingIndex}
                     aspect={pageAspect}
                     reducedMotion={cameraOff}
+                    color={highlightColorFor(selectedBubble?.fillColor)}
                   />
                 ) : null}
                 {displayBubbles.map((bubble) => {

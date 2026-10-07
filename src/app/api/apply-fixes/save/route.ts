@@ -5,11 +5,18 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { type NextRequest } from "next/server";
 import { adminAuthFailure, checkAdminAuth } from "~/lib/admin-auth";
+import {
+  decodeRawImage,
+  pixelBoxOf,
+  sampleFillColorRaw,
+} from "~/lib/bubble-fill";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
+import { pageStoragePath } from "~/lib/storage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import {
   bubbleInsert,
   bubbleUpdate,
+  boxRowsByPage,
   loadWriteContext,
   newPanelLabels,
   panelInsert,
@@ -35,6 +42,40 @@ type Op =
 
 function fail(error: string, status: number) {
   return Response.json({ error }, { status });
+}
+
+/**
+ * Sets `fill_color` on each box-writing bubble row from its page image, one
+ * download per page (#575). A page that fails to download or decode logs a
+ * warning and writes null on its rows; the Save still goes through.
+ */
+async function setFillColors(
+  bookId: string,
+  issueId: string,
+  byPage: Map<number, Record<string, unknown>[]>,
+) {
+  await Promise.all(
+    Array.from(byPage, async ([page, rows]) => {
+      try {
+        const { data, error } = await supabaseAdmin.storage
+          .from("comic-pages")
+          .download(pageStoragePath(bookId, issueId, page));
+        if (error || !data) throw new Error(error?.message ?? "no image");
+        const image = await decodeRawImage(
+          new Uint8Array(await data.arrayBuffer()),
+        );
+        for (const row of rows) {
+          const box = pixelBoxOf(row.box_2d);
+          row.fill_color = box ? sampleFillColorRaw(image, box) : null;
+        }
+      } catch (e) {
+        console.warn(
+          `[save] page ${page}: no fill colour sampled, writing null (${(e as Error).message})`,
+        );
+        for (const row of rows) row.fill_color = null;
+      }
+    }),
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -119,7 +160,18 @@ export async function POST(req: NextRequest) {
   }
 
   let ops: Op[];
+  let boxRows: Map<number, Record<string, unknown>[]>;
   try {
+    const addRows = bubbles.add.map((b) => ({
+      page: b.page,
+      row: bubbleInsert(bookId, issueId, b, ctx),
+    }));
+    const updateRows = bubbles.update.map((b) => ({
+      id: b.id,
+      page: b.page,
+      row: bubbleUpdate(b.id, b.page, b.set, ctx),
+    }));
+    boxRows = boxRowsByPage([...addRows, ...updateRows]);
     const labels = newPanelLabels(
       existingPanels.map((p) => p.panel_id),
       panels.add.map((p) => p.page),
@@ -142,20 +194,11 @@ export async function POST(req: NextRequest) {
           row: panelUpdate(p),
         }),
       ),
-      ...bubbles.add.map(
-        (b): Op => ({
-          op: "insert",
-          table: "bubbles",
-          row: bubbleInsert(bookId, issueId, b, ctx),
-        }),
+      ...addRows.map(
+        ({ row }): Op => ({ op: "insert", table: "bubbles", row }),
       ),
-      ...bubbles.update.map(
-        (b): Op => ({
-          op: "update",
-          table: "bubbles",
-          id: b.id,
-          row: bubbleUpdate(b.id, b.page, b.set, ctx),
-        }),
+      ...updateRows.map(
+        ({ id, row }): Op => ({ op: "update", table: "bubbles", id, row }),
       ),
       ...bubbles.remove.map(
         (b): Op => ({ op: "delete", table: "bubbles", id: b.id }),
@@ -171,6 +214,9 @@ export async function POST(req: NextRequest) {
   if (ops.length === 0) {
     return Response.json({ written: 0, needsAudio: 0 } satisfies SaveResult);
   }
+
+  // The rows are shared with `ops`, so this lands in the RPC payload.
+  await setFillColors(bookId, issueId, boxRows);
 
   const { error, status } = await supabaseAdmin.rpc("save_review_edits", {
     p_book_id: bookId,

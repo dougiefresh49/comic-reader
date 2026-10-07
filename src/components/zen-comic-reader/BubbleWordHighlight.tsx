@@ -6,6 +6,7 @@ import {
   useWordHighlightSelector,
   type WordHighlightStore,
 } from "~/hooks/useWordHighlight";
+import { ACTIVE_OPACITY } from "~/lib/highlight-color";
 import {
   alignTimingsToGeometry,
   type WordGeometryMatch,
@@ -16,9 +17,6 @@ import type { WordTiming } from "./text-utils";
 /** Below this share of lettered words matched, the caption carries the bubble. */
 const MIN_COVERAGE = 0.8;
 
-/** The highlight marker colour (#75, owner call O70). */
-const MARKER = "#FDE047";
-const ACTIVE_OPACITY = 0.85;
 const TRAIL_OPACITY = 0.3;
 /** Longest wipe across the active word, before dividing by playbackRate. */
 const WIPE_MAX_MS = 220;
@@ -102,6 +100,8 @@ interface BubbleWordHighlightProps {
   aspect: number;
   /** System reduced motion or Motion "Off": no wipe. */
   reducedMotion: boolean;
+  /** The marker colour, from `highlightColorFor` on the bubble's fill (#575). */
+  color: string;
 }
 
 /**
@@ -117,6 +117,7 @@ export function BubbleWordHighlight({
   boxesByTimingIndex,
   aspect,
   reducedMotion,
+  color,
 }: BubbleWordHighlightProps) {
   const index = useActiveWordIndex(wordHighlight, bubbleId);
   const paused = useWordHighlightSelector(wordHighlight, (s) => s.paused);
@@ -150,7 +151,7 @@ export function BubbleWordHighlight({
           "@keyframes bubble-word-wipe{from{transform:scaleX(0)}to{transform:scaleX(1)}}"
         }
       </style>
-      <g fill={MARKER} opacity={TRAIL_OPACITY}>
+      <g fill={color} opacity={TRAIL_OPACITY}>
         {rects
           .slice(0, lit)
           .flatMap((boxes, i) =>
@@ -168,7 +169,7 @@ export function BubbleWordHighlight({
           )}
       </g>
       {/* Keyed by word, so the wipe restarts on each new word. */}
-      <g key={lit} fill={MARKER} opacity={ACTIVE_OPACITY}>
+      <g key={lit} fill={color} opacity={ACTIVE_OPACITY}>
         {rects[lit]!.map((r, j) => (
           <rect
             key={j}

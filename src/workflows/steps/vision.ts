@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { FatalError } from "workflow";
+import {
+  decodeRawImage,
+  pixelBoxOf,
+  sampleFillColorRaw,
+} from "~/lib/bubble-fill";
 import { filterDuplicateBubbles } from "~/lib/bubble-filter";
 import {
   bubbleCenter,
@@ -47,6 +52,33 @@ type TypedClient = SupabaseClient<Database>;
 
 function errorText(err: unknown): string {
   return (err instanceof Error ? err.message : String(err)).slice(0, 160);
+}
+
+/**
+ * The bubble rows with `fill_color` sampled under each `box_2d` from the
+ * page image, decoded once (#575). A failed download or decode logs one
+ * warning and writes null on every row; it never fails the step.
+ */
+async function withFillColors(
+  rows: TablesInsert<"bubbles">[],
+  loadImage: () => Promise<Buffer | Uint8Array>,
+  pageLabel: string,
+): Promise<TablesInsert<"bubbles">[]> {
+  try {
+    const image = await decodeRawImage(await loadImage());
+    return rows.map((row) => {
+      const box = pixelBoxOf(row.box_2d);
+      return {
+        ...row,
+        fill_color: box ? sampleFillColorRaw(image, box) : null,
+      };
+    });
+  } catch (err) {
+    console.warn(
+      `[fill-color] ${pageLabel}: no fill colour sampled, writing null (${errorText(err)})`,
+    );
+    return rows.map((row) => ({ ...row, fill_color: null }));
+  }
 }
 
 type RoboflowRead = { data: { outputs?: unknown[] } } | { failure: string };
@@ -759,9 +791,21 @@ export async function roboflowAnalyzeBatch(
         `[roboflow] ${pageLabel}: ${existingBubbles} bubbles already present, skip bubbles write`,
       );
     } else if (bubbleRows.length > 0) {
+      // Roboflow was sent the image URL, so the bytes are fetched here.
+      const rowsWithFill = await withFillColors(
+        bubbleRows,
+        async () => {
+          const { data, error } = await supabase.storage
+            .from("comic-pages")
+            .download(pageStoragePath(bookId, issueId, page.pageNumber));
+          if (error || !data) throw new Error(error?.message ?? "no image");
+          return new Uint8Array(await data.arrayBuffer());
+        },
+        pageLabel,
+      );
       const { error: bErr } = await supabase
         .from("bubbles")
-        .upsert(bubbleRows, {
+        .upsert(rowsWithFill, {
           onConflict: "book_id,issue_id,legacy_id",
           ignoreDuplicates: true,
         });
@@ -1731,7 +1775,11 @@ export async function getContextPage(
       return;
     }
 
-    const newBubbles = mapBubbleRows(bookId, issueId, pageNumber, preds);
+    const newBubbles = await withFillColors(
+      mapBubbleRows(bookId, issueId, pageNumber, preds),
+      async () => imgBuf,
+      pageLabel,
+    );
 
     const { error: upsertErr } = await supabase
       .from("bubbles")
