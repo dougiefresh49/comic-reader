@@ -91,6 +91,8 @@ async function readAliasRows(
 export interface NamedCharacter {
   id: string;
   display_name: string | null;
+  /** `characters.full_name` ("Tangle the Lemur"); set by `readNamedCharacters`. */
+  full_name?: string | null;
   aliases: string[];
 }
 
@@ -117,11 +119,15 @@ export function nameResolver<T extends NamedCharacter>(
 export async function readNamedCharacters(
   client: Client,
 ): Promise<NamedCharacter[]> {
-  const rows: { id: string; display_name: string | null }[] = [];
+  const rows: {
+    id: string;
+    display_name: string | null;
+    full_name: string | null;
+  }[] = [];
   for (;;) {
     const { data, error } = await db(client)
       .from("characters")
-      .select("id, display_name")
+      .select("id, display_name, full_name")
       .order("id")
       .range(rows.length, rows.length + PAGE - 1);
     must("reading characters", error);

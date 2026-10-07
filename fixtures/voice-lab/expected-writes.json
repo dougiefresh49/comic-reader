@@ -47,6 +47,11 @@
               "accent": "en-american",
               "language": "en"
             }
+          },
+          "full_name": null,
+          "clip": {
+            "object": "space-turtles__april.mp3",
+            "file": null
           }
         }
       ]
@@ -78,7 +83,12 @@
             "medium": "movie"
           },
           "voice_actor": null,
-          "stored": null
+          "stored": null,
+          "full_name": null,
+          "clip": {
+            "object": "shell-shock__shredder.mp3",
+            "file": null
+          }
         }
       ]
     },
@@ -128,6 +138,11 @@
               "accent": "en-american",
               "language": "en"
             }
+          },
+          "full_name": null,
+          "clip": {
+            "object": "space-turtles__leonardo.mp3",
+            "file": null
           }
         }
       ]
@@ -187,6 +202,11 @@
               "accent": "en-american",
               "language": "en"
             }
+          },
+          "full_name": null,
+          "clip": {
+            "object": "space-turtles__krang.mp3",
+            "file": "space-turtles/krang.mp3"
           }
         }
       ]
@@ -266,6 +286,11 @@
               "accent": "en-new-york",
               "language": "en"
             }
+          },
+          "full_name": "Bebop the Invented Warthog",
+          "clip": {
+            "object": "shell-shock__bebop.mp3",
+            "file": "shell-shock/bebop.mp3"
           }
         }
       ]
@@ -336,6 +361,11 @@
               "accent": "en-american",
               "language": "en"
             }
+          },
+          "full_name": null,
+          "clip": {
+            "object": "space-turtles__rocksteady.mp3",
+            "file": "space-turtles/rocksteady.mp3"
           }
         }
       ]
@@ -499,6 +529,11 @@
               "accent": "en-new-york",
               "language": "en"
             }
+          },
+          "full_name": "Bebop the Invented Warthog",
+          "clip": {
+            "object": "shell-shock__bebop-take-two.mp3",
+            "file": "shell-shock/bebop-take-two.mp3"
           }
         }
       ]
@@ -533,7 +568,12 @@
           "stored": null,
           "refused": [
             "no labels"
-          ]
+          ],
+          "full_name": null,
+          "clip": {
+            "object": "space-turtles__hun.mp3",
+            "file": null
+          }
         }
       ]
     }
