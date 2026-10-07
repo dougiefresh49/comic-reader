@@ -533,6 +533,7 @@ export type Database = {
           display_name: string | null;
           form_of: string | null;
           franchise_id: string | null;
+          full_name: string | null;
           id: string;
           updated_at: string | null;
           voice_mode: string | null;
@@ -542,6 +543,7 @@ export type Database = {
           display_name?: string | null;
           form_of?: string | null;
           franchise_id?: string | null;
+          full_name?: string | null;
           id: string;
           updated_at?: string | null;
           voice_mode?: string | null;
@@ -551,6 +553,7 @@ export type Database = {
           display_name?: string | null;
           form_of?: string | null;
           franchise_id?: string | null;
+          full_name?: string | null;
           id?: string;
           updated_at?: string | null;
           voice_mode?: string | null;

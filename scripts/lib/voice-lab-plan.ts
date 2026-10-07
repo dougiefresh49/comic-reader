@@ -46,6 +46,8 @@ export interface LookupSubject {
   key: LookupKey;
   /** The character's display name. */
   character: string;
+  /** `characters.full_name` ("Tangle the Lemur"), when the row has one. */
+  full_name: string | null;
   work: { title: string; year: number; medium: string };
   voice_actor: string | null;
 }
@@ -145,6 +147,12 @@ export interface Describe extends LookupSubject {
   stored: { description: string; labels: Record<string, string> } | null;
   /** Set when a stored lookup fails `metadataRefusals`; `stored` is then null. */
   refused?: string[];
+  /**
+   * The voice's clip, for the lookup's clip stage: `object` in the clips
+   * bucket, and `file` in the library while the clip is not uploaded yet
+   * (null when the voice row already holds `object`). Null: no clip.
+   */
+  clip: { object: string; file: string | null } | null;
 }
 
 export interface Plan {
@@ -270,6 +278,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
       key: LookupKey,
       voice: string,
       characterName: string,
+      clip: Describe["clip"],
     ) => {
       const work = worksById.get(key.work_id)!;
       const row = lookupByKey.get(lookupKeyString(key)) ?? null;
@@ -286,6 +295,9 @@ export function planVoiceLabImport(input: PlanInput): Plan {
         voice,
         key,
         character: characterName,
+        full_name:
+          input.characters.find((x) => x.id === key.character_id)?.full_name ??
+          null,
         work: { title: work.title, year: work.year, medium: work.medium },
         voice_actor:
           appearanceByKey.get(lookupKeyString(key))?.voice_actor ?? null,
@@ -296,6 +308,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
             }
           : null,
         ...(refused.length > 0 ? { refused } : {}),
+        clip,
       });
       if (refused.length > 0)
         skip(
@@ -324,6 +337,11 @@ export function planVoiceLabImport(input: PlanInput): Plan {
           key,
           voiceName(v),
           characterName(key.character_id),
+          clip
+            ? { object: clip.object, file: clip.file }
+            : v.source_clip_path
+              ? { object: v.source_clip_path, file: null }
+              : null,
         );
         if (!stored) return;
         if (lacksDescription(v)) set.description = stored.description;
@@ -451,6 +469,7 @@ export function planVoiceLabImport(input: PlanInput): Plan {
       key,
       `new "${displayName}"`,
       characterName(key.character_id),
+      { object: clip.object, file: clip.file },
     );
     if (!lookup) return;
     takenMd5.set(md5, n);

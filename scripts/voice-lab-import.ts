@@ -29,8 +29,11 @@
  *   (no flag)   no Gemini call and no write. Prints the plan, each voice to
  *               describe with its stored description and labels or "lookup
  *               needed", and the count of lookups needed.
- *   --describe  one GEMINI_FAST call per lookup needed, each stored in
- *               voice_lookups and printed. Writes that table and nothing else.
+ *   --describe  one lookup per lookup needed (GEMINI_FAST, then the voice's
+ *               clip to GEMINI_MEDIUM when the model knows no voice to
+ *               describe), each stored in voice_lookups and printed. Writes
+ *               that table and nothing else; reads the clip from the library
+ *               or the bucket.
  *   --execute   no Gemini call. Writes the plan: each voice's missing
  *               description and labels from voice_lookups (never over a value
  *               it holds) and the new clips. A voice whose lookup is not
@@ -57,7 +60,12 @@ import {
   readNamedCharacters,
   type NamedCharacter,
 } from "~/lib/character-aliases";
-import { clipContentType, uploadClip } from "~/lib/voice-slots/bucket";
+import {
+  clipContentType,
+  clipObjectPath,
+  downloadClip,
+  uploadClip,
+} from "~/lib/voice-slots/bucket";
 import { md5Hex } from "~/lib/voice-slots/elevenlabs";
 import {
   insertCandidateVoice,
@@ -88,9 +96,13 @@ import {
 } from "./lib/voice-lab-plan.js";
 import {
   checkAnswer,
+  checkClipAnswer,
+  CLIP_MARK,
   insertVoiceLookup,
+  lookupPrompt,
   lookUpVoice,
   readVoiceLookups,
+  type ClipAudio,
 } from "./lib/voice-lookups.js";
 
 /**
@@ -466,6 +478,52 @@ async function runCheck(): Promise<never> {
     );
   else fail("stage check: direct answer or non-JSON refusal is wrong");
 
+  // The clip stage's check on canned answers: no actor asked or stored.
+  const heard = checkClipAnswer(
+    JSON.stringify({
+      description: "A bright, quick voice.",
+      labels: {
+        gender: "female",
+        age: "young",
+        accent: "en-american",
+        language: "en",
+      },
+    }),
+  );
+  const offVocabulary = checkClipAnswer(
+    JSON.stringify({ ...JSON.parse(answer("")), labels: { gender: "girl" } }),
+  );
+  if (
+    !("refused" in heard) &&
+    heard.actor === "" &&
+    heard.inferred_from === CLIP_MARK &&
+    "refused" in offVocabulary &&
+    "refused" in checkClipAnswer("not json")
+  )
+    ok(
+      `clip check: an answer with no actor is kept, marked "${CLIP_MARK}"; labels outside the vocabulary and non-JSON are refused`,
+    );
+  else fail("clip check: wrong on a canned clip answer");
+
+  // The full name in the prompt: beside the display name when it says more,
+  // and the prompt unchanged when it does not.
+  const subject = plan.describe[0]!;
+  const prompt = (full_name: string | null) =>
+    lookupPrompt({ ...subject, full_name });
+  const plain = prompt(null);
+  if (
+    prompt(subject.character.toUpperCase()) === plain &&
+    prompt("  ") === plain &&
+    prompt("Invented Full Name").includes(
+      `\nCharacter: ${subject.character} (Invented Full Name)\n`,
+    ) &&
+    plain.includes(`\nCharacter: ${subject.character}\n`)
+  )
+    ok(
+      "full name: printed beside the display name when it differs, the prompt unchanged when it is missing, blank or the display name",
+    );
+  else fail("full name: wrong in the lookup prompt");
+
   // Apply's "is this write live" decision for a voice planned beside another
   // clip's: dropped when that clip failed, kept otherwise. No database call.
   const dependent = plan.writes.find(
@@ -685,10 +743,33 @@ async function apply(
   return failures;
 }
 
+/**
+ * The clip a voice to describe has: the library file while it is not
+ * uploaded, else the bucket object the voice row holds. Null when neither
+ * is there.
+ */
+async function readClip(
+  supabase: SupabaseClient,
+  library: string,
+  clip: NonNullable<Describe["clip"]>,
+): Promise<ClipAudio | null> {
+  if (clip.file) {
+    const p = localPath(library, clip.file);
+    if (!p || !existsSync(p)) return null;
+    return {
+      bytes: new Uint8Array(await readFile(p)),
+      mimeType: clipContentType(clip.file),
+    };
+  }
+  const bytes = await downloadClip(supabase, clipObjectPath(clip.object));
+  return bytes ? { bytes, mimeType: clipContentType(clip.object) } : null;
+}
+
 /** --describe: one lookup per key with nothing stored, each stored. */
 async function describeAll(
   supabase: SupabaseClient,
   plan: Plan,
+  library: string,
 ): Promise<string[]> {
   const { getGeminiClient } = await import("~/lib/gemini-client");
   const gemini = getGeminiClient();
@@ -697,15 +778,22 @@ async function describeAll(
   console.log(`\nDescribing ${needed.length} voice(s):`);
   for (const d of needed) {
     const key = `${d.key.character_id} in ${d.key.work_id}`;
-    const result = await lookUpVoice(gemini, d);
+    const clip = d.clip;
+    const result = await lookUpVoice(gemini, d, {
+      loadClip: clip ? () => readClip(supabase, library, clip) : undefined,
+    });
     if (!result.ok) {
       failures.push(`${key}: ${result.reasons.join("; then ")}`);
       console.log(`  ! ${key}: not stored (${result.reasons.join("; then ")})`);
       continue;
     }
     await insertVoiceLookup(supabase, d.key, result.answer, result.model);
+    const source =
+      result.answer.inferred_from === CLIP_MARK
+        ? `described from: ${CLIP_MARK}`
+        : `model names the actor: ${result.answer.actor}${result.answer.inferred_from ? `\n      inferred from: ${result.answer.inferred_from}` : ""}`;
     console.log(
-      `  ${key} (${d.character}, ${d.work.title} ${d.work.year}${d.voice_actor ? `, ${d.voice_actor}` : ""})\n      model names the actor: ${result.answer.actor}${result.answer.inferred_from ? `\n      inferred from: ${result.answer.inferred_from}` : ""}\n      ${result.answer.description}\n      labels: ${labelText(result.answer.labels)}`,
+      `  ${key} (${d.character}, ${d.work.title} ${d.work.year}${d.voice_actor ? `, ${d.voice_actor}` : ""})\n      ${source}\n      ${result.answer.description}\n      labels: ${labelText(result.answer.labels)}`,
     );
   }
   return failures;
@@ -784,7 +872,7 @@ async function main() {
   }
 
   const failures = args.describe
-    ? await describeAll(supabase, plan)
+    ? await describeAll(supabase, plan, args.library)
     : await apply(supabase, plan, args.library);
   if (failures.length > 0) {
     console.error(
