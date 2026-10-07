@@ -905,6 +905,17 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           ? `Saved ${plural(count, "change")}. ${plural(audio, "bubble")} now need${audio === 1 ? "s" : ""} audio.`
           : `Saved ${plural(count, "change")}.`,
       );
+      // The rows landed; only the word-box refresh after them did not (#620).
+      const failed = [...(body?.wordBoxesFailed ?? [])].sort(
+        (a, b) => a.page - b.page,
+      );
+      if (failed.length > 0) {
+        const pages = failed.map((f) => f.page).join(", ");
+        const reasons = [...new Set(failed.map((f) => f.error))].join("; ");
+        setSaveError(
+          `Saved, but the word boxes on ${failed.length === 1 ? "page" : "pages"} ${pages} were not refreshed (${reasons}). The in-bubble highlight there may land on the old lettering; a later Save that moves a box on ${failed.length === 1 ? "that page" : "those pages"} tries again.`,
+        );
+      }
       return { ok: true, sent };
     } catch (e) {
       // No answer: the request may or may not have reached the database.
