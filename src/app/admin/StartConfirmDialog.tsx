@@ -65,10 +65,10 @@ export function StartConfirmDialog({
           reading order of every panel and bubble and the word boxes of every
           spoken bubble, fills in text, speaker, emotion and cues on any bubble
           that has none of them yet, and renders audio for any bubble without
-          it. It spends Gemini on reading order and on each bubble it fills in,
-          Cloud Vision on every page with spoken bubbles, and ElevenLabs credits
-          on each bubble it renders. Roboflow segments only pages it has not
-          segmented yet, and runs text detection on any page with no bubble
+          it. It spends Gemini on reading order and on each bubble with no text
+          yet, Cloud Vision on every page with spoken bubbles, and ElevenLabs
+          credits on each bubble it renders. Roboflow segments only pages it has
+          not segmented yet, and runs text detection on any page with no bubble
           rows.
         </p>
         <p className="font-mono text-xs text-neutral-500">
