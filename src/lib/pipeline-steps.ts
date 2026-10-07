@@ -45,3 +45,16 @@ export function resolvePipelineStep(value: string): PipelineStep | null {
   if (isPipelineStep(value)) return value;
   return Object.hasOwn(RETIRED_STEPS, value) ? RETIRED_STEPS[value]! : null;
 }
+
+/** A `pipeline_step` that means no run has started yet: none, or only pages downloaded (#319). */
+export function isUnstartedStep(step: string | null): boolean {
+  return !step || step === "pages-downloaded";
+}
+
+/** Whether Start Pipeline shows, the one rule the dashboard and the issue hub share (#319). */
+export function canStartPipeline(issue: {
+  pageCount: number;
+  pipelineStep: string | null;
+}): boolean {
+  return issue.pageCount > 0 && isUnstartedStep(issue.pipelineStep);
+}

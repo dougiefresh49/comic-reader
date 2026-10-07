@@ -9,7 +9,9 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
-import { STEP_ORDER } from "~/lib/pipeline-steps";
+import { STEP_ORDER, canStartPipeline } from "~/lib/pipeline-steps";
+import { toRelativeHref } from "~/lib/relative-href";
+import { StartConfirmDialog } from "~/app/admin/StartConfirmDialog";
 import { LiveRefresh } from "~/app/admin/[bookId]/[issueId]/review/pipeline/LiveRefresh";
 
 export interface SkippedGate {
@@ -33,6 +35,11 @@ interface PipelineActionsProps {
   latestRunId: string | null;
   /** `waitedAt` of the open gate wait on that same row, or null. */
   openGateWaitAt: string | null;
+  /**
+   * Whether a paused issue shows its review link. The hub passes false, since
+   * it draws its own gate button.
+   */
+  gateLink?: boolean;
 }
 
 /** How often the row refreshes while it follows a run this tab triggered or resumed. */
@@ -62,32 +69,42 @@ const STEP_LABELS: Record<string, string> = {
   complete: "Complete",
 };
 
-function toRelativePath(url: string): string {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return url;
-  }
-}
-
 /** Masks retry only on a complete issue (trigger-ingest answers 409 otherwise), so a failed issue never offers them. */
 const MASKS_STEP = "extract-foreground-masks";
 
 export interface TriggerRefusal {
   error: string;
   runId?: string;
+  /** "has-bubbles": a start from the beginning that needs the typed confirm (#319). */
+  reason?: string;
+  bubbles?: number;
+  pages?: number;
 }
 
-/** Reads a non-OK trigger-ingest response. A 409 names the live run that blocked it. */
+/**
+ * Reads a non-OK trigger-ingest response. A 409 names the live run that
+ * blocked it, or carries the bubble and page counts of a start that needs
+ * the typed confirm.
+ */
 export async function readTriggerRefusal(
   res: Response,
 ): Promise<TriggerRefusal> {
   const fallback = `Failed to start (HTTP ${res.status})`;
   try {
-    const data = (await res.json()) as { error?: string; runId?: string };
+    const data = (await res.json()) as {
+      error?: string;
+      runId?: string;
+      reason?: string;
+      bubbles?: number;
+      pages?: number;
+    };
+    const is409 = res.status === 409;
     return {
       error: data.error ?? fallback,
-      runId: res.status === 409 ? data.runId : undefined,
+      runId: is409 ? data.runId : undefined,
+      reason: is409 ? data.reason : undefined,
+      bubbles: is409 ? data.bubbles : undefined,
+      pages: is409 ? data.pages : undefined,
     };
   } catch {
     return { error: fallback };
@@ -168,6 +185,7 @@ export function PipelineActions({
   skippedGates,
   latestRunId,
   openGateWaitAt,
+  gateLink = true,
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
   // The run this tab started, until the props catch up with it and it leaves
@@ -185,6 +203,11 @@ export function PipelineActions({
   } | null>(null);
   const [refreshPending, startRefresh] = useTransition();
   const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
+  // The counts of a start the route refused for want of the typed confirm.
+  const [confirmCounts, setConfirmCounts] = useState<{
+    bubbles: number;
+    pages: number;
+  } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
   const busy = loading || cancelling;
@@ -194,8 +217,7 @@ export function PipelineActions({
     ? (pipelineStep ?? "").replace("failed:", "")
     : null;
 
-  const canStart =
-    pageCount > 0 && (!pipelineStep || pipelineStep === "pages-downloaded");
+  const canStart = canStartPipeline({ pageCount, pipelineStep });
 
   const isComplete = pipelineStep === "complete";
   const isRunning =
@@ -205,6 +227,13 @@ export function PipelineActions({
     !pipelinePaused &&
     pipelineStep !== null;
   const isPaused = pipelinePaused && pipelinePausedAt !== null;
+
+  // A refresh that moves the issue to running or complete (another tab
+  // started it) unmounts the dialog; drop its counts so it cannot reopen
+  // later with stale numbers.
+  useEffect(() => {
+    if (isRunning || isComplete) setConfirmCounts(null);
+  }, [isRunning, isComplete]);
 
   // trigger-ingest writes the issue row before it inserts the run row, so once
   // the latest run is ours the other props are from after the trigger.
@@ -238,15 +267,17 @@ export function PipelineActions({
     setResumedFrom(null);
   }, [settled]);
 
-  async function handleTrigger(fromStep?: string) {
+  /** `confirm` is the typed issue id, sent only from the start confirm. */
+  async function handleTrigger(fromStep?: string, confirm?: string) {
     setLoading(true);
     setRefusal(null);
     try {
       const res = await fetch("/api/admin/trigger-ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookId, issueId, fromStep }),
+        body: JSON.stringify({ bookId, issueId, fromStep, confirm }),
       });
+      setConfirmCounts(null);
       if (res.ok) {
         // No runId, or a warning (the run row insert failed), leaves no row
         // to match, so render from props and follow them untracked.
@@ -261,7 +292,17 @@ export function PipelineActions({
           startRefresh(() => router.refresh());
         }
       } else {
-        setRefusal(await readTriggerRefusal(res));
+        const refused = await readTriggerRefusal(res);
+        // A start the route wants confirmed opens the typed confirm; a refusal
+        // of the confirmed start itself shows as any other refusal.
+        if (refused.reason === "has-bubbles" && confirm === undefined) {
+          setConfirmCounts({
+            bubbles: refused.bubbles ?? 0,
+            pages: refused.pages ?? 0,
+          });
+        } else {
+          setRefusal(refused);
+        }
       }
     } finally {
       setLoading(false);
@@ -283,6 +324,20 @@ export function PipelineActions({
             router.refresh();
           }}
           onCancellingChange={setCancelling}
+        />
+      )}
+      {confirmCounts && (
+        <StartConfirmDialog
+          issueId={issueId}
+          bubbles={confirmCounts.bubbles}
+          pages={confirmCounts.pages}
+          busy={loading}
+          onConfirm={() => void handleTrigger(undefined, issueId)}
+          onCancel={() => {
+            // A confirmed start already sent cannot be taken back; the
+            // dialog closes when its answer lands.
+            if (!loading) setConfirmCounts(null);
+          }}
         />
       )}
     </span>
@@ -336,6 +391,7 @@ export function PipelineActions({
         pipelinePausedAt={pipelinePausedAt}
         pipelinePausedUrl={pipelinePausedUrl}
         status={status}
+        gateLink={gateLink}
         triggerLoading={busy}
         onTrigger={handleTrigger}
         onResumed={(pausedAt) =>
@@ -386,6 +442,7 @@ function PausedActions({
   pipelinePausedAt,
   pipelinePausedUrl,
   status,
+  gateLink,
   triggerLoading,
   onTrigger,
   onResumed,
@@ -396,6 +453,7 @@ function PausedActions({
   pipelinePausedAt: string | null;
   pipelinePausedUrl: string | null;
   status: string;
+  gateLink: boolean;
   triggerLoading: boolean;
   onTrigger: (fromStep?: string) => void;
   /**
@@ -513,9 +571,9 @@ function PausedActions({
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <span className="inline-flex flex-wrap items-center gap-1.5">
-        {pipelinePausedUrl && (
+        {gateLink && pipelinePausedUrl && (
           <a
-            href={toRelativePath(pipelinePausedUrl)}
+            href={toRelativeHref(pipelinePausedUrl)}
             className="rounded bg-yellow-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-yellow-500"
           >
             {label} &rarr;
