@@ -300,10 +300,13 @@ export default function ZenComicReader({
 
   // Panel view plus read-aloud in one tick: the play effect below then reads
   // panel 0's first voiced bubble, the page's first in reading order.
+  // showChrome: the top bar may have auto-hidden already, and panel view
+  // should open with its Pause control on screen.
   const handleFloatingPlay = useCallback(() => {
+    showChrome();
     enterPanelView();
     setPanelAutoPlay(true);
-  }, [enterPanelView]);
+  }, [enterPanelView, showChrome]);
 
   const handleDoubleTap = useCallback(() => {
     handleTogglePanelView();
@@ -805,6 +808,7 @@ export default function ZenComicReader({
             hidePageProgress
             overlay
             visible={chromeVisible}
+            onFocusCapture={showChrome}
             reducedMotion={cameraOff}
           >
             <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">

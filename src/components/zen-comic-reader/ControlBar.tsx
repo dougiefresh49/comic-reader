@@ -16,6 +16,8 @@ interface ControlBarProps {
   visible?: boolean;
   /** Skip the slide when the reader's motion setting is off. */
   reducedMotion?: boolean;
+  /** Keyboard focus inside a hidden overlay bar brings the chrome back. */
+  onFocusCapture?: () => void;
 }
 
 export function ControlBar({
@@ -26,6 +28,7 @@ export function ControlBar({
   overlay = false,
   visible = true,
   reducedMotion = false,
+  onFocusCapture,
 }: ControlBarProps) {
   const progress = pageCount > 0 ? pageNumber / pageCount : 0;
   const placement = overlay
@@ -37,6 +40,7 @@ export function ControlBar({
   return (
     <div
       className={`z-50 flex flex-col border-t border-white/5 bg-neutral-950/95 backdrop-blur ${placement}`}
+      onFocusCapture={onFocusCapture}
     >
       {children != null && (
         <div className="flex min-h-[72px] items-center px-4 py-2">
