@@ -26,7 +26,6 @@ import {
   useOnboarding,
 } from "./zen-comic-reader/OnboardingOverlay";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
-import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import {
   bubbleAccessibleName,
   bubbleSpeaker,
@@ -92,7 +91,6 @@ export default function ZenComicReader({
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
   const [isPageSheetOpen, setIsPageSheetOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isViewSheetOpen, setIsViewSheetOpen] = useState(false);
   const [panelViewMode, setPanelViewMode] = useState(false);
   const pathname = usePathname();
   // Pure read so StrictMode's double invoke sees the same value; the effect
@@ -128,7 +126,7 @@ export default function ZenComicReader({
 
   const { isOnboardingOpen, dismissOnboarding } = useOnboarding();
 
-  const anySheetOpen = isPageSheetOpen || isSettingsOpen || isViewSheetOpen;
+  const anySheetOpen = isPageSheetOpen || isSettingsOpen;
   const { chromeVisible, showChrome, toggleChrome, lockChrome } =
     useChromeAutoHide();
 
@@ -157,6 +155,8 @@ export default function ZenComicReader({
     setMotionIntensity,
     wordHighlightMode,
     setWordHighlightMode,
+    captionBar,
+    setCaptionBar,
   } = useSettings();
 
   const effectsOff = systemReducedMotion || motionIntensity !== "full";
@@ -297,6 +297,16 @@ export default function ZenComicReader({
     if (panelViewMode) exitPanelView();
     else enterPanelView();
   }, [panelViewMode, exitPanelView, enterPanelView]);
+
+  // Panel view plus read-aloud in one tick: the play effect below then reads
+  // panel 0's first voiced bubble, the page's first in reading order.
+  // showChrome: the top bar may have auto-hidden already, and panel view
+  // should open with its Pause control on screen.
+  const handleFloatingPlay = useCallback(() => {
+    showChrome();
+    enterPanelView();
+    setPanelAutoPlay(true);
+  }, [enterPanelView, showChrome]);
 
   const handleDoubleTap = useCallback(() => {
     handleTogglePanelView();
@@ -537,6 +547,11 @@ export default function ZenComicReader({
     [speech, selectedBubble],
   );
   const showInBubble = wordMatch !== null && wordHighlightMode !== "caption";
+  // The caption bar is a setting (#607). With it off, a bubble whose words
+  // cannot light up on the art (no word boxes, or the "Caption" mode) still
+  // shows the caption while it plays, and the card goes away when playback
+  // ends. One boolean, read everywhere the bar's content is drawn.
+  const captionShown = captionBar || (isPlaying && !showInBubble);
   // The first word with a box: nothing lights on the art before it, so the
   // border stays at full strength until then.
   const firstBoxedIndex =
@@ -619,6 +634,15 @@ export default function ZenComicReader({
     </div>
   );
 
+  const inPanelView = panelViewMode && panels.length > 0;
+  // The one affordance to start with the bar off, like a paused video's big
+  // play button. It stays while the top bar hides.
+  const showFloatingPlay =
+    !panelViewMode &&
+    !captionShown &&
+    panels.length > 0 &&
+    voicedBubbles.length > 0;
+
   return (
     <>
       <div
@@ -629,7 +653,9 @@ export default function ZenComicReader({
           visible={chromeVisible}
           onOpenPages={() => setIsPageSheetOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenViewSheet={() => setIsViewSheetOpen(true)}
+          panelViewMode={panelViewMode}
+          hasPanels={panels.length > 0}
+          onTogglePanelView={handleTogglePanelView}
         />
 
         <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
@@ -775,13 +801,17 @@ export default function ZenComicReader({
           ) : null}
         </div>
 
-        <ControlBar
-          pageNumber={pageNumber}
-          pageCount={pageCount}
-          hidePageProgress={panelViewMode && panels.length > 0}
-        >
-          <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
-            {panelViewMode && panels.length > 0 ? (
+        {inPanelView ? (
+          <ControlBar
+            pageNumber={pageNumber}
+            pageCount={pageCount}
+            hidePageProgress
+            overlay
+            visible={chromeVisible}
+            onFocusCapture={showChrome}
+            reducedMotion={cameraOff}
+          >
+            <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
               <PanelViewHud
                 panelIndex={panelIndex}
                 panelCount={panels.length}
@@ -794,9 +824,13 @@ export default function ZenComicReader({
                 onTogglePanelAutoPlay={togglePanelAutoPlay}
                 announceText={announceText}
               >
-                {caption}
+                {captionShown ? caption : undefined}
               </PanelViewHud>
-            ) : (
+            </div>
+          </ControlBar>
+        ) : (
+          <ControlBar pageNumber={pageNumber} pageCount={pageCount}>
+            {captionShown ? (
               <div className="flex w-full items-center gap-2">
                 <div className="min-w-0 flex-1">{caption}</div>
                 {panels.length > 0 && (
@@ -826,9 +860,30 @@ export default function ZenComicReader({
                   </button>
                 )}
               </div>
-            )}
-          </div>
-        </ControlBar>
+            ) : undefined}
+          </ControlBar>
+        )}
+
+        {showFloatingPlay && (
+          <button
+            type="button"
+            onClick={handleFloatingPlay}
+            aria-label="Read this page to me"
+            className="absolute left-1/2 z-50 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-neutral-950/90 text-white backdrop-blur transition-colors hover:bg-neutral-900"
+            style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden
+            >
+              <path d="M8 5.14v13.72L19 12 8 5.14z" />
+            </svg>
+          </button>
+        )}
 
         <PageSheet
           bookId={bookId}
@@ -859,16 +914,8 @@ export default function ZenComicReader({
           onSetMotionIntensity={setMotionIntensity}
           wordHighlightMode={wordHighlightMode}
           onSetWordHighlightMode={setWordHighlightMode}
-        />
-
-        <ViewSheet
-          isOpen={isViewSheetOpen}
-          onClose={() => setIsViewSheetOpen(false)}
-          panelViewMode={panelViewMode}
-          onTogglePanelView={handleTogglePanelView}
-          hasPanels={panels.length > 0}
-          motionIntensity={motionIntensity}
-          onSetMotionIntensity={setMotionIntensity}
+          captionBar={captionBar}
+          onToggleCaptionBar={() => setCaptionBar(!captionBar)}
         />
 
         {!panelViewMode && scale > 1 && (

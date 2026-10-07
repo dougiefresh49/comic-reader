@@ -29,6 +29,8 @@ interface SettingsSheetProps {
   onSetMotionIntensity: (m: MotionIntensity) => void;
   wordHighlightMode: WordHighlightMode;
   onSetWordHighlightMode: (m: WordHighlightMode) => void;
+  captionBar: boolean;
+  onToggleCaptionBar: () => void;
 }
 
 const WORD_HIGHLIGHT_OPTIONS: Array<{
@@ -38,6 +40,54 @@ const WORD_HIGHLIGHT_OPTIONS: Array<{
   { value: "bubble", label: "In bubble" },
   { value: "caption", label: "Caption" },
   { value: "both", label: "Both" },
+];
+
+const svgSmall = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 14,
+  height: 14,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+};
+
+const MOTION_OPTIONS: Array<{
+  value: MotionIntensity;
+  label: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    value: "off",
+    label: "Off",
+    icon: (
+      <svg {...svgSmall}>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="4.93" x2="19.07" y1="4.93" y2="19.07" />
+      </svg>
+    ),
+  },
+  {
+    value: "reduced",
+    label: "Reduced",
+    icon: (
+      <svg {...svgSmall}>
+        <path d="M5 12h14" />
+      </svg>
+    ),
+  },
+  {
+    value: "full",
+    label: "Full",
+    icon: (
+      <svg {...svgSmall}>
+        <path d="M12 3v18" />
+        <path d="M18 9l-6-6-6 6" />
+      </svg>
+    ),
+  },
 ];
 
 const VOLUME_LAYERS: Array<{
@@ -92,6 +142,8 @@ export function SettingsSheet({
   onSetMotionIntensity,
   wordHighlightMode,
   onSetWordHighlightMode,
+  captionBar,
+  onToggleCaptionBar,
 }: SettingsSheetProps) {
   return (
     <SheetShell
@@ -159,34 +211,25 @@ export function SettingsSheet({
               value={wordHighlightMode}
               onChange={onSetWordHighlightMode}
             />
+            <ToggleRow
+              label="Caption bar"
+              hint="Show the speaker and line under the page"
+              enabled={captionBar}
+              onToggle={onToggleCaptionBar}
+              icon={<IconCaption />}
+            />
           </div>
         </section>
 
-        {/* ── Visual Section ── */}
+        {/* ── Motion Section ── */}
         <section>
           <h3 className="mb-2 px-1 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-            Visual effects
+            Motion
           </h3>
           <div className="flex flex-col gap-3">
-            <ToggleRow
-              label="Camera motion"
-              hint="Panel zoom, push-in, and shake effects"
-              enabled={motionIntensity !== "off"}
-              onToggle={() =>
-                onSetMotionIntensity(motionIntensity === "off" ? "full" : "off")
-              }
-              icon={<IconVideo />}
-            />
-            <ToggleRow
-              label="Particle effects"
-              hint="Sparkles, dust, rain, and other overlays"
-              enabled={motionIntensity === "full"}
-              onToggle={() =>
-                onSetMotionIntensity(
-                  motionIntensity === "full" ? "reduced" : "full",
-                )
-              }
-              icon={<IconSparkles />}
+            <MotionRow
+              value={motionIntensity}
+              onChange={onSetMotionIntensity}
             />
           </div>
         </section>
@@ -335,6 +378,60 @@ function WordHighlightRow({
                   : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
               }`}
             >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MotionRow({
+  value,
+  onChange,
+}: {
+  value: MotionIntensity;
+  onChange: (m: MotionIntensity) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+      <div className="mb-2 flex items-center gap-3">
+        <div className="shrink-0 text-neutral-400">
+          <IconVideo />
+        </div>
+        <div>
+          <div
+            id="motion-label"
+            className="text-sm font-semibold text-neutral-100"
+          >
+            Camera and effects
+          </div>
+          <div className="text-xs text-neutral-400">
+            Panel zoom and shake. Full adds sparkles, dust and rain.
+          </div>
+        </div>
+      </div>
+      <div
+        role="group"
+        aria-labelledby="motion-label"
+        className="grid grid-cols-3 gap-1"
+      >
+        {MOTION_OPTIONS.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(option.value)}
+              className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors ${
+                selected
+                  ? "bg-cyan-600 text-white"
+                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+              }`}
+            >
+              {option.icon}
               {option.label}
             </button>
           );
@@ -495,27 +592,15 @@ function IconVideo() {
   );
 }
 
-function IconSparkles() {
+function IconCaption() {
   return (
     <svg {...svgProps}>
-      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-      <path d="M20 3v4" />
-      <path d="M22 5h-4" />
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M6 14h4" />
+      <path d="M13 14h5" />
     </svg>
   );
 }
-
-const svgSmall = {
-  xmlns: "http://www.w3.org/2000/svg",
-  width: 14,
-  height: 14,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
 
 function IconSpeechBubble() {
   return (
