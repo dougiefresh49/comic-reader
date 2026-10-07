@@ -37,13 +37,27 @@ let sharedCtx: AudioContext | null = null;
 const gains = new WeakMap<HTMLAudioElement, GainNode>();
 
 /**
+ * WebKit lets a context resume only inside a gesture's activation window,
+ * so call this on the task that follows a tap or slider move, never from a
+ * later timer. A rejection is swallowed; the next gesture tries again.
+ */
+function resumeIfSuspended() {
+  if (sharedCtx?.state === "suspended") {
+    void sharedCtx.resume().catch(() => undefined);
+  }
+}
+
+/**
  * Routes `el` through its own GainNode on first use. The context is created
- * here, the first time a layer is about to play, never at render or mount.
+ * here, the first time a layer is about to play, never at render or mount,
+ * and resumed at once: the music effect calls this on the tap's task, while
+ * its first `play()` waits out the 800 ms crossfade.
  */
 function ensureConnected(el: HTMLAudioElement, level: number): GainNode {
+  sharedCtx ??= new AudioContext();
+  resumeIfSuspended();
   const existing = gains.get(el);
   if (existing) return existing;
-  sharedCtx ??= new AudioContext();
   const gain = sharedCtx.createGain();
   gain.gain.value = level;
   sharedCtx
@@ -57,6 +71,7 @@ function ensureConnected(el: HTMLAudioElement, level: number): GainNode {
 /** A layer at zero is also muted, which silences it even if the context cannot run. */
 function applyLevel(el: HTMLAudioElement | null, level: number) {
   if (!el) return;
+  resumeIfSuspended();
   el.muted = level === 0;
   const gain = gains.get(el);
   if (gain) gain.gain.value = level;
