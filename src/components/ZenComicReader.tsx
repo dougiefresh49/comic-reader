@@ -562,11 +562,15 @@ export default function ZenComicReader({
     const idx = panelIndex + 1;
     const total = panels.length;
     // Quote the bubble the reader is on, and name that bubble's speaker.
+    // The quote is the caption box's text for that bubble (the corrected
+    // text sent to ElevenLabs when it has audio), not its raw OCR text.
     const bubble =
       orderedPanelBubbles.find((b) => b.id === selectedBubble?.id) ??
       orderedPanelBubbles[0];
     const speaker = bubble ? bubbleSpeaker(bubble) : "";
-    const snippet = bubble?.ocr_text?.slice(0, 120) ?? "";
+    const snippet = bubble
+      ? buildSpeechContent(timestamps[bubble.id], bubble.ocr_text).cleanText
+      : "";
     // Says what the caption box shows sighted readers for a silent bubble.
     const silent = bubble && !hasAudio(bubble) ? "No voice yet." : "";
     return [
@@ -583,6 +587,7 @@ export default function ZenComicReader({
     activePanel,
     orderedPanelBubbles,
     selectedBubble,
+    timestamps,
   ]);
 
   useEffect(() => {
