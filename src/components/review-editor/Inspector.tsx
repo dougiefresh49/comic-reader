@@ -327,19 +327,23 @@ function AnalyzeBlock({
 const pointerClick = (e: React.MouseEvent) => e.detail > 0;
 
 /**
- * Play the bubble's take, see its cues, and regenerate either. The two
- * regenerate buttons run on a pointer click only, never a key, and are off
- * while the editor is locked.
+ * Play the bubble's take, edit its cues by hand, and regenerate either. A cues
+ * edit is saved by Save like any other edit and costs nothing; clearing the
+ * field leaves no cues, so the audio reads the text as it is. The cues field
+ * is read-only when the Text field is. The two regenerate buttons run on a
+ * pointer click only, never a key, and are off while the editor is locked.
  */
 function ListenBlock({
   bubble: b,
   view,
   lock,
+  readOnly,
   actions,
 }: {
   bubble: BubbleDoc;
   view: ListenView;
   lock: Lock | null;
+  readOnly: boolean;
   actions: Actions;
 }) {
   const { running, notice } = view;
@@ -362,12 +366,27 @@ function ListenBlock({
       )}
       <div>
         <Label>Cues, as the audio step reads them</Label>
-        <p className="whitespace-pre-wrap text-neutral-300">
-          {cues ??
-            (b.cues
+        <textarea
+          key={b.id}
+          value={cues ?? ""}
+          readOnly={readOnly}
+          placeholder={
+            b.cues
               ? "None: the text changed since they were written."
-              : "None. The audio reads the text as it is.")}
-        </p>
+              : "None. The audio reads the text as it is."
+          }
+          rows={Math.min(8, Math.max(3, (cues ?? "").split("\n").length))}
+          onChange={(e) => {
+            const value = e.target.value;
+            actions.patch(
+              b.id,
+              { cues: value ? { forText: b.text, value } : null },
+              "cues edit",
+              `cues:${b.id}`,
+            );
+          }}
+          className={`${INPUT} resize-y py-1.5 leading-snug`}
+        />
       </div>
       <div className="flex flex-wrap gap-1.5">
         <button
@@ -600,7 +619,13 @@ function BubbleInspector(
       </div>
 
       {listen && (
-        <ListenBlock bubble={b} view={listen} lock={lock} actions={actions} />
+        <ListenBlock
+          bubble={b}
+          view={listen}
+          lock={lock}
+          readOnly={textLocked}
+          actions={actions}
+        />
       )}
 
       <div>
