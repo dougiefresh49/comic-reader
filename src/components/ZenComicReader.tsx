@@ -205,6 +205,7 @@ export default function ZenComicReader({
   // Assigned after useAudioPlayback below; ref breaks the ordering cycle
   // (togglePanelAutoPlay feeds usePanelNavigation which feeds the audio hook).
   const stopAllRef = useRef<() => void>(() => undefined);
+  const cancelPendingRef = useRef<() => void>(() => undefined);
 
   const togglePanelAutoPlay = useCallback(() => {
     if (panelAutoPlay) {
@@ -276,6 +277,10 @@ export default function ZenComicReader({
 
   const enterPanelView = useCallback(() => {
     if (!panels.length) return;
+    // Page-view playback must not carry in, or the first tap lands on a
+    // playing selected bubble and pauses it (#581).
+    stopAllRef.current();
+    cancelPendingRef.current();
     focusBeforePanelRef.current = document.activeElement;
     setPanelIndex(0);
     setPanelViewMode(true);
@@ -451,6 +456,7 @@ export default function ZenComicReader({
   );
 
   scheduleNextRef.current = scheduleNext;
+  cancelPendingRef.current = cancelPending;
 
   useEffect(() => {
     if (!panelViewMode || !panelAutoPlay) return;
