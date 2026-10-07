@@ -5,6 +5,7 @@ import {
   PLAYBACK_RATE_MIN,
   type LayerVolumes,
   type MotionIntensity,
+  type WordHighlightMode,
 } from "~/hooks/useSettings";
 import { SheetShell } from "~/components/ui/SheetShell";
 
@@ -26,7 +27,18 @@ interface SettingsSheetProps {
   onSetPlaybackRate: (rate: number) => void;
   motionIntensity: MotionIntensity;
   onSetMotionIntensity: (m: MotionIntensity) => void;
+  wordHighlightMode: WordHighlightMode;
+  onSetWordHighlightMode: (m: WordHighlightMode) => void;
 }
+
+const WORD_HIGHLIGHT_OPTIONS: Array<{
+  value: WordHighlightMode;
+  label: string;
+}> = [
+  { value: "bubble", label: "In bubble" },
+  { value: "caption", label: "Caption" },
+  { value: "both", label: "Both" },
+];
 
 const VOLUME_LAYERS: Array<{
   key: keyof LayerVolumes;
@@ -78,6 +90,8 @@ export function SettingsSheet({
   onSetPlaybackRate,
   motionIntensity,
   onSetMotionIntensity,
+  wordHighlightMode,
+  onSetWordHighlightMode,
 }: SettingsSheetProps) {
   return (
     <SheetShell
@@ -140,6 +154,10 @@ export function SettingsSheet({
               enabled={autoAdvancePage}
               onToggle={onToggleAutoAdvancePage}
               icon={<IconBookOpen />}
+            />
+            <WordHighlightRow
+              value={wordHighlightMode}
+              onChange={onSetWordHighlightMode}
             />
           </div>
         </section>
@@ -267,6 +285,59 @@ function PlaybackRateRow({
             {p}x
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function WordHighlightRow({
+  value,
+  onChange,
+}: {
+  value: WordHighlightMode;
+  onChange: (m: WordHighlightMode) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+      <div className="mb-2 flex items-center gap-3">
+        <div className="shrink-0 text-neutral-400">
+          <IconHighlighter />
+        </div>
+        <div>
+          <div
+            id="word-highlight-label"
+            className="text-sm font-semibold text-neutral-100"
+          >
+            Highlight words
+          </div>
+          <div className="text-xs text-neutral-400">
+            Light up each word as it&apos;s read
+          </div>
+        </div>
+      </div>
+      <div
+        role="group"
+        aria-labelledby="word-highlight-label"
+        className="grid grid-cols-3 gap-1"
+      >
+        {WORD_HIGHLIGHT_OPTIONS.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(option.value)}
+              className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors ${
+                selected
+                  ? "bg-cyan-600 text-white"
+                  : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -401,6 +472,15 @@ function IconBookOpen() {
     <svg {...svgProps}>
       <path d="M12 7v14" />
       <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+    </svg>
+  );
+}
+
+function IconHighlighter() {
+  return (
+    <svg {...svgProps}>
+      <path d="m9 11-6 6v3h9l3-3" />
+      <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4" />
     </svg>
   );
 }

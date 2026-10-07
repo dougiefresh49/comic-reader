@@ -10,8 +10,15 @@ const MOTION_INTENSITY_KEY = "zen-reader-motion-intensity";
 const MUTE_ALL_KEY = "zen-reader-mute-all";
 const VOICES_ONLY_KEY = "zen-reader-voices-only";
 const AUTO_ADVANCE_PAGE_KEY = "zen-reader-auto-advance-page";
+const WORD_HIGHLIGHT_KEY = "zen-reader-word-highlight";
 
 export type MotionIntensity = "off" | "reduced" | "full";
+
+/**
+ * Where the spoken word lights up (#87): on the bubble's lettering, in the
+ * caption bar, or both. A bubble without word boxes always uses the caption.
+ */
+export type WordHighlightMode = "bubble" | "caption" | "both";
 
 export interface LayerVolumes {
   dialogue: number;
@@ -75,6 +82,16 @@ export function useSettings() {
     return window.localStorage.getItem(AUTO_ADVANCE_PAGE_KEY) === "true";
   });
 
+  const [wordHighlightMode, setWordHighlightMode] = useState<WordHighlightMode>(
+    () => {
+      if (typeof window === "undefined") return "both";
+      const stored = window.localStorage.getItem(WORD_HIGHLIGHT_KEY);
+      if (stored === "bubble" || stored === "caption" || stored === "both")
+        return stored;
+      return "both";
+    },
+  );
+
   const [muteAll, setMuteAll] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(MUTE_ALL_KEY) === "true";
@@ -112,6 +129,10 @@ export function useSettings() {
   useEffect(() => {
     window.localStorage.setItem(AUTO_ADVANCE_PAGE_KEY, String(autoAdvancePage));
   }, [autoAdvancePage]);
+
+  useEffect(() => {
+    window.localStorage.setItem(WORD_HIGHLIGHT_KEY, wordHighlightMode);
+  }, [wordHighlightMode]);
 
   useEffect(() => {
     window.localStorage.setItem(MUTE_ALL_KEY, String(muteAll));
@@ -184,5 +205,7 @@ export function useSettings() {
     setPanelViewPreferred,
     motionIntensity,
     setMotionIntensity,
+    wordHighlightMode,
+    setWordHighlightMode,
   };
 }

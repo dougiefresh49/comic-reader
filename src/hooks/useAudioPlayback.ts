@@ -48,7 +48,13 @@ export function useAudioPlayback({
     onBubbleEndedRef.current = onBubbleEnded;
   }, [onBubbleEnded]);
 
-  const { activeWordIndex, startHighlight, stopHighlight } = useWordHighlight();
+  // Word state lives in a store, not React state here, so a word change
+  // re-renders only the leaves subscribed to it (#87).
+  const {
+    store: wordHighlight,
+    startHighlight,
+    stopHighlight,
+  } = useWordHighlight();
 
   const stopAll = useCallback(() => {
     armedRef.current = false;
@@ -119,7 +125,7 @@ export function useAudioPlayback({
       audio.addEventListener("play", () => {
         setIsPlaying(true);
         if (words.length && audioRef.current === audio) {
-          startHighlight(audio, words);
+          startHighlight(audio, words, bubble.id);
         }
       });
 
@@ -180,5 +186,5 @@ export function useAudioPlayback({
 
   useEffect(() => () => stopAll(), [stopAll]);
 
-  return { playBubble, stopAll, togglePlayPause, isPlaying, activeWordIndex };
+  return { playBubble, stopAll, togglePlayPause, isPlaying, wordHighlight };
 }
