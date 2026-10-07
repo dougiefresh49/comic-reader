@@ -11,6 +11,7 @@ import {
   pixelBoxOf,
   sampleFillColorRaw,
 } from "~/lib/bubble-fill";
+import { isDryRun } from "~/lib/fakes/dry-run";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { pageStoragePath } from "~/lib/storage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
@@ -326,19 +327,26 @@ export async function POST(req: NextRequest) {
   }
 
   // The rows are committed; a page whose word boxes fail to refresh is
-  // reported in the answer and never fails the Save.
+  // reported in the answer and never fails the Save. Under DRY_RUN the
+  // engine returns no lines and the refresh would write null word boxes over
+  // every candidate on the page, so the pages are reported instead of run.
   const refreshPages = wordBoxPages(boxRows, updateIds, ctx);
-  const refreshed = await Promise.allSettled(
-    refreshPages.map((page) =>
-      wordGeometryForPage(
-        // supabaseAdmin is untyped; the bubbles schema is the generated one.
-        supabaseAdmin as SupabaseClient<Database>,
-        bookId,
-        issueId,
-        page,
-      ),
-    ),
-  );
+  const refreshed: PromiseSettledResult<unknown>[] = isDryRun()
+    ? refreshPages.map(() => ({
+        status: "rejected" as const,
+        reason: new Error("DRY_RUN is set, so the word boxes were left alone"),
+      }))
+    : await Promise.allSettled(
+        refreshPages.map((page) =>
+          wordGeometryForPage(
+            // supabaseAdmin is untyped; the bubbles schema is the generated one.
+            supabaseAdmin as SupabaseClient<Database>,
+            bookId,
+            issueId,
+            page,
+          ),
+        ),
+      );
   const wordBoxesFailed: SaveResult["wordBoxesFailed"] = [];
   refreshPages.forEach((page, i) => {
     const r = refreshed[i];
