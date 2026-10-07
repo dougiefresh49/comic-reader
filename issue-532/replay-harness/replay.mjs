@@ -9,7 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MIG = '/Users/dougiefresh49/.t3/worktrees/comic-reader/issue-532-migration-replay/supabase/migrations';
+const MIG = process.env.MIG ?? new URL('../../../supabase/migrations', import.meta.url).pathname; // or set MIG to a checkout's supabase/migrations
 const DATA = join(here, 'pgdata');
 const fixIdx = process.argv.indexOf('--fix');
 const fixFile = fixIdx > 0 ? process.argv[fixIdx + 1] : null;
