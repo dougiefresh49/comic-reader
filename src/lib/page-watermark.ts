@@ -128,62 +128,123 @@ const GUTTER_MARGIN_PX = 40;
 const GUTTER_FLAT = 12;
 /** Pixels inside the box must be this unsaturated to count as lettering or gutter. */
 const GUTTER_MAX_CHROMA = 16;
+/**
+ * Over a flat colour, how far below the margin colour a channel inside the
+ * box may sit and still count as that colour or the lettering: encode noise.
+ */
+const FLAT_BELOW = 12;
+/**
+ * Over a flat colour, a pixel's blend weight toward white, per channel, is
+ * (pixel - margin) / (255 - margin). The lettering is grey-white, so it lifts
+ * every channel by about the same share; the channels' weights may differ by
+ * this much. On issue-1 page 25 they differed by 0.09 at the median and 0.35
+ * at most, the most being encode noise at the strokes' edges (#564).
+ */
+const FLAT_WEIGHT_SPREAD = 0.4;
+/**
+ * The strongest channel weight that still counts as lettering. On issue-1
+ * page 25 the lettering's strongest channel measured 0.29 at the median and
+ * 0.47 at most; the credits text above it is near 1 and its anti-aliased
+ * bottom edge reaches 0.57, so those rows are left to the edit (#564).
+ */
+const FLAT_MAX_WEIGHT = 0.5;
 
 /**
- * Rows of `box` that run across a flat black or white gutter get that colour
- * painted over the lettering, and the image model is left the rows over art.
- * On the fixture the model kept returning grey letters over a black gutter
- * unchanged, three rounds in a row (issue-2 page 20, #541). A row qualifies
- * when its pixels in the margins beside the box are one unsaturated colour,
- * and every pixel inside the box is unsaturated too (lettering over black or
- * white is grey; art inside the box has colour and the row is skipped).
- * Returns the rows painted, as a box, or null.
+ * True when the pixel at `o` is the margin colour `m` or a lighter blend of
+ * it toward white no stronger than the lettering's.
  */
-export function paintGutterRows(img: RgbImage, box: Box): Box | null {
+function isFlatOrLettering(data: Buffer, o: number, m: number[]): boolean {
+  let near = true;
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let c = 0; c < 3; c++) {
+    const d = data[o + c]! - m[c]!;
+    if (d < -FLAT_BELOW) return false;
+    if (Math.abs(d) > GUTTER_FLAT) near = false;
+    const w = d / Math.max(1, 255 - m[c]!);
+    lo = Math.min(lo, w);
+    hi = Math.max(hi, w);
+  }
+  return near || (hi - lo <= FLAT_WEIGHT_SPREAD && hi <= FLAT_MAX_WEIGHT);
+}
+
+/**
+ * Rows of `box` that run across a flat gutter get its colour painted over the
+ * lettering, and the image model is left the rows over art. On the fixture
+ * the model kept returning grey letters over a black gutter unchanged, three
+ * rounds in a row (issue-2 page 20, #541), and painted poorly over the flat
+ * blue of issue-1 page 25 (#564). A row qualifies when its pixels in the
+ * margins beside the box are one flat colour and, inside the box:
+ * - over black or white, every pixel is unsaturated (lettering there is
+ *   grey; art has colour), and the row is filled with the margins' grey;
+ * - over any other colour, every pixel is that colour or a lighter blend of
+ *   it no stronger than the lettering (`isFlatOrLettering`), and the row is
+ *   filled with the margins' mean colour.
+ * Returns the rows that qualified, as a box, and how many pixels the fill
+ * changed (0 once a past round filled them), or null when none qualified.
+ */
+export function paintGutterRows(
+  img: RgbImage,
+  box: Box,
+): { rows: Box; changed: number } | null {
   const x0 = Math.max(0, box.x - GUTTER_MARGIN_PX);
   const x1 = Math.min(img.width, box.x + box.width + GUTTER_MARGIN_PX);
   let top = -1;
   let bottom = -1;
+  let changed = 0;
   for (let y = box.y; y < box.y + box.height; y++) {
-    let sum = 0;
+    const m = [0, 0, 0];
     let n = 0;
     const px = (x: number) => (y * img.width + x) * 3;
     for (let x = x0; x < x1; x++) {
       if (x >= box.x && x < box.x + box.width) continue;
       const o = px(x);
-      sum += img.data[o]! + img.data[o + 1]! + img.data[o + 2]!;
-      n += 3;
+      for (let c = 0; c < 3; c++) m[c]! += img.data[o + c]!;
+      n++;
     }
     if (n === 0) continue;
-    const mean = sum / n;
-    if (mean > 40 && mean < 215) continue; // neither black nor white
+    for (let c = 0; c < 3; c++) m[c]! /= n;
+    const mean = (m[0]! + m[1]! + m[2]!) / 3;
+    const grey = mean <= 40 || mean >= 215;
     let flat = true;
     for (let x = x0; x < x1 && flat; x++) {
       if (x >= box.x && x < box.x + box.width) continue;
       const o = px(x);
       for (let c = 0; c < 3; c++) {
-        if (Math.abs(img.data[o + c]! - mean) > GUTTER_FLAT) flat = false;
+        const ref = grey ? mean : m[c]!;
+        if (Math.abs(img.data[o + c]! - ref) > GUTTER_FLAT) flat = false;
       }
     }
     if (!flat) continue;
-    let unsaturated = true;
-    for (let x = box.x; x < box.x + box.width && unsaturated; x++) {
+    let inside = true;
+    for (let x = box.x; x < box.x + box.width && inside; x++) {
       const o = px(x);
-      const r = img.data[o]!;
-      const g = img.data[o + 1]!;
-      const b = img.data[o + 2]!;
-      if (Math.max(r, g, b) - Math.min(r, g, b) > GUTTER_MAX_CHROMA) {
-        unsaturated = false;
-      }
+      if (grey) {
+        const r = img.data[o]!;
+        const g = img.data[o + 1]!;
+        const b = img.data[o + 2]!;
+        inside = Math.max(r, g, b) - Math.min(r, g, b) <= GUTTER_MAX_CHROMA;
+      } else inside = isFlatOrLettering(img.data, o, m);
     }
-    if (!unsaturated) continue;
-    const v = Math.round(mean);
-    img.data.fill(v, px(box.x), px(box.x + box.width));
+    if (!inside) continue;
+    const fill = grey ? [0, 0, 0].fill(Math.round(mean)) : m.map(Math.round);
+    for (let x = box.x; x < box.x + box.width; x++) {
+      const o = px(x);
+      let moved = false;
+      for (let c = 0; c < 3; c++) {
+        if (img.data[o + c] !== fill[c]) moved = true;
+        img.data[o + c] = fill[c]!;
+      }
+      if (moved) changed++;
+    }
     if (top < 0) top = y;
     bottom = y;
   }
   if (top < 0) return null;
-  return { x: box.x, y: top, width: box.width, height: bottom - top + 1 };
+  return {
+    rows: { x: box.x, y: top, width: box.width, height: bottom - top + 1 },
+    changed,
+  };
 }
 
 // ─── Overlay: detect with a vision call ─────────────────────────────────────
@@ -678,8 +739,9 @@ export async function cleanPageWatermarks(args: {
       let accepted = first.accepted.filter((b) => !inBanner(b, banner));
       for (let round = 1; accepted.length > 0; round++) {
         for (const box of accepted.slice(0, OVERLAY_MAX_BOXES_PER_ROUND)) {
-          const gutter = paintGutterRows(img, box);
-          if (gutter) {
+          const painted = paintGutterRows(img, box);
+          if (painted) {
+            const gutter = painted.rows;
             for (let y = gutter.y; y < gutter.y + gutter.height; y++) {
               changed.fill(
                 1,
@@ -688,6 +750,14 @@ export async function cleanPageWatermarks(args: {
               );
             }
             fixes.push({ kind: "overlay", box: gutter });
+            // A fill that changed pixels ends this box's turn: the
+            // re-detection below decides whether lettering is left, and a
+            // later round edits the box once the fill changes nothing.
+            // Editing now would send the filled rows, and whatever else the
+            // box reaches (the credits text above the lettering on issue-1
+            // page 25), to an image model that kept rewriting crops on that
+            // page (#564).
+            if (painted.changed > 0) continue;
           }
           const outcome = await editOverlay(img, box, editMeta);
           if (!outcome.ok) {
