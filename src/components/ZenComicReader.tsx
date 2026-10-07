@@ -188,8 +188,17 @@ export default function ZenComicReader({
     [visibleBubbles],
   );
 
+  // Assigned after useAudioPlayback below; ref breaks the ordering cycle
+  // (togglePanelAutoPlay feeds usePanelNavigation which feeds the audio hook).
+  const stopAllRef = useRef<() => void>(() => undefined);
+  const cancelPendingRef = useRef<() => void>(() => undefined);
+
   const exitPanelView = useCallback(() => {
     clearPanelTimer();
+    // The playing clip must not run on into page view, or its end hands off
+    // to page-view auto-play, which walks the page by itself (#594, #493).
+    stopAllRef.current();
+    cancelPendingRef.current();
     // A turn may still be loading the next page; it must mount silent.
     readAloudCarryTo = null;
     lastPanelLandingTo = null;
@@ -202,11 +211,6 @@ export default function ZenComicReader({
       queueMicrotask(() => el.focus());
     }
   }, [clearPanelTimer, setPanelViewPreferred]);
-
-  // Assigned after useAudioPlayback below; ref breaks the ordering cycle
-  // (togglePanelAutoPlay feeds usePanelNavigation which feeds the audio hook).
-  const stopAllRef = useRef<() => void>(() => undefined);
-  const cancelPendingRef = useRef<() => void>(() => undefined);
 
   const togglePanelAutoPlay = useCallback(() => {
     if (panelAutoPlay) {
