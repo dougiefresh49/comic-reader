@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Bubble, AudioTimestamps } from "~/types";
 import { audioUrl } from "~/lib/storage";
-import { applyLevel, ensureConnected } from "~/lib/audio-graph";
+import { applyLevel, ensureConnected, sharedContext } from "~/lib/audio-graph";
 import { buildWordTimings } from "~/components/zen-comic-reader/text-utils";
 import { useWordHighlight } from "./useWordHighlight";
 
@@ -176,6 +176,11 @@ export function useAudioPlayback({
     if (!audio) return;
     if (audio.paused) {
       armedRef.current = true;
+      // The play button is a gesture, the one place WebKit lets a context that
+      // was interrupted or suspended while the clip sat paused resume (#611).
+      sharedContext()
+        ?.resume()
+        .catch(() => undefined);
       audio
         .play()
         .then(() => setIsPlaying(true))
