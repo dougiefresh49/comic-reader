@@ -1,10 +1,11 @@
 -- Issue #532: a fresh replay of supabase/migrations did not build production's schema.
--- Five early migrations ran statements on production that their files lack (bucket
--- limits, storage policies, indexes, constraint names, grants, a comment), and some
--- objects were made by hand (an RLS auto-enable event trigger, RLS on book_parts, a
--- sequence default privilege). This file brings a replay (a preview branch) level with
--- production and changes nothing on production: every statement is guarded or idempotent,
--- and applying it twice leaves the catalog unchanged. The comparison and the evidence are
+-- Six early migrations ran statements on production that their files lack (bucket
+-- limits, storage policies, indexes, constraint names, grants, a comment), one file grants
+-- anon reads that production refused, and some objects were made by hand (an RLS
+-- auto-enable event trigger, RLS on book_parts, a sequence default privilege). This file
+-- brings a replay (a preview branch) level with production and changes nothing on
+-- production: every statement is guarded or idempotent, and applying it twice leaves the
+-- catalog unchanged. The comparison and the evidence are
 -- on the issue. The hand-made bb-restyle bucket is left out on purpose: no code references it.
 
 -- ---------------------------------------------------------------------------
@@ -158,7 +159,7 @@ grant update on sequence public.aliases_id_seq, public.pages_id_seq to anon, aut
 -- 8. Grants the files hold that production does not (file-only). The recorded
 --    20260428014010_grant_anon_read_access ends with "Admin tables intentionally omitted:
 --    speaker_reviews, casting_tasks, pipeline_runs, page_context"; the file grants anon
---    SELECT on all four. Production holds it only on speaker_reviews. Revoking a privilege a
---    role does not hold is a no-op, so this changes nothing on production.
+--    SELECT on all four (speaker_reviews was dropped since). Production holds none of the
+--    three. Revoking a privilege a role does not hold is a no-op on production.
 -- ---------------------------------------------------------------------------
 revoke select on public.casting_tasks, public.page_context, public.pipeline_runs from anon;
