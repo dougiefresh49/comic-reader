@@ -93,7 +93,7 @@ function toGeometry(annotation: Annotation | undefined, sha: string) {
 /**
  * OCR one page image. Under DRY_RUN it reads no key, calls no `fetch` and
  * returns a geometry with no lines. Throws when `GOOGLE_CLOUD_VISION_API_KEY`
- * is missing or the API returns an error.
+ * is missing, the API returns an error, or the reply is not one response.
  */
 export async function cloudVisionGeometry(
   image: Uint8Array,
@@ -130,7 +130,12 @@ export async function cloudVisionGeometry(
       `Cloud Vision HTTP ${res.status}: ${body.error?.message ?? res.statusText}`,
     );
   }
-  const response = body.responses?.[0];
+  // A page with no text is `responses: [{}]`; anything else (an unreadable
+  // body, no array, an empty one) must fail, or `--write` nulls the page.
+  if (!Array.isArray(body.responses) || body.responses.length !== 1) {
+    throw new Error(`Cloud Vision HTTP ${res.status}: unreadable response`);
+  }
+  const response = body.responses[0];
   if (response?.error) {
     throw new Error(`Cloud Vision: ${response.error.message}`);
   }
