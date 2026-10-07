@@ -108,8 +108,9 @@ async function getLatestRun(
 
   if (error) {
     console.error("getLatestRun:", error);
-    return null;
+    throw new Error(`getLatestRun: ${error.message}`, { cause: error });
   }
+  // No row is not an error: the issue has never had a run.
   if (!data) return null;
 
   const steps = data.steps ?? {};
@@ -129,12 +130,19 @@ async function getLatestRun(
 
 type CountResult = { count: number | null; error: { message: string } | null };
 
-/** A head count that logs and reads 0 on error, so one bad table never blanks the hub. */
+/**
+ * Logs and throws a failed `getCounts` read (#500). A failed read shown as
+ * zero progress would claim work is missing that may be done, so the hub
+ * shows the error page instead.
+ */
+function countsReadFailed(label: string, error: { message: string }): never {
+  console.error(`getCounts ${label}:`, error);
+  throw new Error(`getCounts ${label}: ${error.message}`, { cause: error });
+}
+
+/** A head count; no rows reads 0, a failed read throws. */
 function countOf(label: string, result: CountResult): number {
-  if (result.error) {
-    console.error(`pipeline-progress ${label}:`, result.error.message);
-    return 0;
-  }
+  if (result.error) countsReadFailed(label, result.error);
   return result.count ?? 0;
 }
 
@@ -219,24 +227,16 @@ async function getCounts(
     // ... and completed_at is not null
     scoped("casting_tasks").not("completed_at", "is", null),
     // The castlist through `~/lib/cast`: the issue's rows, and those with an
-    // active voice or `no_audio`. Logs and reads 0 on error, like countOf.
-    countIssueCast(supabaseAdmin, bookId, issueId).catch((e: unknown) => {
-      console.error(
-        "pipeline-progress castlist:",
-        e instanceof Error ? e.message : e,
-      );
-      return { rows: 0, withVoice: 0 };
-    }),
+    // active voice or `no_audio`. A failed read throws from `~/lib/cast`.
+    countIssueCast(supabaseAdmin, bookId, issueId),
   ]);
 
-  const panelRows = (panelsResult.error ? [] : (panelsResult.data ?? [])) as {
+  if (panelsResult.error) countsReadFailed("panels", panelsResult.error);
+  const panelRows = (panelsResult.data ?? []) as {
     id: string;
     page_number: number;
     foreground_polygons: unknown;
   }[];
-  if (panelsResult.error) {
-    console.error("pipeline-progress panels:", panelsResult.error.message);
-  }
   const panelIds = panelRows.map((p) => p.id);
 
   // Detections hang off panels, so they are scoped through this issue's panel ids.

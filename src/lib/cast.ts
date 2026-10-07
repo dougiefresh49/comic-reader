@@ -878,18 +878,6 @@ export async function deleteBookCast(
   must(`deleting the castlist of ${bookId}`, error);
 }
 
-/** The issue's cast (`issueCast`, so removed rows stay out) as its characters' display names, sorted, as shown to the reader and to Gemini; empty when the issue has none. */
-export async function readCastNames(
-  client: Client,
-  bookId: string,
-  issueId: string,
-): Promise<string[]> {
-  const book = await loadBookCast(client, bookId);
-  return issueCast(book, issueId)
-    .map((r) => r.display_name)
-    .sort();
-}
-
 /** A book's franchises from `book_franchises`, lowest `position` first; empty when it has none. */
 export async function readBookFranchises(
   client: Client,
