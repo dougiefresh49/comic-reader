@@ -44,6 +44,7 @@ const { GEMINI_FAST, GEMINI_HIGH, GEMINI_MEDIUM } = await import(
   "~/lib/models"
 );
 const { TTS_MODEL } = await import("~/lib/tts-request");
+const { cloudVisionGeometry } = await import("~/lib/cloud-vision-geometry");
 
 const post = { method: "POST", body: JSON.stringify({ voice_name: "x" }) };
 
@@ -86,6 +87,13 @@ const fb = (await fallback.json()) as {
 };
 console.log(
   `roboflow text-detection bubbles=${fb.outputs[0]!.predictions.predictions.length}`,
+);
+
+const ocrGeometry = await cloudVisionGeometry(new Uint8Array([1, 2, 3]));
+assert.equal(ocrGeometry.engine, "cloud-vision@v1");
+assert.equal(ocrGeometry.lines.length, 0);
+console.log(
+  `cloud vision: engine=${ocrGeometry.engine} lines=${ocrGeometry.lines.length}`,
 );
 
 const gemini = getGeminiClient();
