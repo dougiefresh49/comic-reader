@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
 import { STEP_ORDER } from "~/lib/pipeline-steps";
+import { LiveRefresh } from "~/app/admin/[bookId]/[issueId]/review/pipeline/LiveRefresh";
 
 export interface SkippedGate {
   gate?: string;
@@ -22,7 +29,12 @@ interface PipelineActionsProps {
   pageCount: number;
   status: string;
   skippedGates?: SkippedGate[];
+  /** `steps.runId` of the issue's newest `pipeline_runs` row, any status. */
+  latestRunId: string | null;
 }
+
+/** How often the row refreshes while it follows a run this tab triggered. */
+const TRACK_POLL_MS = 5000;
 
 const REVIEW_STEPS: Record<string, string> = {
   "review-clusters": "Characters",
@@ -152,9 +164,17 @@ export function PipelineActions({
   pageCount,
   status,
   skippedGates,
+  latestRunId,
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
-  const [triggered, setTriggered] = useState(false);
+  // The run this tab started, until the props catch up with it and it leaves
+  // the running state. Step and pause fields can read the same before and
+  // after a restart at a stop, so only the run id tells old props from new.
+  const [trackedRunId, setTrackedRunId] = useState<string | null>(null);
+  // A trigger with no run row to match: follow the props from the first
+  // refresh after it, which are post-trigger, until the row stops running.
+  const [followUntracked, setFollowUntracked] = useState(false);
+  const [refreshPending, startRefresh] = useTransition();
   const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
@@ -177,6 +197,20 @@ export function PipelineActions({
     pipelineStep !== null;
   const isPaused = pipelinePaused && pipelinePausedAt !== null;
 
+  // trigger-ingest writes the issue row before it inserts the run row, so once
+  // the latest run is ours the other props are from after the trigger.
+  const caughtUp = trackedRunId !== null && latestRunId === trackedRunId;
+  const settled =
+    (caughtUp || (followUntracked && !refreshPending)) && !isRunning;
+  const following = trackedRunId !== null || followUntracked;
+  const pollMs = following && !settled ? TRACK_POLL_MS : null;
+
+  useEffect(() => {
+    if (!settled) return;
+    setTrackedRunId(null);
+    setFollowUntracked(false);
+  }, [settled]);
+
   async function handleTrigger(fromStep?: string) {
     setLoading(true);
     setRefusal(null);
@@ -187,7 +221,18 @@ export function PipelineActions({
         body: JSON.stringify({ bookId, issueId, fromStep }),
       });
       if (res.ok) {
-        setTriggered(true);
+        // No runId, or a warning (the run row insert failed), leaves no row
+        // to match, so render from props and follow them untracked.
+        const data = (await res.json().catch(() => ({}))) as {
+          runId?: string;
+          warning?: string;
+        };
+        if (data.runId && !data.warning) {
+          setTrackedRunId(data.runId);
+        } else {
+          setFollowUntracked(true);
+          startRefresh(() => router.refresh());
+        }
       } else {
         setRefusal(await readTriggerRefusal(res));
       }
@@ -216,9 +261,10 @@ export function PipelineActions({
     </span>
   );
 
-  if (triggered) {
+  if (trackedRunId !== null && !caughtUp) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded bg-emerald-700/30 px-2.5 py-1 text-xs font-medium text-emerald-300">
+        <LiveRefresh intervalMs={pollMs} />
         <Spinner /> Queued
       </span>
     );
@@ -268,6 +314,7 @@ export function PipelineActions({
       .filter((g): g is string => typeof g === "string" && g.length > 0);
     return (
       <span className="inline-flex flex-col gap-0.5">
+        <LiveRefresh intervalMs={pollMs} />
         <span className="inline-flex items-center gap-1.5 rounded bg-cyan-700/30 px-2.5 py-1 text-xs font-medium text-cyan-300">
           <Spinner /> {label}
         </span>

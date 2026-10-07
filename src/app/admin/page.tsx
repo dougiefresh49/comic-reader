@@ -438,6 +438,7 @@ function ActionButtons({
         pageCount={issue.pageCount}
         status={issue.status}
         skippedGates={skippedGates}
+        latestRunId={issue.latestRunId}
       />
       {draft && canPreview && (
         <Link
