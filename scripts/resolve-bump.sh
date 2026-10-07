@@ -61,8 +61,7 @@ Reply with exactly one word: major, minor, or patch."
 
   # Omit maxOutputTokens — use API default so thinking + short answer are not truncated.
   PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{
-    contents: [{parts: [{text: $prompt}]}],
-    generationConfig: {temperature: 0}
+    contents: [{parts: [{text: $prompt}]}]
   }')
 
   RESPONSE=$(curl -sf --max-time 120 \

@@ -291,7 +291,6 @@ Reply with ONLY the speaker label (e.g., "SPEAKER_00") or "UNSURE" if you cannot
   const result = await ai.models.generateContent({
     model: GEMINI_MEDIUM,
     contents: prompt,
-    config: { temperature: 0 },
   });
 
   const answer = result.text?.trim() ?? "";
