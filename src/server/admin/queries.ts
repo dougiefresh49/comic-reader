@@ -1,5 +1,6 @@
 import "server-only";
 import { supabase } from "~/lib/supabase";
+import { supabaseAdmin } from "~/lib/supabase-admin";
 import { listAllIssues } from "~/lib/issue-queries";
 
 export interface AdminIssueRow {
@@ -21,6 +22,8 @@ export interface AdminIssueRow {
   pipelinePaused: boolean;
   pipelinePausedAt: string | null;
   pipelinePausedUrl: string | null;
+  /** `steps.runId` of the issue's newest `pipeline_runs` row, any status. */
+  latestRunId: string | null;
 }
 
 interface IssueQueryRow {
@@ -44,7 +47,54 @@ interface IssueQueryRow {
   book_parts: { id: string; name: string; number: number } | null;
 }
 
+/**
+ * `steps.runId` of each issue's newest `pipeline_runs` row by `started_at`, any
+ * status, keyed `${bookId}/${issueId}`. A row from before runIds were recorded
+ * gives null. Pass one issue to read just its row.
+ * SQL: select book_id, issue_id, steps->>'runId' from pipeline_runs
+ *      [where book_id = $1 and issue_id = $2]
+ *      order by started_at desc nulls last [limit 1]
+ */
+export async function getLatestRunIds(issue?: {
+  bookId: string;
+  issueId: string;
+}): Promise<Map<string, string | null>> {
+  let query = supabaseAdmin
+    .from("pipeline_runs")
+    .select("book_id, issue_id, runId:steps->>runId")
+    .order("started_at", { ascending: false, nullsFirst: false });
+  if (issue) {
+    query = query
+      .eq("book_id", issue.bookId)
+      .eq("issue_id", issue.issueId)
+      .limit(1);
+  }
+  const { data, error } = (await query) as {
+    data: Array<{
+      book_id: string;
+      issue_id: string;
+      runId: string | null;
+    }> | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    console.error("getLatestRunIds:", error);
+    throw new Error(`getLatestRunIds: ${error.message}`, { cause: error });
+  }
+
+  const map = new Map<string, string | null>();
+  for (const row of data ?? []) {
+    const key = `${row.book_id}/${row.issue_id}`;
+    if (!map.has(key)) map.set(key, row.runId ?? null);
+  }
+  return map;
+}
+
 export async function getAdminIssues(): Promise<AdminIssueRow[]> {
+  // Run ids first: trigger-ingest writes the issue row before it inserts the
+  // run row, so an issue read after this one never predates the run id it sees.
+  const latestRunIds = await getLatestRunIds();
   const { data, error } = await listAllIssues(
     supabase,
     "id, book_id, number, name, part_id, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps, status, pipeline_step, pipeline_paused, pipeline_paused_at, pipeline_paused_url, books(id, name), book_parts(id, name, number)",
@@ -76,6 +126,7 @@ export async function getAdminIssues(): Promise<AdminIssueRow[]> {
     pipelinePaused: row.pipeline_paused,
     pipelinePausedAt: row.pipeline_paused_at,
     pipelinePausedUrl: row.pipeline_paused_url,
+    latestRunId: latestRunIds.get(`${row.book_id}/${row.id}`) ?? null,
   }));
 }
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPipelineReviewIssue } from "~/server/admin/pipeline-review";
 import { getPipelineProgress } from "~/server/admin/pipeline-progress";
+import { getLatestRunIds } from "~/server/admin/queries";
 import { PipelineActions } from "~/app/admin/PipelineActions";
 import { LiveRefresh } from "./LiveRefresh";
 import { LocalTime } from "./LocalTime";
@@ -18,6 +19,11 @@ interface Params {
 
 export default async function PipelineReviewPage({ params }: Params) {
   const { bookId, issueId } = await params;
+  // Before the issue read: trigger-ingest writes the issue row before it
+  // inserts the run row, so the issue below never predates this run id.
+  const latestRunId =
+    (await getLatestRunIds({ bookId, issueId })).get(`${bookId}/${issueId}`) ??
+    null;
   const [issue, progress] = await Promise.all([
     getPipelineReviewIssue(bookId, issueId),
     getPipelineProgress(bookId, issueId),
@@ -83,6 +89,7 @@ export default async function PipelineReviewPage({ params }: Params) {
                 pageCount={issue.pageCount}
                 status={issue.status}
                 skippedGates={run?.status === "running" ? run.skipped : []}
+                latestRunId={latestRunId}
               />
               {view.refreshMs !== null && (
                 <span className="text-sm text-neutral-500">
