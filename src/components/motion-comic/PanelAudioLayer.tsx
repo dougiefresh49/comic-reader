@@ -25,55 +25,46 @@ const FADE_MS = 800;
  * Loudness goes through Web Audio, never `el.volume`: iOS WebKit ignores
  * writes to `HTMLMediaElement.volume` (it reads back 1), so a slider that
  * set it did nothing on an iPad (#609). Every browser takes this path.
+ *
+ * The graph lives at module level and outlives any effect cleanup: an
+ * element connected to a MediaElementAudioSourceNode stays bound to it for
+ * life, so a StrictMode double pass or remount must find the existing gain
+ * rather than connect the element again (which throws). One context for the
+ * app, created on first play, never closed; the WeakMap lets an unmounted
+ * element and its nodes be collected.
  */
-interface AudioGraph {
-  ctx: AudioContext | null;
-  gains: Map<HTMLAudioElement, GainNode>;
-}
+let sharedCtx: AudioContext | null = null;
+const gains = new WeakMap<HTMLAudioElement, GainNode>();
 
 /**
  * Routes `el` through its own GainNode on first use. The context is created
  * here, the first time a layer is about to play, never at render or mount.
- * `createMediaElementSource` throws on a second call for the same element,
- * so each element is connected once for the component's life.
  */
-function ensureConnected(
-  graph: AudioGraph,
-  el: HTMLAudioElement,
-  level: number,
-): GainNode {
-  const existing = graph.gains.get(el);
+function ensureConnected(el: HTMLAudioElement, level: number): GainNode {
+  const existing = gains.get(el);
   if (existing) return existing;
-  graph.ctx ??= new AudioContext();
-  const gain = graph.ctx.createGain();
+  sharedCtx ??= new AudioContext();
+  const gain = sharedCtx.createGain();
   gain.gain.value = level;
-  graph.ctx
+  sharedCtx
     .createMediaElementSource(el)
     .connect(gain)
-    .connect(graph.ctx.destination);
-  graph.gains.set(el, gain);
+    .connect(sharedCtx.destination);
+  gains.set(el, gain);
   return gain;
 }
 
-function setGain(graph: AudioGraph, el: HTMLAudioElement, level: number) {
-  const gain = graph.gains.get(el);
+/** A layer at zero is also muted, which silences it even if the context cannot run. */
+function applyLevel(el: HTMLAudioElement | null, level: number) {
+  if (!el) return;
+  el.muted = level === 0;
+  const gain = gains.get(el);
   if (gain) gain.gain.value = level;
 }
 
-/** A layer at zero is also muted, which silences it even if the context cannot run. */
-function applyLevel(
-  graph: AudioGraph,
-  el: HTMLAudioElement | null,
-  level: number,
-) {
-  if (!el) return;
-  el.muted = level === 0;
-  setGain(graph, el, level);
-}
-
-function playLayer(graph: AudioGraph, el: HTMLAudioElement, level: number) {
-  ensureConnected(graph, el, level);
-  graph.ctx?.resume().catch(() => undefined);
+function playLayer(el: HTMLAudioElement, level: number) {
+  ensureConnected(el, level);
+  sharedCtx?.resume().catch(() => undefined);
   el.play().catch(() => undefined);
 }
 
@@ -99,7 +90,6 @@ export function PanelAudioLayer({
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const lastMusicTagRef = useRef<string | null>(null);
   const lastSceneIdRef = useRef<string | null>(null);
-  const graphRef = useRef<AudioGraph>({ ctx: null, gains: new Map() });
   // Effective per-layer levels, read by the play paths so a slider move
   // never re-triggers the one-shot sfx effect.
   const levelsRef = useRef({ ambience: 0, sfx: 0, music: 0 });
@@ -109,16 +99,6 @@ export function PanelAudioLayer({
   const sfxTag = panel?.audioTags.sfx[0] ?? null;
   const musicTag = panel?.audioTags.music_mood ?? null;
 
-  // ── Graph teardown ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const graph = graphRef.current;
-    return () => {
-      graph.ctx?.close().catch(() => undefined);
-      graph.ctx = null;
-      graph.gains.clear();
-    };
-  }, []);
-
   // ── Volumes ────────────────────────────────────────────────────────────
   useEffect(() => {
     const levels = {
@@ -127,10 +107,9 @@ export function PanelAudioLayer({
       music: (volume.music ?? DEFAULT_VOLUME.music) * (muted ? 0 : 1),
     };
     levelsRef.current = levels;
-    const graph = graphRef.current;
-    applyLevel(graph, ambienceRef.current, levels.ambience);
-    applyLevel(graph, sfxRef.current, levels.sfx);
-    applyLevel(graph, musicRef.current, levels.music);
+    applyLevel(ambienceRef.current, levels.ambience);
+    applyLevel(sfxRef.current, levels.sfx);
+    applyLevel(musicRef.current, levels.music);
   }, [muted, volume]);
 
   // ── Ambience: swap source on tag change, loop, play when active ────────
@@ -143,7 +122,7 @@ export function PanelAudioLayer({
       el.load();
     }
     if (active && url && !muted) {
-      playLayer(graphRef.current, el, levelsRef.current.ambience);
+      playLayer(el, levelsRef.current.ambience);
     } else {
       el.pause();
     }
@@ -155,7 +134,7 @@ export function PanelAudioLayer({
     if (!el || !active || !sfxTag || muted) return;
     el.src = audioLibraryUrl("sfx", sfxTag);
     el.currentTime = 0;
-    playLayer(graphRef.current, el, levelsRef.current.sfx);
+    playLayer(el, levelsRef.current.sfx);
   }, [sfxTag, active, muted, panel?.id]);
 
   // ── Music: crossfade on new scene; otherwise continue current bed ──────
@@ -173,14 +152,13 @@ export function PanelAudioLayer({
     const sameMood = lastMusicTagRef.current === musicTag;
     const continuePlaying = sameScene || (sameMood && !newScene);
     const url = audioLibraryUrl("music", musicTag);
-    const graph = graphRef.current;
-    const gain = ensureConnected(graph, el, targetVol);
+    const gain = ensureConnected(el, targetVol);
 
     if (continuePlaying) {
       // A cleanup mid-fade-in leaves the gain partway up the ramp; land on
       // the target rather than staying quieter than the settings ask for.
       gain.gain.value = targetVol;
-      if (el.paused) playLayer(graph, el, targetVol);
+      if (el.paused) playLayer(el, targetVol);
       lastSceneIdRef.current = sceneId;
       lastMusicTagRef.current = musicTag;
       return;
@@ -201,7 +179,7 @@ export function PanelAudioLayer({
         el.src = url;
         el.load();
         gain.gain.value = 0;
-        playLayer(graph, el, 0);
+        playLayer(el, 0);
         lastMusicTagRef.current = musicTag;
         lastSceneIdRef.current = sceneId;
 
