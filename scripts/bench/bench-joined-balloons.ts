@@ -208,9 +208,7 @@ function score(
         ? "not next to each other in play order inside one panel"
         : p.gap === null
           ? "a bubble has no box"
-          : p.gap > gapPx
-            ? `gap ${p.gap} px > ${gapPx}`
-            : "a candidate, but its page got no call (the run stopped early)";
+          : `gap ${p.gap} px > ${gapPx}`;
       return { ...l, why };
     });
   const trueJoins = rows.filter((r) => r.predicted && r.labeled).length;
@@ -533,7 +531,10 @@ async function findOne(p: Page): Promise<{ call: PageCall; rows: PairRow[] }> {
   let error: string | null = null;
   let response: GenerateContentResponse | undefined;
   if (dryRun) {
-    reply = standInReply(p);
+    // The stand-in draws on the same --max-calls budget, so a dry run
+    // exercises the no-verdict path too.
+    if (gate.budget.take()) reply = standInReply(p);
+    else error = `--max-calls ${gate.budget.max} reached before p${p.page}`;
   } else {
     try {
       response = await generateContentLogged(
@@ -585,7 +586,15 @@ async function findOne(p: Page): Promise<{ call: PageCall; rows: PairRow[] }> {
     costUsd: log.reduce((s, a) => s + (a.costUsd ?? 0), 0),
     latencyMs: ok?.latencyMs ?? null,
   };
-  const rows = p.candidates.map((c, index): PairRow => {
+  return { call, rows: pageRows(p, verdicts) };
+}
+
+/** One row per candidate; `predicted` is null where the model gave no verdict. */
+function pageRows(
+  p: Page,
+  verdicts: Map<number, { joined: boolean; reason: string }>,
+): PairRow[] {
+  return p.candidates.map((c, index): PairRow => {
     const v = verdicts.get(index);
     const a = p.bubbles.get(c.a)!;
     const b = p.bubbles.get(c.b)!;
@@ -607,7 +616,6 @@ async function findOne(p: Page): Promise<{ call: PageCall; rows: PairRow[] }> {
       reason: v?.reason ?? null,
     };
   });
-  return { call, rows };
 }
 
 // ── Main ────────────────────────────────────────────────────────────────
@@ -630,7 +638,15 @@ const results = await pool(toSend, 4, findOne, () => gate.halted !== null);
 const done = results.filter(
   (r): r is Awaited<ReturnType<typeof findOne>> => r !== undefined,
 );
-const rows = done.flatMap((r) => r.rows);
+// A page the run never reached (--max-calls, or a refused call halting the
+// pool) still scores: its candidates get no verdict and count as misses.
+const donePages = new Set(done.map((r) => r.call.page));
+const rows = [
+  ...done.flatMap((r) => r.rows),
+  ...toSend
+    .filter((p) => !donePages.has(p.page))
+    .flatMap((p) => pageRows(p, new Map())),
+];
 const calls = done.map((r) => r.call);
 const tokens = calls.reduce(
   (t, c) => ({
