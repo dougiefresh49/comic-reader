@@ -6,6 +6,7 @@
 import {
   STEP_ORDER,
   isPipelineStep,
+  isUnstartedStep,
   type PipelineStep,
 } from "~/lib/pipeline-steps";
 import type { PipelineReviewIssue } from "~/server/admin/pipeline-review";
@@ -169,7 +170,7 @@ export function runState(
   if (issue.pipelinePaused && issue.pipelinePausedAt) return "waiting";
   if (step && isPipelineStep(step)) return "running";
   if (step === "complete" || issue.status === "ready") return "ready";
-  if (!step || step === "pages-downloaded") return "not-started";
+  if (isUnstartedStep(step)) return "not-started";
   return "running";
 }
 

@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
     bookId: string;
     issueId: string;
     fromStep?: unknown;
+    /** The issue id, typed by the admin to start over an issue with bubbles (#319). */
+    confirm?: unknown;
   };
 
   if (!body.bookId || !body.issueId) {
@@ -41,10 +43,11 @@ export async function POST(req: NextRequest) {
     supabaseAdmin,
     body.bookId,
     body.issueId,
-    "id, pipeline_step, pipeline_paused, pipeline_paused_at",
+    "id, pipeline_step, pipeline_paused, pipeline_paused_at, page_count",
   ).single()) as {
     data: {
       id: string;
+      page_count: number | null;
       pipeline_step: string | null;
       pipeline_paused: boolean | null;
       pipeline_paused_at: string | null;
@@ -53,6 +56,36 @@ export async function POST(req: NextRequest) {
 
   if (!issue) {
     return Response.json({ error: "issue not found" }, { status: 404 });
+  }
+
+  // A start from the beginning over existing bubbles rewrites their order and
+  // word boxes and spends on every page, so it needs the issue id typed back
+  // (#319). Retry and Restart name a fromStep and skip this check.
+  if (fromStep === undefined && body.confirm !== body.issueId) {
+    const { count: bubbles, error: countError } = await supabaseAdmin
+      .from("bubbles")
+      .select("*", { count: "exact", head: true })
+      .eq("book_id", body.bookId)
+      .eq("issue_id", body.issueId);
+    if (countError) {
+      return Response.json(
+        {
+          error: `Could not count the bubbles of ${body.bookId}/${body.issueId}, so nothing was started: ${countError.message}`,
+        },
+        { status: 500 },
+      );
+    }
+    if ((bubbles ?? 0) > 0) {
+      return Response.json(
+        {
+          error: `${body.issueId} already has ${bubbles} ${bubbles === 1 ? "bubble" : "bubbles"}. Starting from the beginning needs the issue id typed to confirm.`,
+          reason: "has-bubbles",
+          bubbles,
+          pages: issue.page_count ?? 0,
+        },
+        { status: 409 },
+      );
+    }
   }
 
   // Masks run on a finished issue only (#356).

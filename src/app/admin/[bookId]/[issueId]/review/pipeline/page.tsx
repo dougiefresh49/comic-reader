@@ -4,6 +4,7 @@ import { getPipelineReviewIssue } from "~/server/admin/pipeline-review";
 import { getPipelineProgress } from "~/server/admin/pipeline-progress";
 import { getLatestRunIds } from "~/server/admin/queries";
 import { PipelineActions } from "~/app/admin/PipelineActions";
+import { toRelativeHref } from "~/lib/relative-href";
 import { LiveRefresh } from "./LiveRefresh";
 import { LocalTime } from "./LocalTime";
 import { Stages } from "./StageList";
@@ -91,6 +92,7 @@ export default async function PipelineReviewPage({ params }: Params) {
                 skippedGates={run?.status === "running" ? run.skipped : []}
                 latestRunId={latestRun?.runId ?? null}
                 openGateWaitAt={latestRun?.openGateWaitAt ?? null}
+                gateLink={false}
               />
               {view.refreshMs !== null && (
                 <span className="text-sm text-neutral-500">
@@ -269,20 +271,6 @@ function StateDot({ state }: { state: RunState }) {
       />
     </span>
   );
-}
-
-/**
- * The gate URL is stored absolute to whatever host wrote it (localhost in a
- * dev run, the Vercel host in prod). Keep the path, query and hash, drop the
- * host, so the link opens on the host the hub is served from.
- */
-function toRelativeHref(url: string): string {
-  try {
-    const u = new URL(url);
-    return `${u.pathname}${u.search}${u.hash}`;
-  } catch {
-    return url;
-  }
 }
 
 function reviewPages(bookId: string, issueId: string, hasWebP: boolean) {
