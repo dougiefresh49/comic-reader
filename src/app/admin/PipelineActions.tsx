@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { PAUSE_TO_HOOK_STEP } from "~/app/api/admin/cancel-ingest/hooks";
 import { STEP_ORDER } from "~/lib/pipeline-steps";
@@ -165,6 +171,10 @@ export function PipelineActions({
   // the running state. Step and pause fields can read the same before and
   // after a restart at a stop, so only the run id tells old props from new.
   const [trackedRunId, setTrackedRunId] = useState<string | null>(null);
+  // A trigger with no run row to match: follow the props from the first
+  // refresh after it, which are post-trigger, until the row stops running.
+  const [followUntracked, setFollowUntracked] = useState(false);
+  const [refreshPending, startRefresh] = useTransition();
   const [refusal, setRefusal] = useState<TriggerRefusal | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const router = useRouter();
@@ -190,11 +200,15 @@ export function PipelineActions({
   // trigger-ingest writes the issue row before it inserts the run row, so once
   // the latest run is ours the other props are from after the trigger.
   const caughtUp = trackedRunId !== null && latestRunId === trackedRunId;
-  const settled = caughtUp && !isRunning;
-  const pollMs = trackedRunId !== null && !settled ? TRACK_POLL_MS : null;
+  const settled =
+    (caughtUp || (followUntracked && !refreshPending)) && !isRunning;
+  const following = trackedRunId !== null || followUntracked;
+  const pollMs = following && !settled ? TRACK_POLL_MS : null;
 
   useEffect(() => {
-    if (settled) setTrackedRunId(null);
+    if (!settled) return;
+    setTrackedRunId(null);
+    setFollowUntracked(false);
   }, [settled]);
 
   async function handleTrigger(fromStep?: string) {
@@ -208,7 +222,7 @@ export function PipelineActions({
       });
       if (res.ok) {
         // No runId, or a warning (the run row insert failed), leaves no row
-        // to match, so refresh once and render from props.
+        // to match, so render from props and follow them untracked.
         const data = (await res.json().catch(() => ({}))) as {
           runId?: string;
           warning?: string;
@@ -216,7 +230,8 @@ export function PipelineActions({
         if (data.runId && !data.warning) {
           setTrackedRunId(data.runId);
         } else {
-          router.refresh();
+          setFollowUntracked(true);
+          startRefresh(() => router.refresh());
         }
       } else {
         setRefusal(await readTriggerRefusal(res));
