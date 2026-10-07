@@ -169,6 +169,16 @@ function shortenAtWord(text: string, limit: number): string {
 }
 
 /**
+ * The bubble's own speaker as the reader names it: the character's display
+ * name, else the raw speaker. Empty means the bubble has no speaker (#494).
+ */
+export function bubbleSpeaker(
+  bubble: Pick<Bubble, "speakerName" | "speaker">,
+): string {
+  return (bubble.speakerName ?? bubble.speaker ?? "").trim();
+}
+
+/**
  * The accessible name of a bubble button: what a screen reader speaks when
  * a kid lands on it (#550). The speaker and the start of the text when the
  * bubble has them, else the kind of bubble, and never the database id.
@@ -176,7 +186,7 @@ function shortenAtWord(text: string, limit: number): string {
 export function bubbleAccessibleName(
   bubble: Pick<Bubble, "speakerName" | "speaker" | "ocr_text" | "type">,
 ): string {
-  const speaker = (bubble.speakerName ?? bubble.speaker ?? "").trim();
+  const speaker = bubbleSpeaker(bubble);
   const text = shortenAtWord(
     stripAudioTags(bubble.ocr_text),
     ACCESSIBLE_NAME_TEXT_LIMIT,

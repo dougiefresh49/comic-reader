@@ -33,7 +33,6 @@ export function SpeechBox({
   onTogglePlay,
   voiced = true,
 }: SpeechBoxProps) {
-  const label = speaker?.trim();
   // Subscribed here, not in the reader, so a word change re-renders only
   // this caption (#87).
   const activeWordIndex = useActiveWordIndex(wordHighlight, bubbleId);
@@ -140,10 +139,10 @@ export function SpeechBox({
 
   return (
     <div className="relative flex min-h-[78px] w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/70 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-      <div className="mb-1 flex min-h-4 items-center justify-between">
-        {label && (
+      <div className="mb-1 flex min-h-6 items-center justify-between">
+        {speaker && (
           <span className="text-xs font-semibold tracking-[0.08em] text-cyan-300 uppercase">
-            {label}
+            {speaker}
           </span>
         )}
         {!voiced ? (

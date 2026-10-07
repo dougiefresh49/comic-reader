@@ -29,6 +29,7 @@ import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import { ViewSheet } from "./zen-comic-reader/ViewSheet";
 import {
   bubbleAccessibleName,
+  bubbleSpeaker,
   buildSpeechContent,
 } from "./zen-comic-reader/text-utils";
 import { PanelViewFrame } from "./zen-comic-reader/PanelView";
@@ -564,11 +565,17 @@ export default function ZenComicReader({
     const bubble =
       orderedPanelBubbles.find((b) => b.id === selectedBubble?.id) ??
       orderedPanelBubbles[0];
-    const speaker = (bubble?.speakerName ?? bubble?.speaker)?.trim();
+    const speaker = bubble ? bubbleSpeaker(bubble) : "";
     const snippet = bubble?.ocr_text?.slice(0, 120) ?? "";
-    return speaker
-      ? `Panel ${idx} of ${total}. ${speaker} speaks: ${snippet}`
-      : `Panel ${idx} of ${total}. ${snippet}`;
+    // Says what the caption box shows sighted readers for a silent bubble.
+    const silent = bubble && !hasAudio(bubble) ? "No voice yet." : "";
+    return [
+      `Panel ${idx} of ${total}.`,
+      speaker ? `${speaker} speaks: ${snippet}` : snippet,
+      silent,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }, [
     panelViewMode,
     panels.length,
@@ -591,7 +598,7 @@ export default function ZenComicReader({
   const caption = speech ? (
     <SpeechBox
       bubbleId={selectedBubble?.id ?? ""}
-      speaker={selectedBubble?.speakerName ?? selectedBubble?.speaker}
+      speaker={selectedBubble ? bubbleSpeaker(selectedBubble) : undefined}
       text={speech.cleanText}
       words={speech.words}
       wordHighlight={wordHighlight}
