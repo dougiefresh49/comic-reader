@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { startTransition, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 /**
  * App-wide error boundary. Renders a friendly retry page instead of
@@ -15,9 +16,21 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const router = useRouter();
+
   useEffect(() => {
     console.error("[app-error]", error.digest ?? "", error);
   }, [error]);
+
+  // reset() alone re-renders the failed server payload already in the
+  // client cache. refresh() refetches it; one transition keeps this page
+  // up until the new payload lands, so a second failure lands back here.
+  function retry() {
+    startTransition(() => {
+      router.refresh();
+      reset();
+    });
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-950 px-4 text-center text-neutral-100">
@@ -32,7 +45,7 @@ export default function AppError({
 
       <div className="flex gap-3">
         <button
-          onClick={reset}
+          onClick={retry}
           className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-500 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none"
         >
           Try again
