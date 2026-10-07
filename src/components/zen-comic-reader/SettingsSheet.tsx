@@ -311,7 +311,8 @@ function WordHighlightRow({
             Highlight words
           </div>
           <div className="text-xs text-neutral-400">
-            Light up each word as it&apos;s read
+            Light up each word as it&apos;s read. Some bubbles light up only in
+            the caption.
           </div>
         </div>
       </div>

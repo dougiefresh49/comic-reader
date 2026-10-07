@@ -23,8 +23,8 @@ const TRAIL_OPACITY = 0.3;
 /** Longest wipe across the active word, before dividing by playbackRate. */
 const WIPE_MAX_MS = 220;
 /** Padding around a word box, as a share of the box height. */
-const PAD_X = 0.12;
-const PAD_Y = 0.06;
+const PAD_X = 0.08;
+const PAD_Y = 0.04;
 /** Corner radius, as a share of the padded box height. */
 const RADIUS = 0.15;
 
@@ -183,7 +183,13 @@ export function BubbleWordHighlight({
                 ? {
                     transformBox: "fill-box",
                     transformOrigin: "0 50%",
-                    animation: `bubble-word-wipe ${wipeMs}ms ease-out both`,
+                    // Longhands, not the `animation` shorthand: a rate change
+                    // re-applies the duration, and the shorthand would reset
+                    // play-state to running while the audio is paused.
+                    animationName: "bubble-word-wipe",
+                    animationDuration: `${wipeMs}ms`,
+                    animationTimingFunction: "ease-out",
+                    animationFillMode: "both",
                     animationPlayState: paused ? "paused" : "running",
                   }
                 : undefined

@@ -515,22 +515,31 @@ export default function ZenComicReader({
     [selectedBubble, selectedTimestamps],
   );
 
-  // Per bubble, never per word: the reader holds which bubble plays and
-  // whether its words can light on the art; the word index stays in the
+  // Per bubble, never per word: the reader holds whether the selected
+  // bubble's words can light on the art and whether its marker is lit; the word index stays in the
   // leaves (SpeechBox, BubbleWordHighlight) so a word change does not
   // re-render this component (#87).
-  const playingBubbleId = useWordHighlightSelector(
-    wordHighlight,
-    (s) => s.bubbleId,
-  );
   const wordMatch = useMemo(
     () =>
       speech ? inBubbleMatch(speech.words, selectedBubble?.textGeometry) : null,
     [speech, selectedBubble],
   );
   const showInBubble = wordMatch !== null && wordHighlightMode !== "caption";
-  const inBubbleShowing =
-    showInBubble && playingBubbleId === selectedBubble?.id;
+  // The first word with a box: nothing lights on the art before it, so the
+  // border stays at full strength until then.
+  const firstBoxedIndex =
+    wordMatch?.boxesByTimingIndex.findIndex((boxes) => boxes.length > 0) ?? -1;
+  // A boolean that flips once per bubble (when its first boxed word lights
+  // and when the clip ends), never per word.
+  const markerLit = useWordHighlightSelector(
+    wordHighlight,
+    (s) =>
+      firstBoxedIndex >= 0 &&
+      s.bubbleId === selectedBubble?.id &&
+      s.index !== null &&
+      s.index >= firstBoxedIndex,
+  );
+  const inBubbleShowing = showInBubble && markerLit;
   const pageAspect = (() => {
     const image = selectedBubble?.textGeometry?.image;
     return image && image.w > 0 && image.h > 0 ? image.h / image.w : 1;
