@@ -543,244 +543,249 @@ export default function ZenComicReader({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black">
-      <TopBar
-        visible={chromeVisible}
-        onOpenPages={() => setIsPageSheetOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenViewSheet={() => setIsViewSheetOpen(true)}
-      />
+    <>
+      <div
+        className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black"
+        inert={isOnboardingOpen}
+      >
+        <TopBar
+          visible={chromeVisible}
+          onOpenPages={() => setIsPageSheetOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenViewSheet={() => setIsViewSheetOpen(true)}
+        />
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
-        <div
-          ref={panelContainerRef}
-          tabIndex={panelViewMode ? 0 : -1}
-          className="relative flex h-full w-full touch-none items-center justify-center outline-none"
-          {...(panelViewMode ? gestureProps : pinchHandlers)}
-          // A mouse drag on the page <img> starts the browser's image
-          // drag-and-drop, which fires pointercancel and ends the swipe the
-          // panel gesture reads (#514).
-          onDragStart={panelViewMode ? (e) => e.preventDefault() : undefined}
-        >
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
           <div
-            {...doubleTapProps}
-            className="relative flex h-full w-full flex-col items-center justify-center"
-            style={{
-              transform: panelViewMode
-                ? undefined
-                : `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-              transition: panelViewMode
-                ? undefined
-                : "transform 120ms ease-out",
-            }}
+            ref={panelContainerRef}
+            tabIndex={panelViewMode ? 0 : -1}
+            className="relative flex h-full w-full touch-none items-center justify-center outline-none"
+            {...(panelViewMode ? gestureProps : pinchHandlers)}
+            // A mouse drag on the page <img> starts the browser's image
+            // drag-and-drop, which fires pointercancel and ends the swipe the
+            // panel gesture reads (#514).
+            onDragStart={panelViewMode ? (e) => e.preventDefault() : undefined}
           >
-            <PanelViewFrame
-              panelViewMode={panelViewMode}
-              panels={panels}
-              panelIndex={panelIndex}
-              reducedMotion={cameraOff}
-              pageSize={pageNaturalSize}
-              focusBounds={focusBounds}
-              dimOutsideFocus
-              cameraEffects={false}
+            <div
+              {...doubleTapProps}
+              className="relative flex h-full w-full flex-col items-center justify-center"
+              style={{
+                transform: panelViewMode
+                  ? undefined
+                  : `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                transition: panelViewMode
+                  ? undefined
+                  : "transform 120ms ease-out",
+              }}
             >
-              {panelViewMode && activePanel?.foregroundPolygons ? (
-                <LayeredPanel
-                  pageImage={pageImage}
-                  bbox={activePanel.boundingBox}
-                  polygons={activePanel.foregroundPolygons}
-                  effectsSlot={
+              <PanelViewFrame
+                panelViewMode={panelViewMode}
+                panels={panels}
+                panelIndex={panelIndex}
+                reducedMotion={cameraOff}
+                pageSize={pageNaturalSize}
+                focusBounds={focusBounds}
+                dimOutsideFocus
+                cameraEffects={false}
+              >
+                {panelViewMode && activePanel?.foregroundPolygons ? (
+                  <LayeredPanel
+                    pageImage={pageImage}
+                    bbox={activePanel.boundingBox}
+                    polygons={activePanel.foregroundPolygons}
+                    effectsSlot={
+                      <PanelEffectsOverlay
+                        panel={activePanel}
+                        active={panelViewMode}
+                        reducedMotion={effectsOff}
+                      />
+                    }
+                  />
+                ) : (
+                  <>
+                    <Image
+                      src={pageImage}
+                      alt="Comic page"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
                     <PanelEffectsOverlay
                       panel={activePanel}
                       active={panelViewMode}
                       reducedMotion={effectsOff}
                     />
-                  }
+                  </>
+                )}
+                <PanelAudioLayer
+                  panel={activePanel}
+                  active={panelViewMode && panelAutoPlay}
+                  muted={!panelAutoPlay}
+                  newScene={activePanel?.isNewScene ?? false}
+                  sceneId={activePanel?.sceneId ?? null}
+                  volume={{
+                    ambience: effectiveVolumes.ambience,
+                    sfx: effectiveVolumes.sfx,
+                    music: effectiveVolumes.music,
+                  }}
                 />
-              ) : (
-                <>
-                  <Image
-                    src={pageImage}
-                    alt="Comic page"
-                    fill
-                    className="object-contain"
-                    priority
-                  />
-                  <PanelEffectsOverlay
-                    panel={activePanel}
-                    active={panelViewMode}
-                    reducedMotion={effectsOff}
-                  />
-                </>
-              )}
-              <PanelAudioLayer
-                panel={activePanel}
-                active={panelViewMode && panelAutoPlay}
-                muted={!panelAutoPlay}
-                newScene={activePanel?.isNewScene ?? false}
-                sceneId={activePanel?.sceneId ?? null}
-                volume={{
-                  ambience: effectiveVolumes.ambience,
-                  sfx: effectiveVolumes.sfx,
-                  music: effectiveVolumes.music,
-                }}
-              />
-              {displayBubbles.map((bubble) => {
-                if (!bubble.style) return null;
-                const isSelected = selectedBubbleId === bubble.id;
-                return (
-                  <button
-                    key={bubble.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleBubbleClick(bubble);
-                    }}
-                    className={`absolute transition-all duration-300 ${
-                      isSelected
-                        ? "z-10 border-4 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]"
-                        : "z-[5] border border-transparent hover:border-white/30 hover:bg-white/5"
-                    }`}
-                    style={{
-                      left: bubble.style.left,
-                      top: bubble.style.top,
-                      width: bubble.style.width,
-                      height: bubble.style.height,
-                    }}
-                    aria-label={bubbleAccessibleName(bubble)}
-                  />
-                );
-              })}
-            </PanelViewFrame>
-          </div>
-        </div>
-
-        {!panelViewMode ? (
-          <>
-            <EdgePageNav
-              side="left"
-              onNavigate={navigatePrev}
-              disabled={!prevPageLink}
-            />
-            <EdgePageNav
-              side="right"
-              onNavigate={navigateNext}
-              disabled={!nextPageLink}
-            />
-          </>
-        ) : null}
-      </div>
-
-      <ControlBar
-        pageNumber={pageNumber}
-        pageCount={pageCount}
-        hidePageProgress={panelViewMode && panels.length > 0}
-      >
-        <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
-          {panelViewMode && panels.length > 0 ? (
-            <PanelViewHud
-              panelIndex={panelIndex}
-              panelCount={panels.length}
-              onClose={exitPanelView}
-              onPrev={goPrevPanel}
-              onNext={goNextPanel}
-              hasNextPage={!!nextPageLink}
-              hasPrevPage={!!prevPageLink}
-              panelAutoPlay={panelAutoPlay}
-              onTogglePanelAutoPlay={togglePanelAutoPlay}
-              announceText={announceText}
-            >
-              {caption}
-            </PanelViewHud>
-          ) : (
-            <div className="flex w-full items-center gap-2">
-              <div className="min-w-0 flex-1">{caption}</div>
-              {panels.length > 0 && (
-                <button
-                  type="button"
-                  onClick={enterPanelView}
-                  aria-label="Enter panel view"
-                  title="Panel view"
-                  className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-white/15 sm:px-4"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="3" y="3" width="8" height="8" rx="1" />
-                    <rect x="14" y="3" width="7" height="8" rx="1" />
-                    <rect x="3" y="14" width="18" height="7" rx="1" />
-                  </svg>
-                  <span className="hidden sm:inline">Panels</span>
-                </button>
-              )}
+                {displayBubbles.map((bubble) => {
+                  if (!bubble.style) return null;
+                  const isSelected = selectedBubbleId === bubble.id;
+                  return (
+                    <button
+                      key={bubble.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleBubbleClick(bubble);
+                      }}
+                      className={`absolute transition-all duration-300 ${
+                        isSelected
+                          ? "z-10 border-4 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+                          : "z-[5] border border-transparent hover:border-white/30 hover:bg-white/5"
+                      }`}
+                      style={{
+                        left: bubble.style.left,
+                        top: bubble.style.top,
+                        width: bubble.style.width,
+                        height: bubble.style.height,
+                      }}
+                      aria-label={bubbleAccessibleName(bubble)}
+                    />
+                  );
+                })}
+              </PanelViewFrame>
             </div>
-          )}
+          </div>
+
+          {!panelViewMode ? (
+            <>
+              <EdgePageNav
+                side="left"
+                onNavigate={navigatePrev}
+                disabled={!prevPageLink}
+              />
+              <EdgePageNav
+                side="right"
+                onNavigate={navigateNext}
+                disabled={!nextPageLink}
+              />
+            </>
+          ) : null}
         </div>
-      </ControlBar>
 
-      <PageSheet
-        bookId={bookId}
-        issueId={issueId}
-        currentPage={pageNumber}
-        pageCount={pageCount}
-        isOpen={isPageSheetOpen}
-        onClose={() => setIsPageSheetOpen(false)}
-      />
+        <ControlBar
+          pageNumber={pageNumber}
+          pageCount={pageCount}
+          hidePageProgress={panelViewMode && panels.length > 0}
+        >
+          <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
+            {panelViewMode && panels.length > 0 ? (
+              <PanelViewHud
+                panelIndex={panelIndex}
+                panelCount={panels.length}
+                onClose={exitPanelView}
+                onPrev={goPrevPanel}
+                onNext={goNextPanel}
+                hasNextPage={!!nextPageLink}
+                hasPrevPage={!!prevPageLink}
+                panelAutoPlay={panelAutoPlay}
+                onTogglePanelAutoPlay={togglePanelAutoPlay}
+                announceText={announceText}
+              >
+                {caption}
+              </PanelViewHud>
+            ) : (
+              <div className="flex w-full items-center gap-2">
+                <div className="min-w-0 flex-1">{caption}</div>
+                {panels.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={enterPanelView}
+                    aria-label="Enter panel view"
+                    title="Panel view"
+                    className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-white/15 sm:px-4"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="3" y="3" width="8" height="8" rx="1" />
+                      <rect x="14" y="3" width="7" height="8" rx="1" />
+                      <rect x="3" y="14" width="18" height="7" rx="1" />
+                    </svg>
+                    <span className="hidden sm:inline">Panels</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </ControlBar>
 
-      <SettingsSheet
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        autoPlayEnabled={autoPlayEnabled}
-        onToggleAutoPlay={toggleAutoPlay}
-        muteAll={muteAll}
-        onToggleMuteAll={toggleMuteAll}
-        voicesOnly={voicesOnly}
-        onToggleVoicesOnly={toggleVoicesOnly}
-        volumes={volumes}
-        onSetLayerVolume={setLayerVolume}
-        onResetVolumes={resetVolumes}
-        autoAdvancePage={autoAdvancePage}
-        onToggleAutoAdvancePage={toggleAutoAdvancePage}
-        playbackRate={playbackRate}
-        onSetPlaybackRate={setPlaybackRate}
-        motionIntensity={motionIntensity}
-        onSetMotionIntensity={setMotionIntensity}
-      />
+        <PageSheet
+          bookId={bookId}
+          issueId={issueId}
+          currentPage={pageNumber}
+          pageCount={pageCount}
+          isOpen={isPageSheetOpen}
+          onClose={() => setIsPageSheetOpen(false)}
+        />
 
-      <ViewSheet
-        isOpen={isViewSheetOpen}
-        onClose={() => setIsViewSheetOpen(false)}
-        panelViewMode={panelViewMode}
-        onTogglePanelView={handleTogglePanelView}
-        hasPanels={panels.length > 0}
-        motionIntensity={motionIntensity}
-        onSetMotionIntensity={setMotionIntensity}
-      />
+        <SettingsSheet
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          autoPlayEnabled={autoPlayEnabled}
+          onToggleAutoPlay={toggleAutoPlay}
+          muteAll={muteAll}
+          onToggleMuteAll={toggleMuteAll}
+          voicesOnly={voicesOnly}
+          onToggleVoicesOnly={toggleVoicesOnly}
+          volumes={volumes}
+          onSetLayerVolume={setLayerVolume}
+          onResetVolumes={resetVolumes}
+          autoAdvancePage={autoAdvancePage}
+          onToggleAutoAdvancePage={toggleAutoAdvancePage}
+          playbackRate={playbackRate}
+          onSetPlaybackRate={setPlaybackRate}
+          motionIntensity={motionIntensity}
+          onSetMotionIntensity={setMotionIntensity}
+        />
+
+        <ViewSheet
+          isOpen={isViewSheetOpen}
+          onClose={() => setIsViewSheetOpen(false)}
+          panelViewMode={panelViewMode}
+          onTogglePanelView={handleTogglePanelView}
+          hasPanels={panels.length > 0}
+          motionIntensity={motionIntensity}
+          onSetMotionIntensity={setMotionIntensity}
+        />
+
+        {!panelViewMode && scale > 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              resetView();
+              stopAll();
+            }}
+            className="absolute top-16 right-4 z-50 rounded-full bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-200 shadow-lg backdrop-blur hover:bg-neutral-800"
+          >
+            Reset View
+          </button>
+        )}
+      </div>
 
       {isOnboardingOpen ? (
         <OnboardingOverlay onDismiss={dismissOnboarding} />
       ) : null}
-
-      {!panelViewMode && scale > 1 && (
-        <button
-          type="button"
-          onClick={() => {
-            resetView();
-            stopAll();
-          }}
-          className="absolute top-16 right-4 z-50 rounded-full bg-neutral-900/80 px-3 py-1 text-xs font-semibold text-neutral-200 shadow-lg backdrop-blur hover:bg-neutral-800"
-        >
-          Reset View
-        </button>
-      )}
-    </div>
+    </>
   );
 }
