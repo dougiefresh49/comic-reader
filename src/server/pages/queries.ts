@@ -5,6 +5,7 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { pageImageUrl } from "~/lib/storage";
 import type ZenComicReader from "~/components/ZenComicReader";
 import type { Bubble, AudioTimestamps } from "~/types";
+import type { TextGeometry } from "~/types/text-geometry";
 import type { BookManifest, Manifest } from "~/types/manifest";
 import { getPanelsForPage } from "./panels";
 
@@ -24,6 +25,7 @@ interface BubbleRow {
   ignored: boolean | null;
   box_2d: Bubble["box_2d"] | null;
   style: Bubble["style"] | null;
+  text_geometry: TextGeometry | null;
   audio_storage_path: string | null;
   page_number: number;
   sort_order: number;
@@ -85,6 +87,7 @@ function rowToBubble(row: BubbleRow): Bubble {
     aiReasoning: row.ai_reasoning ?? undefined,
     ignored: row.ignored ?? undefined,
     style: row.style ?? undefined,
+    textGeometry: row.text_geometry ?? null,
     audioStoragePath: row.audio_storage_path ?? undefined,
   };
 }
@@ -109,7 +112,7 @@ export async function getPageData(
   const { data: bubbleRows, error: bubbleError } = await supabase
     .from("bubbles")
     .select(
-      "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
+      "id, ocr_text, text_with_cues, type, speaker, emotion, ai_reasoning, ignored, box_2d, style, text_geometry, audio_storage_path, page_number, sort_order, audio_timestamps(alignment, normalized_alignment), characters(display_name)",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)

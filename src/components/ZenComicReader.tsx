@@ -8,6 +8,7 @@ import type { PageDirectedPanel } from "~/types/panels";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
+import { useWordHighlightSelector } from "~/hooks/useWordHighlight";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
 import { usePinchZoom } from "~/hooks/usePinchZoom";
 import { usePageNavigation } from "~/hooks/usePageNavigation";
@@ -35,6 +36,10 @@ import {
   unionPanelFocusBounds,
 } from "./zen-comic-reader/PanelView.transforms";
 import { LayeredPanel } from "./zen-comic-reader/LayeredPanel";
+import {
+  BubbleWordHighlight,
+  inBubbleMatch,
+} from "./zen-comic-reader/BubbleWordHighlight";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
 import {
@@ -148,6 +153,8 @@ export default function ZenComicReader({
     setPanelViewPreferred,
     motionIntensity,
     setMotionIntensity,
+    wordHighlightMode,
+    setWordHighlightMode,
   } = useSettings();
 
   const effectsOff = systemReducedMotion || motionIntensity !== "full";
@@ -409,7 +416,7 @@ export default function ZenComicReader({
     stopAll,
     togglePlayPause,
     isPlaying,
-    activeWordIndex,
+    wordHighlight,
   } = useAudioPlayback({
     bookId,
     issueId,
@@ -497,9 +504,46 @@ export default function ZenComicReader({
     ],
   );
 
-  const speech = selectedBubble
-    ? buildSpeechContent(timestamps[selectedBubble.id], selectedBubble.ocr_text)
-    : null;
+  const selectedTimestamps = selectedBubble
+    ? timestamps[selectedBubble.id]
+    : undefined;
+  const speech = useMemo(
+    () =>
+      selectedBubble
+        ? buildSpeechContent(selectedTimestamps, selectedBubble.ocr_text)
+        : null,
+    [selectedBubble, selectedTimestamps],
+  );
+
+  // Per bubble, never per word: the reader holds whether the selected
+  // bubble's words can light on the art and whether its marker is lit; the word index stays in the
+  // leaves (SpeechBox, BubbleWordHighlight) so a word change does not
+  // re-render this component (#87).
+  const wordMatch = useMemo(
+    () =>
+      speech ? inBubbleMatch(speech.words, selectedBubble?.textGeometry) : null,
+    [speech, selectedBubble],
+  );
+  const showInBubble = wordMatch !== null && wordHighlightMode !== "caption";
+  // The first word with a box: nothing lights on the art before it, so the
+  // border stays at full strength until then.
+  const firstBoxedIndex =
+    wordMatch?.boxesByTimingIndex.findIndex((boxes) => boxes.length > 0) ?? -1;
+  // A boolean that flips once per bubble (when its first boxed word lights
+  // and when the clip ends), never per word.
+  const markerLit = useWordHighlightSelector(
+    wordHighlight,
+    (s) =>
+      firstBoxedIndex >= 0 &&
+      s.bubbleId === selectedBubble?.id &&
+      s.index !== null &&
+      s.index >= firstBoxedIndex,
+  );
+  const inBubbleShowing = showInBubble && markerLit;
+  const pageAspect = (() => {
+    const image = selectedBubble?.textGeometry?.image;
+    return image && image.w > 0 && image.h > 0 ? image.h / image.w : 1;
+  })();
 
   const announceText = useMemo(() => {
     if (!panelViewMode || !panels.length || !activePanel) return "";
@@ -529,10 +573,13 @@ export default function ZenComicReader({
   // the ONLY play control, so SpeechBox gets no onTogglePlay there.
   const caption = speech ? (
     <SpeechBox
+      bubbleId={selectedBubble?.id ?? ""}
       speaker={selectedBubble?.speakerName ?? selectedBubble?.speaker}
       text={speech.cleanText}
       words={speech.words}
-      activeWordIndex={activeWordIndex}
+      wordHighlight={wordHighlight}
+      // "In bubble" drops the caption pill only where the art lights up.
+      showWordPill={!(wordMatch && wordHighlightMode === "bubble")}
       isPlaying={isPlaying}
       onTogglePlay={panelViewMode ? undefined : togglePlayPause}
     />
@@ -629,9 +676,23 @@ export default function ZenComicReader({
                     music: effectiveVolumes.music,
                   }}
                 />
+                {showInBubble && selectedBubble && speech ? (
+                  <BubbleWordHighlight
+                    key={selectedBubble.id}
+                    wordHighlight={wordHighlight}
+                    bubbleId={selectedBubble.id}
+                    words={speech.words}
+                    boxesByTimingIndex={wordMatch.boxesByTimingIndex}
+                    aspect={pageAspect}
+                    reducedMotion={cameraOff}
+                  />
+                ) : null}
                 {displayBubbles.map((bubble) => {
                   if (!bubble.style) return null;
                   const isSelected = selectedBubbleId === bubble.id;
+                  // The marker on the lettering is the feedback while it
+                  // shows, so the selection border steps back.
+                  const softBorder = isSelected && inBubbleShowing;
                   return (
                     <button
                       key={bubble.id}
@@ -641,9 +702,11 @@ export default function ZenComicReader({
                         handleBubbleClick(bubble);
                       }}
                       className={`absolute transition-all duration-300 ${
-                        isSelected
-                          ? "z-10 border-4 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]"
-                          : "z-[5] border border-transparent hover:border-white/30 hover:bg-white/5"
+                        softBorder
+                          ? "z-10 border-2 border-cyan-400/50"
+                          : isSelected
+                            ? "z-10 border-4 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+                            : "z-[5] border border-transparent hover:border-white/30 hover:bg-white/5"
                       }`}
                       style={{
                         left: bubble.style.left,
@@ -757,6 +820,8 @@ export default function ZenComicReader({
           onSetPlaybackRate={setPlaybackRate}
           motionIntensity={motionIntensity}
           onSetMotionIntensity={setMotionIntensity}
+          wordHighlightMode={wordHighlightMode}
+          onSetWordHighlightMode={setWordHighlightMode}
         />
 
         <ViewSheet

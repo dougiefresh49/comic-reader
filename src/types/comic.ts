@@ -3,6 +3,7 @@
  */
 
 import type { BubbleType } from "~/lib/bubble-types";
+import type { TextGeometry } from "~/types/text-geometry";
 
 export interface Bubble {
   id: string;
@@ -22,6 +23,8 @@ export interface Bubble {
   aiReasoning?: string;
   audioStoragePath?: string;
   ignored?: boolean;
+  /** Lettered word boxes (`bubbles.text_geometry`, #61); null when none were read. */
+  textGeometry?: TextGeometry | null;
   style?: {
     left: string;
     top: string;

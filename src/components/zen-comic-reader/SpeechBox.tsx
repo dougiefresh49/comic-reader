@@ -1,25 +1,38 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import {
+  useActiveWordIndex,
+  type WordHighlightStore,
+} from "~/hooks/useWordHighlight";
 import type { WordTiming } from "./text-utils";
 
 interface SpeechBoxProps {
+  /** The bubble this caption shows; the word state applies only while it plays. */
+  bubbleId: string;
   speaker?: string | null;
   text: string;
   words: WordTiming[];
-  activeWordIndex: number | null;
+  wordHighlight: WordHighlightStore;
+  /** False hides the sliding word pill; the text still fades ahead of the word. */
+  showWordPill?: boolean;
   isPlaying?: boolean;
   onTogglePlay?: () => void;
 }
 
 export function SpeechBox({
+  bubbleId,
   speaker,
   text,
   words,
-  activeWordIndex,
+  wordHighlight,
+  showWordPill = true,
   isPlaying,
   onTogglePlay,
 }: SpeechBoxProps) {
+  // Subscribed here, not in the reader, so a word change re-renders only
+  // this caption (#87).
+  const activeWordIndex = useActiveWordIndex(wordHighlight, bubbleId);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLSpanElement | null>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
@@ -31,7 +44,7 @@ export function SpeechBox({
     const highlight = highlightRef.current;
     const target = activeRef.current;
     if (!highlight) return;
-    if (!target) {
+    if (!target || !showWordPill) {
       highlight.style.opacity = "0";
       return;
     }
@@ -41,7 +54,7 @@ export function SpeechBox({
     highlight.style.transform = `translate(${target.offsetLeft - padX}px, ${target.offsetTop - padY}px)`;
     highlight.style.width = `${target.offsetWidth + padX * 2}px`;
     highlight.style.height = `${target.offsetHeight + padY * 2}px`;
-  }, [activeWordIndex, words, text]);
+  }, [activeWordIndex, words, text, showWordPill]);
 
   useEffect(() => {
     const container = containerRef.current;
