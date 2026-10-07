@@ -17,8 +17,9 @@ import type { Json } from "~/types/database";
 /**
  * Word boxes for one page (#573): OCRs the stored page image with Cloud
  * Vision, assigns its lines to the page's candidate bubbles and writes
- * `bubbles.text_geometry`, null where no line was assigned, the same update
- * as the `--write` loop of `scripts/ocr-word-geometry.ts`. Runs after the
+ * `bubbles.text_geometry`, null where no line was assigned, the same
+ * `text_geometry` write as the `--write` loop of
+ * `scripts/ocr-word-geometry.ts`. Runs after the
  * `review-pages` gate, so the text and rects the owner fixed are the ones
  * boxed. Under DRY_RUN the engine returns no lines and every candidate is
  * written null. A page with no candidate bubbles makes no Cloud Vision call.
