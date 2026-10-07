@@ -22,6 +22,62 @@ const DEFAULT_VOLUME = { ambience: 0.25, sfx: 0.5, music: 0.2 };
 const FADE_MS = 800;
 
 /**
+ * Loudness goes through Web Audio, never `el.volume`: iOS WebKit ignores
+ * writes to `HTMLMediaElement.volume` (it reads back 1), so a slider that
+ * set it did nothing on an iPad (#609). Every browser takes this path.
+ */
+interface AudioGraph {
+  ctx: AudioContext | null;
+  gains: Map<HTMLAudioElement, GainNode>;
+}
+
+/**
+ * Routes `el` through its own GainNode on first use. The context is created
+ * here, the first time a layer is about to play, never at render or mount.
+ * `createMediaElementSource` throws on a second call for the same element,
+ * so each element is connected once for the component's life.
+ */
+function ensureConnected(
+  graph: AudioGraph,
+  el: HTMLAudioElement,
+  level: number,
+): GainNode {
+  const existing = graph.gains.get(el);
+  if (existing) return existing;
+  graph.ctx ??= new AudioContext();
+  const gain = graph.ctx.createGain();
+  gain.gain.value = level;
+  graph.ctx
+    .createMediaElementSource(el)
+    .connect(gain)
+    .connect(graph.ctx.destination);
+  graph.gains.set(el, gain);
+  return gain;
+}
+
+function setGain(graph: AudioGraph, el: HTMLAudioElement, level: number) {
+  const gain = graph.gains.get(el);
+  if (gain) gain.gain.value = level;
+}
+
+/** A layer at zero is also muted, which silences it even if the context cannot run. */
+function applyLevel(
+  graph: AudioGraph,
+  el: HTMLAudioElement | null,
+  level: number,
+) {
+  if (!el) return;
+  el.muted = level === 0;
+  setGain(graph, el, level);
+}
+
+function playLayer(graph: AudioGraph, el: HTMLAudioElement, level: number) {
+  ensureConnected(graph, el, level);
+  graph.ctx?.resume().catch(() => undefined);
+  el.play().catch(() => undefined);
+}
+
+/**
  * Three-track audio mix for a single panel. Mounts inside <PanelViewFrame>
  * as a sibling to <PanelEffectsOverlay>. No <audio> tags are visible —
  * this component just side-effects three refs.
@@ -43,21 +99,38 @@ export function PanelAudioLayer({
   const musicRef = useRef<HTMLAudioElement | null>(null);
   const lastMusicTagRef = useRef<string | null>(null);
   const lastSceneIdRef = useRef<string | null>(null);
+  const graphRef = useRef<AudioGraph>({ ctx: null, gains: new Map() });
+  // Effective per-layer levels, read by the play paths so a slider move
+  // never re-triggers the one-shot sfx effect.
+  const levelsRef = useRef({ ambience: 0, sfx: 0, music: 0 });
 
   // Build URLs from current panel tags. Empty arrays → null.
   const ambienceTag = panel?.audioTags.ambience[0] ?? null;
   const sfxTag = panel?.audioTags.sfx[0] ?? null;
   const musicTag = panel?.audioTags.music_mood ?? null;
 
+  // ── Graph teardown ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const graph = graphRef.current;
+    return () => {
+      graph.ctx?.close().catch(() => undefined);
+      graph.ctx = null;
+      graph.gains.clear();
+    };
+  }, []);
+
   // ── Volumes ────────────────────────────────────────────────────────────
   useEffect(() => {
-    const ambVol =
-      (volume.ambience ?? DEFAULT_VOLUME.ambience) * (muted ? 0 : 1);
-    const sfxVol = (volume.sfx ?? DEFAULT_VOLUME.sfx) * (muted ? 0 : 1);
-    const musVol = (volume.music ?? DEFAULT_VOLUME.music) * (muted ? 0 : 1);
-    if (ambienceRef.current) ambienceRef.current.volume = ambVol;
-    if (sfxRef.current) sfxRef.current.volume = sfxVol;
-    if (musicRef.current) musicRef.current.volume = musVol;
+    const levels = {
+      ambience: (volume.ambience ?? DEFAULT_VOLUME.ambience) * (muted ? 0 : 1),
+      sfx: (volume.sfx ?? DEFAULT_VOLUME.sfx) * (muted ? 0 : 1),
+      music: (volume.music ?? DEFAULT_VOLUME.music) * (muted ? 0 : 1),
+    };
+    levelsRef.current = levels;
+    const graph = graphRef.current;
+    applyLevel(graph, ambienceRef.current, levels.ambience);
+    applyLevel(graph, sfxRef.current, levels.sfx);
+    applyLevel(graph, musicRef.current, levels.music);
   }, [muted, volume]);
 
   // ── Ambience: swap source on tag change, loop, play when active ────────
@@ -70,7 +143,7 @@ export function PanelAudioLayer({
       el.load();
     }
     if (active && url && !muted) {
-      el.play().catch(() => undefined);
+      playLayer(graphRef.current, el, levelsRef.current.ambience);
     } else {
       el.pause();
     }
@@ -82,7 +155,7 @@ export function PanelAudioLayer({
     if (!el || !active || !sfxTag || muted) return;
     el.src = audioLibraryUrl("sfx", sfxTag);
     el.currentTime = 0;
-    el.play().catch(() => undefined);
+    playLayer(graphRef.current, el, levelsRef.current.sfx);
   }, [sfxTag, active, muted, panel?.id]);
 
   // ── Music: crossfade on new scene; otherwise continue current bed ──────
@@ -100,40 +173,42 @@ export function PanelAudioLayer({
     const sameMood = lastMusicTagRef.current === musicTag;
     const continuePlaying = sameScene || (sameMood && !newScene);
     const url = audioLibraryUrl("music", musicTag);
+    const graph = graphRef.current;
+    const gain = ensureConnected(graph, el, targetVol);
 
     if (continuePlaying) {
-      // A cleanup mid-fade-in leaves the volume partway up the ramp; land on
+      // A cleanup mid-fade-in leaves the gain partway up the ramp; land on
       // the target rather than staying quieter than the settings ask for.
-      el.volume = targetVol;
-      if (el.paused) el.play().catch(() => undefined);
+      gain.gain.value = targetVol;
+      if (el.paused) playLayer(graph, el, targetVol);
       lastSceneIdRef.current = sceneId;
       lastMusicTagRef.current = musicTag;
       return;
     }
 
     // Crossfade: fade out current → swap → fade in
-    const startVol = el.volume;
+    const startVol = gain.gain.value;
     const fadeOutSteps = 16;
     const stepMs = FADE_MS / fadeOutSteps;
     let i = 0;
     let fadeIn: ReturnType<typeof setInterval> | undefined;
     const fadeOut = setInterval(() => {
       i++;
-      el.volume = Math.max(0, startVol * (1 - i / fadeOutSteps));
+      gain.gain.value = Math.max(0, startVol * (1 - i / fadeOutSteps));
       if (i >= fadeOutSteps) {
         clearInterval(fadeOut);
         el.pause();
         el.src = url;
         el.load();
-        el.volume = 0;
-        el.play().catch(() => undefined);
+        gain.gain.value = 0;
+        playLayer(graph, el, 0);
         lastMusicTagRef.current = musicTag;
         lastSceneIdRef.current = sceneId;
 
         let j = 0;
         fadeIn = setInterval(() => {
           j++;
-          el.volume = Math.min(targetVol, targetVol * (j / fadeOutSteps));
+          gain.gain.value = Math.min(targetVol, targetVol * (j / fadeOutSteps));
           if (j >= fadeOutSteps) clearInterval(fadeIn);
         }, stepMs);
       }
@@ -146,9 +221,9 @@ export function PanelAudioLayer({
 
   return (
     <>
-      <audio ref={ambienceRef} loop preload="none" />
-      <audio ref={sfxRef} preload="none" />
-      <audio ref={musicRef} loop preload="none" />
+      <audio ref={ambienceRef} crossOrigin="anonymous" loop preload="none" />
+      <audio ref={sfxRef} crossOrigin="anonymous" preload="none" />
+      <audio ref={musicRef} crossOrigin="anonymous" loop preload="none" />
     </>
   );
 }
