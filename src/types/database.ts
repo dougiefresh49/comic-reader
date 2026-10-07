@@ -1293,6 +1293,10 @@ export type Database = {
           similarity: number;
         }[];
       };
+      save_music_scenes: {
+        Args: { p_book_id: string; p_issue_id: string; p_scenes: Json };
+        Returns: number;
+      };
       save_review_edits: {
         Args: { p_book_id: string; p_issue_id: string; p_ops: Json };
         Returns: number;
