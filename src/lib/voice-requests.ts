@@ -192,13 +192,15 @@ async function readDescriptions(
  * `retiring` (the item's voice is recorded; the outgoing voice's DELETE is
  * sent) and `retired` (that DELETE confirmed, its registry write failed).
  * `back` marks an add that restores the archived voice instead of making
- * the item's voice.
+ * the item's voice. The row's `operation_at` is when a live run last wrote
+ * the record, on the database clock. A run that returns clears it only at
+ * `claimed`, `archived`, `added` or `retired` (`markStopped`); at
+ * `archiving`, `retiring` and `adding` it stays, since a request that timed
+ * out may still land.
  */
 export interface OpRecord {
   token: string;
   rev: string;
-  /** When the record was last written; a younger one is a live run. */
-  at?: string;
   phase:
     | "claimed"
     | "archiving"
@@ -208,6 +210,8 @@ export interface OpRecord {
     | "retiring"
     | "retired";
   back?: boolean;
+  /** The claim wrote the request fields on a casting-step row; a give-back clears them. */
+  converted?: boolean;
   /** `voices.id` archived for the item. */
   archived?: string;
   /** `voices.id` of the voice the item replaces, for the metadata copy. */
@@ -596,29 +600,46 @@ export type RunKey = ItemKey & Pick<VoiceWorkItem, "designedVoices">;
 const taskRow = (client: SupabaseClient, item: ItemKey) =>
   client
     .from("casting_tasks")
-    .select("status, operation, target_voice_uuid")
+    .select("status, operation, operation_at, target_voice_uuid")
     .eq("book_id", item.bookId)
     .eq("issue_id", item.issueId)
     .eq("character_id", item.characterId);
 
+/** The request fields a task row carries for the item: the insert's mapping. */
+const requestOf = (item: ItemKey) => ({
+  action: item.action === "design" ? "design" : "clone",
+  target_voice_uuid: item.target?.id ?? null,
+});
+
 /**
  * Writes the item's op record (`null` clears it) as a compare-and-swap: only
- * while the row holds the record with `from.rev` (`null`: no record), and
- * `from.status` when given. `status` also sets the row's status. False when
- * the row did not match.
+ * while the row holds the record with `from.rev` (`null`: no record),
+ * `from.status` when given, and no `action` when `from.unrequested`. A record
+ * stamps `operation_at` with the database's "now"; clearing it clears that
+ * too. `set.status` also sets the row's status; `set.request` writes the
+ * request fields, or with `null` clears them. False when the row did not
+ * match.
  */
 async function swapOperation(
   client: SupabaseClient,
   item: ItemKey,
-  from: { rev: string | null; status?: string },
+  from: { rev: string | null; status?: string; unrequested?: boolean },
   next: OpRecord | null,
-  status?: string,
+  set: {
+    status?: string;
+    request?: ReturnType<typeof requestOf> | null;
+  } = {},
 ): Promise<boolean> {
   let q = client
     .from("casting_tasks")
     .update({
       operation: next,
-      ...(status ? { status, completed_at: null } : {}),
+      // PostgreSQL timestamp input "now": the time comes from the database.
+      operation_at: next ? "now" : null,
+      ...(set.status ? { status: set.status, completed_at: null } : {}),
+      ...(set.request !== undefined
+        ? (set.request ?? { action: null, target_voice_uuid: null })
+        : {}),
     })
     .eq("book_id", item.bookId)
     .eq("issue_id", item.issueId)
@@ -628,6 +649,7 @@ async function swapOperation(
       ? q.is("operation", null)
       : q.eq("operation->>rev", from.rev);
   if (from.status) q = q.eq("status", from.status);
+  if (from.unrequested) q = q.is("action", null);
   const upd = await q.select("id");
   fail(`writing ${item.characterId}'s operation record`, upd.error);
   return (upd.data ?? []).length > 0;
@@ -660,8 +682,7 @@ async function markTask(
     book_id: item.bookId,
     issue_id: item.issueId,
     character_id: item.characterId,
-    action: item.action === "design" ? "design" : "clone",
-    target_voice_uuid: item.target?.id ?? null,
+    ...requestOf(item),
     status,
     completed_at,
   });
@@ -671,15 +692,32 @@ async function markTask(
 /**
  * Claims the item for one run, atomically, before anything is spent: a
  * `pending` row with no record takes the op record, or a row is inserted
- * with it (the unique key refuses a second insert). Returns whether a row
- * was inserted, so a release can remove it again.
+ * with it (the unique key refuses a second insert). A casting-step row
+ * (`action` null) also takes the item's `action` and `target_voice_uuid`,
+ * so the plan still lists the item once its castlist row has a voice; the
+ * record says `converted`, and `op` is updated to match. Returns whether a
+ * row was inserted, so a release can remove it again.
  */
 async function claimTask(
   client: SupabaseClient,
   item: ItemKey,
   op: OpRecord,
 ): Promise<{ ok: true; inserted: boolean } | { ok: false; reason: string }> {
-  if (await swapOperation(client, item, { rev: null, status: "pending" }, op))
+  const from = { rev: null, status: "pending" };
+  const converted = { ...op, converted: true };
+  if (
+    await swapOperation(
+      client,
+      item,
+      { ...from, unrequested: true },
+      converted,
+      { request: requestOf(item) },
+    )
+  ) {
+    Object.assign(op, converted);
+    return { ok: true, inserted: false };
+  }
+  if (await swapOperation(client, item, from, op))
     return { ok: true, inserted: false };
   const { data, error } = await taskRow(client, item);
   fail(`reading ${item.characterId}'s casting task`, error);
@@ -693,10 +731,10 @@ async function claimTask(
     book_id: item.bookId,
     issue_id: item.issueId,
     character_id: item.characterId,
-    action: item.action === "design" ? "design" : "clone",
-    target_voice_uuid: item.target?.id ?? null,
+    ...requestOf(item),
     status: "pending",
     operation: op,
+    operation_at: "now",
   });
   if (ins.error)
     return {
@@ -704,6 +742,35 @@ async function claimTask(
       reason: `another run claimed the item first (${ins.error.message})`,
     };
   return { ok: true, inserted: true };
+}
+
+/**
+ * Marks a run's record stopped when the run returns with it still on the
+ * row, so `reconcile` need not wait out the window: `operation_at` goes null
+ * while the row holds `op.rev`. The record stays. Only at a phase whose last
+ * request has a known outcome (`claimed`, `archived`, `added`, `retired`):
+ * at `archiving`, `retiring` and `adding` a DELETE or add that timed out on
+ * this side may still land after the run returns, so the stamp stays and
+ * the window holds. Best effort: a failed write is ignored.
+ */
+async function markStopped(
+  client: SupabaseClient,
+  item: ItemKey,
+  op: OpRecord,
+): Promise<void> {
+  if (!["claimed", "archived", "added", "retired"].includes(op.phase)) return;
+  const rev = op.rev;
+  try {
+    await client
+      .from("casting_tasks")
+      .update({ operation_at: null })
+      .eq("book_id", item.bookId)
+      .eq("issue_id", item.issueId)
+      .eq("character_id", item.characterId)
+      .eq("operation->>rev", rev);
+  } catch {
+    // The window still ends the record's hold.
+  }
 }
 
 /**
@@ -801,7 +868,6 @@ export async function carryOut(
   const op: OpRecord = {
     token: randomUUID(),
     rev: randomUUID(),
-    at: new Date().toISOString(),
     phase: "claimed",
   };
   const claim = await claimTask(sb, item, op);
@@ -812,15 +878,16 @@ export async function carryOut(
     const result = await carryOutClaimed(deps, item, opts, rec);
     // Refused or failed: nothing of the operation remains, give the item back.
     if (result.status === "refused" || result.status === "failed")
-      await releaseTaskAt(sb, item, op.rev, claim.inserted);
+      await releaseTaskAt(sb, item, op, claim.inserted);
+    else if (result.status === "needs attention")
+      await markStopped(sb, item, op);
     return result;
   } catch (err) {
     if (op.phase === "claimed") {
-      await releaseTaskAt(sb, item, op.rev, claim.inserted).catch(
-        () => undefined,
-      );
+      await releaseTaskAt(sb, item, op, claim.inserted).catch(() => undefined);
       throw err;
     }
+    await markStopped(sb, item, op);
     return {
       status: "needs attention",
       reasons: [
@@ -840,7 +907,10 @@ interface Recorder {
   op: OpRecord;
   /** Records the next phase. */
   record: (next: Partial<OpRecord>) => Promise<void>;
-  /** Ends the record (`operation = null`) and sets the row's status. */
+  /**
+   * Ends the record (`operation = null`) and sets the row's status. Back to
+   * `pending`, a converted casting-step row also loses its request fields.
+   */
   end: (to: "in_progress" | "pending") => Promise<boolean>;
 }
 
@@ -848,17 +918,16 @@ function recorder(sb: SupabaseClient, item: ItemKey, op: OpRecord): Recorder {
   return {
     op,
     record: async (next) => {
-      const to: OpRecord = {
-        ...op,
-        ...next,
-        rev: randomUUID(),
-        at: new Date().toISOString(),
-      };
+      const to: OpRecord = { ...op, ...next, rev: randomUUID() };
       if (!(await swapOperation(sb, item, { rev: op.rev }, to)))
         throw new Error("the item's operation record changed under this run");
       Object.assign(op, to);
     },
-    end: (to) => swapOperation(sb, item, { rev: op.rev }, null, to),
+    end: (to) =>
+      swapOperation(sb, item, { rev: op.rev }, null, {
+        status: to,
+        ...(to === "pending" && op.converted ? { request: null } : {}),
+      }),
   };
 }
 
@@ -929,15 +998,26 @@ async function bringBack(
   return { ok: true };
 }
 
-/** Gives the item back when nothing of the operation remains. */
+/**
+ * Gives the item back when nothing of the operation remains: an inserted
+ * row is removed, and a converted casting-step row loses the request fields
+ * its claim wrote, so the row is as the casting step left it.
+ */
 async function releaseTaskAt(
   client: SupabaseClient,
   item: ItemKey,
-  rev: string,
+  op: OpRecord,
   inserted: boolean,
 ): Promise<void> {
+  const rev = op.rev;
   if (!inserted) {
-    await swapOperation(client, item, { rev }, null);
+    await swapOperation(
+      client,
+      item,
+      { rev },
+      null,
+      op.converted ? { request: null } : {},
+    );
     return;
   }
   const del = await client
@@ -1372,7 +1452,10 @@ export async function reconcile(
   const { data, error } = await taskRow(sb, item);
   fail(`reading ${item.characterId}'s casting task`, error);
   const task = (
-    (data ?? []) as (TaskRow & { target_voice_uuid?: string })[]
+    (data ?? []) as (TaskRow & {
+      target_voice_uuid?: string;
+      operation_at?: string | null;
+    })[]
   )[0];
   const op = task?.operation;
   if (!op)
@@ -1380,9 +1463,14 @@ export async function reconcile(
       status: "refused",
       reasons: [`nothing to reconcile: the item is ${stateOf(task)}`],
     };
-  // A live run writes its record as it goes and holds the claim on the
+  // A live run stamps its record as it goes and holds the claim on the
   // voices it changes: leave it be while either is younger than the window.
-  if (op.at && Date.parse(op.at) >= Date.now() - CLAIM_STALE_MS)
+  // A returned run clears the stamp only when its last request's outcome is
+  // known (`markStopped`); one stopped mid-request waits out the window.
+  if (
+    task.operation_at &&
+    Date.parse(task.operation_at) >= Date.now() - CLAIM_STALE_MS
+  )
     return { status: "refused", reasons: ["a run is still in progress"] };
   const held = [op.archived, task.target_voice_uuid, item.target?.id].filter(
     (id): id is string => Boolean(id),
@@ -1408,12 +1496,16 @@ export async function reconcile(
     archivedRow !== null &&
     op.archivedElevenLabsId !== undefined &&
     archivedRow.current_elevenlabs_id === op.archivedElevenLabsId;
-  const attention = (...reasons: string[]): CarryOutResult => ({
-    status: "needs attention",
-    reasons,
-    archived,
-    newElevenLabsId: op.elevenLabsId,
-  });
+  /** Stops with the record still on the row, marked stopped when its phase allows (`markStopped`). */
+  const attention = async (...reasons: string[]): Promise<CarryOutResult> => {
+    await markStopped(sb, item, op);
+    return {
+      status: "needs attention",
+      reasons,
+      archived,
+      newElevenLabsId: op.elevenLabsId,
+    };
+  };
   const changed = () => attention("the item's record changed during reconcile");
   /** The item goes back to pending; nothing is added for it. */
   const giveBack = async (
@@ -1564,7 +1656,7 @@ export type SettleOutcome =
    */
   | { kind: "rerun"; targetVoiceUuid?: string };
 
-/** Settles one item: points the cast at a picked voice or skips the character, then marks its `casting_tasks` row complete; or puts a made item back to pending (`rerun`). */
+/** Settles one item: marks its `casting_tasks` row complete, then points the cast at a picked voice or skips the character; or puts a made item back to pending (`rerun`). */
 export async function settle(
   client: SupabaseClient,
   item: ItemKey,
@@ -1611,12 +1703,15 @@ export async function settle(
       throw new Error(`voice work: ${item.characterId} changed; plan again`);
     return;
   }
+  // The castlist is written only after the filtered `markTask`, so a run
+  // that claims the row meanwhile leaves the cast as it was.
   if (outcome.kind === "pick") {
     const voice = await readVoice(client, outcome.voiceUuid);
     if (voice?.status !== "active")
       throw new Error(
         `voice work: ${outcome.voiceUuid} is not an active voice`,
       );
+    await markTask(client, item, "complete");
     await castVoiceInBook(
       client,
       item.bookId,
@@ -1624,9 +1719,10 @@ export async function settle(
       item.characterId,
       voice.id,
     );
+    return;
   }
+  await markTask(client, item, "complete");
   if (outcome.kind === "no audio")
     // Skip writers set `no_audio` and leave the voice reference alone (#429).
     await setNoAudio(client, item.bookId, item.issueId, item.characterId, true);
-  await markTask(client, item, "complete");
 }
