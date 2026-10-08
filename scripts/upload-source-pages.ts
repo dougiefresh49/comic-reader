@@ -74,11 +74,16 @@ async function main() {
 
   // Step 1: ensure book + issue rows exist
   const sourcePath = `${book}/${issueId}/source/`;
+  // Existing book is never changed; a new book is created with its id as name.
   const { error: bErr } = await supabase
     .from("books")
-    .upsert({ id: book, slug: book, name: book }, { onConflict: "id" });
-  if (bErr && !bErr.message.includes("duplicate")) {
-    console.warn(`books upsert: ${bErr.message}`);
+    .upsert(
+      { id: book, slug: book, name: book },
+      { onConflict: "id", ignoreDuplicates: true },
+    );
+  if (bErr) {
+    console.error(`books insert: ${bErr.message}`);
+    process.exit(1);
   }
   const { error: iErr } = await upsertIssue(supabase, {
     id: issueId,
