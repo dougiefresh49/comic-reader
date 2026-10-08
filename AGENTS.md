@@ -119,9 +119,11 @@ Half the point of this list is that your reports read the way I think.
   rules. Citations like "audit mode #1" and "E2" resolve in the fleet repo
   (github.com/dougiefresh49/fleet): `docs/transcript-audit-2026-08.md`,
   which links the field-test doc.
-- **book / part / issue / page / panel / bubble**: the content
-  hierarchy, one Supabase table each (`books`, `book_parts`, `issues`,
-  `pages`, `panels`, `bubbles`). Issue ids look like `issue-1`.
+- **series / book / issue / page / panel / bubble**: the content
+  hierarchy, one Supabase table each (`series`, `books`, `issues`, `pages`,
+  `panels`, `bubbles`). A series groups books, one book per volume
+  (`books.series_id`, `books.series_position`). Issue ids look like
+  `issue-1` and restart in each book: the `issues` key is `(book_id, id)`.
 - **speaker / castlist / voice / slot**: the speaker is the character a
   bubble belongs to; the castlist (`castlist` table) maps each character
   to a voice; a voice is an ElevenLabs voice (`voices` table); a slot is
