@@ -13,9 +13,13 @@
 #
 # perl's alarm is the per-command timeout, because macOS has no `timeout`.
 HEAD_HOOK=$1 MAIN_HOOK=$2 CHUNK=$3 OUTF=$4
+for f in "$HEAD_HOOK" "$MAIN_HOOK" "$CHUNK"; do
+  [ -r "$f" ] || { printf 'cannot read %s\n' "$f" >&2; exit 1; }
+done
 total=0 diff=0
 : >"$OUTF"
-while IFS= read -r row; do
+while IFS= read -r row || [ -n "$row" ]; do
+  [ -z "$row" ] && continue
   payload=$(printf '%s' "$row" | jq -c '{tool_name:"Bash",tool_input:{command:.cmd}}')
   h_err=$(printf '%s' "$payload" | env -u DELEGATE -u CREDIT_OVERRIDE perl -e 'alarm 10; exec @ARGV' bash "$HEAD_HOOK" 2>&1 >/dev/null); h=$?
   m_err=$(printf '%s' "$payload" | env -u DELEGATE -u CREDIT_OVERRIDE perl -e 'alarm 10; exec @ARGV' bash "$MAIN_HOOK" 2>&1 >/dev/null); m=$?
@@ -26,3 +30,4 @@ while IFS= read -r row; do
   fi
 done <"$CHUNK"
 printf '{"summary":true,"total":%s,"diff":%s}\n' "$total" "$diff" >>"$OUTF"
+[ "$total" != 0 ]

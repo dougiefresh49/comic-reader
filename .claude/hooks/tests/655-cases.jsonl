@@ -1,6 +1,6 @@
 {"id":"B1 --render after --","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --render"}
 {"id":"B2 --execute after --","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --execute"}
-{"id":"B3 --execute --render, render reason","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --execute --render"}
+{"id":"B3 --execute --render, render reason","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --execute --render","reason":"--render makes one ElevenLabs call"}
 {"id":"B4 flags before --","want":2,"cmd":"pnpm backfill-balloon-groups --render -- --book b --issue issue-1 --labels l.json"}
 {"id":"B5 quoted flag","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json \"--render\""}
 {"id":"B6 pnpm run","want":2,"cmd":"pnpm run backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --render"}
