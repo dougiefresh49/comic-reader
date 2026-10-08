@@ -97,3 +97,8 @@ jobs:
         env:
           GUARD_BASH: ${{ matrix.guard_bash }}
         run: '"$GUARD_BASH" .claude/hooks/tests/run-cases.sh'
+
+      - name: Run the Edit guard cases
+        env:
+          GUARD_BASH: ${{ matrix.guard_bash }}
+        run: '"$GUARD_BASH" .claude/hooks/tests/edit-guard-cases.sh'
