@@ -42,3 +42,58 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+
+  hooks:
+    name: Credit-guard cases (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu gawk
+            os: ubuntu-latest
+            awk: gawk
+            guard_bash: bash
+          - name: ubuntu mawk
+            os: ubuntu-latest
+            awk: mawk
+            guard_bash: bash
+          - name: macos BWK awk, bash 3.2
+            os: macos-latest
+            awk: /usr/bin/awk
+            guard_bash: /bin/bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gawk and mawk
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gawk mawk
+
+      # A shim dir first on PATH whose awk is the variant under test, so the
+      # guard's plain `awk` resolves to it.
+      - name: Put ${{ matrix.awk }} first on PATH as awk
+        run: |
+          shim="$RUNNER_TEMP/awk-shim"
+          mkdir -p "$shim"
+          ln -sf "$(command -v ${{ matrix.awk }})" "$shim/awk"
+          echo "$shim" >>"$GITHUB_PATH"
+
+      - name: Show awk, bash and jq versions
+        env:
+          GUARD_BASH: ${{ matrix.guard_bash }}
+        run: |
+          ls -l "$(command -v awk)"
+          awk --version </dev/null 2>&1 | head -n1 || true
+          awk -W version </dev/null 2>&1 | head -n1 || true
+          "$GUARD_BASH" --version | head -n1
+          jq --version
+
+      # The runner runs under GUARD_BASH too, so the macOS leg checks that
+      # it works on bash 3.2 as well as the guard.
+      - name: Run the case tables
+        env:
+          GUARD_BASH: ${{ matrix.guard_bash }}
+        run: '"$GUARD_BASH" .claude/hooks/tests/run-cases.sh'

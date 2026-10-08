@@ -1,0 +1,141 @@
+{"id":"I1 comment ending in backslash swallows the next line","want":2,"cmd":"# old command \\\npnpm generate-audio"}
+{"id":"I1b trailing comment with backslash","want":2,"cmd":"echo hi # old \\\npnpm generate-audio -- --book x"}
+{"id":"I1c apostrophe inside a comment","want":2,"cmd":"# don't run this yet\npnpm generate-audio"}
+{"id":"I1d hash inside a word is not a comment","want":2,"cmd":"echo a#b; pnpm generate-audio"}
+{"id":"I2 semicolon inside a quoted header","want":2,"cmd":"curl -H \"Content-Type: application/json; charset=utf-8\" -X POST https://api.elevenlabs.io/v1/text-to-speech/voice-id"}
+{"id":"I2b quoted query-string ampersand","want":2,"cmd":"curl -X POST \"https://api.elevenlabs.io/v1/text-to-speech/x?output_format=mp3&optimize=1\""}
+{"id":"I2c form upload with spaces","want":2,"cmd":"curl https://api.elevenlabs.io/v1/voices/add -F \"name=x y\" -F \"files=@sample\""}
+{"id":"I3 env assignment with spaces","want":2,"cmd":"env NODE_OPTIONS=\"--import tsx\" pnpm generate-audio -- --book x --issue 1"}
+{"id":"I3b bare assignment with spaces","want":2,"cmd":"NODE_OPTIONS=\"--import tsx\" pnpm generate-audio -- --book x --issue 1"}
+{"id":"I3c single-quoted assignment, wrong override value","want":2,"cmd":"env NODE_OPTIONS='--import tsx' LIVE_API_OK=0 pnpm generate-audio"}
+{"id":"C2 pnpm exec tsx on the script file","want":2,"cmd":"pnpm exec tsx --env-file=.env scripts/generate-audio.ts"}
+{"id":"C2b npx tsx","want":2,"cmd":"npx tsx scripts/generate-audio.ts"}
+{"id":"C2c bare tsx","want":2,"cmd":"tsx scripts/ingest.ts"}
+{"id":"C2d script name differs from file name","want":2,"cmd":"pnpm exec tsx --env-file=.env scripts/split-voice-clip.ts"}
+{"id":"C2e node --import tsx","want":2,"cmd":"node --import tsx scripts/generate-audio.ts --book x"}
+{"id":"C2f direct run keeps the flag condition","want":2,"cmd":"pnpm exec tsx scripts/voice-rotation.ts --archive --book x --execute"}
+{"id":"C2g absolute path","want":2,"cmd":"pnpm exec tsx /path/to/repo/scripts/generate-audio.ts"}
+{"id":"C1 voice-rotation execute still blocks","want":2,"cmd":"pnpm voice-rotation -- --archive --book x --execute"}
+{"id":"C1b snapshot execute still blocks","want":2,"cmd":"pnpm voice-rotation -- --snapshot --execute"}
+{"id":"R1 redirect onto a guarded file","want":2,"cmd":"printf x > src/lib/models.ts"}
+{"id":"R2 attached redirect","want":2,"cmd":"printf x >src/lib/models.ts"}
+{"id":"R3 append redirect, dotted path","want":2,"cmd":"echo x >> ./src/lib/voice-settings.ts"}
+{"id":"R4 sed -i","want":2,"cmd":"sed -i '' 's/a/b/' src/lib/models.ts"}
+{"id":"R5 cp onto a guarded file","want":2,"cmd":"cp /tmp/x.ts src/lib/tts-request.ts"}
+{"id":"R6 continued cp","want":2,"cmd":"cp replacement.ts \\\n  src/lib/models.ts"}
+{"id":"R7 tee","want":2,"cmd":"echo x | tee src/lib/models.ts"}
+{"id":"R8 stderr to devnull but stdout onto a guarded file","want":2,"cmd":"grep foo a.ts > src/lib/models.ts 2>/dev/null"}
+{"id":"O1 override in an earlier segment","want":2,"cmd":"echo LIVE_API_OK=1; pnpm generate-audio"}
+{"id":"O2 override as an argument","want":2,"cmd":"pnpm generate-audio -- LIVE_API_OK=1"}
+{"id":"O3 override on a different command","want":2,"cmd":"LIVE_API_OK=1 echo hi; pnpm generate-audio"}
+{"id":"S1 sh -c double quotes","want":2,"cmd":"sh -c \"pnpm generate-audio --book x\""}
+{"id":"S2 bash -c single quotes, chained inside","want":2,"cmd":"bash -c 'cd /tmp && pnpm ingest -- --book x'"}
+{"id":"S3 quoted script name","want":2,"cmd":"pnpm \"generate-audio\""}
+{"id":"S4 pnpm run with options","want":2,"cmd":"pnpm run --silent generate-audio"}
+{"id":"S5 env -u","want":2,"cmd":"env -u FOO pnpm generate-audio"}
+{"id":"S6 after cd","want":2,"cmd":"cd /tmp && pnpm generate-audio"}
+{"id":"S7 quoted semicolon before a real one","want":2,"cmd":"echo \"a;b\" && pnpm generate-audio"}
+{"id":"S8 smoke real","want":2,"cmd":"pnpm exec tsx scripts/smoke-ingest.ts --real"}
+{"id":"S9 elevenlabs delete","want":2,"cmd":"curl --request DELETE https://api.elevenlabs.io/v1/voices/abc"}
+{"id":"S10 multi-line, second line paid","want":2,"cmd":"git status\npnpm generate-audio -- --book x"}
+{"id":"D1 delegate reads .env","want":2,"cmd":"cat .env","env":{"DELEGATE":"1"}}
+{"id":"D2 delegate reads .env after a backslash comment","want":2,"cmd":"# note \\\ncat .env","env":{"DELEGATE":"1"}}
+{"id":"P1 override","want":0,"cmd":"LIVE_API_OK=1 pnpm generate-audio -- --book x"}
+{"id":"P2 override through env with a spaced assignment","want":0,"cmd":"env NODE_OPTIONS=\"--import tsx\" LIVE_API_OK=1 pnpm generate-audio"}
+{"id":"P3 override on a direct run","want":0,"cmd":"LIVE_API_OK=1 pnpm exec tsx scripts/generate-audio.ts"}
+{"id":"P4 voice-rotation archive dry run","want":0,"cmd":"pnpm voice-rotation -- --archive --book tmnt-mmpr-iii"}
+{"id":"P5 voice-rotation restore dry run","want":0,"cmd":"pnpm voice-rotation -- --restore --book tmnt-mmpr-iii"}
+{"id":"P6 read-only grep naming a guarded file with stderr to devnull","want":0,"cmd":"grep -n GEMINI src/lib/models.ts scripts/utils/models.ts 2>/dev/null"}
+{"id":"P7 comment body quoting that grep and a paid command","want":0,"cmd":"gh issue comment 292 --body \"ran grep -n GEMINI src/lib/models.ts 2>/dev/null; then pnpm generate-audio\""}
+{"id":"P8 rg for the command text","want":0,"cmd":"rg \"pnpm generate-audio\""}
+{"id":"P9 elevenlabs GET","want":0,"cmd":"curl https://api.elevenlabs.io/v1/voices"}
+{"id":"P10 elevenlabs GET with a quoted semicolon","want":0,"cmd":"curl -H \"Accept: application/json; q=1\" https://api.elevenlabs.io/v1/voices"}
+{"id":"P11 reading the script file","want":0,"cmd":"cat scripts/generate-audio.ts"}
+{"id":"P12 grepping the script file","want":0,"cmd":"grep -n execute scripts/voice-rotation.ts"}
+{"id":"P13 comment only","want":0,"cmd":"# pnpm generate-audio"}
+{"id":"P14 input redirect is a read","want":0,"cmd":"wc -l < src/lib/models.ts"}
+{"id":"P15 diff to a temp file","want":0,"cmd":"git diff src/lib/models.ts > /tmp/models.diff"}
+{"id":"P16 typecheck","want":0,"cmd":"pnpm typecheck"}
+{"id":"P17 echo paid text into a note","want":0,"cmd":"echo \"pnpm generate-audio\" > /tmp/note.txt"}
+{"id":"P18 sed -n read","want":0,"cmd":"sed -n '1,20p' src/lib/models.ts"}
+{"id":"P19 delegate copies .env","want":0,"cmd":"cp ../main/.env .env","env":{"DELEGATE":"1"}}
+{"id":"P20 commit message with a semicolon","want":0,"cmd":"git commit -m \"fix: guard; see #292\""}
+{"id":"P21 voice-lab-import without describe","want":0,"cmd":"pnpm voice-lab-import -- --book x"}
+{"id":"P22 git log of the script file","want":0,"cmd":"git log --oneline -- scripts/generate-audio.ts"}
+{"id":"P23 continued harmless command","want":0,"cmd":"ls \\\n  scripts"}
+{"id":"P24 hash in a quoted string then a newline","want":0,"cmd":"echo \"# not a comment \\\\\"\nls"}
+{"id":"X1 200 lines then a paid one","want":2,"cmd":"echo line 1\necho line 2\necho line 3\necho line 4\necho line 5\necho line 6\necho line 7\necho line 8\necho line 9\necho line 10\necho line 11\necho line 12\necho line 13\necho line 14\necho line 15\necho line 16\necho line 17\necho line 18\necho line 19\necho line 20\necho line 21\necho line 22\necho line 23\necho line 24\necho line 25\necho line 26\necho line 27\necho line 28\necho line 29\necho line 30\necho line 31\necho line 32\necho line 33\necho line 34\necho line 35\necho line 36\necho line 37\necho line 38\necho line 39\necho line 40\necho line 41\necho line 42\necho line 43\necho line 44\necho line 45\necho line 46\necho line 47\necho line 48\necho line 49\necho line 50\necho line 51\necho line 52\necho line 53\necho line 54\necho line 55\necho line 56\necho line 57\necho line 58\necho line 59\necho line 60\necho line 61\necho line 62\necho line 63\necho line 64\necho line 65\necho line 66\necho line 67\necho line 68\necho line 69\necho line 70\necho line 71\necho line 72\necho line 73\necho line 74\necho line 75\necho line 76\necho line 77\necho line 78\necho line 79\necho line 80\necho line 81\necho line 82\necho line 83\necho line 84\necho line 85\necho line 86\necho line 87\necho line 88\necho line 89\necho line 90\necho line 91\necho line 92\necho line 93\necho line 94\necho line 95\necho line 96\necho line 97\necho line 98\necho line 99\necho line 100\necho line 101\necho line 102\necho line 103\necho line 104\necho line 105\necho line 106\necho line 107\necho line 108\necho line 109\necho line 110\necho line 111\necho line 112\necho line 113\necho line 114\necho line 115\necho line 116\necho line 117\necho line 118\necho line 119\necho line 120\necho line 121\necho line 122\necho line 123\necho line 124\necho line 125\necho line 126\necho line 127\necho line 128\necho line 129\necho line 130\necho line 131\necho line 132\necho line 133\necho line 134\necho line 135\necho line 136\necho line 137\necho line 138\necho line 139\necho line 140\necho line 141\necho line 142\necho line 143\necho line 144\necho line 145\necho line 146\necho line 147\necho line 148\necho line 149\necho line 150\necho line 151\necho line 152\necho line 153\necho line 154\necho line 155\necho line 156\necho line 157\necho line 158\necho line 159\necho line 160\necho line 161\necho line 162\necho line 163\necho line 164\necho line 165\necho line 166\necho line 167\necho line 168\necho line 169\necho line 170\necho line 171\necho line 172\necho line 173\necho line 174\necho line 175\necho line 176\necho line 177\necho line 178\necho line 179\necho line 180\necho line 181\necho line 182\necho line 183\necho line 184\necho line 185\necho line 186\necho line 187\necho line 188\necho line 189\necho line 190\necho line 191\necho line 192\necho line 193\necho line 194\necho line 195\necho line 196\necho line 197\necho line 198\necho line 199\necho line 200\npnpm generate-audio\n"}
+{"id":"X2 bash -lc","want":2,"cmd":"bash -lc 'pnpm generate-audio'"}
+{"id":"X3 subshell","want":2,"cmd":"(cd /tmp && pnpm generate-audio)"}
+{"id":"X4 redirect before the command","want":2,"cmd":">log pnpm generate-audio"}
+{"id":"X5 apply-fixes reason with no space after ::","want":2,"cmd":"pnpm apply-fixes"}
+{"id":"X6 fd dup then guarded stdout","want":2,"cmd":"printf x 2>&1 >src/lib/models.ts"}
+{"id":"X7 input from guarded, output elsewhere","want":0,"cmd":"cat <src/lib/models.ts >/tmp/x"}
+{"id":"X8 perl -pi","want":2,"cmd":"perl -pi -e 's/a/b/' src/lib/models.ts"}
+{"id":"X9 node_modules bin tsx","want":2,"cmd":"./node_modules/.bin/tsx scripts/generate-audio.ts"}
+{"id":"X10 direct voice-rotation without execute","want":0,"cmd":"pnpm exec tsx scripts/voice-rotation.ts --archive --book x"}
+{"id":"X11 delegate cat<.env","want":2,"cmd":"cat<.env","env":{"DELEGATE":"1"}}
+{"id":"X12 git mv onto guarded","want":2,"cmd":"git mv x.ts src/lib/models.ts"}
+{"id":"X13 multi-line quote then paid","want":2,"cmd":"echo \"a\nb\"; pnpm generate-audio"}
+{"id":"X14 sh -c with a quoted newline inside","want":2,"cmd":"sh -c \"echo 'x\ny'\npnpm generate-audio\""}
+{"id":"X15 ingest from-step","want":2,"cmd":"pnpm ingest -- --from-step generate-audio"}
+{"id":"X16 curl write with stderr redirect","want":2,"cmd":"curl -X POST \"https://api.elevenlabs.io/v1/x\" 2>/dev/null"}
+{"id":"X17 &> onto guarded","want":2,"cmd":"printf x &> src/lib/models.ts"}
+{"id":"X18 >| onto guarded","want":2,"cmd":"printf x >| src/lib/models.ts"}
+{"id":"X19 recover-issue direct dry run","want":0,"cmd":"pnpm exec tsx scripts/recover-issue.ts --book x"}
+{"id":"X20 recover-issue direct execute","want":2,"cmd":"pnpm exec tsx scripts/recover-issue.ts --book x --execute"}
+{"id":"X21 smoke without real","want":0,"cmd":"pnpm exec tsx scripts/smoke-ingest.ts"}
+{"id":"X22 heredoc commit message with an apostrophe","want":0,"cmd":"git commit -m \"$(cat <<'EOF'\nfix: don't block\nEOF\n)\""}
+{"id":"X23 command substitution","want":2,"cmd":"echo $(pnpm generate-audio)"}
+{"id":"X24 tee with quoted guarded path","want":2,"cmd":"echo x | tee \"src/lib/models.ts\""}
+{"id":"X25 sed -i on a dotted path","want":2,"cmd":"sed -i '' 's/a/b/' ./src/lib/../lib/models.ts"}
+{"id":"X26 tee text inside a quoted body","want":0,"cmd":"gh issue comment 1 --body \"use tee src/lib/models.ts\""}
+{"id":"X27 split-voice via npx","want":2,"cmd":"npx tsx --env-file=.env scripts/split-voice-clip.ts --x"}
+{"id":"X28 absolute guarded path in repo","want":2,"cmd":"cp a /path/to/repo/src/lib/tts-request.ts"}
+{"id":"X29 empty quoted arg then harmless","want":0,"cmd":"echo \"\" ''; ls"}
+{"id":"Y1 env FOO=1 bash -lc","want":2,"cmd":"env FOO=1 bash -lc 'pnpm generate-audio'"}
+{"id":"Y2 git log -S tee on a guarded file","want":0,"cmd":"git log -S 'tee' -- src/lib/models.ts"}
+{"id":"Y3 echo sh -c as text (unquoted sh word unwraps, r3 decision 3)","want":2,"cmd":"echo sh -c 'pnpm generate-audio'"}
+{"id":"Y4 git with an option before mv","want":2,"cmd":"git --no-pager mv a.ts src/lib/models.ts"}
+{"id":"Y5 git show is not a write","want":0,"cmd":"git show HEAD:src/lib/models.ts"}
+{"id":"Y6 /bin/cp","want":2,"cmd":"/bin/cp a src/lib/models.ts"}
+{"id":"Z1 command cp","want":2,"cmd":"command cp /tmp/replacement.ts src/lib/models.ts"}
+{"id":"Z2 /usr/bin/env cp","want":2,"cmd":"/usr/bin/env cp /tmp/replacement.ts src/lib/models.ts"}
+{"id":"Z3 brace group cp","want":2,"cmd":"{ cp /tmp/replacement.ts src/lib/models.ts; }"}
+{"id":"Z4 command bash -c","want":2,"cmd":"command bash -c 'pnpm generate-audio'"}
+{"id":"Z5 time bash -c","want":2,"cmd":"time bash -c 'pnpm generate-audio'"}
+{"id":"Z6 time pnpm","want":2,"cmd":"time pnpm generate-audio"}
+{"id":"Z7 nohup pnpm","want":2,"cmd":"nohup pnpm generate-audio"}
+{"id":"Z8 timeout 30 pnpm","want":2,"cmd":"timeout 30 pnpm generate-audio"}
+{"id":"Z9 sudo -E pnpm","want":2,"cmd":"sudo -E pnpm generate-audio"}
+{"id":"Z10 rg for cp text","want":0,"cmd":"rg \"cp\" src/lib/models.ts"}
+{"id":"Z11 printf of bash -c words","want":0,"cmd":"printf '%s\\n' 'bash' '-c' 'pnpm generate-audio'"}
+{"id":"Z12 bash -cl","want":2,"cmd":"bash -cl 'pnpm generate-audio'"}
+{"id":"Z13 bash -c -e","want":2,"cmd":"bash -c -e 'pnpm generate-audio'"}
+{"id":"Z14 -c after the script file is its argument","want":0,"cmd":"bash script.sh -c 'pnpm generate-audio'"}
+{"id":"Z15 delegate sources .env","want":2,"cmd":". .env","env":{"DELEGATE":"1"}}
+{"id":"Z16 nice -n 10 cp","want":2,"cmd":"nice -n 10 cp /tmp/x src/lib/models.ts"}
+{"id":"Z17 timeout 1.5s pnpm","want":2,"cmd":"timeout 1.5s pnpm generate-audio"}
+{"id":"Z18 if then cp","want":2,"cmd":"if true; then cp /tmp/x src/lib/models.ts; fi"}
+{"id":"H1 <<- tab-indented delimiter, apostrophe in body, paid after","want":2,"cmd":"cat <<-EOF\n\tDoug's note\n\tEOF\npnpm generate-audio"}
+{"id":"H2 <<- harmless after","want":0,"cmd":"cat <<-EOF\n\tDoug's note\n\tEOF\nls"}
+{"id":"H3 <<- quoted delimiter then cp","want":2,"cmd":"cat > /tmp/x <<-'END'\n\tit's fine\n\tEND\ncp /tmp/x src/lib/models.ts"}
+{"id":"H4 body line that is a paid command (accepted over-block)","want":2,"cmd":"cat <<EOF\npnpm generate-audio\nEOF"}
+{"id":"H5 unterminated heredoc keeps reading lines","want":2,"cmd":"cat <<EOF\nDoug's\npnpm generate-audio"}
+{"id":"H6 two heredocs on one line","want":2,"cmd":"cat <<A <<B\nDoug's\nA\nit's\nB\npnpm generate-audio"}
+{"id":"N1 nested subst, paid innermost","want":2,"cmd":"echo $(echo $(pnpm generate-audio))"}
+{"id":"N2 nested subst, harmless","want":0,"cmd":"echo $(basename $(pwd)) > /tmp/y"}
+{"id":"N3 nested subst with a quoted paren inside, then cp","want":2,"cmd":"cp $(dirname $(echo \")\"))/x src/lib/models.ts"}
+{"id":"N4 delegate nested subst reads .env","want":2,"cmd":"echo $(echo $(cat .env))","env":{"DELEGATE":"1"}}
+{"id":"T1 here-string is not a heredoc","want":2,"cmd":"cat <<<EOF\npnpm generate-audio"}
+{"id":"T2 here-string with apostrophe then paid","want":2,"cmd":"cat <<< \"Doug's\"; pnpm generate-audio"}
+{"id":"T3 here-string of paid text","want":0,"cmd":"grep x <<< \"pnpm generate-audio\""}
+{"id":"Q1 quoted subst heredoc with both quote kinds, then paid","want":2,"cmd":"gh pr comment 1 --body \"$(cat <<'EOF'\nDoug's \"quoted\" call\nEOF\n)\" && pnpm generate-audio"}
+{"id":"Q2 quoted subst heredoc with both quote kinds","want":0,"cmd":"gh pr comment 1 --body \"$(cat <<'EOF'\nDoug's \"quoted\" call\nEOF\n)\""}
+{"id":"Q3 quoted subst with an apostrophe in inner quotes, then paid","want":2,"cmd":"X=\"$(echo \"a'b\")\"; pnpm generate-audio"}
+{"id":"Q4 delegate quoted subst reads .env","want":2,"cmd":"echo \"$(cat .env)\"","env":{"DELEGATE":"1"}}
+{"id":"Q5 quoted subst holding a nested quoted subst","want":0,"cmd":"X=\"$(dirname \"$(echo \"a'b/c\")\")\"; echo \"$X\""}
+{"id":"Q6 quoted subst with <<- heredoc and tab-indented delimiter","want":0,"cmd":"gh pr comment 1 --body \"$(cat <<-EOF\n\tit's (fine)\n\tEOF\n)\""}
+{"id":"Q7 here-string inside a quoted subst is not a heredoc","want":0,"cmd":"X=\"$(tr a b <<< \"it's\")\"; echo ok"}
+{"id":"Q8 paid command inside a quoted subst","want":2,"cmd":"echo \"$(pnpm generate-audio)\""}
+{"id":"Q9 still unclosed quoted subst fails closed","want":2,"cmd":"echo \"$(cat <<'EOF'\nDoug's\nEOF\n; pnpm generate-audio"}
