@@ -160,6 +160,7 @@ export async function createBook(
 
   const { error: bookError } = await supabaseAdmin.from("books").insert({
     id: slug,
+    slug,
     name: title,
     wiki_host: wikiHost,
     wiki_title_template: wikiTitleTemplate,
