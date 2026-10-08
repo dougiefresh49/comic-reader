@@ -81,8 +81,9 @@ async function main() {
       { id: book, slug: book, name: book },
       { onConflict: "id", ignoreDuplicates: true },
     );
-  if (bErr && !bErr.message.includes("duplicate")) {
-    console.warn(`books upsert: ${bErr.message}`);
+  if (bErr) {
+    console.error(`books insert: ${bErr.message}`);
+    process.exit(1);
   }
   const { error: iErr } = await upsertIssue(supabase, {
     id: issueId,
