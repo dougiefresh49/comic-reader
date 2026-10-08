@@ -1224,12 +1224,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const lastPage = data.pages[data.pages.length - 1]?.number ?? null;
   const pageSpread = !!spreads.get(pageNumber);
   /** Why the current page's spread toggle is off limits, or null (#723). */
-  const spreadBlock =
-    pageNumber === lastPage
+  const spreadBlock = spreads.get(pageNumber - 1)
+    ? `Right half of ${pageNumber - 1}–${pageNumber}: untick on page ${pageNumber - 1} to split`
+    : pageNumber === lastPage
       ? "Last page"
-      : spreads.get(pageNumber - 1)
-        ? `Right half of ${pageNumber - 1}–${pageNumber}: untick on page ${pageNumber - 1} to split`
-        : null;
+      : null;
 
   /**
    * Join or split page N and N+1 (#723). Saves at once, outside the Save
