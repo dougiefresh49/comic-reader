@@ -1,0 +1,25 @@
+{"id":"1a env -S separate value past a > redirect","want":2,"cmd":"env -S >log 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1b env -S bundled value past a 2> redirect","want":2,"cmd":"env 2>/dev/null -Spnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1c env --split-string separate value past a > redirect (main already blocks it)","want":2,"cmd":"env --split-string >log pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1d env -S echo string past a redirect makes generate-audio an argument","want":0,"cmd":"env -S >log 'echo hi' generate-audio"}
+{"id":"1e env -S printf string past a 2> redirect makes pnpm an argument","want":0,"cmd":"env 2>/dev/null -S 'printf %s' pnpm generate-audio"}
+{"id":"2a env --split= prefix of --split-string","want":2,"cmd":"env --split=pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2b env --split separate value (main already blocks it)","want":2,"cmd":"env --split pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2c env --s= shortest prefix","want":2,"cmd":"env --s=pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2d env --s separate quoted value","want":2,"cmd":"env --s 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2e env --ch prefix of --chdir takes a value","want":2,"cmd":"env --ch /tmp pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2f sudo --us prefix of --user takes a value","want":2,"cmd":"sudo --us bob pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2g xargs --max-a prefix of --max-args takes a value (main already blocks it)","want":2,"cmd":"xargs --max-a 1 pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2h timeout --sig prefix of --signal takes a value","want":2,"cmd":"timeout --sig KILL 60 pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2i env --split= as echo's argument runs nothing","want":0,"cmd":"echo env --split=pnpm generate-audio"}
+{"id":"2j env --ch value is the dir, echo runs","want":0,"cmd":"env --ch pnpm echo generate-audio"}
+{"id":"2k sudo --us value is the user, echo runs","want":0,"cmd":"sudo --us pnpm echo generate-audio"}
+{"id":"2l env --s printf string makes pnpm an argument","want":0,"cmd":"env --s 'printf %s' pnpm generate-audio"}
+{"id":"2m env --split separate quoted value","want":2,"cmd":"env --split 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2n xargs --max-a value is the count, echo runs","want":0,"cmd":"xargs --max-a pnpm echo generate-audio"}
+{"id":"2o env -u value past a redirect, then -S","want":2,"cmd":"env -u >log X -S 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"3a xargs -R takes a value (main already blocks it)","want":2,"cmd":"xargs -R 1 pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"3b xargs -S takes a value (main already blocks it)","want":2,"cmd":"xargs -S 255 pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"3c xargs -tR bundle takes a value (main already blocks it)","want":2,"cmd":"xargs -tR 1 pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"3d xargs -R value is the count, echo runs","want":0,"cmd":"xargs -R 1 echo generate-audio"}
+{"id":"3e xargs -S value is the size, echo runs","want":0,"cmd":"xargs -S pnpm echo generate-audio"}

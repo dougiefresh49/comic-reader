@@ -66,7 +66,7 @@ WRAPPER='^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{
 # (#701): `wrapper:short letters:long names`, `;` between wrappers. The lexer
 # (cmdw, sudosh, env -S) and command_shape both read it, so the heredoc checks
 # and the paid rules find the same command (`timeout -s KILL 60` runs no KILL).
-WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCP:unset,chdir;xargs:ILnPdEasJ:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:;exec:a:;time:of:output,format'
+WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCP:unset,chdir;xargs:ILnPdEasJRS:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:;exec:a:;time:of:output,format'
 
 # --- the rule list, read once ---------------------------------------------
 #
@@ -193,8 +193,12 @@ segments() {
       for (x = 2; x <= length(b); x++) if (index(v, substr(b, x, 1))) return x
       return 0
     }
-    # Is b a long option of wrapper wr that takes the next word as its value.
-    function vlong(b, wr) { return b ~ /^--[^,]+$/ && index(WL[wr], "," substr(b, 3) ",") }
+    # Is b a long option of wrapper wr that takes the next word as its value:
+    # its name or a prefix of it, as getopt_long reads `--us` as `--user`
+    # (#720). An ambiguous prefix makes getopt_long fail, so matching it is safe.
+    function vlong(b, wr) { return b ~ /^--[^,=]+$/ && index(WL[wr], "," substr(b, 3)) }
+    # The index of the first word after w[j] that is no redirect or its target.
+    function nxt(j) { for (j++; w[j] ~ /^\035/; j += 2); return j }
     function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
     # The env -S string v, at w[j], with the words after it joined on (#713).
     # A redirect and its target are stepped over, as bash strips them before
@@ -217,7 +221,7 @@ segments() {
       return v
     }
     # pipe: the segment ends in a pipe.
-    function endseg(pipe,   i, j, line, b, sc, x, v, c) {
+    function endseg(pipe,   i, j, line, b, sc, x, v, c, y) {
       endword()
       if (nw == 0) return
       line = w[0]
@@ -254,16 +258,21 @@ segments() {
         # over, so command_shape finds pnpm in `env -S pnpm generate-audio`.
         # env appends the words after the string to it, so they are queued
         # with it (#713), up to a redirect: `env -Spnpm generate-audio`.
+        # Redirects anywhere in the walk are stepped over, as bash strips them
+        # before env runs (`env -S >log pnpm`, #720), and `--s` up to
+        # `--split-string` is the one option, as getopt_long reads it.
         else if (b == "env" && (c < 0 || i < c)) for (j = i + 1; j < nw; j++) {
           b = w[j]; sub(/^\034/, "", b)
+          if (b ~ /^\035/) { j++; continue }
+          y = substr(b, 3); sub(/=.*/, "", y)
           if (b ~ /^-[^-]/ && (x = vopt(b, WV["env"] "S"))) {
-            v = x < length(b) ? substr(b, x + 1) : w[++j]
+            if (x < length(b)) v = substr(b, x + 1); else { j = nxt(j); v = w[j] }
             if (substr(b, x, 1) == "S") { queue(sjoin(v, j), 0); break }
-          } else if (b ~ /^--split-string(=|$)/) {
-            v = b ~ /=/ ? substr(b, 16) : w[++j]
+          } else if (b ~ /^--s/ && index("split-string", y) == 1) {
+            if (b ~ /=/) v = substr(b, index(b, "=") + 1); else { j = nxt(j); v = w[j] }
             queue(sjoin(v, j), 0); break
           }
-          else if (vlong(b, "env")) j++
+          else if (vlong(b, "env")) j = nxt(j)
           else if (b !~ /^-/) break
         }
         # ssh joins the words after its host and a shell on the host runs them
@@ -479,12 +488,13 @@ command_shape() {
       # follows, from WRAP_OPTS: `timeout -s KILL 60` runs no KILL (#671).
       # Per wrapper, since `sudo -s` takes none. A bundle takes it when its
       # first value letter ends the word (`-vu bob`, as vopt reads it); a long
-      # form when it is the whole word (#694), since `--opt=value` is one word.
+      # form when it is the whole word (#694), since `--opt=value` is one word,
+      # and its name or a prefix of it, as vlong reads it (`--us bob`, #720).
       e=";$WRAP_OPTS"
       case "$e" in *";$wrap:"*) e=${e#*";$wrap:"} && e=${e%%;*} ;; *) e=: ;; esac
       case "$t" in
-      --*,* | --) ;;
-      --*) case ",${e#*:}," in *",${t#--},"*) skip=1 ;; esac ;;
+      --*=* | --*,* | --) ;;
+      --*) case ",${e#*:}" in *",${t#--}"*) skip=1 ;; esac ;;
       *)
         o=${t#-}
         while [ -n "$o" ]; do
