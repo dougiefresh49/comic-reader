@@ -1,0 +1,22 @@
+{"id":"B1 --render after --","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --render"}
+{"id":"B2 --execute after --","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --execute"}
+{"id":"B3 --execute --render, render reason","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --execute --render"}
+{"id":"B4 flags before --","want":2,"cmd":"pnpm backfill-balloon-groups --render -- --book b --issue issue-1 --labels l.json"}
+{"id":"B5 quoted flag","want":2,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json \"--render\""}
+{"id":"B6 pnpm run","want":2,"cmd":"pnpm run backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --render"}
+{"id":"B7 pnpm exec tsx direct run","want":2,"cmd":"pnpm exec tsx scripts/backfill-balloon-groups.ts --render"}
+{"id":"B8 tsx --env-file direct run","want":2,"cmd":"tsx --env-file=.env scripts/backfill-balloon-groups.ts --execute"}
+{"id":"B9 node --import tsx direct run","want":2,"cmd":"node --import tsx scripts/backfill-balloon-groups.ts --render"}
+{"id":"B10 npx tsx direct run","want":2,"cmd":"npx tsx scripts/backfill-balloon-groups.ts --execute"}
+{"id":"B11 ./scripts direct run","want":2,"cmd":"./scripts/backfill-balloon-groups.ts --render"}
+{"id":"B12 echoed LIVE_API_OK does not count","want":2,"cmd":"echo LIVE_API_OK=1; pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --render"}
+{"id":"P1 --render behind LIVE_API_OK","want":0,"cmd":"LIVE_API_OK=1 pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --render"}
+{"id":"P2 --execute behind LIVE_API_OK","want":0,"cmd":"LIVE_API_OK=1 pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json --execute"}
+{"id":"P3 dry run","want":0,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels l.json"}
+{"id":"P4 --rendered","want":0,"cmd":"pnpm backfill-balloon-groups -- --rendered"}
+{"id":"P5 --executed","want":0,"cmd":"pnpm backfill-balloon-groups -- --executed"}
+{"id":"P6 flag inside a labels path","want":0,"cmd":"pnpm backfill-balloon-groups -- --book b --issue issue-1 --labels /tmp/groups--execute.json"}
+{"id":"P7 grep for the flag","want":0,"cmd":"grep -- \"--render\" scripts/backfill-balloon-groups.ts"}
+{"id":"U1 generate-audio still blocks","want":2,"cmd":"pnpm generate-audio"}
+{"id":"U2 recover-issue --execute still blocks","want":2,"cmd":"pnpm recover-issue -- --execute"}
+{"id":"U3 apply-fixes still blocks","want":2,"cmd":"pnpm apply-fixes"}

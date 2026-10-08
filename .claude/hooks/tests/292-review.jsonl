@@ -1,0 +1,22 @@
+{"id":"read-only search","want":0,"cmd":"rg \"cp\" src/lib/models.ts"}
+{"id":"quoted shell documentation","want":0,"cmd":"printf '%s\\n' 'bash' '-c' 'pnpm generate-audio'"}
+{"id":"actual guarded copy","want":2,"cmd":"cp /tmp/x src/lib/models.ts"}
+{"id":"actual shell run","want":2,"cmd":"bash -c 'pnpm generate-audio'"}
+{"id":"F1 heredoc apostrophe then cp","want":2,"cmd":"cat > /tmp/new-models.ts <<'EOF'\n// Doug's tiers\nexport const X = 1;\nEOF\ncp /tmp/new-models.ts src/lib/models.ts"}
+{"id":"F1b heredoc apostrophe then paid","want":2,"cmd":"cat > /tmp/n.md <<'EOF'\nDoug's note\nEOF\npnpm generate-audio --book x"}
+{"id":"F1c heredoc gh body with apostrophe","want":0,"cmd":"gh pr comment 1 --body-file - <<'EOF'\nDoug's call; run pnpm generate-audio later\nEOF"}
+{"id":"F2a subst before the flag","want":2,"cmd":"pnpm voice-rotation --book $(cat /tmp/book) --execute"}
+{"id":"F2b subst in cp source","want":2,"cmd":"cp $(mktemp -d)/models.ts src/lib/models.ts"}
+{"id":"F2c delegate echo subst env","want":2,"cmd":"echo $(cat .env)","env":{"DELEGATE":"1"}}
+{"id":"F3 rg runner word","want":0,"cmd":"rg \"tsx\" scripts/generate-audio.ts"}
+{"id":"F3b grep node","want":0,"cmd":"grep -n node scripts/ingest.ts"}
+{"id":"F3c paid script only as an argument","want":0,"cmd":"pnpm exec tsx scripts/check.ts --input scripts/apply-fixes.ts"}
+{"id":"F4a xargs -I cp","want":2,"cmd":"xargs -I {} cp {} src/lib/models.ts"}
+{"id":"F4b find -exec cp","want":2,"cmd":"find . -exec cp new.ts src/lib/models.ts \\;"}
+{"id":"F4c pnpm exec bash -c","want":2,"cmd":"pnpm exec bash -c \"pnpm generate-audio\""}
+{"id":"G1 quoted subst with inner quotes then paid","want":2,"cmd":"git commit -m \"$(cat <<'EOF'\nfix: the \"don't split\" case\nEOF\n)\" && pnpm generate-audio --book smoke-test"}
+{"id":"G2 ed heredoc on guarded file","want":2,"cmd":"ed -s src/lib/models.ts <<'EOF'\n,s/old/new/g\nw\nq\nEOF"}
+{"id":"G2b ed with input file","want":2,"cmd":"ed -s src/lib/models.ts < cmds.ed"}
+{"id":"G3 shell heredoc with continuation","want":2,"cmd":"bash <<'EOF'\ncp new.ts \\\n  src/lib/models.ts\nEOF"}
+{"id":"G4 ansi-c quote then paid","want":2,"cmd":"printf $'it\\'s\\n'; pnpm generate-audio"}
+{"id":"G5 normal heredoc commit message","want":0,"cmd":"git commit -m \"$(cat <<'EOF'\nfix: Doug's guard\nEOF\n)\""}
