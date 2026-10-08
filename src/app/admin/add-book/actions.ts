@@ -42,8 +42,8 @@ function generateSlug(title: string): string {
 }
 
 /**
- * The series a book joins: an existing row whose name matches ignoring case,
- * spacing and punctuation keeps its id, so a later volume lands in the same
+ * The series a book joins: an existing row whose id is the name's slug, or
+ * whose name matches ignoring case, spacing and punctuation, keeps its id, so a later volume lands in the same
  * series; otherwise the id a new row would get. Null when there is no name.
  * The match runs here, not as an ilike filter, because PostgREST reads `*`
  * in an ilike value as a wildcard; the table holds one row per series.
@@ -61,10 +61,9 @@ async function resolveSeries(
     error: { message: string } | null;
   };
   if (error) return { ok: false, error: error.message };
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const existing = (rows ?? []).find(
-    (r) =>
-      r.name.toLowerCase() === series.toLowerCase() ||
-      franchiseSlug(r.name) === slug,
+    (r) => r.id === slug || key(r.name) === key(series),
   );
   return {
     ok: true,
@@ -184,14 +183,19 @@ export async function createBook(
   const series = resolved.data;
   const seriesId = series?.id ?? null;
   const position = series ? volumeOrNull(volumeNumber) : null;
+  // `created` is true only when this call inserted the row: an ignored
+  // duplicate returns no row.
+  let created = false;
   if (series?.isNew) {
-    const { error: seriesError } = await supabaseAdmin
+    const { data: inserted, error: seriesError } = await supabaseAdmin
       .from("series")
       .upsert(
         { id: series.id, name: series.name },
         { onConflict: "id", ignoreDuplicates: true },
-      );
+      )
+      .select("id");
     if (seriesError) return { ok: false, error: seriesError.message };
+    created = (inserted ?? []).length > 0;
   }
 
   const { error: bookError } = await supabaseAdmin.from("books").insert({
@@ -212,7 +216,7 @@ export async function createBook(
   if (bookError) {
     // A series row this call created has no book in it now; remove it
     // unless another book joined it meanwhile.
-    if (series?.isNew) {
+    if (series && created) {
       const { count } = await supabaseAdmin
         .from("books")
         .select("id", { count: "exact", head: true })
