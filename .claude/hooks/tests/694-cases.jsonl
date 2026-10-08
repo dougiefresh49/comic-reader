@@ -82,3 +82,13 @@
 {"id":"r1-4b echo of an env -S line is text","want":0,"cmd":"echo env -S 'pnpm generate-audio'"}
 {"id":"r1-4c sudo ssh still runs its remote command","want":2,"cmd":"sudo ssh host 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
 {"id":"r1-4d assignment then env -S still runs its string","want":2,"cmd":"X=1 env -S 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"r2-1a if ssh runs its remote command","want":2,"cmd":"if ssh host 'curl -X POST https://api.elevenlabs.io/v1/x'; then echo done; fi","reason":"write against the ElevenLabs API"}
+{"id":"r2-1b ! env -S runs its string","want":2,"cmd":"! env -S 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"r2-1c while ssh runs its remote command","want":2,"cmd":"while ssh host 'pnpm generate-audio'; do sleep 1; done"}
+{"id":"r2-1d then env -S runs its string","want":2,"cmd":"if true; then env -S 'pnpm generate-audio'; fi"}
+{"id":"r2-1e then echo of an ssh line is text","want":0,"cmd":"if true; then echo ssh host 'pnpm generate-audio'; fi"}
+{"id":"r2-1f ! echo of an env -S line is text","want":0,"cmd":"! echo env -S 'pnpm generate-audio'"}
+{"id":"r2-2a pipe to sudo -s on the line after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -s","reason":"generate-audio synthesizes"}
+{"id":"r2-2b pipe to sudo -u value then -i after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -u bob -i"}
+{"id":"r2-2c pipe to sudo su after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo su"}
+{"id":"r2-2d pipe to sudo sed -i after the body is text","want":0,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -u bob sed -i s/a/b/ /tmp/x"}

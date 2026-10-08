@@ -147,10 +147,27 @@ segments() {
         if (wr != "" && b ~ /^-/) { x = vopt(b, WV[wr]); if ((x && x == length(b)) || b ~ WL) i++; continue }
         if (b ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || (wr != "" && b ~ /^[0-9][0-9.]*[smhd]?$/)) continue
         x = b; sub(/.*\//, "", x)
-        if (x ~ /^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf)$/) { wr = x; continue }
+        # The words WRAPPER steps over, shell keywords too (`if ssh`, `! env`).
+        if (x ~ /^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{]|!|if|then|elif|else|do|while|until)$/) { wr = x; continue }
         return i
       }
       return -1
+    }
+    # Does the sudo at a[i] hand its input to a shell: -s, -i, --shell or
+    # --login among its options, which end at the command past the value of
+    # each (#694).
+    function sudosh(a, i, hi,   j, b, x) {
+      for (j = i + 1; j < hi; j++) {
+        b = a[j]
+        if (b ~ /^--(shell|login)$/) return 1
+        else if (b ~ WL) j++
+        else if (b ~ /^-[^-]/) {
+          x = vopt(b, WV["sudo"])
+          if (substr(b, 1, x ? x - 1 : length(b)) ~ /[is]/) return 1
+          if (x == length(b)) j++
+        } else if (b !~ /^-/) return 0
+      }
+      return 0
     }
     # Where in option word b getopt finds its first letter from v, the
     # letters that take a value (0 for none): `-vp` takes the next word as
@@ -218,18 +235,8 @@ segments() {
           }
           if (v != "") queue(v, 1)
         }
-        # sudo -s, -i, --shell or --login hands a heredoc to a shell (#694);
-        # its options end at the command, past the value of each.
-        else if (b == "sudo") for (j = i + 1; j < nw; j++) {
-          b = w[j]
-          if (b ~ /^--(shell|login)$/) lsh = 1
-          else if (b ~ WL) j++
-          else if (b ~ /^-[^-]/) {
-            x = vopt(b, WV["sudo"])
-            if (substr(b, 1, x ? x - 1 : length(b)) ~ /[is]/) lsh = 1
-            if (x == length(b)) j++
-          } else if (b !~ /^-/) break
-        }
+        # sudo -s, -i, --shell or --login hands a heredoc to a shell (#694).
+        else if (b == "sudo" && sudosh(w, i, nw)) lsh = 1
         sc = 0
       }
       split("", w); nw = 0; ss0 = ninner
@@ -331,11 +338,15 @@ segments() {
             p = ""
             # `cat <<EOF |` with a shell on the line after the body: bash
             # carries the pipeline on there, so the last body is fed (#694).
-            # Its command is found past wrappers, as cmdw does (`sudo bash`).
+            # Its command is found past wrappers, as cmdw does (`sudo bash`),
+            # and a sudo in front of it can be the shell (`sudo -s`).
             if (lp && h == nhd - 1) {
               t = substr(s, i + 1); sub(/[\n;&|()<>].*/, "", t); gsub(/[\047"]/, "", t)
-              sub(/^[ \t]+/, "", t); x = split(t, a, "[ \t]+"); x = cmdw(a, 1, x + 1)
+              sub(/^[ \t]+/, "", t); j = split(t, a, "[ \t]+"); x = cmdw(a, 1, j + 1)
               t = a[x]; sub(/.*\//, "", t); if (x > 0 && t ~ SH) fed = 1
+              for (e = 1; e <= (x > 0 ? x - 1 : j); e++) {
+                t = a[e]; sub(/.*\//, "", t); if (t == "sudo" && sudosh(a, e, j + 1)) fed = 1
+              }
             }
             if (found && !fed) {
               # With an unquoted delimiter, a $(...) in the body still runs
