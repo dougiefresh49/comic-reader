@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Bubble, AudioTimestamps } from "~/types";
 import { audioUrl } from "~/lib/storage";
-import { applyLevel, ensureConnected, sharedContext } from "~/lib/audio-graph";
+import {
+  applyLevel,
+  disconnect,
+  ensureConnected,
+  resumeContext,
+} from "~/lib/audio-graph";
 import { buildWordTimings } from "~/components/zen-comic-reader/text-utils";
 import { useWordHighlight } from "./useWordHighlight";
 
@@ -74,6 +79,9 @@ export function useAudioPlayback({
   const playBubble = useCallback(
     (bubble: Bubble) => {
       stopAll();
+      // Either branch below replaces the current clip for good, so its nodes
+      // are unwired here and the element can be collected (#611).
+      if (audioRef.current) disconnect(audioRef.current);
 
       // No audio: stop what was playing and leave no element behind, so a
       // second tap (togglePlayPause) cannot replay the previous bubble's clip.
@@ -176,11 +184,9 @@ export function useAudioPlayback({
     if (!audio) return;
     if (audio.paused) {
       armedRef.current = true;
-      // The play button is a gesture, the one place WebKit lets a context that
-      // was interrupted or suspended while the clip sat paused resume (#611).
-      sharedContext()
-        ?.resume()
-        .catch(() => undefined);
+      // The play button is a gesture, so a context that was interrupted or
+      // suspended while the clip sat paused resumes here (#611).
+      resumeContext();
       audio
         .play()
         .then(() => setIsPlaying(true))

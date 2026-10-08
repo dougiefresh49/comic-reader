@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { audioLibraryUrl } from "~/lib/audio-library";
-import { applyLevel, ensureConnected, sharedContext } from "~/lib/audio-graph";
+import { applyLevel, ensureConnected, resumeContext } from "~/lib/audio-graph";
 import type { PageDirectedPanel } from "~/types/panels";
 
 interface Props {
@@ -24,9 +24,7 @@ const FADE_MS = 800;
 
 function playLayer(el: HTMLAudioElement, level: number) {
   ensureConnected(el, level);
-  sharedContext()
-    ?.resume()
-    .catch(() => undefined);
+  resumeContext();
   el.play().catch(() => undefined);
 }
 
