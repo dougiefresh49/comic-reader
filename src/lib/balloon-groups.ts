@@ -142,12 +142,14 @@ export function scanBalloonPairs(
   return { groups, disagreeing };
 }
 
-const LEADING_ELLIPSIS = /^(?:\.\.\.|…)\s*/;
+/** A leading ellipsis, after any leading cue tags (`[tag] `), which group 1 keeps. */
+const LEADING_ELLIPSIS = /^((?:\[[^\]]*\]\s*)*)(?:\.\.\.|…)\s*/;
 const TRAILING_ELLIPSIS = /(?:\.\.\.|…)$/;
 
 /**
  * Each member's text as it appears in the joined line: trimmed, and with its
- * leading ellipsis dropped when the text before it ends in one.
+ * leading ellipsis dropped when the text before it ends in one. Leading cue
+ * tags stay: "[thoughtful] ...But" becomes "[thoughtful] But".
  */
 function groupTextParts(texts: string[]): string[] {
   const parts: string[] = [];
@@ -155,7 +157,7 @@ function groupTextParts(texts: string[]): string[] {
   for (const text of texts) {
     let part = text.trim();
     if (TRAILING_ELLIPSIS.test(joined) && LEADING_ELLIPSIS.test(part)) {
-      part = part.replace(LEADING_ELLIPSIS, "");
+      part = part.replace(LEADING_ELLIPSIS, "$1").trimEnd();
     }
     parts.push(part);
     if (part) joined = joined ? `${joined} ${part}` : part;
