@@ -45,16 +45,26 @@ if [ ! -r "$LIST" ]; then
 fi
 
 # src/lib//models.ts, src/lib/../lib/models.ts and ./src/lib/models.ts are one
-# file, and the guarded list is written the short way.
+# file, and the guarded list is written the short way. The result goes in NORM
+# rather than to stdout, and nothing here forks: a patch is thousands of
+# tokens, and a subshell plus two seds per token ran a 25-file patch past the
+# 5 s hook timeout (#705). One pass over the segments, because bash 3.2's
+# ${p//x/y} is quadratic in the length of p. A `..` with nothing before it is
+# dropped, which only blocks more. Globbing is off from here on, for this split
+# and for the patch split, or a ` * comment` line would expand its *.
+set -f
 normalize_path() {
-  local p=$1 prev
-  p=$(printf '%s' "$p" | sed -E 's|//+|/|g; s|/\./|/|g; s|/$||')
-  while :; do
-    prev=$p
-    p=$(printf '%s' "$p" | sed -E 's|[^/]+/\.\./||')
-    [ "$p" = "$prev" ] && break
+  local IFS=/ seg n=0 lead= segs out=()
+  case "$1" in /*) lead=/ ;; esac
+  segs=($1)
+  for seg in "${segs[@]}"; do
+    case "$seg" in
+    '' | .) ;;
+    ..) [ "$n" -gt 0 ] && n=$((n - 1)) && unset "out[n]" ;;
+    *) out[n]=$seg && n=$((n + 1)) ;;
+    esac
   done
-  printf '%s' "${p#./}"
+  NORM="${out[*]}" && NORM=${NORM:+$lead$NORM}
 }
 
 # Match on the path relative to the repo root, so an absolute path and a
@@ -63,7 +73,8 @@ REL_PATH=$FILE_PATH
 case "$REL_PATH" in
 "$REPO_ROOT"/*) REL_PATH=${REL_PATH#"$REPO_ROOT"/} ;;
 esac
-REL_PATH=$(normalize_path "$REL_PATH")
+normalize_path "$REL_PATH"
+REL_PATH=$NORM
 
 # No file_path in the payload means a codex apply_patch, which names the file
 # in its patch text. That text arrives as a JSON string, so its line breaks are
@@ -91,7 +102,10 @@ if ! LIST_TEXT=$(cat "$LIST"); then
   exit 2
 fi
 
-NR_FILE_RULES=0
+# Into arrays, once, before any check: the patch check below compares every
+# token with every rule, and re-reading the list per token would cost what
+# #671 cost the Bash guard.
+NR_FILE_RULES=0 F_TARGET=() F_REASON=()
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
   file:*) ;;
@@ -100,27 +114,11 @@ while IFS= read -r line || [ -n "$line" ]; do
 
   target=${line#file:}
   target=${target%%::*}
-  target=$(printf '%s' "$target" | sed -E 's/[[:space:]]+$//')
-  reason=${line#*:: }
+  while [[ $target == *[[:space:]] ]]; do target=${target%[[:space:]]}; done
   [ -n "$target" ] || continue
+  F_TARGET[NR_FILE_RULES]=$target
+  F_REASON[NR_FILE_RULES]=${line#*:: }
   NR_FILE_RULES=$((NR_FILE_RULES + 1))
-
-  if [ "$REL_PATH" = "$target" ] || [ "${REL_PATH%"/$target"}" != "$REL_PATH" ]; then
-    printf 'Blocked: %s\n' "$reason" >&2
-    exit 2
-  fi
-
-  # Those paths get the same normalization, so src/lib/../lib/models.ts in a
-  # patch reaches the rule. Over-blocking on a mention is the safe direction
-  # for a credit guard.
-  while IFS= read -r text || [ -n "$text" ]; do
-    for TOKEN in $text; do
-      if [ "$(normalize_path "$TOKEN")" = "$target" ] || [ "$(normalize_path "$TOKEN")" = "${REPO_ROOT}/$target" ]; then
-        printf 'Blocked: %s\n' "$reason" >&2
-        exit 2
-      fi
-    done
-  done < <(printf '%s\n' "$PATCH_LINES")
 done < <(printf '%s\n' "$LIST_TEXT")
 # A list emptied by mistake, or one whose file: lines lost their paths, leaves
 # no rule to check against; that is not a pass.
@@ -128,5 +126,53 @@ if [ "$NR_FILE_RULES" -eq 0 ]; then
   printf 'Blocked: %s holds no file: rule, so the guarded-file list cannot be checked. Restore it from the repo.\n' "$LIST" >&2
   exit 2
 fi
+
+for ((k = 0; k < NR_FILE_RULES; k++)); do
+  target=${F_TARGET[k]}
+  if [ "$REL_PATH" = "$target" ] || [ "${REL_PATH%"/$target"}" != "$REL_PATH" ]; then
+    printf 'Blocked: %s\n' "${F_REASON[k]}" >&2
+    exit 2
+  fi
+done
+
+# Patch tokens get the same normalization, so src/lib/../lib/models.ts in a
+# patch reaches the rule. Over-blocking on a mention is the safe direction for
+# a credit guard. Normalizing keeps every file name, so only a token holding a
+# rule's file name can reach that rule: a patch with none is a pass, and a
+# token with none is never normalized. One grep keeps only the lines holding a
+# file name, so the bash loop below never walks the rest of a big patch. Its
+# output decides the check, so GREP_OPTIONS from the session (--color, -v) and a
+# grep shell function are kept out of it.
+[ -n "$PATCH_LINES" ] || exit 0
+F_GREP=()
+for ((k = 0; k < NR_FILE_RULES; k++)); do
+  F_NAME[k]=${F_TARGET[k]##*/}
+  F_GREP+=(-e "${F_NAME[k]}")
+done
+CAND=$(printf '%s\n' "$PATCH_LINES" | env -u GREP_OPTIONS LC_ALL=C grep -F --color=never "${F_GREP[@]}")
+case $? in
+0) ;;
+1) exit 0 ;;
+*)
+  printf 'Blocked: the apply_patch text could not be searched, so the guarded paths in it could not be checked.\n' >&2
+  exit 2
+  ;;
+esac
+for TOKEN in $CAND; do
+  for ((k = 0; k < NR_FILE_RULES; k++)); do
+    [[ $TOKEN == *"${F_NAME[k]}"* ]] || continue
+    # No real path is this long, and on bash 3.2 a long run of `..` costs
+    # depth times pops in normalize_path, so a token like that blocks unread.
+    if [ "${#TOKEN}" -gt 4096 ]; then
+      printf 'Blocked: a token of over 4096 characters in the apply_patch text names %s, too long to check in time.\n' "${F_NAME[k]}" >&2
+      exit 2
+    fi
+    normalize_path "$TOKEN"
+    if [ "$NORM" = "${F_TARGET[k]}" ] || [ "$NORM" = "${REPO_ROOT}/${F_TARGET[k]}" ]; then
+      printf 'Blocked: %s\n' "${F_REASON[k]}" >&2
+      exit 2
+    fi
+  done
+done
 
 exit 0
