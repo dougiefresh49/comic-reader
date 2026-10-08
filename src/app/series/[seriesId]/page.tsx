@@ -7,46 +7,53 @@ import { getIssueOfflineUrls } from "~/server/offline";
 import { IssueGrid, MetaChip } from "~/components/IssueCards";
 import { CoverImage } from "~/components/ui/CoverImage";
 
-interface BookDetailProps {
+interface SeriesDetailProps {
   params: Promise<{
-    bookId: string;
+    seriesId: string;
   }>;
 }
 
-export default async function BookDetailPage({ params }: BookDetailProps) {
-  const { bookId } = await params;
+export default async function SeriesDetailPage({ params }: SeriesDetailProps) {
+  const { seriesId } = await params;
 
   const manifest = await getManifest({ publishedOnly: true });
 
-  // Find the book
-  const book = manifest.books.find((b) => b.id === bookId);
-  if (!book) {
+  // The series and its published books, lowest position first
+  const series = manifest.series.find((s) => s.id === seriesId);
+  if (!series) {
     notFound();
   }
 
-  // Compute offline URL lists for each available issue. Empty for
-  // not-yet-ingested issues. ~50 URLs/issue, fast.
-  const offlineUrlsByIssue: Record<string, string[]> = {};
+  // Offline URL lists for each available issue, keyed by book then issue.
+  // Empty for not-yet-ingested issues. ~50 URLs/issue, fast.
+  const offlineUrlsByBook: Record<string, Record<string, string[]>> = {};
   await Promise.all(
-    book.issues
-      .filter((i) => i.hasWebP)
-      .map(async (issue) => {
-        offlineUrlsByIssue[issue.id] = await getIssueOfflineUrls(
-          bookId,
-          issue.id,
-          issue.pageCount,
-        );
-      }),
+    series.books.flatMap((book) => {
+      const byIssue: Record<string, string[]> = {};
+      offlineUrlsByBook[book.id] = byIssue;
+      return book.issues
+        .filter((i) => i.hasWebP)
+        .map(async (issue) => {
+          byIssue[issue.id] = await getIssueOfflineUrls(
+            book.id,
+            issue.id,
+            issue.pageCount,
+          );
+        });
+    }),
   );
 
-  // Get cover image (first page of first issue)
-  const firstIssue = book.issues[0];
-  const coverImage = firstIssue ? pageImageUrl(bookId, firstIssue.id, 1) : null;
-  const hasVoiceActing = book.issues.some((issue) => issue.hasAudio);
-  const backHref = book.series ? `/series/${book.series.id}` : "/";
-  const backLabel = book.series
-    ? `Back to ${book.series.name}`
-    : "Back to Library";
+  // Cover image: first page of the first issue of the first book
+  const firstBook = series.books[0];
+  const firstIssue = firstBook?.issues[0];
+  const coverImage =
+    firstBook && firstIssue
+      ? pageImageUrl(firstBook.id, firstIssue.id, 1)
+      : null;
+  const issueCount = series.books.reduce((n, b) => n + b.issues.length, 0);
+  const hasVoiceActing = series.books.some((book) =>
+    book.issues.some((issue) => issue.hasAudio),
+  );
 
   return (
     <main className="relative min-h-screen bg-neutral-950 text-neutral-100">
@@ -58,7 +65,7 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
 
       <div className="relative container mx-auto px-4 py-10">
         <Link
-          href={backHref}
+          href="/"
           className="mb-8 inline-flex items-center gap-1.5 rounded-full text-sm text-neutral-400 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none"
         >
           <svg
@@ -75,7 +82,7 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
           >
             <path d="m15 18-6-6 6-6" />
           </svg>
-          {backLabel}
+          Back to Library
         </Link>
 
         {/* Hero row */}
@@ -84,8 +91,8 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
             <div className="relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-neutral-900">
               <CoverImage
                 src={coverImage}
-                alt={book.name}
-                fallbackLabel={monogram(book.name)}
+                alt={series.name}
+                fallbackLabel={monogram(series.name)}
                 sizes="208px"
                 priority
               />
@@ -94,12 +101,12 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
 
           <div className="flex flex-col gap-3 pb-1">
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              {book.name}
+              {series.name}
             </h1>
             <div className="flex flex-wrap gap-2">
               <MetaChip>
-                <span className="tabular-nums">{book.issues.length}</span> issue
-                {book.issues.length !== 1 ? "s" : ""}
+                <span className="tabular-nums">{issueCount}</span> issue
+                {issueCount !== 1 ? "s" : ""}
               </MetaChip>
               {hasVoiceActing ? (
                 <MetaChip>
@@ -126,18 +133,22 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
           </div>
         </div>
 
-        {/* Issues */}
-        <section>
-          <h2 className="mb-4 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-            Issues
-          </h2>
-          <IssueGrid
-            bookId={bookId}
-            bookName={book.name}
-            issues={book.issues}
-            offlineUrlsByIssue={offlineUrlsByIssue}
-          />
-        </section>
+        {/* One section per book (volume), in series order */}
+        <div className="space-y-12">
+          {series.books.map((book) => (
+            <section key={book.id}>
+              <h2 className="mb-4 text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+                {book.name}
+              </h2>
+              <IssueGrid
+                bookId={book.id}
+                bookName={book.name}
+                issues={book.issues}
+                offlineUrlsByIssue={offlineUrlsByBook[book.id] ?? {}}
+              />
+            </section>
+          ))}
+        </div>
       </div>
     </main>
   );
