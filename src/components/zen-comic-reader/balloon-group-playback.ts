@@ -32,32 +32,28 @@ export interface GroupUnit {
 
 /**
  * Every group on the page that plays as one clip, keyed by each member's id.
- * Members are the bubbles sharing a `groupId`, in `sortOrder` (the list
- * position when it is missing, since the page query orders by it). A group
- * of one, or one not yet rendered (`groupPlaysAsUnit`), is left out: its
+ * Members are the bubbles sharing a `groupId`, in `sortOrder`. A group of
+ * one, or one not yet rendered (`groupPlaysAsUnit`), is left out: its
  * balloons play their own clips.
  */
 export function findGroupUnits(
   bubbles: Bubble[],
   timestamps: Record<string, AudioTimestamps>,
 ): Map<string, GroupUnit> {
-  const byGroup = new Map<
-    string,
-    Array<{ bubble: Bubble; sortOrder: number }>
-  >();
-  bubbles.forEach((bubble, i) => {
-    if (!bubble.groupId) return;
+  const byGroup = new Map<string, Bubble[]>();
+  for (const bubble of bubbles) {
+    if (!bubble.groupId) continue;
     const entries = byGroup.get(bubble.groupId) ?? [];
-    entries.push({ bubble, sortOrder: bubble.sortOrder ?? i });
+    entries.push(bubble);
     byGroup.set(bubble.groupId, entries);
-  });
+  }
 
   const units = new Map<string, GroupUnit>();
-  for (const entries of byGroup.values()) {
+  for (const [groupId, entries] of byGroup) {
     if (entries.length < 2) continue;
-    const members = entries.map(({ bubble, sortOrder }) => ({
+    const members = entries.map((bubble) => ({
       id: bubble.id,
-      sortOrder,
+      sortOrder: bubble.sortOrder,
       audioStoragePath: bubble.audioStoragePath ?? null,
       hasTimestamps: Boolean(timestamps[bubble.id]),
     }));
@@ -66,34 +62,62 @@ export function findGroupUnits(
     // Play order, ties on the id: the order `groupLeadId` and the render use.
     entries.sort(
       (a, b) =>
-        a.sortOrder - b.sortOrder ||
-        (a.bubble.id < b.bubble.id ? -1 : a.bubble.id > b.bubble.id ? 1 : 0),
+        a.sortOrder - b.sortOrder || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
     );
     const leadId = groupLeadId(members);
-    const lead = entries.find((e) => e.bubble.id === leadId)!.bubble;
-    const ts = timestamps[leadId];
-    const { cleanText, words } = buildWordTimings(
-      ts?.normalized_alignment ?? ts?.alignment ?? null,
-    );
-    // The text each member was rendered from, in the order the clip joined it.
-    const ranges = memberWordRanges(
-      entries.map((e) => e.bubble.textWithCues ?? e.bubble.ocr_text),
-      words.length,
+    const lead = entries.find((b) => b.id === leadId)!;
+    const { cleanText, words, ranges } = groupWords(
+      groupId,
+      timestamps[leadId],
+      // The text each member was rendered from, in the order the clip joined it.
+      entries.map((b) => b.textWithCues ?? b.ocr_text),
     );
     const unit: GroupUnit = {
       lead,
-      memberIds: entries.map((e) => e.bubble.id),
+      memberIds: entries.map((b) => b.id),
       words,
       cleanText,
       spans:
-        ranges?.map((range, k) => ({
-          bubbleId: entries[k]!.bubble.id,
-          ...range,
-        })) ?? null,
+        ranges?.map((range, k) => ({ bubbleId: entries[k]!.id, ...range })) ??
+        null,
     };
-    for (const e of entries) units.set(e.bubble.id, unit);
+    for (const b of entries) units.set(b.id, unit);
   }
   return units;
+}
+
+/** Group ids already warned about, so a re-render does not repeat it. */
+const warnedGroups = new Set<string>();
+
+/**
+ * The group clip's words and each member's share of them. The raw
+ * alignment mirrors the text sent to ElevenLabs, so it is tried first; the
+ * normalized one spells out numerals and abbreviations ("10" as "ten") and
+ * can count differently. When neither count matches the members' text, the
+ * words come from the alignment a single bubble would use and `ranges` is
+ * null (the lead lights every word).
+ */
+function groupWords(
+  groupId: string,
+  ts: AudioTimestamps | undefined,
+  memberTexts: string[],
+): SpeechContent & { ranges: ReturnType<typeof memberWordRanges> } {
+  for (const alignment of [ts?.alignment, ts?.normalized_alignment]) {
+    if (!alignment) continue;
+    const speech = buildWordTimings(alignment);
+    const ranges = memberWordRanges(memberTexts, speech.words.length);
+    if (ranges) return { ...speech, ranges };
+  }
+  if (!warnedGroups.has(groupId)) {
+    warnedGroups.add(groupId);
+    console.warn(
+      `Joined balloons: group ${groupId}'s clip words do not match its members' text; the lead lights every word.`,
+    );
+  }
+  const speech = buildWordTimings(
+    ts?.normalized_alignment ?? ts?.alignment ?? null,
+  );
+  return { ...speech, ranges: null };
 }
 
 /**

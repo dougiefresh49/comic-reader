@@ -30,7 +30,7 @@ export interface Bubble {
   /** Joined balloons (`bubbles.group_id`, #451): members of one group share it; null when the balloon stands alone. */
   groupId: string | null;
   /** Play order on the page (`bubbles.sort_order`); the reader picks a group's lead by it. */
-  sortOrder?: number;
+  sortOrder: number;
   style?: {
     left: string;
     top: string;

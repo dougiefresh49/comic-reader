@@ -35,19 +35,31 @@ export interface PlayOptions {
   spans?: readonly WordSpan[];
 }
 
+/** Each loading element's latest seek target, read by its one listener. */
+const pendingSeek = new WeakMap<HTMLAudioElement, number>();
+
 /**
  * Moves `audio` to `seconds`. Before the metadata loads the element cannot
  * seek, so the time is set again on `loadedmetadata`; until then the spec
- * keeps it as the default playback start position.
+ * keeps it as the default playback start position. Taps while it loads
+ * replace the target, and only the last one is applied.
  */
 function seekWhenReady(audio: HTMLAudioElement, seconds: number) {
   audio.currentTime = seconds;
-  if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) return;
+  if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    pendingSeek.delete(audio);
+    return;
+  }
+  const listening = pendingSeek.has(audio);
+  pendingSeek.set(audio, seconds);
+  if (listening) return;
   audio.addEventListener(
     "loadedmetadata",
     () => {
-      if (Math.abs(audio.currentTime - seconds) > 0.05) {
-        audio.currentTime = seconds;
+      const target = pendingSeek.get(audio);
+      pendingSeek.delete(audio);
+      if (target !== undefined && Math.abs(audio.currentTime - target) > 0.05) {
+        audio.currentTime = target;
       }
     },
     { once: true },
