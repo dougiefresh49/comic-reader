@@ -12,10 +12,11 @@
 # `rg "pnpm generate-audio"`.
 #
 # LIMIT: the command is lexed the way a shell splits it, with quotes, comments,
-# backslash escapes and continued lines, but nothing is expanded: a variable
-# holding the command name, $(...), backticks, eval and heredoc bodies are read
-# as plain words. That is a known boundary (decisions row 204), not an
-# oversight: this is a seatbelt for a delegate who forgets, not a sandbox.
+# backslash escapes, continued lines, $(...) and heredoc bodies (each body
+# line read as a command), but nothing is expanded: a variable holding the
+# command name, backticks and eval are read as plain words. That is a known
+# boundary (decisions row 204), not an oversight: this is a seatbelt for a
+# delegate who forgets, not a sandbox.
 
 PAYLOAD=$(cat)
 COMMAND=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
@@ -45,12 +46,10 @@ block() {
 # Words are split on \037 below; no word of a command should ever glob.
 set -f
 M=$'\035' # the mark on a redirect operator word, which no quoted ">" can carry
+Q=$'\034' # the mark on a word that had quotes in it, so is no command name
 
-# Words that run the command after them rather than being it, compared on the
-# basename, plus a bare count or duration (`nice -n 10`, `timeout 30`). Both
-# executable finders read this one list: command_shape, and the sh -c unwrap
-# in segments(), which gets it as awk's `wrap`. No backslashes: awk -v would
-# eat them.
+# Words command_shape steps over, compared on the basename: they run the next
+# command rather than being it, or are a count (`nice -n 10`, `timeout 30`).
 WRAPPER='^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{]|!|if|then|elif|else|do|while|until|[0-9][0-9.]*[smhd]?)$'
 
 # --- the rule list, read once ---------------------------------------------
@@ -98,43 +97,46 @@ done <<<"$SCRIPT_FILES"
 
 # --- segment splitting ----------------------------------------------------
 
-# Print one segment per line, its words joined by \037, quotes removed and each
-# word whole: `NODE_OPTIONS="--import tsx"` is one word, not a `tsx` standing
-# where the executable goes. One pass, because quotes, comments and continued
-# lines decide what each other mean: a ; inside a quoted curl header is text;
-# a `# old command \` comment ends at its newline and does not swallow the
-# next line; a backslash-newline outside one joins a wrapped `cp x \` to its
-# destination. A redirect operator is its own word, marked with \035, so its
-# target is the next word; a quoted newline is kept as \036. One level of
-# `sh -c "..."` is unwrapped by lexing its word again at the end.
+# Print one segment per line, words joined by \037, quotes removed, each word
+# whole (`NODE_OPTIONS="--import tsx"` is one word). One pass, because quotes,
+# comments and continued lines decide what each other mean: a quoted ; is
+# text, a `# old \` comment ends at its newline, and a backslash-newline joins
+# `cp x \` to its destination. Marks: \035 starts a redirect operator word
+# (its target is the next word), \034 a word that had quotes, \036 stands for
+# a quoted newline. Lexed again at the end: an unquoted `sh -c` string, an
+# unquoted $(...), and each heredoc body line alone, so an apostrophe in a
+# body cannot swallow the commands after it.
 segments() {
-  printf '%s' "$1" | awk -v wrap="$WRAPPER" '
-    function endword() { if (inw) w[nw++] = cur; cur = ""; inw = 0 }
+  printf '%s' "$1" | awk '
+    function endword() {
+      if (inw && hdnext) { hd[nhd] = cur; hdd[nhd++] = hdnext == 2; hdnext = 0 }
+      if (inw) w[nw++] = (wq ? "\034" : "") cur
+      cur = ""; inw = 0; wq = 0
+    }
     function endseg(   i, j, line, b, sc) {
       endword()
       if (nw == 0) return
       line = w[0]
       for (i = 1; i < nw; i++) line = line "\037" w[i]
       print line
-      # Only when the shell is the executable, found the way command_shape
-      # finds it, so a quoted "bash" "-c" handed to printf is just text.
-      for (i = 0; depth == 0 && i < nw; i++) {
-        if (w[i] ~ /^(\035|-u$|--unset$|-C$|--chdir$)/) { i++; continue }
+      # Any unquoted shell word, so `pnpm exec bash -c` unwraps and a quoted
+      # "bash" "-c" handed to printf does not. Its options run up to its first
+      # other word: one holding a c (-c, -cl) makes that word the command
+      # string, and a -c after it (`bash script.sh -c`) belongs to the script.
+      for (i = 0; i < nw; i++) {
         b = w[i]; sub(/.*\//, "", b)
-        if (w[i] ~ /^(-|[A-Za-z_][A-Za-z0-9_]*=)/ || b ~ wrap) continue
-        # The options of the shell run up to its first other word: any of them
-        # holding a c (-c, -cl, -lc) makes that word the command string, and
-        # a -c after it (`bash script.sh -c`) is an argument to the script.
-        for (j = i + 1; b ~ /^(ba|z|k|da)?sh$/ && j < nw; j++) {
-          if (w[j] ~ /^-[a-zA-Z]*c[a-zA-Z]*$/) sc = 1
-          if (w[j] !~ /^-/) { if (sc) inner[ninner++] = w[j]; break }
+        if (w[i] ~ /^\034/ || b !~ /^(ba|z|k|da)?sh$/) continue
+        for (j = i + 1; j < nw; j++) {
+          b = w[j]; sub(/^\034/, "", b)
+          if (b ~ /^-[a-zA-Z]*c[a-zA-Z]*$/) sc = 1
+          if (b !~ /^-/) { if (sc) inner[ninner++] = b; break }
         }
-        break
+        sc = 0
       }
       split("", w); nw = 0
     }
-    function lex(s,   n, i, c, d, q, op) {
-      cur = ""; inw = 0; nw = 0; split("", w); q = ""
+    function lex(s,   n, i, j, c, d, e, q, op, dep, h, t) {
+      cur = ""; inw = 0; wq = 0; nw = 0; split("", w); q = ""; nhd = 0; hdnext = 0
       n = length(s)
       for (i = 1; i <= n; i++) {
         c = substr(s, i, 1); d = substr(s, i + 1, 1)
@@ -150,9 +152,40 @@ segments() {
           continue
         }
         if (c == "\\") { i++; if (d != "\n") { cur = cur d; inw = 1 }; continue }
-        if (c == "\047" || c == "\"") { q = c; inw = 1; continue }
+        if (c == "\047" || c == "\"") { q = c; inw = 1; wq = 1; continue }
         if (c == " " || c == "\t") { endword(); continue }
         if (c == "#" && !inw) { while (i < n && substr(s, i + 1, 1) != "\n") i++; continue }
+        if (c == "$" && d == "(") {
+          # Through the matching paren, quotes respected; the word keeps it.
+          dep = 1; t = ""
+          for (j = i + 2; j <= n && dep > 0; j++) {
+            e = substr(s, j, 1)
+            if (t == "\047") { if (e == "\047") t = ""; continue }
+            if (e == "\\") { j++; continue }
+            if (t == "\"") { if (e == "\"") t = ""; continue }
+            if (e == "\047" || e == "\"") t = e
+            else if (e == "(") dep++
+            else if (e == ")") dep--
+          }
+          inner[ninner++] = substr(s, i + 2, j - i - 2 - (dep == 0))
+          e = substr(s, i, j - i); gsub(/\n/, "\036", e)
+          cur = cur e; inw = 1; i = j - 1; continue
+        }
+        if (c == "\n") endword()
+        if (c == "\n" && nhd) {
+          # Each heredoc body line up to its delimiter (<<- strips tabs) is queued.
+          endseg()
+          for (h = 0; h < nhd; h++)
+            while (i < n) {
+              e = index(substr(s, i + 1), "\n")
+              t = e ? substr(s, i + 1, e - 1) : substr(s, i + 1)
+              i = e ? i + e : n
+              d = t; if (hdd[h]) sub(/^\t+/, "", d)
+              if (d == hd[h]) break
+              inner[ninner++] = t
+            }
+          nhd = 0; continue
+        }
         if (c ~ /[\n;|()]/ || (c == "&" && d != ">")) { endseg(); continue }
         if (c ~ /[<>&]/) {
           # 2> and 2>> name a file descriptor; the digits belong to the operator.
@@ -161,6 +194,9 @@ segments() {
           if (c == "&") { op = op d; i++; d = substr(s, i + 1, 1) }
           if (index(op, ">") && (d == ">" || d == "|" || d == "&")) { op = op d; i++ }
           else if (c == "<" && (d == "<" || d == "&" || d == ">")) { op = op d; i++ }
+          if (op ~ /<<$/ && substr(s, i + 1, 1) ~ /[-<]/) op = op substr(s, ++i, 1)
+          # << and <<- (not the <<< here-string): the next word is a delimiter.
+          if (op ~ /<<-?$/ && op !~ /<<</) hdnext = op ~ /-$/ ? 2 : 1
           w[nw++] = "\035" op
           continue
         }
@@ -170,9 +206,8 @@ segments() {
     }
     { all = (NR > 1 ? all "\n" : "") $0 }
     END {
-      gsub(/[\035\036\037]/, "", all)
-      depth = 0; lex(all)
-      depth = 1
+      gsub(/[\034\035\036\037]/, "", all)
+      lex(all)
       for (k = 0; k < ninner; k++) { s = inner[k]; gsub(/\036/, "\n", s); lex(s) }
     }'
 }
@@ -242,25 +277,34 @@ guarded_reason() {
   return 1
 }
 
-# Does this segment write files by the name of the command it runs? Only the
-# executable counts, so `rg "cp" src/lib/models.ts` is a search, not a copy;
-# `git mv` is the one subcommand that writes. -i is an in-place flag wherever
-# it sits in sed's options, so it is looked for in any word. Redirects are
-# checked on their own target in the loop below.
+# CN is word $1 as a command name: its basename, or empty when it had quotes
+# in it, because `rg "cp"` and printf 'bash' name no command. NI is the first
+# word after $1 that is not an option.
+cmd_name() {
+  CN=
+  [ "$1" -ge 0 ] || return 0
+  case "${RW[$1]}" in "$Q"*) ;; *) CN=${RW[$1]##*/} ;; esac
+}
+next_word() {
+  NI=$(($1 + 1))
+  while [ "$NI" -lt "${#W[@]}" ] && [[ ${W[NI]} == -* ]]; do NI=$((NI + 1)); done
+}
+
+# Does this segment write files by the name of a command in it? Any unquoted
+# word counts, wherever it sits (`xargs -I {} cp`, `find -exec cp`, `git mv`),
+# and so does sed or perl with an in-place -i anywhere in its options.
+# Redirects are checked on their own target in the loop below.
 is_write_segment() {
-  local t i
-  case "${EXE##*/}" in
-  tee | truncate | patch | dd | install | cp | mv) return 0 ;;
-  sed | perl)
-    for t in "${W[@]}"; do [[ $t =~ $INPLACE ]] && return 0; done
-    ;;
-  git)
-    for ((i = EXE_I + 1; i < ${#W[@]}; i++)); do
-      case "${W[i]}" in -*) ;; *) [ "${W[i]}" = mv ] && return 0 || return 1 ;; esac
-    done
-    ;;
-  esac
-  return 1
+  local i sed=0 inplace=0
+  for ((i = 0; i < ${#W[@]}; i++)); do
+    [[ ${W[i]} =~ $INPLACE ]] && inplace=1
+    cmd_name "$i"
+    case "$CN" in
+    tee | truncate | patch | dd | install | cp | mv) return 0 ;;
+    sed | perl) sed=1 ;;
+    esac
+  done
+  [ "$sed" = 1 ] && [ "$inplace" = 1 ]
 }
 INPLACE='^-[a-zA-Z]*i(=|$)'
 
@@ -275,6 +319,8 @@ SEGS=$(segments "$COMMAND" 2>/dev/null) || block "the command could not be lexed
 while IFS= read -r SEG || [ -n "$SEG" ]; do
   [ -z "$SEG" ] && continue
   IFS=$'\037'
+  RW=($SEG)
+  SEG=${SEG//$Q/}
   W=($SEG)
   IFS=' '
   # The text form the cmd: rules and the reader check match: words joined by
@@ -290,21 +336,31 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   # --- paid commands, unless this segment carries the override -----------
 
   if [ "$OVERRIDE" = 0 ]; then
-    # A .ts file this segment runs: the executable itself, or a word after a
-    # runner (tsx, node --import tsx, ./node_modules/.bin/tsx). `cat` or
-    # `git log` on the same file is not a run.
-    RUNS=()
-    RUNNER=-1
-    for ((i = 0; i < ${#W[@]}; i++)); do
-      case "${W[i]##*/}" in
-      tsx | node | ts-node | bun | vite-node | deno) [ "$RUNNER" -ge 0 ] || RUNNER=$i ;;
-      *.ts)
-        if [ "$i" = "$EXE_I" ] || { [ "$RUNNER" -ge 0 ] && [ "$RUNNER" -lt "$i" ]; }; then
-          RUNS[${#RUNS[@]}]=$(normalize_path "${W[i]}")
-        fi
-        ;;
-      esac
-    done
+    # The .ts file this segment runs: the executable itself, or the first .ts
+    # word after a runner (tsx, node, ./node_modules/.bin/tsx) that is the
+    # executable or what pnpm exec/dlx, npx or bunx runs. `rg tsx x.ts` and a
+    # second .ts handed to the script as an argument are not runs.
+    RUN=
+    r=$EXE_I
+    cmd_name "$r"
+    case "$CN" in
+    pnpm) next_word "$r" && case "${W[NI]}" in exec | dlx) next_word "$NI" && r=$NI ;; esac ;;
+    npx | bunx) next_word "$r" && r=$NI ;;
+    esac
+    cmd_name "$r"
+    case "$CN" in
+    *.ts) RUN=${W[r]} ;;
+    tsx | node | ts-node | bun | vite-node | deno)
+      for ((i = r + 1; i < ${#W[@]}; i++)); do
+        case "${W[i]}" in
+        --import | -r | --require | --loader) i=$((i + 1)) ;;
+        -*) ;;
+        *.ts) RUN=${W[i]} && break ;;
+        esac
+      done
+      ;;
+    esac
+    [ -n "$RUN" ] && RUN=$(normalize_path "$RUN")
 
     # A rule matches when its target does and every condition after `&&`
     # matches the text form. Rules are tried in list order.
@@ -317,9 +373,7 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
         if [ "$EXE" = pnpm ]; then
           for t in "${W[@]}"; do [ "$t" = "${R_NAME[k]}" ] && hit=1 && break; done
         fi
-        for p in "${RUNS[@]}"; do
-          case "$p" in "${R_FILE[k]}" | */"${R_FILE[k]}") hit=1 && break ;; esac
-        done
+        case "$RUN" in "${R_FILE[k]}" | */"${R_FILE[k]}") hit=1 ;; esac
       fi
       for ((j = R_FROM[k]; hit == 1 && j < R_TO[k]; j++)); do
         re=${PATS[j]}
