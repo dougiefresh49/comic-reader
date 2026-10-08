@@ -60,6 +60,15 @@ check patch-body-token 2 "$(patch "$(hunks src/a.ts)"$'\n'"+see x/../src/lib/tts
 # reach it.
 check patch-grep-color 2 "$(patch "$(hunks src/lib/models.ts)")" GREP_OPTIONS=--color=always
 check patch-grep-invert 2 "$(patch "$(hunks src/lib/models.ts)")" GREP_OPTIONS=-v
+# A patch token gets the suffix match an Edit path gets (#721): a path into
+# another checkout, and the second half of a repo root holding a space.
+check patch-other-checkout 2 "$(patch "$(hunks /tmp/other-checkout/src/lib/models.ts)")"
+check patch-root-with-space 2 "$(patch "$(hunks "/tmp/my repo/src/lib/models.ts")")"
+check patch-same-name-elsewhere 0 "$(patch "$(hunks src/other/models.ts xsrc/lib/models.ts)")"
+# A CRLF header: the \r survives jq and must not keep the token from matching.
+check patch-crlf-header 2 "$(patch $'*** Update File: src/lib/models.ts\r\n@@\r\n-old line\r\n+new line\r')"
+# A \r mid-path is a character of the path, not a split: main blocked this.
+check patch-cr-mid-path 2 "$(patch "$(hunks $'src/lib\r/../lib/models.ts')")"
 
 files=()
 i=1
