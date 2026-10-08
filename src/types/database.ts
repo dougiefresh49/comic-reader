@@ -1326,6 +1326,7 @@ export type Database = {
           p_alignment: Json;
           p_audio_storage_path: string;
           p_book_id: string;
+          p_group_id: string;
           p_issue_id: string;
           p_lead_id: string;
           p_member_ids: string[];

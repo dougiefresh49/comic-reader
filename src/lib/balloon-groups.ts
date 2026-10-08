@@ -54,7 +54,7 @@ export function boxFromStyle(
   };
 }
 
-/** Edge-to-edge distance, rounded to whole pixels; 0 when the boxes touch or overlap. */
+/** Edge-to-edge distance in pixels, unrounded; 0 when the boxes touch or overlap. */
 export function gapBetween(a: GroupBox, b: GroupBox): number {
   const dx = Math.max(
     0,
@@ -64,7 +64,7 @@ export function gapBetween(a: GroupBox, b: GroupBox): number {
     0,
     Math.max(a.y, b.y) - Math.min(a.y + a.height, b.y + b.height),
   );
-  return Math.round(Math.hypot(dx, dy));
+  return Math.hypot(dx, dy);
 }
 
 /** One page's balloon as the finder reads it. */

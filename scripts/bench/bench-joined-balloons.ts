@@ -401,7 +401,7 @@ async function loadPages(): Promise<Page[]> {
         panel: panelName.get(a.panel) ?? a.panel.slice(0, 8),
         a: a.id,
         b: b.id,
-        gap: a.box && b.box ? gapBetween(a.box, b.box) : null,
+        gap: a.box && b.box ? Math.round(gapBetween(a.box, b.box)) : null,
       });
     }
     out.push({
