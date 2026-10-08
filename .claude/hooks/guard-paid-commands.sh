@@ -14,10 +14,11 @@
 # LIMIT: the command is lexed the way a shell splits it, with quotes, comments,
 # backslash escapes, continued lines, $(...) and heredoc bodies (each body
 # line read as a command when a shell can read the body, #671; otherwise the
-# body is text, apart from each $(...) under an unquoted delimiter), but nothing is expanded: a variable holding the
-# command name, backticks and eval are read as plain words. That is a known
-# boundary (decisions row 204), not an oversight: this is a seatbelt for a
-# delegate who forgets, not a sandbox.
+# body is text, apart from each $(...) under an unquoted delimiter), but
+# nothing is expanded: a variable holding the command name, backticks and
+# eval are read as plain words. That is a known boundary (decisions row 204),
+# not an oversight: this is a seatbelt for a delegate who forgets, not a
+# sandbox.
 
 PAYLOAD=$(cat)
 COMMAND=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
@@ -233,7 +234,9 @@ segments() {
               e = index(substr(s, i + 1), "\n")
               t = e ? substr(s, i + 1, e - 1) : substr(s, i + 1)
               i = e ? i + e : n
-              d = t; if (hdd[h]) sub(/^\t+/, "", d)
+              # Under an unquoted delimiter bash joins a continued line before it
+              # compares, so `E\` then `OF` ends the body (#671).
+              d = hdq[h] ? t : p t; if (hdd[h]) sub(/^\t+/, "", d)
               if (d == hd[h]) { found = 1; break }
               if (t ~ /(^|[^\\])(\\\\)*\\$/) { p = p substr(t, 1, length(t) - 1); continue }
               ish[ninner] = 1; inner[ninner++] = p t; p = ""

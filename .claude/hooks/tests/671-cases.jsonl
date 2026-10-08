@@ -92,3 +92,5 @@
 {"id":"r2-1c quoted gh body of a curl write still passes","want":0,"cmd":"gh pr comment 1 --body \"curl -X POST https://api.elevenlabs.io/v1/x\""}
 {"id":"r2-2a body $ and ( split by a continued line","want":2,"cmd":"cat <<EOF\nlog: $\\\n(pnpm generate-audio)\nEOF","reason":"generate-audio synthesizes"}
 {"id":"r2-2b same split, quoted delimiter","want":0,"cmd":"cat <<'EOF'\nlog: $\\\n(pnpm generate-audio)\nEOF"}
+{"id":"r3-1a delimiter split by a continued line ends the body, paid after","want":2,"cmd":"cat <<EOF\nhi\nE\\\nOF\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"r3-1b quoted delimiter: no join, the body runs to the last EOF","want":0,"cmd":"cat <<'EOF'\nhi\nE\\\nOF\npnpm generate-audio\nEOF"}
