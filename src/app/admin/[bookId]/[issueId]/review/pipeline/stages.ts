@@ -45,6 +45,7 @@ export const STAGE_BLURBS: Record<Stage, string> = {
 
 export const STEP_STAGE: Record<PipelineStep, Stage> = {
   "roboflow-page-analyze": "detect",
+  "detect-spreads": "detect",
   "fetch-wiki-context": "detect",
   "character-lookahead": "detect",
   "review-clusters": "characters",
@@ -62,6 +63,7 @@ export const STEP_STAGE: Record<PipelineStep, Stage> = {
 
 export const STEP_LABELS: Record<PipelineStep, string> = {
   "roboflow-page-analyze": "Analyze pages",
+  "detect-spreads": "Find spreads",
   "fetch-wiki-context": "Fetch wiki context",
   "character-lookahead": "Character lookahead",
   "review-clusters": "Characters",

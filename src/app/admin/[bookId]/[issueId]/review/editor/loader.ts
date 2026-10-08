@@ -43,6 +43,7 @@ interface PageRow {
   width: number;
   height: number;
   reviewed_at: string | null;
+  spread_with_next: boolean;
 }
 
 interface BubbleRow {
@@ -173,7 +174,9 @@ export async function loadEditor(
       .order("sort_order"),
     supabaseAdmin
       .from("pages")
-      .select("number, width, height, reviewed_at", { count: "exact" })
+      .select("number, width, height, reviewed_at, spread_with_next", {
+        count: "exact",
+      })
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .order("number"),
@@ -262,6 +265,7 @@ export async function loadEditor(
         height: d.height,
         imageUrl: pageImageUrl(bookId, issueId, number),
         reviewedAt: dims.get(number)?.reviewed_at ?? null,
+        spreadWithNext: dims.get(number)?.spread_with_next ?? false,
       };
     });
 

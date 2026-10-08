@@ -17,6 +17,8 @@ export interface SrcPage {
   imageUrl: string;
   /** `pages.reviewed_at`: when the owner approved the page, or null. */
   reviewedAt: string | null;
+  /** `pages.spread_with_next`: this page and the next are one spread (#723). */
+  spreadWithNext: boolean;
 }
 
 export interface SrcPanel {

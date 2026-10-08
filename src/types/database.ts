@@ -842,6 +842,7 @@ export type Database = {
           issue_id: string;
           number: number;
           reviewed_at: string | null;
+          spread_with_next: boolean;
           storage_path: string | null;
           width: number;
         };
@@ -852,6 +853,7 @@ export type Database = {
           issue_id: string;
           number: number;
           reviewed_at?: string | null;
+          spread_with_next?: boolean;
           storage_path?: string | null;
           width: number;
         };
@@ -862,6 +864,7 @@ export type Database = {
           issue_id?: string;
           number?: number;
           reviewed_at?: string | null;
+          spread_with_next?: boolean;
           storage_path?: string | null;
           width?: number;
         };
