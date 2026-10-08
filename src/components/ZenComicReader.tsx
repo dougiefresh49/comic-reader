@@ -515,7 +515,11 @@ export default function ZenComicReader({
     if (autoAdvancePage) navigateNextRef.current?.();
   }, [autoAdvancePage]);
 
-  const { scheduleNext, cancelPending } = useAutoPlay(
+  const {
+    scheduleNext,
+    cancelPending,
+    pending: autoPlayPending,
+  } = useAutoPlay(
     voicedBubbles,
     autoPlayEnabled,
     playBubble,
@@ -681,6 +685,16 @@ export default function ZenComicReader({
     !captionShown &&
     panels.length > 0 &&
     voicedBubbles.length > 0;
+  // A clip plays, or auto-play waits out the gap before the next bubble or
+  // the page turn: the floating button is a pause, so it does not flash to
+  // play at every bubble boundary (#706).
+  const pageBeingRead = isPlaying || autoPlayPending;
+  // Pause stops; play again restarts from the page's first voiced bubble,
+  // like the panel HUD. stopAll fires no `ended`, so nothing schedules on.
+  const handleFloatingPause = () => {
+    stopAll();
+    cancelPending();
+  };
 
   return (
     <>
@@ -910,21 +924,39 @@ export default function ZenComicReader({
         {showFloatingPlay && (
           <button
             type="button"
-            onClick={handleFloatingPlay}
-            aria-label="Read this page to me"
+            onClick={pageBeingRead ? handleFloatingPause : handleFloatingPlay}
+            aria-label={pageBeingRead ? "Pause" : "Read this page to me"}
             className="absolute left-1/2 z-50 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-neutral-950/90 text-white backdrop-blur transition-colors hover:bg-neutral-900"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden
-            >
-              <path d="M8 5.14v13.72L19 12 8 5.14z" />
-            </svg>
+            {pageBeingRead ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden
+              >
+                <path d="M8 5.14v13.72L19 12 8 5.14z" />
+              </svg>
+            )}
           </button>
         )}
 
