@@ -6,19 +6,22 @@
 # It only ever reads the command string, never runs it.
 #
 # The command is walked one segment at a time (split on unquoted ; & && || |
-# ( ) and newlines, plus the inside of an `sh -c "..."`), because the override
-# and the thing it overrides have to be in the same segment. Without that,
+# ( ) and newlines, plus the inside of an `sh -c "..."`, an `env -S "..."` and
+# the remote command of an ssh), because the override and the thing it
+# overrides have to be in the same segment. Without that,
 # `echo LIVE_API_OK=1; pnpm generate-audio` would pass, and so would
 # `rg "pnpm generate-audio"`.
 #
 # LIMIT: the command is lexed the way a shell splits it, with quotes, comments,
 # backslash escapes, continued lines, $(...) and heredoc bodies (each body
-# line read as a command when a shell can read the body, #671; otherwise the
-# body is text, apart from each $(...) under an unquoted delimiter), but
-# nothing is expanded: a variable holding the command name, backticks and
-# eval are read as plain words. That is a known boundary (decisions row 204),
-# not an oversight: this is a seatbelt for a delegate who forgets, not a
-# sandbox.
+# line read as a command when a shell can read the body, #671: a shell word or
+# su on the line, sudo -s or -i, a quoted shell at command position, a pipe to
+# a shell on the line after the body, or a $(...) whose output runs, #694;
+# otherwise the body is text, apart from each $(...) under an unquoted
+# delimiter), but nothing is expanded: a variable holding the command name,
+# backticks and eval are read as plain words. That is a known boundary
+# (decisions row 204), not an oversight: this is a seatbelt for a delegate who
+# forgets, not a sandbox.
 
 PAYLOAD=$(cat)
 COMMAND=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
@@ -114,9 +117,10 @@ done <<<"$SCRIPT_FILES"
 # `cp x \` to its destination. Marks: \035 starts a redirect operator word
 # (its target is the next word), \034 a word that had quotes, \036 stands for
 # a quoted newline. Lexed again at the end: an unquoted `sh -c` string, an
-# unquoted $(...), and each heredoc body line alone when a shell reads the
-# body. Every body is stepped over line by line, so an apostrophe in it cannot
-# swallow the commands after it. Read as bytes (LC_ALL=C): every
+# `env -S` string, the words after an ssh host, an unquoted $(...), and each
+# heredoc body line alone when a shell reads the body. Every body is stepped
+# over line by line, so an apostrophe in it cannot swallow the commands after
+# it. Read as bytes (LC_ALL=C): every
 # character the lexer acts on is ASCII, and macOS awk in a UTF-8 locale stops
 # on some multibyte text (a `…` in a heredoc), which would block the command.
 segments() {
@@ -125,12 +129,21 @@ segments() {
       if (inw && hdnext) { hd[nhd] = cur; hdq[nhd] = wq; hdd[nhd++] = hdnext == 2; hdnext = 0 }
       # An unquoted word that can read a heredoc as commands, anywhere on the
       # physical line (`cat <<EOF | bash`), so the bodies that line opens are
-      # lexed as commands (#671).
-      else if (inw && !wq) { b = cur; sub(/.*\//, "", b); if (b ~ /^(sh|bash|zsh|ksh|dash|eval|source|\.|xargs|ssh)$/) lsh = 1 }
-      if (inw) w[nw++] = (wq ? "\034" : "") cur
+      # lexed as commands (#671). A quoted one counts at command position,
+      # where a shell runs "bash" as bash; as an argument it is text (#694).
+      else if (inw && (!wq || nw == 0)) { b = cur; sub(/.*\//, "", b); if (b ~ SH) lsh = 1 }
+      if (inw) { w[nw++] = (wq ? "\034" : "") cur; lp = 0 }
       cur = ""; inw = 0; wq = 0
     }
-    function endseg(   i, j, line, b, sc) {
+    # Where in option word b getopt finds its first letter from v, the
+    # letters that take a value (0 for none): `-vp` takes the next word as
+    # its value, `-p22` the rest of the word.
+    function vopt(b, v,   x) {
+      for (x = 2; x <= length(b); x++) if (index(v, substr(b, x, 1))) return x
+      return 0
+    }
+    function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
+    function endseg(   i, j, line, b, sc, x, v) {
       endword()
       if (nw == 0) return
       line = w[0]
@@ -142,14 +155,53 @@ segments() {
       # string, and a -c after it (`bash script.sh -c`) belongs to the script.
       for (i = 0; i < nw; i++) {
         b = w[i]; sub(/.*\//, "", b)
-        if (w[i] ~ /^\034/ || b !~ /^(ba|z|k|da)?sh$/) continue
-        for (j = i + 1; j < nw; j++) {
+        if (w[i] ~ /^\034/) continue
+        if (b ~ /^(ba|z|k|da)?sh$/) for (j = i + 1; j < nw; j++) {
           b = w[j]; sub(/^\034/, "", b)
           if (b ~ /^-[a-zA-Z]*c[a-zA-Z]*$/) sc = 1
           # Options that take the next word as their value (`-o pipefail`,
-          # `-eo pipefail`, `+O extglob`, `--rcfile x`) do not end the walk (#671).
-          if (b ~ /^([-+][a-zA-Z]*[oO]|--rcfile|--init-file)$/) { j++; continue }
-          if (b !~ /^-/) { if (sc) { ish[ninner] = 1; inner[ninner++] = b }; break }
+          # `-eo pipefail`, `+O extglob`, `--rcfile x`) do not end the walk
+          # (#671), and neither does an o bundled before or after the c
+          # (`-oc pipefail`, #694).
+          if (b ~ /^([-+][a-zA-Z]*[oO][a-zA-Z]*|--rcfile|--init-file)$/) { j++; continue }
+          if (b !~ /^-/) { if (sc) queue(b, 1); break }
+        }
+        # env -S splits its string into a command and runs it (#694).
+        else if (b == "env") for (j = i + 1; j < nw; j++) {
+          b = w[j]; sub(/^\034/, "", b)
+          if (b ~ /^-[^-]/ && (x = vopt(b, "uCPS"))) {
+            v = x < length(b) ? substr(b, x + 1) : w[++j]
+            if (substr(b, x, 1) == "S") { queue(v, 0); break }
+          } else if (b ~ /^--split-string(=|$)/) { queue(b ~ /=/ ? substr(b, 16) : w[++j], 0); break }
+          else if (b ~ /^--(unset|chdir)$/) j++
+          else if (b !~ /^-/) break
+        }
+        # ssh joins the words after its host and a shell on the host runs them
+        # (#694). Its options that take a value are stepped over to find the host.
+        else if (b == "ssh") {
+          for (j = i + 1; j < nw; j++) {
+            b = w[j]; sub(/^\034/, "", b)
+            if (b !~ /^-/) break
+            if (vopt(b, "BbcDEeFIiJLlmOopQRSWw") == length(b)) j++
+          }
+          v = ""
+          for (j++; j < nw; j++) {
+            if (w[j] ~ /^\035/) { j++; continue }
+            b = w[j]; sub(/^\034/, "", b); v = v (v == "" ? "" : " ") b
+          }
+          if (v != "") queue(v, 1)
+        }
+        # sudo -s, -i, --shell or --login hands a heredoc to a shell (#694);
+        # its options end at the command, past the value of each.
+        else if (b == "sudo") for (j = i + 1; j < nw; j++) {
+          b = w[j]
+          if (b ~ /^--(shell|login)$/) lsh = 1
+          else if (b ~ /^--(user|group|prompt|chdir|host|role|type|other-user|close-from|chroot|command-timeout)$/) j++
+          else if (b ~ /^-[^-]/) {
+            x = vopt(b, "ugpChDUrtRT")
+            if (substr(b, 1, x ? x - 1 : length(b)) ~ /[is]/) lsh = 1
+            if (x == length(b)) j++
+          } else if (b !~ /^-/) break
         }
         sc = 0
       }
@@ -192,9 +244,13 @@ segments() {
       return j
     }
     # sh is the shell context: s came from a -c string or a shell-fed body.
+    # A $(...) whose output a shell runs is lexed in shell context, so a cat
+    # heredoc inside it is commands (#694): at command position, or anywhere
+    # on a line holding a shell word (`eval "$(...)"`, `echo "$(...)" | bash`).
+    # ls0 is where the queue for this line starts.
     function lex(s, top, sh,   n, i, j, c, d, e, q, op, h, t, p, fed, n0, found, bt, x) {
       cur = ""; inw = 0; wq = 0; nw = 0; split("", w); q = ""; nhd = 0; hdnext = 0
-      ctx = sh; lsh = 0
+      ctx = sh; lsh = 0; lp = 0; ls0 = ninner
       n = length(s)
       for (i = 1; i <= n; i++) {
         c = substr(s, i, 1); d = substr(s, i + 1, 1)
@@ -206,6 +262,7 @@ segments() {
           if (c == "\"") { q = ""; continue }
           if (c == "$" && d == "(") {
             j = subst(s, i, n, top); e = substr(s, i, j - i); gsub(/\n/, "\036", e)
+            if (nw == 0 && cur == "") ish[ninner - 1] = 1
             cur = cur e; i = j - 1; continue
           }
           if (c == "\\" && d == "\n") { i++; continue }
@@ -219,9 +276,15 @@ segments() {
         if (c == "#" && !inw) { while (i < n && substr(s, i + 1, 1) != "\n") i++; continue }
         if (c == "$" && d == "(") {
           j = subst(s, i, n, top); e = substr(s, i, j - i); gsub(/\n/, "\036", e)
+          if (nw == 0 && cur == "") ish[ninner - 1] = 1
           cur = cur e; inw = 1; i = j - 1; continue
         }
-        if (c == "\n") { endword(); fed = lsh || ctx; lsh = 0 }
+        if (c == "\n") {
+          # endseg, not endword: its sudo -s check sets lsh.
+          endseg(); fed = lsh || ctx
+          if (lsh) for (x = ls0; x < ninner; x++) ish[x] = 1
+          lsh = 0; ls0 = ninner
+        }
         if (c == "\n" && nhd) {
           # Each heredoc body line up to its delimiter (<<- strips tabs) is
           # queued, a line ending in an unescaped backslash joined to the next.
@@ -243,6 +306,12 @@ segments() {
             }
             if (p != "") { ish[ninner] = 1; inner[ninner++] = p }
             p = ""
+            # `cat <<EOF |` with a shell on the line after the body: bash
+            # carries the pipeline on there, so the last body is fed (#694).
+            if (lp && h == nhd - 1) {
+              t = substr(s, i + 1); sub(/^[ \t]*/, "", t); sub(/[ \t\n;&|()<>].*/, "", t)
+              gsub(/[\047"]/, "", t); sub(/.*\//, "", t); if (t ~ SH) fed = 1
+            }
             if (found && !fed) {
               # With an unquoted delimiter, a $(...) in the body still runs
               # (`log: $(cmd)` under cat <<EOF), so each one is queued. The
@@ -255,9 +324,11 @@ segments() {
               }
             }
           }
-          nhd = 0; continue
+          nhd = 0; lp = 0; ls0 = ninner; continue
         }
-        if (c ~ /[\n;|()]/ || (c == "&" && d != ">")) { endseg(); continue }
+        if (c ~ /[\n;|()]/ || (c == "&" && d != ">")) {
+          endseg(); lp = c == "|" && d != "|" && substr(s, i - 1, 1) != "|"; continue
+        }
         if (c ~ /[<>&]/) {
           # 2> and 2>> name a file descriptor; the digits belong to the operator.
           if (c != "&" && inw && cur ~ /^[0-9]+$/) { op = cur; cur = ""; inw = 0 } else { endword(); op = "" }
@@ -279,9 +350,11 @@ segments() {
       # whatever came after may be a command: exit 3 so the caller blocks.
       if (q != "" && top) bad = 1
       endseg()
+      if (lsh) for (x = ls0; x < ninner; x++) ish[x] = 1
     }
     # Numeric from the start: an unset ninner indexes ish[] as "", not 0.
-    BEGIN { ninner = 0 }
+    # SH: a word that can read a heredoc as commands.
+    BEGIN { ninner = 0; SH = "^(sh|bash|zsh|ksh|dash|eval|source|\\.|xargs|ssh|su)$" }
     { all = (NR > 1 ? all "\n" : "") $0 }
     END {
       gsub(/[\034\035\036\037]/, "", all)
@@ -316,9 +389,11 @@ command_shape() {
     -*)
       # An option that takes the next word as its value, for the wrapper it
       # follows: `timeout -s KILL 60` runs no KILL (#671). Per wrapper, since
-      # `sudo -s` takes none.
+      # `sudo -s` takes none. Long forms too (#694); `--opt=value` is one word.
       case "$wrap:$t" in
-      timeout:-s | timeout:--signal | timeout:-k | timeout:--kill-after | sudo:-[ugpChDUrt] | xargs:-[ILnPdEas] | stdbuf:-[ioe]) skip=1 ;;
+      timeout:-s | timeout:--signal | timeout:-k | timeout:--kill-after | sudo:-[ugpChDUrtRT] | xargs:-[ILnPdEas] | stdbuf:-[ioe]) skip=1 ;;
+      sudo:--user | sudo:--group | sudo:--prompt | sudo:--host | sudo:--role | sudo:--type | sudo:--other-user | sudo:--close-from | sudo:--chroot | sudo:--command-timeout) skip=1 ;;
+      xargs:--delimiter | xargs:--max-args | xargs:--max-procs | xargs:--arg-file | xargs:--max-chars | xargs:--process-slot-var | stdbuf:--input | stdbuf:--output | stdbuf:--error) skip=1 ;;
       esac
       continue
       ;;
@@ -405,14 +480,14 @@ is_write_segment() {
 INPLACE='^-[a-zA-Z]*i(=|$)'
 
 # Where a cp or install run as the executable writes: its -t directory (TD),
-# else its last word that is no option or redirect (DEST). Known miss: an
-# option value after the destination (`install x dest -m 644`) is read as it.
+# else its last word that is no option, option value or redirect (DEST), so
+# `install x dest -m 644` writes dest (#694).
 copy_dest() {
   local i
   DEST= TD=
   for ((i = EXE_I + 1; i < ${#W[@]}; i++)); do
     case "${W[i]}" in
-    "$M"*) i=$((i + 1)) ;;
+    "$M"* | -m | --mode | -o | --owner | -g | --group | -S | --suffix) i=$((i + 1)) ;;
     -t | --target-directory) TD=${W[i + 1]} && i=$((i + 1)) ;;
     --target-directory=*) TD=${W[i]#*=} ;;
     -t?*) TD=${W[i]#-t} ;;
@@ -481,10 +556,12 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     case "$CN" in
     pnpm)
       # pnpm runs a bin, or a .ts file, when no script has that name (#671).
-      # Its options that take a value (`-C /tmp/wt`) are stepped over with it.
+      # Its options that take a value (`-C /tmp/wt`) are stepped over with it,
+      # and so is `run`: with no script by that name, pnpm run tsx runs the
+      # bin (#694).
       NI=$((r + 1))
-      while [[ ${W[NI]} == -* ]]; do
-        case "${W[NI]}" in -C | --dir | --filter | -F | --workspace-dir) NI=$((NI + 1)) ;; esac
+      while [[ ${W[NI]} == -* || ${W[NI]} == run || ${W[NI]} == run-script ]]; do
+        case "${W[NI]}" in -C | --dir | --filter | -F | --workspace-dir | --loglevel | --reporter | --filter-prod | --test-pattern | --changed-files-ignore-pattern | --workspace-concurrency) NI=$((NI + 1)) ;; esac
         NI=$((NI + 1))
       done
       case "${W[NI]##*/}" in
@@ -539,12 +616,13 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
       fi
       if [ "${R_KIND[k]}" = script ]; then
         # A pnpm segment with the script name as a word, so quoting and pnpm
-        # options do not hide it, or a direct run of the script's file.
+        # options do not hide it, or a direct run of the script's file, matched
+        # on the basename so a run from inside scripts/ counts (#694).
         hit=0
         if [ "$EXE" = pnpm ]; then
           for t in "${W[@]}"; do [ "$t" = "${R_NAME[k]}" ] && hit=1 && break; done
         fi
-        case "$RUN" in "${R_FILE[k]}" | */"${R_FILE[k]}") hit=1 ;; esac
+        [ -n "$RUN" ] && [ "${RUN##*/}" = "${R_FILE[k]##*/}" ] && hit=1
       fi
       for ((j = R_FROM[k]; hit == 1 && j < R_TO[k]; j++)); do
         re="^(${PATS[j]})" hit=0
