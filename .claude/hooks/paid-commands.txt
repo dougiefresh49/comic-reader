@@ -5,8 +5,10 @@
 #   script:<name> :: <reason>            a pnpm run of that script name, or a
 #                                       direct run of the file it runs
 #   script:<name> && <ere> :: <reason>   that script, and the flag has to be
-#                                       there too
-#   cmd:<ere> :: <reason>                anything else, matched as written
+#                                       there too: one word starts with a
+#                                       match of the ere
+#   cmd:<ere> :: <reason>                anything else, matched against the
+#                                       segment's text from its executable on
 #   cmd:<ere> && <ere> :: <reason>       several conditions, all must hold
 #   file:<path> :: <reason>              an Edit, Write or shell write to that
 #                                       path is guarded
@@ -38,12 +40,12 @@ script:apply-fixes ::Paid: apply-fixes writes production rows. Re-run it as LIVE
 # and the method is not GET. The method is spelled out in character classes
 # because macOS grep has no case-insensitive mode, and it allows -X, --request,
 # an = separator, a quoted method and an attached value.
-cmd:curl.*api\.elevenlabs\.io && .*(-[Xx][[:space:]]*=*[[:space:]]*[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|--request(=|[[:space:]]+)[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|(-[dFT][[:space:]\"']|-[dFT][^[:space:]]|--data|--form|--upload-file)) :: Paid: that is a write against the ElevenLabs API, not a GET. Re-run it as LIVE_API_OK=1 curl ... only if the task named that spend.
+cmd:^([^[:space:]]*/)?curl[[:space:]].*api\.elevenlabs\.io &&.*(-[Xx][[:space:]]*=*[[:space:]]*[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|--request(=|[[:space:]]+)[\"']?([Pp][Oo][Ss][Tt]|[Pp][Uu][Tt]|[Pp][Aa][Tt][Cc][Hh]|[Dd][Ee][Ll][Ee][Tt][Ee])|(-[dFT][[:space:]\"']|-[dFT][^[:space:]]|--data|--form|--upload-file)) :: Paid: that is a write against the ElevenLabs API, not a GET. Re-run it as LIVE_API_OK=1 curl ... only if the task named that spend.
 
 # The smoke run has no package script; it runs through pnpm exec tsx, and only
-# --real makes it spend.
-cmd:smoke-ingest\.ts && --real([^[:alnum:]_-]|$) :: Paid: smoke-ingest --real runs the pipeline with real Gemini, ElevenLabs and Roboflow calls. Re-run it as LIVE_API_OK=1 pnpm exec tsx scripts/smoke-ingest.ts --real ... only if the task named that spend.
-cmd:voice-lab-import\.ts && --describe([^[:alnum:]_-]|$) :: Paid: voice-lab-import --describe makes one Gemini call per voice lookup not stored yet. Re-run it as LIVE_API_OK=1 pnpm exec tsx scripts/voice-lab-import.ts --describe ... only if the task named that spend.
+# --real makes it spend. A script: rule still covers a run of
+# scripts/<name>.ts, so a grep for the flag or a quoted command line is no run.
+script:smoke-ingest && --real([^[:alnum:]_-]|$) :: Paid: smoke-ingest --real runs the pipeline with real Gemini, ElevenLabs and Roboflow calls. Re-run it as LIVE_API_OK=1 pnpm exec tsx scripts/smoke-ingest.ts --real ... only if the task named that spend.
 
 file:src/lib/models.ts :: Paid: this file holds the Gemini model ids and caps. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.
 file:src/lib/voice-settings.ts :: Paid: this file holds the voice settings for paid synthesis. Edit it as CREDIT_OVERRIDE=1 only if the task named that spend.

@@ -1,0 +1,79 @@
+{"id":"1a pnpm runs the tsx bin on a paid script","want":2,"cmd":"pnpm tsx scripts/generate-audio.ts","reason":"generate-audio synthesizes"}
+{"id":"1b pnpm runs the node bin with --import tsx","want":2,"cmd":"pnpm node --import tsx scripts/ingest.ts","reason":"ingest resumes"}
+{"id":"1c pnpm runs a .ts file by path","want":2,"cmd":"pnpm scripts/generate-audio.ts"}
+{"id":"1d pnpm tsx on a free script","want":0,"cmd":"pnpm tsx scripts/check.ts"}
+{"id":"1e pnpm script that is no runner","want":0,"cmd":"pnpm typecheck"}
+{"id":"2a timeout -s value is no executable","want":2,"cmd":"timeout -s KILL 60 pnpm generate-audio"}
+{"id":"2b timeout --signal value","want":2,"cmd":"timeout --signal KILL 60 pnpm generate-audio"}
+{"id":"2c timeout -k value","want":2,"cmd":"timeout -k 5 -s TERM 60 pnpm generate-audio"}
+{"id":"2d timeout attached -sKILL","want":2,"cmd":"timeout -sKILL 60 pnpm generate-audio"}
+{"id":"2e sudo -s takes no value","want":2,"cmd":"sudo -s pnpm generate-audio"}
+{"id":"2f sudo -g value","want":2,"cmd":"sudo -g staff pnpm generate-audio"}
+{"id":"2g xargs -I value","want":2,"cmd":"xargs -I X pnpm generate-audio --book X"}
+{"id":"2h xargs -E value","want":2,"cmd":"xargs -E END pnpm generate-audio"}
+{"id":"2i stdbuf -o value","want":2,"cmd":"stdbuf -o L pnpm generate-audio"}
+{"id":"2j timeout -s on a free script","want":0,"cmd":"timeout -s KILL 60 pnpm typecheck"}
+{"id":"3a quoted runner after pnpm exec","want":2,"cmd":"pnpm exec \"tsx\" scripts/ingest.ts"}
+{"id":"3b quoted runner after npx","want":2,"cmd":"npx 'tsx' scripts/generate-audio.ts"}
+{"id":"3c quoted runner as the executable","want":2,"cmd":"\"tsx\" scripts/generate-audio.ts"}
+{"id":"3d quoted runner word in a grep","want":0,"cmd":"grep \"tsx\" scripts/ingest.ts"}
+{"id":"4a --experimental-loader value is no script","want":2,"cmd":"node --experimental-loader ./x.ts scripts/ingest.ts"}
+{"id":"4b --experimental-loader attached","want":2,"cmd":"node --experimental-loader=./x.ts scripts/ingest.ts"}
+{"id":"4c --experimental-loader on a free script","want":0,"cmd":"node --experimental-loader ./x.ts scripts/check.ts"}
+{"id":"5a bash -o value before -c","want":2,"cmd":"bash -o pipefail -c 'pnpm generate-audio'"}
+{"id":"5b bash -O value before -c","want":2,"cmd":"bash -O extglob -c 'pnpm generate-audio'"}
+{"id":"5c bash --rcfile value before -c","want":2,"cmd":"bash --rcfile x -c 'pnpm generate-audio'"}
+{"id":"5d bash +o value before -c","want":2,"cmd":"bash +o histexpand -c 'pnpm generate-audio'"}
+{"id":"5e bash --init-file value before -c","want":2,"cmd":"bash --init-file x -c 'pnpm generate-audio'"}
+{"id":"5i bundled -eo value before -c","want":2,"cmd":"bash -eo pipefail -c 'pnpm generate-audio'"}
+{"id":"5f sh -o value before a -c write","want":2,"cmd":"sh -o errexit -c 'cp /tmp/x src/lib/models.ts'"}
+{"id":"5g bash -o -c on a free script","want":0,"cmd":"bash -o pipefail -c 'pnpm typecheck'"}
+{"id":"5h -c after the script belongs to the script","want":0,"cmd":"bash -o pipefail script.sh -c 'pnpm generate-audio'"}
+{"id":"6a backslashed cp onto a guarded file","want":2,"cmd":"\\cp x src/lib/models.ts"}
+{"id":"6b command with a backslashed cp","want":2,"cmd":"command \\cp x src/lib/models.ts"}
+{"id":"7a grep for the smoke real flag","want":0,"cmd":"grep -n -- \"--real\" scripts/smoke-ingest.ts"}
+{"id":"7a gh body quotes the smoke real run","want":0,"cmd":"gh issue comment 1 --body \"run pnpm exec tsx scripts/smoke-ingest.ts --real\""}
+{"id":"7a smoke real through pnpm exec tsx","want":2,"cmd":"pnpm exec tsx scripts/smoke-ingest.ts --real","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"7a smoke real through tsx","want":2,"cmd":"tsx scripts/smoke-ingest.ts --real","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"7a smoke without real","want":0,"cmd":"tsx scripts/smoke-ingest.ts --book smoke-test"}
+{"id":"7a voice-lab-import describe direct run","want":2,"cmd":"pnpm exec tsx scripts/voice-lab-import.ts --describe","reason":"--describe makes one Gemini call"}
+{"id":"7a grep for the describe flag","want":0,"cmd":"grep -n -- --describe scripts/voice-lab-import.ts"}
+{"id":"7b gh body quotes a curl write","want":0,"cmd":"gh issue comment 1 --body \"curl -X POST https://api.elevenlabs.io/v1/x\""}
+{"id":"7b echo of a curl write","want":0,"cmd":"echo curl -X POST https://api.elevenlabs.io/v1/x"}
+{"id":"7b curl with the method after a quoted url","want":2,"cmd":"curl \"https://api.elevenlabs.io/v1/x\" -X POST","reason":"write against the ElevenLabs API"}
+{"id":"7b sudo curl","want":2,"cmd":"sudo curl -X POST https://api.elevenlabs.io/v1/x"}
+{"id":"7b xargs curl","want":2,"cmd":"xargs curl -X POST https://api.elevenlabs.io/v1/x"}
+{"id":"7b curl by full path","want":2,"cmd":"/usr/bin/curl -X POST https://api.elevenlabs.io/v1/x"}
+{"id":"7b curl inside bash -c","want":2,"cmd":"bash -c 'curl -X POST https://api.elevenlabs.io/v1/x'"}
+{"id":"7b curl GET stays free","want":0,"cmd":"curl https://api.elevenlabs.io/v1/voices"}
+{"id":"7c cat heredoc body is text","want":0,"cmd":"cat <<'EOF'\npnpm backfill-balloon-groups --render\nEOF"}
+{"id":"7c gh body from a cat heredoc is text","want":0,"cmd":"gh issue create --title t --body \"$(cat <<'EOF'\nNever run this by hand:\npnpm generate-audio --book smoke-test\nEOF\n)\""}
+{"id":"7c bash reads its heredoc","want":2,"cmd":"bash <<EOF\npnpm generate-audio\nEOF"}
+{"id":"7c heredoc piped to bash","want":2,"cmd":"cat <<'EOF' | bash\npnpm generate-audio\nEOF"}
+{"id":"7c heredoc inside bash -c subst","want":2,"cmd":"bash -c \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\""}
+{"id":"7c a -c string is shell context, so its heredoc bodies are lexed","want":2,"cmd":"bash -c 'cat <<EOF\npnpm generate-audio\nEOF'"}
+{"id":"7c ssh reads its heredoc","want":2,"cmd":"ssh host <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"7c heredoc piped to xargs","want":2,"cmd":"cat <<'EOF' | xargs -I{} sh -c '{}'\npnpm generate-audio\nEOF"}
+{"id":"7c paid run after a text body","want":2,"cmd":"cat <<'EOF'\nok\nEOF\npnpm generate-audio"}
+{"id":"7c unclosed text body stays read as commands","want":2,"cmd":"cat <<EOF\npnpm generate-audio"}
+{"id":"7c ed heredoc still writes its file","want":2,"cmd":"ed -s src/lib/models.ts <<'EOF'\n,s/old/new/g\nw\nq\nEOF"}
+{"id":"8 dry run label path with a space before the flag","want":0,"cmd":"pnpm backfill-balloon-groups --labels \"/tmp/groups --execute.json\""}
+{"id":"8 quoted flag word","want":2,"cmd":"pnpm voice-rotation \"--execute\"","reason":"--execute renames or deletes"}
+{"id":"8 flag with a value","want":2,"cmd":"pnpm voice-rotation --execute=1"}
+{"id":"8 flag after --","want":2,"cmd":"pnpm voice-rotation -- --execute"}
+{"id":"8 smoke real flag as a word","want":2,"cmd":"pnpm exec tsx scripts/smoke-ingest.ts --real"}
+{"id":"8 render flag as a word","want":2,"cmd":"pnpm backfill-balloon-groups --render","reason":"--render makes one ElevenLabs call"}
+{"id":"8 flag only inside another word","want":0,"cmd":"pnpm voice-rotation --note=--execute"}
+{"id":"9a backup copy of a guarded file","want":0,"cmd":"cp src/lib/models.ts /tmp/bak.ts"}
+{"id":"9b backup copy with options","want":0,"cmd":"cp -p src/lib/models.ts /tmp/bak.ts"}
+{"id":"9c backup copy into a -t directory","want":0,"cmd":"cp -t /tmp src/lib/models.ts"}
+{"id":"9d backup copy into an attached --target-directory","want":0,"cmd":"cp --target-directory=/tmp src/lib/models.ts"}
+{"id":"9e copy onto a guarded file","want":2,"cmd":"cp /tmp/new.ts src/lib/models.ts"}
+{"id":"9f install onto a guarded file","want":2,"cmd":"install -m 644 /tmp/new.ts src/lib/models.ts"}
+{"id":"9g copy onto a guarded file after a redirect","want":2,"cmd":"cp /tmp/new.ts src/lib/models.ts 2>/dev/null"}
+{"id":"9h backup copy with a redirect onto a guarded file","want":2,"cmd":"cp src/lib/models.ts /tmp/bak.ts > src/lib/tts-request.ts"}
+{"id":"9i mv of a guarded file","want":2,"cmd":"mv src/lib/models.ts /tmp/bak.ts"}
+{"id":"9j xargs cp keeps every word","want":2,"cmd":"xargs cp src/lib/models.ts"}
+{"id":"9k find -exec cp keeps every word","want":2,"cmd":"find . -name x -exec cp src/lib/models.ts /tmp \\;"}
+{"id":"9l cp -t into src/lib passes as before (into-a-directory gap, out of scope)","want":0,"cmd":"cp -t src/lib /tmp/models.ts"}
+{"id":"9m backup copy, then a copy onto the file","want":2,"cmd":"cp src/lib/models.ts /tmp/bak.ts && cp /tmp/bak.ts src/lib/models.ts"}
