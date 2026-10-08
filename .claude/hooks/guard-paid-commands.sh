@@ -108,8 +108,9 @@ while IFS= read -r line || [ -n "$line" ]; do
   fi
   R_TO[NR_RULES]=${#PATS[@]} && NR_RULES=$((NR_RULES + 1))
 done < <(printf '%s\n' "$LIST_TEXT")
-# A read that failed part way, or a list emptied by mistake, leaves no rule to
-# check against; that is not a pass.
+# A list emptied by mistake, or a feed into the loop that never ran, leaves no
+# rule to check against; that is not a pass. (A read that failed part way is
+# the cat check above.)
 [ "$NR_RULES" -gt 0 ] || block "$LIST holds no script: or cmd: rule, so the paid-command list cannot be checked. Restore it from the repo."
 
 # A `script:` rule also covers a direct run of its file, which is the
@@ -583,7 +584,11 @@ case $? in
 *) block "the command could not be lexed, so the paid-command list could not be checked." ;;
 esac
 
+# printf always gives the loop one line, so a loop that ran sets SEEN; one whose
+# feed failed has checked nothing.
+SEEN=0
 while IFS= read -r SEG || [ -n "$SEG" ]; do
+  SEEN=1
   [ -z "$SEG" ] && continue
   IFS=$'\037'
   RW=($SEG)
@@ -746,5 +751,6 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     done
   fi
 done < <(printf '%s\n' "$SEGS")
+[ "$SEEN" = 1 ] || block "the command's segments could not be read, so the paid-command list could not be checked."
 
 exit 0
