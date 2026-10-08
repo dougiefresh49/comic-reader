@@ -542,7 +542,13 @@ export async function sortPageElements(
     gemini,
     pageImage,
     sortPrompt(imgW, imgH, panels, bubbles, handles),
-    { step: "sort-page-elements", bookId, issueId, pageNumber },
+    {
+      step: "sort-page-elements",
+      bookId,
+      issueId,
+      pageNumber,
+      serviceTier: "flex",
+    },
   );
 
   // Past the paid call: a Workflow retry would pay for Gemini again, so every

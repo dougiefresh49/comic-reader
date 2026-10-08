@@ -7,13 +7,14 @@
  * DRY_RUN the call runs and no row is written, since nothing was paid for.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
-import type {
-  EmbedContentParameters,
-  EmbedContentResponse,
-  GenerateContentParameters,
-  GenerateContentResponse,
-  GenerateContentResponseUsageMetadata,
-  GoogleGenAI,
+import {
+  type EmbedContentParameters,
+  type EmbedContentResponse,
+  type GenerateContentParameters,
+  type GenerateContentResponse,
+  type GenerateContentResponseUsageMetadata,
+  type GoogleGenAI,
+  ServiceTier,
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TablesInsert } from "~/types/database";
@@ -33,8 +34,11 @@ export type LlmCallMeta = {
   pageNumber?: number | null;
   /** ElevenLabs only; a Gemini row takes the model from the request. */
   model?: string | null;
-  /** Gemini: "standard" unless the request says otherwise (#104). */
-  serviceTier?: string | null;
+  /**
+   * Gemini: "standard" unless the request says otherwise. `"flex"` on
+   * `generateContentLogged` asks for the Flex tier with backoff (#104).
+   */
+  serviceTier?: "standard" | "flex" | null;
 };
 
 /**
@@ -59,6 +63,33 @@ export function ambientLlmMeta(fallbackStep: string): LlmCallMeta {
 }
 
 const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
+
+/** Flex bills half the standard rate for every model in the map (#104). */
+export const GEMINI_FLEX_PRICE_MULTIPLIER = 0.5;
+
+/** Flex retry policy (#104): full-jitter backoff, retries on 429, 503, timeout. */
+const FLEX_MAX_ATTEMPTS = 4;
+const FLEX_BACKOFF_BASE_MS = 1_000;
+const FLEX_BACKOFF_CAP_MS = 30_000;
+/** Client timeout per Flex attempt; Flex's latency target is 1 to 15 min. */
+const FLEX_ATTEMPT_TIMEOUT_MS = 240_000;
+/**
+ * Total Flex time per call, after which the one standard attempt starts.
+ * Workflow steps deploy with `maxDuration: 'max'` (`@workflow/next`
+ * builder, `.well-known/workflow/v1/config.json` `steps.maxDuration`),
+ * which is 300 s on the Vercel Hobby plan this project runs on (row 195 shows
+ * the plan). 180 s of Flex leaves 120 s for the standard attempt (the slowest
+ * standard sort call in `llm_calls` took 52.5 s) and the rest of the step.
+ * Under `pnpm dev` a step has no limit, and the deadline still holds.
+ */
+export const FLEX_DEADLINE_MS = 180_000;
+/**
+ * Client timeout on the standard attempt after Flex, so it ends with a row
+ * before the 300 s step limit kills the step mid-call and leaves none.
+ */
+const STANDARD_AFTER_FLEX_TIMEOUT_MS = 100_000;
+/** A Flex attempt shorter than this is not worth starting. */
+const FLEX_MIN_ATTEMPT_MS = 30_000;
 
 function baseRow(
   provider: "gemini" | "elevenlabs",
@@ -94,6 +125,12 @@ export function usageToRow(
 ): LlmCallInsert {
   const row = baseRow("gemini", model, meta);
   if (!usage) return row;
+  // The tier Google billed (`usageMetadata.serviceTier`, e.g. "flex") wins
+  // over the one requested, so a row never claims a discount it did not get.
+  // The API sends it; the SDK's 1.x types do not declare it.
+  const billedTier = (usage as { serviceTier?: unknown }).serviceTier;
+  if (typeof billedTier === "string" && billedTier)
+    row.service_tier = billedTier;
   const tokensIn = usage.promptTokenCount ?? 0;
   const tokensOut = usage.candidatesTokenCount ?? 0;
   const tokensThinking = usage.thoughtsTokenCount ?? 0;
@@ -102,8 +139,10 @@ export function usageToRow(
   row.tokens_thinking = tokensThinking;
   const rate = GEMINI_USD_PER_1M_TOKENS[model];
   if (rate) {
+    const tier = row.service_tier === "flex" ? GEMINI_FLEX_PRICE_MULTIPLIER : 1;
     row.usd_est = round5(
-      (tokensIn * rate.input + (tokensOut + tokensThinking) * rate.output) /
+      (tier *
+        (tokensIn * rate.input + (tokensOut + tokensThinking) * rate.output)) /
         1e6,
     );
   }
@@ -186,11 +225,147 @@ type GenerateClient = {
 };
 type EmbedClient = { models: Pick<GoogleGenAI["models"], "embedContent"> };
 
+/**
+ * Pure: milliseconds from a `Retry-After` value (delay seconds or an HTTP
+ * date), or null when it is missing or unreadable.
+ */
+export function parseRetryAfter(
+  value: string | null | undefined,
+  now = Date.now(),
+): number | null {
+  if (!value?.trim()) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? null : Math.max(0, date - now);
+}
+
+/** What failed on one Flex attempt. `status` is the SDK `ApiError` status. */
+export type FlexFailure = {
+  status?: number;
+  timedOut?: boolean;
+  retryAfter?: string | null;
+};
+
+/**
+ * Pure: what follows failed Flex attempt `attempt` (1-based). A number is
+ * the wait in ms before the next Flex attempt; "standard" ends Flex and makes
+ * the one standard attempt; "throw" rethrows. Only 429, 503 and a client
+ * timeout retry. The wait is full jitter on base 1 s, cap 30 s, or the
+ * `Retry-After` delay when there is one. Flex ends after 4 attempts, or when
+ * the wait would leave less than 30 s before the Flex deadline.
+ */
+export function flexRetryWait(
+  failure: FlexFailure,
+  attempt: number,
+  remainingMs: number,
+  random: () => number = Math.random,
+  now = Date.now(),
+): number | "standard" | "throw" {
+  const retryable =
+    failure.timedOut === true ||
+    failure.status === 429 ||
+    failure.status === 503;
+  if (!retryable) return "throw";
+  if (attempt >= FLEX_MAX_ATTEMPTS) return "standard";
+  const backoff =
+    random() *
+    Math.min(FLEX_BACKOFF_CAP_MS, FLEX_BACKOFF_BASE_MS * 2 ** (attempt - 1));
+  const wait = Math.round(parseRetryAfter(failure.retryAfter, now) ?? backoff);
+  return remainingMs - wait < FLEX_MIN_ATTEMPT_MS ? "standard" : wait;
+}
+
+/**
+ * The SDK's `ApiError` carries `status` and the error body as its message,
+ * not the response headers, so `Retry-After` is out of reach. A Gemini 429
+ * body may carry `google.rpc.RetryInfo` with `retryDelay: "17s"`; that delay
+ * stands in for it, in seconds.
+ */
+function flexFailure(err: unknown): FlexFailure {
+  const status = (err as { status?: unknown } | null)?.status;
+  const message = err instanceof Error ? err.message : "";
+  return {
+    status: typeof status === "number" ? status : undefined,
+    // The SDK aborts the fetch at `httpOptions.timeout`, and nothing else here
+    // aborts it.
+    timedOut: err instanceof Error && err.name === "AbortError",
+    retryAfter: /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(message)?.[1],
+  };
+}
+
+/**
+ * Flex attempts with backoff, then one standard attempt. Each attempt is a
+ * paid request with its own row. The SDK retries only when the client was
+ * built with `httpOptions.retryOptions` (`ApiClient.apiCall`), which ours
+ * are not, so nothing stacks on this loop.
+ */
+async function generateFlex(
+  gemini: GenerateClient,
+  params: GenerateContentParameters,
+  meta: LlmCallMeta,
+): Promise<GenerateContentResponse> {
+  const flexMeta: LlmCallMeta = { ...meta, serviceTier: "flex" };
+  const deadline = Date.now() + FLEX_DEADLINE_MS;
+  for (let attempt = 1; ; attempt++) {
+    const timeout = Math.min(FLEX_ATTEMPT_TIMEOUT_MS, deadline - Date.now());
+    const flexParams: GenerateContentParameters = {
+      ...params,
+      config: {
+        ...params.config,
+        serviceTier: ServiceTier.FLEX,
+        httpOptions: { ...params.config?.httpOptions, timeout },
+      },
+    };
+    try {
+      return await logged(
+        () => gemini.models.generateContent(flexParams),
+        (res) => usageToRow(res?.usageMetadata, params.model, flexMeta),
+      );
+    } catch (err) {
+      const next = flexRetryWait(
+        flexFailure(err),
+        attempt,
+        deadline - Date.now(),
+      );
+      if (next === "throw") throw err;
+      console.warn(
+        `[gemini] ${meta.step} Flex attempt ${attempt} failed (${errorText(err).slice(0, 120)}); ` +
+          (next === "standard"
+            ? "one standard attempt"
+            : `retry in ${next} ms`),
+      );
+      if (next === "standard") break;
+      await new Promise((r) => setTimeout(r, next));
+    }
+  }
+  const standardMeta: LlmCallMeta = { ...meta, serviceTier: "standard" };
+  const standardParams: GenerateContentParameters = {
+    ...params,
+    config: {
+      ...params.config,
+      httpOptions: {
+        ...params.config?.httpOptions,
+        timeout: STANDARD_AFTER_FLEX_TIMEOUT_MS,
+      },
+    },
+  };
+  return logged(
+    () => gemini.models.generateContent(standardParams),
+    (res) => usageToRow(res?.usageMetadata, params.model, standardMeta),
+  );
+}
+
+/**
+ * One logged `generateContent`. `meta.serviceTier: "flex"` asks for Flex with
+ * backoff and a standard fallback (`generateFlex`); anything else is one
+ * standard request.
+ */
 export function generateContentLogged(
   gemini: GenerateClient,
   params: GenerateContentParameters,
   meta: LlmCallMeta,
 ): Promise<GenerateContentResponse> {
+  if (meta.serviceTier === "flex") return generateFlex(gemini, params, meta);
   return logged(
     () => gemini.models.generateContent(params),
     (res) => usageToRow(res?.usageMetadata, params.model, meta),
