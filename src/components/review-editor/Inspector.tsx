@@ -422,7 +422,7 @@ function ListenBlock({
           title={
             grouped
               ? "Uses ElevenLabs credits. The joined balloons render as one clip in their speaker's voice, and every balloon of the group plays it."
-              : undefined
+              : "Uses ElevenLabs credits."
           }
           onClick={(e) => {
             if (pointerClick(e)) actions.regenerate(b.id, "audio");
@@ -432,15 +432,15 @@ function ListenBlock({
             ? "Regenerating audio..."
             : grouped
               ? `${first} group audio (${view.groupSize} balloons)`
-              : `${first} audio (uses ElevenLabs credits)`}
+              : `${first} audio`}
         </button>
       </div>
-      {grouped && (
-        <p className="text-[11px] text-neutral-500">
-          Uses ElevenLabs credits. The group renders as one clip for all{" "}
-          {view.groupSize} balloons.
-        </p>
-      )}
+      <p className="text-[11px] text-neutral-500">
+        Uses ElevenLabs credits.
+        {grouped && (
+          <> The group renders as one clip for all {view.groupSize} balloons.</>
+        )}
+      </p>
       {lock ? (
         <p className="text-amber-300">{lock.reason}</p>
       ) : (
