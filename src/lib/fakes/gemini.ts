@@ -158,6 +158,13 @@ const MATCHERS: Array<{
     opening: "Consolidate these voice description snippets",
     respond: voiceDescription,
   },
+  {
+    // #343: no words outside the frames, so the filter's drop stands and a
+    // dry run keeps its count.
+    purpose: "bubble-group",
+    opening: "This picture is cut from a comic book page.",
+    respond: () => '{"outside": ""}',
+  },
 ];
 
 async function generateContent(params: { model: string; contents: unknown }) {
