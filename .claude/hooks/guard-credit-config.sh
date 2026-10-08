@@ -120,8 +120,8 @@ while IFS= read -r line || [ -n "$line" ]; do
         exit 2
       fi
     done
-  done <<<"$PATCH_LINES"
-done <<<"$LIST_TEXT"
+  done < <(printf '%s\n' "$PATCH_LINES")
+done < <(printf '%s\n' "$LIST_TEXT")
 # A list emptied by mistake, or one whose file: lines lost their paths, leaves
 # no rule to check against; that is not a pass.
 if [ "$NR_FILE_RULES" -eq 0 ]; then
