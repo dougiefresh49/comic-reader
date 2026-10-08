@@ -261,7 +261,7 @@ export async function runItem(args: {
         error: `Refused: the item is ${fresh.state}${fresh.refusals.length ? `: ${fresh.refusals.join("; ")}` : ""}.`,
       };
     }
-    // Casting-step clones need a target; request-sourced ones already have one.
+    // A speaker's clone or restore needs the voice it brings back.
     if (
       fresh.source !== "request" &&
       fresh.action !== "design" &&
@@ -271,7 +271,8 @@ export async function runItem(args: {
     // carryOut's claim writes the request on the item's row (inserting or
     // converting a casting-step row) and gives it back as it found it when
     // the run is refused or fails, so a made voice stays listed as "made"
-    // until accepted.
+    // until accepted. The guard measures against the plan the owner saw, not
+    // this re-plan.
     const result = await carryOut(
       deps,
       { ...fresh, designedVoices: item.designedVoices },
@@ -280,7 +281,7 @@ export async function runItem(args: {
     revalidate(scope);
     return describe(result);
   } catch (err) {
-    // Nothing to undo here; carryOut released before throwing.
+    // Nothing to undo: carryOut throws only after releasing its claim.
     revalidate(scope);
     return fail("running", err);
   }
