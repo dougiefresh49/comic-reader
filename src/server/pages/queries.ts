@@ -92,6 +92,7 @@ function rowToBubble(row: BubbleRow): Bubble {
     textGeometry: row.text_geometry ?? null,
     fillColor: row.fill_color ?? null,
     groupId: row.group_id ?? null,
+    sortOrder: row.sort_order,
     audioStoragePath: row.audio_storage_path ?? undefined,
   };
 }

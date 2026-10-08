@@ -28,11 +28,46 @@ export function findActiveWordIndex(
   return i;
 }
 
+/**
+ * A run of one clip's words that lights in one balloon of a joined group
+ * (#451): half-open `[start, end)` indexes into the clip's words.
+ */
+export type WordSpan = Readonly<{
+  bubbleId: string;
+  start: number;
+  end: number;
+}>;
+
+/**
+ * Where clip word `index` lights: the span holding it, with the index made
+ * relative to that span, else `bubbleId` with the index as it is.
+ */
+export function wordOwner(
+  spans: readonly WordSpan[] | undefined,
+  bubbleId: string,
+  index: number | null,
+): { bubbleId: string; index: number | null } {
+  if (index !== null && spans) {
+    for (const span of spans) {
+      if (index >= span.start && index < span.end) {
+        return { bubbleId: span.bubbleId, index: index - span.start };
+      }
+    }
+  }
+  return { bubbleId, index };
+}
+
 /** What the playing clip is doing, as the word highlight sees it. */
 export type WordHighlightSnapshot = Readonly<{
-  /** The bubble whose clip drives the highlight; null when nothing plays. */
+  /**
+   * The bubble the active word lights in; null when nothing plays. For a
+   * joined group (#451) that is the member speaking, not the clip's lead.
+   */
   bubbleId: string | null;
-  /** Index into that bubble's `buildWordTimings` words; null before the first. */
+  /**
+   * Index into that bubble's words (a group member's own slice of the clip's
+   * `buildWordTimings` words); null before the first.
+   */
   index: number | null;
   /** The clip is paused mid-bubble (the highlight holds). */
   paused: boolean;
@@ -112,17 +147,31 @@ export function useActiveWordIndex(
 export function useWordHighlight() {
   const [store] = useState(createWordHighlightStore);
   const rafRef = useRef<number | null>(null);
+  // The active index into the clip's words, kept across a pause and resume
+  // (each resume restarts the loop) and cleared when the highlight stops.
+  const activeRef = useRef<number | null>(null);
 
   const stopHighlight = useCallback(() => {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
+    activeRef.current = null;
     store.set(IDLE);
   }, [store]);
 
+  /**
+   * Drives the store from `audio`'s clock. `spans` splits a joined group's
+   * clip among its balloons (#451); without it every word lights in
+   * `bubbleId`.
+   */
   const startHighlight = useCallback(
-    (audio: HTMLAudioElement, words: WordTiming[], bubbleId: string) => {
+    (
+      audio: HTMLAudioElement,
+      words: WordTiming[],
+      bubbleId: string,
+      spans?: readonly WordSpan[],
+    ) => {
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current);
       }
@@ -130,22 +179,17 @@ export function useWordHighlight() {
       // The store only notifies on a change, so this per-frame tick costs a
       // render once per word (or per pause, resume or rate change).
       const tick = () => {
-        const prev = store.getSnapshot();
-        const paused = audio.paused && !audio.ended;
+        // Paused or ended: keep the index, so the current word stays lit.
+        if (!audio.paused && !audio.ended) {
+          activeRef.current = findActiveWordIndex(
+            words,
+            audio.currentTime,
+            activeRef.current,
+          );
+        }
         store.set({
-          bubbleId,
-          // Paused: keep the index, so the current word stays highlighted.
-          index:
-            audio.paused || audio.ended
-              ? prev.bubbleId === bubbleId
-                ? prev.index
-                : null
-              : findActiveWordIndex(
-                  words,
-                  audio.currentTime,
-                  prev.bubbleId === bubbleId ? prev.index : null,
-                ),
-          paused,
+          ...wordOwner(spans, bubbleId, activeRef.current),
+          paused: audio.paused && !audio.ended,
           rate: audio.playbackRate,
         });
         rafRef.current = requestAnimationFrame(tick);
