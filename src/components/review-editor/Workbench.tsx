@@ -213,6 +213,9 @@ const CANVAS_MIN = 320;
 
 /** How edits made here stand with localStorage. */
 type Kept = "kept" | "no-history" | "failed" | "stale";
+/** Why a stale tab's Save does nothing (#665). */
+const STALE_SAVE =
+  "Save is off in this tab: the issue was edited in another tab. Reload to pick up those edits.";
 
 function clampWidth(
   value: unknown,
@@ -494,7 +497,10 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   // last change, so typing never waits on a write. A write happens only when
   // the document or the history changed, and only over the revision this tab
   // last read or wrote: another tab's write since then makes this tab stale,
-  // and a stale tab never writes again.
+  // and a stale tab never writes again. A Save starting writes even when
+  // nothing changed (`force`), so it takes the stored revision and every
+  // other tab goes stale before it can store edits measured against the
+  // rows from before the Save (#665).
   const stateRef = useRef(state);
   const revRef = useRef(boot.rev);
   const writtenRef = useRef(boot.state);
@@ -503,35 +509,40 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     staleRef.current = true;
     setKept("stale");
   }, []);
-  const store = useCallback(() => {
-    const current = stateRef.current;
-    const written = writtenRef.current;
-    if (staleRef.current) return;
-    if (
-      written.doc === current.doc &&
-      written.base === current.base &&
-      written.past === current.past &&
-      written.future === current.future
-    )
-      return;
-    if (storedRev(readRaw(storeKey)) !== revRef.current) {
-      goStale();
-      return;
-    }
-    const rev = newId();
-    const packed = packState(current, rev);
-    // A full store keeps the edits and lets the history go.
-    const result: Kept = writeLocal(storeKey, packed)
-      ? "kept"
-      : writeLocal(storeKey, { ...packed, past: [], future: [] })
-        ? "no-history"
-        : "failed";
-    if (result !== "failed") {
-      revRef.current = rev;
-      writtenRef.current = current;
-    }
-    setKept(result);
-  }, [storeKey, goStale]);
+  const writeState = useCallback(
+    (force: boolean) => {
+      const current = stateRef.current;
+      const written = writtenRef.current;
+      if (staleRef.current) return;
+      if (
+        !force &&
+        written.doc === current.doc &&
+        written.base === current.base &&
+        written.past === current.past &&
+        written.future === current.future
+      )
+        return;
+      if (storedRev(readRaw(storeKey)) !== revRef.current) {
+        goStale();
+        return;
+      }
+      const rev = newId();
+      const packed = packState(current, rev);
+      // A full store keeps the edits and lets the history go.
+      const result: Kept = writeLocal(storeKey, packed)
+        ? "kept"
+        : writeLocal(storeKey, { ...packed, past: [], future: [] })
+          ? "no-history"
+          : "failed";
+      if (result !== "failed") {
+        revRef.current = rev;
+        writtenRef.current = current;
+      }
+      setKept(result);
+    },
+    [storeKey, goStale],
+  );
+  const store = useCallback(() => writeState(false), [writeState]);
   useEffect(() => {
     stateRef.current = state;
     const timer = window.setTimeout(store, 250);
@@ -887,6 +898,13 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         ok: false,
         error: "A Save is already running. Try again once it finishes.",
       };
+    // Another tab stored edits measured against the rows as they are now; a
+    // Save here would leave them to be restored over its rows on a reload.
+    if (staleRef.current || storedRev(readRaw(storeKey)) !== revRef.current) {
+      goStale();
+      say(STALE_SAVE, "warn");
+      return { ok: false, error: STALE_SAVE };
+    }
     const sent = state.doc;
     const edits = buildSave(state.base, sent);
     const count = saveCount(edits);
@@ -894,6 +912,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       say("Nothing to save.");
       return { ok: true, sent };
     }
+    // Take the stored revision before anything is sent. A refused write does
+    // not stop the Save: the "not being kept" banner already says so.
+    writeState(true);
     dispatch({ type: "saving" });
     savingRef.current = true;
     setSaving(true);
@@ -1766,9 +1787,13 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         )}
         <button
           type="button"
-          disabled={toWrite === 0 || !!lockReason}
+          disabled={toWrite === 0 || !!lockReason || kept === "stale"}
           onClick={() => void save()}
-          title={lockReason ?? "Save every pending edit (Cmd S)"}
+          title={
+            kept === "stale"
+              ? STALE_SAVE
+              : (lockReason ?? "Save every pending edit (Cmd S)")
+          }
           className="flex h-6 shrink-0 items-center gap-1.5 rounded-sm bg-neutral-100 px-2 font-medium text-neutral-950 hover:bg-white disabled:bg-neutral-800 disabled:font-normal disabled:text-neutral-500"
         >
           {saving ? "Saving" : "Save"}
@@ -1876,7 +1901,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             <div role="alert" className="flex items-center gap-3 px-3 py-1.5">
               <span className="flex-1">
                 This issue was edited in another tab. Nothing done here is being
-                kept. Reload to pick up the edits from the other tab.
+                kept, and Save is off in this tab. Reload to pick up the edits
+                from the other tab.
               </span>
               <button
                 type="button"
