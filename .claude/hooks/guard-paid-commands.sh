@@ -196,11 +196,24 @@ segments() {
     # Is b a long option of wrapper wr that takes the next word as its value.
     function vlong(b, wr) { return b ~ /^--[^,]+$/ && index(WL[wr], "," substr(b, 3) ",") }
     function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
-    # The env -S string v, at w[j], with the words after it joined on, up to
-    # the first redirect (#713).
-    function sjoin(v, j,   b) {
+    # The env -S string v, at w[j], with the words after it joined on (#713).
+    # A redirect and its target are stepped over, as bash strips them before
+    # env runs. env splits only v, so a joined word with a character a shell
+    # reads is single-quoted, to stay one word when re-lexed; a plain one stays
+    # bare, since a quoted word is never a command name (`env -S X=1 pnpm`).
+    # Joined from split, not gsub: awks differ on a backslash in a replacement.
+    function sjoin(v, j,   b, p, k, n) {
       sub(/^\034/, "", v)
-      for (j++; j < nw && w[j] !~ /^\035/; j++) { b = w[j]; sub(/^\034/, "", b); v = v " " b }
+      for (j++; j < nw; j++) {
+        if (w[j] ~ /^\035/) { j++; continue }
+        b = w[j]; sub(/^\034/, "", b)
+        if (b ~ /[^A-Za-z0-9_.\/:=@%+,-]/) {
+          n = split(b, p, "\047"); b = "\047" p[1]
+          for (k = 2; k <= n; k++) b = b "\047\\\047\047" p[k]
+          b = b "\047"
+        }
+        v = v " " b
+      }
       return v
     }
     # pipe: the segment ends in a pipe.
