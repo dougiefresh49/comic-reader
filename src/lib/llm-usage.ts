@@ -77,12 +77,17 @@ const FLEX_ATTEMPT_TIMEOUT_MS = 240_000;
  * Total Flex time per call, after which the one standard attempt starts.
  * Workflow steps deploy with `maxDuration: 'max'` (`@workflow/next`
  * builder, `.well-known/workflow/v1/config.json` `steps.maxDuration`),
- * which is 300 s on the Vercel Hobby plan (decisions row 195). 180 s of
- * Flex leaves 120 s for the standard attempt (the slowest standard sort call
- * in `llm_calls` took 52.5 s) and the rest of the step. Under `pnpm dev` a
- * step has no limit, and the deadline still holds.
+ * which is 300 s on the Vercel Hobby plan this project runs on (row 195 shows
+ * the plan). 180 s of Flex leaves 120 s for the standard attempt (the slowest
+ * standard sort call in `llm_calls` took 52.5 s) and the rest of the step.
+ * Under `pnpm dev` a step has no limit, and the deadline still holds.
  */
 export const FLEX_DEADLINE_MS = 180_000;
+/**
+ * Client timeout on the standard attempt after Flex, so it ends with a row
+ * before the 300 s step limit kills the step mid-call and leaves none.
+ */
+const STANDARD_AFTER_FLEX_TIMEOUT_MS = 100_000;
 /** A Flex attempt shorter than this is not worth starting. */
 const FLEX_MIN_ATTEMPT_MS = 30_000;
 
@@ -334,8 +339,18 @@ async function generateFlex(
     }
   }
   const standardMeta: LlmCallMeta = { ...meta, serviceTier: "standard" };
+  const standardParams: GenerateContentParameters = {
+    ...params,
+    config: {
+      ...params.config,
+      httpOptions: {
+        ...params.config?.httpOptions,
+        timeout: STANDARD_AFTER_FLEX_TIMEOUT_MS,
+      },
+    },
+  };
   return logged(
-    () => gemini.models.generateContent(params),
+    () => gemini.models.generateContent(standardParams),
     (res) => usageToRow(res?.usageMetadata, params.model, standardMeta),
   );
 }
