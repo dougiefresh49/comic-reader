@@ -22,7 +22,11 @@ export type BubbleDrop<T> = {
    * detections of one balloon disagree about where it extends (#343 review
    * cases 4 and 5). A container drop is also unsure when its counted boxes
    * span under `UNSURE_SPAN`, or when the span test counted two held
-   * detections of one balloon once. Always false for a twin.
+   * detections of one balloon once. A nested or twin drop is also unsure
+   * when every box it dropped for later dropped too, unless the boxes those
+   * dropped for sit inside it and span `UNSURE_SPAN` of it: a loose box
+   * under `TWIN_IOU` with its inner box survives the nested pass, can win a
+   * twin or nested drop, and then drop as a container itself (#652).
    */
   unsure: boolean;
 };
@@ -160,7 +164,8 @@ function spanShare(big: PanelBoundingBox, held: PanelBoundingBox[]): number {
  *    judged largest first against the ones still kept.
  *
  * A drop leaves its text to the boxes it drops for, all kept when it is
- * judged, though a twin's winner may still drop later as a container. A drop
+ * judged; a nested or twin drop whose boxes all drop later leaves it to what
+ * they dropped for, and is unsure unless those span it. A drop
  * marked `unsure` is still dropped, and the caller decides whether to look
  * again. The box units only need to agree with each other. Order is
  * preserved in `kept`, `dropped` and `drops`.
@@ -230,6 +235,23 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
         counted.length < innermost.length ||
         disputed(bubble, counted),
     });
+  }
+  // A nested or twin drop whose winners all dropped later as containers
+  // leaves its text to their carriers; unsure unless those span it.
+  for (const drop of drops.values()) {
+    if (drop.rule === "container" || drop.by.some((o) => !drops.has(o)))
+      continue;
+    const carriers = drop.by
+      .flatMap((w) => drops.get(w)!.by)
+      .filter((o) => !drops.has(o));
+    const covered =
+      carriers.length > 0 &&
+      carriers.every((o) => holds(drop.bubble, o)) &&
+      spanShare(
+        drop.bubble.bounding_box,
+        carriers.map((o) => o.bounding_box),
+      ) >= UNSURE_SPAN;
+    if (!covered) drop.unsure = true;
   }
   return {
     kept: bubbles.filter((b) => !drops.has(b)),
