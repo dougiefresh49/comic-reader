@@ -407,6 +407,7 @@ function ListenBlock({
           type="button"
           className={BUTTON + " h-7"}
           disabled={off}
+          title="Uses a Gemini call."
           onClick={(e) => {
             if (pointerClick(e)) actions.regenerate(b.id, "cues");
           }}
@@ -436,7 +437,7 @@ function ListenBlock({
         </button>
       </div>
       <p className="text-[11px] text-neutral-500">
-        Uses ElevenLabs credits.
+        Regenerating cues uses a Gemini call; audio uses ElevenLabs credits.
         {grouped && (
           <> The group renders as one clip for all {view.groupSize} balloons.</>
         )}
