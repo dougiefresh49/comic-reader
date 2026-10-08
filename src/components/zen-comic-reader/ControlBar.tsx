@@ -5,6 +5,8 @@ interface ControlBarProps {
   children?: React.ReactNode;
   pageNumber: number;
   pageCount: number;
+  /** The counter's printed number when it is not `pageNumber`: "8–9" on a spread (#724). */
+  pageLabel?: string;
   /** Panel mode shows its own cyan panel-progress bar — keep ONE progress story. */
   hidePageProgress?: boolean;
   /**
@@ -24,6 +26,7 @@ export function ControlBar({
   children,
   pageNumber,
   pageCount,
+  pageLabel,
   hidePageProgress = false,
   overlay = false,
   visible = true,
@@ -54,7 +57,7 @@ export function ControlBar({
             style={{ width: `${progress * 100}%` }}
           />
           <span className="absolute -top-5 right-2 text-[10px] text-neutral-500 tabular-nums">
-            {pageNumber}/{pageCount}
+            {pageLabel ?? pageNumber}/{pageCount}
           </span>
         </div>
       )}
