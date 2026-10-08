@@ -17,7 +17,9 @@ export type BubbleDrop<T> = {
    * detections of one balloon once; or a counted box holds a box reaching
    * past the container's edge; or a counted box is in a nested pair at
    * `TWIN_IOU` or more, spared by the twin pass, with a box the container
-   * does not hold. Always false for a twin.
+   * does not hold. The last two look at every box not dropped as a twin,
+   * including a larger one already dropped as a container. Always false
+   * for a twin.
    */
   unsure: boolean;
 };
@@ -204,17 +206,23 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
       counted.map((o) => o.bounding_box),
     );
     if (span < HOLD_SPAN) continue;
+    // The two rules below look at every box not dropped as a twin, kept or
+    // not: a loose box larger than this container has already been judged,
+    // and may already have dropped, before this container's turn.
+    const others = bubbles.filter(
+      (o) => o !== bubble && drops.get(o)?.rule !== "twin",
+    );
     // A counted box that holds a box the container does not (it straddles
     // the container's edge) may be a loose box, not the container's content.
     const straddles = counted.some((c) =>
-      live(bubble).some((o) => o !== c && holds(c, o) && !holds(bubble, o)),
+      others.some((o) => o !== c && holds(c, o) && !holds(bubble, o)),
     );
     // A counted box in a nested pair the twin pass spared (IoU at TWIN_IOU
     // or more) whose other box the container does not hold: the twin test
     // would have settled that pair by confidence, so the span rests on a
     // call the pass never made.
     const sparedTwin = counted.some((c) =>
-      live(bubble).some(
+      others.some(
         (o) =>
           o !== c && nested(c, o) && iou(c, o) >= TWIN_IOU && !holds(bubble, o),
       ),
