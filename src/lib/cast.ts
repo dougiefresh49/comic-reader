@@ -922,7 +922,13 @@ export async function renameCharacter(
   if (!data?.length) throw new Error(`cast: no character ${characterId}`);
 }
 
-/** Records the voice the owner wants for a character in this issue; upserts on (book, issue, character), so a cancelled or carried-out request can be made again. */
+/**
+ * Records the voice the owner wants for a character in this issue: one
+ * update of its (book, issue, character) row while no voice operation is
+ * open on it, else an insert, so a cancelled or carried-out request can be
+ * made again. A row with an open operation refuses both: the update matches
+ * nothing and the unique key refuses the insert.
+ */
 export async function storeVoiceRequest(
   client: Client,
   bookId: string,
@@ -930,30 +936,34 @@ export async function storeVoiceRequest(
   characterId: string,
   request: VoiceRequest,
 ): Promise<void> {
-  const open = await db(client)
+  const fields = {
+    action: request.action,
+    target_voice_uuid:
+      request.action === "clone" ? request.targetVoiceUuid : null,
+    status: "pending",
+    completed_at: null,
+  };
+  const upd = await db(client)
     .from("casting_tasks")
-    .select("operation")
+    .update(fields)
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
-    .eq("character_id", characterId);
-  must(`reading the voice request for ${characterId}`, open.error);
-  if ((open.data ?? []).some((r) => r.operation))
-    throw new Error(`cast: a voice operation is open for ${characterId}`);
+    .eq("character_id", characterId)
+    .is("operation", null)
+    .select("id");
+  must(`storing the voice request for ${characterId}`, upd.error);
+  if ((upd.data ?? []).length > 0) return;
   const { error } = await db(client)
     .from("casting_tasks")
-    .upsert(
-      {
-        book_id: bookId,
-        issue_id: issueId,
-        character_id: characterId,
-        action: request.action,
-        target_voice_uuid:
-          request.action === "clone" ? request.targetVoiceUuid : null,
-        status: "pending",
-        completed_at: null,
-      },
-      { onConflict: "book_id,issue_id,character_id" },
-    );
+    .insert({
+      book_id: bookId,
+      issue_id: issueId,
+      character_id: characterId,
+      ...fields,
+    });
+  // 23505, unique violation: the row exists and holds an operation.
+  if (error?.code === "23505")
+    throw new Error(`cast: a voice operation is open for ${characterId}`);
   must(`storing the voice request for ${characterId}`, error);
 }
 

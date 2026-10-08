@@ -193,6 +193,12 @@ class FakeDb {
   ]);
   /** Storage objects by `<bucket>/<path>`. */
   objects = new Map<string, Uint8Array>();
+  /** One-shot: runs on the table's rows just before its next write of `op`. */
+  hooks: { table: string; op: Op; run: (rows: Row[]) => void }[] = [];
+
+  beforeNext(table: string, op: Op, run: (rows: Row[]) => void) {
+    this.hooks.push({ table, op, run });
+  }
 
   rows(table: string): Row[] {
     let t = this.tables.get(table);
@@ -353,6 +359,15 @@ class FakeQuery implements PromiseLike<{ data: unknown; error: unknown }> {
 
   private run(): { data: unknown; error: unknown } {
     const rows = this.db.rows(this.table);
+    if (this.op !== "select") {
+      const at = this.db.hooks.findIndex(
+        (h) => h.table === this.table && h.op === this.op,
+      );
+      if (at >= 0) this.db.hooks.splice(at, 1)[0]!.run(rows);
+      // PostgreSQL timestamp input "now", as the database reads it.
+      for (const [k, v] of Object.entries(this.payload))
+        if (v === "now") this.payload[k] = new Date().toISOString();
+    }
     const matched = rows.filter((r) => this.filters.every((f) => f(r)));
     let out: Row[] = matched;
     if (this.op !== "select") {
@@ -635,19 +650,11 @@ async function checkCarryOut() {
   const castLib = await import("~/lib/cast");
   const liveReconcile = (lib as Partial<typeof lib>).reconcile;
   /**
-   * The cases below reconcile a run that stopped a moment ago; a record that
-   * young reads as a live run (round 5), so age it past the window first.
+   * The cases below reconcile a run that stopped a moment ago, with no
+   * aging: a run that returns clears its `operation_at` (#390), so only a
+   * live run's fresh stamp makes reconcile wait.
    */
-  const reconcile = liveReconcile
-    ? (...a: Parameters<typeof lib.reconcile>) => {
-        const db = (a[0].supabase as unknown as { fakeDb: FakeDb }).fakeDb;
-        for (const t of db.rows("casting_tasks")) {
-          const op = t.operation as { at?: string } | null;
-          if (op) op.at = new Date(Date.now() - 3_600_000).toISOString();
-        }
-        return liveReconcile(...a);
-      }
-    : undefined;
+  const reconcile = liveReconcile;
   const results: { name: string; pass: boolean }[] = [];
   const report = (name: string, lines: string[], pass: boolean) => {
     console.log(`\n${name}: ${pass ? "PASS" : "FAIL"}`);
@@ -1905,6 +1912,222 @@ async function checkCarryOut() {
         short(b).includes("already an active designed voice") &&
         w.acct.adds === addsAfterA &&
         active.length === 1,
+    );
+  }
+
+  // ── #390 ──
+
+  const status = (r: unknown) => (r as { status?: string } | undefined)?.status;
+  const say = (r: unknown) => (r === undefined ? "ok" : short(r));
+  const taskOf = (db: FakeDb, c: string) =>
+    db.rows("casting_tasks").find((t) => t.character_id === c);
+  const zedWorld = (limit?: number) =>
+    world({
+      characters: ["zed"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+      ],
+      limit,
+    });
+
+  {
+    // Item 1: a casting-step row (no action) that carryOut claims takes the
+    // request fields, so the item stays on the plan once the castlist has a
+    // voice; a refused run puts the row back as the casting step wrote it.
+    const stepRow = (db: FakeDb) =>
+      db.rows("casting_tasks").push({
+        id: randomUUID(),
+        book_id: BOOK,
+        issue_id: "issue-1",
+        character_id: "zed",
+        action: null,
+        target_voice_uuid: null,
+        status: "pending",
+        operation: null,
+        operation_at: null,
+        completed_at: null,
+      });
+    const w = zedWorld();
+    stepRow(w.db);
+    const item = await itemOf(w.deps, "zed");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    const row = taskOf(w.db, "zed")!;
+    const after = (await lib.planVoiceWork(w.deps, BOOK, "issue-1")).items.find(
+      (i) => i.characterId === "zed",
+    );
+    const v = zedWorld(0); // no free slot: the run refuses after its claim
+    stepRow(v.db);
+    const vItem = await itemOf(v.deps, "zed");
+    const refused = await attempt(() =>
+      lib.carryOut(v.deps, vItem, { archiveVoiceId: null }),
+    );
+    const vRow = taskOf(v.db, "zed")!;
+    report(
+      "#390 item 1: a claimed casting-step row stays on the plan; a refused run leaves its action null",
+      [
+        `plan: ${item.action} (${item.source}); carryOut: ${short(r)}`,
+        `row after: action ${String(row.action)}, target ${String(row.target_voice_uuid)}, ${task(w.db, "zed")}; castlist zed: ${cast(w.db, "zed")}`,
+        `plan after: ${after ? `${after.source}, ${after.state}` : "item gone"}`,
+        `no free slot: carryOut ${short(refused)}; row: action ${String(vRow.action)}, target ${String(vRow.target_voice_uuid)}, ${task(v.db, "zed")}; adds ${v.acct.adds}`,
+      ],
+      status(r) === "done" &&
+        row.action === "clone" &&
+        row.target_voice_uuid === "zed-1993" &&
+        cast(w.db, "zed") === "zed-1993" &&
+        after?.source === "request" &&
+        after.state === "made" &&
+        status(refused) === "refused" &&
+        vRow.action === null &&
+        vRow.target_voice_uuid === null &&
+        task(v.db, "zed") === "pending" &&
+        v.acct.adds === 0,
+    );
+  }
+
+  {
+    // Item 3: storeVoiceRequest is one filtered update, then an insert.
+    const w = world({
+      characters: ["rex", "zed", "kit"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+      ],
+    });
+    seedOp(w.db, "rex", { phase: "claimed" });
+    request(w.db, "zed", "design");
+    const rexBefore = JSON.stringify(taskOf(w.db, "rex"));
+    const zedId = taskOf(w.db, "zed")!.id;
+    const store = (
+      c: string,
+      req: Parameters<typeof castLib.storeVoiceRequest>[4],
+    ) =>
+      attempt(() =>
+        castLib.storeVoiceRequest(w.db.client(), BOOK, "issue-1", c, req),
+      );
+    const rex = await store("rex", { action: "design" });
+    const zed = await store("zed", {
+      action: "clone",
+      targetVoiceUuid: "zed-1993",
+    });
+    const kit = await store("kit", { action: "design" });
+    const rows = (c: string) =>
+      w.db.rows("casting_tasks").filter((t) => t.character_id === c);
+    const zedRow = taskOf(w.db, "zed")!;
+    const kitRow = taskOf(w.db, "kit");
+    report(
+      "#390 item 3: storeVoiceRequest refuses an open operation, updates in place, inserts when no row",
+      [
+        `rex (open operation): ${say(rex)}; row unchanged: ${String(JSON.stringify(taskOf(w.db, "rex")) === rexBefore)}`,
+        `zed (no operation): ${say(zed)}; rows ${rows("zed").length}, same id ${String(zedRow.id === zedId)}, ${String(zedRow.action)} ${String(zedRow.target_voice_uuid)}`,
+        `kit (no row): ${say(kit)}; rows ${rows("kit").length}, ${String(kitRow?.action)} ${String(kitRow?.status)}`,
+      ],
+      say(rex).includes("a voice operation is open for rex") &&
+        JSON.stringify(taskOf(w.db, "rex")) === rexBefore &&
+        zed === undefined &&
+        rows("zed").length === 1 &&
+        zedRow.id === zedId &&
+        zedRow.action === "clone" &&
+        zedRow.target_voice_uuid === "zed-1993" &&
+        kit === undefined &&
+        rows("kit").length === 1 &&
+        kitRow?.action === "design" &&
+        kitRow.status === "pending",
+    );
+  }
+
+  {
+    // Item 4: a run claims the row between settle's read and its markTask;
+    // the castlist stays as it was.
+    const lines: string[] = [];
+    let pass = true;
+    for (const outcome of [
+      { kind: "pick", voiceUuid: "zed-now" },
+      { kind: "no audio" },
+    ] as const) {
+      const w = world({
+        characters: ["zed"],
+        voices: [
+          { id: "zed-now", name: "Zed", status: "active", character: "zed" },
+        ],
+      });
+      request(w.db, "zed", "design");
+      const item = await itemOf(w.deps, "zed");
+      w.db.beforeNext("casting_tasks", "update", (rows) => {
+        const t = rows.find((x) => x.character_id === "zed")!;
+        t.operation = { token: "t1", rev: "r1", phase: "claimed" };
+        t.operation_at = new Date().toISOString();
+      });
+      const r = await attempt(() => lib.settle(w.db.client(), item, outcome));
+      lines.push(
+        `${outcome.kind}: settle ${say(r)}; castlist zed: ${cast(w.db, "zed")}; task: ${task(w.db, "zed")}`,
+      );
+      pass &&=
+        say(r).includes("open operation") &&
+        cast(w.db, "zed") === "none" &&
+        task(w.db, "zed") === "pending (open at claimed)";
+    }
+    report(
+      "#390 item 4: settle writes no castlist row when a run claims the item before its markTask",
+      lines,
+      pass,
+    );
+  }
+
+  {
+    // Item 5: a live run stamps its record; a run that returns with the
+    // record on the row clears the stamp, so reconcile proceeds at once.
+    const w = zedWorld();
+    request(w.db, "zed", "clone", "zed-1993");
+    w.acct.addMode = "timeout-lands";
+    w.acct.lists = ["ok", "fail"]; // the inventory, then the lookup
+    let release = () => {};
+    w.acct.gate = new Promise<void>((r) => (release = r));
+    const item = await itemOf(w.deps, "zed");
+    const run = attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    while (w.acct.adds === 0) await new Promise((r) => setImmediate(r));
+    const during = taskOf(w.db, "zed")!.operation_at;
+    release();
+    const r = await run;
+    const stopped = taskOf(w.db, "zed")!.operation_at;
+    const left = task(w.db, "zed");
+    const fixed = await attempt(() => lib.reconcile(w.deps, item));
+
+    const v = world({
+      characters: ["rex"],
+      voices: [{ id: "rex-old", name: "Rex", status: "active" }],
+      limit: 2,
+    });
+    seedOp(v.db, "rex", { phase: "claimed" });
+    taskOf(v.db, "rex")!.operation_at = new Date().toISOString();
+    const live = await attempt(() => lib.reconcile(v.deps, rexKey));
+    report(
+      "#390 item 5: a returned run clears operation_at and reconcile proceeds; a fresh stamp still refuses",
+      [
+        `operation_at mid-add: ${String(during)}; carryOut: ${short(r)}`,
+        `after it returned: operation_at ${String(stopped)}, task ${left}; reconcile at once: ${short(fixed)}`,
+        `rex with a fresh operation_at: reconcile ${short(live)}; task ${task(v.db, "rex")}`,
+      ],
+      typeof during === "string" &&
+        !Number.isNaN(Date.parse(during)) &&
+        status(r) === "needs attention" &&
+        stopped === null &&
+        left === "pending (open at adding)" &&
+        status(fixed) === "done" &&
+        short(live).includes("a run is still in progress") &&
+        task(v.db, "rex") === "pending (open at claimed)",
     );
   }
 
