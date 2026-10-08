@@ -5,7 +5,7 @@ import { GEMINI_MEDIUM } from "~/lib/models";
 import { createPartFromText } from "@google/genai";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { generateContentLogged } from "~/lib/llm-usage";
-import { insertIssue, listBookIssues } from "~/lib/issue-queries";
+import { insertIssue, listBookIssues, selectIssue } from "~/lib/issue-queries";
 import { requireAdmin } from "~/server/admin/require-admin";
 
 type Ok<T> = { ok: true; data: T };
@@ -147,6 +147,21 @@ export async function createIssue(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
   const issueId = `issue-${args.issueNumber}`;
+  const { data: existing, error: lookupErr } = await selectIssue(
+    supabaseAdmin,
+    args.bookId,
+    issueId,
+    "id, part_id",
+  ).maybeSingle();
+  if (lookupErr) {
+    return { ok: false, error: lookupErr.message };
+  }
+  if (existing) {
+    return {
+      ok: false,
+      error: `${issueId} already exists in ${args.bookId}${existing.part_id ? ` (part ${existing.part_id})` : ""}. Issue ids for a new part get a part prefix, like part-1-issue-1 (decisions row 396); this form does not build those yet.`,
+    };
+  }
   const { data, error } = (await insertIssue(supabaseAdmin, {
     id: issueId,
     book_id: args.bookId,

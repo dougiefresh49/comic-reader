@@ -373,6 +373,7 @@ export type Database = {
           id: string;
           issue_id: string;
           operation: Json | null;
+          operation_at: string | null;
           status: string;
           target_voice_uuid: string | null;
         };
@@ -385,6 +386,7 @@ export type Database = {
           id?: string;
           issue_id: string;
           operation?: Json | null;
+          operation_at?: string | null;
           status?: string;
           target_voice_uuid?: string | null;
         };
@@ -397,6 +399,7 @@ export type Database = {
           id?: string;
           issue_id?: string;
           operation?: Json | null;
+          operation_at?: string | null;
           status?: string;
           target_voice_uuid?: string | null;
         };

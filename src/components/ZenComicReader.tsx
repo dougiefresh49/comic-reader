@@ -15,6 +15,7 @@ import { usePageNavigation } from "~/hooks/usePageNavigation";
 import { usePanelNavigation } from "~/hooks/usePanelNavigation";
 import { useDoubleTap } from "~/hooks/useDoubleTap";
 import { useChromeAutoHide } from "~/hooks/useChromeAutoHide";
+import { useWordHighlightSelector } from "~/hooks/useWordHighlight";
 import { TopBar } from "./zen-comic-reader/TopBar";
 import { ControlBar } from "./zen-comic-reader/ControlBar";
 import { SpeechBox } from "./zen-comic-reader/SpeechBox";
@@ -31,6 +32,13 @@ import {
   buildSpeechContent,
 } from "./zen-comic-reader/text-utils";
 import { PanelViewFrame } from "./zen-comic-reader/PanelView";
+import {
+  collapseGroups,
+  findGroupUnits,
+  memberOwnText,
+  memberSpeech,
+  memberStartSeconds,
+} from "./zen-comic-reader/balloon-group-playback";
 import {
   styleToNormRect,
   unionPanelFocusBounds,
@@ -181,11 +189,29 @@ export default function ZenComicReader({
     [bubbles],
   );
 
-  // Autoplay walks only bubbles with audio; tapping and rendering keep the
-  // full visibleBubbles list.
+  // Joined balloons that play as one clip (#451), keyed by each member's id.
+  const groupUnits = useMemo(
+    () => findGroupUnits(visibleBubbles, timestamps),
+    [visibleBubbles, timestamps],
+  );
+
+  // A bubble's caption and highlight words: its slice of a group clip, or
+  // its own clip's words.
+  const speechFor = useCallback(
+    (b: Bubble) => {
+      const unit = groupUnits.get(b.id);
+      return unit
+        ? memberSpeech(unit, b)
+        : buildSpeechContent(timestamps[b.id], b.ocr_text);
+    },
+    [groupUnits, timestamps],
+  );
+
+  // Autoplay walks only bubbles with audio, a joined group once as its lead;
+  // tapping and rendering keep the full visibleBubbles list.
   const voicedBubbles = useMemo(
-    () => visibleBubbles.filter(hasAudio),
-    [visibleBubbles],
+    () => collapseGroups(visibleBubbles.filter(hasAudio), groupUnits),
+    [visibleBubbles, groupUnits],
   );
 
   // Assigned after useAudioPlayback below; ref breaks the ordering cycle
@@ -368,8 +394,8 @@ export default function ZenComicReader({
   const panelAutoPlayRef = useRef(panelAutoPlay);
   const panelIndexRef = useRef(panelIndex);
   const orderedPanelVoicedBubbles = useMemo(
-    () => orderedPanelBubbles.filter(hasAudio),
-    [orderedPanelBubbles],
+    () => collapseGroups(orderedPanelBubbles.filter(hasAudio), groupUnits),
+    [orderedPanelBubbles, groupUnits],
   );
   const orderedPanelVoicedBubblesRef = useRef(orderedPanelVoicedBubbles);
   const panelsRef = useRef(panels);
@@ -434,6 +460,7 @@ export default function ZenComicReader({
 
   const {
     playBubble: rawPlayBubble,
+    seekCurrent,
     stopAll,
     togglePlayPause,
     isPlaying,
@@ -448,13 +475,37 @@ export default function ZenComicReader({
   });
   stopAllRef.current = stopAll;
 
+  // A joined group's member plays the lead's clip from the member's first
+  // word, reusing the clip when it is already loaded (#451).
   const playBubble = useCallback(
     (b: Bubble) => {
-      setSelectedBubbleId(b.id);
-      rawPlayBubble(b);
+      const unit = groupUnits.get(b.id);
+      if (!unit) {
+        setSelectedBubbleId(b.id);
+        rawPlayBubble(b);
+        return;
+      }
+      const startAt = memberStartSeconds(unit, b.id);
+      setSelectedBubbleId(unit.spans ? b.id : unit.lead.id);
+      if (seekCurrent(unit.lead.id, startAt)) return;
+      rawPlayBubble(unit.lead, {
+        startAt,
+        words: unit.words,
+        spans: unit.spans ?? undefined,
+      });
     },
-    [rawPlayBubble],
+    [groupUnits, rawPlayBubble, seekCurrent],
   );
+
+  // The balloon whose word is lit. In a joined group it walks member to
+  // member, and the selection (outline, caption, in-bubble marker) follows.
+  // Per member, never per word (#87).
+  const speakingId = useWordHighlightSelector(wordHighlight, (s) => s.bubbleId);
+  useEffect(() => {
+    if (speakingId !== null && groupUnits.has(speakingId)) {
+      setSelectedBubbleId(speakingId);
+    }
+  }, [speakingId, groupUnits]);
 
   useEffect(() => {
     playBubbleRef.current = playBubble;
@@ -511,7 +562,15 @@ export default function ZenComicReader({
     (bubble: Bubble) => {
       cancelPending();
       clearPanelTimer();
-      if (selectedBubbleId === bubble.id) {
+      // A group member pauses or resumes only while its own words are the
+      // ones lit (or its clip is still loading); otherwise the tap plays from
+      // its first word, after the group ended or on another member's turn.
+      const onIt =
+        selectedBubbleId === bubble.id &&
+        (!groupUnits.has(bubble.id) ||
+          speakingId === bubble.id ||
+          (isPlaying && speakingId === null));
+      if (onIt) {
         togglePlayPause();
       } else {
         playBubble(bubble);
@@ -519,6 +578,9 @@ export default function ZenComicReader({
     },
     [
       selectedBubbleId,
+      groupUnits,
+      speakingId,
+      isPlaying,
       togglePlayPause,
       cancelPending,
       playBubble,
@@ -526,15 +588,9 @@ export default function ZenComicReader({
     ],
   );
 
-  const selectedTimestamps = selectedBubble
-    ? timestamps[selectedBubble.id]
-    : undefined;
   const speech = useMemo(
-    () =>
-      selectedBubble
-        ? buildSpeechContent(selectedTimestamps, selectedBubble.ocr_text)
-        : null,
-    [selectedBubble, selectedTimestamps],
+    () => (selectedBubble ? speechFor(selectedBubble) : null),
+    [selectedBubble, speechFor],
   );
 
   // Per bubble, never per word: the reader holds whether the selected
@@ -568,9 +624,7 @@ export default function ZenComicReader({
       orderedPanelBubbles.find((b) => b.id === selectedBubble?.id) ??
       orderedPanelBubbles[0];
     const speaker = bubble ? bubbleSpeaker(bubble) : "";
-    const snippet = bubble
-      ? buildSpeechContent(timestamps[bubble.id], bubble.ocr_text).cleanText
-      : "";
+    const snippet = bubble ? speechFor(bubble).cleanText : "";
     // Says what the caption box shows sighted readers for a silent bubble.
     const silent = bubble && !hasAudio(bubble) ? "No voice yet." : "";
     return [
@@ -587,7 +641,7 @@ export default function ZenComicReader({
     activePanel,
     orderedPanelBubbles,
     selectedBubble,
-    timestamps,
+    speechFor,
   ]);
 
   useEffect(() => {
@@ -732,6 +786,7 @@ export default function ZenComicReader({
                 {displayBubbles.map((bubble) => {
                   if (!bubble.style) return null;
                   const isSelected = selectedBubbleId === bubble.id;
+                  const unit = groupUnits.get(bubble.id);
                   // The word markers are the feedback when they can show,
                   // so the selection box draws only for the caption
                   // fallback (#608).
@@ -759,10 +814,12 @@ export default function ZenComicReader({
                       }}
                       aria-label={bubbleAccessibleName(
                         bubble,
-                        buildSpeechContent(
-                          timestamps[bubble.id],
-                          bubble.ocr_text,
-                        ).cleanText,
+                        unit
+                          ? memberOwnText(unit, bubble)
+                          : buildSpeechContent(
+                              timestamps[bubble.id],
+                              bubble.ocr_text,
+                            ).cleanText,
                       )}
                     />
                   );

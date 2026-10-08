@@ -15,7 +15,6 @@ interface VoiceClaimRow {
   operation_claimed_at: string | null;
 }
 
-/** A claim older than ten minutes is stale and can be taken over. */
 /** How long a claim or an op record counts as a live run. */
 export const CLAIM_STALE_MS = 10 * 60 * 1000;
 
