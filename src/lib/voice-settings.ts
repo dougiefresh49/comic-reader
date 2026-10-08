@@ -100,5 +100,3 @@ export function parseVoiceOverride(
   }
   return out;
 }
-
-export const SKIPPED_VOICE = "__SKIPPED__";

@@ -12,8 +12,8 @@ export interface TtsRequestOptions {
   /** The bubble's `text_with_cues`, else its `ocr_text`. */
   text: string;
   /**
-   * The castlist `voice_id`. Not part of the returned object: the SDK takes
-   * it as the first positional argument, beside the request.
+   * The voice's `current_elevenlabs_id`. Not part of the returned object:
+   * the SDK takes it as the first positional argument, beside the request.
    */
   voiceId: string;
   /**
