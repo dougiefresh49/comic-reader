@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Backfill `bubbles.fill_color` (#575): sample each bubble's balloon fill
- * from its page image, one download per page. Writes PRODUCTION unless
+ * Backfill `bubbles.fill_color` (#575): sample the colour under each
+ * bubble's words (its balloon fill when it has no word boxes, #672) from its page image, one download per page. Writes PRODUCTION unless
  * `--dry-run`, which samples and prints each bubble's colour, its text and
  * the highlight colour the reader would pick, and writes nothing. By default
  * only rows with no colour are filled; `--force` recomputes every row. No

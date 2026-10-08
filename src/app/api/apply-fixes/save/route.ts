@@ -57,8 +57,8 @@ function fail(error: string, status: number) {
 
 /**
  * Sets `fill_color` on each box-writing bubble row from its page image, one
- * download per page (#575). An updated row skips its stored `text_geometry`
- * word boxes, read in one query (#597); an inserted row has none. A failed
+ * download per page (#575). An updated row is sampled inside its stored
+ * `text_geometry` word boxes, read in one query (#672); an inserted row has none. A failed
  * geometry read logs a warning and samples unmasked. A page that fails to
  * download or decode logs a warning and writes null on its rows; the Save
  * still goes through.
