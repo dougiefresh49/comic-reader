@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   getAdminIssues,
-  getAdminBooksWithParts,
+  getAdminBooks,
   type AdminIssueRow,
   type AdminBookInfo,
 } from "~/server/admin/queries";
@@ -59,7 +59,7 @@ export default async function AdminDashboardPage() {
   const [issues, books, skippedByIssue, publishedByBook, storedPages] =
     await Promise.all([
       getAdminIssues(),
-      getAdminBooksWithParts(),
+      getAdminBooks(),
       getLatestSkippedByIssue(),
       getBookPublishedFlags(),
       getStoredPageCounts(),
@@ -156,7 +156,6 @@ function BookSection({
   published: boolean;
   storedPageCounts: Record<string, number>;
 }) {
-  const hasParts = book.parts.length > 0;
   // The owner's way in. A draft book has no public route, so the admin list
   // links /admin/preview, which the basic-auth matcher covers. An issue with
   // no pages 404s in the reader, so the book-level link skips those; every
@@ -170,14 +169,6 @@ function BookSection({
       .map((iss) => iss.issueId),
   );
   const firstIssue = issues.find((iss) => previewable.has(iss.issueId));
-
-  const issuesByPart = new Map<string | null, AdminIssueRow[]>();
-  for (const iss of issues) {
-    const key = iss.partId;
-    const list = issuesByPart.get(key) ?? [];
-    list.push(iss);
-    issuesByPart.set(key, list);
-  }
 
   return (
     <section>
@@ -194,6 +185,13 @@ function BookSection({
         )}
         <div className="flex flex-wrap gap-2 text-xs text-neutral-500">
           {book.publisher && <span>{book.publisher}</span>}
+          {book.series && (
+            <span>
+              {book.series.name}
+              {book.series.position != null &&
+                ` · Vol. ${book.series.position}`}
+            </span>
+          )}
           {book.franchises && book.franchises.length > 0 && (
             <span>{book.franchises.join(", ")}</span>
           )}
@@ -227,57 +225,12 @@ function BookSection({
         </div>
       </div>
 
-      {hasParts ? (
-        <div className="space-y-4">
-          {book.parts.map((part) => {
-            const partIssues = issuesByPart.get(part.id) ?? [];
-            return (
-              <div key={part.id}>
-                <h3 className="mb-1.5 text-sm font-medium text-neutral-400">
-                  {part.name}
-                  {part.totalIssues != null && (
-                    <span className="ml-2 text-xs text-neutral-600">
-                      {partIssues.length}/{part.totalIssues}
-                    </span>
-                  )}
-                </h3>
-                {partIssues.length > 0 ? (
-                  <IssueList
-                    issues={partIssues}
-                    skippedByIssue={skippedByIssue}
-                    draft={!published}
-                    previewable={previewable}
-                  />
-                ) : (
-                  <p className="py-2 text-xs text-neutral-600">
-                    No issues yet.
-                  </p>
-                )}
-              </div>
-            );
-          })}
-          {(issuesByPart.get(null) ?? []).length > 0 && (
-            <div>
-              <h3 className="mb-1.5 text-sm font-medium text-neutral-400">
-                Unassigned
-              </h3>
-              <IssueList
-                issues={issuesByPart.get(null)!}
-                skippedByIssue={skippedByIssue}
-                draft={!published}
-                previewable={previewable}
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <IssueList
-          issues={issues}
-          skippedByIssue={skippedByIssue}
-          draft={!published}
-          previewable={previewable}
-        />
-      )}
+      <IssueList
+        issues={issues}
+        skippedByIssue={skippedByIssue}
+        draft={!published}
+        previewable={previewable}
+      />
     </section>
   );
 }

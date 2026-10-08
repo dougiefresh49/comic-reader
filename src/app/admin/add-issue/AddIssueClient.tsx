@@ -7,7 +7,6 @@ interface BookInfo {
   id: string;
   name: string;
   totalIssues: number | null;
-  parts: { id: string; number: number; name: string; slug: string }[];
   nextIssueNumber: number;
   wikiTitleTemplate: string | null;
   wikiHost: string | null;
@@ -22,9 +21,6 @@ interface DownloadProgress {
 }
 
 export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
-  const [partId, setPartId] = useState<string>(
-    bookInfo.parts.length > 0 ? bookInfo.parts[0]!.id : "",
-  );
   const [issueNumber, setIssueNumber] = useState(bookInfo.nextIssueNumber);
   const [wikiUrl, setWikiUrl] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -84,7 +80,6 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
     const result = await createIssue({
       bookId: bookInfo.id,
       issueNumber,
-      partId: partId || undefined,
       wikiUrl,
       sourceUrl,
     });
@@ -206,23 +201,6 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Add Issue — {bookInfo.name}</h1>
-
-      {bookInfo.parts.length > 0 && (
-        <div>
-          <label className="mb-1 block text-sm text-neutral-400">Part</label>
-          <select
-            value={partId}
-            onChange={(e) => setPartId(e.target.value)}
-            className="w-full rounded-lg bg-neutral-800 px-4 py-2 text-neutral-100 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-          >
-            {bookInfo.parts.map((p) => (
-              <option key={p.id} value={p.id}>
-                Part {p.number}: {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       <div>
         <label className="mb-1 block text-sm text-neutral-400">
