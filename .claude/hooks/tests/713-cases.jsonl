@@ -1,0 +1,17 @@
+{"id":"1a env -S bundled value joins the words after it","want":2,"cmd":"env -Spnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1b env --split-string= joins the words after it","want":2,"cmd":"env --split-string=pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1c env -S quoted command with an option, script after it","want":2,"cmd":"env -S 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1d env -S quoted assignment and command, script after it","want":2,"cmd":"env -S 'X=1 pnpm' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1e env -S join stops at a redirect","want":2,"cmd":"env -S pnpm generate-audio > log","reason":"generate-audio synthesizes"}
+{"id":"1f env -S with a quoted bundled value","want":2,"cmd":"env -S'pnpm' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1g env --split-string separate quoted value joins the words after it","want":2,"cmd":"env --split-string 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1h env -S printf string makes pnpm an argument","want":0,"cmd":"env -S 'printf %s' pnpm generate-audio"}
+{"id":"1i env -S echo alone","want":0,"cmd":"env -S 'echo hi'"}
+{"id":"2a xargs -J takes a value","want":2,"cmd":"xargs -J % pnpm generate-audio %","reason":"generate-audio synthesizes"}
+{"id":"2b exec -a takes a value","want":2,"cmd":"exec -a name pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2c time -o takes a value","want":2,"cmd":"/usr/bin/time -o log pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2d time --output takes a value","want":2,"cmd":"time --output log pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2e xargs -0J bundle takes a value","want":2,"cmd":"xargs -0J % pnpm generate-audio %","reason":"generate-audio synthesizes"}
+{"id":"2f exec -a value is the name, echo runs","want":0,"cmd":"exec -a pnpm echo generate-audio"}
+{"id":"2g time -o value is the file, echo runs","want":0,"cmd":"time -o pnpm echo generate-audio"}
+{"id":"2h xargs -J value is the token, echo runs","want":0,"cmd":"xargs -J pnpm echo generate-audio"}

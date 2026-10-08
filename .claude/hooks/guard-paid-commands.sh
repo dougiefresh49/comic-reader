@@ -66,7 +66,7 @@ WRAPPER='^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{
 # (#701): `wrapper:short letters:long names`, `;` between wrappers. The lexer
 # (cmdw, sudosh, env -S) and command_shape both read it, so the heredoc checks
 # and the paid rules find the same command (`timeout -s KILL 60` runs no KILL).
-WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCP:unset,chdir;xargs:ILnPdEas:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:'
+WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCP:unset,chdir;xargs:ILnPdEasJ:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:;exec:a:;time:of:output,format'
 
 # --- the rule list, read once ---------------------------------------------
 #
@@ -196,6 +196,13 @@ segments() {
     # Is b a long option of wrapper wr that takes the next word as its value.
     function vlong(b, wr) { return b ~ /^--[^,]+$/ && index(WL[wr], "," substr(b, 3) ",") }
     function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
+    # The env -S string v, at w[j], with the words after it joined on, up to
+    # the first redirect (#713).
+    function sjoin(v, j,   b) {
+      sub(/^\034/, "", v)
+      for (j++; j < nw && w[j] !~ /^\035/; j++) { b = w[j]; sub(/^\034/, "", b); v = v " " b }
+      return v
+    }
     # pipe: the segment ends in a pipe.
     function endseg(pipe,   i, j, line, b, sc, x, v, c) {
       endword()
@@ -232,12 +239,17 @@ segments() {
         # is a wrapper in front of the command, not an argument (`echo env`).
         # S is not in WRAP_OPTS: its value is the command, not a word to step
         # over, so command_shape finds pnpm in `env -S pnpm generate-audio`.
+        # env appends the words after the string to it, so they are queued
+        # with it (#713), up to a redirect: `env -Spnpm generate-audio`.
         else if (b == "env" && (c < 0 || i < c)) for (j = i + 1; j < nw; j++) {
           b = w[j]; sub(/^\034/, "", b)
           if (b ~ /^-[^-]/ && (x = vopt(b, WV["env"] "S"))) {
             v = x < length(b) ? substr(b, x + 1) : w[++j]
-            if (substr(b, x, 1) == "S") { queue(v, 0); break }
-          } else if (b ~ /^--split-string(=|$)/) { queue(b ~ /=/ ? substr(b, 16) : w[++j], 0); break }
+            if (substr(b, x, 1) == "S") { queue(sjoin(v, j), 0); break }
+          } else if (b ~ /^--split-string(=|$)/) {
+            v = b ~ /=/ ? substr(b, 16) : w[++j]
+            queue(sjoin(v, j), 0); break
+          }
           else if (vlong(b, "env")) j++
           else if (b !~ /^-/) break
         }
