@@ -3,7 +3,7 @@ import { type NextRequest } from "next/server";
 import pLimit from "p-limit";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
-import { updateIssue, upsertIssue } from "~/lib/issue-queries";
+import { insertIssue, selectIssue, updateIssue } from "~/lib/issue-queries";
 
 export const maxDuration = 300;
 
@@ -29,7 +29,7 @@ interface FinalizeBody {
 }
 
 // POST: { mode: "init" | "url" | "finalize" } + payload
-// init      → upserts books + issues row
+// init      → upserts books row, creates the issues row; 409 if the issue exists
 // url       → returns signed upload URL for one file
 // finalize  → convert raw sources to WebP, upsert pages rows, set page_count
 export async function POST(req: NextRequest) {
@@ -41,6 +41,26 @@ export async function POST(req: NextRequest) {
   if (body.mode === "init") {
     if (!body.bookId || !body.issueId || !body.number) {
       return Response.json({ error: "missing fields" }, { status: 400 });
+    }
+    // Refuse before any write, so a refused init leaves the DB untouched.
+    const alreadyExists = (status: string | null) =>
+      Response.json(
+        {
+          error: `${body.issueId} already exists in ${body.bookId}${status ? ` (status ${status})` : ""}. This uploader only creates new issues; pick an unused issue number.`,
+        },
+        { status: 409 },
+      );
+    const { data: existing, error: lookupErr } = await selectIssue(
+      supabaseAdmin,
+      body.bookId,
+      body.issueId,
+      "id, status",
+    ).maybeSingle();
+    if (lookupErr) {
+      return Response.json({ error: lookupErr.message }, { status: 500 });
+    }
+    if (existing) {
+      return alreadyExists(existing.status);
     }
     if (body.bookName) {
       const { error: bookErr } = await supabaseAdmin.from("books").upsert(
@@ -56,7 +76,9 @@ export async function POST(req: NextRequest) {
       }
     }
     const sourcePath = `${body.bookId}/${body.issueId}/source/`;
-    const { error: issueErr } = await upsertIssue(supabaseAdmin, {
+    // insert, not upsert: a racing init that lost the check above hits the
+    // primary key (23505) instead of overwriting the row.
+    const { error: issueErr } = await insertIssue(supabaseAdmin, {
       id: body.issueId,
       book_id: body.bookId,
       number: body.number,
@@ -65,6 +87,7 @@ export async function POST(req: NextRequest) {
       source_pages_path: sourcePath,
     });
     if (issueErr) {
+      if (issueErr.code === "23505") return alreadyExists(null);
       return Response.json({ error: issueErr.message }, { status: 500 });
     }
     return Response.json({ ok: true, sourcePath });

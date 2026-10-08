@@ -19,11 +19,17 @@ export function NewIssueUploader() {
     "meta",
   );
   const [error, setError] = useState<string | null>(null);
+  // The bookId/issueId this page already created, so a retry skips init
+  // instead of being refused by its own row.
+  const [initializedFor, setInitializedFor] = useState<string | null>(null);
 
   const issueId = useMemo(
     () => (issueNumber ? `issue-${issueNumber}` : ""),
     [issueNumber],
   );
+  // Once init has run, this page is tied to that issue: every field locks, and
+  // a retry skips init. Reload the page to start a different issue.
+  const created = initializedFor !== null;
 
   const onDrop = useCallback((dropped: FileList | null) => {
     if (!dropped) return;
@@ -69,21 +75,35 @@ export function NewIssueUploader() {
     setStep("uploading");
 
     try {
-      // Step 1: init issue
-      const initRes = await fetch("/api/admin/upload-source-page", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "init",
-          bookId,
-          bookName: bookName || undefined,
-          issueId,
-          issueName: issueName || undefined,
-          number: Number(issueNumber),
-        }),
-      });
-      if (!initRes.ok) {
-        throw new Error(`init: ${initRes.status} ${await initRes.text()}`);
+      // Step 1: init issue (once per bookId/issueId on this page)
+      const initKey = `${bookId}/${issueId}`;
+      if (initializedFor !== initKey) {
+        const initRes = await fetch("/api/admin/upload-source-page", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            mode: "init",
+            bookId,
+            bookName: bookName || undefined,
+            issueId,
+            issueName: issueName || undefined,
+            number: Number(issueNumber),
+          }),
+        });
+        if (!initRes.ok) {
+          const text = await initRes.text();
+          let message = `init: ${initRes.status} ${text}`;
+          try {
+            const parsed = JSON.parse(text) as { error?: string };
+            if (parsed.error) message = parsed.error;
+          } catch {
+            // not JSON; keep status + text
+          }
+          setError(message);
+          setStep("meta");
+          return;
+        }
+        setInitializedFor(initKey);
       }
 
       // Step 2: upload each file in parallel (limit 5 concurrent)
@@ -216,8 +236,9 @@ export function NewIssueUploader() {
                 type="text"
                 value={bookId}
                 onChange={(e) => setBookId(e.target.value.trim())}
+                disabled={created}
                 placeholder="tmnt-mmpr-iii"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
             <label className="text-sm">
@@ -228,8 +249,9 @@ export function NewIssueUploader() {
                 type="text"
                 value={bookName}
                 onChange={(e) => setBookName(e.target.value)}
+                disabled={created}
                 placeholder="TMNT × MMPR III"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
             <label className="text-sm">
@@ -238,8 +260,9 @@ export function NewIssueUploader() {
                 type="number"
                 value={issueNumber}
                 onChange={(e) => setIssueNumber(e.target.value)}
+                disabled={created}
                 placeholder="3"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
             <label className="text-sm">
@@ -248,18 +271,19 @@ export function NewIssueUploader() {
                 type="text"
                 value={issueName}
                 onChange={(e) => setIssueName(e.target.value)}
+                disabled={created}
                 placeholder="Issue 3"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
           </div>
           {issueId && (
             <p className="text-xs text-neutral-500">
-              Will create issue{" "}
+              {created ? "Already created" : "Will create"} issue{" "}
               <code>
                 {bookId}/{issueId}
               </code>
-              .
+              .{created && " Reload the page to start a different issue."}
             </p>
           )}
           <button
