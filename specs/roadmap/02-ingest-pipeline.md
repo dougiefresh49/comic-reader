@@ -1,5 +1,7 @@
 # Ingest pipeline — end state
 
+> **History.** This page planned the local `pnpm ingest` pipeline, retired in [#309](https://github.com/dougiefresh49/comic-reader/issues/309). The live pipeline is `src/workflows/ingest-pipeline.ts`; read that, not this page.
+
 The shape of the ingest pipeline once every workstream lands. New
 steps are flagged `(NEW)`; existing steps from `CLAUDE.md` keep their
 names.
