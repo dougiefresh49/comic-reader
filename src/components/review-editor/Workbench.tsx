@@ -868,8 +868,8 @@ function Editor({ data, initialPage }: WorkbenchProps) {
 
   /**
    * Write every pending edit in one request. The editor stays as it is: on
-   * success the document that was sent becomes the baseline, and nothing
-   * else changes; on failure the edits stay pending and the error shows.
+   * success the document that was sent becomes the baseline and undo stops
+   * there (#653); on failure the edits stay pending and the error shows.
    * Resolves to the document that is now saved, or why nothing was.
    * `save` is the button and Cmd S; a regenerate's save-first, which already
    * holds the lock, calls `writeSave`.
@@ -894,6 +894,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       say("Nothing to save.");
       return { ok: true, sent };
     }
+    dispatch({ type: "saving" });
     savingRef.current = true;
     setSaving(true);
     setSaveError(null);
