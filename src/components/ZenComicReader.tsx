@@ -237,7 +237,7 @@ export default function ZenComicReader({
   } = usePanelNavigation({
     panelCount: panels.length,
     enabled: panelViewMode && panels.length > 0,
-    keyboardEnabled: !anySheetOpen,
+    keyboardEnabled: !anySheetOpen && !isOnboardingOpen,
     onExit: exitPanelView,
     onTogglePanelAutoPlay: togglePanelAutoPlay,
     onPastEnd: () => navigateNextRef.current?.(),
