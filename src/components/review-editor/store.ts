@@ -63,6 +63,11 @@ export type EditorAction =
   | { type: "page"; page: number; sel?: Sel | null }
   | { type: "discard" }
   /**
+   * A Save started: the next edit opens a new undo step, so the document
+   * the Save sent is always a step boundary (#653).
+   */
+  | { type: "saving" }
+  /**
    * A Save landed: the document it sent is the new baseline. Edits made
    * while the Save was in flight stay pending, and undo stops at the saved
    * document: an undo past it would re-dirty rows already in the database
@@ -237,21 +242,19 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         ...initState(state.base, state.page),
         lastHistory: state.lastHistory,
       };
+    case "saving":
+      return state.coalesce === null ? state : { ...state, coalesce: null };
     case "saved": {
       let past: HistoryEntry[] = [];
       if (state.doc !== action.base) {
-        // The first unmerged edit made during the Save pushed the sent
-        // document as its step; keep the steps from there on.
+        // The first edit made during the Save pushed the sent document as
+        // its step (`saving` stops it merging); keep the steps from there on.
         const j = state.past.map((e) => e.doc).lastIndexOf(action.base);
-        const last = state.past[state.past.length - 1];
-        // None: that edit merged into a step begun before the Save, so the
-        // step now starts from the saved document.
-        past =
-          j >= 0
-            ? state.past.slice(j)
-            : last
-              ? [{ ...last, doc: action.base }]
-              : [];
+        if (j >= 0) past = state.past.slice(j);
+        // A full stack without it dropped the sent document off the bottom,
+        // so every step left came after the Save. Otherwise the save point
+        // is lost, and the history goes with it.
+        else if (state.past.length >= LIMIT) past = state.past;
       }
       return {
         ...state,
