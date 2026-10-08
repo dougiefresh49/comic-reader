@@ -448,17 +448,17 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   command_shape
   EXE=
   [ "$EXE_I" -ge 0 ] && EXE=${W[EXE_I]}
-  # What cmd: rules match (XT): the text from each unquoted word at or after
-  # the executable, so a gh --body that quotes a curl line runs no curl, and
-  # `env $(...) curl` or `find -exec curl` still do (#671).
-  XT=()
-  for ((i = EXE_I; i >= 0 && i < ${#W[@]}; i++)); do
-    case "${RW[i]}" in "$Q"*) continue ;; esac
-    IFS=' '
-    t="${W[*]:i}"
-    IFS=$' \t\n'
-    t=${t//$M/}
-    XT[${#XT[@]}]=${t//$'\036'/ }
+  # Where cmd: rules start matching (XO, offsets into TEXT): each unquoted word
+  # at or after the executable, so a gh --body that quotes a curl line runs no
+  # curl, and `env $(...) curl` or `find -exec curl` still do (#671). Offsets,
+  # not a text per word: joining one per word took 3.7 s on 2000 words.
+  XO=() off=0
+  for ((i = 0; i < ${#W[@]}; i++)); do
+    if [ "$EXE_I" -ge 0 ] && [ "$i" -ge "$EXE_I" ]; then
+      case "${RW[i]}" in "$Q"*) ;; *) XO[${#XO[@]}]=$off ;; esac
+    fi
+    t=${W[i]//$M/}
+    off=$((off + ${#t} + 1))
   done
 
   # --- paid commands, unless this segment carries the override -----------
@@ -506,15 +506,22 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     [ -n "$RUN" ] && RUN=$(normalize_path "$RUN")
 
     # A rule matches when its target does and every condition after `&&`
-    # holds. Rules are tried in list order. A cmd: rule needs one text in XT
-    # that meets every condition; a script: condition matches the start of
-    # one word, so the dry run `--labels "/tmp/groups --execute.json"` holds
-    # no --execute flag (#671).
+    # holds. Rules are tried in list order. A cmd: rule needs one start in XO
+    # whose text meets every condition; a script: condition matches the start
+    # of one word, so the dry run `--labels "/tmp/groups --execute.json"`
+    # holds no --execute flag (#671).
     for ((k = 0; k < NR_RULES; k++)); do
       hit=1
       if [ "${R_KIND[k]}" = cmd ]; then
+        # Whole TEXT first, the leading ^ dropped: a start can only match if
+        # the whole text does, and most segments stop here in one test.
+        for ((j = R_FROM[k]; j < R_TO[k]; j++)); do
+          re=${PATS[j]#^}
+          [[ $TEXT =~ $re ]] || continue 2
+        done
         hit=0
-        for t in "${XT[@]}"; do
+        for o in ${XO[@]+"${XO[@]}"}; do
+          t=${TEXT:o}
           for ((j = R_FROM[k]; j < R_TO[k]; j++)); do
             re=${PATS[j]}
             [[ $t =~ $re ]] || continue 2
