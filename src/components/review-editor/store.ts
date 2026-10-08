@@ -253,8 +253,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         const doc = take(entry.doc);
         return doc === entry.doc ? entry : { ...entry, doc };
       };
+      // The next merged keystroke opens a new undo step from the document
+      // that holds the new cues; replaying on a step start whose text
+      // differed would drop them (review of PR #650, round 4).
       return {
         ...state,
+        coalesce: null,
         base: take(state.base),
         doc: take(state.doc),
         past: state.past.map(takeEntry),
