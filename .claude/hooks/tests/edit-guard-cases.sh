@@ -16,10 +16,10 @@ GUARD_BASH=${GUARD_BASH:-bash}
 pass=0
 fail=0
 
-# check <id> <want> <payload>
+# check <id> <want> <payload> [VAR=value ...]
 check() {
   local err got
-  err=$(printf '%s' "$3" | env -u DELEGATE -u CREDIT_OVERRIDE -u LIVE_API_OK perl -e 'alarm 5; exec @ARGV or exit 127' "$GUARD_BASH" "$HOOK" 2>&1 >/dev/null)
+  err=$(printf '%s' "$3" | env -u DELEGATE -u CREDIT_OVERRIDE -u LIVE_API_OK "${@:4}" perl -e 'alarm 5; exec @ARGV or exit 127' "$GUARD_BASH" "$HOOK" 2>&1 >/dev/null)
   got=$?
   if [ "$got" = "$2" ]; then
     pass=$((pass + 1))
@@ -53,6 +53,13 @@ check edit-dotdot 2 "$(edit src/lib/../lib/models.ts)"
 check edit-unguarded 0 "$(edit README.md)"
 check patch-double-slash 2 "$(patch "$(hunks src/lib//models.ts)")"
 check patch-unguarded 0 "$(patch "$(hunks src/a.ts)")"
+check patch-dotdot 2 "$(patch "$(hunks src/lib/../lib/voice-settings.ts)")"
+check patch-absolute 2 "$(patch "$(hunks "$REPO_ROOT/src/lib/tts-request.ts")")"
+check patch-body-token 2 "$(patch "$(hunks src/a.ts)"$'\n'"+see x/../src/lib/tts-request.ts")"
+# The grep's output decides the check, so the session's GREP_OPTIONS must not
+# reach it.
+check patch-grep-color 2 "$(patch "$(hunks src/lib/models.ts)")" GREP_OPTIONS=--color=always
+check patch-grep-invert 2 "$(patch "$(hunks src/lib/models.ts)")" GREP_OPTIONS=-v
 
 files=()
 i=1
@@ -70,6 +77,9 @@ models=$(hunks src/lib/models.ts)
 check long-token-double-slash 2 "$(patch "+$long//"$'\n'"$models")"
 check long-token-dot 2 "$(patch "+$long/./"$'\n'"$models")"
 check long-token-with-name 2 "$(patch "+$long//src/lib/models.ts"$'\n'"$models")"
+# A long run of `..` costs depth times pops on bash 3.2: 75k deep, 30k pops.
+deep=$(printf 'x/%.0s' $(seq 75000))$(printf 'y/../%.0s' $(seq 30000))
+check long-token-dotdot 2 "$(patch "+${deep}src/lib/models.ts"$'\n'"$models")"
 
 # About 100k tokens before the guarded header: 8192 lines of 12 words.
 body=$'+w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12\n'

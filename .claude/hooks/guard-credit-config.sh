@@ -140,14 +140,16 @@ done
 # a credit guard. Normalizing keeps every file name, so only a token holding a
 # rule's file name can reach that rule: a patch with none is a pass, and a
 # token with none is never normalized. One grep keeps only the lines holding a
-# file name, so the bash loop below never walks the rest of a big patch.
+# file name, so the bash loop below never walks the rest of a big patch. Its
+# output decides the check, so GREP_OPTIONS from the session (--color, -v) and a
+# grep shell function are kept out of it.
 [ -n "$PATCH_LINES" ] || exit 0
 F_GREP=()
 for ((k = 0; k < NR_FILE_RULES; k++)); do
   F_NAME[k]=${F_TARGET[k]##*/}
   F_GREP+=(-e "${F_NAME[k]}")
 done
-CAND=$(printf '%s\n' "$PATCH_LINES" | grep -F "${F_GREP[@]}")
+CAND=$(printf '%s\n' "$PATCH_LINES" | env -u GREP_OPTIONS LC_ALL=C grep -F --color=never "${F_GREP[@]}")
 case $? in
 0) ;;
 1) exit 0 ;;
@@ -159,6 +161,12 @@ esac
 for TOKEN in $CAND; do
   for ((k = 0; k < NR_FILE_RULES; k++)); do
     [[ $TOKEN == *"${F_NAME[k]}"* ]] || continue
+    # No real path is this long, and on bash 3.2 a long run of `..` costs
+    # depth times pops in normalize_path, so a token like that blocks unread.
+    if [ "${#TOKEN}" -gt 4096 ]; then
+      printf 'Blocked: a token of over 4096 characters in the apply_patch text names %s, too long to check in time.\n' "${F_NAME[k]}" >&2
+      exit 2
+    fi
     normalize_path "$TOKEN"
     if [ "$NORM" = "${F_TARGET[k]}" ] || [ "$NORM" = "${REPO_ROOT}/${F_TARGET[k]}" ]; then
       printf 'Blocked: %s\n' "${F_REASON[k]}" >&2
