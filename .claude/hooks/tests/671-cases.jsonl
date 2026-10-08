@@ -87,3 +87,8 @@
 {"id":"r1-3a pnpm -C value before exec","want":2,"cmd":"pnpm -C /tmp/wt exec tsx scripts/smoke-ingest.ts --real","reason":"smoke-ingest --real runs the pipeline"}
 {"id":"r1-3b pnpm --dir value before exec","want":2,"cmd":"pnpm --dir . exec tsx scripts/voice-lab-import.ts --describe","reason":"--describe makes one Gemini call"}
 {"id":"r1-3c pnpm --filter value before exec","want":2,"cmd":"pnpm --filter x exec tsx scripts/generate-audio.ts","reason":"generate-audio synthesizes"}
+{"id":"r2-1a quoted curl executable","want":2,"cmd":"\"curl\" -X POST https://api.elevenlabs.io/v1/text-to-speech/abc -d '{}'","reason":"a write against the ElevenLabs API"}
+{"id":"r2-1b sudo then quoted curl","want":2,"cmd":"sudo \"curl\" -X POST https://api.elevenlabs.io/v1/x -d '{}'","reason":"a write against the ElevenLabs API"}
+{"id":"r2-1c quoted gh body of a curl write still passes","want":0,"cmd":"gh pr comment 1 --body \"curl -X POST https://api.elevenlabs.io/v1/x\""}
+{"id":"r2-2a body $ and ( split by a continued line","want":2,"cmd":"cat <<EOF\nlog: $\\\n(pnpm generate-audio)\nEOF","reason":"generate-audio synthesizes"}
+{"id":"r2-2b same split, quoted delimiter","want":0,"cmd":"cat <<'EOF'\nlog: $\\\n(pnpm generate-audio)\nEOF"}

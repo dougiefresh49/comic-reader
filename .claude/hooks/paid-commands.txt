@@ -8,7 +8,9 @@
 #                                       there too: one word starts with a
 #                                       match of the ere
 #   cmd:<ere> :: <reason>                anything else, matched against the
-#                                       segment's text from its executable on
+#                                       segment's text from its executable,
+#                                       or from any unquoted word after it
+#                                       (a pattern may use ^ only to lead)
 #   cmd:<ere> && <ere> :: <reason>       several conditions, all must hold
 #   file:<path> :: <reason>              an Edit, Write or shell write to that
 #                                       path is guarded

@@ -14,7 +14,7 @@
 # LIMIT: the command is lexed the way a shell splits it, with quotes, comments,
 # backslash escapes, continued lines, $(...) and heredoc bodies (each body
 # line read as a command when a shell can read the body, #671; otherwise the
-# body is text), but nothing is expanded: a variable holding the
+# body is text, apart from each $(...) under an unquoted delimiter), but nothing is expanded: a variable holding the
 # command name, backticks and eval are read as plain words. That is a known
 # boundary (decisions row 204), not an oversight: this is a seatbelt for a
 # delegate who forgets, not a sandbox.
@@ -228,23 +228,24 @@ segments() {
           # so its lines are dropped again; an unclosed one stays (#671).
           endseg()
           for (h = 0; h < nhd; h++) {
-            n0 = ninner; found = 0; bt = ""
+            n0 = ninner; found = 0
             while (i < n) {
               e = index(substr(s, i + 1), "\n")
               t = e ? substr(s, i + 1, e - 1) : substr(s, i + 1)
               i = e ? i + e : n
               d = t; if (hdd[h]) sub(/^\t+/, "", d)
               if (d == hd[h]) { found = 1; break }
-              bt = bt t "\n"
               if (t ~ /(^|[^\\])(\\\\)*\\$/) { p = p substr(t, 1, length(t) - 1); continue }
               ish[ninner] = 1; inner[ninner++] = p t; p = ""
             }
             if (p != "") { ish[ninner] = 1; inner[ninner++] = p }
             p = ""
             if (found && !fed) {
-              ninner = n0
               # With an unquoted delimiter, a $(...) in the body still runs
-              # (`log: $(cmd)` under cat <<EOF), so each one is queued.
+              # (`log: $(cmd)` under cat <<EOF), so each one is queued. The
+              # scan reads the joined lines, so `$\` then `(` is still a $(.
+              bt = ""; for (x = n0; x < ninner; x++) bt = bt inner[x] "\n"
+              ninner = n0
               if (!hdq[h]) for (x = 1; x <= length(bt); x++) {
                 if (substr(bt, x, 1) == "\\") x++
                 else if (substr(bt, x, 2) == "$(") x = subst(bt, x, length(bt), 0) - 1
@@ -448,14 +449,15 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   command_shape
   EXE=
   [ "$EXE_I" -ge 0 ] && EXE=${W[EXE_I]}
-  # Where cmd: rules start matching (XO, offsets into TEXT): each unquoted word
-  # at or after the executable, so a gh --body that quotes a curl line runs no
+  # Where cmd: rules start matching (XO, offsets into TEXT): the executable and
+  # each unquoted word after it, so a gh --body that quotes a curl line runs no
   # curl, and `env $(...) curl` or `find -exec curl` still do (#671). Offsets,
   # not a text per word: joining one per word took 3.7 s on 2000 words.
   XO=() off=0
   for ((i = 0; i < ${#W[@]}; i++)); do
+    # The executable counts quoted or not: a shell runs "curl" as curl.
     if [ "$EXE_I" -ge 0 ] && [ "$i" -ge "$EXE_I" ]; then
-      case "${RW[i]}" in "$Q"*) ;; *) XO[${#XO[@]}]=$off ;; esac
+      case "$i:${RW[i]}" in "$EXE_I":*) XO[${#XO[@]}]=$off ;; *:"$Q"*) ;; *) XO[${#XO[@]}]=$off ;; esac
     fi
     t=${W[i]//$M/}
     off=$((off + ${#t} + 1))
@@ -514,7 +516,8 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
       hit=1
       if [ "${R_KIND[k]}" = cmd ]; then
         # Whole TEXT first, the leading ^ dropped: a start can only match if
-        # the whole text does, and most segments stop here in one test.
+        # the whole text does, and most segments stop here in one test. That
+        # holds while a cmd: pattern has no ^ other than its leading one.
         for ((j = R_FROM[k]; j < R_TO[k]; j++)); do
           re=${PATS[j]#^}
           [[ $TEXT =~ $re ]] || continue 2
