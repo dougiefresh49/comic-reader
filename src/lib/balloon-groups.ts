@@ -201,8 +201,17 @@ export function groupLeadId(
 ): string {
   const [first, ...rest] = members;
   if (!first) throw new Error("groupLeadId: a group needs at least one member");
+  // Ties on sortOrder break on the id, the same rule as the RPC's
+  // `ORDER BY sort_order, id` (uuid order equals lowercase hex string order).
   let lead = first;
-  for (const m of rest) if (m.sortOrder < lead.sortOrder) lead = m;
+  for (const m of rest) {
+    if (
+      m.sortOrder < lead.sortOrder ||
+      (m.sortOrder === lead.sortOrder && m.id < lead.id)
+    ) {
+      lead = m;
+    }
+  }
   return lead.id;
 }
 

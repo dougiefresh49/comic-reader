@@ -209,7 +209,7 @@ function score(
         ? "not next to each other in play order inside one panel"
         : p.gap === null
           ? "a bubble has no box"
-          : `gap ${p.gap} px > ${gapPx}`;
+          : `gap ${Math.round(p.gap)} px > ${gapPx}`;
       return { ...l, why };
     });
   const trueJoins = rows.filter((r) => r.predicted && r.labeled).length;
@@ -243,7 +243,7 @@ function report(f: JoinRunFile) {
     "page | panel | a -> b | text a | text b | gap | predicted | labeled | reason",
     ...f.rows.map(
       (r) =>
-        `p${r.page} | ${r.panel} | ${r.a.slice(0, 8)} -> ${r.b.slice(0, 8)} | ${cut(r.textA)} | ${cut(r.textB)} | ${r.gap} | ${yn(r.predicted)} | ${yn(r.labeled)}${r.predicted !== r.labeled ? " <<" : ""} | ${r.reason ?? "-"}`,
+        `p${r.page} | ${r.panel} | ${r.a.slice(0, 8)} -> ${r.b.slice(0, 8)} | ${cut(r.textA)} | ${cut(r.textB)} | ${Math.round(r.gap)} | ${yn(r.predicted)} | ${yn(r.labeled)}${r.predicted !== r.labeled ? " <<" : ""} | ${r.reason ?? "-"}`,
     ),
     "",
     `Geometry misses (labeled, not a candidate): ${s.geometryMisses.length}`,
@@ -401,7 +401,7 @@ async function loadPages(): Promise<Page[]> {
         panel: panelName.get(a.panel) ?? a.panel.slice(0, 8),
         a: a.id,
         b: b.id,
-        gap: a.box && b.box ? Math.round(gapBetween(a.box, b.box)) : null,
+        gap: a.box && b.box ? gapBetween(a.box, b.box) : null,
       });
     }
     out.push({
@@ -493,7 +493,7 @@ function standInReply(p: Page): string {
     candidates: p.candidates.map((c, index) => ({
       index,
       joined: c.gap === 0,
-      reason: `DRY_RUN stand-in: boxes ${c.gap === 0 ? "overlap" : `${c.gap} px apart`}`,
+      reason: `DRY_RUN stand-in: boxes ${c.gap === 0 ? "overlap" : `${Math.round(c.gap ?? 0)} px apart`}`,
     })),
   });
 }
