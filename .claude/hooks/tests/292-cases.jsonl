@@ -120,7 +120,7 @@
 {"id":"H1 <<- tab-indented delimiter, apostrophe in body, paid after","want":2,"cmd":"cat <<-EOF\n\tDoug's note\n\tEOF\npnpm generate-audio"}
 {"id":"H2 <<- harmless after","want":0,"cmd":"cat <<-EOF\n\tDoug's note\n\tEOF\nls"}
 {"id":"H3 <<- quoted delimiter then cp","want":2,"cmd":"cat > /tmp/x <<-'END'\n\tit's fine\n\tEND\ncp /tmp/x src/lib/models.ts"}
-{"id":"H4 body line that is a paid command (accepted over-block)","want":2,"cmd":"cat <<EOF\npnpm generate-audio\nEOF"}
+{"id":"H4 body line that is a paid command (over-block fixed, #671)","want":0,"cmd":"cat <<EOF\npnpm generate-audio\nEOF"}
 {"id":"H5 unterminated heredoc keeps reading lines","want":2,"cmd":"cat <<EOF\nDoug's\npnpm generate-audio"}
 {"id":"H6 two heredocs on one line","want":2,"cmd":"cat <<A <<B\nDoug's\nA\nit's\nB\npnpm generate-audio"}
 {"id":"N1 nested subst, paid innermost","want":2,"cmd":"echo $(echo $(pnpm generate-audio))"}
