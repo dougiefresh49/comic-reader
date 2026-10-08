@@ -242,7 +242,7 @@ export default function ZenComicReader({
       // to page-view auto-play, which walks the page by itself (#594, #493).
       // The double tap is the exception: the kid asked for that bubble on the
       // full page, and page view's Auto-play setting decides what follows
-      // (#708).
+      // (#708). A held clip stays held too, for the floating play (#728).
       if (!opts?.keepPlaying) stopAllRef.current();
       cancelPendingRef.current();
       // A turn may still be loading the next page; it must mount silent.
@@ -260,17 +260,17 @@ export default function ZenComicReader({
     [clearPanelTimer, setPanelViewPreferred],
   );
 
-  const togglePanelAutoPlay = useCallback(() => {
-    if (panelAutoPlay) {
-      // Turning read-aloud OFF: cancel the pending advance and silence the
-      // currently playing bubble — the HUD play is the only control in panel mode.
-      clearPanelTimer();
-      stopAllRef.current();
-      // A turn may still be loading the next page; it must mount silent.
-      readAloudCarryTo = null;
-    }
-    setPanelAutoPlay(!panelAutoPlay);
-  }, [panelAutoPlay, clearPanelTimer]);
+  // The HUD toggle reads the audio hook's play state, so it is defined below
+  // that hook; the keyboard reaches it through this ref.
+  const togglePanelAutoPlayRef = useRef<() => void>(() => undefined);
+  const onTogglePanelAutoPlayKey = useCallback(
+    () => togglePanelAutoPlayRef.current(),
+    [],
+  );
+  // Set when read-aloud turns on around a clip already sounding or held
+  // (#728): the play effect below then skips one run instead of restarting
+  // the panel at its first bubble.
+  const keepCurrentClipRef = useRef(false);
 
   const navigateNextRef = useRef<(() => void) | null>(null);
   const navigatePrevRef = useRef<(() => void) | null>(null);
@@ -287,7 +287,7 @@ export default function ZenComicReader({
     enabled: panelViewMode && panels.length > 0,
     keyboardEnabled: !anySheetOpen && !isOnboardingOpen,
     onExit: exitPanelView,
-    onTogglePanelAutoPlay: togglePanelAutoPlay,
+    onTogglePanelAutoPlay: onTogglePanelAutoPlayKey,
     onPastEnd: () => navigateNextRef.current?.(),
     onBeforeStart: () => navigatePrevRef.current?.(),
   });
@@ -335,7 +335,8 @@ export default function ZenComicReader({
       // Page-view playback must not carry in, or the first tap lands on a
       // playing selected bubble and pauses it (#581). The double tap is the
       // exception: it lands on the playing bubble's panel and lets the clip
-      // finish there, since the kid asked to see that bubble up close (#707).
+      // finish there, since the kid asked to see that bubble up close (#707),
+      // or keeps a held clip held for the HUD's Read to resume (#728).
       if (opts?.carryToPanel === undefined) stopAllRef.current();
       cancelPendingRef.current();
       focusBeforePanelRef.current = document.activeElement;
@@ -533,25 +534,81 @@ export default function ZenComicReader({
     playBubbleRef.current = playBubble;
   }, [playBubble]);
 
-  // Only the double tap carries a playing bubble across the toggle; with
-  // nothing sounding it toggles as every other control does (#707, #708).
-  const handleDoubleTap = useCallback(() => {
-    if (!isPlaying) return handleTogglePanelView();
-    if (panelViewMode) return exitPanelView({ keepPlaying: true });
-    const playingId = speakingId ?? selectedBubbleId;
-    const idx = panels.findIndex(
-      (p) => playingId !== null && p.bubbleIds.includes(playingId),
-    );
-    enterPanelView(idx >= 0 ? { carryToPanel: idx } : undefined);
+  // Turns panel read-aloud on around the clip already sounding or held, so
+  // its end hands on through the panel instead of the panel starting over.
+  const readAloudFromCurrentClip = useCallback(() => {
+    keepCurrentClipRef.current = true;
+    setPanelAutoPlay(true);
+  }, []);
+
+  // In panel view the HUD's Pause holds a playing clip and Read resumes a
+  // held one, whoever started it, so the button means one thing (#728). A
+  // held clip counts only on its own panel: leaving the panel drops the
+  // selection (the effect above), and Read then starts that panel fresh.
+  const togglePanelAutoPlay = useCallback(() => {
+    if (isPlaying) {
+      clearPanelTimer();
+      togglePlayPause();
+      // A turn may still be loading the next page; it must mount silent.
+      readAloudCarryTo = null;
+      setPanelAutoPlay(false);
+      return;
+    }
+    if (panelAutoPlay) {
+      // Read-aloud waits between bubbles: there is no clip to hold, so
+      // cancel the pending advance and stop.
+      clearPanelTimer();
+      stopAll();
+      readAloudCarryTo = null;
+      setPanelAutoPlay(false);
+      return;
+    }
+    if (pausedBubbleId !== null && selectedBubbleId !== null) {
+      togglePlayPause();
+      readAloudFromCurrentClip();
+      return;
+    }
+    setPanelAutoPlay(true);
   }, [
     isPlaying,
+    panelAutoPlay,
+    pausedBubbleId,
+    selectedBubbleId,
+    clearPanelTimer,
+    togglePlayPause,
+    stopAll,
+    readAloudFromCurrentClip,
+  ]);
+  togglePanelAutoPlayRef.current = togglePanelAutoPlay;
+
+  // Only the double tap carries a playing or held bubble across the toggle;
+  // with neither it toggles as every other control does (#707, #708, #728).
+  const handleDoubleTap = useCallback(() => {
+    if (!isPlaying && pausedBubbleId === null) return handleTogglePanelView();
+    if (panelViewMode) return exitPanelView({ keepPlaying: true });
+    // The highlight holds through a pause, so speakingId names the joined
+    // group's member even while held.
+    const carriedId = speakingId ?? selectedBubbleId ?? pausedBubbleId;
+    const idx = panels.findIndex(
+      (p) => carriedId !== null && p.bubbleIds.includes(carriedId),
+    );
+    if (idx < 0) return enterPanelView();
+    enterPanelView({ carryToPanel: idx });
+    // A playing clip hands on to panel read-aloud when page view's Auto-play
+    // is on; a held one waits for Read.
+    if (isPlaying && autoPlayEnabled) readAloudFromCurrentClip();
+  }, [
+    isPlaying,
+    pausedBubbleId,
     panelViewMode,
     speakingId,
     selectedBubbleId,
     panels,
+    autoPlayEnabled,
     handleTogglePanelView,
     exitPanelView,
     enterPanelView,
+    readAloudFromCurrentClip,
   ]);
 
   const doubleTapBinder = useDoubleTap(handleDoubleTap, toggleChrome);
@@ -578,6 +635,10 @@ export default function ZenComicReader({
   useEffect(() => {
     if (!panelViewMode || !panelAutoPlay) return;
     clearPanelTimer();
+    if (keepCurrentClipRef.current) {
+      keepCurrentClipRef.current = false;
+      return;
+    }
     const panel = panels[panelIndex];
     if (!panel) return;
     const idSet = new Set(panel.bubbleIds);
@@ -933,7 +994,8 @@ export default function ZenComicReader({
                 onNext={goNextPanel}
                 hasNextPage={!!nextPageLink}
                 hasPrevPage={!!prevPageLink}
-                panelAutoPlay={panelAutoPlay}
+                // Pause while any clip sounds, read-aloud's or not (#728).
+                panelAutoPlay={panelAutoPlay || isPlaying}
                 onTogglePanelAutoPlay={togglePanelAutoPlay}
                 announceText={announceText}
               >
