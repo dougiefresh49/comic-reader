@@ -44,9 +44,9 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
   const coverImage = firstIssue ? pageImageUrl(bookId, firstIssue.id, 1) : null;
   const hasVoiceActing = book.issues.some((issue) => issue.hasAudio);
   const backHref = book.series ? `/series/${book.series.id}` : "/";
-  const backLabel = book.series
-    ? `Back to ${book.series.name}`
-    : "Back to Library";
+  // Three words like every other back link: the series name runs to 58
+  // characters and would wrap beside the chevron on a phone.
+  const backLabel = book.series ? "Back to series" : "Back to Library";
 
   return (
     <main className="relative min-h-screen bg-neutral-950 text-neutral-100">

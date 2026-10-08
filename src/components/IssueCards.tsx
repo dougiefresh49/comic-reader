@@ -12,7 +12,9 @@ function issueMonogram(issue: IssueManifest): string {
 
 /**
  * One book's issues as the book page shows them: the empty-state line, or a
- * grid of cards. Shared by `/book/<bookId>` and `/series/<seriesId>`.
+ * grid of cards. Shared by `/book/<bookId>` and `/series/<seriesId>`, which
+ * also share `MetaChip` (below) for the chips under their hero titles; the
+ * hero rows themselves stay in each page.
  */
 export function IssueGrid({
   bookId,
