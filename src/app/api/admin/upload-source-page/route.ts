@@ -29,7 +29,7 @@ interface FinalizeBody {
 }
 
 // POST: { mode: "init" | "url" | "finalize" } + payload
-// init      → upserts books row, creates the issues row; 409 if the issue exists
+// init      → creates books row only if missing, creates the issues row; 409 if the issue exists
 // url       → returns signed upload URL for one file
 // finalize  → convert raw sources to WebP, upsert pages rows, set page_count
 export async function POST(req: NextRequest) {
@@ -63,13 +63,14 @@ export async function POST(req: NextRequest) {
       return alreadyExists(existing.status);
     }
     if (body.bookName) {
+      // Existing book is never changed (a racing init cannot overwrite it either).
       const { error: bookErr } = await supabaseAdmin.from("books").upsert(
         {
           id: body.bookId,
           name: body.bookName,
           slug: body.bookId,
         },
-        { onConflict: "id" },
+        { onConflict: "id", ignoreDuplicates: true },
       );
       if (bookErr) {
         return Response.json({ error: bookErr.message }, { status: 500 });
