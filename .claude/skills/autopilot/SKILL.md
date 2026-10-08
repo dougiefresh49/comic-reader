@@ -97,7 +97,11 @@ You may launch an issue without asking when all of these hold:
 
 Launch with `t3_thread_launch`, title `#<N> <issue title>`,
 `workspaceStrategy` `{"type":"worktree","baseRef":"main","branch":"issue-<N>-<slug>","startFromOrigin":true}`,
-and this message with the blanks filled:
+`modelSelection` of provider instance `claudeAgent`, model
+`claude-opus-5-5`, effort `high` by default (model
+`claude-fable-5-1`, effort `high` when the issue is work the roster
+gives fable-5.1; see `docs/decisions.md` row 395), and this message
+with the blanks filled:
 
 ```
 Run issue #<N> "<title>". Read AGENTS.md, then the issue and its comments; the issue is the spec.
