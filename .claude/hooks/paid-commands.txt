@@ -39,6 +39,7 @@ script:recover-issue && --execute([^[:alnum:]_-]|$) :: Paid: recover-issue --exe
 script:backfill-balloon-groups && (^|[[:space:]])--render([^[:alnum:]_-]|$) :: Paid: backfill-balloon-groups --render makes one ElevenLabs call per group. Re-run it as LIVE_API_OK=1 pnpm backfill-balloon-groups ... only if the task named that spend.
 script:backfill-balloon-groups && (^|[[:space:]])--execute([^[:alnum:]_-]|$) :: Paid: backfill-balloon-groups --execute writes group_id on production bubble rows. Re-run it as LIVE_API_OK=1 pnpm backfill-balloon-groups ... only if the task named that write.
 script:apply-fixes ::Paid: apply-fixes writes production rows. Re-run it as LIVE_API_OK=1 pnpm apply-fixes ... only if the task named that write.
+script:db:push && --apply([^[:alnum:]_-]|$) :: Guarded: db:push --apply applies pending migrations to the production database, and only the lead runs it; without --apply it is a dry run. Re-run it as LIVE_API_OK=1 pnpm db:push --apply only after pnpm db:push showed the pending list and the PR's review is clean.
 
 # A GET is free, so this asks for two things at once: the host is ElevenLabs,
 # and the method is not GET. The method is spelled out in character classes

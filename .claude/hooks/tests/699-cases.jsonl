@@ -1,0 +1,12 @@
+{"id":"1 dry run is free","want":0,"cmd":"pnpm db:push"}
+{"id":"2 apply is guarded","want":2,"cmd":"pnpm db:push --apply","reason":"applies pending migrations to the production database"}
+{"id":"3 LIVE_API_OK lets the lead apply","want":0,"cmd":"LIVE_API_OK=1 pnpm db:push --apply"}
+{"id":"4 pnpm run form","want":2,"cmd":"pnpm run db:push --apply","reason":"only the lead runs it"}
+{"id":"5 direct run of the file","want":2,"cmd":"pnpm exec tsx scripts/db-push.ts --apply","reason":"db:push --apply"}
+{"id":"6 tsx with env-file","want":2,"cmd":"tsx --env-file=.env scripts/db-push.ts --apply"}
+{"id":"7 a different word","want":0,"cmd":"pnpm db:push --apply-later"}
+{"id":"8 direct dry run","want":0,"cmd":"pnpm exec tsx scripts/db-push.ts"}
+{"id":"9 quoted script name","want":2,"cmd":"pnpm \"db:push\" --apply"}
+{"id":"10 chained after cd","want":2,"cmd":"cd /tmp && pnpm db:push --apply"}
+{"id":"11 DELEGATE with LIVE_API_OK still passes the hook (the script blocks it)","want":0,"cmd":"LIVE_API_OK=1 pnpm db:push --apply","env":{"DELEGATE":"1"}}
+{"id":"12 db:types is not db:push","want":0,"cmd":"pnpm db:types --apply"}

@@ -15,6 +15,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:types": "supabase gen types typescript --project-id sinmmbxrsbpjneccykwd --schema public > src/types/database.ts && prettier --write src/types/database.ts",
+    "db:push": "tsx --env-file=.env scripts/db-push.ts",
     "download-comic-images": "python3 scripts/download_comic_images.py",
     "fetch-wiki-context": "tsx --env-file=.env scripts/fetch-wiki-context.ts",
     "test-ivc-fidelity": "tsx --env-file=.env scripts/test-ivc-fidelity.ts",
