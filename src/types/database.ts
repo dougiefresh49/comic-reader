@@ -251,6 +251,7 @@ export type Database = {
           crop_storage_path: string | null;
           emotion: string | null;
           fill_color: string | null;
+          group_id: string | null;
           id: string;
           ignored: boolean;
           issue_id: string;
@@ -283,6 +284,7 @@ export type Database = {
           crop_storage_path?: string | null;
           emotion?: string | null;
           fill_color?: string | null;
+          group_id?: string | null;
           id?: string;
           ignored?: boolean;
           issue_id: string;
@@ -315,6 +317,7 @@ export type Database = {
           crop_storage_path?: string | null;
           emotion?: string | null;
           fill_color?: string | null;
+          group_id?: string | null;
           id?: string;
           ignored?: boolean;
           issue_id?: string;
@@ -1314,6 +1317,18 @@ export type Database = {
           p_book_id: string;
           p_bubble_id: string;
           p_issue_id: string;
+          p_normalized_alignment: Json;
+        };
+        Returns: string;
+      };
+      switch_group_audio_take: {
+        Args: {
+          p_alignment: Json;
+          p_audio_storage_path: string;
+          p_book_id: string;
+          p_issue_id: string;
+          p_lead_id: string;
+          p_member_ids: string[];
           p_normalized_alignment: Json;
         };
         Returns: string;

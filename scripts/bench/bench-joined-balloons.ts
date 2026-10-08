@@ -53,6 +53,7 @@ import {
 } from "@google/genai";
 import { readFileSync } from "node:fs";
 import sharp from "sharp";
+import { boxFromStyle, gapBetween } from "~/lib/balloon-groups";
 import { isDryRun, logSpend } from "~/lib/fakes/dry-run";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_FAST } from "~/lib/models";
@@ -319,33 +320,6 @@ type Page = {
   candidates: Pair[];
 };
 
-/** `style` percent strings to page pixels; null when a field is missing. */
-function boxOf(style: unknown, w: number, h: number): Box | null {
-  const s = (style ?? {}) as Record<string, unknown>;
-  const f = (k: string) => Number.parseFloat(String(s[k] ?? "")) / 100;
-  const [left, top, width, height] = [
-    f("left"),
-    f("top"),
-    f("width"),
-    f("height"),
-  ];
-  if (![left, top, width, height].every(Number.isFinite)) return null;
-  return { x: left * w, y: top * h, width: width * w, height: height * h };
-}
-
-/** Edge-to-edge distance; 0 when the boxes touch or overlap. */
-function gapOf(a: Box, b: Box): number {
-  const dx = Math.max(
-    0,
-    Math.max(a.x, b.x) - Math.min(a.x + a.width, b.x + b.width),
-  );
-  const dy = Math.max(
-    0,
-    Math.max(a.y, b.y) - Math.min(a.y + a.height, b.y + b.height),
-  );
-  return Math.round(Math.hypot(dx, dy));
-}
-
 async function loadPages(): Promise<Page[]> {
   const sizes = must(
     await supabase
@@ -411,7 +385,7 @@ async function loadPages(): Promise<Page[]> {
           panel: b.panel_id,
           text: (b.ocr_text ?? "").replace(/\s+/g, " ").trim(),
           character: b.character_id,
-          box: boxOf(b.style, size.width, size.height),
+          box: boxFromStyle(b.style, size.width, size.height),
         },
       ]),
     );
@@ -427,7 +401,7 @@ async function loadPages(): Promise<Page[]> {
         panel: panelName.get(a.panel) ?? a.panel.slice(0, 8),
         a: a.id,
         b: b.id,
-        gap: a.box && b.box ? gapOf(a.box, b.box) : null,
+        gap: a.box && b.box ? gapBetween(a.box, b.box) : null,
       });
     }
     out.push({
