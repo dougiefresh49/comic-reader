@@ -109,10 +109,13 @@ segments() {
       line = w[0]
       for (i = 1; i < nw; i++) line = line "\037" w[i]
       print line
+      # Only when the shell is the executable, found the way command_shape
+      # finds it, so a quoted "bash" "-c" handed to printf is just text.
       for (i = 0; depth == 0 && i < nw; i++) {
+        if (w[i] ~ /^(\035|-u$|--unset$|-C$|--chdir$)/) { i++; continue }
+        if (w[i] ~ /^(-|env$|[A-Za-z_][A-Za-z0-9_]*=)/) continue
         b = w[i]; sub(/.*\//, "", b)
-        if (b !~ /^(ba|z|k|da)?sh$/) continue
-        for (j = i + 1; j < nw - 1; j++)
+        for (j = i + 1; b ~ /^(ba|z|k|da)?sh$/ && j < nw - 1; j++)
           if (w[j] ~ /^-[a-zA-Z]*c$/) { inner[ninner++] = w[j + 1]; break }
         break
       }
@@ -225,26 +228,35 @@ guarded_reason() {
   return 1
 }
 
-# Does this segment write files by the name of the command it runs? -i is an
-# in-place flag wherever it sits in sed's options, so it is looked for in any
-# word. The command has to be a whole word: `tee` inside a quoted comment body
-# is text. Redirects are checked on their own target in the loop below.
+# Does this segment write files by the name of the command it runs? Only the
+# executable counts, so `rg "cp" src/lib/models.ts` is a search, not a copy;
+# `git mv` is the one subcommand that writes. -i is an in-place flag wherever
+# it sits in sed's options, so it is looked for in any word. Redirects are
+# checked on their own target in the loop below.
 is_write_segment() {
-  local t sed=0 inplace=0
-  for t in "${W[@]}"; do
-    case "${t##*/}" in
-    tee | truncate | patch | dd | install | cp | mv) return 0 ;;
-    sed | perl) sed=1 ;;
-    esac
-    [[ $t =~ $INPLACE ]] && inplace=1
-  done
-  [ "$sed" = 1 ] && [ "$inplace" = 1 ]
+  local t i
+  case "${EXE##*/}" in
+  tee | truncate | patch | dd | install | cp | mv) return 0 ;;
+  sed | perl)
+    for t in "${W[@]}"; do [[ $t =~ $INPLACE ]] && return 0; done
+    ;;
+  git)
+    for ((i = EXE_I + 1; i < ${#W[@]}; i++)); do
+      case "${W[i]}" in -*) ;; *) [ "${W[i]}" = mv ] && return 0 || return 1 ;; esac
+    done
+    ;;
+  esac
+  return 1
 }
 INPLACE='^-[a-zA-Z]*i(=|$)'
 
 # --- per segment ----------------------------------------------------------
 
 READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdump|base64|nl|tac|sort|uniq|tr|rev|wc|cut|paste|column|split|grep|egrep|fgrep|rg|ag|awk|sed|jq|python3?|node|perl|ruby|php|source|open|security)($|[[:space:]/.<>])'
+
+# Captured first, because a process substitution drops awk's exit status: a
+# lexer that failed has not cleared the command, so it blocks.
+SEGS=$(segments "$COMMAND") || block "the command could not be lexed, so the paid-command list could not be checked."
 
 while IFS= read -r SEG || [ -n "$SEG" ]; do
   [ -z "$SEG" ] && continue
@@ -334,6 +346,6 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
       esac
     done
   fi
-done < <(segments "$COMMAND")
+done <<<"$SEGS"
 
 exit 0
