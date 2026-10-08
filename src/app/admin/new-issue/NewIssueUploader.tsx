@@ -19,6 +19,9 @@ export function NewIssueUploader() {
     "meta",
   );
   const [error, setError] = useState<string | null>(null);
+  // The bookId/issueId this page already created, so a retry skips init
+  // instead of being refused by its own row.
+  const [initializedFor, setInitializedFor] = useState<string | null>(null);
 
   const issueId = useMemo(
     () => (issueNumber ? `issue-${issueNumber}` : ""),
@@ -69,21 +72,35 @@ export function NewIssueUploader() {
     setStep("uploading");
 
     try {
-      // Step 1: init issue
-      const initRes = await fetch("/api/admin/upload-source-page", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          mode: "init",
-          bookId,
-          bookName: bookName || undefined,
-          issueId,
-          issueName: issueName || undefined,
-          number: Number(issueNumber),
-        }),
-      });
-      if (!initRes.ok) {
-        throw new Error(`init: ${initRes.status} ${await initRes.text()}`);
+      // Step 1: init issue (once per bookId/issueId on this page)
+      const initKey = `${bookId}/${issueId}`;
+      if (initializedFor !== initKey) {
+        const initRes = await fetch("/api/admin/upload-source-page", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            mode: "init",
+            bookId,
+            bookName: bookName || undefined,
+            issueId,
+            issueName: issueName || undefined,
+            number: Number(issueNumber),
+          }),
+        });
+        if (!initRes.ok) {
+          const text = await initRes.text();
+          let message = `init: ${initRes.status} ${text}`;
+          try {
+            const parsed = JSON.parse(text) as { error?: string };
+            if (parsed.error) message = parsed.error;
+          } catch {
+            // not JSON; keep status + text
+          }
+          setError(message);
+          setStep("meta");
+          return;
+        }
+        setInitializedFor(initKey);
       }
 
       // Step 2: upload each file in parallel (limit 5 concurrent)
