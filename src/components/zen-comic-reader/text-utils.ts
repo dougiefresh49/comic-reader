@@ -126,6 +126,21 @@ export function buildWordTimings(
 }
 
 /**
+ * How many words `buildWordTimings` finds in `text` when ElevenLabs speaks
+ * it: the same pass over an alignment of its characters, so whitespace splits
+ * words and `[tag]` text is skipped exactly as the reader's highlight does.
+ */
+export function countSpokenWords(text: string): number {
+  const characters = Array.from(text);
+  const times = characters.map(() => MIN_TIME);
+  return buildWordTimings({
+    characters,
+    character_start_times_seconds: times,
+    character_end_times_seconds: times,
+  }).words.length;
+}
+
+/**
  * Creates a speech payload from timestamps and the fallback bubble text.
  * If timestamps are missing, we still return cleaned text but no timings.
  */

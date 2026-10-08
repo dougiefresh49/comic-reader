@@ -27,6 +27,8 @@ export interface Bubble {
   textGeometry?: TextGeometry | null;
   /** Balloon fill colour (`bubbles.fill_color`, #575), `#rrggbb`; null when not sampled. */
   fillColor?: string | null;
+  /** Joined balloons (`bubbles.group_id`, #451): members of one group share it; null when the balloon stands alone. */
+  groupId: string | null;
   style?: {
     left: string;
     top: string;
