@@ -128,6 +128,11 @@ interface PanelViewFrameProps {
   dimOutsideFocus?: boolean;
   /** Animate the page plane from panel camera tags. Reader callers disable this. */
   cameraEffects?: boolean;
+  /**
+   * Width / height of a spread's plane (#724). Page mode frames it at that
+   * aspect instead of the 2:3 single-page frame. Omit it for a single page.
+   */
+  spreadAspect?: number;
   children: React.ReactNode;
 }
 
@@ -145,6 +150,7 @@ export function PanelViewFrame({
   focusBounds,
   dimOutsideFocus = false,
   cameraEffects = true,
+  spreadAspect,
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -269,15 +275,26 @@ export function PanelViewFrame({
       : cameraEffectClassFromTags(activePanel.effectTags);
 
   // Panel mode fills the measured reader area. Page mode keeps the 2:3
-  // frame with 140px reserved for the bottom chrome.
+  // frame with 140px reserved for the bottom chrome; a spread gets the same
+  // frame at its own aspect, so on a portrait phone it fits the width.
+  const spreadFrame = !panelViewMode && spreadAspect !== undefined;
   const frameSizeClass = panelViewMode
     ? "h-full w-full"
-    : "mx-auto aspect-[2/3] w-full max-h-[calc(100vh-140px)] max-w-[min(100%,calc((100vh-140px)*0.667))]";
+    : spreadFrame
+      ? "mx-auto w-full max-h-[calc(100vh-140px)]"
+      : "mx-auto aspect-[2/3] w-full max-h-[calc(100vh-140px)] max-w-[min(100%,calc((100vh-140px)*0.667))]";
+  const frameStyle = spreadFrame
+    ? {
+        aspectRatio: `${spreadAspect}`,
+        maxWidth: `min(100%, calc((100vh - 140px) * ${spreadAspect}))`,
+      }
+    : undefined;
 
   return (
     <div
       ref={viewportRef}
       className={`relative overflow-hidden select-none ${frameSizeClass}`}
+      style={frameStyle}
     >
       <div ref={transformRef} className="relative h-full w-full">
         <div

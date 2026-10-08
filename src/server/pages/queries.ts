@@ -7,6 +7,15 @@ import type ZenComicReader from "~/components/ZenComicReader";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { TextGeometry } from "~/types/text-geometry";
 import type { BookManifest, Manifest, SeriesManifest } from "~/types/manifest";
+import {
+  normalizeSpreadStarts,
+  spreadPageTurns,
+  spreadPagesFor,
+  spreadPlane,
+  toSpreadPlane,
+  type ReaderSpread,
+  type SpreadPage,
+} from "~/lib/spreads";
 import { getPanelsForPage } from "./panels";
 
 export interface PageData {
@@ -340,11 +349,49 @@ function pageCountFor(
 
 export type ReaderPageProps = ComponentProps<typeof ZenComicReader>;
 
+interface SpreadPageRow {
+  number: number;
+  width: number;
+  height: number;
+  spread_with_next: boolean;
+}
+
+/**
+ * The `pages` rows a reader page needs for spreads (#724), in one read:
+ * every page of the issue flagged `spread_with_next`, plus `pageNum` and its
+ * two neighbours, whose sizes place the halves of a spread `pageNum` is in.
+ * Service-role client, because the anon key cannot read `pages`.
+ */
+async function getSpreadRows(
+  bookId: string,
+  issueId: string,
+  pageNum: number,
+): Promise<SpreadPageRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("pages")
+    .select("number, width, height, spread_with_next")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .or(
+      `spread_with_next.eq.true,number.in.(${pageNum - 1},${pageNum},${pageNum + 1})`,
+    );
+  if (error) {
+    console.error("getSpreadRows:", error);
+    throw new Error(`getSpreadRows: ${error.message}`, { cause: error });
+  }
+  return (data ?? []) as SpreadPageRow[];
+}
+
 /**
  * Everything the reader needs for one page, or null when the book, the
  * issue or the page does not exist (or the book is a draft and
  * `publishedOnly` is set). `basePath` roots the prev and next links, so the
  * admin preview keeps its readers on `/admin/preview`.
+ *
+ * A page in a spread (#724) comes back as the whole spread: `spread` holds
+ * both images and sizes, and `bubbles` and `panels` are both pages' rows on
+ * the spread plane (`~/lib/spreads`). The prev and next links step over the
+ * spread as one stop. Other pages come back as before, with `spread` null.
  */
 export async function getReaderPage({
   bookId,
@@ -365,33 +412,81 @@ export async function getReaderPage({
     ?.issues.find((i) => i.id === issueId);
   if (!issue) return null;
 
+  const pageNum = parseInt(pageNumber, 10);
+  if (isNaN(pageNum) || pageNum < 1) return null;
+
+  const [storedCounts, spreadRows] = await Promise.all([
+    getStoredPageCounts(bookId),
+    getSpreadRows(bookId, issueId, pageNum),
+  ]);
   const pageCount = pageCountFor(
     bookId,
     issueId,
     issue.pageCount,
-    await getStoredPageCounts(bookId),
+    storedCounts,
   );
+  if (pageNum > pageCount) return null;
 
-  const pageNum = parseInt(pageNumber, 10);
-  if (isNaN(pageNum) || pageNum < 1 || pageNum > pageCount) return null;
-
-  const [{ bubbles, timestamps }, panels] = await Promise.all([
-    getPageData(bookId, issueId, pageNumber),
-    getPanelsForPage(bookId, issueId, pageNum),
-  ]);
-
+  const spreadStarts = normalizeSpreadStarts(
+    spreadRows.filter((r) => r.spread_with_next).map((r) => r.number),
+    pageCount,
+  );
+  const halves = spreadPagesFor(pageNum, spreadStarts);
   const pageLink = (n: number) => `${basePath}/${bookId}/${issueId}/${n}`;
-
-  return {
+  const turns = spreadPageTurns(pageNum, spreadStarts, pageCount);
+  const common = {
     pageImage: pageImageUrl(bookId, issueId, pageNum),
-    bubbles,
-    timestamps,
     bookId,
     issueId,
     pageNumber: pageNum,
     pageCount,
-    prevPageLink: pageNum > 1 ? pageLink(pageNum - 1) : null,
-    nextPageLink: pageNum < pageCount ? pageLink(pageNum + 1) : null,
+    prevPageLink: turns.prev !== null ? pageLink(turns.prev) : null,
+    nextPageLink: turns.next !== null ? pageLink(turns.next) : null,
+    spreadStarts,
+  };
+
+  if (!halves) {
+    const [{ bubbles, timestamps }, panels] = await Promise.all([
+      getPageData(bookId, issueId, pageNumber),
+      getPanelsForPage(bookId, issueId, pageNum),
+    ]);
+    return { ...common, bubbles, timestamps, panels, spread: null };
+  }
+
+  const half = (n: number): SpreadPage => {
+    const row = spreadRows.find((r) => r.number === n);
+    // A missing size falls back to the 2:3 page every reader frame assumes.
+    const ok = row && row.width > 0 && row.height > 0;
+    return {
+      pageNumber: n,
+      image: pageImageUrl(bookId, issueId, n),
+      width: ok ? row.width : 2,
+      height: ok ? row.height : 3,
+    };
+  };
+  const left = half(halves.left);
+  const right = half(halves.right);
+  const plane = spreadPlane(left, right);
+
+  const [leftData, rightData, leftPanels, rightPanels] = await Promise.all([
+    getPageData(bookId, issueId, String(left.pageNumber)),
+    getPageData(bookId, issueId, String(right.pageNumber)),
+    getPanelsForPage(bookId, issueId, left.pageNumber),
+    getPanelsForPage(bookId, issueId, right.pageNumber),
+  ]);
+  const { bubbles, panels } = toSpreadPlane(
+    plane,
+    { bubbles: leftData.bubbles, panels: leftPanels },
+    { bubbles: rightData.bubbles, panels: rightPanels },
+  );
+  const spread: ReaderSpread = { left, right, ...plane };
+
+  return {
+    ...common,
+    bubbles,
+    // Keyed by bubble id, so the two pages' entries never collide.
+    timestamps: { ...leftData.timestamps, ...rightData.timestamps },
     panels,
+    spread,
   };
 }

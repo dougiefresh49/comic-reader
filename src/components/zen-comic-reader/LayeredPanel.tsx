@@ -2,14 +2,75 @@
 
 import { useId } from "react";
 import Image from "next/image";
+import type { ReaderSpread } from "~/lib/spreads";
 import type {
   PanelBoundingBox,
   PanelForegroundPolygons,
   PanelLocalPolygon,
 } from "~/types/panels";
 
+interface PageArtProps {
+  pageImage: string;
+  /** Set on a spread (#724): both pages side by side across the plane. */
+  spread?: ReaderSpread | null;
+  alt: string;
+  style?: React.CSSProperties;
+}
+
+/**
+ * The page art filling the page plane. A single page is the one image it
+ * always was; a spread is its two images side by side, the left one across
+ * `leftShare` of the plane and the right one across the rest, meeting at
+ * the seam. `style` (a clip path) applies to the art as a whole.
+ */
+export function PageArt({ pageImage, spread, alt, style }: PageArtProps) {
+  if (!spread) {
+    return (
+      <Image
+        src={pageImage}
+        alt={alt}
+        fill
+        className="object-contain"
+        style={style}
+        priority
+        aria-hidden={alt ? undefined : true}
+      />
+    );
+  }
+  const share = spread.leftShare * 100;
+  return (
+    <div
+      className="absolute inset-0"
+      style={style}
+      role={alt ? "img" : undefined}
+      aria-label={alt || undefined}
+      aria-hidden={alt ? undefined : true}
+    >
+      {[
+        { page: spread.left, left: 0, width: share },
+        { page: spread.right, left: share, width: 100 - share },
+      ].map(({ page, left, width }) => (
+        <div
+          key={page.pageNumber}
+          className="absolute inset-y-0"
+          style={{ left: `${left}%`, width: `${width}%` }}
+        >
+          <Image
+            src={page.image}
+            alt=""
+            fill
+            className="object-contain"
+            priority
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface LayeredPanelProps {
   pageImage: string;
+  spread?: ReaderSpread | null;
   bbox: PanelBoundingBox;
   polygons: PanelForegroundPolygons;
   effectsSlot: React.ReactNode;
@@ -29,6 +90,7 @@ function polyToSvgPath(
 
 export function LayeredPanel({
   pageImage,
+  spread,
   bbox,
   polygons,
   effectsSlot,
@@ -41,13 +103,7 @@ export function LayeredPanel({
   if (allPolys.length === 0) {
     return (
       <>
-        <Image
-          src={pageImage}
-          alt="Comic page"
-          fill
-          className="object-contain"
-          priority
-        />
+        <PageArt pageImage={pageImage} spread={spread} alt="Comic page" />
         {effectsSlot}
       </>
     );
@@ -70,25 +126,20 @@ export function LayeredPanel({
         </defs>
       </svg>
 
-      <Image
-        src={pageImage}
+      <PageArt
+        pageImage={pageImage}
+        spread={spread}
         alt=""
-        fill
-        className="object-contain"
         style={{ clipPath: `url(#${clipId}-bg)` }}
-        priority
-        aria-hidden
       />
 
       {effectsSlot}
 
-      <Image
-        src={pageImage}
+      <PageArt
+        pageImage={pageImage}
+        spread={spread}
         alt="Comic page"
-        fill
-        className="object-contain"
         style={{ clipPath: `url(#${clipId}-fg)` }}
-        priority
       />
     </>
   );

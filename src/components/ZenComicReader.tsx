@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
 import { highlightColorFor } from "~/lib/highlight-color";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
+import { pageLabel, type ReaderSpread } from "~/lib/spreads";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
@@ -43,7 +43,7 @@ import {
   styleToNormRect,
   unionPanelFocusBounds,
 } from "./zen-comic-reader/PanelView.transforms";
-import { LayeredPanel } from "./zen-comic-reader/LayeredPanel";
+import { LayeredPanel, PageArt } from "./zen-comic-reader/LayeredPanel";
 import {
   BubbleWordHighlight,
   inBubbleMatch,
@@ -80,6 +80,13 @@ interface ZenComicReaderProps {
   pageNumber: number;
   pageCount: number;
   panels?: PageDirectedPanel[];
+  /**
+   * Set when this page is half of a spread (#724): both images, and the
+   * plane `bubbles` and `panels` are already mapped onto.
+   */
+  spread?: ReaderSpread | null;
+  /** Left pages of the issue's spreads, for the counter and the page sheet. */
+  spreadStarts?: number[];
 }
 
 export default function ZenComicReader({
@@ -93,6 +100,8 @@ export default function ZenComicReader({
   pageNumber,
   pageCount,
   panels: rawPanels = [],
+  spread = null,
+  spreadStarts = [],
 }: ZenComicReaderProps) {
   const panels = useMemo(() => sortPanelsForReading(rawPanels), [rawPanels]);
   const [selectedBubbleId, setSelectedBubbleId] = useState<string | null>(null);
@@ -121,11 +130,17 @@ export default function ZenComicReader({
   const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
+    // A spread's plane size comes from its stored page sizes.
+    if (spread) return;
     const img = new window.Image();
     img.onload = () =>
       setPageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
     img.src = pageImage;
-  }, [pageImage]);
+  }, [pageImage, spread]);
+  const pageSize = spread ? spread.size : pageNaturalSize;
+  // The counter's number: "8–9" on either half of a spread.
+  const counterLabel = pageLabel(pageNumber, spreadStarts);
+  const progressPage = spread ? spread.right.pageNumber : pageNumber;
 
   const systemReducedMotion = usePrefersReducedMotion();
   const focusBeforePanelRef = useRef<Element | null>(null);
@@ -777,14 +792,18 @@ export default function ZenComicReader({
                 panels={panels}
                 panelIndex={panelIndex}
                 reducedMotion={cameraOff}
-                pageSize={pageNaturalSize}
+                pageSize={pageSize}
                 focusBounds={focusBounds}
                 dimOutsideFocus
                 cameraEffects={false}
+                spreadAspect={
+                  spread ? spread.size.w / spread.size.h : undefined
+                }
               >
                 {panelViewMode && activePanel?.foregroundPolygons ? (
                   <LayeredPanel
                     pageImage={pageImage}
+                    spread={spread}
                     bbox={activePanel.boundingBox}
                     polygons={activePanel.foregroundPolygons}
                     effectsSlot={
@@ -797,12 +816,10 @@ export default function ZenComicReader({
                   />
                 ) : (
                   <>
-                    <Image
-                      src={pageImage}
+                    <PageArt
+                      pageImage={pageImage}
+                      spread={spread}
                       alt="Comic page"
-                      fill
-                      className="object-contain"
-                      priority
                     />
                     <PanelEffectsOverlay
                       panel={activePanel}
@@ -898,8 +915,9 @@ export default function ZenComicReader({
 
         {inPanelView ? (
           <ControlBar
-            pageNumber={pageNumber}
+            pageNumber={progressPage}
             pageCount={pageCount}
+            pageLabel={counterLabel}
             hidePageProgress
             overlay
             visible={chromeVisible}
@@ -924,7 +942,11 @@ export default function ZenComicReader({
             </div>
           </ControlBar>
         ) : (
-          <ControlBar pageNumber={pageNumber} pageCount={pageCount}>
+          <ControlBar
+            pageNumber={progressPage}
+            pageCount={pageCount}
+            pageLabel={counterLabel}
+          >
             {captionShown ? (
               <div className="flex w-full items-center gap-2">
                 <div className="min-w-0 flex-1">{caption}</div>
@@ -1005,6 +1027,7 @@ export default function ZenComicReader({
           issueId={issueId}
           currentPage={pageNumber}
           pageCount={pageCount}
+          spreadStarts={spreadStarts}
           isOpen={isPageSheetOpen}
           onClose={() => setIsPageSheetOpen(false)}
         />
