@@ -11,6 +11,7 @@ import {
   bubbleCenter,
   filterDuplicatePanels,
   filterSliverPanels,
+  intersectArea,
   matchBubblePanel,
 } from "~/lib/panel-filter";
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
@@ -713,12 +714,81 @@ export async function roboflowAnalyzeBatch(
         },
       })),
     );
-    for (const { bounding_box: b, confidence } of bubbleFilter.dropped) {
+    // Roboflow was sent the image URL, so the bytes are fetched here, once,
+    // and only when something needs them. A failed fetch is not kept, so
+    // the next caller tries again.
+    let pageBytes: Promise<Uint8Array> | undefined;
+    const loadPageImage = () =>
+      (pageBytes ??= (async () => {
+        const { data, error } = await supabase.storage
+          .from("comic-pages")
+          .download(pageStoragePath(bookId, issueId, page.pageNumber));
+        if (error || !data) throw new Error(error?.message ?? "no image");
+        return new Uint8Array(await data.arrayBuffer());
+      })().catch((err: unknown) => {
+        pageBytes = undefined;
+        throw err;
+      }));
+    // An unsure container drop gets a Gemini look, which can only keep it
+    // (#343). Not when the page's bubble rows exist and will not be written,
+    // and not once the page's time budget is spent: those stay kept.
+    const groupChecks = new Map<number, { keep: boolean; note: string }>();
+    const checksStarted = Date.now();
+    let overBudget = 0;
+    for (const drop of bubbleFilter.drops) {
+      if (!drop.unsure || existingBubbles > 0) continue;
+      const { checkBubbleGroup, GROUP_CHECK_PAGE_BUDGET_MS } = await import(
+        "~/lib/bubble-group-check"
+      );
+      if (Date.now() - checksStarted >= GROUP_CHECK_PAGE_BUDGET_MS) {
+        overBudget++;
+        groupChecks.set(drop.bubble.idx, {
+          keep: true,
+          note: "unchecked, page check budget spent",
+        });
+        continue;
+      }
+      // Only boxes that stay are framed: a frame on a loose box that drops
+      // later could hide the container's own words.
+      const touching = bubbleFilter.kept.filter(
+        (o) => intersectArea(o.bounding_box, drop.bubble.bounding_box) > 0,
+      );
+      groupChecks.set(
+        drop.bubble.idx,
+        await checkBubbleGroup(
+          loadPageImage,
+          drop.bubble.bounding_box,
+          touching.map((o) => o.bounding_box),
+          {
+            step: "roboflow-page-analyze:group-check",
+            bookId,
+            issueId,
+            pageNumber: page.pageNumber,
+          },
+        ),
+      );
+    }
+    if (overBudget > 0) {
       console.log(
-        `[roboflow] ${pageLabel}: dropped duplicate bubble x ${Math.round(b.x)} y ${Math.round(b.y)} w ${Math.round(b.w)} h ${Math.round(b.h)} conf ${confidence.toFixed(3)}`,
+        `[roboflow] ${pageLabel}: group check budget spent, ${overBudget} unsure container(s) kept without a check`,
+      );
+    }
+    for (const { bubble, rule, unsure } of bubbleFilter.drops) {
+      const { bounding_box: b, confidence } = bubble;
+      const check = groupChecks.get(bubble.idx);
+      const why = check
+        ? `, ${check.note}`
+        : unsure
+          ? ", unsure, unchecked"
+          : "";
+      console.log(
+        `[roboflow] ${pageLabel}: ${check?.keep ? "kept unsure" : "dropped duplicate"} bubble (${rule}${why}) x ${Math.round(b.x)} y ${Math.round(b.y)} w ${Math.round(b.w)} h ${Math.round(b.h)} conf ${confidence.toFixed(3)}`,
       );
     }
     const keptBubbleIdx = new Set(bubbleFilter.kept.map((c) => c.idx));
+    for (const [idx, check] of groupChecks) {
+      if (check.keep) keptBubbleIdx.add(idx);
+    }
     const bubblePredictions = rawBubbles.filter((_, idx) =>
       keptBubbleIdx.has(idx),
     );
@@ -791,16 +861,9 @@ export async function roboflowAnalyzeBatch(
         `[roboflow] ${pageLabel}: ${existingBubbles} bubbles already present, skip bubbles write`,
       );
     } else if (bubbleRows.length > 0) {
-      // Roboflow was sent the image URL, so the bytes are fetched here.
       const rowsWithFill = await withFillColors(
         bubbleRows,
-        async () => {
-          const { data, error } = await supabase.storage
-            .from("comic-pages")
-            .download(pageStoragePath(bookId, issueId, page.pageNumber));
-          if (error || !data) throw new Error(error?.message ?? "no image");
-          return new Uint8Array(await data.arrayBuffer());
-        },
+        loadPageImage,
         pageLabel,
       );
       const { error: bErr } = await supabase
