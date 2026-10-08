@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Backfill `bubbles.fill_color` (#575): sample each bubble's balloon fill
- * from its page image, one download per page. Writes PRODUCTION unless
+ * Backfill `bubbles.fill_color` (#575): sample the colour under each
+ * bubble's words (its balloon fill when it has no word boxes, #672) from its page image, one download per page. Writes PRODUCTION unless
  * `--dry-run`, which samples and prints each bubble's colour, its text and
  * the highlight colour the reader would pick, and writes nothing. By default
  * only rows with no colour are filled; `--force` recomputes every row. No
@@ -10,7 +10,8 @@
  * The pixel box is `box_2d` when it holds numeric x, y, width and height,
  * else the `style` percents times the decoded image's size (some issue-1
  * rows carry only `{"index":N}` in `box_2d`). A row with neither is skipped.
- * Its stored `text_geometry` word boxes are left out of the sample (#597).
+ * When it has stored `text_geometry` word boxes, the sample is read inside
+ * them (#672).
  *
  * Rows are read with `select("*")` and the colour is filtered here, so a dry
  * run also works before the column's migration is applied.

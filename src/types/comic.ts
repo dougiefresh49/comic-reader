@@ -25,7 +25,7 @@ export interface Bubble {
   ignored?: boolean;
   /** Lettered word boxes (`bubbles.text_geometry`, #61); null when none were read. */
   textGeometry?: TextGeometry | null;
-  /** Balloon fill colour (`bubbles.fill_color`, #575), `#rrggbb`; null when not sampled. */
+  /** The colour under the bubble's words, else its balloon fill (`bubbles.fill_color`, #575, #672), `#rrggbb`; null when not sampled. */
   fillColor?: string | null;
   /** Joined balloons (`bubbles.group_id`, #451): members of one group share it; null when the balloon stands alone. */
   groupId: string | null;
