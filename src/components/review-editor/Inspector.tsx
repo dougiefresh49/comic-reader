@@ -437,7 +437,7 @@ function ListenBlock({
         </button>
       </div>
       <p className="text-[11px] text-neutral-500">
-        Cues use a Gemini call. Audio uses ElevenLabs credits.
+        Regenerating cues uses a Gemini call; audio uses ElevenLabs credits.
         {grouped && (
           <> The group renders as one clip for all {view.groupSize} balloons.</>
         )}
