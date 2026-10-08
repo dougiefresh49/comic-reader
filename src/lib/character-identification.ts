@@ -7,24 +7,8 @@ import {
 } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readAliases } from "./character-aliases";
-import {
-  ambientLlmMeta,
-  generateContentLogged,
-  type LlmCallMeta,
-} from "./llm-usage";
+import { ambientLlmMeta, generateContentLogged } from "./llm-usage";
 import { GEMINI_MEDIUM } from "./models";
-
-/**
- * The ambient meta, on Flex when the call comes from the ingest lookahead
- * step (#104). Benches and dry runs name their own step, so they stay
- * standard.
- */
-function faceCallMeta(fallbackStep: string): LlmCallMeta {
-  const meta = ambientLlmMeta(fallbackStep);
-  return meta.step === "character-lookahead"
-    ? { ...meta, serviceTier: "flex" }
-    : meta;
-}
 
 export interface FaceIdentification {
   characterName: string | null;
@@ -206,7 +190,7 @@ export async function identifyFace(
           ? { config: { thinkingConfig: { thinkingLevel } } }
           : {}),
       },
-      faceCallMeta("identify-face"),
+      ambientLlmMeta("identify-face"),
     );
   } catch (err) {
     if (options?.throwOnApiError) throw err;
@@ -293,7 +277,7 @@ export async function matchFaceToClusters(
     const response = await generateContentLogged(
       gemini,
       { model: GEMINI_MEDIUM, contents: [{ role: "user", parts }] },
-      faceCallMeta("match-face-clusters"),
+      ambientLlmMeta("match-face-clusters"),
     );
 
     const text = response.text?.trim() ?? "";

@@ -120,6 +120,12 @@ export function usageToRow(
 ): LlmCallInsert {
   const row = baseRow("gemini", model, meta);
   if (!usage) return row;
+  // The tier Google billed (`usageMetadata.serviceTier`, e.g. "flex") wins
+  // over the one requested, so a row never claims a discount it did not get.
+  // The API sends it; the SDK's 1.x types do not declare it.
+  const billedTier = (usage as { serviceTier?: unknown }).serviceTier;
+  if (typeof billedTier === "string" && billedTier)
+    row.service_tier = billedTier;
   const tokensIn = usage.promptTokenCount ?? 0;
   const tokensOut = usage.candidatesTokenCount ?? 0;
   const tokensThinking = usage.thoughtsTokenCount ?? 0;
@@ -301,7 +307,7 @@ async function generateFlex(
       ...params,
       config: {
         ...params.config,
-        serviceTier: ServiceTier.SERVICE_TIER_FLEX,
+        serviceTier: ServiceTier.FLEX,
         httpOptions: { ...params.config?.httpOptions, timeout },
       },
     };
