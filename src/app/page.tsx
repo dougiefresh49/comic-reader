@@ -3,18 +3,63 @@ import { getManifest } from "~/server";
 import { monogram } from "~/lib/monogram";
 import { pageImageUrl } from "~/lib/storage";
 import { CoverImage } from "~/components/ui/CoverImage";
-import type { BookManifest } from "~/types/manifest";
+import type { BookManifest, Manifest } from "~/types/manifest";
 
 export const revalidate = 3600;
 
-function bookCover(book: BookManifest): string | null {
-  const firstIssue = book.issues[0];
-  return firstIssue ? pageImageUrl(book.id, firstIssue.id, 1) : null;
+function bookCover(book: BookManifest | undefined): string | null {
+  const firstIssue = book?.issues[0];
+  return book && firstIssue ? pageImageUrl(book.id, firstIssue.id, 1) : null;
+}
+
+/** One card on the shelf: a standalone book, or a whole series. */
+interface ShelfItem {
+  key: string;
+  name: string;
+  cover: string | null;
+  issueCount: number;
+  href: string;
+  isSeries: boolean;
+}
+
+/**
+ * The books in manifest order, where the first book of a series stands in
+ * for the whole series and its later books add nothing.
+ */
+function shelfItems(manifest: Manifest): ShelfItem[] {
+  const items: ShelfItem[] = [];
+  const seen = new Set<string>();
+  for (const book of manifest.books) {
+    if (!book.series) {
+      items.push({
+        key: `book:${book.id}`,
+        name: book.name,
+        cover: bookCover(book),
+        issueCount: book.issues.length,
+        href: `/book/${book.id}`,
+        isSeries: false,
+      });
+      continue;
+    }
+    if (seen.has(book.series.id)) continue;
+    seen.add(book.series.id);
+    const series = manifest.series.find((s) => s.id === book.series?.id);
+    const books = series?.books ?? [book];
+    items.push({
+      key: `series:${book.series.id}`,
+      name: book.series.name,
+      cover: bookCover(books[0]),
+      issueCount: books.reduce((n, b) => n + b.issues.length, 0),
+      href: `/series/${book.series.id}`,
+      isSeries: true,
+    });
+  }
+  return items;
 }
 
 export default async function LibraryPage() {
   const manifest = await getManifest({ publishedOnly: true });
-  const books = manifest.books;
+  const items = shelfItems(manifest);
 
   return (
     <main className="relative min-h-screen bg-neutral-950 text-neutral-100">
@@ -34,12 +79,12 @@ export default async function LibraryPage() {
           </p>
         </header>
 
-        {books.length === 0 ? (
+        {items.length === 0 ? (
           <EmptyLibrary />
-        ) : books.length <= 2 ? (
-          <FeaturedBooks books={books} />
+        ) : items.length <= 2 ? (
+          <FeaturedBooks items={items} />
         ) : (
-          <BookGrid books={books} />
+          <BookGrid items={items} />
         )}
       </div>
     </main>
@@ -47,30 +92,39 @@ export default async function LibraryPage() {
 }
 
 /** Centered hero treatment for a 1–2 book library. */
-function FeaturedBooks({ books }: { books: BookManifest[] }) {
+function FeaturedBooks({ items }: { items: ShelfItem[] }) {
   return (
     <div className="flex flex-wrap items-start justify-center gap-8 pt-4 sm:pt-8">
-      {books.map((book) => (
+      {items.map((item) => (
         <Link
-          key={book.id}
-          href={`/book/${book.id}`}
+          key={item.key}
+          href={item.href}
           className="group flex w-60 flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10 hover:ring-2 hover:ring-cyan-400/60 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none sm:w-72"
         >
           <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900">
             <CoverImage
-              src={bookCover(book)}
-              alt={book.name}
-              fallbackLabel={monogram(book.name)}
+              src={item.cover}
+              alt={item.name}
+              fallbackLabel={monogram(item.name)}
               sizes="288px"
               priority
               className="transition-transform duration-300 group-hover:scale-[1.02]"
             />
           </div>
           <div className="flex items-center justify-between gap-3 px-1 pb-1">
-            <h2 className="text-sm font-semibold text-neutral-100">
-              {book.name}
-            </h2>
-            <IssueCountChip count={book.issues.length} />
+            {item.isSeries ? (
+              <div>
+                <SeriesLabel />
+                <h2 className="text-sm font-semibold text-neutral-100">
+                  {item.name}
+                </h2>
+              </div>
+            ) : (
+              <h2 className="text-sm font-semibold text-neutral-100">
+                {item.name}
+              </h2>
+            )}
+            <IssueCountChip count={item.issueCount} />
           </div>
         </Link>
       ))}
@@ -79,35 +133,44 @@ function FeaturedBooks({ books }: { books: BookManifest[] }) {
 }
 
 /** Standard grid for 3+ books. */
-function BookGrid({ books }: { books: BookManifest[] }) {
+function BookGrid({ items }: { items: ShelfItem[] }) {
   return (
     <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-      {books.map((book) => (
+      {items.map((item) => (
         <Link
-          key={book.id}
-          href={`/book/${book.id}`}
+          key={item.key}
+          href={item.href}
           className="group flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-2.5 transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none"
         >
           <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900">
             <CoverImage
-              src={bookCover(book)}
-              alt={book.name}
-              fallbackLabel={monogram(book.name)}
+              src={item.cover}
+              alt={item.name}
+              fallbackLabel={monogram(item.name)}
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 20vw, 16vw"
               className="transition-transform duration-300 group-hover:scale-[1.02]"
             />
           </div>
           <div className="px-1 pb-1">
+            {item.isSeries ? <SeriesLabel /> : null}
             <h2 className="line-clamp-2 text-sm font-semibold text-neutral-100">
-              {book.name}
+              {item.name}
             </h2>
             <p className="mt-1 text-xs text-neutral-500 tabular-nums">
-              {book.issues.length} issue{book.issues.length !== 1 ? "s" : ""}
+              {item.issueCount} issue{item.issueCount !== 1 ? "s" : ""}
             </p>
           </div>
         </Link>
       ))}
     </div>
+  );
+}
+
+function SeriesLabel() {
+  return (
+    <p className="text-[10px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+      Series
+    </p>
   );
 }
 

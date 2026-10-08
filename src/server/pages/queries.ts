@@ -6,7 +6,7 @@ import { pageImageUrl } from "~/lib/storage";
 import type ZenComicReader from "~/components/ZenComicReader";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { TextGeometry } from "~/types/text-geometry";
-import type { BookManifest, Manifest } from "~/types/manifest";
+import type { BookManifest, Manifest, SeriesManifest } from "~/types/manifest";
 import { getPanelsForPage } from "./panels";
 
 export interface PageData {
@@ -70,6 +70,9 @@ interface IssueRow {
 interface BookRow {
   id: string;
   name: string;
+  series_id: string | null;
+  series_position: number | null;
+  series: { id: string; name: string } | null;
   issues: IssueRow[] | null;
 }
 
@@ -166,7 +169,7 @@ export async function getManifest({
   let query = supabase
     .from("books")
     .select(
-      "id, name, issues(id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps)",
+      "id, name, series_id, series_position, series(id, name), issues(id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps)",
     )
     .order("number", { ascending: true, foreignTable: "issues" });
   if (publishedOnly) {
@@ -180,30 +183,72 @@ export async function getManifest({
     throw new Error(`getManifest: ${error.message}`, { cause: error });
   }
 
-  const books: BookManifest[] = ((data ?? []) as BookRow[]).map((book) => ({
-    id: book.id,
-    name: book.name,
-    issues: (book.issues ?? []).map((issue) => ({
-      id: issue.id,
-      name: issue.name,
-      pageCount: issue.page_count,
-      bubbleCount: issue.bubble_count,
-      audioCount: issue.audio_count,
-      hasWebP: issue.has_webp,
-      hasAudio: issue.has_audio,
-      hasTimestamps: issue.has_timestamps,
-    })),
-  }));
+  const books: BookManifest[] = ((data ?? []) as unknown as BookRow[]).map(
+    (book) => ({
+      id: book.id,
+      name: book.name,
+      series: book.series
+        ? {
+            id: book.series.id,
+            name: book.series.name,
+            position: book.series_position,
+          }
+        : null,
+      issues: (book.issues ?? []).map((issue) => ({
+        id: issue.id,
+        name: issue.name,
+        pageCount: issue.page_count,
+        bubbleCount: issue.bubble_count,
+        audioCount: issue.audio_count,
+        hasWebP: issue.has_webp,
+        hasAudio: issue.has_audio,
+        hasTimestamps: issue.has_timestamps,
+      })),
+    }),
+  );
 
   return {
     books,
+    series: groupSeries(books),
     generatedAt: new Date().toISOString(),
   };
 }
 
 /**
+ * The series among `books`, in the order each one's first book appears, with
+ * its books by `position` ascending (nulls last), then by book id. Built from
+ * the books the caller already filtered, so with `publishedOnly` a series
+ * with no published book is absent.
+ */
+function groupSeries(books: BookManifest[]): SeriesManifest[] {
+  const byId = new Map<string, SeriesManifest>();
+  for (const book of books) {
+    if (!book.series) continue;
+    let entry = byId.get(book.series.id);
+    if (!entry) {
+      entry = { id: book.series.id, name: book.series.name, books: [] };
+      byId.set(entry.id, entry);
+    }
+    entry.books.push(book);
+  }
+  for (const entry of byId.values()) {
+    entry.books.sort((a, z) => {
+      const ap = a.series?.position ?? null;
+      const zp = z.series?.position ?? null;
+      if (ap !== zp) {
+        if (ap === null) return 1;
+        if (zp === null) return -1;
+        return ap - zp;
+      }
+      return a.id < z.id ? -1 : a.id > z.id ? 1 : 0;
+    });
+  }
+  return [...byId.values()];
+}
+
+/**
  * `books.published` keyed by book id, for the admin book list. The list reads
- * its books from `getAdminBooksWithParts`, which is a different shape, so
+ * its books from `getAdminBooks`, which is a different shape, so
  * this is a second small read rather than a change to that query.
  */
 export async function getBookPublishedFlags(): Promise<
