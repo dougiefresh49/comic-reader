@@ -21,9 +21,7 @@
 # (--from-step generate-audio) gets the ingest reason and not that script's.
 script:ingest :: Paid: ingest resumes whatever steps are unfinished, and any of them can spend on Gemini, ElevenLabs credits or voice slots. Re-run it as LIVE_API_OK=1 pnpm ingest ... only if the task named that spend.
 script:generate-audio :: Paid: generate-audio synthesizes the whole issue with ElevenLabs. Re-run it as LIVE_API_OK=1 pnpm generate-audio ... only if the task named that spend.
-script:generate-voice-models :: Paid: Voice Design takes real ElevenLabs voice slots, and the account is at its cap. Re-run it as LIVE_API_OK=1 pnpm generate-voice-models ... only if the task named that spend.
 script:regenerate-timestamps :: Paid: regenerating timestamps re-calls ElevenLabs for every cue. Re-run it as LIVE_API_OK=1 pnpm regenerate-timestamps ... only if the task named that spend.
-script:get-context :: Paid: get-context runs a Gemini call per issue. Re-run it as LIVE_API_OK=1 pnpm get-context ... only if the task named that spend.
 script:motion-comic :: Paid: motion-comic calls Gemini for the motion plan. Re-run it as LIVE_API_OK=1 pnpm motion-comic ... only if the task named that spend.
 script:split-voice :: Paid: split-voice builds a new voice, which takes a voice slot. Re-run it as LIVE_API_OK=1 pnpm split-voice ... only if the task named that spend.
 script:voice-rotation && --execute([^[:alnum:]_-]|$) :: Paid: --execute renames or deletes real ElevenLabs voices; without it every mode is a plan. Re-run it as LIVE_API_OK=1 pnpm voice-rotation ... only if the task named that spend.
