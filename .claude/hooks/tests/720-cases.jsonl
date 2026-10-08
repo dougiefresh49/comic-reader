@@ -23,3 +23,5 @@
 {"id":"3c xargs -tR bundle takes a value (main already blocks it)","want":2,"cmd":"xargs -tR 1 pnpm generate-audio","reason":"generate-audio synthesizes"}
 {"id":"3d xargs -R value is the count, echo runs","want":0,"cmd":"xargs -R 1 echo generate-audio"}
 {"id":"3e xargs -S value is the size, echo runs","want":0,"cmd":"xargs -S pnpm echo generate-audio"}
+{"id":"2p env long-option prefix value before -S (awk vlong)","want":2,"cmd":"env --ch /tmp -S 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"3f xargs -R non-numeric value is not the command","want":0,"cmd":"xargs -R pnpm echo generate-audio"}
