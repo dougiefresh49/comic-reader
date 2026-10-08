@@ -26,6 +26,7 @@ import {
 } from "./steps/vision";
 import { sortPageElements, addBubbleStyles } from "./steps/sort";
 import { groupBalloons } from "./steps/group-balloons";
+import { detectSpreads } from "./steps/spreads";
 import { fetchWikiContextStep } from "./steps/wiki";
 import { generateVoiceDescriptions } from "./steps/voice";
 import { wordGeometryPage } from "./steps/word-geometry";
@@ -88,6 +89,22 @@ export async function ingestPipeline(input: IngestInput) {
           "Roboflow produced 0 panels. API may be down or credentials invalid",
         );
       }
+      await recordStepEnd(bookId, issueId, currentStep, timing);
+    }
+
+    // Spreads (#723): free, no model call. It reads only the stored page
+    // images, and marks the left page of each pair whose art crosses the
+    // seam; the owner confirms or unticks it in the review editor.
+    if (run("detect-spreads")) {
+      currentStep = "detect-spreads";
+      await updatePipelineStep(bookId, issueId, currentStep);
+      const timing = await recordStepStart(
+        bookId,
+        issueId,
+        currentStep,
+        pages.length,
+      );
+      await detectSpreads(bookId, issueId);
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 

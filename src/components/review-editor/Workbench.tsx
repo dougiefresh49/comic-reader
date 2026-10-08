@@ -15,6 +15,7 @@ import type { AnalyzeProposal } from "~/server/actions/review/analyze-bubble";
 import {
   checkIssueReady,
   setPageApproval,
+  setSpreadWithNext,
 } from "~/app/admin/[bookId]/[issueId]/review/editor/actions";
 import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
@@ -378,6 +379,12 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     approvalRef.current = job;
     setApprovalJob(job);
   }, []);
+  /** `pages.spread_with_next` by page number, as last read or written (#723). */
+  const [spreads, setSpreads] = useState(
+    () => new Map(data.pages.map((p) => [p.number, p.spreadWithNext])),
+  );
+  /** The page whose spread toggle is saving, or null. */
+  const [spreadSaving, setSpreadSaving] = useState<number | null>(null);
   const [resumed, setResumed] = useState(false);
   const [resumeError, setResumeError] = useState<string | null>(null);
 
@@ -1212,6 +1219,53 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     }
   };
 
+  // ------------------------------------------------------------- spread
+
+  const lastPage = data.pages[data.pages.length - 1]?.number ?? null;
+  const pageSpread = !!spreads.get(pageNumber);
+  /** Why the current page's spread toggle is off limits, or null (#723). */
+  const spreadBlock = spreads.get(pageNumber - 1)
+    ? `Right half of ${pageNumber - 1}–${pageNumber}: untick on page ${pageNumber - 1} to split`
+    : pageNumber === lastPage
+      ? "Last page"
+      : null;
+
+  /**
+   * Join or split page N and N+1 (#723). Saves at once, outside the Save
+   * button's pending edits; the box shows the new state while it saves and
+   * goes back to the old one when the save fails.
+   */
+  const toggleSpread = async (n: number, spread: boolean) => {
+    if (spreadSaving !== null) return;
+    setSpreadSaving(n);
+    setSpreads((prev) => new Map(prev).set(n, spread));
+    const pair = `${n}–${n + 1}`;
+    try {
+      const res = await setSpreadWithNext({
+        bookId: data.bookId,
+        issueId: data.issueId,
+        page: n,
+        spread,
+      });
+      if (!res.ok) {
+        setSpreads((prev) => new Map(prev).set(n, !spread));
+        say(res.error, "warn");
+        return;
+      }
+      say(
+        spread ? `Pages ${pair} are one spread.` : `Pages ${pair} are split.`,
+      );
+    } catch (e) {
+      setSpreads((prev) => new Map(prev).set(n, !spread));
+      say(
+        `The spread of pages ${pair} may or may not have been stored (${(e as Error).message}). Reload to see it as it is now.`,
+        "warn",
+      );
+    } finally {
+      setSpreadSaving(null);
+    }
+  };
+
   /**
    * Approve issue, with the editor locked throughout: save the pending edits
    * (a failed Save stops here, its error showing), have the server check the
@@ -1831,6 +1885,38 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             <span className="tabular-nums opacity-60">{toWrite}</span>
           )}
         </button>
+        <label
+          className={`flex h-6 shrink-0 items-center gap-1.5 ${
+            spreadBlock ? "text-neutral-600" : "text-neutral-300"
+          }`}
+          title={
+            spreadBlock ??
+            (pageSpread
+              ? `Untick to split pages ${pageNumber}–${pageNumber + 1}`
+              : `Tick to join pages ${pageNumber}–${pageNumber + 1} as one spread`)
+          }
+        >
+          <input
+            type="checkbox"
+            tabIndex={-1}
+            checked={pageSpread}
+            disabled={!!spreadBlock || spreadSaving !== null}
+            onChange={(e) => {
+              // Focus left on the box would read as typing and mute the editor's keys.
+              e.currentTarget.blur();
+              void toggleSpread(pageNumber, e.target.checked);
+            }}
+            className="accent-emerald-500"
+          />
+          Spread with next page
+          {spreadSaving === pageNumber ? (
+            <span className="text-neutral-500">Saving</span>
+          ) : (
+            spreadBlock && (
+              <span className="text-neutral-500">{spreadBlock}</span>
+            )
+          )}
+        </label>
         <button
           type="button"
           disabled={!!lockReason}

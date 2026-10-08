@@ -5,6 +5,7 @@
  */
 export const STEP_ORDER = [
   "roboflow-page-analyze",
+  "detect-spreads",
   "fetch-wiki-context",
   "character-lookahead",
   "review-clusters",
