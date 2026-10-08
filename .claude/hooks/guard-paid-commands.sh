@@ -46,6 +46,13 @@ block() {
 set -f
 M=$'\035' # the mark on a redirect operator word, which no quoted ">" can carry
 
+# Words that run the command after them rather than being it, compared on the
+# basename, plus a bare count or duration (`nice -n 10`, `timeout 30`). Both
+# executable finders read this one list: command_shape, and the sh -c unwrap
+# in segments(), which gets it as awk's `wrap`. No backslashes: awk -v would
+# eat them.
+WRAPPER='^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{]|!|if|then|elif|else|do|while|until|[0-9][0-9.]*[smhd]?)$'
+
 # --- the rule list, read once ---------------------------------------------
 #
 # Into arrays, once: re-reading the list with a grep per rule per segment took
@@ -101,9 +108,9 @@ done <<<"$SCRIPT_FILES"
 # target is the next word; a quoted newline is kept as \036. One level of
 # `sh -c "..."` is unwrapped by lexing its word again at the end.
 segments() {
-  printf '%s' "$1" | awk '
+  printf '%s' "$1" | awk -v wrap="$WRAPPER" '
     function endword() { if (inw) w[nw++] = cur; cur = ""; inw = 0 }
-    function endseg(   i, j, line, b) {
+    function endseg(   i, j, line, b, sc) {
       endword()
       if (nw == 0) return
       line = w[0]
@@ -113,10 +120,15 @@ segments() {
       # finds it, so a quoted "bash" "-c" handed to printf is just text.
       for (i = 0; depth == 0 && i < nw; i++) {
         if (w[i] ~ /^(\035|-u$|--unset$|-C$|--chdir$)/) { i++; continue }
-        if (w[i] ~ /^(-|env$|[A-Za-z_][A-Za-z0-9_]*=)/) continue
         b = w[i]; sub(/.*\//, "", b)
-        for (j = i + 1; b ~ /^(ba|z|k|da)?sh$/ && j < nw - 1; j++)
-          if (w[j] ~ /^-[a-zA-Z]*c$/) { inner[ninner++] = w[j + 1]; break }
+        if (w[i] ~ /^(-|[A-Za-z_][A-Za-z0-9_]*=)/ || b ~ wrap) continue
+        # The options of the shell run up to its first other word: any of them
+        # holding a c (-c, -cl, -lc) makes that word the command string, and
+        # a -c after it (`bash script.sh -c`) is an argument to the script.
+        for (j = i + 1; b ~ /^(ba|z|k|da)?sh$/ && j < nw; j++) {
+          if (w[j] ~ /^-[a-zA-Z]*c[a-zA-Z]*$/) sc = 1
+          if (w[j] !~ /^-/) { if (sc) inner[ninner++] = w[j]; break }
+        }
         break
       }
       split("", w); nw = 0
@@ -168,9 +180,10 @@ segments() {
 # The executable a segment runs (its index in W, or -1), and whether the run of
 # assignments in front of it named the override (OVERRIDE=1).
 #
-# `env` is a wrapper rather than a command, so the walk goes through it, its
-# options (`env -u NAME`) and the assignments it carries, the way a shell
-# would; a redirect and its target are stepped over too.
+# `env`, `time`, `sudo` and the rest of WRAPPER run a command rather than
+# being one, so the walk goes through them, their options (`env -u NAME`) and
+# the assignments they carry, the way a shell would; a redirect and its target
+# are stepped over too.
 #
 # The override has to be an exact LIVE_API_OK=1 in that leading run, which is
 # where a shell would read it: `LIVE_API_OK=1.0` is another value, and
@@ -185,8 +198,9 @@ command_shape() {
     if [ "$skip" = 1 ]; then skip=0 && continue; fi
     case "$t" in
     "$M"* | -u | --unset | -C | --chdir) skip=1 && continue ;;
-    -* | env) continue ;;
+    -*) continue ;;
     esac
+    [[ ${t##*/} =~ $WRAPPER ]] && continue
     if [[ $t =~ $ASSIGN ]]; then
       [ "$t" = LIVE_API_OK=1 ] && OVERRIDE=1
       continue
@@ -256,7 +270,7 @@ READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdu
 
 # Captured first, because a process substitution drops awk's exit status: a
 # lexer that failed has not cleared the command, so it blocks.
-SEGS=$(segments "$COMMAND") || block "the command could not be lexed, so the paid-command list could not be checked."
+SEGS=$(segments "$COMMAND" 2>/dev/null) || block "the command could not be lexed, so the paid-command list could not be checked."
 
 while IFS= read -r SEG || [ -n "$SEG" ]; do
   [ -z "$SEG" ] && continue
@@ -337,9 +351,10 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   #
   # Copying .env into a worktree is pre-approved and every worktree needs one.
   # Reading it is how a key lands in a transcript. LIVE_API_OK=1 does not
-  # release this one; it names paid spend, not key access.
+  # release this one; it names paid spend, not key access. `. .env` sources
+  # it, which the reader list cannot see in text.
 
-  if [ "${DELEGATE:-}" = "1" ] && [[ $TEXT =~ $READER ]]; then
+  if [ "${DELEGATE:-}" = "1" ] && { [[ $TEXT =~ $READER ]] || [ "$EXE" = . ]; }; then
     for t in "${W[@]}"; do
       case "$t" in
       *.env) block "a DELEGATE=1 session may copy .env into a worktree but not read it, so keys stay out of the transcript. Run the check against the admin UI, or ask the owner for the value you need." ;;
