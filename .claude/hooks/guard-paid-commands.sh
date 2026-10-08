@@ -5,16 +5,17 @@
 # Block contract (#85 decision 3): exit 2 with a one-line reason on stderr.
 # It only ever reads the command string, never runs it.
 #
-# The command is walked one segment at a time (split on ; & && || | and
-# newlines, plus the inside of an `sh -c "..."`), because the override and the
-# thing it overrides have to be in the same segment. Without that,
+# The command is walked one segment at a time (split on unquoted ; & && || |
+# ( ) and newlines, plus the inside of an `sh -c "..."`), because the override
+# and the thing it overrides have to be in the same segment. Without that,
 # `echo LIVE_API_OK=1; pnpm generate-audio` would pass, and so would
 # `rg "pnpm generate-audio"`.
 #
-# LIMIT: this matches shell text with patterns, it does not run a shell parser.
-# It reads the ordinary ways a command is written. A deliberately mangled
-# invocation (a variable holding the command name, an eval) can still get
-# through, and that is a known boundary rather than an oversight.
+# LIMIT: the command is lexed the way a shell splits it, with quotes, comments,
+# backslash escapes and continued lines, but nothing is expanded: a variable
+# holding the command name, $(...), backticks, eval and heredoc bodies are read
+# as plain words. That is a known boundary (decisions row 204), not an
+# oversight: this is a seatbelt for a delegate who forgets, not a sandbox.
 
 PAYLOAD=$(cat)
 COMMAND=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null)
@@ -41,84 +42,157 @@ block() {
   exit 2
 }
 
+# Words are split on \037 below; no word of a command should ever glob.
+set -f
+M=$'\035' # the mark on a redirect operator word, which no quoted ">" can carry
+
+# --- the rule list, read once ---------------------------------------------
+#
+# Into arrays, once: re-reading the list with a grep per rule per segment took
+# 20 s on a 200-line command, against a 5 s hook timeout. A rule is its `&&`
+# parts; a `script:` rule's first part is the script name.
+NR_RULES=0 NR_FILES=0 PATS=()
+while IFS= read -r line || [ -n "$line" ]; do
+  spec=${line%% ::*}
+  reason=${line#* ::}
+  case "$spec" in
+  file:*)
+    F_PATH[NR_FILES]=${spec#file:} F_REASON[NR_FILES]=${reason# }
+    NR_FILES=$((NR_FILES + 1)) && continue
+    ;;
+  script:* | cmd:*) R_KIND[NR_RULES]=${spec%%:*} rest=${spec#*:} ;;
+  *) continue ;;
+  esac
+  R_REASON[NR_RULES]=${reason# } R_FROM[NR_RULES]=${#PATS[@]}
+  while :; do
+    part=${rest%%&&*} && part=${part% }
+    PATS[${#PATS[@]}]=${part# }
+    case "$rest" in *'&&'*) rest=${rest#*&&} ;; *) break ;; esac
+  done
+  if [ "${R_KIND[NR_RULES]}" = script ]; then
+    R_NAME[NR_RULES]=${PATS[R_FROM[NR_RULES]]}
+    R_FILE[NR_RULES]="scripts/${R_NAME[NR_RULES]}.ts"
+    R_FROM[NR_RULES]=$((R_FROM[NR_RULES] + 1))
+  fi
+  R_TO[NR_RULES]=${#PATS[@]} && NR_RULES=$((NR_RULES + 1))
+done <"$LIST"
+
+# A `script:` rule also covers a direct run of its file, which is the
+# scripts/...ts word in its package.json command (split-voice runs
+# scripts/split-voice-clip.ts). Without package.json, scripts/<name>.ts stands.
+SCRIPT_FILES=$(jq -r '.scripts // {} | to_entries[]
+  | "\(.key)\t\([.value | scan("scripts/[^ \"]+\\.ts")][0] // "")"' \
+  "$REPO_ROOT/package.json" 2>/dev/null)
+while IFS=$'\t' read -r name file; do
+  for ((k = 0; k < NR_RULES; k++)); do
+    [ -n "$file" ] && [ "${R_NAME[k]}" = "$name" ] && R_FILE[k]=$file
+  done
+done <<<"$SCRIPT_FILES"
+
 # --- segment splitting ----------------------------------------------------
 
-# Print one command segment per line. Also unwraps one level of `sh -c "..."`,
-# because the outer segment would otherwise hide everything inside it. A
-# comment runs to the end of the line, so one is dropped before splitting: a
-# `# LIVE_API_OK=1` at the end of a line is not an assignment.
-#
-# Continued lines are joined first, and before the comment strip, because a
-# backslash-newline is not a separator: a shell reads
-#   cp replacement.ts \
-#     src/lib/models.ts
-# as one command, and a wrapped long argument is what a careful delegate
-# writes. Splitting first would read it as two harmless ones.
+# Print one segment per line, its words joined by \037, quotes removed and each
+# word whole: `NODE_OPTIONS="--import tsx"` is one word, not a `tsx` standing
+# where the executable goes. One pass, because quotes, comments and continued
+# lines decide what each other mean: a ; inside a quoted curl header is text;
+# a `# old command \` comment ends at its newline and does not swallow the
+# next line; a backslash-newline outside one joins a wrapped `cp x \` to its
+# destination. A redirect operator is its own word, marked with \035, so its
+# target is the next word; a quoted newline is kept as \036. One level of
+# `sh -c "..."` is unwrapped by lexing its word again at the end.
 segments() {
-  local text
-  text=$(printf '%s' "$1" | awk '
-    {
-      if (held) buf = buf " " $0; else { buf = $0; held = 1 }
-      if (buf ~ /\\[ \t]*$/) { sub(/[ \t]*\\[ \t]*$/, "", buf); next }
-      print buf
-      buf = ""
-      held = 0
+  printf '%s' "$1" | awk '
+    function endword() { if (inw) w[nw++] = cur; cur = ""; inw = 0 }
+    function endseg(   i, j, line, b) {
+      endword()
+      if (nw == 0) return
+      line = w[0]
+      for (i = 1; i < nw; i++) line = line "\037" w[i]
+      print line
+      for (i = 0; depth == 0 && i < nw; i++) {
+        b = w[i]; sub(/.*\//, "", b)
+        if (b !~ /^(ba|z|k|da)?sh$/) continue
+        for (j = i + 1; j < nw - 1; j++)
+          if (w[j] ~ /^-[a-zA-Z]*c$/) { inner[ninner++] = w[j + 1]; break }
+        break
+      }
+      split("", w); nw = 0
     }
-    END { if (held && buf != "") print buf }
-  ')
-  text=$(printf '%s\n' "$text" | sed -E 's/(^|[[:space:]])#.*$//')
-  printf '%s\n' "$text" | sed -E 's/(;|&&|\|\||\||&|\n)/\n/g'
-  printf '%s\n' "$text" |
-    grep -oE "(^|[[:space:]])(ba|z|k|da)?sh[[:space:]]+-c[[:space:]]+[\"'][^\"']*[\"']" |
-    sed -E "s/^.*-c[[:space:]]+[\"']//; s/[\"']\$//"
-}
-
-# The executable a segment runs, and whether the run of assignments in front
-# of it named the override. Two lines: the executable, then `override` or
-# `no-override`.
-#
-# `env` is a wrapper rather than a command, so the walk goes through it and
-# the assignments it carries: `env NODE_ENV=production pnpm generate-audio`
-# runs pnpm, and `env LIVE_API_OK=1 pnpm generate-audio` carries the override
-# the way a shell would. Its options are stepped over too, so `env -u NAME`
-# does not leave `-u` standing where the executable goes.
-command_shape() {
-  printf '%s' "$1" | tr -d "\"'<>" | awk '
-    { for (i = 1; i <= NF; i++) {
-        t = $i
-        if (t == "-u" || t == "--unset" || t == "-C" || t == "--chdir") { skips = 1; continue }
-        if (skips) { skips = 0; continue }
-        if (t ~ /^-/) continue
-        if (t == "env") continue
-        if (t ~ /^[A-Za-z_][A-Za-z0-9_]*=/) {
-          if (t == "LIVE_API_OK=1") override = 1
+    function lex(s,   n, i, c, d, q, op) {
+      cur = ""; inw = 0; nw = 0; split("", w); q = ""
+      n = length(s)
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1); d = substr(s, i + 1, 1)
+        if (q == "\047") {
+          if (c == "\047") q = ""; else cur = cur (c == "\n" ? "\036" : c)
           continue
         }
-        exe = t
-        break
-      } }
-    END { print exe; print (override ? "override" : "no-override") }'
+        if (q == "\"") {
+          if (c == "\"") { q = ""; continue }
+          if (c == "\\" && d == "\n") { i++; continue }
+          if (c == "\\" && d != "" && index("\"\\$`", d)) { cur = cur d; i++; continue }
+          cur = cur (c == "\n" ? "\036" : c)
+          continue
+        }
+        if (c == "\\") { i++; if (d != "\n") { cur = cur d; inw = 1 }; continue }
+        if (c == "\047" || c == "\"") { q = c; inw = 1; continue }
+        if (c == " " || c == "\t") { endword(); continue }
+        if (c == "#" && !inw) { while (i < n && substr(s, i + 1, 1) != "\n") i++; continue }
+        if (c ~ /[\n;|()]/ || (c == "&" && d != ">")) { endseg(); continue }
+        if (c ~ /[<>&]/) {
+          # 2> and 2>> name a file descriptor; the digits belong to the operator.
+          if (c != "&" && inw && cur ~ /^[0-9]+$/) { op = cur; cur = ""; inw = 0 } else { endword(); op = "" }
+          op = op c
+          if (c == "&") { op = op d; i++; d = substr(s, i + 1, 1) }
+          if (index(op, ">") && (d == ">" || d == "|" || d == "&")) { op = op d; i++ }
+          else if (c == "<" && (d == "<" || d == "&" || d == ">")) { op = op d; i++ }
+          w[nw++] = "\035" op
+          continue
+        }
+        cur = cur c; inw = 1
+      }
+      endseg()
+    }
+    { all = (NR > 1 ? all "\n" : "") $0 }
+    END {
+      gsub(/[\035\036\037]/, "", all)
+      depth = 0; lex(all)
+      depth = 1
+      for (k = 0; k < ninner; k++) { s = inner[k]; gsub(/\036/, "\n", s); lex(s) }
+    }'
 }
 
-# A segment runs pnpm when pnpm is the command being run, after any leading
-# VAR=value assignments, not when the string merely mentions it.
-invokes_pnpm() {
-  [ "$(command_shape "$1" | head -n1)" = "pnpm" ]
-}
-
-# The override the paid rules name: LIVE_API_OK=1 as an env assignment in
-# front of the executable, which is where a shell would read it. Only those
-# rules take it; it is not a release from the .env or the guarded-file rules
-# below.
+# The executable a segment runs (its index in W, or -1), and whether the run of
+# assignments in front of it named the override (OVERRIDE=1).
 #
-# So the token has to be an exact LIVE_API_OK=1, and it has to sit in the run
-# of leading assignments before the executable, through an `env` wrapper as
-# well as in front of it. `LIVE_API_OK=1.0` is a different value, and
-# `pnpm generate-audio -- LIVE_API_OK=1` is an argument the command never
-# reads as an assignment, so neither one counts.
-has_override() {
-  [ "$(command_shape "$1" | tail -n1)" = "override" ]
+# `env` is a wrapper rather than a command, so the walk goes through it, its
+# options (`env -u NAME`) and the assignments it carries, the way a shell
+# would; a redirect and its target are stepped over too.
+#
+# The override has to be an exact LIVE_API_OK=1 in that leading run, which is
+# where a shell would read it: `LIVE_API_OK=1.0` is another value, and
+# `pnpm generate-audio -- LIVE_API_OK=1` is an argument. Only the paid rules
+# take it; it is no release from the .env or guarded-file rules below.
+command_shape() {
+  local i t skip=0
+  EXE_I=-1
+  OVERRIDE=0
+  for ((i = 0; i < ${#W[@]}; i++)); do
+    t=${W[i]}
+    if [ "$skip" = 1 ]; then skip=0 && continue; fi
+    case "$t" in
+    "$M"* | -u | --unset | -C | --chdir) skip=1 && continue ;;
+    -* | env) continue ;;
+    esac
+    if [[ $t =~ $ASSIGN ]]; then
+      [ "$t" = LIVE_API_OK=1 ] && OVERRIDE=1
+      continue
+    fi
+    EXE_I=$i
+    return
+  done
 }
+ASSIGN='^[A-Za-z_][A-Za-z0-9_]*='
 
 # src/lib//models.ts, src/lib/../lib/models.ts and ./src/lib/models.ts are one
 # file, and the guarded list is written the short way.
@@ -134,106 +208,114 @@ normalize_path() {
 }
 
 # Does this path name a guarded file? Compared on the tail, so any worktree
-# path reaches the same rule.
+# path reaches the same rule. Sets REASON. A word that does not even contain a
+# guarded file's name is ruled out before the path is normalized.
 guarded_reason() {
-  local path reason target rel
-  rel=$(normalize_path "$1")
-  case "$rel" in
-  "$REPO_ROOT"/*) rel=${rel#"$REPO_ROOT"/} ;;
-  esac
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-    file:*) ;;
-    *) continue ;;
-    esac
-    target=$(printf '%s' "${line#file:}" | sed -E 's/[[:space:]]*::.*$//')
-    reason=${line#*:: }
+  local f rel=
+  for ((f = 0; f < NR_FILES; f++)); do
+    case "$1" in *"${F_PATH[f]##*/}"*) ;; *) continue ;; esac
+    [ -n "$rel" ] || rel=$(normalize_path "$1")
     case "$rel" in
-    "$target") printf '%s' "$reason"; return 0 ;;
-    *"/$target") printf '%s' "$reason"; return 0 ;;
+    "$REPO_ROOT"/*) rel=${rel#"$REPO_ROOT"/} ;;
     esac
-  done <"$LIST"
+    case "$rel" in
+    "${F_PATH[f]}" | *"/${F_PATH[f]}") REASON=${F_REASON[f]} && return 0 ;;
+    esac
+  done
   return 1
 }
 
-# Does this segment write a file? -i is an in-place flag wherever it sits in
-# sed's options, and a redirect operator attaches to what follows it, so both
-# are looked for anywhere in the segment rather than in one position.
+# Does this segment write files by the name of the command it runs? -i is an
+# in-place flag wherever it sits in sed's options, so it is looked for in any
+# word. The command has to be a whole word: `tee` inside a quoted comment body
+# is text. Redirects are checked on their own target in the loop below.
 is_write_segment() {
-  printf '%s' "$1" | grep -qE '(^|[[:space:];|&(){}])(sed|perl)([[:space:]]|$)' &&
-    printf '%s' "$1" | grep -qE '(^|[[:space:]])-[a-zA-Z]*i([=[:space:]]|$)' && return 0
-  printf '%s' "$1" | grep -qE '(^|[[:space:];|&(){}])(tee|truncate|patch|dd|install|cp|mv)([[:space:]]|$)|[<>]'
+  local t sed=0 inplace=0
+  for t in "${W[@]}"; do
+    case "${t##*/}" in
+    tee | truncate | patch | dd | install | cp | mv) return 0 ;;
+    sed | perl) sed=1 ;;
+    esac
+    [[ $t =~ $INPLACE ]] && inplace=1
+  done
+  [ "$sed" = 1 ] && [ "$inplace" = 1 ]
 }
+INPLACE='^-[a-zA-Z]*i(=|$)'
 
 # --- per segment ----------------------------------------------------------
 
+READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdump|base64|nl|tac|sort|uniq|tr|rev|wc|cut|paste|column|split|grep|egrep|fgrep|rg|ag|awk|sed|jq|python3?|node|perl|ruby|php|source|open|security)($|[[:space:]/.<>])'
+
 while IFS= read -r SEG || [ -n "$SEG" ]; do
   [ -z "$SEG" ] && continue
-
-  # Quoting removed and redirect operators turned into separators, so a token
-  # is what a shell would hand to the program: `pnpm "generate-audio"` and
-  # `printf x >src/lib/models.ts` both read plainly here. The operators go
-  # first and the quotes come off after, because deleting the operator out of
-  # `x>src/lib/models.ts` would weld the argument to the destination.
-  DEQUOTED=$(printf '%s' "$SEG" | tr '><' '  ' | tr -d "\"'" | tr -s ' ')
+  IFS=$'\037'
+  W=($SEG)
+  IFS=' '
+  # The text form the cmd: rules and the reader check match: words joined by
+  # spaces, quotes already gone, a redirect shown as its operator.
+  TEXT="${W[*]}"
+  IFS=$' \t\n'
+  TEXT=${TEXT//$M/}
+  TEXT=${TEXT//$'\036'/ }
+  command_shape
+  EXE=
+  [ "$EXE_I" -ge 0 ] && EXE=${W[EXE_I]}
 
   # --- paid commands, unless this segment carries the override -----------
 
-  if ! has_override "$SEG"; then
-    # rule 1: script:<name> [&& <ere>] , a pnpm run of a named script
-    # rule 2: cmd:<ere> [&& <ere>]    , anything else, matched as written
-    while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in
-      '' | '#'* | file:*) continue ;;
-      esac
-      spec=${line%% ::*}
-      reason=${line#*:: }
-      case "$spec" in
-      script:*)
-        target=${spec#script:}
-        cond=
-        case "$target" in
-        *'&&'*)
-          cond=${target#*&&}
-          target=${target%%&&*}
-          ;;
-        esac
-        target=$(printf '%s' "$target" | sed -E 's/[[:space:]]+$//')
-        # A token in the segment, so quoting and pnpm options do not hide it.
-        invokes_pnpm "$SEG" || continue
-        printf '%s' "$DEQUOTED" | grep -qE "(^|[[:space:]])$target([[:space:]]|$)" || continue
-        if [ -n "$cond" ]; then
-          printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || continue
+  if [ "$OVERRIDE" = 0 ]; then
+    # A .ts file this segment runs: the executable itself, or a word after a
+    # runner (tsx, node --import tsx, ./node_modules/.bin/tsx). `cat` or
+    # `git log` on the same file is not a run.
+    RUNS=()
+    RUNNER=-1
+    for ((i = 0; i < ${#W[@]}; i++)); do
+      case "${W[i]##*/}" in
+      tsx | node | ts-node | bun | vite-node | deno) [ "$RUNNER" -ge 0 ] || RUNNER=$i ;;
+      *.ts)
+        if [ "$i" = "$EXE_I" ] || { [ "$RUNNER" -ge 0 ] && [ "$RUNNER" -lt "$i" ]; }; then
+          RUNS[${#RUNS[@]}]=$(normalize_path "${W[i]}")
         fi
-        block "$reason"
         ;;
-      cmd:*)
-        target=${spec#cmd:}
-        cond=
-        case "$target" in
-        *'&&'*)
-          cond=${target#*&&}
-          target=${target%%&&*}
-          ;;
-        esac
-        ok=1
-        for PART in ${target//&&/$'\n'}; do
-          printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$PART" | sed -E 's/^[[:space:]]+//')" || ok=0
+      esac
+    done
+
+    # A rule matches when its target does and every condition after `&&`
+    # matches the text form. Rules are tried in list order.
+    for ((k = 0; k < NR_RULES; k++)); do
+      hit=1
+      if [ "${R_KIND[k]}" = script ]; then
+        # A pnpm segment with the script name as a word, so quoting and pnpm
+        # options do not hide it, or a direct run of the script's file.
+        hit=0
+        if [ "$EXE" = pnpm ]; then
+          for t in "${W[@]}"; do [ "$t" = "${R_NAME[k]}" ] && hit=1 && break; done
+        fi
+        for p in "${RUNS[@]}"; do
+          case "$p" in "${R_FILE[k]}" | */"${R_FILE[k]}") hit=1 && break ;; esac
         done
-        if [ -n "$cond" ]; then
-          printf '%s' "$SEG" | grep -qE -- "$(printf '%s' "$cond" | sed -E 's/^[[:space:]]+//')" || ok=0
-        fi
-        [ "$ok" = "1" ] && block "$reason"
-        ;;
-      esac
-    done <"$LIST"
+      fi
+      for ((j = R_FROM[k]; hit == 1 && j < R_TO[k]; j++)); do
+        re=${PATS[j]}
+        [[ $TEXT =~ $re ]] || hit=0
+      done
+      [ "$hit" = 1 ] && block "${R_REASON[k]}"
+    done
   fi
 
   # --- a shell write onto a guarded credit source ------------------------
+  #
+  # A redirect writes only its own target: `2>/dev/null` next to a guarded
+  # path is not a write to it, and `<` is a read.
 
-  if [ "${CREDIT_OVERRIDE:-}" != "1" ] && is_write_segment "$SEG"; then
-    for TOKEN in $DEQUOTED; do
-      if REASON=$(guarded_reason "$TOKEN"); then
+  if [ "${CREDIT_OVERRIDE:-}" != "1" ]; then
+    WRITES=()
+    for ((i = 0; i < ${#W[@]}; i++)); do
+      case "${W[i]}" in "$M"*'>'*) WRITES[${#WRITES[@]}]=${W[i + 1]} ;; esac
+    done
+    is_write_segment && WRITES=("${W[@]}")
+    for TOKEN in "${WRITES[@]}"; do
+      if guarded_reason "$TOKEN"; then
         block "$REASON That command writes the file from a shell; edit it with the Edit tool, or start the session with CREDIT_OVERRIDE=1."
       fi
     done
@@ -245,11 +327,12 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   # Reading it is how a key lands in a transcript. LIVE_API_OK=1 does not
   # release this one; it names paid spend, not key access.
 
-  if [ "${DELEGATE:-}" = "1" ]; then
-    READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdump|base64|nl|tac|sort|uniq|tr|rev|wc|cut|paste|column|split|grep|egrep|fgrep|rg|ag|awk|sed|jq|python3?|node|perl|ruby|php|source|open|security)($|[[:space:]/.<>])'
-    if printf '%s' "$DEQUOTED" | grep -qE "$READER" && printf '%s' "$DEQUOTED" | grep -qE '(^|[[:space:]])[^[:space:]]*\.env([[:space:]]|$)'; then
-      block "a DELEGATE=1 session may copy .env into a worktree but not read it, so keys stay out of the transcript. Run the check against the admin UI, or ask the owner for the value you need."
-    fi
+  if [ "${DELEGATE:-}" = "1" ] && [[ $TEXT =~ $READER ]]; then
+    for t in "${W[@]}"; do
+      case "$t" in
+      *.env) block "a DELEGATE=1 session may copy .env into a worktree but not read it, so keys stay out of the transcript. Run the check against the admin UI, or ask the owner for the value you need." ;;
+      esac
+    done
   fi
 done < <(segments "$COMMAND")
 
