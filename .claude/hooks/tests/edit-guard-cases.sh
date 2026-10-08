@@ -67,6 +67,8 @@ check patch-root-with-space 2 "$(patch "$(hunks "/tmp/my repo/src/lib/models.ts"
 check patch-same-name-elsewhere 0 "$(patch "$(hunks src/other/models.ts xsrc/lib/models.ts)")"
 # A CRLF header: the \r survives jq and must not keep the token from matching.
 check patch-crlf-header 2 "$(patch $'*** Update File: src/lib/models.ts\r\n@@\r\n-old line\r\n+new line\r')"
+# A \r mid-path is a character of the path, not a split: main blocked this.
+check patch-cr-mid-path 2 "$(patch "$(hunks $'src/lib\r/../lib/models.ts')")"
 
 files=()
 i=1

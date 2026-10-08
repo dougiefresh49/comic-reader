@@ -160,9 +160,6 @@ case $? in
   exit 2
   ;;
 esac
-# \r splits too, so a CRLF patch's header token does not keep the \r and miss
-# the rule (#721).
-IFS=$' \t\n\r'
 for TOKEN in $CAND; do
   for ((k = 0; k < NR_FILE_RULES; k++)); do
     [[ $TOKEN == *"${F_NAME[k]}"* ]] || continue
@@ -172,6 +169,11 @@ for TOKEN in $CAND; do
       printf 'Blocked: a token of over 4096 characters in the apply_patch text names %s, too long to check in time.\n' "${F_NAME[k]}" >&2
       exit 2
     fi
+    # A CRLF patch's header token ends in \r, which would miss the rule
+    # (#721). Only a trailing one comes off: splitting on every \r would cut
+    # src/lib\r/../lib/models.ts in two and lose the rule. After the length
+    # check, because on bash 3.2 this strip is slow on a long token.
+    TOKEN=${TOKEN%$'\r'}
     normalize_path "$TOKEN"
     target=${F_TARGET[k]}
     if [ "$NORM" = "$target" ] || [ "${NORM%"/$target"}" != "$NORM" ]; then
