@@ -49,7 +49,6 @@
     "backfill-panels": "tsx --env-file=.env scripts/backfill-panels.ts",
     "sweep-thresholds": "tsx --env-file=.env scripts/sweep-thresholds.ts",
     "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",
-    "upload-source-pages": "tsx --env-file=.env scripts/upload-source-pages.ts",
     "train-panel-detection": "tsx --env-file=.env scripts/train-panel-detection.ts",
     "backfill-page-context": "tsx --env-file=.env scripts/backfill-page-context.ts",
     "bootstrap-audio-library": "tsx --env-file=.env scripts/bootstrap-audio-library.ts",
