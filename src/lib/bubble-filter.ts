@@ -16,14 +16,15 @@ export type BubbleDrop<T> = {
    * True when the geometry is unsure, so the caller may ask something that
    * can see the page before dropping it. Judged after every pass over the
    * kept boxes it holds (#652), and for a container at its turn too, over the
-   * live boxes it holds: innermost only, two detections of one balloon counted
-   * once. Unsure when those span under `UNSURE_SPAN` of it, when two were
-   * counted once, when a counted box holds a box this one does not, twin
-   * drops aside (it straddles the edge), or when a counted box (for a
-   * nested drop, also one in `by`) is the inner box of another nested drop
-   * not nested with this one (#343 review cases 4 and 5). A twin whose
-   * winner is kept is sure; one whose winner dropped is also unsure unless
-   * the winner's kept `by` boxes are all held and span `UNSURE_SPAN` of it.
+   * live ones: innermost only, two detections of one balloon counted once.
+   * Unsure when those span under `UNSURE_SPAN` of it, when two were counted
+   * once, when a counted box holds a box this one does not, twin drops aside
+   * (it straddles the edge), or when a counted box (for a nested drop, also
+   * one in `by`) is the inner box of another nested drop not nested with
+   * this one (#343 review cases 4 and 5). A nested drop is also unsure when
+   * a box in `by` dropped since. A twin whose winner is kept is sure; one
+   * whose winner dropped is also unsure unless the winner's kept `by` boxes
+   * are all held and span `UNSURE_SPAN` of it.
    */
   unsure: boolean;
 };
@@ -182,9 +183,8 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
     const inner = live(bubble).filter(
       (o) => holds(bubble, o) && iou(bubble, o) >= TWIN_IOU,
     );
-    if (inner.length > 0) {
-      drops.set(bubble, { bubble, rule: "nested", by: inner, unsure: false });
-    }
+    if (inner.length === 0) continue;
+    drops.set(bubble, { bubble, rule: "nested", by: inner, unsure: false });
   }
   // An inner box of two nested drops whose outer boxes are not nested in
   // each other is disputed: the loose boxes disagree about its balloon.
@@ -198,8 +198,7 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
           !nested(d.bubble, dropping),
       ),
     );
-  // A held box that holds another held box is a looser box around it, not
-  // more of the dropping box's span: only the innermost boxes count.
+  // Only the innermost held boxes count: a box around another adds no span.
   const judge = (bubble: T, held: T[]) => {
     const innermost = held.filter((h) => !held.some((o) => holds(h, o)));
     const counted = oneBoxPerBalloon(innermost);
@@ -241,22 +240,23 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
     drops.set(bubble, { bubble, rule: "container", by: held, unsure });
   }
 
-  // Unsure is judged again against the boxes that stay, since a box a drop
-  // held may have dropped since. A twin whose winner stays is sure; one whose
-  // winner dropped is also unsure unless the kept boxes that winner dropped
-  // for are all held and span it (`UNSURE_SPAN`), #642's test for keeping it.
+  // Unsure is judged again on the boxes that stay. A twin whose winner stays
+  // is sure; one whose winner dropped needs that winner's kept boxes held and
+  // spanning it (`UNSURE_SPAN`), #642's restore test.
   const kept = bubbles.filter((b) => !drops.has(b));
   for (const drop of drops.values()) {
-    const winner = drop.rule === "twin" ? drops.get(drop.by[0]!) : undefined;
-    if (drop.rule === "twin" && !winner) continue;
-    const held = kept.filter((o) => holds(drop.bubble, o));
+    const { bubble, rule, by } = drop;
+    const winner = rule === "twin" ? drops.get(by[0]!) : undefined;
+    if (rule === "twin" && !winner) continue;
+    const held = kept.filter((o) => holds(bubble, o));
     const carriers = winner?.by.filter((o) => !drops.has(o)) ?? [];
     drop.unsure ||=
-      judge(drop.bubble, held).unsure ||
-      (drop.rule === "nested" && disputed(drop.bubble, drop.by)) ||
+      judge(bubble, held).unsure ||
+      (rule === "nested" &&
+        (disputed(bubble, by) || by.some((o) => drops.has(o)))) ||
       (!!winner &&
-        (carriers.some((o) => !holds(drop.bubble, o)) ||
-          spanShare(drop.bubble, carriers) < UNSURE_SPAN));
+        (carriers.some((o) => !holds(bubble, o)) ||
+          spanShare(bubble, carriers) < UNSURE_SPAN));
   }
   return {
     kept,
