@@ -99,8 +99,8 @@ Launch with `t3_thread_launch`, title `#<N> <issue title>`,
 `workspaceStrategy` `{"type":"worktree","baseRef":"main","branch":"issue-<N>-<slug>","startFromOrigin":true}`,
 `modelSelection` of provider instance `claudeAgent`, model
 `claude-opus-5-5`, effort `high` by default (model
-`claude-fable-5-1`, effort `high` when the issue is work the roster
-gives fable-5.1; see `docs/decisions.md` row 395), and this message
+`claude-fable-5-1`, effort `high` when the issue is work CLAUDE.md's
+model roster gives fable-5.1; see `docs/decisions.md` row 395), and this message
 with the blanks filled:
 
 ```
