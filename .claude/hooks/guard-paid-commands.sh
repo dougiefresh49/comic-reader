@@ -73,6 +73,16 @@ WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,cl
 # Into arrays, once: re-reading the list with a grep per rule per segment took
 # 20 s on a 200-line command, against a 5 s hook timeout. A rule is its `&&`
 # parts; a `script:` rule's first part is the script name.
+#
+# Read whole before the loop: `read` ends the same way on an I/O error as at
+# end of file, so a loop fed straight from the list would pass on the rules it
+# got before the error. cat reports the error. Each loop here reads from
+# `< <(printf ...)`, a /dev/fd pipe, not a `<<<` here-string: bash 3.2 writes a
+# temp file for each here-string, and where temp writes are denied the loop
+# never runs.
+if ! LIST_TEXT=$(cat "$LIST"); then
+  block "$LIST could not be read in full, so the paid-command list cannot be checked."
+fi
 NR_RULES=0 NR_FILES=0 PATS=()
 while IFS= read -r line || [ -n "$line" ]; do
   spec=${line%% ::*}
@@ -97,7 +107,7 @@ while IFS= read -r line || [ -n "$line" ]; do
     R_FROM[NR_RULES]=$((R_FROM[NR_RULES] + 1))
   fi
   R_TO[NR_RULES]=${#PATS[@]} && NR_RULES=$((NR_RULES + 1))
-done <"$LIST"
+done < <(printf '%s\n' "$LIST_TEXT")
 # A read that failed part way, or a list emptied by mistake, leaves no rule to
 # check against; that is not a pass.
 [ "$NR_RULES" -gt 0 ] || block "$LIST holds no script: or cmd: rule, so the paid-command list cannot be checked. Restore it from the repo."
@@ -112,7 +122,7 @@ while IFS=$'\t' read -r name file; do
   for ((k = 0; k < NR_RULES; k++)); do
     [ -n "$file" ] && [ "${R_NAME[k]}" = "$name" ] && R_FILE[k]=$file
   done
-done <<<"$SCRIPT_FILES"
+done < <(printf '%s\n' "$SCRIPT_FILES")
 
 # --- segment splitting ----------------------------------------------------
 
@@ -735,6 +745,6 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
       esac
     done
   fi
-done <<<"$SEGS"
+done < <(printf '%s\n' "$SEGS")
 
 exit 0
