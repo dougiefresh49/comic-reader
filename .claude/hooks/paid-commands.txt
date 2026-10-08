@@ -30,6 +30,8 @@ script:voice-rotation-archive :: Paid: voice-rotation-archive renames and delete
 script:voice-rotation-checkout :: Paid: voice-rotation-checkout renames and deletes real ElevenLabs voices. Re-run it as LIVE_API_OK=1 pnpm voice-rotation-checkout ... only if the task named that spend.
 script:fix-page-watermarks :: Paid: fix-page-watermarks calls Gemini for every page it cleans. Re-run it as LIVE_API_OK=1 pnpm fix-page-watermarks ... only if the task named that spend.
 script:recover-issue && --execute([^[:alnum:]_-]|$) :: Paid: recover-issue --execute stores every page through the watermark clean, one Gemini detect call per page and an image edit per overlay. Re-run it as LIVE_API_OK=1 pnpm recover-issue ... only if the task named that spend.
+script:backfill-balloon-groups && (^|[[:space:]])--render([^[:alnum:]_-]|$) :: Paid: backfill-balloon-groups --render makes one ElevenLabs call per group. Re-run it as LIVE_API_OK=1 pnpm backfill-balloon-groups ... only if the task named that spend.
+script:backfill-balloon-groups && (^|[[:space:]])--execute([^[:alnum:]_-]|$) :: Paid: backfill-balloon-groups --execute writes group_id on production bubble rows. Re-run it as LIVE_API_OK=1 pnpm backfill-balloon-groups ... only if the task named that write.
 script:apply-fixes ::Paid: apply-fixes writes production rows. Re-run it as LIVE_API_OK=1 pnpm apply-fixes ... only if the task named that write.
 
 # A GET is free, so this asks for two things at once: the host is ElevenLabs,
