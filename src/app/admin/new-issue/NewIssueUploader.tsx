@@ -27,8 +27,9 @@ export function NewIssueUploader() {
     () => (issueNumber ? `issue-${issueNumber}` : ""),
     [issueNumber],
   );
-  // Init already ran for this issue, so its names are fixed; a retry skips init.
-  const created = initializedFor === `${bookId}/${issueId}`;
+  // Once init has run, this page is tied to that issue: every field locks, and
+  // a retry skips init. Reload the page to start a different issue.
+  const created = initializedFor !== null;
 
   const onDrop = useCallback((dropped: FileList | null) => {
     if (!dropped) return;
@@ -235,8 +236,9 @@ export function NewIssueUploader() {
                 type="text"
                 value={bookId}
                 onChange={(e) => setBookId(e.target.value.trim())}
+                disabled={created}
                 placeholder="tmnt-mmpr-iii"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
             <label className="text-sm">
@@ -258,8 +260,9 @@ export function NewIssueUploader() {
                 type="number"
                 value={issueNumber}
                 onChange={(e) => setIssueNumber(e.target.value)}
+                disabled={created}
                 placeholder="3"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
             <label className="text-sm">
@@ -280,7 +283,7 @@ export function NewIssueUploader() {
               <code>
                 {bookId}/{issueId}
               </code>
-              .
+              .{created && " Reload the page to start a different issue."}
             </p>
           )}
           <button
