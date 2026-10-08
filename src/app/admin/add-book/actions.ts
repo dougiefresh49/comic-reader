@@ -22,6 +22,9 @@ export interface BookSearchResult {
   seriesName: string | null;
   /** This book's volume within that series; null when standalone. */
   volumeNumber: number | null;
+  /** The `series.id` createBook will store, and whether that row exists yet. */
+  seriesId: string | null;
+  seriesIsNew: boolean;
   /** This volume's issue count only. */
   totalIssues: number;
   wikiTitleTemplate: string;
@@ -36,6 +39,44 @@ function generateSlug(title: string): string {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
+}
+
+/**
+ * The series a book joins: an existing row whose name matches ignoring case,
+ * spacing and punctuation keeps its id, so a later volume lands in the same
+ * series; otherwise the id a new row would get. Null when there is no name.
+ * The match runs here, not as an ilike filter, because PostgREST reads `*`
+ * in an ilike value as a wildcard; the table holds one row per series.
+ */
+async function resolveSeries(
+  name: string | null | undefined,
+): Promise<Result<{ id: string; name: string; isNew: boolean } | null>> {
+  const series = name?.trim();
+  const slug = series ? franchiseSlug(series) : "";
+  if (!series || !slug) return { ok: true, data: null };
+  const { data: rows, error } = (await supabaseAdmin
+    .from("series")
+    .select("id, name")) as {
+    data: { id: string; name: string }[] | null;
+    error: { message: string } | null;
+  };
+  if (error) return { ok: false, error: error.message };
+  const existing = (rows ?? []).find(
+    (r) =>
+      r.name.toLowerCase() === series.toLowerCase() ||
+      franchiseSlug(r.name) === slug,
+  );
+  return {
+    ok: true,
+    data: existing
+      ? { id: existing.id, name: existing.name, isNew: false }
+      : { id: slug, name: series, isNew: true },
+  };
+}
+
+/** Gemini's volume number, kept only when it is a positive integer. */
+function volumeOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : null;
 }
 
 export async function searchForBook(
@@ -78,12 +119,21 @@ Return JSON only, no markdown.`;
     const cleaned = text.replace(/^```json?\s*/, "").replace(/\s*```$/, "");
     const parsed = JSON.parse(cleaned) as Omit<
       BookSearchResult,
-      "suggestedSlug"
+      "suggestedSlug" | "seriesId" | "seriesIsNew"
     >;
+    const series = await resolveSeries(parsed.seriesName);
+    if (!series.ok) return series;
 
     return {
       ok: true,
-      data: { ...parsed, suggestedSlug: generateSlug(parsed.title) },
+      data: {
+        ...parsed,
+        seriesName: series.data?.name ?? null,
+        volumeNumber: series.data ? volumeOrNull(parsed.volumeNumber) : null,
+        seriesId: series.data?.id ?? null,
+        seriesIsNew: series.data?.isNew ?? false,
+        suggestedSlug: generateSlug(parsed.title),
+      },
     };
   } catch (e) {
     return {
@@ -128,34 +178,20 @@ export async function createBook(
   if (!slug || !title)
     return { ok: false, error: "Slug and title are required" };
 
-  // The book's series: an existing row whose name matches case-insensitively
-  // keeps its id, so a later volume lands in the same series; otherwise a new
-  // row, written insert-only the way franchises are. No series name, no row.
-  // The match runs here, not as an ilike filter, because PostgREST reads `*`
-  // in an ilike value as a wildcard; the table holds one row per series.
-  let seriesId: string | null = null;
-  const series = seriesName?.trim();
-  if (series) {
-    const { data: rows, error: lookupError } = (await supabaseAdmin
+  // The book's series, written insert-only the way franchises are.
+  const resolved = await resolveSeries(seriesName);
+  if (!resolved.ok) return resolved;
+  const series = resolved.data;
+  const seriesId = series?.id ?? null;
+  const position = series ? volumeOrNull(volumeNumber) : null;
+  if (series?.isNew) {
+    const { error: seriesError } = await supabaseAdmin
       .from("series")
-      .select("id, name")) as {
-      data: { id: string; name: string }[] | null;
-      error: { message: string } | null;
-    };
-    if (lookupError) return { ok: false, error: lookupError.message };
-    const existing = (rows ?? []).find(
-      (r) => r.name.toLowerCase() === series.toLowerCase(),
-    );
-    seriesId = existing?.id ?? (franchiseSlug(series) || null);
-    if (!existing && seriesId) {
-      const { error: seriesError } = await supabaseAdmin
-        .from("series")
-        .upsert(
-          { id: seriesId, name: series },
-          { onConflict: "id", ignoreDuplicates: true },
-        );
-      if (seriesError) return { ok: false, error: seriesError.message };
-    }
+      .upsert(
+        { id: series.id, name: series.name },
+        { onConflict: "id", ignoreDuplicates: true },
+      );
+    if (seriesError) return { ok: false, error: seriesError.message };
   }
 
   const { error: bookError } = await supabaseAdmin.from("books").insert({
@@ -167,20 +203,30 @@ export async function createBook(
     publisher,
     total_issues: totalIssues,
     series_id: seriesId,
-    series_position: seriesId ? volumeNumber : null,
+    series_position: position,
     // #131: a book is a draft until the owner publishes it from /admin, so a
     // book added ahead of the pipeline never shows kids an empty cover.
     published: false,
   });
 
   if (bookError) {
+    // A series row this call created has no book in it now; remove it
+    // unless another book joined it meanwhile.
+    if (series?.isNew) {
+      const { count } = await supabaseAdmin
+        .from("books")
+        .select("id", { count: "exact", head: true })
+        .eq("series_id", series.id);
+      if (count === 0)
+        await supabaseAdmin.from("series").delete().eq("id", series.id);
+    }
     if (
       bookError.code === "23505" &&
       bookError.message.includes("books_series_id_series_position_key")
     ) {
       return {
         ok: false,
-        error: `Another book is already volume ${volumeNumber} of the ${series} series.`,
+        error: `Another book is already volume ${position} of the ${series?.name} series.`,
       };
     }
     return { ok: false, error: bookError.message };

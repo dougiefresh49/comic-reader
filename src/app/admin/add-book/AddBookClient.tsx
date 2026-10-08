@@ -12,6 +12,8 @@ interface BookSearchResult {
   franchises: string[];
   seriesName: string | null;
   volumeNumber: number | null;
+  seriesId: string | null;
+  seriesIsNew: boolean;
   totalIssues: number;
   wikiTitleTemplate: string;
   suggestedSlug: string;
@@ -130,8 +132,8 @@ export function AddBookClient() {
 
           {/* What createBook stores as series_id and series_position */}
           <p className="text-sm text-neutral-400">
-            {result.seriesName
-              ? `Series: ${result.seriesName}${result.volumeNumber != null ? ` · Vol. ${result.volumeNumber}` : ""}`
+            {result.seriesId
+              ? `Series: ${result.seriesName}${result.volumeNumber != null ? ` · Vol. ${result.volumeNumber}` : ""} (${result.seriesIsNew ? "new series" : "joins series"} ${result.seriesId})`
               : "Standalone"}
           </p>
 
