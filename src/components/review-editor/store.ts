@@ -63,10 +63,10 @@ export type EditorAction =
   | { type: "page"; page: number; sel?: Sel | null }
   | { type: "discard" }
   /**
-   * A Save landed: the document it sent is the new baseline. Only the
-   * baseline moves, so edits made while the Save was in flight stay pending,
-   * and the undo history stays: an undo past the save point is measured
-   * against the new baseline and shows as a new pending edit.
+   * A Save landed: the document it sent is the new baseline. Edits made
+   * while the Save was in flight stay pending, and undo stops at the saved
+   * document: an undo past it would re-dirty rows already in the database
+   * (#653). The redo stack goes too, and the next typed edit opens a new step.
    */
   | { type: "saved"; base: Doc }
   /**
@@ -237,8 +237,30 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         ...initState(state.base, state.page),
         lastHistory: state.lastHistory,
       };
-    case "saved":
-      return { ...state, base: action.base };
+    case "saved": {
+      let past: HistoryEntry[] = [];
+      if (state.doc !== action.base) {
+        // The first unmerged edit made during the Save pushed the sent
+        // document as its step; keep the steps from there on.
+        const j = state.past.map((e) => e.doc).lastIndexOf(action.base);
+        const last = state.past[state.past.length - 1];
+        // None: that edit merged into a step begun before the Save, so the
+        // step now starts from the saved document.
+        past =
+          j >= 0
+            ? state.past.slice(j)
+            : last
+              ? [{ ...last, doc: action.base }]
+              : [];
+      }
+      return {
+        ...state,
+        base: action.base,
+        past,
+        future: [],
+        coalesce: null,
+      };
+    }
     case "cuesWritten": {
       const { id, cues } = action;
       const take = (doc: Doc): Doc => {
