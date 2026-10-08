@@ -66,7 +66,7 @@ WRAPPER='^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{
 # (#701): `wrapper:short letters:long names`, `;` between wrappers. The lexer
 # (cmdw, sudosh, env -S) and command_shape both read it, so the heredoc checks
 # and the paid rules find the same command (`timeout -s KILL 60` runs no KILL).
-WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCPS:unset,chdir;xargs:ILnPdEas:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:'
+WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCP:unset,chdir;xargs:ILnPdEas:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:'
 
 # --- the rule list, read once ---------------------------------------------
 #
@@ -219,9 +219,11 @@ segments() {
         }
         # env -S splits its string into a command and runs it (#694), when env
         # is a wrapper in front of the command, not an argument (`echo env`).
+        # S is not in WRAP_OPTS: its value is the command, not a word to step
+        # over, so command_shape finds pnpm in `env -S pnpm generate-audio`.
         else if (b == "env" && (c < 0 || i < c)) for (j = i + 1; j < nw; j++) {
           b = w[j]; sub(/^\034/, "", b)
-          if (b ~ /^-[^-]/ && (x = vopt(b, WV["env"]))) {
+          if (b ~ /^-[^-]/ && (x = vopt(b, WV["env"] "S"))) {
             v = x < length(b) ? substr(b, x + 1) : w[++j]
             if (substr(b, x, 1) == "S") { queue(v, 0); break }
           } else if (b ~ /^--split-string(=|$)/) { queue(b ~ /=/ ? substr(b, 16) : w[++j], 0); break }

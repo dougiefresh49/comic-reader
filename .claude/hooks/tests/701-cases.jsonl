@@ -31,3 +31,6 @@
 {"id":"4b time takes no -C value, so x is the command","want":0,"cmd":"time -C x pnpm generate-audio"}
 {"id":"4c timeout takes no --input value, so x is the command and bash its argument","want":0,"cmd":"timeout --input x \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
 {"id":"4d sudo takes no --signal value, so x is the command and -s its argument","want":0,"cmd":"sudo --signal x -s <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"5a env -S value is the command (review)","want":2,"cmd":"env -S pnpm generate-audio"}
+{"id":"5b env -S string runs printf, not the next word (review)","want":0,"cmd":"env -S 'printf %s' pnpm generate-audio"}
+{"id":"5c env -S quoted paid string","want":2,"cmd":"env -S 'pnpm generate-audio'"}
