@@ -10,6 +10,11 @@ import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadBookCast } from "~/lib/cast";
+import {
+  GroupRenderError,
+  renderGroupAudio,
+  type GroupRenderResult,
+} from "~/lib/render-group-audio";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import { resolveSpeakerVoice } from "./resolve-castlist-row";
 
@@ -75,6 +80,88 @@ function afterSpendError(
   };
 }
 
+/**
+ * Regenerate a joined group's audio (#451): one clip for every member,
+ * through `renderGroupAudio`, the same render the audio step makes. The
+ * members stay on their old clips until `switch_group_audio_take` commits.
+ */
+async function regenerateGroup(
+  args: Args,
+  b: { id: string; audio_storage_path: string | null; page_number: number },
+  groupId: string,
+): Promise<
+  | { ok: false; error: string }
+  | { ok: true; audioStoragePath: string; memberIds: string[] }
+> {
+  const hadAudio = b.audio_storage_path != null;
+  const readerRoute = `/book/${args.bookId}/${args.issueId}/${b.page_number}`;
+  const who = `${b.id}'s group`;
+  let result: GroupRenderResult;
+  try {
+    result = await renderGroupAudio({
+      client: supabaseAdmin,
+      bookId: args.bookId,
+      issueId: args.issueId,
+      groupId,
+      step: "review-editor:regenerate-group",
+    });
+  } catch (e) {
+    if (!(e instanceof GroupRenderError))
+      return { ok: false, error: (e as Error).message };
+    if (e.stage === "unconfirmed") {
+      try {
+        revalidatePath(readerRoute);
+      } catch (re) {
+        console.warn(
+          `[regenerate-audio] could not refresh ${readerRoute} (${(re as Error).message})`,
+        );
+      }
+    }
+    return afterSpendError(e.stage, who, hadAudio, e.message, readerRoute);
+  }
+
+  if ("rendered" in result) {
+    try {
+      revalidatePath(readerRoute);
+    } catch (e) {
+      return afterSpendError("refresh", who, hadAudio, (e as Error).message);
+    }
+    return {
+      ok: true,
+      audioStoragePath: result.path,
+      memberIds: result.memberIds,
+    };
+  }
+  const nothingSpent = " Nothing was spent.";
+  switch (result.skipped) {
+    case "single":
+      return {
+        ok: false,
+        error: `The group no longer has two active balloons, so nothing was rendered. Reload the editor and regenerate again.${nothingSpent}`,
+      };
+    case "no-text":
+      return {
+        ok: false,
+        error: `Balloon ${result.memberId} in this group has no text, so the group was not rendered.${nothingSpent}`,
+      };
+    case "inactive-member":
+      return {
+        ok: false,
+        error: `Balloon ${result.memberId} in this group is silent or ignored, so the group was not rendered. Split it off the group, save, then regenerate.${nothingSpent}`,
+      };
+    case "no-voice":
+      return {
+        ok: false,
+        error: `The group's first balloon has no voice to render with (${result.detail}).${nothingSpent}`,
+      };
+    case "stale-group":
+      return {
+        ok: false,
+        error: `The group changed while its audio was rendering (${result.detail}). ElevenLabs charged for the take, and it was not stored, so the reader plays what it played before. Regenerating will spend ElevenLabs credits again.`,
+      };
+  }
+}
+
 export async function regenerateAudio(args: Args) {
   const auth = checkAdminAuth((await headers()).get("authorization"));
   if (!auth.ok) return { ok: false, error: auth.message };
@@ -96,7 +183,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, character_id, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id",
+      "id, legacy_id, speaker, character_id, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id, group_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -118,11 +205,27 @@ export async function regenerateAudio(args: Args) {
     ignored: boolean | null;
     audio_storage_path: string | null;
     page_number: number;
+    group_id: string | null;
   };
   const b = bubble as BubbleRow;
 
   if (b.ignored) {
     return { ok: false, error: "Bubble is ignored — cannot regenerate audio" };
+  }
+
+  // A member of a joined group (#451) with two or more active members
+  // renders the whole group as one clip.
+  if (b.group_id) {
+    const { count, error: gErr } = await supabaseAdmin
+      .from("bubbles")
+      .select("id", { count: "exact", head: true })
+      .eq("book_id", args.bookId)
+      .eq("issue_id", args.issueId)
+      .eq("group_id", b.group_id)
+      .eq("ignored", false)
+      .eq("silent", false);
+    if (gErr) return { ok: false, error: gErr.message };
+    if ((count ?? 0) >= 2) return regenerateGroup(args, b, b.group_id);
   }
   if (!b.speaker && !b.character_id) {
     return { ok: false, error: "No speaker assigned" };
@@ -258,6 +361,7 @@ export async function regenerateAudio(args: Args) {
     return {
       ok: true,
       audioStoragePath: storagePath,
+      memberIds: [b.id],
     };
   } catch (e) {
     // A throw from the switch call is an unanswered call too.

@@ -42,13 +42,25 @@ export interface BubbleEdit {
   panelId?: string | null;
   sortOrder?: number;
   box?: Box;
+  /** `group_id` (#451): joined balloons share one; null stands alone unreviewed. */
+  groupId?: string | null;
 }
 
 /** Page size in pixels when a page has no `pages` row. The loader uses it too. */
 export const DEFAULT_PAGE = { width: 1988, height: 3057 };
 
-/** Edits that change what the audio step would say, so the bubble needs new audio. */
-const AUDIO_FIELDS = ["speaker", "text", "textWithCues", "type"] as const;
+/**
+ * Edits that change what the audio step would say, so the bubble needs new
+ * audio. A `groupId` change does too: the bubble now plays alone or in a
+ * different group (#451).
+ */
+const AUDIO_FIELDS = [
+  "speaker",
+  "text",
+  "textWithCues",
+  "type",
+  "groupId",
+] as const;
 
 type Row = Record<string, unknown>;
 
@@ -68,6 +80,8 @@ export interface WriteContext {
   ignored: Set<string>;
   /** The stored `bubbles.type` of each named bubble. */
   type: Map<string, string>;
+  /** The stored `bubbles.group_id` of each named bubble that has one (#451). */
+  groupId: Map<string, string>;
 }
 
 /** Reads what the rules need. Throws on a failed read: nothing has been written yet. */
@@ -125,10 +139,11 @@ export async function loadWriteContext(
   const silent = new Set<string>();
   const ignored = new Set<string>();
   const type = new Map<string, string>();
+  const groupId = new Map<string, string>();
   for (const ids of chunk(Array.from(new Set(need.bubbleIds)), 100)) {
     const { data, error } = await supabaseAdmin
       .from("bubbles")
-      .select("id, page_number, box_2d, silent, ignored, type")
+      .select("id, page_number, box_2d, silent, ignored, type, group_id")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .in("id", ids);
@@ -140,11 +155,13 @@ export async function loadWriteContext(
       silent: boolean | null;
       ignored: boolean | null;
       type: string;
+      group_id: string | null;
     }[]) {
       bubblePage.set(row.id, row.page_number);
       if (row.silent) silent.add(row.id);
       if (row.ignored) ignored.add(row.id);
       type.set(row.id, row.type);
+      if (row.group_id) groupId.set(row.id, row.group_id);
       const c = row.box_2d?.confidence;
       if (typeof c === "number") confidence.set(row.id, c);
     }
@@ -158,6 +175,7 @@ export async function loadWriteContext(
     silent,
     ignored,
     type,
+    groupId,
   };
 }
 
@@ -213,6 +231,38 @@ export function boxColumns(
   };
 }
 
+/**
+ * The stored `group_id` this edit takes the bubble out of, or null when it
+ * leaves none: no `groupId` in the edit, no stored group, or the same one.
+ */
+export function groupLeft(
+  id: string,
+  edit: BubbleEdit,
+  ctx: WriteContext,
+): string | null {
+  const before = ctx.groupId.get(id) ?? null;
+  return edit.groupId !== undefined &&
+    before !== null &&
+    edit.groupId !== before
+    ? before
+    : null;
+}
+
+/**
+ * The columns that retire a group clip on a bubble still in that group after
+ * a member left it (#451): no clip, and new audio wanted unless the bubble
+ * plays nothing.
+ */
+export function staleGroupColumns(row: {
+  ignored: boolean;
+  silent: boolean;
+}): Row {
+  return {
+    audio_storage_path: null,
+    needs_audio: !row.ignored && !row.silent,
+  };
+}
+
 /** The columns an edit to an existing bubble writes. Empty when it writes none. */
 export function bubbleUpdate(
   id: string,
@@ -232,6 +282,7 @@ export function bubbleUpdate(
   if (edit.kept !== undefined) row.kept = edit.kept;
   if (edit.panelId !== undefined) row.panel_id = edit.panelId;
   if (edit.sortOrder !== undefined) row.sort_order = edit.sortOrder;
+  if (edit.groupId !== undefined) row.group_id = edit.groupId;
   if (edit.box)
     Object.assign(row, boxColumns(edit.box, page, ctx, ctx.confidence.get(id)));
   // A bubble silent or ignored after the edit (as edited, else as stored) plays
@@ -242,6 +293,12 @@ export function bubbleUpdate(
   const ignoredAfter = edit.ignored ?? ctx.ignored.has(id);
   const affectsAudio = AUDIO_FIELDS.some((f) => edit[f] !== undefined);
   if (affectsAudio && !ignoredAfter && !silentAfter) row.needs_audio = true;
+  // Leaving a group (a split or a re-join, #451): its clip is the old
+  // group's, whose words no longer match, so it goes. A plain join (from no
+  // group) keeps the bubble's own clip playing until the group renders
+  // (decision row 386). `staleGroupColumns` clears the rest of the old group.
+  const leaving = groupLeft(id, edit, ctx);
+  if (leaving) row.audio_storage_path = null;
   if (edit.silent === true) {
     row.audio_storage_path = null;
     row.needs_audio = false;
@@ -290,6 +347,7 @@ export function bubbleInsert(
     needs_ocr: !hasText,
     audio_storage_path: null,
     panel_id: bubble.panelId ?? null,
+    ...(bubble.groupId ? { group_id: bubble.groupId } : {}),
     ...(bubble.box
       ? boxColumns(bubble.box, bubble.page, ctx, bubble.confidence ?? undefined)
       : { style: null, box_2d: null }),
@@ -402,6 +460,7 @@ const bubbleEdit = z
     panelId: uuid.nullable().optional(),
     sortOrder: order.optional(),
     box: box.optional(),
+    groupId: uuid.nullable().optional(),
   })
   .strict();
 
@@ -453,4 +512,10 @@ export interface SaveResult {
    * with why. Empty when every refresh landed or no page needed one.
    */
   wordBoxesFailed: { page: number; error: string }[];
+  /**
+   * Bubbles whose group clip this Save retired (#451): a member left a
+   * joined group, so the old clip no longer matches the words. They have no
+   * audio now and need new audio.
+   */
+  audioCleared: string[];
 }

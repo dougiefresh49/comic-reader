@@ -54,6 +54,8 @@ function playOrder(doc: Doc, page: number) {
  * them, an accepted analyze proposal writes its own, an undo of that accept
  * writes back what was there, and a text edit undone back to the original
  * words writes the original cues again.
+ * `groupId` is written as `group_id` whenever it differs (#451); the Save
+ * route works out which group clips that leaves stale.
  * `auto` and the added cast have no column and are not written.
  */
 export function buildSave(base: Doc, doc: Doc): SaveEdits {
@@ -125,6 +127,8 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
           ignored: b.ignored,
           silent: b.silent,
           kept: b.kept,
+          // Stored edits from before #451 have no `groupId`.
+          ...(b.groupId ? { groupId: b.groupId } : {}),
         });
         return;
       }
@@ -141,6 +145,8 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
       if (was.ignored !== b.ignored) set.ignored = b.ignored;
       if (was.silent !== b.silent) set.silent = b.silent;
       if (was.kept !== b.kept) set.kept = b.kept;
+      if ((was.groupId ?? null) !== (b.groupId ?? null))
+        set.groupId = b.groupId ?? null;
       if (!sameRect(was.rect, b.rect)) set.box = b.rect;
       if ((then.panelOf.get(id) ?? null) !== panelId) set.panelId = panelId;
       if (orderChanged) set.sortOrder = i;

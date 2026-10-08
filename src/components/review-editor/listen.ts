@@ -187,9 +187,22 @@ export function useListen({
           const res = await regenerateAudio({ bookId, issueId, bubbleId: id });
           if (res.ok && res.audioStoragePath) {
             const path = res.audioStoragePath;
-            if (playingRef.current === id) stop();
-            setPaths((prev) => ({ ...prev, [id]: path }));
-            note(id, { tone: "ok", text: "New take saved. L plays it." });
+            // A joined group (#451) renders one clip that every member plays.
+            const members = res.memberIds.length > 0 ? res.memberIds : [id];
+            if (playingRef.current && members.includes(playingRef.current))
+              stop();
+            setPaths((prev) => {
+              const next = { ...prev };
+              for (const m of members) next[m] = path;
+              return next;
+            });
+            note(id, {
+              tone: "ok",
+              text:
+                members.length > 1
+                  ? `New group take saved for ${members.length} balloons. L plays it.`
+                  : "New take saved. L plays it.",
+            });
           } else {
             note(id, {
               tone: "error",

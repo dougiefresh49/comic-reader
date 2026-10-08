@@ -25,10 +25,14 @@ import {
   addBubble,
   addCast,
   addPanel,
+  defectFlags,
   diffDoc,
   facesIn,
+  groupMembers,
   initDoc,
   issueFlags,
+  joinNeighbour,
+  joinWith,
   moveBubbleTo,
   moveBubbleToPanel,
   movePanelTo,
@@ -44,6 +48,9 @@ import {
   setSpeaker,
   shiftBubble,
   shiftPanel,
+  splitFrom,
+  standAlone,
+  touchingFlags,
   unvoicedBubbles,
   visibleBubbles,
   type BubbleDoc,
@@ -124,6 +131,8 @@ const SHEET: { title: string; rows: [string, string][] }[] = [
     title: "Order and boxes",
     rows: [
       ["Alt ↑ / ↓", "Earlier or later in play order, crosses panels"],
+      ["G", "Join with the next balloon in the panel: one line, one clip"],
+      ["Shift G", "Join with the previous balloon in the panel"],
       ["Shift arrows", "Move the box"],
       ["Alt Shift arrows", "Resize the box"],
       ["V", "Back to the select tool"],
@@ -413,7 +422,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   const castById = useMemo(() => new Map(cast.map((c) => [c.id, c])), [cast]);
 
   const panels = useMemo(() => pagePanels(doc, pageNumber), [doc, pageNumber]);
-  const flags = useMemo(() => pageFlags(doc, pageNumber), [doc, pageNumber]);
+  const pageAllFlags = useMemo(
+    () => pageFlags(doc, pageNumber),
+    [doc, pageNumber],
+  );
+  // What needs fixing, and apart from it the touching-balloon prompts (#451),
+  // which never count as "needs you".
+  const flags = useMemo(() => defectFlags(pageAllFlags), [pageAllFlags]);
+  const touching = useMemo(() => touchingFlags(pageAllFlags), [pageAllFlags]);
   const allFlags = useMemo(() => issueFlags(doc), [doc]);
   const bubbles = useMemo(
     () => visibleBubbles(doc, pageBubbleIds(doc, pageNumber)),
@@ -898,12 +914,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         return { ok: false, error };
       }
       dispatch({ type: "saved", base: sent });
-      listen.dropTakes(takesDropped(edits));
+      // A split or re-join retires the old group clip (#451): the route says
+      // which rows lost it, so the editor never plays it as current.
+      const cleared = body?.audioCleared ?? [];
+      listen.dropTakes([...takesDropped(edits), ...cleared]);
       const audio = body?.needsAudio ?? 0;
       say(
-        audio > 0
+        (audio > 0
           ? `Saved ${plural(count, "change")}. ${plural(audio, "bubble")} now need${audio === 1 ? "s" : ""} audio.`
-          : `Saved ${plural(count, "change")}.`,
+          : `Saved ${plural(count, "change")}.`) +
+          (cleared.length > 0
+            ? ` The old group clip was dropped from ${plural(cleared.length, "balloon")}.`
+            : ""),
       );
       // The rows landed; only the word-box refresh after them did not (#620).
       const failed = [...(body?.wordBoxesFailed ?? [])].sort(
@@ -933,11 +955,16 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     const row = state.base.bubbles[id];
     return !!row && !row.deleted;
   };
-  /** A Save would write this bubble's row. */
-  const hasPending = (id: string) =>
-    [...pending.bubbles.add, ...pending.bubbles.update].some(
-      (row) => row.id === id,
+  /**
+   * A Save would write this bubble's row, or a row of its joined group
+   * (#451): a group regenerate reads every member's saved text.
+   */
+  const hasPending = (id: string) => {
+    const ids = new Set([id, ...groupMembers(state.doc, id).map((m) => m.id)]);
+    return [...pending.bubbles.add, ...pending.bubbles.update].some((row) =>
+      ids.has(row.id),
     );
+  };
 
   /**
    * Before a regenerate: when the bubble has a pending edit, part 2's Save
@@ -1007,6 +1034,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             listen.active?.id === selBubble.id ? listen.active.job : null,
           notice: listen.notices[selBubble.id] ?? null,
           saveFirst: hasPending(selBubble.id) ? toWrite : 0,
+          groupSize: groupMembers(doc, selBubble.id).filter(
+            (m) => !m.ignored && !m.silent,
+          ).length,
         }
       : null;
 
@@ -1281,6 +1311,31 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           ? shiftPanel(d, target.id, dir)
           : shiftBubble(d, target.id, dir),
       ),
+    joinWith: (id, dir) => {
+      const found = joinNeighbour(state.doc, id, dir);
+      if ("reason" in found) {
+        say(`Not joined: ${found.reason}`, "warn");
+        return;
+      }
+      const fresh = newId();
+      apply(dir === -1 ? "join with previous" : "join with next", (d) =>
+        joinWith(d, id, found.id, fresh),
+      );
+      say(
+        "Joined: one line, one clip once its group audio is regenerated. Each balloon plays its own clip until then.",
+      );
+    },
+    splitFrom: (id) => {
+      const fresh = newId();
+      apply("split off", (d) => splitFrom(d, id, fresh));
+      say(
+        "Split off. Once saved, the group's clip is dropped and these balloons need audio again.",
+      );
+    },
+    standAlone: (id, otherId) => {
+      const fresh: [string, string] = [newId(), newId()];
+      apply("not one line", (d) => standAlone(d, id, otherId, fresh));
+    },
     setRect,
     zoomTo: (rect) => canvasRef.current?.zoomTo(rect),
     goto,
@@ -1476,6 +1531,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           return done();
         case "m":
           openField("emotion");
+          return done();
+        case "g":
+          actions.joinWith(b.id, e.shiftKey ? -1 : 1);
           return done();
         case "x":
           actions.patch(
@@ -1997,6 +2055,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                   pageNumber={pageNumber}
                   panels={panels}
                   flags={flags}
+                  touching={touching}
                   numbers={numbers}
                   castById={castById}
                   sel={sel}
@@ -2149,6 +2208,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
                 sel={sel}
                 panels={panels}
                 flags={flags}
+                touching={touching}
                 allFlags={allFlags}
                 numbers={numbers}
                 cast={cast}

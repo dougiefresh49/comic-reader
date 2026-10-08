@@ -15,6 +15,8 @@ import {
 } from "./lib";
 import {
   facesIn,
+  groupMembers,
+  joinNeighbour,
   panelOf,
   SPOKEN,
   visibleBubbles,
@@ -73,6 +75,12 @@ export interface Actions {
   play: (id: string) => void;
   /** Save first when the bubble has pending edits, then regenerate. */
   regenerate: (id: string, job: ListenJob) => void;
+  /** Join with the previous (-1) or next (1) balloon in the panel (#451). */
+  joinWith: (id: string, dir: -1 | 1) => void;
+  /** Take the balloon out of its joined group. */
+  splitFrom: (id: string) => void;
+  /** "Not one line": a touching pair stands alone, both balloons. */
+  standAlone: (id: string, otherId: string) => void;
 }
 
 /**
@@ -88,6 +96,8 @@ export interface ListenView {
   notice: ListenNotice | null;
   /** Rows a Save writes before a regenerate; 0 when this bubble has no pending edit. */
   saveFirst: number;
+  /** Active balloons in its joined group (#451); under 2 means it renders alone. */
+  groupSize: number;
 }
 
 /**
@@ -106,6 +116,8 @@ interface InspectorProps {
   sel: Sel | null;
   panels: PanelDoc[];
   flags: Map<string, Flag[]>;
+  /** Touching-balloon prompts (#451): each bubble's other balloon. */
+  touching: Map<string, string>;
   allFlags: IssueFlag[];
   numbers: Map<string, number>;
   cast: CastMember[];
@@ -201,6 +213,7 @@ function BoxFields({
 function flagLine(flag: Flag): string {
   if (flag.kind === "duplicate") return "possible duplicate";
   if (flag.kind === "no-speaker") return "no speaker";
+  if (flag.kind === "touching") return "touches another speaker";
   return `"${flag.raw}" not in cast`;
 }
 
@@ -350,6 +363,7 @@ function ListenBlock({
   const cues = cuesOf(b);
   const first = view.saveFirst > 0 ? "Save, then regenerate" : "Regenerate";
   const off = !!lock;
+  const grouped = view.groupSize >= 2;
   return (
     <div className="space-y-2 rounded-sm border border-neutral-800 p-2">
       {view.hasAudio ? (
@@ -405,15 +419,27 @@ function ListenBlock({
             BUTTON + " h-auto min-h-7 py-1 text-left whitespace-normal"
           }
           disabled={off}
+          title={
+            grouped
+              ? "The joined balloons render as one clip, read in the first balloon's voice, and every balloon of the group plays it."
+              : undefined
+          }
           onClick={(e) => {
             if (pointerClick(e)) actions.regenerate(b.id, "audio");
           }}
         >
           {running === "audio"
             ? "Regenerating audio..."
-            : `${first} audio (uses ElevenLabs credits)`}
+            : grouped
+              ? `${first} group audio (${view.groupSize} balloons, uses ElevenLabs credits)`
+              : `${first} audio (uses ElevenLabs credits)`}
         </button>
       </div>
+      {grouped && (
+        <p className="text-[11px] text-neutral-500">
+          The group renders as one clip for all {view.groupSize} balloons.
+        </p>
+      )}
       {lock ? (
         <p className="text-amber-300">{lock.reason}</p>
       ) : (
@@ -454,6 +480,7 @@ function BubbleInspector(
     page,
     panels,
     flags,
+    touching,
     numbers,
     cast,
     castById,
@@ -500,6 +527,24 @@ function BubbleInspector(
 
   const duplicate = f.find((x) => x.kind === "duplicate");
   const unknown = f.find((x) => x.kind === "unknown-speaker");
+
+  // Joined balloons (#451).
+  const touchingId = touching.get(b.id);
+  const touchingBubble = touchingId ? doc.bubbles[touchingId] : undefined;
+  const touchingName = touchingBubble
+    ? ((touchingBubble.speakerId
+        ? castById.get(touchingBubble.speakerId)?.name
+        : null) ??
+      touchingBubble.rawSpeaker ??
+      "another speaker")
+    : null;
+  const joinPrev = joinNeighbour(doc, b.id, -1);
+  const joinNext = joinNeighbour(doc, b.id, 1);
+  const joined = groupMembers(doc, b.id).filter((m) => m.id !== b.id);
+  const shortText = (text: string) => {
+    const flat = text.replace(/\s+/g, " ").trim();
+    return flat.length > 32 ? `${flat.slice(0, 31)}…` : flat || "(no text)";
+  };
   const candidates = unknown
     ? unknown.raw
         .split(/,|&|\/|\band\b/i)
@@ -579,6 +624,44 @@ function BubbleInspector(
               onClick={() => actions.keep(b.id)}
             >
               Keep both <Key>Y</Key>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {touchingId && touchingName && (
+        <div className="space-y-2 rounded-sm border border-sky-400/40 bg-sky-400/10 p-2">
+          <p className="text-sky-200">
+            Touches {touchingName}&apos;s balloon,{" "}
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-white"
+              onClick={() => actions.select({ kind: "bubble", id: touchingId })}
+            >
+              bubble {numbers.get(touchingId)}
+            </button>
+            . One line split in two?
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              className={BUTTON}
+              title="Join the two balloons: one speaker, one clip"
+              onClick={() =>
+                actions.joinWith(
+                  b.id,
+                  "id" in joinPrev && joinPrev.id === touchingId ? -1 : 1,
+                )
+              }
+            >
+              Join
+            </button>
+            <button
+              type="button"
+              className={BUTTON}
+              onClick={() => actions.standAlone(b.id, touchingId)}
+            >
+              Not one line
             </button>
           </div>
         </div>
@@ -871,6 +954,58 @@ function BubbleInspector(
             </button>
           </div>
         </div>
+      </div>
+
+      <div>
+        <Label>
+          Join, one line in one clip <Key>G</Key>
+        </Label>
+        <div className="flex gap-1">
+          {(
+            [
+              [-1, "with previous", joinPrev],
+              [1, "with next", joinNext],
+            ] as const
+          ).map(([dir, label, found]) => (
+            <button
+              key={dir}
+              type="button"
+              className={BUTTON + " h-7"}
+              disabled={"reason" in found}
+              title={"reason" in found ? found.reason : undefined}
+              onClick={() => actions.joinWith(b.id, dir)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {joined.length > 0 && (
+          <div className="mt-1.5 space-y-1">
+            <p className="text-neutral-400">
+              Joined with {plural(joined.length, "other balloon")}:{" "}
+              {joined.map((m, i) => (
+                <span key={m.id}>
+                  {i > 0 && ", "}
+                  <button
+                    type="button"
+                    className="underline underline-offset-2 hover:text-white"
+                    onClick={() => actions.select({ kind: "bubble", id: m.id })}
+                  >
+                    {numbers.get(m.id)}
+                  </button>{" "}
+                  &ldquo;{shortText(m.text)}&rdquo;
+                </span>
+              ))}
+            </p>
+            <button
+              type="button"
+              className={BUTTON + " h-7"}
+              onClick={() => actions.splitFrom(b.id)}
+            >
+              Split off
+            </button>
+          </div>
+        )}
       </div>
 
       <BoxFields

@@ -59,6 +59,7 @@ interface BubbleRow {
   silent: boolean | null;
   kept: boolean | null;
   audio_storage_path: string | null;
+  group_id: string | null;
   box_2d: {
     x?: number;
     y?: number;
@@ -156,7 +157,7 @@ export async function loadEditor(
     supabaseAdmin
       .from("bubbles")
       .select(
-        "id, page_number, panel_id, ocr_text, text_with_cues, type, character_id, speaker, emotion, ignored, silent, kept, audio_storage_path, box_2d, style",
+        "id, page_number, panel_id, ocr_text, text_with_cues, type, character_id, speaker, emotion, ignored, silent, kept, audio_storage_path, group_id, box_2d, style",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -230,6 +231,7 @@ export async function loadEditor(
       kept: b.kept ?? false,
       confidence: typeof box.confidence === "number" ? box.confidence : null,
       audioPath: b.audio_storage_path,
+      groupId: b.group_id,
     };
   });
 

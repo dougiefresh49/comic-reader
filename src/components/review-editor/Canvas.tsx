@@ -489,6 +489,15 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
 
   // Small boxes paint last so a balloon inside a bigger box stays clickable.
   const painted = bubbles.slice().sort((a, b) => area(b.rect) - area(a.rect));
+  // Consecutive members of each joined group, in play order (#451).
+  const links: [BubbleDoc, BubbleDoc][] = [];
+  const lastInGroup = new Map<string, BubbleDoc>();
+  for (const b of bubbles) {
+    if (!b.groupId) continue;
+    const prev = lastInGroup.get(b.groupId);
+    if (prev) links.push([prev, b]);
+    lastInGroup.set(b.groupId, b);
+  }
   const selRect = sel ? rectOf(sel) : null;
 
   return (
@@ -531,6 +540,30 @@ export const Canvas = forwardRef<CanvasHandle, CanvasProps>(function Canvas(
             draggable={false}
             className="absolute inset-0 h-full w-full"
           />
+
+          {/* Joined balloons (#451): a thin line between consecutive members. */}
+          {links.length > 0 && (
+            <svg
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              viewBox="0 0 1 1"
+              preserveAspectRatio="none"
+            >
+              {links.map(([a, z]) => (
+                <line
+                  key={`${a.id}-${z.id}`}
+                  x1={a.rect.x + a.rect.w / 2}
+                  y1={a.rect.y + a.rect.h / 2}
+                  x2={z.rect.x + z.rect.w / 2}
+                  y2={z.rect.y + z.rect.h / 2}
+                  stroke="white"
+                  strokeOpacity={0.75}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+            </svg>
+          )}
 
           {panels.map((p, i) => {
             const selected = isSel("panel", p.id);

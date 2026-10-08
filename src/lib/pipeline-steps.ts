@@ -10,6 +10,7 @@ export const STEP_ORDER = [
   "review-clusters",
   "get-context",
   "sort-page-elements",
+  "group-balloons",
   "review-pages",
   "word-geometry",
   "generate-voice-descriptions",

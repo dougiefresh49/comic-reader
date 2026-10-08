@@ -11,6 +11,7 @@ import {
   pixelBoxOf,
   sampleFillColorRaw,
 } from "~/lib/bubble-fill";
+import { chunk } from "~/lib/chunk";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { pageStoragePath } from "~/lib/storage";
@@ -22,7 +23,9 @@ import {
   bubbleInsert,
   bubbleUpdate,
   boxRowsByPage,
+  groupLeft,
   loadWriteContext,
+  staleGroupColumns,
   newPanelLabels,
   panelInsert,
   panelUpdate,
@@ -238,6 +241,45 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Joined balloons (#451): a member that leaves a group (a split, a re-join)
+  // or is removed leaves the group clip stale on every row still in that
+  // group. Those rows lose the clip and need audio, in this same transaction.
+  const leavers = new Set<string>();
+  const staleGroups = new Set<string>();
+  for (const b of bubbles.update) {
+    const left = groupLeft(b.id, b.set, ctx);
+    if (left) {
+      leavers.add(b.id);
+      staleGroups.add(left);
+    }
+  }
+  for (const b of bubbles.remove) {
+    const g = ctx.groupId.get(b.id);
+    if (g) staleGroups.add(g);
+  }
+  const removed = new Set(bubbles.remove.map((b) => b.id));
+  const staleRows: {
+    id: string;
+    page_number: number;
+    ignored: boolean;
+    silent: boolean;
+  }[] = [];
+  for (const ids of chunk([...staleGroups], 100)) {
+    const { data, error } = await supabaseAdmin
+      .from("bubbles")
+      .select("id, page_number, ignored, silent")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .in("group_id", ids);
+    if (error)
+      return fail(
+        `Nothing was saved: could not read the joined balloons (${error.message}).`,
+        500,
+      );
+    for (const r of (data ?? []) as typeof staleRows)
+      if (!removed.has(r.id) && !leavers.has(r.id)) staleRows.push(r);
+  }
+
   let ops: Op[];
   let boxRows: Map<number, Record<string, unknown>[]>;
   try {
@@ -250,6 +292,18 @@ export async function POST(req: NextRequest) {
       page: b.page,
       row: bubbleUpdate(b.id, b.page, b.set, ctx),
     }));
+    for (const r of staleRows) {
+      const own = updateRows.find((u) => u.id === r.id);
+      const row = own?.row ?? {};
+      Object.assign(
+        row,
+        staleGroupColumns({
+          ignored: typeof row.ignored === "boolean" ? row.ignored : r.ignored,
+          silent: typeof row.silent === "boolean" ? row.silent : r.silent,
+        }),
+      );
+      if (!own) updateRows.push({ id: r.id, page: r.page_number, row });
+    }
     boxRows = boxRowsByPage([...addRows, ...updateRows]);
     const labels = newPanelLabels(
       existingPanels.map((p) => p.panel_id),
@@ -295,6 +349,7 @@ export async function POST(req: NextRequest) {
       written: 0,
       needsAudio: 0,
       wordBoxesFailed: [],
+      audioCleared: [],
     } satisfies SaveResult);
   }
 
@@ -376,5 +431,6 @@ export async function POST(req: NextRequest) {
         op.table === "bubbles" && op.op !== "delete" && op.row.needs_audio,
     ).length,
     wordBoxesFailed,
+    audioCleared: [...leavers, ...staleRows.map((r) => r.id)],
   } satisfies SaveResult);
 }

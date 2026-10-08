@@ -59,6 +59,7 @@ const STEP_LABELS: Record<string, string> = {
   "review-clusters": "Characters",
   "get-context": "Get context",
   "sort-page-elements": "Sort elements",
+  "group-balloons": "Join balloons",
   "review-pages": "Page review",
   "word-geometry": "Word boxes",
   "generate-voice-descriptions": "Voice descriptions",

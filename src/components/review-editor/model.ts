@@ -1,4 +1,5 @@
 // The editor's document: plain data plus pure operations, so undo is a stack of snapshots.
+import { DEFAULT_GROUP_GAP_PX, scanBalloonPairs } from "~/lib/balloon-groups";
 import { NARRATOR_ID, slug } from "./lib";
 import { SPOKEN, needsSpeaker } from "~/lib/bubble-types";
 import type {
@@ -40,6 +41,11 @@ export interface BubbleDoc {
   /** Drawn in the browser and never reordered by hand: it re-sorts as its box moves. */
   auto: boolean;
   confidence: number | null;
+  /**
+   * `bubbles.group_id` (#451): shared with another bubble = joined balloons;
+   * held alone = reviewed, stands alone; null = not reviewed yet.
+   */
+  groupId: string | null;
 }
 
 export interface PanelDoc {
@@ -51,6 +57,9 @@ export interface PanelDoc {
 
 export interface PageDoc {
   number: number;
+  /** The page image's size in pixels, for the joined-balloon gap (#451). */
+  width: number;
+  height: number;
   panelIds: string[];
   /** Bubbles that overlap no panel. */
   looseIds: string[];
@@ -87,7 +96,20 @@ export interface Sel {
 export type Flag =
   | { kind: "no-speaker" }
   | { kind: "unknown-speaker"; raw: string }
-  | { kind: "duplicate"; ofId: string };
+  | { kind: "duplicate"; ofId: string }
+  /**
+   * Touches a balloon of another speaker (#451): maybe one line split in
+   * two. A prompt, not a defect: it never blocks approval and is left out of
+   * `issueFlags`.
+   */
+  | { kind: "touching"; ofId: string };
+
+/** A flag that asks a question rather than marks something wrong. */
+export function isPrompt(
+  flag: Flag,
+): flag is Extract<Flag, { kind: "touching" }> {
+  return flag.kind === "touching";
+}
 
 /** The page's live bubbles that keep it from being approved, in play order. */
 export function unvoicedBubbles(doc: Doc, pageNumber: number): BubbleDoc[] {
@@ -194,6 +216,7 @@ function toBubble(src: SrcBubble, cast: CastMember[]): BubbleDoc {
     kept: src.kept,
     auto: false,
     confidence: src.confidence,
+    groupId: src.groupId,
   };
 }
 
@@ -202,6 +225,8 @@ export function initDoc(data: EditorData): Doc {
   for (const page of data.pages) {
     doc.pages[page.number] = {
       number: page.number,
+      width: page.width,
+      height: page.height,
       panelIds: [],
       looseIds: [],
     };
@@ -297,6 +322,57 @@ export function pageFlags(doc: Doc, pageNumber: number): Map<string, Flag[]> {
       }
     }
   });
+
+  // Two speakers' balloons touching in play order, neither reviewed for
+  // joining yet (#451): the finder's `disagreeing` pairs.
+  const page = doc.pages[pageNumber];
+  if (page) {
+    const panelOfId = new Map<string, string>();
+    for (const p of pagePanels(doc, pageNumber))
+      for (const id of p.bubbleIds) panelOfId.set(id, p.id);
+    const { disagreeing } = scanBalloonPairs(
+      live.map((b, i) => ({
+        id: b.id,
+        panelId: panelOfId.get(b.id) ?? null,
+        sortOrder: i,
+        characterId: b.speakerId,
+        type: b.type,
+        ignored: b.ignored,
+        box: {
+          x: b.rect.x * page.width,
+          y: b.rect.y * page.height,
+          width: b.rect.w * page.width,
+          height: b.rect.h * page.height,
+        },
+      })),
+      DEFAULT_GROUP_GAP_PX,
+    );
+    for (const [a, b] of disagreeing) {
+      if (doc.bubbles[a]?.groupId || doc.bubbles[b]?.groupId) continue;
+      add(a, { kind: "touching", ofId: b });
+      add(b, { kind: "touching", ofId: a });
+    }
+  }
+  return out;
+}
+
+/** The flags that mark something wrong: `pageFlags` without the prompts. */
+export function defectFlags(flags: Map<string, Flag[]>): Map<string, Flag[]> {
+  const out = new Map<string, Flag[]>();
+  for (const [id, list] of flags) {
+    const defects = list.filter((f) => !isPrompt(f));
+    if (defects.length > 0) out.set(id, defects);
+  }
+  return out;
+}
+
+/** Each bubble's touching-balloon prompt (#451): the other balloon's id. */
+export function touchingFlags(flags: Map<string, Flag[]>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [id, list] of flags) {
+    const touching = list.find(isPrompt);
+    if (touching) out.set(id, touching.ofId);
+  }
   return out;
 }
 
@@ -313,7 +389,7 @@ export function issueFlags(doc: Doc): IssueFlag[] {
     .map((p) => p.number)
     .sort((a, b) => a - b);
   for (const n of numbers) {
-    const flags = pageFlags(doc, n);
+    const flags = defectFlags(pageFlags(doc, n));
     for (const id of pageBubbleIds(doc, n)) {
       const f = flags.get(id);
       if (f) out.push({ page: n, bubbleId: id, flags: f });
@@ -553,6 +629,7 @@ export function addBubble(doc: Doc, id: string, page: number, rect: Rect): Doc {
     kept: false,
     auto: true,
     confidence: null,
+    groupId: null,
   };
   return placeByBox({ ...doc, bubbles: { ...doc.bubbles, [id]: bubble } }, id);
 }
@@ -631,6 +708,157 @@ export function addCast(doc: Doc, member: AddedCast, alsoMatch?: string): Doc {
     }
   }
   return { ...doc, bubbles, addedCast: [...doc.addedCast, member] };
+}
+
+// ------------------------------------------------------- joined balloons
+
+/**
+ * The live bubbles that share this bubble's `groupId`, itself included, in
+ * play order; empty when it stands alone (no id, or one nobody else holds).
+ * Groups never span pages, so only its page is searched.
+ */
+export function groupMembers(doc: Doc, id: string): BubbleDoc[] {
+  const b = doc.bubbles[id];
+  if (!b?.groupId || b.deleted) return [];
+  const members = visibleBubbles(doc, pageBubbleIds(doc, b.page)).filter(
+    (o) => o.groupId === b.groupId,
+  );
+  return members.length >= 2 ? members : [];
+}
+
+/**
+ * The balloon this one can join in direction `dir`: its neighbour in play
+ * order inside its panel. Or why it cannot, in words the inspector shows.
+ */
+export function joinNeighbour(
+  doc: Doc,
+  id: string,
+  dir: -1 | 1,
+): { id: string } | { reason: string } {
+  const b = doc.bubbles[id];
+  if (!b || b.deleted) return { reason: "No such balloon." };
+  if (b.ignored) return { reason: "Ignored balloons are not read." };
+  const panel = panelOf(doc, b);
+  if (!panel) return { reason: "Balloons join only inside one panel." };
+  const ids = visibleBubbles(doc, panel.bubbleIds).map((o) => o.id);
+  const n = doc.bubbles[ids[ids.indexOf(id) + dir] ?? ""];
+  const which = dir === -1 ? "previous" : "next";
+  if (!n)
+    return {
+      reason: `It is the ${dir === -1 ? "first" : "last"} balloon in its panel.`,
+    };
+  if (n.ignored) return { reason: `The ${which} balloon is ignored.` };
+  if (b.groupId && b.groupId === n.groupId)
+    return { reason: `Already joined with the ${which} balloon.` };
+  return { id: n.id };
+}
+
+/** Set `groupId` on every bubble of `page` that holds `from`. */
+function regroup(
+  bubbles: Record<string, BubbleDoc>,
+  page: number,
+  from: string,
+  to: string,
+): void {
+  for (const o of Object.values(bubbles)) {
+    if (o.page === page && o.groupId === from)
+      bubbles[o.id] = { ...o, groupId: to };
+  }
+}
+
+/**
+ * Join a balloon with its neighbour in play order inside one panel (#451).
+ * One side's group, shared or alone, takes in the other; with neither, both
+ * get `freshId`; with two groups, the neighbour's group takes this one's.
+ * Every member then takes the lead's speaker (the lead is first in play
+ * order). Type is left alone. Throws on a pair the UI never offers.
+ */
+export function joinWith(
+  doc: Doc,
+  id: string,
+  neighborId: string,
+  freshId: string,
+): Doc {
+  const a = doc.bubbles[id];
+  const n = doc.bubbles[neighborId];
+  const panel = a ? panelOf(doc, a) : null;
+  const ids = panel
+    ? visibleBubbles(doc, panel.bubbleIds).map((o) => o.id)
+    : [];
+  if (
+    !a ||
+    !n ||
+    a.page !== n.page ||
+    !panel ||
+    Math.abs(ids.indexOf(id) - ids.indexOf(neighborId)) !== 1 ||
+    !ids.includes(neighborId)
+  )
+    throw new Error(
+      `joinWith: ${neighborId} is not next to ${id} in one panel`,
+    );
+
+  const bubbles = { ...doc.bubbles };
+  let target: string;
+  if (a.groupId && n.groupId) {
+    target = a.groupId;
+    regroup(bubbles, a.page, n.groupId, target);
+  } else if (a.groupId) {
+    target = a.groupId;
+    bubbles[n.id] = { ...n, groupId: target };
+  } else if (n.groupId) {
+    target = n.groupId;
+    bubbles[a.id] = { ...a, groupId: target };
+  } else {
+    target = freshId;
+    bubbles[a.id] = { ...a, groupId: target };
+    bubbles[n.id] = { ...n, groupId: target };
+  }
+
+  const next: Doc = { ...doc, bubbles };
+  const members = visibleBubbles(next, pageBubbleIds(next, a.page)).filter(
+    (o) => o.groupId === target,
+  );
+  const lead = members[0];
+  if (lead) {
+    for (const m of members) {
+      if (m.speakerId !== lead.speakerId || m.rawSpeaker !== lead.rawSpeaker)
+        bubbles[m.id] = {
+          ...m,
+          speakerId: lead.speakerId,
+          rawSpeaker: lead.rawSpeaker,
+        };
+    }
+  }
+  return next;
+}
+
+/**
+ * Take a balloon out of its shared group: it gets `freshId`, its own, so it
+ * stands alone and is never auto-joined again. A lone member left behind
+ * keeps the old id and stands alone too. No-op outside a shared group.
+ */
+export function splitFrom(doc: Doc, id: string, freshId: string): Doc {
+  if (groupMembers(doc, id).length === 0) return doc;
+  return withBubble(doc, id, { groupId: freshId });
+}
+
+/**
+ * "Not one line": both balloons of a touching pair are marked as standing
+ * alone, each with its own fresh id, so the prompt goes away for good. A
+ * side that already has a group is left as it is.
+ */
+export function standAlone(
+  doc: Doc,
+  id: string,
+  otherId: string,
+  freshIds: [string, string],
+): Doc {
+  let next = doc;
+  if (!doc.bubbles[id]?.groupId)
+    next = withBubble(next, id, { groupId: freshIds[0] });
+  if (!doc.bubbles[otherId]?.groupId)
+    next = withBubble(next, otherId, { groupId: freshIds[1] });
+  return next;
 }
 
 // ------------------------------------------------------------ pending edits

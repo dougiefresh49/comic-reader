@@ -126,6 +126,46 @@ export function planBubbleVoices(
   return { toSend, skipped };
 }
 
+/**
+ * One unit of the audio step's work: a bubble rendered alone, or a group of
+ * joined balloons (#451) rendered once, keyed on its `group_id`, with the
+ * selected members it covers (the single-bubble fallback when the group
+ * turns out to have fewer than two active members).
+ */
+export type AudioJob =
+  | { bubbleId: string }
+  | { groupId: string; bubbleIds: string[] };
+
+/**
+ * The selected bubbles as jobs, in their order: every bubble whose
+ * `group_id` is shared by two or more active members (`activeGroupSize`)
+ * folds into one job for its group, however many members were selected;
+ * the rest stay single-bubble jobs.
+ */
+export function collapseAudioJobs(
+  selected: { id: string; group_id: string | null }[],
+  activeGroupSize: ReadonlyMap<string, number>,
+): AudioJob[] {
+  const jobs: AudioJob[] = [];
+  const byGroup = new Map<string, { groupId: string; bubbleIds: string[] }>();
+  for (const b of selected) {
+    const g = b.group_id;
+    if (g === null || (activeGroupSize.get(g) ?? 0) < 2) {
+      jobs.push({ bubbleId: b.id });
+      continue;
+    }
+    const job = byGroup.get(g);
+    if (job) {
+      job.bubbleIds.push(b.id);
+    } else {
+      const fresh = { groupId: g, bubbleIds: [b.id] };
+      byGroup.set(g, fresh);
+      jobs.push(fresh);
+    }
+  }
+  return jobs;
+}
+
 export function normalizeAlignment(
   raw: AlignmentRaw | null | undefined,
 ): NormalizedAlignment | null {

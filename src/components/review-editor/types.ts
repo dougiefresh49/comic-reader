@@ -48,6 +48,11 @@ export interface SrcBubble {
   confidence: number | null;
   /** `audio_storage_path`: the current take in the `comic-audio` bucket, or null when it has none. */
   audioPath: string | null;
+  /**
+   * `bubbles.group_id` (#451): shared by two or more rows = joined balloons;
+   * held by one row = reviewed, stands alone; null = not reviewed yet.
+   */
+  groupId: string | null;
 }
 
 export interface Face {

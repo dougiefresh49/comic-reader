@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { needYou, plural, tintFor } from "./lib";
 import {
+  groupMembers,
   SPOKEN,
   visibleBubbles,
   type BubbleDoc,
@@ -19,6 +20,8 @@ interface TreeProps {
   pageNumber: number;
   panels: PanelDoc[];
   flags: Map<string, Flag[]>;
+  /** Touching-balloon prompts (#451): each bubble's other balloon. */
+  touching: Map<string, string>;
   numbers: Map<string, number>;
   castById: Map<string, CastMember>;
   sel: Sel | null;
@@ -76,6 +79,7 @@ export function Tree({
   pageNumber,
   panels,
   flags,
+  touching,
   numbers,
   castById,
   sel,
@@ -174,6 +178,7 @@ export function Tree({
     const member = b.speakerId ? castById.get(b.speakerId) : undefined;
     const cell = speakerCell(b, f, member);
     const duplicate = f?.some((x) => x.kind === "duplicate");
+    const joined = groupMembers(doc, b.id).length > 0;
     return (
       <div
         key={b.id}
@@ -233,6 +238,22 @@ export function Tree({
         >
           {b.text.replace(/\s+/g, " ")}
         </span>
+        {joined && (
+          <span
+            title="Joined with the next or previous balloon: one line, one clip"
+            className="shrink-0 text-[10px] text-neutral-500"
+          >
+            joined
+          </span>
+        )}
+        {touching.has(b.id) && (
+          <span
+            title="Touches another speaker's balloon: one line split in two?"
+            className="shrink-0 text-[10px] text-sky-300"
+          >
+            touching?
+          </span>
+        )}
         {duplicate && (
           <button
             type="button"
