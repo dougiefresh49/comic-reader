@@ -503,14 +503,16 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   // rows from before the Save (#665). While a Save is in flight the stored
   // copy keeps the edits but no history: a tab opened or reloaded then reads
   // rows that may already hold the Save, and history from before it could
-  // undo back past it. `writtenRef` holds what was stored, history dropped
-  // included, so the next write after a failed Save puts the history back.
+  // undo back past it. `heldBackRef` marks a write that held the history
+  // back that way, so the next write after a failed Save puts it back.
   const stateRef = useRef(state);
   const revRef = useRef(boot.rev);
   const writtenRef = useRef(boot.state);
   const staleRef = useRef(false);
   /** A Save is in flight; set by `writeSave`. */
   const savingRef = useRef(false);
+  /** The last write dropped the history because a Save was in flight. */
+  const heldBackRef = useRef(false);
   const goStale = useCallback(() => {
     staleRef.current = true;
     setKept("stale");
@@ -522,6 +524,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       if (staleRef.current) return;
       if (
         !force &&
+        !heldBackRef.current &&
         written.doc === current.doc &&
         written.base === current.base &&
         written.past === current.past &&
@@ -535,19 +538,25 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       const rev = newId();
       const packed = packState(current, rev);
       const saving = savingRef.current;
-      let result: Kept = "failed";
-      let stored = current;
-      if (!saving && writeLocal(storeKey, packed)) result = "kept";
       // Storage full, or a Save in flight: keep the edits, let the history go.
-      else if (writeLocal(storeKey, { ...packed, past: [], future: [] })) {
-        result = saving ? "kept" : "no-history";
-        stored = { ...current, past: [], future: [] };
-      }
+      const result: Kept =
+        !saving && writeLocal(storeKey, packed)
+          ? "kept"
+          : writeLocal(storeKey, { ...packed, past: [], future: [] })
+            ? "no-history"
+            : "failed";
       if (result !== "failed") {
         revRef.current = rev;
-        writtenRef.current = stored;
+        writtenRef.current = current;
+        heldBackRef.current = saving;
       }
-      setKept(result);
+      // A Save holding the history back is not storage running out; a tab
+      // already out of room keeps saying so.
+      setKept((prev) =>
+        saving && result === "no-history" && prev !== "no-history"
+          ? "kept"
+          : result,
+      );
     },
     [storeKey, goStale],
   );
@@ -955,6 +964,11 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       }
       landed = true;
       dispatch({ type: "saved", base: sent });
+      // A store before the next render must not write the pre-Save state.
+      stateRef.current = reducer(stateRef.current, {
+        type: "saved",
+        base: sent,
+      });
       // A split or re-join retires the old group clip (#451): the route says
       // which rows lost it, so the editor never plays it as current.
       const cleared = body?.audioCleared ?? [];
