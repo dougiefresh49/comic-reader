@@ -38,6 +38,11 @@ if [ ! -f "$LIST" ]; then
   printf 'Blocked: %s is missing, so the guarded-file list cannot be checked. Restore it from the repo.\n' "$LIST" >&2
   exit 2
 fi
+# A list that exists but cannot be read loads zero rules, which is no check.
+if [ ! -r "$LIST" ]; then
+  printf 'Blocked: %s cannot be read, so the guarded-file list cannot be checked. Fix its permissions.\n' "$LIST" >&2
+  exit 2
+fi
 
 # src/lib//models.ts, src/lib/../lib/models.ts and ./src/lib/models.ts are one
 # file, and the guarded list is written the short way.
@@ -78,11 +83,13 @@ if [ -z "$FILE_PATH" ]; then
   PATCH_LINES=$(printf '%s' "$PATCH_LINES" | sed -E 's/^\*\*\*[[:space:]]*//')
 fi
 
+NR_FILE_RULES=0
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
   file:*) ;;
   *) continue ;;
   esac
+  NR_FILE_RULES=$((NR_FILE_RULES + 1))
 
   target=${line#file:}
   target=${target%%::*}
@@ -106,5 +113,11 @@ while IFS= read -r line || [ -n "$line" ]; do
     done
   done <<<"$PATCH_LINES"
 done <"$LIST"
+# A read that failed part way, or a list emptied by mistake, leaves no rule to
+# check against; that is not a pass.
+if [ "$NR_FILE_RULES" -eq 0 ]; then
+  printf 'Blocked: %s holds no file: rule, so the guarded-file list cannot be checked. Restore it from the repo.\n' "$LIST" >&2
+  exit 2
+fi
 
 exit 0
