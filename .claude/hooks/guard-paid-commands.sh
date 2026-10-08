@@ -105,9 +105,11 @@ done <<<"$SCRIPT_FILES"
 # (its target is the next word), \034 a word that had quotes, \036 stands for
 # a quoted newline. Lexed again at the end: an unquoted `sh -c` string, an
 # unquoted $(...), and each heredoc body line alone, so an apostrophe in a
-# body cannot swallow the commands after it.
+# body cannot swallow the commands after it. Read as bytes (LC_ALL=C): every
+# character the lexer acts on is ASCII, and macOS awk in a UTF-8 locale stops
+# on some multibyte text (a `…` in a heredoc), which would block the command.
 segments() {
-  printf '%s' "$1" | awk '
+  printf '%s' "$1" | LC_ALL=C awk '
     function endword() {
       if (inw && hdnext) { hd[nhd] = cur; hdd[nhd++] = hdnext == 2; hdnext = 0 }
       if (inw) w[nw++] = (wq ? "\034" : "") cur
