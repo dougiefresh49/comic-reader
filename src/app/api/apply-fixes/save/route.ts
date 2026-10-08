@@ -22,7 +22,13 @@ import {
   bubbleInsert,
   bubbleUpdate,
   boxRowsByPage,
+  groupGained,
+  groupLeft,
+  leavesGroupClip,
   loadWriteContext,
+  splitUnvoiced,
+  staleClipHolders,
+  staleGroupColumns,
   newPanelLabels,
   panelInsert,
   panelUpdate,
@@ -185,6 +191,10 @@ export async function POST(req: NextRequest) {
         ...bubbles.update.map((b) => b.set.speaker),
       ],
       bubbleIds: [...bubbles.update, ...bubbles.remove].map((b) => b.id),
+      groupIds: [
+        ...bubbles.update.map((b) => b.set.groupId),
+        ...bubbles.add.map((b) => b.groupId),
+      ].flatMap((g) => (g ? [g] : [])),
     });
   } catch (e) {
     return fail(`Nothing was saved: ${(e as Error).message}`, 500);
@@ -238,6 +248,46 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Joined balloons (#451). An edit or an added row that sets ignored or
+  // silent on a member of a stored joined group splits it off. Then a stored
+  // group that plays one clip (two or more rows share a non-null path,
+  // `groupClip`) and loses a member (a split, a re-join, a removal) or gains
+  // one has a clip that no longer covers its words: the rows holding it lose
+  // it and need audio, in this same transaction. A group saved but never
+  // rendered keeps every member's own clip.
+  for (const b of bubbles.update) b.set = splitUnvoiced(b.id, b.set, ctx);
+  bubbles.add = bubbles.add.map((b) => splitUnvoiced(b.id, b, ctx));
+  const leaving = new Set<string>();
+  const leavers = new Set<string>();
+  const staleGroups = new Set<string>();
+  for (const b of bubbles.update) {
+    const left = groupLeft(b.id, b.set, ctx);
+    if (left) {
+      leaving.add(b.id);
+      staleGroups.add(left);
+      if (leavesGroupClip(b.id, b.set, ctx)) leavers.add(b.id);
+    }
+    const gained = groupGained(b.id, b.set, ctx);
+    if (gained) staleGroups.add(gained);
+  }
+  for (const b of bubbles.add) {
+    const gained = groupGained(null, b, ctx);
+    if (gained) staleGroups.add(gained);
+  }
+  for (const b of bubbles.remove) {
+    const g = ctx.groupId.get(b.id);
+    if (g) staleGroups.add(g);
+  }
+  const removed = new Set(bubbles.remove.map((b) => b.id));
+  const staleRows = [
+    ...new Map(
+      [...staleGroups]
+        .flatMap((g) => staleClipHolders(g, ctx))
+        .filter((r) => !removed.has(r.id) && !leaving.has(r.id))
+        .map((r) => [r.id, r]),
+    ).values(),
+  ];
+
   let ops: Op[];
   let boxRows: Map<number, Record<string, unknown>[]>;
   try {
@@ -250,6 +300,18 @@ export async function POST(req: NextRequest) {
       page: b.page,
       row: bubbleUpdate(b.id, b.page, b.set, ctx),
     }));
+    for (const r of staleRows) {
+      const own = updateRows.find((u) => u.id === r.id);
+      const row = own?.row ?? {};
+      Object.assign(
+        row,
+        staleGroupColumns({
+          ignored: typeof row.ignored === "boolean" ? row.ignored : r.ignored,
+          silent: typeof row.silent === "boolean" ? row.silent : r.silent,
+        }),
+      );
+      if (!own) updateRows.push({ id: r.id, page: r.page_number, row });
+    }
     boxRows = boxRowsByPage([...addRows, ...updateRows]);
     const labels = newPanelLabels(
       existingPanels.map((p) => p.panel_id),
@@ -295,6 +357,7 @@ export async function POST(req: NextRequest) {
       written: 0,
       needsAudio: 0,
       wordBoxesFailed: [],
+      audioCleared: [],
     } satisfies SaveResult);
   }
 
@@ -376,5 +439,6 @@ export async function POST(req: NextRequest) {
         op.table === "bubbles" && op.op !== "delete" && op.row.needs_audio,
     ).length,
     wordBoxesFailed,
+    audioCleared: [...leavers, ...staleRows.map((r) => r.id)],
   } satisfies SaveResult);
 }

@@ -23,6 +23,7 @@
     "character-lookahead": "tsx --env-file=.env scripts/character-lookahead.ts",
     "test-ivc-fidelity": "tsx --env-file=.env scripts/test-ivc-fidelity.ts",
     "render-bubble": "tsx --env-file=.env scripts/render-bubble.ts",
+    "backfill-balloon-groups": "tsx --env-file=.env scripts/backfill-balloon-groups.ts",
     "voice-rotation": "tsx --env-file=.env scripts/voice-rotation.ts",
     "voice-rotation-checkout": "tsx --env-file=.env scripts/voice-rotation-checkout.ts",
     "voice-rotation-archive": "tsx --env-file=.env scripts/voice-rotation-archive.ts",

@@ -3,9 +3,11 @@ import {
   applyDocPatch,
   diffDoc,
   reconcile,
+  repairChanged,
   type BubbleDoc,
   type Doc,
   type DocPatch,
+  type Mint,
   type Sel,
 } from "./model";
 
@@ -35,9 +37,23 @@ export type EditorAction =
   | {
       type: "apply";
       label: string;
+      /**
+       * With `coalesce`, the recipe must set an absolute value (a whole
+       * rect, a whole field), never a step from the current one: a merged
+       * edit replays only its latest recipe on the document from before the
+       * step began.
+       */
       recipe: (doc: Doc) => Doc;
-      /** Consecutive edits with the same key fold into one undo step. */
+      /**
+       * Consecutive edits with the same key fold into one undo step: typed
+       * fields and Shift-arrow nudges. A drag commits once, with no key.
+       */
       coalesce?: string;
+      /**
+       * Mints group ids for `repairChanged`, run on the result measured from
+       * the document before the undo step began. Left out, no repair.
+       */
+      mint?: Mint;
       select?: Sel | null;
       page?: number;
     }
@@ -90,7 +106,21 @@ export function initState(doc: Doc, page: number): EditorState {
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case "apply": {
-      const doc = action.recipe(state.doc);
+      const folds =
+        action.coalesce !== undefined &&
+        action.coalesce === state.coalesce &&
+        state.past.length > 0;
+      // A merged edit replays its latest (absolute) recipe on the document
+      // from before the undo step began, then repairs groups against it
+      // (#451): a half-typed value that briefly moved a box leaves nothing
+      // behind, and only where the step ends can split a group.
+      const stepStart = folds
+        ? (state.past[state.past.length - 1]?.doc ?? state.doc)
+        : state.doc;
+      const next = action.recipe(stepStart);
+      const doc = action.mint
+        ? repairChanged(stepStart, next, action.mint)
+        : next;
       const page = action.page ?? state.page;
       const sel =
         action.select !== undefined
@@ -101,10 +131,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           ? state
           : { ...state, sel, page };
       }
-      const folds =
-        action.coalesce !== undefined &&
-        action.coalesce === state.coalesce &&
-        state.past.length > 0;
       const past = folds
         ? state.past
         : [
@@ -227,8 +253,12 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         const doc = take(entry.doc);
         return doc === entry.doc ? entry : { ...entry, doc };
       };
+      // The next merged keystroke opens a new undo step from the document
+      // that holds the new cues; replaying on a step start whose text
+      // differed would drop them (review of PR #650, round 4).
       return {
         ...state,
+        coalesce: null,
         base: take(state.base),
         doc: take(state.doc),
         past: state.past.map(takeEntry),

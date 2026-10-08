@@ -2,19 +2,27 @@ import { FatalError } from "workflow";
 import type { Json } from "~/types/database";
 import {
   bubbleNeedsAudio,
+  collapseAudioJobs,
   normalizeAlignment,
   planBubbleVoices,
   type AlignmentRaw,
+  type AudioJob,
 } from "./audio-plan";
+import { chunk } from "~/lib/chunk";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 
 const fatal = (err: unknown) =>
   new FatalError(err instanceof Error ? err.message : String(err));
 
-export async function getBubbleIdsForAudio(
+/**
+ * The audio step's work: the bubbles with no audio that `bubbleNeedsAudio`,
+ * as jobs (`collapseAudioJobs`). Members of a joined group (#451) with two or
+ * more active members fold into one job for the group.
+ */
+export async function getAudioJobs(
   bookId: string,
   issueId: string,
-): Promise<string[]> {
+): Promise<AudioJob[]> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
@@ -22,7 +30,7 @@ export async function getBubbleIdsForAudio(
   const { data: bubbles, error } = await supabase
     .from("bubbles")
     .select(
-      "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order",
+      "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order, group_id",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
@@ -34,20 +42,46 @@ export async function getBubbleIdsForAudio(
 
   if (error) throw new FatalError(error.message);
 
-  const ids = (bubbles ?? [])
-    .filter((b) => bubbleNeedsAudio(b))
-    .map((b) => b.id);
+  const selected = (bubbles ?? []).filter((b) => bubbleNeedsAudio(b));
 
+  // Active members per group, counted over the whole group (members that
+  // already have audio included), so a group with one member selected still
+  // renders as a group.
+  const groupIds = [
+    ...new Set(selected.flatMap((b) => (b.group_id ? [b.group_id] : []))),
+  ];
+  const activeGroupSize = new Map<string, number>();
+  for (const ids of chunk(groupIds, 100)) {
+    const { data: members, error: gErr } = await supabase
+      .from("bubbles")
+      .select("group_id")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("ignored", false)
+      .eq("silent", false)
+      .in("group_id", ids);
+    if (gErr) throw new FatalError(gErr.message);
+    for (const m of members ?? []) {
+      if (m.group_id)
+        activeGroupSize.set(
+          m.group_id,
+          (activeGroupSize.get(m.group_id) ?? 0) + 1,
+        );
+    }
+  }
+
+  const jobs = collapseAudioJobs(selected, activeGroupSize);
+  const groups = jobs.filter((j) => "groupId" in j).length;
   console.log(
-    `[get-bubbles] ${bookId}/${issueId}: ${ids.length} bubbles need audio`,
+    `[get-bubbles] ${bookId}/${issueId}: ${selected.length} bubbles need audio, ${jobs.length} jobs (${groups} joined groups)`,
   );
-  return ids;
+  return jobs;
 }
 
 export async function generateAudioBatch(
   bookId: string,
   issueId: string,
-  bubbleIds: string[],
+  jobs: AudioJob[],
 ) {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
@@ -59,20 +93,66 @@ export async function generateAudioBatch(
   const client = await getElevenLabsClient();
   const { recordElevenLabsCall } = await import("~/lib/llm-usage");
 
-  const { data: bubbles, error: bubErr } = await supabase
-    .from("bubbles")
-    .select(
-      "id, speaker, character_id, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
-    )
-    .in("id", bubbleIds);
-
-  if (bubErr) throw new FatalError(bubErr.message);
-  if (!bubbles || bubbles.length === 0) return;
-
   const { loadBookCast } = await import("~/lib/cast");
   const book = await loadBookCast(supabase, bookId).catch((e: Error) => {
     throw new FatalError(e.message);
   });
+
+  // Groups first: one render each. A group that turns out to have fewer than
+  // two active members falls back to its selected bubbles rendered alone.
+  const { renderGroupAudio } = await import("~/lib/render-group-audio");
+  const bubbleIds: string[] = [];
+  let generated = 0;
+  for (const job of jobs) {
+    if ("bubbleId" in job) {
+      bubbleIds.push(job.bubbleId);
+      continue;
+    }
+    let result;
+    try {
+      result = await renderGroupAudio({
+        client: supabase,
+        bookId,
+        issueId,
+        groupId: job.groupId,
+        step: "generate-audio",
+        book,
+      });
+    } catch (e) {
+      throw fatal(e);
+    }
+    if ("rendered" in result) {
+      generated++;
+      console.log(
+        `[audio] group ${job.groupId}: ${result.memberIds.length} balloons, ${result.characters} chars -> ${result.path}`,
+      );
+    } else if (result.skipped === "single") {
+      bubbleIds.push(...job.bubbleIds);
+    } else {
+      const detail =
+        "memberId" in result
+          ? ` (member ${result.memberId})`
+          : "detail" in result
+            ? ` (${result.detail})`
+            : "";
+      console.log(
+        `[audio] skip group ${job.groupId}: ${result.skipped}${detail}`,
+      );
+    }
+  }
+
+  const { data: fetched, error: bubErr } =
+    bubbleIds.length > 0
+      ? await supabase
+          .from("bubbles")
+          .select(
+            "id, speaker, character_id, text_with_cues, ocr_text, audio_storage_path, ignored, silent",
+          )
+          .in("id", bubbleIds)
+      : { data: [], error: null };
+
+  if (bubErr) throw new FatalError(bubErr.message);
+  const bubbles = fetched ?? [];
 
   const sendPlan = planBubbleVoices(bubbles, book, issueId);
   for (const { bubble, reason, lookup: found } of sendPlan.skipped) {
@@ -89,8 +169,6 @@ export async function generateAudioBatch(
   ).catch((err: unknown) => {
     throw fatal(err);
   });
-
-  let generated = 0;
 
   for (const {
     bubble,
@@ -163,7 +241,7 @@ export async function generateAudioBatch(
   }
 
   console.log(
-    `[audio] ${bookId}/${issueId}: generated ${generated}/${bubbleIds.length} audio files`,
+    `[audio] ${bookId}/${issueId}: generated ${generated}/${jobs.length} audio files`,
   );
 }
 generateAudioBatch.maxRetries = 0;

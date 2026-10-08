@@ -25,10 +25,11 @@ import {
   getContextPage,
 } from "./steps/vision";
 import { sortPageElements, addBubbleStyles } from "./steps/sort";
+import { groupBalloons } from "./steps/group-balloons";
 import { fetchWikiContextStep } from "./steps/wiki";
 import { generateVoiceDescriptions } from "./steps/voice";
 import { wordGeometryPage } from "./steps/word-geometry";
-import { getBubbleIdsForAudio, generateAudioBatch } from "./steps/generation";
+import { getAudioJobs, generateAudioBatch } from "./steps/generation";
 import { generateManifest } from "./steps/publishing";
 import { createCastingTasks } from "./steps/casting-tasks";
 import { recordGateSkip, recordGateWait } from "./steps/gate-checks";
@@ -164,6 +165,21 @@ export async function ingestPipeline(input: IngestInput) {
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 
+    // Joined balloons (#451): free, no model call. It reads the speaker
+    // step's answer and the boxes addBubbleStyles just wrote.
+    if (run("group-balloons")) {
+      currentStep = "group-balloons";
+      await updatePipelineStep(bookId, issueId, currentStep);
+      const timing = await recordStepStart(
+        bookId,
+        issueId,
+        currentStep,
+        pages.length,
+      );
+      await groupBalloons(bookId, issueId);
+      await recordStepEnd(bookId, issueId, currentStep, timing);
+    }
+
     if (run("review-pages")) {
       currentStep = "review-pages";
       // The window covers the pause setup and closes before the gate opens,
@@ -250,8 +266,9 @@ export async function ingestPipeline(input: IngestInput) {
       currentStep = "generate-audio";
       await updatePipelineStep(bookId, issueId, currentStep);
       const timing = await recordStepStart(bookId, issueId, currentStep);
-      const bubbleIds = await getBubbleIdsForAudio(bookId, issueId);
-      const audioBatches = batchArray(bubbleIds, 20);
+      // A joined group is one job, so a batch is 20 renders either way.
+      const jobs = await getAudioJobs(bookId, issueId);
+      const audioBatches = batchArray(jobs, 20);
       for (const batch of audioBatches) {
         await generateAudioBatch(bookId, issueId, batch);
       }

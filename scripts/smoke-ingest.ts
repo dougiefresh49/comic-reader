@@ -1136,6 +1136,32 @@ function gateReport(
 
 // ── Assert ──────────────────────────────────────────────────────────────
 /**
+ * The cast bubbles with no audio path, no mp3, or no word timings for their
+ * clip. Joined balloons (#451) share one clip and only the group's lead
+ * holds its timings row, so a clip counts as timed when any bubble on it is.
+ */
+function lackingAudio<
+  B extends { id: string; audio_storage_path: string | null },
+>(
+  cast: B[],
+  all: B[],
+  stamps: Set<string>,
+  files: Set<string | undefined>,
+): B[] {
+  const timed = new Set(
+    all.flatMap((b) =>
+      b.audio_storage_path && stamps.has(b.id) ? [b.audio_storage_path] : [],
+    ),
+  );
+  return cast.filter(
+    (b) =>
+      !b.audio_storage_path ||
+      !timed.has(b.audio_storage_path) ||
+      !files.has(b.audio_storage_path),
+  );
+}
+
+/**
  * Real mode (#430): counts are reported, not compared with the fixture.
  * Cast bubbles are the ones the audio step voices (`planBubbleVoices`, read
  * as if none had audio yet); the run fails on zero of them or on one
@@ -1185,12 +1211,7 @@ async function assertRealRows(): Promise<string[]> {
       p.split("/").pop(),
     ),
   );
-  const missing = castBubbles.filter(
-    (b) =>
-      !b.audio_storage_path ||
-      !stamps.has(b.id) ||
-      !files.has(b.audio_storage_path),
-  );
+  const missing = lackingAudio(castBubbles, bubbles, stamps, files);
   tally.castBubbles = {
     total: castBubbles.length,
     withAudio: castBubbles.length - missing.length,
@@ -1278,12 +1299,7 @@ async function assertRows(scenario: Scenario): Promise<string[]> {
   const castBubbles = bubbles.filter(
     (b) => !b.ignored && b.character_id && voiced.has(b.character_id),
   );
-  const missing = castBubbles.filter(
-    (b) =>
-      !b.audio_storage_path ||
-      !stamps.has(b.id) ||
-      !files.has(b.audio_storage_path),
-  );
+  const missing = lackingAudio(castBubbles, bubbles, stamps, files);
   // Every fixture bubble with text has a cast speaker (Narrator included),
   // except the stranger's; so zero cast bubbles cannot pass.
   const want =
