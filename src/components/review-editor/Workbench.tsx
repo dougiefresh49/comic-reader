@@ -500,11 +500,17 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   // and a stale tab never writes again. A Save starting writes even when
   // nothing changed (`force`), so it takes the stored revision and every
   // other tab goes stale before it can store edits measured against the
-  // rows from before the Save (#665).
+  // rows from before the Save (#665). While a Save is in flight the stored
+  // copy keeps the edits but no history: a tab opened or reloaded then reads
+  // rows that may already hold the Save, and history from before it could
+  // undo back past it. `writtenRef` holds what was stored, history dropped
+  // included, so the next write after a failed Save puts the history back.
   const stateRef = useRef(state);
   const revRef = useRef(boot.rev);
   const writtenRef = useRef(boot.state);
   const staleRef = useRef(false);
+  /** A Save is in flight; set by `writeSave`. */
+  const savingRef = useRef(false);
   const goStale = useCallback(() => {
     staleRef.current = true;
     setKept("stale");
@@ -528,15 +534,18 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       }
       const rev = newId();
       const packed = packState(current, rev);
-      // A full store keeps the edits and lets the history go.
-      const result: Kept = writeLocal(storeKey, packed)
-        ? "kept"
-        : writeLocal(storeKey, { ...packed, past: [], future: [] })
-          ? "no-history"
-          : "failed";
+      const saving = savingRef.current;
+      let result: Kept = "failed";
+      let stored = current;
+      if (!saving && writeLocal(storeKey, packed)) result = "kept";
+      // Storage full, or a Save in flight: keep the edits, let the history go.
+      else if (writeLocal(storeKey, { ...packed, past: [], future: [] })) {
+        result = saving ? "kept" : "no-history";
+        stored = { ...current, past: [], future: [] };
+      }
       if (result !== "failed") {
         revRef.current = rev;
-        writtenRef.current = current;
+        writtenRef.current = stored;
       }
       setKept(result);
     },
@@ -885,7 +894,6 @@ function Editor({ data, initialPage }: WorkbenchProps) {
    * `save` is the button and Cmd S; a regenerate's save-first, which already
    * holds the lock, calls `writeSave`.
    */
-  const savingRef = useRef(false);
   const save = async () => {
     if (refuse()) return;
     await writeSave();
@@ -912,11 +920,15 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       say("Nothing to save.");
       return { ok: true, sent };
     }
-    // Take the stored revision before anything is sent. A refused write does
-    // not stop the Save: the "not being kept" banner already says so.
+    // Take the stored revision before anything is sent, with no history
+    // while the Save is in flight. A refused write does not stop the Save:
+    // the "not being kept" banner already says so. `stateRef` can lag a
+    // render behind, so it is set to what is sent first.
+    savingRef.current = true;
+    stateRef.current = state;
     writeState(true);
     dispatch({ type: "saving" });
-    savingRef.current = true;
+    let landed = false;
     setSaving(true);
     setSaveError(null);
     try {
@@ -941,6 +953,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         setSaveError(error);
         return { ok: false, error };
       }
+      landed = true;
       dispatch({ type: "saved", base: sent });
       // A split or re-join retires the old group clip (#451): the route says
       // which rows lost it, so the editor never plays it as current.
@@ -975,6 +988,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
     } finally {
       savingRef.current = false;
       setSaving(false);
+      // Nothing landed: the history goes back to storage now. After a Save
+      // that landed, `saved` trims it and the next store writes that.
+      if (!landed) store();
     }
   };
 
@@ -1157,7 +1173,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       if (pagePending(n)) {
         const saved = await writeSave();
         if (!saved.ok) {
-          say(`Page ${n} is not approved: its edits did not save.`, "warn");
+          say(`Page ${n} is not approved. ${saved.error}`, "warn");
           return;
         }
       }
