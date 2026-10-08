@@ -27,6 +27,8 @@ export function NewIssueUploader() {
     () => (issueNumber ? `issue-${issueNumber}` : ""),
     [issueNumber],
   );
+  // Init already ran for this issue, so its names are fixed; a retry skips init.
+  const created = initializedFor === `${bookId}/${issueId}`;
 
   const onDrop = useCallback((dropped: FileList | null) => {
     if (!dropped) return;
@@ -245,8 +247,9 @@ export function NewIssueUploader() {
                 type="text"
                 value={bookName}
                 onChange={(e) => setBookName(e.target.value)}
+                disabled={created}
                 placeholder="TMNT × MMPR III"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
             <label className="text-sm">
@@ -265,14 +268,15 @@ export function NewIssueUploader() {
                 type="text"
                 value={issueName}
                 onChange={(e) => setIssueName(e.target.value)}
+                disabled={created}
                 placeholder="Issue 3"
-                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm"
+                className="mt-1 w-full rounded border border-neutral-700 bg-neutral-950 px-3 py-2 text-sm disabled:opacity-50"
               />
             </label>
           </div>
           {issueId && (
             <p className="text-xs text-neutral-500">
-              Will create issue{" "}
+              {created ? "Already created" : "Will create"} issue{" "}
               <code>
                 {bookId}/{issueId}
               </code>
