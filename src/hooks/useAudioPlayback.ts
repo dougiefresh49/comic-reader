@@ -10,7 +10,7 @@ import {
   resumeContext,
 } from "~/lib/audio-graph";
 import { buildWordTimings } from "~/components/zen-comic-reader/text-utils";
-import { useWordHighlight } from "./useWordHighlight";
+import { useWordHighlight, type WordSpan } from "./useWordHighlight";
 
 interface UseAudioPlaybackOptions {
   bookId: string;
@@ -25,6 +25,33 @@ interface UseAudioPlaybackOptions {
   volume?: number;
   /** HTMLMediaElement.playbackRate; pitch-preserved up to ~1.5x in Safari. */
   playbackRate?: number;
+}
+
+/** How `playBubble` starts a clip; both fields serve joined groups (#451). */
+export interface PlayOptions {
+  /** Seconds into the clip to start from: a group member's first word. */
+  startAt?: number;
+  /** The group's words per balloon, so the highlight walks between them. */
+  spans?: readonly WordSpan[];
+}
+
+/**
+ * Moves `audio` to `seconds`. Before the metadata loads the element cannot
+ * seek, so the time is set again on `loadedmetadata`; until then the spec
+ * keeps it as the default playback start position.
+ */
+function seekWhenReady(audio: HTMLAudioElement, seconds: number) {
+  audio.currentTime = seconds;
+  if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) return;
+  audio.addEventListener(
+    "loadedmetadata",
+    () => {
+      if (Math.abs(audio.currentTime - seconds) > 0.05) {
+        audio.currentTime = seconds;
+      }
+    },
+    { once: true },
+  );
 }
 
 /** A bubble has audio exactly when its storage path is set. */
@@ -44,6 +71,8 @@ export function useAudioPlayback({
 }: UseAudioPlaybackOptions) {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // The bubble whose clip audioRef holds, so seekCurrent can reuse it.
+  const audioBubbleIdRef = useRef<string | null>(null);
   // Whether the current clip may advance the reader when it fails. stopAll
   // (a page turn, unmount, Reset View) clears it, because pausing an element
   // does not cancel its fetch and the element stays in audioRef, so a late
@@ -77,7 +106,7 @@ export function useAudioPlayback({
   }, [stopHighlight]);
 
   const playBubble = useCallback(
-    (bubble: Bubble) => {
+    (bubble: Bubble, { startAt = 0, spans }: PlayOptions = {}) => {
       stopAll();
       // Either branch below replaces the current clip for good, so its nodes
       // are unwired here and the element can be collected (#611).
@@ -88,6 +117,7 @@ export function useAudioPlayback({
       // No `ended` either: autoplay never picks such a bubble.
       if (!hasAudio(bubble)) {
         audioRef.current = null;
+        audioBubbleIdRef.current = null;
         failCurrentRef.current = null;
         return;
       }
@@ -102,6 +132,7 @@ export function useAudioPlayback({
       applyLevel(audio, level);
       audio.playbackRate = playbackRate;
       audioRef.current = audio;
+      audioBubbleIdRef.current = bubble.id;
       armedRef.current = true;
       setIsPlaying(true);
 
@@ -142,10 +173,11 @@ export function useAudioPlayback({
       audio.addEventListener("play", () => {
         setIsPlaying(true);
         if (words.length && audioRef.current === audio) {
-          startHighlight(audio, words, bubble.id);
+          startHighlight(audio, words, bubble.id, spans);
         }
       });
 
+      if (startAt > 0) seekWhenReady(audio, startAt);
       audio.play().catch((err: unknown) => {
         const name = err instanceof DOMException ? err.name : undefined;
         // stopAll paused this clip before play() resolved: it was replaced.
@@ -179,30 +211,54 @@ export function useAudioPlayback({
     }
   }, [volume, playbackRate]);
 
+  // Plays the paused current clip from where it sits. The tap that calls
+  // this is a gesture, so a context that was interrupted or suspended while
+  // the clip sat paused resumes here (#611).
+  const resume = useCallback((audio: HTMLAudioElement) => {
+    armedRef.current = true;
+    resumeContext();
+    audio
+      .play()
+      .then(() => setIsPlaying(true))
+      .catch((err: unknown) => {
+        const name = err instanceof DOMException ? err.name : undefined;
+        if (name === "AbortError" || name === "NotAllowedError") {
+          console.error("Audio resume failed", err);
+          return;
+        }
+        failCurrentRef.current?.(err);
+      });
+  }, []);
+
   const togglePlayPause = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
-      armedRef.current = true;
-      // The play button is a gesture, so a context that was interrupted or
-      // suspended while the clip sat paused resumes here (#611).
-      resumeContext();
-      audio
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err: unknown) => {
-          const name = err instanceof DOMException ? err.name : undefined;
-          if (name === "AbortError" || name === "NotAllowedError") {
-            console.error("Audio resume failed", err);
-            return;
-          }
-          failCurrentRef.current?.(err);
-        });
+      resume(audio);
     } else {
       audio.pause();
       setIsPlaying(false);
     }
-  }, []);
+  }, [resume]);
+
+  /**
+   * Moves the loaded clip to `seconds` and plays it, when that clip is
+   * `bubbleId`'s and has not failed: a tap on another balloon of the joined
+   * group playing (#451) jumps without reloading. False when there is no
+   * such clip; the caller then starts one with `playBubble`.
+   */
+  const seekCurrent = useCallback(
+    (bubbleId: string, seconds: number): boolean => {
+      const audio = audioRef.current;
+      if (!audio || audioBubbleIdRef.current !== bubbleId || audio.error) {
+        return false;
+      }
+      seekWhenReady(audio, seconds);
+      if (audio.paused) resume(audio);
+      return true;
+    },
+    [resume],
+  );
 
   // Unmount lets go of the clip for good: pause it and unwire its nodes, or
   // the last clip of every page stays on the shared destination (#611).
@@ -214,5 +270,12 @@ export function useAudioPlayback({
     [stopAll],
   );
 
-  return { playBubble, stopAll, togglePlayPause, isPlaying, wordHighlight };
+  return {
+    playBubble,
+    seekCurrent,
+    stopAll,
+    togglePlayPause,
+    isPlaying,
+    wordHighlight,
+  };
 }
