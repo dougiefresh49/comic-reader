@@ -135,14 +135,16 @@ for ((k = 0; k < NR_FILE_RULES; k++)); do
   fi
 done
 
-# Patch tokens get the same normalization, so src/lib/../lib/models.ts in a
-# patch reaches the rule. Over-blocking on a mention is the safe direction for
-# a credit guard. Normalizing keeps every file name, so only a token holding a
-# rule's file name can reach that rule: a patch with none is a pass, and a
-# token with none is never normalized. One grep keeps only the lines holding a
-# file name, so the bash loop below never walks the rest of a big patch. Its
-# output decides the check, so GREP_OPTIONS from the session (--color, -v) and a
-# grep shell function are kept out of it.
+# Patch tokens get the same normalization and the same match as file_path: the
+# rule itself or any path ending in /<rule>, so src/lib/../lib/models.ts, this
+# checkout's absolute path, another checkout's, and the half after the space in
+# a root like `/tmp/my repo` all reach it (#721). Over-blocking on a mention is
+# the safe direction for a credit guard. Normalizing keeps every file name, so
+# only a token holding a rule's file name can reach that rule: a patch with
+# none is a pass, and a token with none is never normalized. One grep keeps
+# only the lines holding a file name, so the bash loop below never walks the
+# rest of a big patch. Its output decides the check, so GREP_OPTIONS from the
+# session (--color, -v) and a grep shell function are kept out of it.
 [ -n "$PATCH_LINES" ] || exit 0
 F_GREP=()
 for ((k = 0; k < NR_FILE_RULES; k++)); do
@@ -158,6 +160,9 @@ case $? in
   exit 2
   ;;
 esac
+# \r splits too, so a CRLF patch's header token does not keep the \r and miss
+# the rule (#721).
+IFS=$' \t\n\r'
 for TOKEN in $CAND; do
   for ((k = 0; k < NR_FILE_RULES; k++)); do
     [[ $TOKEN == *"${F_NAME[k]}"* ]] || continue
@@ -168,7 +173,8 @@ for TOKEN in $CAND; do
       exit 2
     fi
     normalize_path "$TOKEN"
-    if [ "$NORM" = "${F_TARGET[k]}" ] || [ "$NORM" = "${REPO_ROOT}/${F_TARGET[k]}" ]; then
+    target=${F_TARGET[k]}
+    if [ "$NORM" = "$target" ] || [ "${NORM%"/$target"}" != "$NORM" ]; then
       printf 'Blocked: %s\n' "${F_REASON[k]}" >&2
       exit 2
     fi
