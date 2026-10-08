@@ -15,18 +15,16 @@ export type BubbleDrop<T> = {
   by: T[];
   /**
    * True when the geometry is unsure, so the caller may ask something that
-   * can see the page before dropping it. A nested or container drop is
-   * unsure when a box it drops for (a nested drop's inner box, a container
-   * drop's counted box) is also the inner box of another nested drop whose
-   * outer box neither holds the dropping box nor is held by it: two loose
-   * detections of one balloon disagree about where it extends (#343 review
-   * cases 4 and 5). A nested or container drop is also unsure when the
-   * innermost boxes it holds, counted once per balloon, span under
-   * `UNSURE_SPAN` of it, or when that count merged two detections of one
-   * balloon. Any drop is also unsure when every box it dropped for dropped
-   * later, unless the boxes those dropped for sit inside it and span
-   * `UNSURE_SPAN` of it: a loose box under `TWIN_IOU` with its inner box
-   * survives the nested pass, can win a drop, then drop itself (#652).
+   * can see the page before dropping it. Judged once, after every pass,
+   * over the kept boxes it holds, since a box it held when it dropped may
+   * have dropped since (#652): only the innermost of those count, and two
+   * detections of one balloon count once. Unsure when the counted boxes
+   * span under `UNSURE_SPAN` of it, when two detections were counted once,
+   * or when a counted box (for a nested drop, also an inner box in `by`) is
+   * the inner box of another nested drop whose outer box neither holds this
+   * box nor is held by it: two loose detections of one balloon disagree
+   * about where it extends (#343 review cases 4 and 5). A twin whose winner
+   * is kept is always sure; one whose winner dropped is judged as above.
    */
   unsure: boolean;
 };
@@ -72,10 +70,10 @@ const HOLD_SPAN = 0.75;
 const SAME_BALLOON_OVERLAP = 0.2;
 
 /**
- * A nested or container drop whose counted boxes span less than this share of it is
+ * A drop whose kept, counted boxes span less than this share of it is
  * unsure, and worth a look at the page (#343; every reason is listed on
- * `BubbleDrop.unsure`). 0.85 is HOLD_SPAN plus 0.1: on the smoke page every
- * sure container drop spans 0.9 or more.
+ * `BubbleDrop.unsure`). 0.85 is HOLD_SPAN plus 0.1: on the smoke page
+ * every sure container drop spans 0.9 or more.
  */
 const UNSURE_SPAN = 0.85;
 
@@ -164,11 +162,11 @@ function spanShare(big: PanelBoundingBox, held: PanelBoundingBox[]): number {
  *    judged largest first against the ones still kept.
  *
  * A drop leaves its text to the boxes it drops for, all kept when it is
- * judged; a drop whose boxes all drop later leaves it to what
- * they dropped for, and is unsure unless those span it. A drop
- * marked `unsure` is still dropped, and the caller decides whether to look
- * again. The box units only need to agree with each other. Order is
- * preserved in `kept`, `dropped` and `drops`.
+ * judged, though some may drop later; `unsure` is judged after the passes,
+ * against the boxes that stay. A drop marked `unsure` is still dropped, and
+ * the caller decides whether to look again. The box units only need to
+ * agree with each other. Order is preserved in `kept`, `dropped` and
+ * `drops`.
  */
 export function filterDuplicateBubbles<T extends FilterableBubble>(
   bubbles: T[],
@@ -214,11 +212,6 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
       disputed(bubble, counted);
     return { span, unsure };
   };
-  for (const drop of nestedDrops) {
-    const held = live(drop.bubble).filter((o) => holds(drop.bubble, o));
-    drop.unsure =
-      disputed(drop.bubble, drop.by) || judge(drop.bubble, held).unsure;
-  }
 
   const byConfidence = [...bubbles].sort((a, b) => b.confidence - a.confidence);
   for (const bubble of byConfidence) {
@@ -236,28 +229,23 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
   for (const bubble of bySize) {
     if (drops.has(bubble)) continue;
     const held = live(bubble).filter((o) => holds(bubble, o));
-    const { span, unsure } = judge(bubble, held);
-    if (span < HOLD_SPAN) continue;
-    drops.set(bubble, { bubble, rule: "container", by: held, unsure });
+    if (judge(bubble, held).span < HOLD_SPAN) continue;
+    drops.set(bubble, { bubble, rule: "container", by: held, unsure: false });
   }
-  // A drop whose boxes all dropped later leaves its text to what they
-  // dropped for; unsure unless those sit inside it and span it.
+
+  // Unsure is judged once, against the boxes that stay: a box a drop held
+  // when it was judged may have dropped since. A twin whose winner stays
+  // leaves its text to that twin, and is sure.
+  const kept = bubbles.filter((b) => !drops.has(b));
   for (const drop of drops.values()) {
-    if (drop.by.some((o) => !drops.has(o))) continue;
-    const carriers = drop.by
-      .flatMap((w) => drops.get(w)!.by)
-      .filter((o) => !drops.has(o));
-    const covered =
-      carriers.length > 0 &&
-      carriers.every((o) => holds(drop.bubble, o)) &&
-      spanShare(
-        drop.bubble.bounding_box,
-        carriers.map((o) => o.bounding_box),
-      ) >= UNSURE_SPAN;
-    if (!covered) drop.unsure = true;
+    if (drop.rule === "twin" && !drops.has(drop.by[0]!)) continue;
+    const held = kept.filter((o) => holds(drop.bubble, o));
+    drop.unsure =
+      judge(drop.bubble, held).unsure ||
+      (drop.rule === "nested" && disputed(drop.bubble, drop.by));
   }
   return {
-    kept: bubbles.filter((b) => !drops.has(b)),
+    kept,
     dropped: bubbles.filter((b) => drops.has(b)),
     drops: bubbles.flatMap((b) => drops.get(b) ?? []),
   };
