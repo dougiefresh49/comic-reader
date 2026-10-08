@@ -47,19 +47,22 @@ export function PageArt({ pageImage, spread, alt, style }: PageArtProps) {
       aria-hidden={alt ? undefined : true}
     >
       {[
-        { page: spread.left, left: 0, width: share },
-        { page: spread.right, left: share, width: 100 - share },
+        // The left half runs 1px under the right one, so the seam never
+        // lands on a fractional pixel that lets the background show through
+        // when panel view scales the art up.
+        { page: spread.left, left: "0%", width: `calc(${share}% + 1px)` },
+        { page: spread.right, left: `${share}%`, width: `${100 - share}%` },
       ].map(({ page, left, width }) => (
         <div
           key={page.pageNumber}
           className="absolute inset-y-0"
-          style={{ left: `${left}%`, width: `${width}%` }}
+          style={{ left, width }}
         >
           <Image
             src={page.image}
             alt=""
             fill
-            className="object-contain"
+            className="object-fill"
             priority
           />
         </div>

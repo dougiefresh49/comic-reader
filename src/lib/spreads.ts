@@ -16,7 +16,7 @@ import type {
 import type { Box, TextGeometry } from "~/types/text-geometry";
 
 /** A panel within this share of the seam touches it (x + w ≥ 0.98, x ≤ 0.02). */
-export const SEAM_EDGE = 0.02;
+const SEAM_EDGE = 0.02;
 
 /** One half of a spread, as the reader renders it. */
 export interface SpreadPage {
@@ -275,10 +275,27 @@ function joinPanels(
           ],
         }
       : null;
-  const effects = {
-    ...rebaseEffects(right.effectPositions, right.boundingBox, box),
-    ...rebaseEffects(left.effectPositions, left.boundingBox, box),
-  };
+  const rightEffects = rebaseEffects(
+    right.effectPositions,
+    right.boundingBox,
+    box,
+  );
+  const effects = { ...rightEffects };
+  for (const [tag, pos] of Object.entries(
+    rebaseEffects(left.effectPositions, left.boundingBox, box),
+  )) {
+    // A tag both halves place keeps both: its box spans the two.
+    const r = rightEffects[tag]?.bbox;
+    if (pos.bbox && r) {
+      const u = union(
+        { x: pos.bbox[0], y: pos.bbox[1], w: pos.bbox[2], h: pos.bbox[3] },
+        { x: r[0], y: r[1], w: r[2], h: r[3] },
+      );
+      effects[tag] = { ...pos, bbox: [u.x, u.y, u.w, u.h] };
+    } else {
+      effects[tag] = pos;
+    }
+  }
   const durations = [
     left.estimatedDurationSeconds,
     right.estimatedDurationSeconds,
