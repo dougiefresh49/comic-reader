@@ -1,0 +1,94 @@
+{"id":"1a sudo -s reads its heredoc","want":2,"cmd":"sudo -s <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"1b sudo -i reads its heredoc","want":2,"cmd":"sudo -i <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1c sudo bundled -is","want":2,"cmd":"sudo -is <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1d sudo --login after -u value","want":2,"cmd":"sudo -u bob --login <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1e sudo --shell after --user value","want":2,"cmd":"sudo --user bob --shell <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1f su reads its heredoc","want":2,"cmd":"su <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1g su - user reads its heredoc","want":2,"cmd":"su - bob <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1h sudo tee body is text","want":0,"cmd":"sudo tee /tmp/f <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1i sudo -u value then a command, body is text","want":0,"cmd":"sudo -u bob tee /tmp/f <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"1j sudo command with its own -i, body is text","want":0,"cmd":"sudo sed -i s/a/b/ /tmp/f <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"2a quoted bash at command position reads its heredoc","want":2,"cmd":"\"bash\" <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"2b quoted /bin/sh at command position","want":2,"cmd":"'/bin/sh' <<EOF\npnpm generate-audio\nEOF"}
+{"id":"2c quoted bash handed to printf, body is text","want":0,"cmd":"printf \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"2d quoted bash handed to rg, body is text","want":0,"cmd":"rg \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"3a pipe to bash on the line after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nbash","reason":"generate-audio synthesizes"}
+{"id":"3b pipe to /bin/sh with options after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\n  /bin/sh -s"}
+{"id":"3c pipe to a non-shell after the body is text","want":0,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nwc -l"}
+{"id":"3d a body then bash on its own line, no pipe, is text","want":0,"cmd":"cat <<'EOF' > /tmp/x\npnpm generate-audio\nEOF\nbash /tmp/other.sh"}
+{"id":"3e || then bash after the body is text","want":0,"cmd":"cat <<'EOF' ||\npnpm generate-audio\nEOF\nbash /tmp/other.sh"}
+{"id":"4a eval of a $(cat heredoc)","want":2,"cmd":"eval \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\"","reason":"generate-audio synthesizes"}
+{"id":"4b $(cat heredoc) at command position","want":2,"cmd":"\"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\""}
+{"id":"4c unquoted $(cat heredoc) at command position","want":2,"cmd":"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)"}
+{"id":"4d echo $(cat heredoc) piped to bash","want":2,"cmd":"echo \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\" | bash"}
+{"id":"4e echo $(cat heredoc) to a file is text","want":0,"cmd":"echo \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\" > /tmp/x"}
+{"id":"4f assignment from $(cat heredoc) is text","want":0,"cmd":"X=\"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\""}
+{"id":"5a ssh host runs a quoted curl write","want":2,"cmd":"ssh host \"curl -X POST https://api.elevenlabs.io/v1/x\"","reason":"write against the ElevenLabs API"}
+{"id":"5b ssh with value options runs a quoted paid script","want":2,"cmd":"ssh -p 22 -i ~/.ssh/k -o BatchMode=yes host 'cd /app && pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"5c ssh with an attached and a bundled value option","want":2,"cmd":"ssh -p2222 -tl bob host pnpm generate-audio"}
+{"id":"5d ssh -J jump host","want":2,"cmd":"ssh -J jump host 'pnpm exec tsx scripts/smoke-ingest.ts --real'","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"5e ssh remote command with the override","want":0,"cmd":"ssh host 'LIVE_API_OK=1 pnpm generate-audio'"}
+{"id":"5f ssh remote free command","want":0,"cmd":"ssh -p 22 host 'pnpm typecheck' > /tmp/out"}
+{"id":"5g gh body that quotes the ssh line stays text","want":0,"cmd":"gh issue comment 1 --body \"ssh host 'curl -X POST https://api.elevenlabs.io/v1/x'\""}
+{"id":"6a env -S runs a quoted curl write","want":2,"cmd":"env -S \"curl -X POST https://api.elevenlabs.io/v1/x\"","reason":"write against the ElevenLabs API"}
+{"id":"6b env -S runs a quoted paid script","want":2,"cmd":"env -S 'pnpm generate-audio --book x'","reason":"generate-audio synthesizes"}
+{"id":"6c env --split-string= attached","want":2,"cmd":"env '--split-string=pnpm generate-audio'"}
+{"id":"6d env -u value then -S","want":2,"cmd":"env -u HOME --split-string 'pnpm generate-audio'"}
+{"id":"6e env -S with the override inside","want":0,"cmd":"env -S 'LIVE_API_OK=1 pnpm generate-audio'"}
+{"id":"6f env -S free command","want":0,"cmd":"env -S 'pnpm typecheck'"}
+{"id":"7a sudo --group value","want":2,"cmd":"sudo --group staff pnpm generate-audio"}
+{"id":"7b sudo --user value","want":2,"cmd":"sudo --user bob pnpm generate-audio"}
+{"id":"7c sudo --prompt value","want":2,"cmd":"sudo --prompt x pnpm generate-audio"}
+{"id":"7d sudo --close-from value","want":2,"cmd":"sudo --close-from 3 pnpm generate-audio"}
+{"id":"7e xargs --delimiter value","want":2,"cmd":"xargs --delimiter , pnpm generate-audio"}
+{"id":"7f xargs --max-args value","want":2,"cmd":"xargs --max-args 1 pnpm generate-audio"}
+{"id":"7g xargs --arg-file value","want":2,"cmd":"xargs --arg-file /tmp/a pnpm generate-audio"}
+{"id":"7h stdbuf --output value","want":2,"cmd":"stdbuf --output L pnpm generate-audio"}
+{"id":"7i stdbuf --error value","want":2,"cmd":"stdbuf --error L pnpm generate-audio"}
+{"id":"7j sudo --group with the override","want":0,"cmd":"LIVE_API_OK=1 sudo --group staff pnpm generate-audio"}
+{"id":"7k xargs --delimiter on a free script","want":0,"cmd":"xargs --delimiter , pnpm typecheck"}
+{"id":"8a bash -oc value before the command string","want":2,"cmd":"bash -oc pipefail 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"8b bash -co value before the command string","want":2,"cmd":"bash -co pipefail 'pnpm generate-audio'"}
+{"id":"8c bash -eoc value before the command string","want":2,"cmd":"bash -eoc pipefail 'curl -X POST https://api.elevenlabs.io/v1/x'"}
+{"id":"8d bash -oc on a free command","want":0,"cmd":"bash -oc pipefail 'pnpm typecheck'"}
+{"id":"9a pnpm --loglevel value before exec","want":2,"cmd":"pnpm --loglevel error exec tsx scripts/generate-audio.ts","reason":"generate-audio synthesizes"}
+{"id":"9b pnpm --reporter value before exec","want":2,"cmd":"pnpm --reporter silent exec tsx scripts/smoke-ingest.ts --real","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"9c pnpm --filter-prod value before a runner","want":2,"cmd":"pnpm --filter-prod x tsx scripts/generate-audio.ts"}
+{"id":"9d pnpm --test-pattern value before exec","want":2,"cmd":"pnpm --test-pattern x exec tsx scripts/generate-audio.ts"}
+{"id":"9e pnpm --loglevel on a free script","want":0,"cmd":"pnpm --loglevel error exec tsx scripts/check.ts"}
+{"id":"10a pnpm run tsx on a paid script","want":2,"cmd":"pnpm run tsx scripts/generate-audio.ts","reason":"generate-audio synthesizes"}
+{"id":"10b pnpm run-script with options before node","want":2,"cmd":"pnpm run-script --silent node --import tsx scripts/ingest.ts","reason":"ingest resumes"}
+{"id":"10c pnpm run tsx on a free script","want":0,"cmd":"pnpm run tsx scripts/check.ts"}
+{"id":"10d pnpm run tsx with the override","want":0,"cmd":"LIVE_API_OK=1 pnpm run tsx scripts/generate-audio.ts"}
+{"id":"11a run from inside scripts/","want":2,"cmd":"cd scripts && tsx smoke-ingest.ts --real","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"11b run by ./name from inside scripts/","want":2,"cmd":"cd scripts && pnpm exec tsx ./generate-audio.ts","reason":"generate-audio synthesizes"}
+{"id":"11c smoke from inside scripts/ without --real","want":0,"cmd":"cd scripts && tsx smoke-ingest.ts --book smoke-test"}
+{"id":"11d free script from inside scripts/","want":0,"cmd":"cd scripts && tsx check.ts"}
+{"id":"12a install with -m after the guarded destination","want":2,"cmd":"install x src/lib/models.ts -m 644","reason":"Gemini model ids"}
+{"id":"12b install with -o and --group after the destination","want":2,"cmd":"install /tmp/new.ts src/lib/tts-request.ts -o root --group wheel"}
+{"id":"12c cp --suffix after the destination","want":2,"cmd":"cp /tmp/new.ts src/lib/voice-settings.ts --suffix .bak"}
+{"id":"12d install of a guarded file as source with -m after","want":0,"cmd":"install src/lib/models.ts /tmp/backup -m 644"}
+{"id":"12e install onto a guarded file with CREDIT_OVERRIDE","want":0,"cmd":"install x src/lib/models.ts -m 644","env":{"CREDIT_OVERRIDE":"1"}}
+{"id":"r1-1a commit heredoc then && bash in another segment is text","want":0,"cmd":"git commit -m \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\" && bash x.sh"}
+{"id":"r1-1b printf $(cat heredoc) piped to sh","want":2,"cmd":"printf '%s\\n' \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\" | sh","reason":"generate-audio synthesizes"}
+{"id":"r1-1c eval after a wrapper","want":2,"cmd":"command eval \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\""}
+{"id":"r1-2a sudo then quoted bash reads its heredoc","want":2,"cmd":"sudo \"bash\" <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"r1-2b env assignment and sudo -u value then quoted sh","want":2,"cmd":"env X=1 sudo -u bob 'sh' <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"r1-2c sudo printf with a quoted bash argument, body is text","want":0,"cmd":"sudo printf \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"r1-3a pipe to sudo bash on the line after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo bash","reason":"generate-audio synthesizes"}
+{"id":"r1-3b pipe to sudo -u value then nice -n value then sh after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -u bob nice -n 5 sh"}
+{"id":"r1-3c pipe to sudo tee after the body is text","want":0,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo tee /tmp/x"}
+{"id":"r1-4a echo of an ssh line is text","want":0,"cmd":"echo ssh host 'pnpm generate-audio'"}
+{"id":"r1-4b echo of an env -S line is text","want":0,"cmd":"echo env -S 'pnpm generate-audio'"}
+{"id":"r1-4c sudo ssh still runs its remote command","want":2,"cmd":"sudo ssh host 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"r1-4d assignment then env -S still runs its string","want":2,"cmd":"X=1 env -S 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"r2-1a if ssh runs its remote command","want":2,"cmd":"if ssh host 'curl -X POST https://api.elevenlabs.io/v1/x'; then echo done; fi","reason":"write against the ElevenLabs API"}
+{"id":"r2-1b ! env -S runs its string","want":2,"cmd":"! env -S 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"r2-1c while ssh runs its remote command","want":2,"cmd":"while ssh host 'pnpm generate-audio'; do sleep 1; done"}
+{"id":"r2-1d then env -S runs its string","want":2,"cmd":"if true; then env -S 'pnpm generate-audio'; fi"}
+{"id":"r2-1e then echo of an ssh line is text","want":0,"cmd":"if true; then echo ssh host 'pnpm generate-audio'; fi"}
+{"id":"r2-1f ! echo of an env -S line is text","want":0,"cmd":"! echo env -S 'pnpm generate-audio'"}
+{"id":"r2-2a pipe to sudo -s on the line after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -s","reason":"generate-audio synthesizes"}
+{"id":"r2-2b pipe to sudo -u value then -i after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -u bob -i"}
+{"id":"r2-2c pipe to sudo su after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo su"}
+{"id":"r2-2d pipe to sudo sed -i after the body is text","want":0,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -u bob sed -i s/a/b/ /tmp/x"}
