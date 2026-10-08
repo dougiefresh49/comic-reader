@@ -104,6 +104,10 @@ export function useAudioPlayback({
   playbackRate = 1,
 }: UseAudioPlaybackOptions) {
   const [isPlaying, setIsPlaying] = useState(false);
+  // The bubble whose clip togglePlayPause paused mid-line, so a play control
+  // can resume it rather than start over (#714). Set only there: the
+  // element's `pause` event also fires after stopAll, which ends the clip.
+  const [pausedBubbleId, setPausedBubbleId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // The bubble whose clip audioRef holds, so seekCurrent can reuse it.
   const audioBubbleIdRef = useRef<string | null>(null);
@@ -137,6 +141,7 @@ export function useAudioPlayback({
     }
     stopHighlight();
     setIsPlaying(false);
+    setPausedBubbleId(null);
   }, [stopHighlight]);
 
   const playBubble = useCallback(
@@ -190,6 +195,7 @@ export function useAudioPlayback({
         );
         stopHighlight();
         setIsPlaying(false);
+        setPausedBubbleId(null);
         onBubbleEndedRef.current?.(bubble);
       };
       failCurrentRef.current = failed;
@@ -198,6 +204,7 @@ export function useAudioPlayback({
         settled = true;
         stopHighlight();
         setIsPlaying(false);
+        setPausedBubbleId(null);
         onBubbleEndedRef.current?.(bubble);
       });
       audio.addEventListener("error", () => failed(audio.error));
@@ -254,7 +261,10 @@ export function useAudioPlayback({
     resumeContext();
     audio
       .play()
-      .then(() => setIsPlaying(true))
+      .then(() => {
+        setIsPlaying(true);
+        setPausedBubbleId(null);
+      })
       .catch((err: unknown) => {
         const name = err instanceof DOMException ? err.name : undefined;
         if (name === "AbortError" || name === "NotAllowedError") {
@@ -273,6 +283,7 @@ export function useAudioPlayback({
     } else {
       audio.pause();
       setIsPlaying(false);
+      setPausedBubbleId(audioBubbleIdRef.current);
     }
   }, [resume]);
 
@@ -311,6 +322,7 @@ export function useAudioPlayback({
     stopAll,
     togglePlayPause,
     isPlaying,
+    pausedBubbleId,
     wordHighlight,
   };
 }

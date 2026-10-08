@@ -336,8 +336,9 @@ export default function ZenComicReader({
     else enterPanelView();
   }, [panelViewMode, exitPanelView, enterPanelView]);
 
-  // Panel view plus read-aloud in one tick: the play effect below then reads
-  // panel 0's first voiced bubble, the page's first in reading order.
+  // With nothing paused, the floating play opens panel view plus read-aloud
+  // in one tick: the play effect below then reads panel 0's first voiced
+  // bubble, the page's first in reading order.
   // showChrome: the top bar may have auto-hidden already, and panel view
   // should open with its Pause control on screen.
   const handleFloatingPlay = useCallback(() => {
@@ -469,6 +470,7 @@ export default function ZenComicReader({
     stopAll,
     togglePlayPause,
     isPlaying,
+    pausedBubbleId,
     wordHighlight,
   } = useAudioPlayback({
     bookId,
@@ -718,11 +720,18 @@ export default function ZenComicReader({
   // the page turn: the floating button is a pause, so it does not flash to
   // play at every bubble boundary (#706).
   const pageBeingRead = isPlaying || autoPlayPending;
-  // Pause stops; play again restarts from the page's first voiced bubble,
-  // like the panel HUD. stopAll fires no `ended`, so nothing schedules on.
+  // Pause holds the clip where it is, so play picks it up from that word
+  // (#714). In auto-play's gap there is no clip to hold: cancelling the gap
+  // leaves nothing paused, and play then starts the page over.
   const handleFloatingPause = () => {
-    stopAll();
+    if (isPlaying) togglePlayPause();
     cancelPending();
+  };
+  // A paused clip resumes in page view; its `ended` hands on to auto-play as
+  // usual. A page turn, a tap on another bubble or panel view clears it.
+  const handleFloatingResumeOrPlay = () => {
+    if (pausedBubbleId !== null) togglePlayPause();
+    else handleFloatingPlay();
   };
 
   return (
@@ -953,7 +962,9 @@ export default function ZenComicReader({
         {showFloatingPlay && (
           <button
             type="button"
-            onClick={pageBeingRead ? handleFloatingPause : handleFloatingPlay}
+            onClick={
+              pageBeingRead ? handleFloatingPause : handleFloatingResumeOrPlay
+            }
             aria-label={pageBeingRead ? "Pause" : "Read this page to me"}
             className="absolute left-1/2 z-50 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-neutral-950/90 text-white backdrop-blur transition-colors hover:bg-neutral-900"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
