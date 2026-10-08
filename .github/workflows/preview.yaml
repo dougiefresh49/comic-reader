@@ -46,6 +46,7 @@ jobs:
   hooks:
     name: Credit-guard cases (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
