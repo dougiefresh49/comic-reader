@@ -770,7 +770,7 @@ export async function roboflowAnalyzeBatch(
     }
     if (overBudget > 0) {
       console.log(
-        `[roboflow] ${pageLabel}: group check budget spent, ${overBudget} unsure container(s) kept without a check`,
+        `[roboflow] ${pageLabel}: group check budget spent, ${overBudget} unsure drop(s) kept without a check`,
       );
     }
     for (const { bubble, rule, unsure } of bubbleFilter.drops) {
