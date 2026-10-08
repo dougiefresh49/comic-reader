@@ -297,7 +297,7 @@ function AnalyzeBlock({
               type="button"
               className={BUTTON + " h-7"}
               disabled={!!lock}
-              title="Uses two Gemini calls."
+              title="Uses up to two Gemini calls."
               onClick={() => actions.analyze(b.id)}
             >
               Try again <Key>R</Key>
@@ -326,14 +326,14 @@ function AnalyzeBlock({
           type="button"
           className={BUTTON}
           disabled={running || !!lock}
-          title="Uses two Gemini calls."
+          title="Uses up to two Gemini calls."
           onClick={() => actions.analyze(b.id)}
         >
           Analyze again
         </button>
       </div>
       <p className="text-[11px] text-neutral-500">
-        Each analyze uses two Gemini calls.
+        Each analyze uses up to two Gemini calls.
       </p>
     </div>
   );
