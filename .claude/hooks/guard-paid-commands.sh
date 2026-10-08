@@ -62,6 +62,12 @@ Q=$'\034' # the mark on a word that had quotes in it, so is no command name
 # command rather than being it, or are a count (`nice -n 10`, `timeout 30`).
 WRAPPER='^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf|[{]|!|if|then|elif|else|do|while|until|[0-9][0-9.]*[smhd]?)$'
 
+# The one home for the wrapper options that take the next word as their value
+# (#701): `wrapper:short letters:long names`, `;` between wrappers. The lexer
+# (cmdw, sudosh, env -S) and command_shape both read it, so the heredoc checks
+# and the paid rules find the same command (`timeout -s KILL 60` runs no KILL).
+WRAP_OPTS='sudo:ugpChDUrtRT:user,group,prompt,chdir,host,role,type,other-user,close-from,chroot,command-timeout;env:uCPS:unset,chdir;xargs:ILnPdEas:delimiter,max-args,max-procs,arg-file,max-chars,process-slot-var;stdbuf:ioe:input,output,error;timeout:sk:signal,kill-after;nice:n:'
+
 # --- the rule list, read once ---------------------------------------------
 #
 # Into arrays, once: re-reading the list with a grep per rule per segment took
@@ -124,7 +130,7 @@ done <<<"$SCRIPT_FILES"
 # character the lexer acts on is ASCII, and macOS awk in a UTF-8 locale stops
 # on some multibyte text (a `…` in a heredoc), which would block the command.
 segments() {
-  printf '%s' "$1" | LC_ALL=C awk '
+  printf '%s' "$1" | LC_ALL=C awk -v WRAP_OPTS="$WRAP_OPTS" '
     function endword(   b) {
       if (inw) { w[nw++] = (wq ? "\034" : "") cur; lp = 0 }
       if (inw && hdnext) { hd[nhd] = cur; hdq[nhd] = wq; hdd[nhd++] = hdnext == 2; hdnext = 0 }
@@ -144,7 +150,7 @@ segments() {
       for (i = lo; i < hi; i++) {
         b = a[i]; sub(/^\034/, "", b)
         if (b ~ /^\035/) { i++; continue }
-        if (wr != "" && b ~ /^-/) { x = vopt(b, WV[wr]); if ((x && x == length(b)) || b ~ WL) i++; continue }
+        if (wr != "" && b ~ /^-/) { x = (b ~ /^-[^-]/) ? vopt(b, WV[wr]) : 0; if ((x && x == length(b)) || vlong(b, wr)) i++; continue }
         if (b ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || (wr != "" && b ~ /^[0-9][0-9.]*[smhd]?$/)) continue
         x = b; sub(/.*\//, "", x)
         # The words WRAPPER steps over, shell keywords too (`if ssh`, `! env`).
@@ -160,7 +166,7 @@ segments() {
       for (j = i + 1; j < hi; j++) {
         b = a[j]
         if (b ~ /^--(shell|login)$/) return 1
-        else if (b ~ WL) j++
+        else if (vlong(b, "sudo")) j++
         else if (b ~ /^-[^-]/) {
           x = vopt(b, WV["sudo"])
           if (substr(b, 1, x ? x - 1 : length(b)) ~ /[is]/) return 1
@@ -176,6 +182,8 @@ segments() {
       for (x = 2; x <= length(b); x++) if (index(v, substr(b, x, 1))) return x
       return 0
     }
+    # Is b a long option of wrapper wr that takes the next word as its value.
+    function vlong(b, wr) { return b ~ /^--[^,]+$/ && index(WL[wr], "," substr(b, 3) ",") }
     function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
     # pipe: the segment ends in a pipe.
     function endseg(pipe,   i, j, line, b, sc, x, v, c) {
@@ -191,13 +199,14 @@ segments() {
       if (b == "eval") for (x = ss0; x < ninner; x++) ish[x] = 1
       if (b ~ SH) for (x = pp0; x < pp1; x++) ish[x] = 1
       pp0 = pipe ? ss0 : 0; pp1 = pipe ? ninner : 0
-      # Any unquoted shell word, so `pnpm exec bash -c` unwraps and a quoted
-      # "bash" "-c" handed to printf does not. Its options run up to its first
-      # other word: one holding a c (-c, -cl) makes that word the command
+      # Any unquoted shell word, so `pnpm exec bash -c` unwraps, and a quoted
+      # one at command position past wrappers (`sudo "sh" -c`, #701), so a
+      # quoted "bash" "-c" handed to printf does not. Its options run up to its
+      # first other word: one holding a c (-c, -cl) makes that word the command
       # string, and a -c after it (`bash script.sh -c`) belongs to the script.
       for (i = 0; i < nw; i++) {
-        b = w[i]; sub(/.*\//, "", b)
-        if (w[i] ~ /^\034/) continue
+        b = w[i]; sub(/^\034/, "", b); sub(/.*\//, "", b)
+        if (w[i] ~ /^\034/ && !(i == c && b ~ /^(ba|z|k|da)?sh$/)) continue
         if (b ~ /^(ba|z|k|da)?sh$/) for (j = i + 1; j < nw; j++) {
           b = w[j]; sub(/^\034/, "", b)
           if (b ~ /^-[a-zA-Z]*c[a-zA-Z]*$/) sc = 1
@@ -216,7 +225,7 @@ segments() {
             v = x < length(b) ? substr(b, x + 1) : w[++j]
             if (substr(b, x, 1) == "S") { queue(v, 0); break }
           } else if (b ~ /^--split-string(=|$)/) { queue(b ~ /=/ ? substr(b, 16) : w[++j], 0); break }
-          else if (b ~ /^--(unset|chdir)$/) j++
+          else if (vlong(b, "env")) j++
           else if (b !~ /^-/) break
         }
         # ssh joins the words after its host and a shell on the host runs them
@@ -389,13 +398,12 @@ segments() {
       endseg()
     }
     # Numeric from the start: an unset ninner indexes ish[] as "", not 0.
-    # SH: a word that can read a heredoc as commands. WV: per wrapper, the
-    # short options that take a value; WL: the long ones, any wrapper.
+    # SH: a word that can read a heredoc as commands. From WRAP_OPTS, per
+    # wrapper: WV the short options that take a value, WL the long ones.
     BEGIN {
       ninner = 0; SH = "^(sh|bash|zsh|ksh|dash|eval|source|\\.|xargs|ssh|su)$"
-      WV["sudo"] = "ugpChDUrtRT"; WV["env"] = "uCPS"; WV["xargs"] = "ILnPdEas"
-      WV["stdbuf"] = "ioe"; WV["timeout"] = "sk"; WV["nice"] = "n"
-      WL = "^--(user|group|prompt|chdir|host|role|type|other-user|close-from|chroot|command-timeout|delimiter|max-args|max-procs|arg-file|max-chars|process-slot-var|input|output|error|signal|kill-after|unset)$"
+      n = split(WRAP_OPTS, a, ";")
+      for (k = 1; k <= n; k++) { split(a[k], f, ":"); WV[f[1]] = f[2]; WL[f[1]] = "," f[3] "," }
     }
     { all = (NR > 1 ? all "\n" : "") $0 }
     END {
@@ -419,7 +427,7 @@ segments() {
 # `pnpm generate-audio -- LIVE_API_OK=1` is an argument. Only the paid rules
 # take it; it is no release from the .env or guarded-file rules below.
 command_shape() {
-  local i t skip=0 wrap=
+  local i t o e skip=0 wrap=
   EXE_I=-1
   OVERRIDE=0
   VIA_XARGS=0
@@ -427,15 +435,25 @@ command_shape() {
     t=${W[i]}
     if [ "$skip" = 1 ]; then skip=0 && continue; fi
     case "$t" in
-    "$M"* | -u | --unset | -C | --chdir) skip=1 && continue ;;
+    "$M"*) skip=1 && continue ;;
     -*)
       # An option that takes the next word as its value, for the wrapper it
-      # follows: `timeout -s KILL 60` runs no KILL (#671). Per wrapper, since
-      # `sudo -s` takes none. Long forms too (#694); `--opt=value` is one word.
-      case "$wrap:$t" in
-      timeout:-s | timeout:--signal | timeout:-k | timeout:--kill-after | sudo:-[ugpChDUrtRT] | xargs:-[ILnPdEas] | stdbuf:-[ioe]) skip=1 ;;
-      sudo:--user | sudo:--group | sudo:--prompt | sudo:--host | sudo:--role | sudo:--type | sudo:--other-user | sudo:--close-from | sudo:--chroot | sudo:--command-timeout) skip=1 ;;
-      xargs:--delimiter | xargs:--max-args | xargs:--max-procs | xargs:--arg-file | xargs:--max-chars | xargs:--process-slot-var | stdbuf:--input | stdbuf:--output | stdbuf:--error) skip=1 ;;
+      # follows, from WRAP_OPTS: `timeout -s KILL 60` runs no KILL (#671).
+      # Per wrapper, since `sudo -s` takes none. A bundle takes it when its
+      # first value letter ends the word (`-vu bob`, as vopt reads it); a long
+      # form when it is the whole word (#694), since `--opt=value` is one word.
+      e=";$WRAP_OPTS"
+      case "$e" in *";$wrap:"*) e=${e#*";$wrap:"} && e=${e%%;*} ;; *) e=: ;; esac
+      case "$t" in
+      --*,* | --) ;;
+      --*) case ",${e#*:}," in *",${t#--},"*) skip=1 ;; esac ;;
+      *)
+        o=${t#-}
+        while [ -n "$o" ]; do
+          case "${e%%:*}" in *"${o:0:1}"*) [ "${#o}" = 1 ] && skip=1; break ;; esac
+          o=${o#?}
+        done
+        ;;
       esac
       continue
       ;;

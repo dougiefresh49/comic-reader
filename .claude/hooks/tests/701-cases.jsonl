@@ -1,0 +1,33 @@
+{"id":"1a quoted bash -c runs its string","want":2,"cmd":"\"bash\" -c 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"1b sudo then quoted sh -c","want":2,"cmd":"sudo \"sh\" -c 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"1c quoted bash -c handed to printf is text","want":0,"cmd":"printf \"bash\" -c x"}
+{"id":"1d sudo -u value then quoted bash -c","want":2,"cmd":"sudo -u bob \"bash\" -c 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"1e timeout -s value and duration then quoted bash -c","want":2,"cmd":"timeout -s KILL 5 \"bash\" -c 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"1f quoted bash -c as an echo argument is text","want":0,"cmd":"echo \"bash\" -c 'pnpm generate-audio'"}
+{"id":"1g quoted /bin/sh -c runs a curl write","want":2,"cmd":"'/bin/sh' -c 'curl -X POST https://api.elevenlabs.io/v1/x'","reason":"write against the ElevenLabs API"}
+{"id":"1h quoted bash with bundled -lc","want":2,"cmd":"\"bash\" -lc 'pnpm generate-audio'"}
+{"id":"1i env -u value then quoted bash -c","want":2,"cmd":"env -u X \"bash\" -c 'pnpm generate-audio'"}
+{"id":"1j nice -n value then quoted zsh -c","want":2,"cmd":"nice -n 5 \"zsh\" -c 'pnpm generate-audio'"}
+{"id":"1k env -S string holding a quoted bash -c","want":2,"cmd":"env -S '\"bash\" -c \"pnpm generate-audio\"'"}
+{"id":"1l quoted bash -c on a free command","want":0,"cmd":"\"bash\" -c 'pnpm typecheck'"}
+{"id":"1m quoted bash -c with the override inside","want":0,"cmd":"\"bash\" -c 'LIVE_API_OK=1 pnpm generate-audio'"}
+{"id":"1n sudo -u value then printf with a quoted bash -c is text","want":0,"cmd":"sudo -u bob printf \"bash\" -c 'pnpm generate-audio'"}
+{"id":"2a sudo --chdir value then quoted bash reads its heredoc","want":2,"cmd":"sudo --chdir /tmp \"bash\" <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"2b sudo -D value then a paid script","want":2,"cmd":"sudo -D /tmp pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2c env -P value then quoted bash reads its heredoc","want":2,"cmd":"env -P /usr/bin \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"2d env -P value then a paid script","want":2,"cmd":"env -P /usr/bin pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2e xargs bundled -0I value then a paid script","want":2,"cmd":"xargs -0I {} pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2f xargs --max-procs value then a paid script","want":2,"cmd":"xargs --max-procs 2 pnpm generate-audio"}
+{"id":"2g stdbuf -o value then quoted bash reads its heredoc","want":2,"cmd":"stdbuf -o L \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"2h stdbuf --output value then a paid script","want":2,"cmd":"stdbuf --output L pnpm generate-audio"}
+{"id":"2i timeout --signal value then quoted sh reads its heredoc","want":2,"cmd":"timeout --signal KILL 5 \"sh\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"2j timeout -k value then a paid script","want":2,"cmd":"timeout -k 5 10 pnpm generate-audio"}
+{"id":"2k nice -n value then quoted bash reads its heredoc","want":2,"cmd":"nice -n 5 \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"2l nice -n value then a paid script","want":2,"cmd":"nice -n 5 pnpm generate-audio"}
+{"id":"2m stdbuf -o value then printf with a quoted bash, body is text","want":0,"cmd":"stdbuf -o L printf \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"3a sudo bundled -Eu value then a paid script","want":2,"cmd":"sudo -Eu bob pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"3b timeout bundled -vs value then a paid script","want":2,"cmd":"timeout -vs KILL 5 pnpm generate-audio"}
+{"id":"4a nohup takes no -u value, so x is the command","want":0,"cmd":"nohup -u x pnpm generate-audio"}
+{"id":"4b time takes no -C value, so x is the command","want":0,"cmd":"time -C x pnpm generate-audio"}
+{"id":"4c timeout takes no --input value, so x is the command and bash its argument","want":0,"cmd":"timeout --input x \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"4d sudo takes no --signal value, so x is the command and -s its argument","want":0,"cmd":"sudo --signal x -s <<'EOF'\npnpm generate-audio\nEOF"}
