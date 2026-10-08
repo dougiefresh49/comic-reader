@@ -1,0 +1,23 @@
+{"id":"1a env -S bundled value joins the words after it","want":2,"cmd":"env -Spnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1b env --split-string= joins the words after it","want":2,"cmd":"env --split-string=pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1c env -S quoted command with an option, script after it","want":2,"cmd":"env -S 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1d env -S quoted assignment and command, script after it","want":2,"cmd":"env -S 'X=1 pnpm' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1e env -S with a trailing redirect (main already blocks it)","want":2,"cmd":"env -S pnpm generate-audio > log","reason":"generate-audio synthesizes"}
+{"id":"1f env -S with a quoted bundled value","want":2,"cmd":"env -S'pnpm' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1g env --split-string separate quoted value joins the words after it","want":2,"cmd":"env --split-string 'pnpm --silent' generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1h env -S printf string makes pnpm an argument","want":0,"cmd":"env -S 'printf %s' pnpm generate-audio"}
+{"id":"1i env -S echo alone","want":0,"cmd":"env -S 'echo hi'"}
+{"id":"1j env -S bundled, a 2> redirect between the string and the script","want":2,"cmd":"env -Spnpm 2>/dev/null generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1k env --split-string=, a > redirect between the string and the script","want":2,"cmd":"env --split-string=pnpm >log generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1l env -S quoted, a > redirect between the string and the script","want":2,"cmd":"env -S 'pnpm --silent' >log generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1m env -S trailing word with a quote char re-opens no quote","want":2,"cmd":"env -Spnpm --config.x=\"a'b\" generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1n env -S printf string past a redirect makes pnpm an argument","want":0,"cmd":"env -S 'printf %s' >log pnpm generate-audio"}
+{"id":"1o env -S echo with a quote-char word makes pnpm an argument","want":0,"cmd":"env -S echo \"a'b\" pnpm generate-audio"}
+{"id":"2a xargs -J takes a value","want":2,"cmd":"xargs -J % pnpm generate-audio %","reason":"generate-audio synthesizes"}
+{"id":"2b exec -a takes a value","want":2,"cmd":"exec -a name pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2c time -o takes a value","want":2,"cmd":"/usr/bin/time -o log pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2d time --output takes a value","want":2,"cmd":"time --output log pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"2e xargs -0J bundle takes a value","want":2,"cmd":"xargs -0J % pnpm generate-audio %","reason":"generate-audio synthesizes"}
+{"id":"2f exec -a value is the name, echo runs","want":0,"cmd":"exec -a pnpm echo generate-audio"}
+{"id":"2g time -o value is the file, echo runs","want":0,"cmd":"time -o pnpm echo generate-audio"}
+{"id":"2h xargs -J value is the token, echo runs","want":0,"cmd":"xargs -J pnpm echo generate-audio"}
