@@ -139,14 +139,24 @@ done
 # patch reaches the rule. Over-blocking on a mention is the safe direction for
 # a credit guard. Normalizing keeps every file name, so only a token holding a
 # rule's file name can reach that rule: a patch with none is a pass, and a
-# token with none is never normalized.
-HIT=
+# token with none is never normalized. One grep keeps only the lines holding a
+# file name, so the bash loop below never walks the rest of a big patch.
+[ -n "$PATCH_LINES" ] || exit 0
+F_GREP=()
 for ((k = 0; k < NR_FILE_RULES; k++)); do
   F_NAME[k]=${F_TARGET[k]##*/}
-  [[ $PATCH_LINES == *"${F_NAME[k]}"* ]] && HIT=1
+  F_GREP+=(-e "${F_NAME[k]}")
 done
-[ -n "$HIT" ] || exit 0
-for TOKEN in $PATCH_LINES; do
+CAND=$(printf '%s\n' "$PATCH_LINES" | grep -F "${F_GREP[@]}")
+case $? in
+0) ;;
+1) exit 0 ;;
+*)
+  printf 'Blocked: the apply_patch text could not be searched, so the guarded paths in it could not be checked.\n' >&2
+  exit 2
+  ;;
+esac
+for TOKEN in $CAND; do
   for ((k = 0; k < NR_FILE_RULES; k++)); do
     [[ $TOKEN == *"${F_NAME[k]}"* ]] || continue
     normalize_path "$TOKEN"
