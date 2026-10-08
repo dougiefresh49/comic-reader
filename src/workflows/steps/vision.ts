@@ -729,7 +729,7 @@ export async function roboflowAnalyzeBatch(
         pageBytes = undefined;
         throw err;
       }));
-    // An unsure container drop gets a Gemini look, which can only keep it
+    // An unsure drop gets a Gemini look, which can only keep it
     // (#343). Not when the page's bubble rows exist and will not be written,
     // and not once the page's time budget is spent: those stay kept.
     const groupChecks = new Map<number, { keep: boolean; note: string }>();
