@@ -499,7 +499,14 @@ export async function generateVoiceDescriptions(
       getGeminiClient(),
       bookId,
       issueId,
-      { generate: generateContentLogged },
+      {
+        // Flex on the pipeline step only; carryOut's design stays standard.
+        generate: (client, params, meta) =>
+          generateContentLogged(client, params, {
+            ...meta,
+            serviceTier: "flex",
+          }),
+      },
     ));
   } catch (e) {
     throw new FatalError(e instanceof Error ? e.message : String(e));
