@@ -39,15 +39,20 @@ export function useChromeAutoHide(opts?: { disabled?: boolean }) {
 
   const lockVisible = useCallback(
     (locked: boolean) => {
+      const wasLocked = sheetOpenRef.current;
       sheetOpenRef.current = locked;
       if (locked) {
         clearTimer();
         setVisible(true);
-      } else {
-        startTimer();
+        return;
+      }
+      // A bar left up after a sheet closes covers bubbles at the top of the page (#636).
+      if (wasLocked && !opts?.disabled) {
+        clearTimer();
+        setVisible(false);
       }
     },
-    [clearTimer, startTimer],
+    [clearTimer, opts?.disabled],
   );
 
   useEffect(() => {
