@@ -13,12 +13,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import {
-  cancelVoiceRequest,
-  loadBookCast,
-  storeVoiceRequest,
-  voiceFor,
-} from "~/lib/cast";
+import { loadBookCast, storeVoiceRequest, voiceFor } from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
@@ -238,7 +233,6 @@ export async function runItem(args: {
   archiveVoiceId: string | null;
 }): Promise<ActionResult> {
   const { scope, item } = args;
-  let stored = false;
   try {
     await requireAdmin();
     const deps = { supabase: supabaseAdmin };
@@ -267,51 +261,30 @@ export async function runItem(args: {
         error: `Refused: the item is ${fresh.state}${fresh.refusals.length ? `: ${fresh.refusals.join("; ")}` : ""}.`,
       };
     }
-    // A speaker with no request row runs as a request, so the voice it
-    // makes stays on the list as "made" until he accepts it: the plan lists
-    // requests by row, and a speaker with a voice no longer as "no voice".
-    if (fresh.source !== "request") {
-      if (fresh.action !== "design" && !fresh.target)
-        return { ok: false, error: "Refused: no voice to clone." };
-      await storeVoiceRequest(
-        supabaseAdmin,
-        scope.bookId,
-        scope.issueId,
-        fresh.characterId,
-        fresh.action === "design" || !fresh.target
-          ? { action: "design" }
-          : { action: "clone", targetVoiceUuid: fresh.target.id },
-      );
-      stored = true;
-    }
-    // The guard measures against the plan the owner saw, not this re-plan.
+    // A speaker's clone or restore needs the voice it brings back.
+    if (
+      fresh.source !== "request" &&
+      fresh.action !== "design" &&
+      !fresh.target
+    )
+      return { ok: false, error: "Refused: no voice to clone." };
+    // carryOut's claim writes the request on the item's row (inserting or
+    // converting a casting-step row) and gives it back as it found it when
+    // the run is refused or fails, so a made voice stays listed as "made"
+    // until accepted. The guard measures against the plan the owner saw, not
+    // this re-plan.
     const result = await carryOut(
       deps,
       { ...fresh, designedVoices: item.designedVoices },
       { archiveVoiceId: args.archiveVoiceId },
     );
-    // Refused or failed: carryOut released its claim and nothing was made,
-    // so the request stored above goes too and the item is "no voice" again.
-    if (stored && (result.status === "refused" || result.status === "failed"))
-      await dropStoredRequest(scope, fresh.characterId);
     revalidate(scope);
     return describe(result);
   } catch (err) {
-    // carryOut throws only before its claim holds anything (it releases first).
-    if (stored)
-      await dropStoredRequest(scope, item.characterId).catch(() => undefined);
+    // Nothing to undo: carryOut throws only after releasing its claim.
     revalidate(scope);
     return fail("running", err);
   }
-}
-
-async function dropStoredRequest(scope: Scope, characterId: string) {
-  await cancelVoiceRequest(
-    supabaseAdmin,
-    scope.bookId,
-    scope.issueId,
-    characterId,
-  );
 }
 
 /** Accepts the voice Run made: settles the item. */
