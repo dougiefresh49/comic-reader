@@ -193,7 +193,10 @@ async function readDescriptions(
  * sent) and `retired` (that DELETE confirmed, its registry write failed).
  * `back` marks an add that restores the archived voice instead of making
  * the item's voice. The row's `operation_at` is when a live run last wrote
- * the record, on the database clock; a run that returns clears it.
+ * the record, on the database clock. A run that returns clears it only at
+ * `claimed`, `archived`, `added` or `retired` (`markStopped`); at
+ * `archiving`, `retiring` and `adding` it stays, since a request that timed
+ * out may still land.
  */
 export interface OpRecord {
   token: string;
@@ -1460,9 +1463,10 @@ export async function reconcile(
       status: "refused",
       reasons: [`nothing to reconcile: the item is ${stateOf(task)}`],
     };
-  // A live run stamps its record as it goes (a returned run clears the
-  // stamp) and holds the claim on the voices it changes: leave it be while
-  // either is younger than the window.
+  // A live run stamps its record as it goes and holds the claim on the
+  // voices it changes: leave it be while either is younger than the window.
+  // A returned run clears the stamp only when its last request's outcome is
+  // known (`markStopped`); one stopped mid-request waits out the window.
   if (
     task.operation_at &&
     Date.parse(task.operation_at) >= Date.now() - CLAIM_STALE_MS

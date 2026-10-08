@@ -2180,28 +2180,50 @@ async function checkCarryOut() {
   }
 
   {
-    // (b) A converted row whose run was killed at `claimed`: reconcile gives
-    // it back as the casting step wrote it.
-    const w = zedWorld();
-    stepRow(w.db);
-    Object.assign(taskOf(w.db, "zed")!, {
-      action: "clone",
-      target_voice_uuid: "zed-1993",
-      operation: { token: "t0", rev: "r0", phase: "claimed", converted: true },
+    // (b) A real run converts a casting-step row, archives first, and stops
+    // at `archiving` (the DELETE times out but lands). Reconcile, past the
+    // window, finds the voice gone and gives the item back as the casting
+    // step wrote it.
+    const w = world({
+      characters: ["zed"],
+      voices: [
+        {
+          id: "zed-1993",
+          name: "Zed (1993)",
+          status: "archived",
+          character: "zed",
+        },
+        { id: "parked", name: "Parked", status: "active" },
+      ],
+      limit: 1,
     });
+    stepRow(w.db);
+    w.acct.deleteMode = "timeout-lands";
     const item = await itemOf(w.deps, "zed");
-    const r = await attempt(() => lib.reconcile(w.deps, item));
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: "parked" }),
+    );
+    const mid = taskOf(w.db, "zed")!;
+    const midState = `action ${String(mid.action)}, ${task(w.db, "zed")}, converted ${String((mid.operation as { converted?: boolean } | null)?.converted)}`;
+    const wantMid = "action clone, pending (open at archiving), converted true";
+    const fixed = reconcile
+      ? await attempt(() => reconcile(w.deps, item))
+      : "reconcile does not exist";
     const row = taskOf(w.db, "zed")!;
     report(
-      "#390 round 1 (b): reconcile's give-back of a converted row clears its request fields",
+      "#390 round 2 (b): a real run's converted row stopped at `archiving` is given back with its request fields cleared",
       [
-        `reconcile: ${short(r)}`,
+        `carryOut (archive parked first, its DELETE times out and lands): ${short(r)}`,
+        `row after the run: ${midState}`,
+        `reconcile (aged): ${short(fixed)}`,
         `row: action ${String(row.action)}, target ${String(row.target_voice_uuid)}, ${task(w.db, "zed")}; adds ${w.acct.adds}`,
       ],
-      status(r) === "failed" &&
+      status(r) === "needs attention" &&
+        midState === wantMid &&
+        task(w.db, "zed") === "pending" &&
+        status(fixed) === "failed" &&
         row.action === null &&
         row.target_voice_uuid === null &&
-        task(w.db, "zed") === "pending" &&
         w.acct.adds === 0,
     );
   }
