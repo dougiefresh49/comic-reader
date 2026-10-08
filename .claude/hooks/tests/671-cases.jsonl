@@ -78,7 +78,7 @@
 {"id":"9i mv of a guarded file","want":2,"cmd":"mv src/lib/models.ts /tmp/bak.ts"}
 {"id":"9j xargs cp keeps every word","want":2,"cmd":"xargs cp src/lib/models.ts"}
 {"id":"9k find -exec cp keeps every word","want":2,"cmd":"find . -name x -exec cp src/lib/models.ts /tmp \\;"}
-{"id":"9l cp -t into src/lib passes as before (into-a-directory gap, out of scope)","want":0,"cmd":"cp -t src/lib /tmp/models.ts"}
+{"id":"9l cp -t into src/lib writes src/lib/models.ts, blocked since #727","want":2,"cmd":"cp -t src/lib /tmp/models.ts","reason":"Gemini model ids"}
 {"id":"9m backup copy, then a copy onto the file","want":2,"cmd":"cp src/lib/models.ts /tmp/bak.ts && cp /tmp/bak.ts src/lib/models.ts"}
 {"id":"r1-1a live $(...) in an unquoted-delimiter cat body","want":2,"cmd":"cat <<EOF > /tmp/r.md\nlog: $(pnpm generate-audio --book x)\nEOF","reason":"generate-audio synthesizes"}
 {"id":"r1-1b live $(...) in an unquoted-delimiter body inside a gh --body","want":2,"cmd":"gh pr comment 1 --body \"$(cat <<EOF\n$(pnpm exec tsx scripts/smoke-ingest.ts --real | tail -3)\nEOF\n)\"","reason":"smoke-ingest --real runs the pipeline"}

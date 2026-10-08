@@ -161,7 +161,8 @@ segments() {
       for (i = lo; i < hi; i++) {
         b = a[i]; sub(/^\034/, "", b)
         if (b ~ /^\035/) { i++; continue }
-        if (wr != "" && b ~ /^-/) { x = (b ~ /^-[^-]/) ? vopt(b, WV[wr]) : 0; if ((x && x == length(b)) || vlong(b, wr)) i++; continue }
+        # The value is the first word past any redirect and its target (#727).
+        if (wr != "" && b ~ /^-/) { x = (b ~ /^-[^-]/) ? vopt(b, WV[wr]) : 0; if ((x && x == length(b)) || vlong(b, wr)) i = nxt(a, i); continue }
         if (b ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || (wr != "" && b ~ /^[0-9][0-9.]*[smhd]?$/)) continue
         x = b; sub(/.*\//, "", x)
         # The words WRAPPER steps over, shell keywords too (`if ssh`, `! env`).
@@ -172,16 +173,17 @@ segments() {
     }
     # Does the sudo at a[i] hand its input to a shell: -s, -i, --shell or
     # --login among its options, which end at the command past the value of
-    # each (#694).
+    # each (#694). `--sh` and `--lo` are those, as getopt_long reads them, and
+    # a value is past any redirect, as cmdw steps (#727).
     function sudosh(a, i, hi,   j, b, x) {
       for (j = i + 1; j < hi; j++) {
         b = a[j]
-        if (b ~ /^--(shell|login)$/) return 1
-        else if (vlong(b, "sudo")) j++
+        if (b ~ /^--[^=]+$/ && (index("shell", substr(b, 3)) == 1 || index("login", substr(b, 3)) == 1)) return 1
+        else if (vlong(b, "sudo")) j = nxt(a, j)
         else if (b ~ /^-[^-]/) {
           x = vopt(b, WV["sudo"])
           if (substr(b, 1, x ? x - 1 : length(b)) ~ /[is]/) return 1
-          if (x == length(b)) j++
+          if (x == length(b)) j = nxt(a, j)
         } else if (b !~ /^-/) return 0
       }
       return 0
@@ -197,8 +199,8 @@ segments() {
     # its name or a prefix of it, as getopt_long reads `--us` as `--user`
     # (#720). An ambiguous prefix makes getopt_long fail, so matching it is safe.
     function vlong(b, wr) { return b ~ /^--[^,=]+$/ && index(WL[wr], "," substr(b, 3)) }
-    # The index of the first word after w[j] that is no redirect or its target.
-    function nxt(j) { for (j++; w[j] ~ /^\035/; j += 2); return j }
+    # The index of the first word after a[j] that is no redirect or its target.
+    function nxt(a, j) { for (j++; a[j] ~ /^\035/; j += 2); return j }
     function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
     # The env -S string v, at w[j], with the words after it joined on (#713).
     # A redirect and its target are stepped over, as bash strips them before
@@ -266,13 +268,13 @@ segments() {
           if (b ~ /^\035/) { j++; continue }
           y = substr(b, 3); sub(/=.*/, "", y)
           if (b ~ /^-[^-]/ && (x = vopt(b, WV["env"] "S"))) {
-            if (x < length(b)) v = substr(b, x + 1); else { j = nxt(j); v = w[j] }
+            if (x < length(b)) v = substr(b, x + 1); else { j = nxt(w, j); v = w[j] }
             if (substr(b, x, 1) == "S") { queue(sjoin(v, j), 0); break }
           } else if (b ~ /^--s/ && index("split-string", y) == 1) {
-            if (b ~ /=/) v = substr(b, index(b, "=") + 1); else { j = nxt(j); v = w[j] }
+            if (b ~ /=/) v = substr(b, index(b, "=") + 1); else { j = nxt(w, j); v = w[j] }
             queue(sjoin(v, j), 0); break
           }
-          else if (vlong(b, "env")) j = nxt(j)
+          else if (vlong(b, "env")) j = nxt(w, j)
           else if (b !~ /^-/) break
         }
         # ssh joins the words after its host and a shell on the host runs them
@@ -480,7 +482,12 @@ command_shape() {
   VIA_XARGS=0
   for ((i = 0; i < ${#W[@]}; i++)); do
     t=${W[i]}
-    if [ "$skip" = 1 ]; then skip=0 && continue; fi
+    if [ "$skip" = 1 ]; then
+      # A redirect where a value goes is stepped over with its target, and
+      # the value is the word after (`env -u >log X`, #727).
+      case "$t" in "$M"*) i=$((i + 1)) && continue ;; esac
+      skip=0 && continue
+    fi
     case "$t" in
     "$M"*) skip=1 && continue ;;
     -*)
@@ -589,10 +596,10 @@ INPLACE='^-[a-zA-Z]*i(=|$)'
 
 # Where a cp or install run as the executable writes: its -t directory (TD),
 # else its last word that is no option, option value or redirect (DEST), so
-# `install x dest -m 644` writes dest (#694).
+# `install x dest -m 644` writes dest (#694). SRCS: the other such words.
 copy_dest() {
   local i
-  DEST= TD=
+  DEST= TD= SRCS=()
   for ((i = EXE_I + 1; i < ${#W[@]}; i++)); do
     case "${W[i]}" in
     "$M"* | -m | --mode | -o | --owner | -g | --group | -S | --suffix) i=$((i + 1)) ;;
@@ -600,9 +607,10 @@ copy_dest() {
     --target-directory=*) TD=${W[i]#*=} ;;
     -t?*) TD=${W[i]#-t} ;;
     -*) ;;
-    *) DEST=${W[i]} ;;
+    *) [ -n "$DEST" ] && SRCS[${#SRCS[@]}]=$DEST; DEST=${W[i]} ;;
     esac
   done
+  [ -n "$TD" ] && [ -n "$DEST" ] && SRCS[${#SRCS[@]}]=$DEST
 }
 
 # --- per segment ----------------------------------------------------------
@@ -760,7 +768,13 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     if is_write_segment; then
       cmd_name "$EXE_I"
       case "$WRITERS:$CN:$VIA_XARGS" in
-      1:cp:0 | 1:install:0) copy_dest; WRITES[${#WRITES[@]}]=${TD:-$DEST} ;;
+      1:cp:0 | 1:install:0)
+        copy_dest
+        WRITES[${#WRITES[@]}]=${TD:-$DEST}
+        # Into a directory, it writes <dir>/<source's basename>; no stat, so
+        # a file DEST adds a name that matches nothing (#727).
+        for t in ${SRCS[@]+"${SRCS[@]}"}; do WRITES[${#WRITES[@]}]=${TD:-$DEST}/${t##*/}; done
+        ;;
       *) WRITES=("${W[@]}") ;;
       esac
     fi

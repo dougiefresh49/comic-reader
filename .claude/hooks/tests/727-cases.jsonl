@@ -1,0 +1,22 @@
+{"id":"1a env -u value past a > redirect","want":2,"cmd":"env -u >log X pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1b timeout -s value past a > redirect","want":2,"cmd":"timeout -s >/dev/null KILL 60 pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1c sudo -u value past a 2> redirect","want":2,"cmd":"sudo -u 2>/dev/null bob pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1d env --chdir value past a > redirect","want":2,"cmd":"env --chdir >log /tmp pnpm generate-audio","reason":"generate-audio synthesizes"}
+{"id":"1e sudo -u value past a redirect, then a quoted shell reads the heredoc (cmdw)","want":2,"cmd":"sudo -u >x bob \"bash\" <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"1f sudo -u value past a redirect, then -s reads the heredoc (sudosh)","want":2,"cmd":"sudo -u >x bob -s <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"1g env -u value is the name, pnpm dev runs","want":0,"cmd":"env -u FOO pnpm dev"}
+{"id":"1h timeout -s value is the signal, pnpm dev runs","want":0,"cmd":"timeout -s KILL 60 pnpm dev"}
+{"id":"1i sudo -u value is the user, ls runs with a redirect","want":0,"cmd":"sudo -u bob ls >log"}
+{"id":"1j env -u value past a redirect, echo runs","want":0,"cmd":"env -u >log pnpm echo generate-audio"}
+{"id":"2a sudo --sh prefix of --shell reads its heredoc","want":2,"cmd":"sudo --sh <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"2b sudo --lo prefix of --login reads its heredoc","want":2,"cmd":"sudo --lo <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"2c pipe to sudo --sh on the line after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo --sh","reason":"generate-audio synthesizes"}
+{"id":"2d sudo --list","want":0,"cmd":"sudo --list"}
+{"id":"2e sudo --list reads no heredoc","want":0,"cmd":"sudo --list <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"3a cp into a guarded file's directory","want":2,"cmd":"cp /tmp/x/models.ts src/lib","reason":"Gemini model ids"}
+{"id":"3b cp -t after the source into a guarded file's directory","want":2,"cmd":"cp /tmp/x/models.ts -t src/lib","reason":"Gemini model ids"}
+{"id":"3c cp into a guarded file's directory with a trailing slash","want":2,"cmd":"cp /tmp/x/models.ts src/lib/","reason":"Gemini model ids"}
+{"id":"3d cp --target-directory= into a guarded file's directory, two sources","want":2,"cmd":"cp --target-directory=src/lib /tmp/a.ts /tmp/x/models.ts","reason":"Gemini model ids"}
+{"id":"3e install into a guarded file's directory","want":2,"cmd":"install -m 644 /tmp/x/models.ts src/lib","reason":"Gemini model ids"}
+{"id":"3f cp of another file into src/lib","want":0,"cmd":"cp /tmp/x/other.ts src/lib"}
+{"id":"3g backup copy of a guarded file into a directory","want":0,"cmd":"cp src/lib/models.ts /tmp/backup/"}
