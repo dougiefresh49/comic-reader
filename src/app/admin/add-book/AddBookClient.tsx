@@ -10,10 +10,8 @@ interface BookSearchResult {
   wikiHost: string;
   publisher: string;
   franchises: string[];
-  hasParts: boolean;
-  parts:
-    | { name: string; number: number; issueCount: number; wikiUrl: string }[]
-    | null;
+  seriesName: string | null;
+  volumeNumber: number | null;
   totalIssues: number;
   wikiTitleTemplate: string;
   suggestedSlug: string;
@@ -57,7 +55,8 @@ export function AddBookClient() {
       publisher: result.publisher,
       franchises: result.franchises,
       totalIssues: result.totalIssues,
-      parts: result.parts ?? undefined,
+      seriesName: result.seriesName ?? null,
+      volumeNumber: result.volumeNumber ?? null,
     });
     if (res.ok) {
       router.push(`/admin/add-issue?book=${encodeURIComponent(slug.trim())}`);
@@ -129,22 +128,12 @@ export function AddBookClient() {
             </a>
           </p>
 
-          {/* Parts list */}
-          {result.hasParts && result.parts && result.parts.length > 0 && (
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-neutral-300">Parts</h3>
-              <ul className="space-y-1 pl-4 text-sm text-neutral-400">
-                {result.parts.map((part) => (
-                  <li key={part.number} className="list-disc">
-                    {part.name}{" "}
-                    <span className="text-neutral-500">
-                      ({part.issueCount} issues)
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* What createBook stores as series_id and series_position */}
+          <p className="text-sm text-neutral-400">
+            {result.seriesName
+              ? `Series: ${result.seriesName}${result.volumeNumber != null ? ` · Vol. ${result.volumeNumber}` : ""}`
+              : "Standalone"}
+          </p>
 
           {/* Slug field */}
           <div className="space-y-1">
