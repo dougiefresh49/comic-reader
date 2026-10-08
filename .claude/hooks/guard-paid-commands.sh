@@ -135,7 +135,7 @@ segments() {
       }
       split("", w); nw = 0
     }
-    function lex(s,   n, i, j, c, d, e, q, op, dep, h, t) {
+    function lex(s, top,   n, i, j, c, d, e, q, op, dep, h, t, p) {
       cur = ""; inw = 0; wq = 0; nw = 0; split("", w); q = ""; nhd = 0; hdnext = 0
       n = length(s)
       for (i = 1; i <= n; i++) {
@@ -167,23 +167,29 @@ segments() {
             else if (e == "(") dep++
             else if (e == ")") dep--
           }
+          if (dep && top) bad = 1
           inner[ninner++] = substr(s, i + 2, j - i - 2 - (dep == 0))
           e = substr(s, i, j - i); gsub(/\n/, "\036", e)
           cur = cur e; inw = 1; i = j - 1; continue
         }
         if (c == "\n") endword()
         if (c == "\n" && nhd) {
-          # Each heredoc body line up to its delimiter (<<- strips tabs) is queued.
+          # Each heredoc body line up to its delimiter (<<- strips tabs) is
+          # queued, a line ending in an unescaped backslash joined to the next.
           endseg()
-          for (h = 0; h < nhd; h++)
+          for (h = 0; h < nhd; h++) {
             while (i < n) {
               e = index(substr(s, i + 1), "\n")
               t = e ? substr(s, i + 1, e - 1) : substr(s, i + 1)
               i = e ? i + e : n
               d = t; if (hdd[h]) sub(/^\t+/, "", d)
               if (d == hd[h]) break
-              inner[ninner++] = t
+              if (t ~ /(^|[^\\])(\\\\)*\\$/) { p = p substr(t, 1, length(t) - 1); continue }
+              inner[ninner++] = p t; p = ""
             }
+            if (p != "") inner[ninner++] = p
+            p = ""
+          }
           nhd = 0; continue
         }
         if (c ~ /[\n;|()]/ || (c == "&" && d != ">")) { endseg(); continue }
@@ -202,13 +208,19 @@ segments() {
         }
         cur = cur c; inw = 1
       }
+      # A top-level quote or $( still open at the end means the quotes were
+      # misread (an ANSI-C $-quote with an escaped quote, quotes inside a
+      # quoted $(...)), and
+      # whatever came after may be a command: exit 3 so the caller blocks.
+      if (q != "" && top) bad = 1
       endseg()
     }
     { all = (NR > 1 ? all "\n" : "") $0 }
     END {
       gsub(/[\034\035\036\037]/, "", all)
-      lex(all)
-      for (k = 0; k < ninner; k++) { s = inner[k]; gsub(/\036/, "\n", s); lex(s) }
+      lex(all, 1)
+      for (k = 0; k < ninner; k++) { s = inner[k]; gsub(/\036/, "\n", s); lex(s, 0) }
+      exit bad ? 3 : 0
     }'
 }
 
@@ -300,7 +312,7 @@ is_write_segment() {
     [[ ${W[i]} =~ $INPLACE ]] && inplace=1
     cmd_name "$i"
     case "$CN" in
-    tee | truncate | patch | dd | install | cp | mv) return 0 ;;
+    tee | truncate | patch | dd | install | cp | mv | ed | ex) return 0 ;;
     sed | perl) sed=1 ;;
     esac
   done
@@ -313,8 +325,14 @@ INPLACE='^-[a-zA-Z]*i(=|$)'
 READER='(^|[^[:alnum:]_-])(cat|less|more|view|head|tail|bat|strings|xxd|od|hexdump|base64|nl|tac|sort|uniq|tr|rev|wc|cut|paste|column|split|grep|egrep|fgrep|rg|ag|awk|sed|jq|python3?|node|perl|ruby|php|source|open|security)($|[[:space:]/.<>])'
 
 # Captured first, because a process substitution drops awk's exit status: a
-# lexer that failed has not cleared the command, so it blocks.
-SEGS=$(segments "$COMMAND" 2>/dev/null) || block "the command could not be lexed, so the paid-command list could not be checked."
+# lexer that failed has not cleared the command, so it blocks. Exit 3 is the
+# lexer saying it lost track of the quotes.
+SEGS=$(segments "$COMMAND" 2>/dev/null)
+case $? in
+0) ;;
+3) block "the command has a quote the guard cannot read past (an unclosed quote, an ANSI-C \$'...' with an escaped quote, or quotes inside a quoted \$(...)), so the paid-command list could not be checked. Rewrite it, for example with the commit message in a file (git commit -F)." ;;
+*) block "the command could not be lexed, so the paid-command list could not be checked." ;;
+esac
 
 while IFS= read -r SEG || [ -n "$SEG" ]; do
   [ -z "$SEG" ] && continue
