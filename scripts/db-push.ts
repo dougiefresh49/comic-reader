@@ -13,7 +13,7 @@
  */
 
 import { spawn, spawnSync } from "child_process";
-import { existsSync, rmSync } from "fs";
+import { existsSync, rmSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
@@ -25,6 +25,8 @@ const POOLER_HOST = "aws-1-us-east-1.pooler.supabase.com";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI_PACKAGE = join(ROOT, "node_modules", "supabase");
 const CLI_BIN = join(CLI_PACKAGE, "bin", "supabase");
+// Written only after a fetch whose checksum the postinstall verified.
+const CLI_MARKER = join(CLI_PACKAGE, "bin", ".checksum-verified");
 
 const USAGE = `Usage:
   pnpm db:push           list the migrations that would apply (dry run)
@@ -45,6 +47,11 @@ const apply = args[0] === "--apply";
 if (apply && process.env.DELEGATE === "1") {
   fail(
     "db:push --apply is blocked in a DELEGATE=1 session: only the lead applies migrations. Run the dry run (pnpm db:push) and hand the apply up in your report.",
+  );
+}
+if (apply && process.env.LIVE_API_OK !== "1") {
+  fail(
+    "db:push --apply applies migrations to production and needs LIVE_API_OK=1. Re-run it as LIVE_API_OK=1 pnpm db:push --apply.",
   );
 }
 
@@ -71,22 +78,29 @@ delete baseEnv.SUPABASE_DB_PASSWORD;
 
 // pnpm 10 skips the package's postinstall, so a fresh install has no binary.
 // Run that postinstall ourselves: it downloads the release for this platform
-// and checks it against the release's checksum file.
-if (!existsSync(CLI_BIN)) {
+// and checks it against the release's checksum file. It exits 0 even when it
+// skipped the check, so only its "Checksum verified." line counts, and only a
+// binary with the marker beside it is trusted (an extract can be cut short).
+if (!existsSync(CLI_BIN) || !existsSync(CLI_MARKER)) {
+  rmSync(dirname(CLI_BIN), { recursive: true, force: true });
   console.log(
-    "Supabase CLI binary missing; fetching it with the package's postinstall.",
+    "Supabase CLI binary missing or unverified; fetching it with the package's postinstall.",
   );
   const fetched = spawnSync(process.execPath, ["scripts/postinstall.js"], {
     cwd: CLI_PACKAGE,
     env: baseEnv,
-    stdio: "inherit",
+    stdio: ["ignore", "pipe", "inherit"],
+    encoding: "utf8",
   });
-  if (fetched.status !== 0 || !existsSync(CLI_BIN)) {
-    // A checksum mismatch throws after the binary is already extracted; do not
-    // leave it for the next run to trust.
+  process.stdout.write(fetched.stdout ?? "");
+  const verified = /^Checksum verified\.$/m.test(fetched.stdout ?? "");
+  if (fetched.status !== 0 || !verified || !existsSync(CLI_BIN)) {
     rmSync(dirname(CLI_BIN), { recursive: true, force: true });
-    fail("Could not fetch the Supabase CLI binary (see the output above).");
+    fail(
+      "Could not fetch a checksum-verified Supabase CLI binary (see above).",
+    );
   }
+  writeFileSync(CLI_MARKER, "");
 }
 
 const dbUrl = `postgresql://postgres.${PROJECT_REF}@${POOLER_HOST}:5432/postgres?sslmode=require`;
