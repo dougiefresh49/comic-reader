@@ -63,6 +63,7 @@ export interface GroupHolder {
   page_number: number;
   ignored: boolean;
   silent: boolean;
+  audio_storage_path: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -183,7 +184,7 @@ export async function loadWriteContext(
   for (const ids of chunk([...wanted], 100)) {
     const { data, error } = await supabaseAdmin
       .from("bubbles")
-      .select("id, page_number, ignored, silent, group_id")
+      .select("id, page_number, ignored, silent, audio_storage_path, group_id")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .in("group_id", ids);
@@ -198,6 +199,7 @@ export async function loadWriteContext(
         page_number: row.page_number,
         ignored: !!row.ignored,
         silent: !!row.silent,
+        audio_storage_path: row.audio_storage_path,
       });
       groupHolders.set(row.group_id, list);
     }
@@ -297,9 +299,29 @@ export function boxColumns(
 }
 
 /**
- * The stored joined group this edit takes the bubble out of, or null when it
- * leaves none: no `groupId` in the edit, the same one, or a stored id held
- * by one row only (a "stands alone" mark, which carries no audio).
+ * The stored group's clip (#451): a non-null `audio_storage_path` that two or
+ * more of its rows hold, the test `rendered()` in the backfill script uses.
+ * Null for a group joined in the editor and saved before anyone rendered it,
+ * whose members still play their own clips.
+ */
+export function groupClip(
+  groupId: string | null | undefined,
+  ctx: WriteContext,
+): string | null {
+  if (!groupId) return null;
+  const count = new Map<string, number>();
+  for (const h of ctx.groupHolders.get(groupId) ?? []) {
+    if (!h.audio_storage_path) continue;
+    const n = (count.get(h.audio_storage_path) ?? 0) + 1;
+    if (n >= 2) return h.audio_storage_path;
+    count.set(h.audio_storage_path, n);
+  }
+  return null;
+}
+
+/**
+ * The stored group this edit takes the bubble out of, or null: no `groupId`
+ * in the edit, no stored group, or the same one.
  */
 export function groupLeft(
   id: string,
@@ -308,16 +330,35 @@ export function groupLeft(
 ): string | null {
   const before = ctx.groupId.get(id) ?? null;
   return edit.groupId !== undefined &&
-    edit.groupId !== before &&
-    storedShared(before, ctx)
+    before !== null &&
+    edit.groupId !== before
     ? before
     : null;
 }
 
 /**
- * The stored joined group this edit adds the bubble to, or null. Its clip no
- * longer covers the group's words, so its holders lose it (#451). The
- * joining bubble keeps its own clip until the group renders.
+ * Whether this edit takes the bubble out of a group whose clip it plays.
+ * That clip holds other balloons' words, so it goes. A bubble that still
+ * plays its own clip keeps it.
+ */
+export function leavesGroupClip(
+  id: string,
+  edit: BubbleEdit,
+  ctx: WriteContext,
+): boolean {
+  const left = groupLeft(id, edit, ctx);
+  const clip = groupClip(left, ctx);
+  if (!left || !clip) return false;
+  return (
+    ctx.groupHolders.get(left)?.find((h) => h.id === id)?.audio_storage_path ===
+    clip
+  );
+}
+
+/**
+ * The stored group this edit adds the bubble to, or null. If that group
+ * plays one clip, the clip no longer covers its words (#451). The joining
+ * bubble keeps its own clip until the group renders.
  */
 export function groupGained(
   id: string | null,
@@ -325,17 +366,29 @@ export function groupGained(
   ctx: WriteContext,
 ): string | null {
   const before = id ? (ctx.groupId.get(id) ?? null) : null;
-  return edit.groupId &&
-    edit.groupId !== before &&
-    storedShared(edit.groupId, ctx)
-    ? edit.groupId
-    : null;
+  return edit.groupId && edit.groupId !== before ? edit.groupId : null;
 }
 
 /**
- * The columns that retire a group clip on a bubble still in that group after
- * a member left or joined it (#451): no clip, and new audio wanted unless the
- * bubble plays nothing.
+ * The rows of a stored group that lose its clip after a member left, joined
+ * or was removed (#451): those holding the group clip. A member still on its
+ * own clip keeps it; a group with no clip yet loses nothing.
+ */
+export function staleClipHolders(
+  groupId: string,
+  ctx: WriteContext,
+): GroupHolder[] {
+  const clip = groupClip(groupId, ctx);
+  if (!clip) return [];
+  return (ctx.groupHolders.get(groupId) ?? []).filter(
+    (h) => h.audio_storage_path === clip,
+  );
+}
+
+/**
+ * The columns that retire a group clip on a bubble that holds it after a
+ * member left or joined the group (#451): no clip, and new audio wanted
+ * unless the bubble plays nothing.
  */
 export function staleGroupColumns(row: {
   ignored: boolean;
@@ -377,12 +430,12 @@ export function bubbleUpdate(
   const ignoredAfter = edit.ignored ?? ctx.ignored.has(id);
   const affectsAudio = AUDIO_FIELDS.some((f) => edit[f] !== undefined);
   if (affectsAudio && !ignoredAfter && !silentAfter) row.needs_audio = true;
-  // Leaving a joined group (a split, a re-join, or turned ignored or silent,
-  // #451): its clip is the old group's, whose words no longer match, so it
-  // goes. A join from no group or from a "stands alone" mark keeps the
-  // bubble's own clip until the group renders (decision row 386).
-  // `staleGroupColumns` clears the rest of the group.
-  if (groupLeft(id, edit, ctx)) {
+  // Leaving a group whose clip it plays (a split, a re-join, or turned
+  // ignored or silent, #451): that clip holds other balloons' words, so it
+  // goes. A bubble on its own clip keeps it, and a join keeps the bubble's
+  // own clip until the group renders (decision row 386).
+  // `staleClipHolders` names the rest of the group that loses the clip.
+  if (leavesGroupClip(id, edit, ctx)) {
     row.audio_storage_path = null;
     row.needs_audio = !ignoredAfter && !silentAfter;
   }

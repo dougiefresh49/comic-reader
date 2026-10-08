@@ -82,17 +82,18 @@ export async function groupBalloons(bookId: string, issueId: string) {
         .select("id");
       if (writeError) throw dbError(`group ${ids.join(",")}`, writeError);
       const n = written?.length ?? 0;
-      if (n >= 2) {
+      if (n === ids.length) {
         groups++;
         members += n;
         continue;
       }
-      // Members took a group_id since the read. A lone survivor would read
-      // as a "stands alone" mark nobody made, so it goes back to null.
+      // Members took a group_id since the read (an editor Save). What was
+      // written would be a lone "stands alone" mark nobody made, or a group
+      // with a gap that never renders, so it goes back to null.
       console.log(
-        `[group-balloons] ${ids.join(",")}: ${n} of ${ids.length} written, not counted`,
+        `[group-balloons] ${ids.join(",")}: ${n} of ${ids.length} written, put back to null`,
       );
-      if (n === 1) {
+      if (n > 0) {
         const { error: undoError } = await supabase
           .from("bubbles")
           .update({ group_id: null })

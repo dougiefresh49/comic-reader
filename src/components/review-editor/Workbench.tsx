@@ -42,7 +42,6 @@ import {
   panelOf,
   patchBubble,
   removePanel,
-  repairChanged,
   setBubbleRect,
   setDeleted,
   setPanelRect,
@@ -636,12 +635,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       }
       // Every edit keeps joined groups whole (#451): a move, Earlier/Later,
       // a panel change or a member marked ignored or silent splits it off.
-      dispatch({
-        type: "apply",
-        label,
-        recipe: (d) => repairChanged(d, recipe(d), newId),
-        ...opts,
-      });
+      // The reducer repairs a merged edit (a typed box, a nudge, a drag)
+      // from where its undo step began, so only where it ends counts.
+      dispatch({ type: "apply", label, recipe, mint: newId, ...opts });
     },
     [say],
   );

@@ -3,9 +3,11 @@ import {
   applyDocPatch,
   diffDoc,
   reconcile,
+  repairChanged,
   type BubbleDoc,
   type Doc,
   type DocPatch,
+  type Mint,
   type Sel,
 } from "./model";
 
@@ -27,6 +29,12 @@ export interface EditorState {
   /** Each page remembers what was selected on it. */
   selByPage: Record<number, Sel | null>;
   coalesce: string | null;
+  /**
+   * The current merged edit's document before `repairGroups` (#451), or
+   * null. A merged edit (a typed box field, a nudge, a drag) replays on it,
+   * so a half-typed value that briefly breaks a group leaves no new ids.
+   */
+  raw: Doc | null;
   /** The label of the last undo or redo, for the note. */
   lastHistory: { n: number; text: string } | null;
 }
@@ -38,6 +46,11 @@ export type EditorAction =
       recipe: (doc: Doc) => Doc;
       /** Consecutive edits with the same key fold into one undo step. */
       coalesce?: string;
+      /**
+       * Mints group ids for `repairChanged`, run on the result measured from
+       * the document before the undo step began. Left out, no repair.
+       */
+      mint?: Mint;
       select?: Sel | null;
       page?: number;
     }
@@ -83,6 +96,7 @@ export function initState(doc: Doc, page: number): EditorState {
     sel: null,
     selByPage: {},
     coalesce: null,
+    raw: null,
     lastHistory: null,
   };
 }
@@ -90,7 +104,20 @@ export function initState(doc: Doc, page: number): EditorState {
 export function reducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {
     case "apply": {
-      const doc = action.recipe(state.doc);
+      const folds =
+        action.coalesce !== undefined &&
+        action.coalesce === state.coalesce &&
+        state.past.length > 0;
+      // A merged edit replays on its unrepaired document and is repaired
+      // against the document before the undo step began (#451), so only the
+      // step's end state can split a group.
+      const stepStart = folds
+        ? (state.past[state.past.length - 1]?.doc ?? state.doc)
+        : state.doc;
+      const raw = action.recipe(folds && state.raw ? state.raw : state.doc);
+      const doc = action.mint
+        ? repairChanged(stepStart, raw, action.mint)
+        : raw;
       const page = action.page ?? state.page;
       const sel =
         action.select !== undefined
@@ -101,10 +128,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
           ? state
           : { ...state, sel, page };
       }
-      const folds =
-        action.coalesce !== undefined &&
-        action.coalesce === state.coalesce &&
-        state.past.length > 0;
       const past = folds
         ? state.past
         : [
@@ -125,6 +148,7 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         sel,
         selByPage: { ...state.selByPage, [page]: sel },
         coalesce: action.coalesce ?? null,
+        raw: action.coalesce !== undefined ? raw : null,
       };
     }
     case "undo": {
@@ -231,6 +255,9 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         ...state,
         base: take(state.base),
         doc: take(state.doc),
+        // A merged edit after this replays on the document, not on a raw
+        // copy that lacks the new cues.
+        raw: null,
         past: state.past.map(takeEntry),
         future: state.future.map(takeEntry),
       };
