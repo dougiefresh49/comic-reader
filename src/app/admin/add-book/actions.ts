@@ -43,8 +43,9 @@ function generateSlug(title: string): string {
 
 /**
  * The series a book joins: an existing row whose id is the name's slug, or
- * whose name matches ignoring case, spacing and punctuation, keeps its id, so a later volume lands in the same
- * series; otherwise the id a new row would get. Null when there is no name.
+ * whose name matches ignoring case, spacing and punctuation, keeps its id, so
+ * a later volume lands in the same series; otherwise the id a new row would
+ * get. Null when there is no name.
  * The match runs here, not as an ilike filter, because PostgREST reads `*`
  * in an ilike value as a wildcard; the table holds one row per series.
  */
