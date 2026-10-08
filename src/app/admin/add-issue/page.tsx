@@ -63,7 +63,6 @@ export default async function AddIssuePage({
             id: bookId,
             name: result.data.name,
             totalIssues: result.data.totalIssues,
-            parts: result.data.parts,
             nextIssueNumber: result.data.nextIssueNumber,
             wikiTitleTemplate: result.data.wikiTitleTemplate,
             wikiHost: result.data.wikiHost,

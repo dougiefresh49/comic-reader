@@ -106,7 +106,6 @@ const BOOK_TABLES = [
   "panels",
   "pages",
   "issues",
-  "book_parts",
 ];
 const RETRY = /step will be retried/;
 const LOG_FAILURES = [

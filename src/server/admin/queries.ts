@@ -10,8 +10,6 @@ export interface AdminIssueRow {
   issueId: string;
   issueName: string;
   number: number;
-  partId: string | null;
-  partName: string | null;
   pageCount: number;
   bubbleCount: number;
   audioCount: number;
@@ -42,7 +40,6 @@ interface IssueQueryRow {
   book_id: string;
   number: number;
   name: string;
-  part_id: string | null;
   page_count: number;
   bubble_count: number;
   audio_count: number;
@@ -55,7 +52,6 @@ interface IssueQueryRow {
   pipeline_paused_at: string | null;
   pipeline_paused_url: string | null;
   books: { id: string; name: string } | null;
-  book_parts: { id: string; name: string; number: number } | null;
 }
 
 /**
@@ -128,7 +124,7 @@ export async function getAdminIssues(): Promise<AdminIssueRow[]> {
   const latestRuns = await getLatestRunIds();
   const { data, error } = await listAllIssues(
     supabase,
-    "id, book_id, number, name, part_id, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps, status, pipeline_step, pipeline_paused, pipeline_paused_at, pipeline_paused_url, books(id, name), book_parts(id, name, number)",
+    "id, book_id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps, status, pipeline_step, pipeline_paused, pipeline_paused_at, pipeline_paused_url, books(id, name)",
   )
     .order("book_id")
     .order("number");
@@ -146,8 +142,6 @@ export async function getAdminIssues(): Promise<AdminIssueRow[]> {
       issueId: row.id,
       issueName: row.name,
       number: row.number,
-      partId: row.part_id,
-      partName: row.book_parts?.name ?? null,
       pageCount: row.page_count,
       bubbleCount: row.bubble_count,
       audioCount: row.audio_count,
@@ -172,25 +166,21 @@ export interface AdminBookInfo {
   publisher: string | null;
   /** `franchises.name` through `book_franchises`, lowest `position` first. */
   franchises: string[];
-  parts: {
-    id: string;
-    name: string;
-    number: number;
-    totalIssues: number | null;
-  }[];
+  /** The series this book is a volume of, or null for a standalone book. */
+  series: { name: string; position: number | null } | null;
 }
 
-export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
+export async function getAdminBooks(): Promise<AdminBookInfo[]> {
   const { data, error } = await supabase
     .from("books")
     .select(
-      "id, name, total_issues, publisher, book_franchises(position, franchises(name)), book_parts(id, name, number, total_issues)",
+      "id, name, total_issues, publisher, series_position, book_franchises(position, franchises(name)), series(id, name)",
     )
     .order("name");
 
   if (error) {
-    console.error("getAdminBooksWithParts:", error);
-    throw new Error(`getAdminBooksWithParts: ${error.message}`, {
+    console.error("getAdminBooks:", error);
+    throw new Error(`getAdminBooks: ${error.message}`, {
       cause: error,
     });
   }
@@ -201,17 +191,11 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
       name: string;
       total_issues: number | null;
       publisher: string | null;
+      series_position: number | null;
       book_franchises:
         | { position: number; franchises: { name: string } | null }[]
         | null;
-      book_parts:
-        | {
-            id: string;
-            name: string;
-            number: number;
-            total_issues: number | null;
-          }[]
-        | null;
+      series: { id: string; name: string } | null;
     }>
   ).map((b) => ({
     id: b.id,
@@ -221,13 +205,8 @@ export async function getAdminBooksWithParts(): Promise<AdminBookInfo[]> {
     franchises: [...(b.book_franchises ?? [])]
       .sort((a, z) => a.position - z.position)
       .flatMap((f) => (f.franchises ? [f.franchises.name] : [])),
-    parts: (b.book_parts ?? [])
-      .sort((a, z) => a.number - z.number)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        number: p.number,
-        totalIssues: p.total_issues,
-      })),
+    series: b.series
+      ? { name: b.series.name, position: b.series_position }
+      : null,
   }));
 }

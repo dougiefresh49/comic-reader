@@ -19,7 +19,6 @@ interface BookInfo {
   totalIssues: number | null;
   wikiHost: string | null;
   wikiTitleTemplate: string | null;
-  parts: { id: string; number: number; name: string; slug: string }[];
   nextIssueNumber: number;
 }
 
@@ -48,14 +47,6 @@ export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
     return { ok: false, error: bookErr?.message ?? "Book not found" };
   }
 
-  const { data: parts } = (await supabaseAdmin
-    .from("book_parts")
-    .select("id, number, name, slug")
-    .eq("book_id", bookId)
-    .order("number", { ascending: true })) as {
-    data: { id: string; number: number; name: string; slug: string }[] | null;
-  };
-
   const { data: maxIssue } = (await listBookIssues(
     supabaseAdmin,
     bookId,
@@ -72,7 +63,6 @@ export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
       totalIssues: book.total_issues,
       wikiHost: book.wiki_host,
       wikiTitleTemplate: book.wiki_title_template,
-      parts: parts ?? [],
       nextIssueNumber: (maxIssue?.number ?? 0) + 1,
     },
   };
@@ -133,7 +123,6 @@ export async function findReadingSource(
 interface CreateIssueArgs {
   bookId: string;
   issueNumber: number;
-  partId?: string;
   wikiUrl: string;
   sourceUrl: string;
 }
@@ -151,7 +140,7 @@ export async function createIssue(
     supabaseAdmin,
     args.bookId,
     issueId,
-    "id, part_id",
+    "id",
   ).maybeSingle();
   if (lookupErr) {
     return { ok: false, error: lookupErr.message };
@@ -159,7 +148,7 @@ export async function createIssue(
   if (existing) {
     return {
       ok: false,
-      error: `${issueId} already exists in ${args.bookId}${existing.part_id ? ` (part ${existing.part_id})` : ""}. Issue ids for a new part get a part prefix, like part-1-issue-1 (decisions row 396); this form does not build those yet.`,
+      error: `${issueId} already exists in ${args.bookId}.`,
     };
   }
   const { data, error } = (await insertIssue(supabaseAdmin, {
@@ -167,7 +156,6 @@ export async function createIssue(
     book_id: args.bookId,
     number: args.issueNumber,
     name: `Issue ${args.issueNumber}`,
-    part_id: args.partId ?? null,
     wiki_url: args.wikiUrl,
     source_url: args.sourceUrl,
   })

@@ -1,5 +1,7 @@
 # Feature: Book Parts (Multi-Part Series Support)
 
+Superseded by `docs/decisions.md` row 417 (#64) and #675: one book per volume, grouped into a series; `book_parts` is gone.
+
 ## Status: tracked in [features.md](features.md)
 ## Prerequisite: None (additive schema change)
 ## Blocks: Smart Add Flow (for multi-part series like TMNT x MMPR)

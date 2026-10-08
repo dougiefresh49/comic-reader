@@ -162,47 +162,6 @@ export type Database = {
           },
         ];
       };
-      book_parts: {
-        Row: {
-          book_id: string;
-          created_at: string | null;
-          id: string;
-          name: string;
-          number: number;
-          slug: string;
-          total_issues: number | null;
-          wiki_url: string | null;
-        };
-        Insert: {
-          book_id: string;
-          created_at?: string | null;
-          id: string;
-          name: string;
-          number: number;
-          slug: string;
-          total_issues?: number | null;
-          wiki_url?: string | null;
-        };
-        Update: {
-          book_id?: string;
-          created_at?: string | null;
-          id?: string;
-          name?: string;
-          number?: number;
-          slug?: string;
-          total_issues?: number | null;
-          wiki_url?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "book_parts_book_id_fkey";
-            columns: ["book_id"];
-            isOneToOne: false;
-            referencedRelation: "books";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       books: {
         Row: {
           created_at: string | null;
@@ -210,6 +169,8 @@ export type Database = {
           name: string;
           published: boolean;
           publisher: string | null;
+          series_id: string | null;
+          series_position: number | null;
           slug: string;
           total_issues: number | null;
           wiki_host: string | null;
@@ -221,6 +182,8 @@ export type Database = {
           name: string;
           published?: boolean;
           publisher?: string | null;
+          series_id?: string | null;
+          series_position?: number | null;
           slug: string;
           total_issues?: number | null;
           wiki_host?: string | null;
@@ -232,12 +195,22 @@ export type Database = {
           name?: string;
           published?: boolean;
           publisher?: string | null;
+          series_id?: string | null;
+          series_position?: number | null;
           slug?: string;
           total_issues?: number | null;
           wiki_host?: string | null;
           wiki_title_template?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "books_series_id_fkey";
+            columns: ["series_id"];
+            isOneToOne: false;
+            referencedRelation: "series";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       bubbles: {
         Row: {
@@ -612,7 +585,6 @@ export type Database = {
           name: string;
           number: number;
           page_count: number;
-          part_id: string | null;
           pipeline_paused: boolean;
           pipeline_paused_at: string | null;
           pipeline_paused_url: string | null;
@@ -636,7 +608,6 @@ export type Database = {
           name: string;
           number: number;
           page_count?: number;
-          part_id?: string | null;
           pipeline_paused?: boolean;
           pipeline_paused_at?: string | null;
           pipeline_paused_url?: string | null;
@@ -660,7 +631,6 @@ export type Database = {
           name?: string;
           number?: number;
           page_count?: number;
-          part_id?: string | null;
           pipeline_paused?: boolean;
           pipeline_paused_at?: string | null;
           pipeline_paused_url?: string | null;
@@ -678,13 +648,6 @@ export type Database = {
             columns: ["book_id"];
             isOneToOne: false;
             referencedRelation: "books";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "issues_part_id_fkey";
-            columns: ["part_id"];
-            isOneToOne: false;
-            referencedRelation: "book_parts";
             referencedColumns: ["id"];
           },
         ];
@@ -1091,6 +1054,24 @@ export type Database = {
             referencedColumns: ["book_id", "id"];
           },
         ];
+      };
+      series: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string;
+          id: string;
+          name: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+        };
+        Relationships: [];
       };
       voice_archives: {
         Row: {
