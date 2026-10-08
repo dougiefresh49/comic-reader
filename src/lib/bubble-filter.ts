@@ -9,8 +9,8 @@ export type BubbleDrop<T> = {
   bubble: T;
   rule: "nested" | "twin" | "container";
   /**
-   * The kept boxes it holds at `TWIN_IOU` (nested), the twin that outranked
-   * it, or every kept box the container holds.
+   * The live boxes it holds at `TWIN_IOU` (nested), the twin that outranked
+   * it, or every live box the container holds.
    */
   by: T[];
   /**
@@ -20,11 +20,14 @@ export type BubbleDrop<T> = {
    * have dropped since (#652): only the innermost of those count, and two
    * detections of one balloon count once. Unsure when the counted boxes
    * span under `UNSURE_SPAN` of it, when two detections were counted once,
-   * or when a counted box (for a nested drop, also an inner box in `by`) is
-   * the inner box of another nested drop whose outer box neither holds this
-   * box nor is held by it: two loose detections of one balloon disagree
-   * about where it extends (#343 review cases 4 and 5). A twin whose winner
-   * is kept is always sure; one whose winner dropped is judged as above.
+   * when a counted box holds a kept box this box does not (it straddles the
+   * edge), or when a counted box (for a nested drop, also an inner box in
+   * `by`) is the inner box of another nested drop whose outer box neither
+   * holds this box nor is held by it: two loose detections of one balloon
+   * disagree about where it extends (#343 review cases 4 and 5). A twin
+   * whose winner is kept is always sure; one whose winner dropped is judged
+   * as above, and is also unsure when it does not hold every kept box in
+   * the winner's `by` (#652).
    */
   unsure: boolean;
 };
@@ -206,10 +209,16 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
       bubble.bounding_box,
       counted.map((o) => o.bounding_box),
     );
+    // A counted box holding a box the dropping box does not (it straddles
+    // the edge) may be a loose box, not the dropping box's content.
+    const straddles = counted.some((c) =>
+      live(bubble).some((o) => holds(c, o) && !holds(bubble, o)),
+    );
     const unsure =
       span < UNSURE_SPAN ||
       counted.length < innermost.length ||
-      disputed(bubble, counted);
+      disputed(bubble, counted) ||
+      straddles;
     return { span, unsure };
   };
 
@@ -235,14 +244,17 @@ export function filterDuplicateBubbles<T extends FilterableBubble>(
 
   // Unsure is judged once, against the boxes that stay: a box a drop held
   // when it was judged may have dropped since. A twin whose winner stays
-  // leaves its text to that twin, and is sure.
+  // leaves its text to that twin, and is sure; one whose winner dropped is
+  // also unsure when it does not hold every kept box that winner dropped for.
   const kept = bubbles.filter((b) => !drops.has(b));
   for (const drop of drops.values()) {
-    if (drop.rule === "twin" && !drops.has(drop.by[0]!)) continue;
+    const winner = drop.rule === "twin" ? drops.get(drop.by[0]!) : undefined;
+    if (drop.rule === "twin" && !winner) continue;
     const held = kept.filter((o) => holds(drop.bubble, o));
     drop.unsure =
       judge(drop.bubble, held).unsure ||
-      (drop.rule === "nested" && disputed(drop.bubble, drop.by));
+      (drop.rule === "nested" && disputed(drop.bubble, drop.by)) ||
+      !!winner?.by.some((o) => !drops.has(o) && !holds(drop.bubble, o));
   }
   return {
     kept,

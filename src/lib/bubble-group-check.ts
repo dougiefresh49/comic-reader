@@ -1,10 +1,10 @@
 /**
  * A second look at a bubble box the duplicate filter is unsure of (#343).
- * `filterDuplicateBubbles` drops a container when the boxes it holds cover
- * it; when the filter marks a drop `unsure` (the reasons are listed on
- * `BubbleDrop.unsure`), this asks `GEMINI_FAST` whether the container is a balloon of its own or only a
- * box around the smaller balloons, by asking for any words in it that no
- * smaller balloon covers. It can only keep a container: such words ("own")
+ * When `filterDuplicateBubbles` marks a drop `unsure` (the reasons are
+ * listed on `BubbleDrop.unsure`), this asks `GEMINI_FAST` whether the
+ * dropped box is a balloon of its own or only a box around the smaller
+ * balloons, by asking for any words in it that no smaller balloon covers.
+ * It can only keep the box: such words ("own")
  * keep it, and an error, a timeout or an unclear reply keeps it too, since a
  * dropped balloon is a line a kid never hears (decision row 238). No such
  * words ("group") lets the drop stand.
