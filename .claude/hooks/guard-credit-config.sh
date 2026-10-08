@@ -83,18 +83,27 @@ if [ -z "$FILE_PATH" ]; then
   PATCH_LINES=$(printf '%s' "$PATCH_LINES" | sed -E 's/^\*\*\*[[:space:]]*//')
 fi
 
+# Read whole before the loop: `read` ends the same way on an I/O error as at
+# end of file, so a loop fed straight from the list would pass on the rules it
+# got before the error. cat reports the error.
+if ! LIST_TEXT=$(cat "$LIST"); then
+  printf 'Blocked: %s could not be read in full, so the guarded-file list cannot be checked.\n' "$LIST" >&2
+  exit 2
+fi
+
 NR_FILE_RULES=0
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
   file:*) ;;
   *) continue ;;
   esac
-  NR_FILE_RULES=$((NR_FILE_RULES + 1))
 
   target=${line#file:}
   target=${target%%::*}
   target=$(printf '%s' "$target" | sed -E 's/[[:space:]]+$//')
   reason=${line#*:: }
+  [ -n "$target" ] || continue
+  NR_FILE_RULES=$((NR_FILE_RULES + 1))
 
   if [ "$REL_PATH" = "$target" ] || [ "${REL_PATH%"/$target"}" != "$REL_PATH" ]; then
     printf 'Blocked: %s\n' "$reason" >&2
@@ -112,9 +121,9 @@ while IFS= read -r line || [ -n "$line" ]; do
       fi
     done
   done <<<"$PATCH_LINES"
-done <"$LIST"
-# A read that failed part way, or a list emptied by mistake, leaves no rule to
-# check against; that is not a pass.
+done <<<"$LIST_TEXT"
+# A list emptied by mistake, or one whose file: lines lost their paths, leaves
+# no rule to check against; that is not a pass.
 if [ "$NR_FILE_RULES" -eq 0 ]; then
   printf 'Blocked: %s holds no file: rule, so the guarded-file list cannot be checked. Restore it from the repo.\n' "$LIST" >&2
   exit 2
