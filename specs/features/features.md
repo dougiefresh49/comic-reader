@@ -2,7 +2,7 @@
 
 Backlog and status tracker for planned features. Update status here when work starts or completes.
 
-**Statuses:** `pending` · `in-progress` · `done` · `blocked`
+**Statuses:** `pending` · `in-progress` · `done` · `blocked` · `superseded`
 
 > **Looking for the big picture?** See [`specs/roadmap/00-overview.md`](../roadmap/00-overview.md) — north-star, end-state diagrams, and phased plan that ties all the work below together.
 
@@ -41,7 +41,7 @@ Backlog and status tracker for planned features. Update status here when work st
 | Source page upload + admin dashboard | `done` | [upload-and-pipeline-trigger.md](upload-and-pipeline-trigger.md) | `/admin/new-issue` drag-and-drop upload to `comic-pages-raw` bucket. `/admin` dashboard shows pipeline status per issue with pause/resume links. |
 | Casting browser UI | `done` | [casting-browser.md](casting-browser.md) | `/admin/characters/casting` — two-phase triage UI with wiki voice hints, on-demand Gemini research per character, Voice Design flow, paste voice ID, Complete Casting to unpause pipeline. |
 | Voice clip splitting | `done` | [audio-splitting.md](audio-splitting.md) | `pnpm split-voice` — isolate target character voice from mixed audio using source separation + diarization + Gemini speaker ID. PR #31. |
-| Book parts (multi-part series) | `done` | [book-parts.md](book-parts.md) | `book_parts` table for multi-part series (e.g., TMNT x MMPR Part I/II/III). Nullable `part_id` on issues. New columns on `books` for wiki/publisher/franchises. |
+| Book parts (multi-part series) | `superseded` | [book-parts.md](book-parts.md) | Superseded by decisions row 417 / [#675](https://github.com/dougiefresh49/comic-reader/issues/675): one book per volume, grouped by a `series` table; the parts table and `issues.part_id` were dropped. |
 | Smart add flow | `testing` | [smart-add-flow.md](smart-add-flow.md) | AI-assisted book/issue discovery. Gemini + Google Search grounding finds wiki pages and reading sources. Two flows: "Add Book" (search + create) and "Add Issue" (auto-detect next + lookup source). Implementation complete — in review/testing. |
 | Face exemplar embeddings (pgvector) | `done` | [face-exemplar-embeddings.md](face-exemplar-embeddings.md) | `gemini-embedding-2` multimodal embeddings of face crops stored in Supabase pgvector. Retrieves visually similar exemplars during character identification. Self-hosted alternative to Google File Search Store. Infrastructure + script integration complete. 24 exemplars seeded from issue-1. |
 | Workflow lookahead unification | `done` | [workflow-lookahead-integration.md](workflow-lookahead-integration.md) | Shared modules in `src/lib/` for face extraction, character ID, exemplar store, embeddings. Workflow `characterLookaheadPage` rewritten. Scripts delegate to shared modules. |
