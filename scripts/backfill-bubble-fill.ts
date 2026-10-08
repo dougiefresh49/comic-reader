@@ -10,7 +10,8 @@
  * The pixel box is `box_2d` when it holds numeric x, y, width and height,
  * else the `style` percents times the decoded image's size (some issue-1
  * rows carry only `{"index":N}` in `box_2d`). A row with neither is skipped.
- * Its stored `text_geometry` word boxes are left out of the sample (#597).
+ * When it has stored `text_geometry` word boxes, the sample is read inside
+ * them (#672).
  *
  * Rows are read with `select("*")` and the colour is filtered here, so a dry
  * run also works before the column's migration is applied.

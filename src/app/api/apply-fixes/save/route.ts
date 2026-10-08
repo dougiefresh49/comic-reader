@@ -122,7 +122,7 @@ async function setFillColors(
 /**
  * The pages whose word boxes this Save makes stale (#620). A bubble's
  * `text_geometry` is assigned from the lines its box covered when the page was
- * OCR'd, and its `fill_color` is sampled with those word boxes skipped. A box
+ * OCR'd, and its `fill_color` is sampled inside those word boxes (#672). A box
  * that moves or grows keeps the old boxes, so the reader's highlight lands on
  * the old lettering; a bubble drawn new has none, so the reader falls back to
  * the caption highlight. So a page re-runs its word boxes when this Save writes

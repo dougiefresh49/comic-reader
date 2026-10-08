@@ -33,8 +33,8 @@ export class WordGeometryDataError extends Error {
  * wrote (#620). Under DRY_RUN the engine returns no lines and every candidate
  * is written null. A page with no candidate bubbles makes no Cloud Vision call.
  *
- * A bubble given word boxes has its `fill_color` resampled with them skipped
- * (#597), in the same update. A page image that fails to decode logs one
+ * A bubble given word boxes has its `fill_color` resampled from the pixels
+ * inside them (#672), in the same update. A page image that fails to decode logs one
  * warning and leaves every fill as it was; a null-geometry bubble keeps its.
  */
 export async function wordGeometryForPage(

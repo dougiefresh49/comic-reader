@@ -3,13 +3,15 @@
  * decisions row 365). Server only: it imports sharp. No "server-only"
  * import, because the backfill script imports this too.
  *
- * Comic balloons are ovals, so the box corners are page art and the box edge
- * is the balloon outline: only pixels inside the ellipse inscribed in the
- * box, shrunk to 80%, are read. Pixels inside the bubble's word boxes
- * (`text_geometry`, padded) are skipped, so big coloured lettering is not
- * read as the fill (#597); too few pixels left falls back to the whole
- * ellipse. Dark pixels (lettering, outline) are dropped, and the most common
- * remaining colour, bucketed at 4 bits per channel, is the fill.
+ * The stored colour is what the reader's word marker multiplies over, so it
+ * is the colour under the words (#672). With word boxes (`text_geometry`,
+ * padded), only pixels inside them are read: white on a black-on-white
+ * balloon, orange on a shout lettered in orange over the art. Too few there
+ * falls back to the ellipse outside them, then to the whole ellipse. With no
+ * word boxes, the ellipse inscribed in the box, shrunk to 80%, is read: comic
+ * balloons are ovals, so the box corners are page art and the box edge is the
+ * balloon outline. Dark pixels (lettering, outline) are dropped, and the most
+ * common remaining colour, bucketed at 4 bits per channel, is the fill.
  */
 import sharp from "sharp";
 
@@ -41,10 +43,10 @@ const DARK_LUMINANCE = 0.03;
 /** Fewer surviving pixels than this is no fill to trust. */
 const MIN_PIXELS = 20;
 /**
- * Page pixels added on each side of a word box before its pixels are
- * skipped, for glyph edges just outside the OCR box. Kept at 1: at 4 the
- * pad ate the gaps between lines on cream-to-orange gradient captions, and
- * their orange margins outvoted the cream behind the words (#597 dry run).
+ * Page pixels added on each side of a word box, for glyph edges just
+ * outside the OCR box. Kept at 1 from #597, when word boxes were skipped:
+ * at 4 the pad ate the gaps between lines on cream-to-orange gradient
+ * captions and their orange margins outvoted the cream behind the words.
  */
 const WORD_PAD_PX = 1;
 
@@ -120,7 +122,7 @@ export async function decodeRawImage(
 /**
  * The fill colour under `box` in an already-decoded image, lowercase
  * `#rrggbb`, or null. `textGeometry` is the bubble's stored `text_geometry`;
- * pixels inside its word boxes are skipped.
+ * with word boxes, the colour inside them wins (see the file header).
  */
 export function sampleFillColorRaw(
   image: RawImage,
@@ -135,29 +137,33 @@ export function sampleFillColorRaw(
 
   // 1 marks a padded word-box pixel, row-major from (x0, y0).
   const span = x1 - x0;
-  let skip: Uint8Array | null = null;
+  let mask: Uint8Array | null = null;
   for (const [wx, wy, ww, wh] of wordBoxesOf(textGeometry)) {
     const sx0 = Math.max(x0, Math.floor(wx * image.width) - WORD_PAD_PX);
     const sy0 = Math.max(y0, Math.floor(wy * image.height) - WORD_PAD_PX);
     const sx1 = Math.min(x1, Math.ceil((wx + ww) * image.width) + WORD_PAD_PX);
     const sy1 = Math.min(y1, Math.ceil((wy + wh) * image.height) + WORD_PAD_PX);
     if (!(sx1 > sx0 && sy1 > sy0)) continue;
-    skip ??= new Uint8Array(span * (y1 - y0));
+    mask ??= new Uint8Array(span * (y1 - y0));
     for (let py = sy0; py < sy1; py++) {
       const row = (py - y0) * span - x0;
-      skip.fill(1, row + sx0, row + sx1);
+      mask.fill(1, row + sx0, row + sx1);
     }
   }
 
   return (
-    (skip && voteFill(image, x0, y0, x1, y1, skip)) ??
-    voteFill(image, x0, y0, x1, y1, null)
+    (mask &&
+      (voteFill(image, x0, y0, x1, y1, mask, true) ??
+        voteFill(image, x0, y0, x1, y1, mask, false))) ??
+    voteFill(image, x0, y0, x1, y1, null, false)
   );
 }
 
 /**
- * The most common non-dark colour in the ellipse of [x0, x1) by [y0, y1),
- * leaving out pixels `skip` marks, or null below `MIN_PIXELS`.
+ * The most common non-dark colour in [x0, x1) by [y0, y1), or null below
+ * `MIN_PIXELS`. With `inside`, only the pixels `mask` marks are read, ellipse
+ * or not: a shout's words run to the box edge, past the ellipse. Otherwise
+ * the ellipse is read, leaving out what `mask` marks.
  */
 function voteFill(
   image: RawImage,
@@ -165,7 +171,8 @@ function voteFill(
   y0: number,
   x1: number,
   y1: number,
-  skip: Uint8Array | null,
+  mask: Uint8Array | null,
+  inside: boolean,
 ): string | null {
   const cx = (x0 + x1) / 2;
   const cy = (y0 + y1) / 2;
@@ -183,8 +190,8 @@ function voteFill(
     const dy = (py + 0.5 - cy) / ry;
     for (let px = x0; px < x1; px++) {
       const dx = (px + 0.5 - cx) / rx;
-      if (dx * dx + dy * dy > 1) continue;
-      if (skip?.[(py - y0) * span + px - x0]) continue;
+      if (mask && !!mask[(py - y0) * span + px - x0] !== inside) continue;
+      if (!inside && dx * dx + dy * dy > 1) continue;
       const i = (py * width + px) * channels;
       const r = data[i]!;
       const g = data[i + 1]!;
