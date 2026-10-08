@@ -635,8 +635,10 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       }
       // Every edit keeps joined groups whole (#451): a move, Earlier/Later,
       // a panel change or a member marked ignored or silent splits it off.
-      // The reducer repairs a merged edit (a typed box, a nudge, a drag)
-      // from where its undo step began, so only where it ends counts.
+      // The reducer replays a merged edit (a typed field, a Shift-arrow
+      // nudge) on the document from before its undo step and repairs from
+      // there, so only where it ends counts. Merged-edit recipes must set
+      // absolute values. A drag commits once, unmerged.
       dispatch({ type: "apply", label, recipe, mint: newId, ...opts });
     },
     [say],

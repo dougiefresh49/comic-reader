@@ -29,12 +29,6 @@ export interface EditorState {
   /** Each page remembers what was selected on it. */
   selByPage: Record<number, Sel | null>;
   coalesce: string | null;
-  /**
-   * The current merged edit's document before `repairGroups` (#451), or
-   * null. A merged edit (a typed box field, a nudge, a drag) replays on it,
-   * so a half-typed value that briefly breaks a group leaves no new ids.
-   */
-  raw: Doc | null;
   /** The label of the last undo or redo, for the note. */
   lastHistory: { n: number; text: string } | null;
 }
@@ -43,8 +37,17 @@ export type EditorAction =
   | {
       type: "apply";
       label: string;
+      /**
+       * With `coalesce`, the recipe must set an absolute value (a whole
+       * rect, a whole field), never a step from the current one: a merged
+       * edit replays only its latest recipe on the document from before the
+       * step began.
+       */
       recipe: (doc: Doc) => Doc;
-      /** Consecutive edits with the same key fold into one undo step. */
+      /**
+       * Consecutive edits with the same key fold into one undo step: typed
+       * fields and Shift-arrow nudges. A drag commits once, with no key.
+       */
       coalesce?: string;
       /**
        * Mints group ids for `repairChanged`, run on the result measured from
@@ -96,7 +99,6 @@ export function initState(doc: Doc, page: number): EditorState {
     sel: null,
     selByPage: {},
     coalesce: null,
-    raw: null,
     lastHistory: null,
   };
 }
@@ -108,16 +110,17 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         action.coalesce !== undefined &&
         action.coalesce === state.coalesce &&
         state.past.length > 0;
-      // A merged edit replays on its unrepaired document and is repaired
-      // against the document before the undo step began (#451), so only the
-      // step's end state can split a group.
+      // A merged edit replays its latest (absolute) recipe on the document
+      // from before the undo step began, then repairs groups against it
+      // (#451): a half-typed value that briefly moved a box leaves nothing
+      // behind, and only where the step ends can split a group.
       const stepStart = folds
         ? (state.past[state.past.length - 1]?.doc ?? state.doc)
         : state.doc;
-      const raw = action.recipe(folds && state.raw ? state.raw : state.doc);
+      const next = action.recipe(stepStart);
       const doc = action.mint
-        ? repairChanged(stepStart, raw, action.mint)
-        : raw;
+        ? repairChanged(stepStart, next, action.mint)
+        : next;
       const page = action.page ?? state.page;
       const sel =
         action.select !== undefined
@@ -148,7 +151,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         sel,
         selByPage: { ...state.selByPage, [page]: sel },
         coalesce: action.coalesce ?? null,
-        raw: action.coalesce !== undefined ? raw : null,
       };
     }
     case "undo": {
@@ -255,9 +257,6 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         ...state,
         base: take(state.base),
         doc: take(state.doc),
-        // A merged edit after this replays on the document, not on a raw
-        // copy that lacks the new cues.
-        raw: null,
         past: state.past.map(takeEntry),
         future: state.future.map(takeEntry),
       };

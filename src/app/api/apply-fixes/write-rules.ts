@@ -299,8 +299,10 @@ export function boxColumns(
 }
 
 /**
- * The stored group's clip (#451): a non-null `audio_storage_path` that two or
- * more of its rows hold, the test `rendered()` in the backfill script uses.
+ * The stored group's clip (#451): a non-null `audio_storage_path` that any
+ * two or more of its rows share. Looser than `rendered()` in the backfill
+ * script, which needs every member on the lead's path: a group that gained a
+ * member after its render still has a clip here, held by the old members.
  * Null for a group joined in the editor and saved before anyone rendered it,
  * whose members still play their own clips.
  */
