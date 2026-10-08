@@ -204,7 +204,15 @@ export function useAudioPlayback({
     }
   }, []);
 
-  useEffect(() => () => stopAll(), [stopAll]);
+  // Unmount lets go of the clip for good: pause it and unwire its nodes, or
+  // the last clip of every page stays on the shared destination (#611).
+  useEffect(
+    () => () => {
+      stopAll();
+      if (audioRef.current) disconnect(audioRef.current);
+    },
+    [stopAll],
+  );
 
   return { playBubble, stopAll, togglePlayPause, isPlaying, wordHighlight };
 }
