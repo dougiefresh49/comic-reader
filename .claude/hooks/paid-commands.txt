@@ -18,6 +18,8 @@
 # hide it, and it has to be a real script name from package.json, which is what
 # decision 1 asks for. A run of the file that package.json entry names, through
 # tsx, node --import tsx, npx tsx or pnpm exec tsx, matches the rule too (#292).
+# smoke-ingest is the exception: it has no package script, so it is matched as
+# a run of scripts/smoke-ingest.ts (#671).
 
 # ingest comes first, so a --from-step value that is also a script name
 # (--from-step generate-audio) gets the ingest reason and not that script's.

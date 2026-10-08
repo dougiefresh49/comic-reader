@@ -39,7 +39,10 @@
 {"id":"7a voice-lab-import describe direct run","want":2,"cmd":"pnpm exec tsx scripts/voice-lab-import.ts --describe","reason":"--describe makes one Gemini call"}
 {"id":"7a grep for the describe flag","want":0,"cmd":"grep -n -- --describe scripts/voice-lab-import.ts"}
 {"id":"7b gh body quotes a curl write","want":0,"cmd":"gh issue comment 1 --body \"curl -X POST https://api.elevenlabs.io/v1/x\""}
-{"id":"7b echo of a curl write","want":0,"cmd":"echo curl -X POST https://api.elevenlabs.io/v1/x"}
+{"id":"7b unquoted echo of a curl write (accepted over-block)","want":2,"cmd":"echo curl -X POST https://api.elevenlabs.io/v1/x"}
+{"id":"r1-2a curl behind an env $(...) word","want":2,"cmd":"env $(grep -v '^#' .env | xargs) curl -X POST https://api.elevenlabs.io/v1/text-to-speech/abc -d '{\"text\":\"hi\"}'","reason":"write against the ElevenLabs API"}
+{"id":"r1-2b curl behind find -exec","want":2,"cmd":"find . -exec curl -X POST https://api.elevenlabs.io/v1/x \\;"}
+{"id":"r1-2c quoted curl in a gh body stays text","want":0,"cmd":"gh issue comment 1 --body \"curl -X POST https://api.elevenlabs.io/v1/x\" --repo a/b"}
 {"id":"7b curl with the method after a quoted url","want":2,"cmd":"curl \"https://api.elevenlabs.io/v1/x\" -X POST","reason":"write against the ElevenLabs API"}
 {"id":"7b sudo curl","want":2,"cmd":"sudo curl -X POST https://api.elevenlabs.io/v1/x"}
 {"id":"7b xargs curl","want":2,"cmd":"xargs curl -X POST https://api.elevenlabs.io/v1/x"}
@@ -77,3 +80,10 @@
 {"id":"9k find -exec cp keeps every word","want":2,"cmd":"find . -name x -exec cp src/lib/models.ts /tmp \\;"}
 {"id":"9l cp -t into src/lib passes as before (into-a-directory gap, out of scope)","want":0,"cmd":"cp -t src/lib /tmp/models.ts"}
 {"id":"9m backup copy, then a copy onto the file","want":2,"cmd":"cp src/lib/models.ts /tmp/bak.ts && cp /tmp/bak.ts src/lib/models.ts"}
+{"id":"r1-1a live $(...) in an unquoted-delimiter cat body","want":2,"cmd":"cat <<EOF > /tmp/r.md\nlog: $(pnpm generate-audio --book x)\nEOF","reason":"generate-audio synthesizes"}
+{"id":"r1-1b live $(...) in an unquoted-delimiter body inside a gh --body","want":2,"cmd":"gh pr comment 1 --body \"$(cat <<EOF\n$(pnpm exec tsx scripts/smoke-ingest.ts --real | tail -3)\nEOF\n)\"","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"r1-1c $(...) in a quoted-delimiter body is text","want":0,"cmd":"cat <<'EOF'\nlog: $(pnpm generate-audio)\nEOF"}
+{"id":"r1-1d escaped \\$(...) in an unquoted-delimiter body is text","want":0,"cmd":"cat <<EOF\nlog: \\$(pnpm generate-audio)\nEOF"}
+{"id":"r1-3a pnpm -C value before exec","want":2,"cmd":"pnpm -C /tmp/wt exec tsx scripts/smoke-ingest.ts --real","reason":"smoke-ingest --real runs the pipeline"}
+{"id":"r1-3b pnpm --dir value before exec","want":2,"cmd":"pnpm --dir . exec tsx scripts/voice-lab-import.ts --describe","reason":"--describe makes one Gemini call"}
+{"id":"r1-3c pnpm --filter value before exec","want":2,"cmd":"pnpm --filter x exec tsx scripts/generate-audio.ts","reason":"generate-audio synthesizes"}

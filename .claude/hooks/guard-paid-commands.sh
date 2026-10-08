@@ -121,7 +121,7 @@ done <<<"$SCRIPT_FILES"
 segments() {
   printf '%s' "$1" | LC_ALL=C awk '
     function endword(   b) {
-      if (inw && hdnext) { hd[nhd] = cur; hdd[nhd++] = hdnext == 2; hdnext = 0 }
+      if (inw && hdnext) { hd[nhd] = cur; hdq[nhd] = wq; hdd[nhd++] = hdnext == 2; hdnext = 0 }
       # An unquoted word that can read a heredoc as commands, anywhere on the
       # physical line (`cat <<EOF | bash`), so the bodies that line opens are
       # lexed as commands (#671).
@@ -191,7 +191,7 @@ segments() {
       return j
     }
     # sh is the shell context: s came from a -c string or a shell-fed body.
-    function lex(s, top, sh,   n, i, j, c, d, e, q, op, h, t, p, fed, n0, found) {
+    function lex(s, top, sh,   n, i, j, c, d, e, q, op, h, t, p, fed, n0, found, bt, x) {
       cur = ""; inw = 0; wq = 0; nw = 0; split("", w); q = ""; nhd = 0; hdnext = 0
       ctx = sh; lsh = 0
       n = length(s)
@@ -228,19 +228,28 @@ segments() {
           # so its lines are dropped again; an unclosed one stays (#671).
           endseg()
           for (h = 0; h < nhd; h++) {
-            n0 = ninner; found = 0
+            n0 = ninner; found = 0; bt = ""
             while (i < n) {
               e = index(substr(s, i + 1), "\n")
               t = e ? substr(s, i + 1, e - 1) : substr(s, i + 1)
               i = e ? i + e : n
               d = t; if (hdd[h]) sub(/^\t+/, "", d)
               if (d == hd[h]) { found = 1; break }
+              bt = bt t "\n"
               if (t ~ /(^|[^\\])(\\\\)*\\$/) { p = p substr(t, 1, length(t) - 1); continue }
               ish[ninner] = 1; inner[ninner++] = p t; p = ""
             }
             if (p != "") { ish[ninner] = 1; inner[ninner++] = p }
             p = ""
-            if (found && !fed) ninner = n0
+            if (found && !fed) {
+              ninner = n0
+              # With an unquoted delimiter, a $(...) in the body still runs
+              # (`log: $(cmd)` under cat <<EOF), so each one is queued.
+              if (!hdq[h]) for (x = 1; x <= length(bt); x++) {
+                if (substr(bt, x, 1) == "\\") x++
+                else if (substr(bt, x, 2) == "$(") x = subst(bt, x, length(bt), 0) - 1
+              }
+            }
           }
           nhd = 0; continue
         }
@@ -392,7 +401,8 @@ is_write_segment() {
 INPLACE='^-[a-zA-Z]*i(=|$)'
 
 # Where a cp or install run as the executable writes: its -t directory (TD),
-# else its last word that is no option or redirect (DEST).
+# else its last word that is no option or redirect (DEST). Known miss: an
+# option value after the destination (`install x dest -m 644`) is read as it.
 copy_dest() {
   local i
   DEST= TD=
@@ -436,17 +446,20 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
   TEXT=${TEXT//$M/}
   TEXT=${TEXT//$'\036'/ }
   command_shape
-  EXE= XTEXT=
+  EXE=
   [ "$EXE_I" -ge 0 ] && EXE=${W[EXE_I]}
-  # What cmd: rules match: the text from the executable on, so a gh --body
-  # that quotes a curl line runs no curl (#671).
-  if [ "$EXE_I" -ge 0 ]; then
+  # What cmd: rules match (XT): the text from each unquoted word at or after
+  # the executable, so a gh --body that quotes a curl line runs no curl, and
+  # `env $(...) curl` or `find -exec curl` still do (#671).
+  XT=()
+  for ((i = EXE_I; i >= 0 && i < ${#W[@]}; i++)); do
+    case "${RW[i]}" in "$Q"*) continue ;; esac
     IFS=' '
-    XTEXT="${W[*]:EXE_I}"
+    t="${W[*]:i}"
     IFS=$' \t\n'
-    XTEXT=${XTEXT//$M/}
-    XTEXT=${XTEXT//$'\036'/ }
-  fi
+    t=${t//$M/}
+    XT[${#XT[@]}]=${t//$'\036'/ }
+  done
 
   # --- paid commands, unless this segment carries the override -----------
 
@@ -463,7 +476,13 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     case "$CN" in
     pnpm)
       # pnpm runs a bin, or a .ts file, when no script has that name (#671).
-      next_word "$r" && case "${W[NI]##*/}" in
+      # Its options that take a value (`-C /tmp/wt`) are stepped over with it.
+      NI=$((r + 1))
+      while [[ ${W[NI]} == -* ]]; do
+        case "${W[NI]}" in -C | --dir | --filter | -F | --workspace-dir) NI=$((NI + 1)) ;; esac
+        NI=$((NI + 1))
+      done
+      case "${W[NI]##*/}" in
       exec | dlx) next_word "$NI" && r=$NI ;;
       tsx | node | ts-node | bun | vite-node | deno | *.ts) r=$NI ;;
       esac
@@ -487,11 +506,24 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
     [ -n "$RUN" ] && RUN=$(normalize_path "$RUN")
 
     # A rule matches when its target does and every condition after `&&`
-    # holds. Rules are tried in list order. A cmd: condition matches XTEXT; a
-    # script: condition matches the start of one word, so the dry run
-    # `--labels "/tmp/groups --execute.json"` holds no --execute flag (#671).
+    # holds. Rules are tried in list order. A cmd: rule needs one text in XT
+    # that meets every condition; a script: condition matches the start of
+    # one word, so the dry run `--labels "/tmp/groups --execute.json"` holds
+    # no --execute flag (#671).
     for ((k = 0; k < NR_RULES; k++)); do
       hit=1
+      if [ "${R_KIND[k]}" = cmd ]; then
+        hit=0
+        for t in "${XT[@]}"; do
+          for ((j = R_FROM[k]; j < R_TO[k]; j++)); do
+            re=${PATS[j]}
+            [[ $t =~ $re ]] || continue 2
+          done
+          hit=1 && break
+        done
+        [ "$hit" = 1 ] && block "${R_REASON[k]}"
+        continue
+      fi
       if [ "${R_KIND[k]}" = script ]; then
         # A pnpm segment with the script name as a word, so quoting and pnpm
         # options do not hide it, or a direct run of the script's file.
@@ -502,13 +534,8 @@ while IFS= read -r SEG || [ -n "$SEG" ]; do
         case "$RUN" in "${R_FILE[k]}" | */"${R_FILE[k]}") hit=1 ;; esac
       fi
       for ((j = R_FROM[k]; hit == 1 && j < R_TO[k]; j++)); do
-        re=${PATS[j]}
-        if [ "${R_KIND[k]}" = cmd ]; then
-          [[ $XTEXT =~ $re ]] || hit=0
-        else
-          re="^($re)" hit=0
-          for t in "${W[@]}"; do [[ $t =~ $re ]] && hit=1 && break; done
-        fi
+        re="^(${PATS[j]})" hit=0
+        for t in "${W[@]}"; do [[ $t =~ $re ]] && hit=1 && break; done
       done
       [ "$hit" = 1 ] && block "${R_REASON[k]}"
     done
