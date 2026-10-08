@@ -488,7 +488,11 @@ export default function ZenComicReader({
       const startAt = memberStartSeconds(unit, b.id);
       setSelectedBubbleId(unit.spans ? b.id : unit.lead.id);
       if (seekCurrent(unit.lead.id, startAt)) return;
-      rawPlayBubble(unit.lead, { startAt, spans: unit.spans ?? undefined });
+      rawPlayBubble(unit.lead, {
+        startAt,
+        words: unit.words,
+        spans: unit.spans ?? undefined,
+      });
     },
     [groupUnits, rawPlayBubble, seekCurrent],
   );

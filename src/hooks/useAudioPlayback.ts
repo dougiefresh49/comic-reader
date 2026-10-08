@@ -9,7 +9,10 @@ import {
   ensureConnected,
   resumeContext,
 } from "~/lib/audio-graph";
-import { buildWordTimings } from "~/components/zen-comic-reader/text-utils";
+import {
+  buildWordTimings,
+  type WordTiming,
+} from "~/components/zen-comic-reader/text-utils";
 import { useWordHighlight, type WordSpan } from "./useWordHighlight";
 
 interface UseAudioPlaybackOptions {
@@ -27,12 +30,31 @@ interface UseAudioPlaybackOptions {
   playbackRate?: number;
 }
 
-/** How `playBubble` starts a clip; both fields serve joined groups (#451). */
+/** How `playBubble` starts a clip; every field serves joined groups (#451). */
 export interface PlayOptions {
   /** Seconds into the clip to start from: a group member's first word. */
   startAt?: number;
+  /**
+   * The clip's words as the group model chose them. `spans` and `startAt`
+   * index into this list, so the highlight must walk the same one.
+   */
+  words?: WordTiming[];
   /** The group's words per balloon, so the highlight walks between them. */
   spans?: readonly WordSpan[];
+}
+
+/**
+ * The word list the highlight walks for a clip: the caller's when it chose
+ * one (a joined group), else the bubble's own alignment, normalized first.
+ */
+export function clipWords(
+  ts: AudioTimestamps | undefined,
+  words?: WordTiming[],
+): WordTiming[] {
+  return (
+    words ??
+    buildWordTimings(ts?.normalized_alignment ?? ts?.alignment ?? null).words
+  );
 }
 
 /** Each loading element's latest seek target, read by its one listener. */
@@ -118,7 +140,10 @@ export function useAudioPlayback({
   }, [stopHighlight]);
 
   const playBubble = useCallback(
-    (bubble: Bubble, { startAt = 0, spans }: PlayOptions = {}) => {
+    (
+      bubble: Bubble,
+      { startAt = 0, words: chosenWords, spans }: PlayOptions = {},
+    ) => {
       stopAll();
       // Either branch below replaces the current clip for good, so its nodes
       // are unwired here and the element can be collected (#611).
@@ -148,9 +173,7 @@ export function useAudioPlayback({
       armedRef.current = true;
       setIsPlaying(true);
 
-      const ts = timestamps[bubble.id];
-      const alignment = ts?.normalized_alignment ?? ts?.alignment ?? null;
-      const { words } = buildWordTimings(alignment);
+      const words = clipWords(timestamps[bubble.id], chosenWords);
 
       // A clip that fails to load never fires `ended`, so it is treated as
       // one that ended: the reader moves on through the same callback. A 400
