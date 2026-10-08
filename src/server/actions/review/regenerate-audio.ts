@@ -149,6 +149,16 @@ async function regenerateGroup(
         ok: false,
         error: `Balloon ${result.memberId} in this group is silent or ignored, so the group was not rendered. Split it off the group, save, then regenerate.${nothingSpent}`,
       };
+    case "non-adjacent":
+      return {
+        ok: false,
+        error: `This group is not one run of balloons side by side in one panel (${result.detail}), so it was not rendered. Split off the stray balloon, save, then regenerate.${nothingSpent}`,
+      };
+    case "mixed-speakers":
+      return {
+        ok: false,
+        error: `The balloons in this group have different speakers (${result.detail}), so it was not rendered. Pick one speaker for the group, save, then regenerate.${nothingSpent}`,
+      };
     case "no-voice":
       return {
         ok: false,

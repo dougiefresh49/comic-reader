@@ -421,7 +421,7 @@ function ListenBlock({
           disabled={off}
           title={
             grouped
-              ? "The joined balloons render as one clip, read in the first balloon's voice, and every balloon of the group plays it."
+              ? "Uses ElevenLabs credits. The joined balloons render as one clip in their speaker's voice, and every balloon of the group plays it."
               : undefined
           }
           onClick={(e) => {
@@ -431,13 +431,14 @@ function ListenBlock({
           {running === "audio"
             ? "Regenerating audio..."
             : grouped
-              ? `${first} group audio (${view.groupSize} balloons, uses ElevenLabs credits)`
+              ? `${first} group audio (${view.groupSize} balloons)`
               : `${first} audio (uses ElevenLabs credits)`}
         </button>
       </div>
       {grouped && (
         <p className="text-[11px] text-neutral-500">
-          The group renders as one clip for all {view.groupSize} balloons.
+          Uses ElevenLabs credits. The group renders as one clip for all{" "}
+          {view.groupSize} balloons.
         </p>
       )}
       {lock ? (
@@ -714,6 +715,11 @@ function BubbleInspector(
       <div>
         <Label>
           Speaker <Key>S</Key>
+          {joined.length > 0 && (
+            <span className="text-neutral-500">
+              (applies to {joined.length + 1} joined balloons)
+            </span>
+          )}
         </Label>
         {picker.open ? (
           <SpeakerPicker

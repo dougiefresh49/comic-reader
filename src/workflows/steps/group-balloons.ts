@@ -15,9 +15,10 @@ function dbError(label: string, error: { message: string; code?: string }) {
 
 /**
  * Joined balloons (#451): per page, run the finder (`scanBalloonPairs`) over
- * the bubbles with no `group_id` and give each group it finds one fresh
- * `group_id`. A row that already carries one, shared or alone, is never
- * regrouped, so an editor join, split or "stands alone" survives a rerun.
+ * the voiced bubbles (ignored and silent ones skipped) and give each group it
+ * finds that holds only rows with no `group_id` one fresh `group_id`. A row
+ * that already carries one, shared or alone, is never regrouped, so an
+ * editor join, split or "stands alone" survives a rerun.
  * Free: no model call. Each group's write also filters on `group_id is null`,
  * so a retry, or an editor Save landing meanwhile, never overwrites one.
  */
@@ -40,16 +41,24 @@ export async function groupBalloons(bookId: string, issueId: string) {
     const { data: rows, error } = await supabase
       .from("bubbles")
       .select(
-        "id, panel_id, sort_order, character_id, type, ignored, style, group_id",
+        "id, panel_id, sort_order, character_id, type, ignored, silent, style, group_id",
       )
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .eq("page_number", page.number);
     if (error) throw dbError(`bubbles page ${page.number}`, error);
 
+    // Every voiced row is scanned, grouped ones included, so neighbours stay
+    // real neighbours: an ungrouped balloon never pairs across a group or a
+    // "stands alone" balloon between it and the next. A found group that
+    // holds an already-grouped row is dropped whole.
+    const all = rows ?? [];
+    const grouped = new Set(
+      all.filter((b) => b.group_id !== null).map((b) => b.id),
+    );
     const found = scanBalloonPairs(
-      (rows ?? [])
-        .filter((b) => b.group_id === null)
+      all
+        .filter((b) => !b.silent)
         .map((b) => ({
           id: b.id,
           panelId: b.panel_id,
@@ -61,19 +70,37 @@ export async function groupBalloons(bookId: string, issueId: string) {
         })),
     );
     for (const ids of found.groups) {
+      if (ids.some((id) => grouped.has(id))) continue;
+      const groupId = randomUUID();
       const { data: written, error: writeError } = await supabase
         .from("bubbles")
-        .update({ group_id: randomUUID() })
+        .update({ group_id: groupId })
         .eq("book_id", bookId)
         .eq("issue_id", issueId)
         .in("id", ids)
         .is("group_id", null)
         .select("id");
       if (writeError) throw dbError(`group ${ids.join(",")}`, writeError);
-      // A member that gained a group_id since the read keeps it; the rest
-      // stay grouped, and a lone survivor reads as standing alone.
-      groups++;
-      members += written?.length ?? 0;
+      const n = written?.length ?? 0;
+      if (n >= 2) {
+        groups++;
+        members += n;
+        continue;
+      }
+      // Members took a group_id since the read. A lone survivor would read
+      // as a "stands alone" mark nobody made, so it goes back to null.
+      console.log(
+        `[group-balloons] ${ids.join(",")}: ${n} of ${ids.length} written, not counted`,
+      );
+      if (n === 1) {
+        const { error: undoError } = await supabase
+          .from("bubbles")
+          .update({ group_id: null })
+          .eq("book_id", bookId)
+          .eq("issue_id", issueId)
+          .eq("group_id", groupId);
+        if (undoError) throw dbError(`group ${groupId}`, undoError);
+      }
     }
   }
 

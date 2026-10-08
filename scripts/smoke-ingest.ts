@@ -1136,12 +1136,6 @@ function gateReport(
 
 // ── Assert ──────────────────────────────────────────────────────────────
 /**
- * Real mode (#430): counts are reported, not compared with the fixture.
- * Cast bubbles are the ones the audio step voices (`planBubbleVoices`, read
- * as if none had audio yet); the run fails on zero of them or on one
- * missing its audio path, its audio_timestamps row or its mp3.
- */
-/**
  * The cast bubbles with no audio path, no mp3, or no word timings for their
  * clip. Joined balloons (#451) share one clip and only the group's lead
  * holds its timings row, so a clip counts as timed when any bubble on it is.
@@ -1167,6 +1161,12 @@ function lackingAudio<
   );
 }
 
+/**
+ * Real mode (#430): counts are reported, not compared with the fixture.
+ * Cast bubbles are the ones the audio step voices (`planBubbleVoices`, read
+ * as if none had audio yet); the run fails on zero of them or on one
+ * missing its audio path, its audio_timestamps row or its mp3.
+ */
 async function assertRealRows(): Promise<string[]> {
   const bad: string[] = [];
   for (const table of REAL_COUNTS) {

@@ -347,8 +347,19 @@ export function pageFlags(doc: Doc, pageNumber: number): Map<string, Flag[]> {
       })),
       DEFAULT_GROUP_GAP_PX,
     );
+    // The prompt stands while nobody has ruled on the pair: neither balloon
+    // is in a shared group, and at least one has no `groupId` yet (a
+    // "Not one line" on a neighbouring pair marks only the balloon it names).
+    const holders = new Map<string, number>();
+    for (const b of visibleBubbles(doc, pageBubbleIds(doc, pageNumber)))
+      if (b.groupId) holders.set(b.groupId, (holders.get(b.groupId) ?? 0) + 1);
+    const shared = (id: string) => {
+      const g = doc.bubbles[id]?.groupId;
+      return !!g && (holders.get(g) ?? 0) >= 2;
+    };
     for (const [a, b] of disagreeing) {
-      if (doc.bubbles[a]?.groupId || doc.bubbles[b]?.groupId) continue;
+      if (shared(a) || shared(b)) continue;
+      if (doc.bubbles[a]?.groupId && doc.bubbles[b]?.groupId) continue;
       add(a, { kind: "touching", ofId: b });
       add(b, { kind: "touching", ofId: a });
     }
@@ -419,8 +430,16 @@ export function patchBubble(
   return withBubble(doc, id, patch);
 }
 
+/**
+ * A joined group has one speaker (#451), so a speaker set on any member is
+ * set on every member.
+ */
 export function setSpeaker(doc: Doc, id: string, castId: string | null): Doc {
-  return withBubble(doc, id, { speakerId: castId, rawSpeaker: null });
+  const members = groupMembers(doc, id);
+  let next = doc;
+  for (const target of members.length > 0 ? members.map((m) => m.id) : [id])
+    next = withBubble(next, target, { speakerId: castId, rawSpeaker: null });
+  return next;
 }
 
 /** Take a bubble out of whichever list holds it. */
@@ -738,6 +757,7 @@ export function joinNeighbour(
   const b = doc.bubbles[id];
   if (!b || b.deleted) return { reason: "No such balloon." };
   if (b.ignored) return { reason: "Ignored balloons are not read." };
+  if (b.silent) return { reason: "Silent balloons are not voiced." };
   const panel = panelOf(doc, b);
   if (!panel) return { reason: "Balloons join only inside one panel." };
   const ids = visibleBubbles(doc, panel.bubbleIds).map((o) => o.id);
@@ -748,6 +768,7 @@ export function joinNeighbour(
       reason: `It is the ${dir === -1 ? "first" : "last"} balloon in its panel.`,
     };
   if (n.ignored) return { reason: `The ${which} balloon is ignored.` };
+  if (n.silent) return { reason: `The ${which} balloon is silent.` };
   if (b.groupId && b.groupId === n.groupId)
     return { reason: `Already joined with the ${which} balloon.` };
   return { id: n.id };
@@ -769,7 +790,7 @@ function regroup(
 /**
  * Join a balloon with its neighbour in play order inside one panel (#451).
  * One side's group, shared or alone, takes in the other; with neither, both
- * get `freshId`; with two groups, the neighbour's group takes this one's.
+ * get a fresh id; with two groups, the neighbour's group takes this one's.
  * Every member then takes the lead's speaker (the lead is first in play
  * order). Type is left alone. Throws on a pair the UI never offers.
  */
@@ -777,7 +798,7 @@ export function joinWith(
   doc: Doc,
   id: string,
   neighborId: string,
-  freshId: string,
+  mint: Mint,
 ): Doc {
   const a = doc.bubbles[id];
   const n = doc.bubbles[neighborId];
@@ -809,7 +830,7 @@ export function joinWith(
     target = n.groupId;
     bubbles[a.id] = { ...a, groupId: target };
   } else {
-    target = freshId;
+    target = mint();
     bubbles[a.id] = { ...a, groupId: target };
     bubbles[n.id] = { ...n, groupId: target };
   }
@@ -829,35 +850,130 @@ export function joinWith(
         };
     }
   }
-  return next;
+  return repairGroups(next, a.page, mint);
 }
 
 /**
- * Take a balloon out of its shared group: it gets `freshId`, its own, so it
- * stands alone and is never auto-joined again. A lone member left behind
- * keeps the old id and stands alone too. No-op outside a shared group.
+ * Take a balloon out of its shared group: it gets an id of its own, so it
+ * stands alone and is never auto-joined again. What is left breaks into its
+ * runs (`repairGroups`): splitting the middle of three leaves two balloons
+ * standing alone. No-op outside a shared group.
  */
-export function splitFrom(doc: Doc, id: string, freshId: string): Doc {
-  if (groupMembers(doc, id).length === 0) return doc;
-  return withBubble(doc, id, { groupId: freshId });
+export function splitFrom(doc: Doc, id: string, mint: Mint): Doc {
+  const b = doc.bubbles[id];
+  if (!b || groupMembers(doc, id).length === 0) return doc;
+  return repairGroups(withBubble(doc, id, { groupId: mint() }), b.page, mint);
 }
 
 /**
  * "Not one line": both balloons of a touching pair are marked as standing
  * alone, each with its own fresh id, so the prompt goes away for good. A
- * side that already has a group is left as it is.
+ * side that already has an id is left as it is.
  */
 export function standAlone(
   doc: Doc,
   id: string,
   otherId: string,
-  freshIds: [string, string],
+  mint: Mint,
 ): Doc {
   let next = doc;
   if (!doc.bubbles[id]?.groupId)
-    next = withBubble(next, id, { groupId: freshIds[0] });
+    next = withBubble(next, id, { groupId: mint() });
   if (!doc.bubbles[otherId]?.groupId)
-    next = withBubble(next, otherId, { groupId: freshIds[1] });
+    next = withBubble(next, otherId, { groupId: mint() });
+  return next;
+}
+
+/** Makes a fresh group id: `newId` in the browser. */
+export type Mint = () => string;
+
+/** Voiced: neither ignored nor silent. Only voiced balloons are group members. */
+function voiced(b: BubbleDoc): boolean {
+  return !b.ignored && !b.silent;
+}
+
+/**
+ * Keeps every joined group on a page a run (#451): two or more voiced
+ * balloons next to each other in play order inside one panel, deleted and
+ * unvoiced balloons skipped. A group that is not one run breaks apart: an
+ * ignored or silent member gets an id of its own, the first run of two or
+ * more keeps the group's id, a later run of two or more gets a new shared
+ * one, and a run of one gets its own (it stands alone). One-member ids,
+ * "stands alone" marks, are left as they are. Returns the same document when
+ * every group is already one run.
+ */
+export function repairGroups(doc: Doc, page: number, mint: Mint): Doc {
+  const live = visibleBubbles(doc, pageBubbleIds(doc, page));
+  const panelOfId = new Map<string, string>();
+  for (const p of pagePanels(doc, page))
+    for (const id of p.bubbleIds) panelOfId.set(id, p.id);
+
+  const holders = new Map<string, BubbleDoc[]>();
+  for (const b of live)
+    if (b.groupId)
+      holders.set(b.groupId, [...(holders.get(b.groupId) ?? []), b]);
+
+  const runs = new Map<string, string[][]>();
+  let prev: BubbleDoc | null = null;
+  for (const b of live.filter(voiced)) {
+    const g = b.groupId;
+    if (g) {
+      const panel = panelOfId.get(b.id);
+      const list = runs.get(g) ?? [];
+      const continues =
+        prev?.groupId === g &&
+        panel !== undefined &&
+        panelOfId.get(prev.id) === panel;
+      if (continues) list[list.length - 1]!.push(b.id);
+      else list.push([b.id]);
+      runs.set(g, list);
+    }
+    prev = b;
+  }
+
+  const ids = new Map<string, string>();
+  for (const [g, members] of holders) {
+    if (members.length < 2) continue;
+    const unvoiced = members.filter((m) => !voiced(m));
+    const groupRuns = runs.get(g) ?? [];
+    if (unvoiced.length === 0 && groupRuns.length === 1) continue;
+    for (const m of unvoiced) ids.set(m.id, mint());
+    let kept = false;
+    for (const run of groupRuns) {
+      if (run.length >= 2 && !kept) {
+        kept = true;
+        continue;
+      }
+      const shared = run.length >= 2 ? mint() : null;
+      for (const m of run) ids.set(m, shared ?? mint());
+    }
+  }
+  if (ids.size === 0) return doc;
+  const bubbles = { ...doc.bubbles };
+  for (const [id, groupId] of ids) {
+    const b = bubbles[id];
+    if (b) bubbles[id] = { ...b, groupId };
+  }
+  return { ...doc, bubbles };
+}
+
+/**
+ * `repairGroups` on every page an edit touched: a page whose panel list, a
+ * panel's bubble list or a bubble changed. The editor runs it after every
+ * edit, so a move, Earlier/Later, a panel change, or marking a member
+ * ignored or silent never leaves a group with a gap.
+ */
+export function repairChanged(before: Doc, after: Doc, mint: Mint): Doc {
+  if (before === after) return after;
+  const pages = new Set<number>();
+  for (const [id, b] of Object.entries(after.bubbles))
+    if (before.bubbles[id] !== b) pages.add(b.page);
+  for (const [id, p] of Object.entries(after.panels))
+    if (before.panels[id] !== p) pages.add(p.page);
+  for (const [n, p] of Object.entries(after.pages))
+    if (before.pages[Number(n)] !== p) pages.add(p.number);
+  let next = after;
+  for (const page of pages) next = repairGroups(next, page, mint);
   return next;
 }
 

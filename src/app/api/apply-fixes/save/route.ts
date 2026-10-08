@@ -11,7 +11,6 @@ import {
   pixelBoxOf,
   sampleFillColorRaw,
 } from "~/lib/bubble-fill";
-import { chunk } from "~/lib/chunk";
 import { isDryRun } from "~/lib/fakes/dry-run";
 import { revalidateReaderPages } from "~/lib/revalidate-reader";
 import { pageStoragePath } from "~/lib/storage";
@@ -23,9 +22,12 @@ import {
   bubbleInsert,
   bubbleUpdate,
   boxRowsByPage,
+  groupGained,
   groupLeft,
   loadWriteContext,
+  splitUnvoiced,
   staleGroupColumns,
+  storedShared,
   newPanelLabels,
   panelInsert,
   panelUpdate,
@@ -188,6 +190,10 @@ export async function POST(req: NextRequest) {
         ...bubbles.update.map((b) => b.set.speaker),
       ],
       bubbleIds: [...bubbles.update, ...bubbles.remove].map((b) => b.id),
+      groupIds: [
+        ...bubbles.update.map((b) => b.set.groupId),
+        ...bubbles.add.map((b) => b.groupId),
+      ].flatMap((g) => (g ? [g] : [])),
     });
   } catch (e) {
     return fail(`Nothing was saved: ${(e as Error).message}`, 500);
@@ -241,9 +247,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Joined balloons (#451): a member that leaves a group (a split, a re-join)
-  // or is removed leaves the group clip stale on every row still in that
-  // group. Those rows lose the clip and need audio, in this same transaction.
+  // Joined balloons (#451). An edit that sets ignored or silent on a member
+  // of a stored joined group splits it off. Then any stored joined group
+  // (two or more rows) that loses a member (a split, a re-join, a removal)
+  // or gains one has a clip that no longer covers its words: every row still
+  // in it loses the clip and needs audio, in this same transaction. A
+  // one-row id is a "stands alone" mark and carries no audio consequence.
+  for (const b of bubbles.update) b.set = splitUnvoiced(b.id, b.set, ctx);
   const leavers = new Set<string>();
   const staleGroups = new Set<string>();
   for (const b of bubbles.update) {
@@ -252,33 +262,26 @@ export async function POST(req: NextRequest) {
       leavers.add(b.id);
       staleGroups.add(left);
     }
+    const gained = groupGained(b.id, b.set, ctx);
+    if (gained) staleGroups.add(gained);
+  }
+  for (const b of bubbles.add) {
+    const gained = groupGained(null, b, ctx);
+    if (gained) staleGroups.add(gained);
   }
   for (const b of bubbles.remove) {
     const g = ctx.groupId.get(b.id);
-    if (g) staleGroups.add(g);
+    if (storedShared(g, ctx) && g) staleGroups.add(g);
   }
   const removed = new Set(bubbles.remove.map((b) => b.id));
-  const staleRows: {
-    id: string;
-    page_number: number;
-    ignored: boolean;
-    silent: boolean;
-  }[] = [];
-  for (const ids of chunk([...staleGroups], 100)) {
-    const { data, error } = await supabaseAdmin
-      .from("bubbles")
-      .select("id, page_number, ignored, silent")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .in("group_id", ids);
-    if (error)
-      return fail(
-        `Nothing was saved: could not read the joined balloons (${error.message}).`,
-        500,
-      );
-    for (const r of (data ?? []) as typeof staleRows)
-      if (!removed.has(r.id) && !leavers.has(r.id)) staleRows.push(r);
-  }
+  const staleRows = [
+    ...new Map(
+      [...staleGroups]
+        .flatMap((g) => ctx.groupHolders.get(g) ?? [])
+        .filter((r) => !removed.has(r.id) && !leavers.has(r.id))
+        .map((r) => [r.id, r]),
+    ).values(),
+  ];
 
   let ops: Op[];
   let boxRows: Map<number, Record<string, unknown>[]>;

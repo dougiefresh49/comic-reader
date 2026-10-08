@@ -42,6 +42,7 @@ import {
   panelOf,
   patchBubble,
   removePanel,
+  repairChanged,
   setBubbleRect,
   setDeleted,
   setPanelRect,
@@ -633,7 +634,14 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         );
         return;
       }
-      dispatch({ type: "apply", label, recipe, ...opts });
+      // Every edit keeps joined groups whole (#451): a move, Earlier/Later,
+      // a panel change or a member marked ignored or silent splits it off.
+      dispatch({
+        type: "apply",
+        label,
+        recipe: (d) => repairChanged(d, recipe(d), newId),
+        ...opts,
+      });
     },
     [say],
   );
@@ -1317,25 +1325,21 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         say(`Not joined: ${found.reason}`, "warn");
         return;
       }
-      const fresh = newId();
       apply(dir === -1 ? "join with previous" : "join with next", (d) =>
-        joinWith(d, id, found.id, fresh),
+        joinWith(d, id, found.id, newId),
       );
       say(
-        "Joined: one line, one clip once its group audio is regenerated. Each balloon plays its own clip until then.",
+        "Joined: one line, one clip once its group audio is regenerated. Until then each balloon plays its own clip; a group clip it joins is dropped on Save.",
       );
     },
     splitFrom: (id) => {
-      const fresh = newId();
-      apply("split off", (d) => splitFrom(d, id, fresh));
+      apply("split off", (d) => splitFrom(d, id, newId));
       say(
         "Split off. Once saved, the group's clip is dropped and these balloons need audio again.",
       );
     },
-    standAlone: (id, otherId) => {
-      const fresh: [string, string] = [newId(), newId()];
-      apply("not one line", (d) => standAlone(d, id, otherId, fresh));
-    },
+    standAlone: (id, otherId) =>
+      apply("not one line", (d) => standAlone(d, id, otherId, newId)),
     setRect,
     zoomTo: (rect) => canvasRef.current?.zoomTo(rect),
     goto,

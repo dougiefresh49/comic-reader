@@ -48,6 +48,13 @@ export type GroupRenderResult =
    * clip, so the owner splits it off first.
    */
   | { skipped: "inactive-member"; memberId: string }
+  /**
+   * The active members are not one run: not all in one panel, or another
+   * voiced balloon sits between two of them in play order.
+   */
+  | { skipped: "non-adjacent"; detail: string }
+  /** The active members have different speakers; a group has one. */
+  | { skipped: "mixed-speakers"; detail: string }
   /** The lead's speaker has no voice to render with (`renderVoice`'s miss). */
   | { skipped: "no-voice"; leadId: string; detail: string }
   /**
@@ -96,7 +103,7 @@ export async function renderGroupAudio({
   const { data, error } = await client
     .from("bubbles")
     .select(
-      "id, sort_order, character_id, text_with_cues, ocr_text, ignored, silent",
+      "id, sort_order, panel_id, character_id, text_with_cues, ocr_text, ignored, silent",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
@@ -107,6 +114,7 @@ export async function renderGroupAudio({
   const rows = (data ?? []) as {
     id: string;
     sort_order: number;
+    panel_id: string | null;
     character_id: string | null;
     text_with_cues: string | null;
     ocr_text: string | null;
@@ -115,6 +123,43 @@ export async function renderGroupAudio({
   }[];
   const members = rows.filter((r) => !r.ignored && !r.silent);
   if (members.length < 2) return { skipped: "single" };
+
+  // A group is one run: consecutive voiced balloons in play order inside one
+  // panel, unvoiced ones skipped, the same rule as the editor's.
+  const panelId = members[0]!.panel_id;
+  if (!panelId || members.some((m) => m.panel_id !== panelId))
+    return {
+      skipped: "non-adjacent",
+      detail: "the members are not all in one panel",
+    };
+  const { data: panelRows, error: panelErr } = await client
+    .from("bubbles")
+    .select("id")
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .eq("panel_id", panelId)
+    .eq("ignored", false)
+    .eq("silent", false)
+    .order("sort_order")
+    .order("id");
+  if (panelErr) throw new Error(`group ${groupId}: ${panelErr.message}`);
+  const order = ((panelRows ?? []) as { id: string }[]).map((r) => r.id);
+  const at = order.indexOf(members[0]!.id);
+  if (at === -1 || members.some((m, i) => order[at + i] !== m.id))
+    return {
+      skipped: "non-adjacent",
+      detail: "another balloon sits between members in play order",
+    };
+
+  const speakers = new Set(members.map((m) => m.character_id));
+  if (speakers.size > 1)
+    return {
+      skipped: "mixed-speakers",
+      detail: [...speakers].map((s) => s ?? "(none)").join(", "),
+    };
+
+  // Kept as the last guard: the editor and the Save split an ignored or
+  // silent balloon off its group, so a group should never hold one.
   const inactive = rows.find((r) => r.ignored || r.silent);
   if (inactive) return { skipped: "inactive-member", memberId: inactive.id };
 

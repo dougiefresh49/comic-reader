@@ -198,9 +198,10 @@ async function conflictOf(
   const missing = label.bubbles.filter((id) => !rows.has(id));
   if (missing.length > 0) return `not in this issue: ${missing.join(", ")}`;
   const members = label.bubbles.map((id) => rows.get(id)!);
-  const ignored = members.filter((r) => r.ignored);
-  if (ignored.length > 0)
-    return `ignored: ${ignored.map((r) => r.legacy_id ?? r.id).join(", ")}`;
+  // An ignored or silent balloon is never a group member (#451).
+  const unvoiced = members.filter((r) => r.ignored || r.silent);
+  if (unvoiced.length > 0)
+    return `ignored or silent: ${unvoiced.map((r) => r.legacy_id ?? r.id).join(", ")}`;
   const ids = [...new Set(members.flatMap((r) => r.group_id ?? []))];
   if (ids.length > 1)
     return `members already hold different group_ids: ${members
@@ -376,6 +377,11 @@ async function main(): Promise<void> {
     );
     let spent = 0;
     for (const label of labels) {
+      const conflict = conflicts.get(label.group);
+      if (conflict) {
+        console.log(`  ${label.group}: skipped, CONFLICT (${conflict})`);
+        continue;
+      }
       const members = ordered(label, fresh);
       const ids = [...new Set(members.map((m) => m.group_id))];
       if (
