@@ -137,7 +137,41 @@ segments() {
       }
       split("", w); nw = 0
     }
-    function lex(s, top,   n, i, j, c, d, e, q, op, dep, h, t, p) {
+    # The $(...) at i, quoted or not, through its matching paren: quotes are
+    # respected, a nested "$(" inside quotes is scanned the same way, and a
+    # heredoc body is stepped over whole lines to its delimiter. The inside is
+    # queued for its own lex; the return is one past the closing paren.
+    function subst(s, i, n, top,   j, e, t, dep, dl, dh, k, ln) {
+      dep = 1; t = ""; dl = ""
+      for (j = i + 2; j <= n && dep > 0; j++) {
+        e = substr(s, j, 1)
+        if (t == "\047") { if (e == "\047") t = ""; continue }
+        if (e == "\\") { j++; continue }
+        if (t == "\"" && e == "$" && substr(s, j + 1, 1) == "(") { j = subst(s, j, n, top) - 1; continue }
+        if (t == "\"") { if (e == "\"") t = ""; continue }
+        if (e == "\047" || e == "\"") t = e
+        else if (e == "(") dep++
+        else if (e == ")") dep--
+        else if (substr(s, j - 1, 4) ~ /^[^<]<<[^<]/ && match(substr(s, j + 2), /^-?[ \t]*[^ \t\n;&|()<>]+/)) {
+          dh = substr(s, j + 2, 1) == "-"
+          dl = substr(s, j + 2 + dh, RLENGTH - dh); gsub(/[ \t\047"]/, "", dl)
+          if (dl !~ /[A-Za-z_]/) dl = ""; else j += 1 + RLENGTH
+        } else if (e == "\n" && dl != "") {
+          while (j < n) {
+            k = index(substr(s, j + 1), "\n")
+            ln = k ? substr(s, j + 1, k - 1) : substr(s, j + 1)
+            j = k ? j + k : n
+            if (dh) sub(/^\t+/, "", ln)
+            if (ln == dl) break
+          }
+          dl = ""
+        }
+      }
+      if (dep && top) bad = 1
+      inner[ninner++] = substr(s, i + 2, j - i - 2 - (dep == 0))
+      return j
+    }
+    function lex(s, top,   n, i, j, c, d, e, q, op, h, t, p) {
       cur = ""; inw = 0; wq = 0; nw = 0; split("", w); q = ""; nhd = 0; hdnext = 0
       n = length(s)
       for (i = 1; i <= n; i++) {
@@ -148,6 +182,10 @@ segments() {
         }
         if (q == "\"") {
           if (c == "\"") { q = ""; continue }
+          if (c == "$" && d == "(") {
+            j = subst(s, i, n, top); e = substr(s, i, j - i); gsub(/\n/, "\036", e)
+            cur = cur e; i = j - 1; continue
+          }
           if (c == "\\" && d == "\n") { i++; continue }
           if (c == "\\" && d != "" && index("\"\\$`", d)) { cur = cur d; i++; continue }
           cur = cur (c == "\n" ? "\036" : c)
@@ -158,20 +196,7 @@ segments() {
         if (c == " " || c == "\t") { endword(); continue }
         if (c == "#" && !inw) { while (i < n && substr(s, i + 1, 1) != "\n") i++; continue }
         if (c == "$" && d == "(") {
-          # Through the matching paren, quotes respected; the word keeps it.
-          dep = 1; t = ""
-          for (j = i + 2; j <= n && dep > 0; j++) {
-            e = substr(s, j, 1)
-            if (t == "\047") { if (e == "\047") t = ""; continue }
-            if (e == "\\") { j++; continue }
-            if (t == "\"") { if (e == "\"") t = ""; continue }
-            if (e == "\047" || e == "\"") t = e
-            else if (e == "(") dep++
-            else if (e == ")") dep--
-          }
-          if (dep && top) bad = 1
-          inner[ninner++] = substr(s, i + 2, j - i - 2 - (dep == 0))
-          e = substr(s, i, j - i); gsub(/\n/, "\036", e)
+          j = subst(s, i, n, top); e = substr(s, i, j - i); gsub(/\n/, "\036", e)
           cur = cur e; inw = 1; i = j - 1; continue
         }
         if (c == "\n") endword()
