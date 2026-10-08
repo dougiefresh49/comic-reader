@@ -7,8 +7,10 @@
 # {"DELEGATE":"1"}, and an optional "reason", text the hook's stderr must
 # contain. A row that is not that shape fails, and so does a table with no rows.
 # Each hook call gets 5 s, the hook's timeout in .claude/settings.json: a block
-# that comes later is no block in use, so it fails here (exit 142). GUARD_BASH (default bash) is the shell that runs the hook.
-# Needs jq. Runs on bash 3.2 and bash 5.
+# that comes later is no block in use, so it fails here (exit 142). The alarm
+# kills only the hook's own bash, so a child that never exits (a looping awk)
+# hangs the run, and the CI job's timeout-minutes is what stops that. GUARD_BASH (default bash) is the shell that runs the hook.
+# Needs jq and perl. Runs on bash 3.2 and bash 5.
 DIR=$(cd "$(dirname "$0")" && pwd)
 HOOK="$DIR/../guard-paid-commands.sh"
 GUARD_BASH=${GUARD_BASH:-bash}
@@ -39,7 +41,7 @@ for cases in "$@"; do
     while IFS= read -r kv; do
       envs+=("$kv")
     done < <(printf '%s' "$row" | jq -r '(.env // {}) | to_entries[] | "\(.key)=\(.value)"')
-    err=$(printf '%s' "$payload" | env -u DELEGATE -u CREDIT_OVERRIDE -u LIVE_API_OK ${envs[@]+"${envs[@]}"} perl -e 'alarm 5; exec @ARGV' "$GUARD_BASH" "$HOOK" 2>&1 >/dev/null)
+    err=$(printf '%s' "$payload" | env -u DELEGATE -u CREDIT_OVERRIDE -u LIVE_API_OK ${envs[@]+"${envs[@]}"} perl -e 'alarm 5; exec @ARGV or exit 127' "$GUARD_BASH" "$HOOK" 2>&1 >/dev/null)
     got=$?
     if [ "$got" = "$want" ] && case "$err" in *"$reason"*) true ;; *) false ;; esac; then
       pass=$((pass + 1))

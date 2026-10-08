@@ -13,9 +13,10 @@
 #
 # perl's alarm is the per-command timeout, because macOS has no `timeout`.
 HEAD_HOOK=$1 MAIN_HOOK=$2 CHUNK=$3 OUTF=$4
-for f in "$HEAD_HOOK" "$MAIN_HOOK" "$CHUNK"; do
-  [ -f "$f" ] && [ -r "$f" ] || { printf 'cannot read %s\n' "$f" >&2; exit 1; }
+for f in "$HEAD_HOOK" "$MAIN_HOOK"; do
+  [ -f "$f" ] && [ -r "$f" ] || { printf 'cannot read the hook %s\n' "$f" >&2; exit 1; }
 done
+[ -r "$CHUNK" ] || { printf 'cannot read %s\n' "$CHUNK" >&2; exit 1; }
 [ -n "$OUTF" ] && : >"$OUTF" || { printf 'cannot write the out file %s\n' "$OUTF" >&2; exit 1; }
 total=0 diff=0 skipped=0
 while IFS= read -r row || [ -n "$row" ]; do
