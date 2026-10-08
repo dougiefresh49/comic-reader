@@ -450,6 +450,8 @@ function fakeAccount(limit: number) {
     adds: 0,
     deletes: 0,
     addMode: "ok" as AddMode,
+    /** "timeout-lands": a DELETE removes the voice, then times out. */
+    deleteMode: "ok" as "ok" | "timeout-lands",
     /** One entry per coming `GET /v1/voices`: "fail" answers 503. */
     lists: [] as ("ok" | "fail")[],
     /** While set, an add waits on it: the run is mid-add. */
@@ -479,6 +481,7 @@ function fakeAccount(limit: number) {
         const id = path.split("/").pop()!;
         acct.deletes++;
         acct.voices = acct.voices.filter((v) => v.voice_id !== id);
+        if (acct.deleteMode === "timeout-lands") throw timeout();
         return json({ status: "ok" });
       }
       if (path === "/v1/text-to-voice/design")
@@ -650,11 +653,20 @@ async function checkCarryOut() {
   const castLib = await import("~/lib/cast");
   const liveReconcile = (lib as Partial<typeof lib>).reconcile;
   /**
-   * The cases below reconcile a run that stopped a moment ago, with no
-   * aging: a run that returns clears its `operation_at` (#390), so only a
-   * live run's fresh stamp makes reconcile wait.
+   * The cases below reconcile a run that stopped a moment ago. One that
+   * stopped mid-request (`archiving`, `adding`, `retiring`) keeps its fresh
+   * `operation_at` and reads as a live run (#390), so age it past the
+   * window first. `lib.reconcile` is the unaged call.
    */
-  const reconcile = liveReconcile;
+  const reconcile = liveReconcile
+    ? (...a: Parameters<typeof lib.reconcile>) => {
+        const db = (a[0].supabase as unknown as { fakeDb: FakeDb }).fakeDb;
+        for (const t of db.rows("casting_tasks"))
+          if (t.operation_at)
+            t.operation_at = new Date(Date.now() - 3_600_000).toISOString();
+        return liveReconcile(...a);
+      }
+    : undefined;
   const results: { name: string; pass: boolean }[] = [];
   const report = (name: string, lines: string[], pass: boolean) => {
     console.log(`\n${name}: ${pass ? "PASS" : "FAIL"}`);
@@ -1935,23 +1947,25 @@ async function checkCarryOut() {
       limit,
     });
 
+  /** The casting step's row for zed: no action, no record. */
+  const stepRow = (db: FakeDb) =>
+    db.rows("casting_tasks").push({
+      id: randomUUID(),
+      book_id: BOOK,
+      issue_id: "issue-1",
+      character_id: "zed",
+      action: null,
+      target_voice_uuid: null,
+      status: "pending",
+      operation: null,
+      operation_at: null,
+      completed_at: null,
+    });
+
   {
     // Item 1: a casting-step row (no action) that carryOut claims takes the
     // request fields, so the item stays on the plan once the castlist has a
     // voice; a refused run puts the row back as the casting step wrote it.
-    const stepRow = (db: FakeDb) =>
-      db.rows("casting_tasks").push({
-        id: randomUUID(),
-        book_id: BOOK,
-        issue_id: "issue-1",
-        character_id: "zed",
-        action: null,
-        target_voice_uuid: null,
-        status: "pending",
-        operation: null,
-        operation_at: null,
-        completed_at: null,
-      });
     const w = zedWorld();
     stepRow(w.db);
     const item = await itemOf(w.deps, "zed");
@@ -2085,12 +2099,13 @@ async function checkCarryOut() {
   }
 
   {
-    // Item 5: a live run stamps its record; a run that returns with the
-    // record on the row clears the stamp, so reconcile proceeds at once.
+    // Item 5: a live run stamps its record; a run that returns at a phase
+    // whose last request has a known outcome (here `added`: the castlist
+    // write fails) clears the stamp, so reconcile proceeds at once.
     const w = zedWorld();
     request(w.db, "zed", "clone", "zed-1993");
-    w.acct.addMode = "timeout-lands";
-    w.acct.lists = ["ok", "fail"]; // the inventory, then the lookup
+    // zed has no castlist row: the write is an update that changes nothing, then this upsert.
+    w.db.failNext("castlist", "upsert", () => true, "castlist down");
     let release = () => {};
     w.acct.gate = new Promise<void>((r) => (release = r));
     const item = await itemOf(w.deps, "zed");
@@ -2124,10 +2139,113 @@ async function checkCarryOut() {
         !Number.isNaN(Date.parse(during)) &&
         status(r) === "needs attention" &&
         stopped === null &&
-        left === "pending (open at adding)" &&
+        left === "pending (open at added)" &&
         status(fixed) === "done" &&
         short(live).includes("a run is still in progress") &&
         task(v.db, "rex") === "pending (open at claimed)",
+    );
+  }
+
+  // ── #390 review round 1 (PR #647) ──
+
+  {
+    // (a) A converted casting-step row whose run stops at `added` (the
+    // castlist write fails): reconcile finishes it from the plan.
+    const w = zedWorld();
+    stepRow(w.db);
+    w.db.failNext("castlist", "upsert", () => true, "castlist down");
+    const item = await itemOf(w.deps, "zed");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: null }),
+    );
+    const left = task(w.db, "zed");
+    const fixed = await attempt(() => lib.reconcile(w.deps, item));
+    const row = taskOf(w.db, "zed")!;
+    report(
+      "#390 round 1 (a): a converted row stopped at `added` is finished by reconcile",
+      [
+        `carryOut: ${short(r)}; task ${left}`,
+        `reconcile at once: ${short(fixed)}`,
+        `row: action ${String(row.action)}, target ${String(row.target_voice_uuid)}, ${task(w.db, "zed")}; castlist zed: ${cast(w.db, "zed")}; adds ${w.acct.adds}`,
+      ],
+      status(r) === "needs attention" &&
+        left === "pending (open at added)" &&
+        status(fixed) === "done" &&
+        !short(fixed).includes("gone from the plan") &&
+        row.action === "clone" &&
+        task(w.db, "zed") === "in_progress" &&
+        cast(w.db, "zed") === "zed-1993" &&
+        w.acct.adds === 1,
+    );
+  }
+
+  {
+    // (b) A converted row whose run was killed at `claimed`: reconcile gives
+    // it back as the casting step wrote it.
+    const w = zedWorld();
+    stepRow(w.db);
+    Object.assign(taskOf(w.db, "zed")!, {
+      action: "clone",
+      target_voice_uuid: "zed-1993",
+      operation: { token: "t0", rev: "r0", phase: "claimed", converted: true },
+    });
+    const item = await itemOf(w.deps, "zed");
+    const r = await attempt(() => lib.reconcile(w.deps, item));
+    const row = taskOf(w.db, "zed")!;
+    report(
+      "#390 round 1 (b): reconcile's give-back of a converted row clears its request fields",
+      [
+        `reconcile: ${short(r)}`,
+        `row: action ${String(row.action)}, target ${String(row.target_voice_uuid)}, ${task(w.db, "zed")}; adds ${w.acct.adds}`,
+      ],
+      status(r) === "failed" &&
+        row.action === null &&
+        row.target_voice_uuid === null &&
+        task(w.db, "zed") === "pending" &&
+        w.acct.adds === 0,
+    );
+  }
+
+  {
+    // (c) A carryOut that stops at `archiving` (the DELETE times out) keeps
+    // its stamp: the DELETE may still land, so reconcile waits.
+    const w = world({
+      characters: ["rex"],
+      voices: [
+        { id: "rex-old", name: "Rex", status: "active", castAs: ["rex"] },
+        {
+          id: "rex-1993",
+          name: "Rex (1993)",
+          status: "archived",
+          character: "rex",
+        },
+      ],
+      limit: 1,
+    });
+    request(w.db, "rex", "clone", "rex-1993");
+    w.acct.deleteMode = "timeout-lands";
+    const item = await itemOf(w.deps, "rex");
+    const r = await attempt(() =>
+      lib.carryOut(w.deps, item, { archiveVoiceId: "rex-old" }),
+    );
+    const stamp = taskOf(w.db, "rex")!.operation_at;
+    const claims = w.db
+      .rows("voices")
+      .filter((v) => v.operation_claim !== null).length;
+    const live = await attempt(() => lib.reconcile(w.deps, item));
+    report(
+      "#390 round 1 (c): a run stopped at `archiving` keeps operation_at, and reconcile waits",
+      [
+        `carryOut (archive rex-old first, its DELETE times out): ${short(r)}`,
+        `task ${task(w.db, "rex")}; operation_at ${String(stamp)}; voice claims held: ${claims}`,
+        `reconcile at once: ${short(live)}; adds ${w.acct.adds}`,
+      ],
+      status(r) === "needs attention" &&
+        task(w.db, "rex") === "pending (open at archiving)" &&
+        typeof stamp === "string" &&
+        claims === 0 &&
+        say(live).includes("a run is still in progress") &&
+        w.acct.adds === 0,
     );
   }
 

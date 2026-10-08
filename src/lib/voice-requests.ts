@@ -207,6 +207,8 @@ export interface OpRecord {
     | "retiring"
     | "retired";
   back?: boolean;
+  /** The claim wrote the request fields on a casting-step row; a give-back clears them. */
+  converted?: boolean;
   /** `voices.id` archived for the item. */
   archived?: string;
   /** `voices.id` of the voice the item replaces, for the metadata copy. */
@@ -684,35 +686,36 @@ async function markTask(
   fail(`inserting ${item.characterId}'s casting task`, ins.error);
 }
 
-/** How `claimTask` took the row, so a release can undo exactly that. */
-interface Claim {
-  /** The row was inserted with the record. */
-  inserted: boolean;
-  /** A casting-step row (`action` null) took the request fields too. */
-  converted: boolean;
-}
-
 /**
  * Claims the item for one run, atomically, before anything is spent: a
  * `pending` row with no record takes the op record, or a row is inserted
  * with it (the unique key refuses a second insert). A casting-step row
  * (`action` null) also takes the item's `action` and `target_voice_uuid`,
- * so the plan still lists the item once its castlist row has a voice.
+ * so the plan still lists the item once its castlist row has a voice; the
+ * record says `converted`, and `op` is updated to match. Returns whether a
+ * row was inserted, so a release can remove it again.
  */
 async function claimTask(
   client: SupabaseClient,
   item: ItemKey,
   op: OpRecord,
-): Promise<({ ok: true } & Claim) | { ok: false; reason: string }> {
+): Promise<{ ok: true; inserted: boolean } | { ok: false; reason: string }> {
   const from = { rev: null, status: "pending" };
+  const converted = { ...op, converted: true };
   if (
-    await swapOperation(client, item, { ...from, unrequested: true }, op, {
-      request: requestOf(item),
-    })
-  )
-    return { ok: true, inserted: false, converted: true };
+    await swapOperation(
+      client,
+      item,
+      { ...from, unrequested: true },
+      converted,
+      { request: requestOf(item) },
+    )
+  ) {
+    Object.assign(op, converted);
+    return { ok: true, inserted: false };
+  }
   if (await swapOperation(client, item, from, op))
-    return { ok: true, inserted: false, converted: false };
+    return { ok: true, inserted: false };
   const { data, error } = await taskRow(client, item);
   fail(`reading ${item.characterId}'s casting task`, error);
   const held = ((data ?? []) as TaskRow[])[0];
@@ -735,20 +738,25 @@ async function claimTask(
       ok: false,
       reason: `another run claimed the item first (${ins.error.message})`,
     };
-  return { ok: true, inserted: true, converted: false };
+  return { ok: true, inserted: true };
 }
 
 /**
  * Marks a run's record stopped when the run returns with it still on the
- * row: `operation_at` goes null while the row holds `rev`, so `reconcile`
- * need not wait out the window. The record stays. Best effort: a failed
- * write is ignored.
+ * row, so `reconcile` need not wait out the window: `operation_at` goes null
+ * while the row holds `op.rev`. The record stays. Only at a phase whose last
+ * request has a known outcome (`claimed`, `archived`, `added`, `retired`):
+ * at `archiving`, `retiring` and `adding` a DELETE or add that timed out on
+ * this side may still land after the run returns, so the stamp stays and
+ * the window holds. Best effort: a failed write is ignored.
  */
 async function markStopped(
   client: SupabaseClient,
   item: ItemKey,
-  rev: string,
+  op: OpRecord,
 ): Promise<void> {
+  if (!["claimed", "archived", "added", "retired"].includes(op.phase)) return;
+  const rev = op.rev;
   try {
     await client
       .from("casting_tasks")
@@ -867,16 +875,16 @@ export async function carryOut(
     const result = await carryOutClaimed(deps, item, opts, rec);
     // Refused or failed: nothing of the operation remains, give the item back.
     if (result.status === "refused" || result.status === "failed")
-      await releaseTaskAt(sb, item, op.rev, claim);
+      await releaseTaskAt(sb, item, op, claim.inserted);
     else if (result.status === "needs attention")
-      await markStopped(sb, item, op.rev);
+      await markStopped(sb, item, op);
     return result;
   } catch (err) {
     if (op.phase === "claimed") {
-      await releaseTaskAt(sb, item, op.rev, claim).catch(() => undefined);
+      await releaseTaskAt(sb, item, op, claim.inserted).catch(() => undefined);
       throw err;
     }
-    await markStopped(sb, item, op.rev);
+    await markStopped(sb, item, op);
     return {
       status: "needs attention",
       reasons: [
@@ -896,7 +904,10 @@ interface Recorder {
   op: OpRecord;
   /** Records the next phase. */
   record: (next: Partial<OpRecord>) => Promise<void>;
-  /** Ends the record (`operation = null`) and sets the row's status. */
+  /**
+   * Ends the record (`operation = null`) and sets the row's status. Back to
+   * `pending`, a converted casting-step row also loses its request fields.
+   */
   end: (to: "in_progress" | "pending") => Promise<boolean>;
 }
 
@@ -909,7 +920,11 @@ function recorder(sb: SupabaseClient, item: ItemKey, op: OpRecord): Recorder {
         throw new Error("the item's operation record changed under this run");
       Object.assign(op, to);
     },
-    end: (to) => swapOperation(sb, item, { rev: op.rev }, null, { status: to }),
+    end: (to) =>
+      swapOperation(sb, item, { rev: op.rev }, null, {
+        status: to,
+        ...(to === "pending" && op.converted ? { request: null } : {}),
+      }),
   };
 }
 
@@ -988,16 +1003,17 @@ async function bringBack(
 async function releaseTaskAt(
   client: SupabaseClient,
   item: ItemKey,
-  rev: string,
-  claim: Claim,
+  op: OpRecord,
+  inserted: boolean,
 ): Promise<void> {
-  if (!claim.inserted) {
+  const rev = op.rev;
+  if (!inserted) {
     await swapOperation(
       client,
       item,
       { rev },
       null,
-      claim.converted ? { request: null } : {},
+      op.converted ? { request: null } : {},
     );
     return;
   }
@@ -1476,9 +1492,9 @@ export async function reconcile(
     archivedRow !== null &&
     op.archivedElevenLabsId !== undefined &&
     archivedRow.current_elevenlabs_id === op.archivedElevenLabsId;
-  /** Stops with the record still on the row, marked stopped. */
+  /** Stops with the record still on the row, marked stopped when its phase allows (`markStopped`). */
   const attention = async (...reasons: string[]): Promise<CarryOutResult> => {
-    await markStopped(sb, item, op.rev);
+    await markStopped(sb, item, op);
     return {
       status: "needs attention",
       reasons,
