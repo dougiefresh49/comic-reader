@@ -69,3 +69,16 @@
 {"id":"12c cp --suffix after the destination","want":2,"cmd":"cp /tmp/new.ts src/lib/voice-settings.ts --suffix .bak"}
 {"id":"12d install of a guarded file as source with -m after","want":0,"cmd":"install src/lib/models.ts /tmp/backup -m 644"}
 {"id":"12e install onto a guarded file with CREDIT_OVERRIDE","want":0,"cmd":"install x src/lib/models.ts -m 644","env":{"CREDIT_OVERRIDE":"1"}}
+{"id":"r1-1a commit heredoc then && bash in another segment is text","want":0,"cmd":"git commit -m \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\" && bash x.sh"}
+{"id":"r1-1b printf $(cat heredoc) piped to sh","want":2,"cmd":"printf '%s\\n' \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\" | sh","reason":"generate-audio synthesizes"}
+{"id":"r1-1c eval after a wrapper","want":2,"cmd":"command eval \"$(cat <<'EOF'\npnpm generate-audio\nEOF\n)\""}
+{"id":"r1-2a sudo then quoted bash reads its heredoc","want":2,"cmd":"sudo \"bash\" <<'EOF'\npnpm generate-audio\nEOF","reason":"generate-audio synthesizes"}
+{"id":"r1-2b env assignment and sudo -u value then quoted sh","want":2,"cmd":"env X=1 sudo -u bob 'sh' <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"r1-2c sudo printf with a quoted bash argument, body is text","want":0,"cmd":"sudo printf \"bash\" <<'EOF'\npnpm generate-audio\nEOF"}
+{"id":"r1-3a pipe to sudo bash on the line after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo bash","reason":"generate-audio synthesizes"}
+{"id":"r1-3b pipe to sudo -u value then nice -n value then sh after the body","want":2,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo -u bob nice -n 5 sh"}
+{"id":"r1-3c pipe to sudo tee after the body is text","want":0,"cmd":"cat <<'EOF' |\npnpm generate-audio\nEOF\nsudo tee /tmp/x"}
+{"id":"r1-4a echo of an ssh line is text","want":0,"cmd":"echo ssh host 'pnpm generate-audio'"}
+{"id":"r1-4b echo of an env -S line is text","want":0,"cmd":"echo env -S 'pnpm generate-audio'"}
+{"id":"r1-4c sudo ssh still runs its remote command","want":2,"cmd":"sudo ssh host 'pnpm generate-audio'","reason":"generate-audio synthesizes"}
+{"id":"r1-4d assignment then env -S still runs its string","want":2,"cmd":"X=1 env -S 'pnpm generate-audio'","reason":"generate-audio synthesizes"}

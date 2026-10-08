@@ -126,14 +126,31 @@ done <<<"$SCRIPT_FILES"
 segments() {
   printf '%s' "$1" | LC_ALL=C awk '
     function endword(   b) {
+      if (inw) { w[nw++] = (wq ? "\034" : "") cur; lp = 0 }
       if (inw && hdnext) { hd[nhd] = cur; hdq[nhd] = wq; hdd[nhd++] = hdnext == 2; hdnext = 0 }
       # An unquoted word that can read a heredoc as commands, anywhere on the
       # physical line (`cat <<EOF | bash`), so the bodies that line opens are
       # lexed as commands (#671). A quoted one counts at command position,
-      # where a shell runs "bash" as bash; as an argument it is text (#694).
-      else if (inw && (!wq || nw == 0)) { b = cur; sub(/.*\//, "", b); if (b ~ SH) lsh = 1 }
-      if (inw) { w[nw++] = (wq ? "\034" : "") cur; lp = 0 }
+      # past wrappers (`sudo "bash"`), where a shell runs "bash" as bash; as
+      # an argument it is text (#694).
+      else if (inw) { b = cur; sub(/.*\//, "", b); if (b ~ SH && (!wq || cmdw(w, 0, nw) == nw - 1)) lsh = 1 }
       cur = ""; inw = 0; wq = 0
+    }
+    # The index in a[lo..hi) of the command a segment runs, past assignments,
+    # redirects, and wrapper words with their options and values (-1 for
+    # none): `sudo -u bob "bash"` runs bash (#694). command_shape below walks
+    # the same way for the paid rules.
+    function cmdw(a, lo, hi,   i, b, x, wr) {
+      for (i = lo; i < hi; i++) {
+        b = a[i]; sub(/^\034/, "", b)
+        if (b ~ /^\035/) { i++; continue }
+        if (wr != "" && b ~ /^-/) { x = vopt(b, WV[wr]); if ((x && x == length(b)) || b ~ WL) i++; continue }
+        if (b ~ /^[A-Za-z_][A-Za-z0-9_]*=/ || (wr != "" && b ~ /^[0-9][0-9.]*[smhd]?$/)) continue
+        x = b; sub(/.*\//, "", x)
+        if (x ~ /^(env|command|builtin|exec|time|nohup|nice|sudo|xargs|timeout|stdbuf)$/) { wr = x; continue }
+        return i
+      }
+      return -1
     }
     # Where in option word b getopt finds its first letter from v, the
     # letters that take a value (0 for none): `-vp` takes the next word as
@@ -143,12 +160,20 @@ segments() {
       return 0
     }
     function queue(str, sh) { sub(/^\034/, "", str); ish[ninner] = sh; inner[ninner++] = str }
-    function endseg(   i, j, line, b, sc, x, v) {
+    # pipe: the segment ends in a pipe.
+    function endseg(pipe,   i, j, line, b, sc, x, v, c) {
       endword()
       if (nw == 0) return
       line = w[0]
       for (i = 1; i < nw; i++) line = line "\037" w[i]
       print line
+      # A $(...) whose output a shell runs is lexed in shell context, so a cat
+      # heredoc inside it is commands (#694): under eval, or in a segment that
+      # pipes into a shell (`echo "$(...)" | bash`). Its queue starts at ss0.
+      c = cmdw(w, 0, nw); b = c < 0 ? "" : w[c]; sub(/^\034/, "", b); sub(/.*\//, "", b)
+      if (b == "eval") for (x = ss0; x < ninner; x++) ish[x] = 1
+      if (b ~ SH) for (x = pp0; x < pp1; x++) ish[x] = 1
+      pp0 = pipe ? ss0 : 0; pp1 = pipe ? ninner : 0
       # Any unquoted shell word, so `pnpm exec bash -c` unwraps and a quoted
       # "bash" "-c" handed to printf does not. Its options run up to its first
       # other word: one holding a c (-c, -cl) makes that word the command
@@ -166,10 +191,11 @@ segments() {
           if (b ~ /^([-+][a-zA-Z]*[oO][a-zA-Z]*|--rcfile|--init-file)$/) { j++; continue }
           if (b !~ /^-/) { if (sc) queue(b, 1); break }
         }
-        # env -S splits its string into a command and runs it (#694).
-        else if (b == "env") for (j = i + 1; j < nw; j++) {
+        # env -S splits its string into a command and runs it (#694), when env
+        # is a wrapper in front of the command, not an argument (`echo env`).
+        else if (b == "env" && (c < 0 || i < c)) for (j = i + 1; j < nw; j++) {
           b = w[j]; sub(/^\034/, "", b)
-          if (b ~ /^-[^-]/ && (x = vopt(b, "uCPS"))) {
+          if (b ~ /^-[^-]/ && (x = vopt(b, WV["env"]))) {
             v = x < length(b) ? substr(b, x + 1) : w[++j]
             if (substr(b, x, 1) == "S") { queue(v, 0); break }
           } else if (b ~ /^--split-string(=|$)/) { queue(b ~ /=/ ? substr(b, 16) : w[++j], 0); break }
@@ -177,8 +203,9 @@ segments() {
           else if (b !~ /^-/) break
         }
         # ssh joins the words after its host and a shell on the host runs them
-        # (#694). Its options that take a value are stepped over to find the host.
-        else if (b == "ssh") {
+        # (#694), when ssh is the command. Its options that take a value are
+        # stepped over to find the host.
+        else if (b == "ssh" && i == c) {
           for (j = i + 1; j < nw; j++) {
             b = w[j]; sub(/^\034/, "", b)
             if (b !~ /^-/) break
@@ -196,16 +223,16 @@ segments() {
         else if (b == "sudo") for (j = i + 1; j < nw; j++) {
           b = w[j]
           if (b ~ /^--(shell|login)$/) lsh = 1
-          else if (b ~ /^--(user|group|prompt|chdir|host|role|type|other-user|close-from|chroot|command-timeout)$/) j++
+          else if (b ~ WL) j++
           else if (b ~ /^-[^-]/) {
-            x = vopt(b, "ugpChDUrtRT")
+            x = vopt(b, WV["sudo"])
             if (substr(b, 1, x ? x - 1 : length(b)) ~ /[is]/) lsh = 1
             if (x == length(b)) j++
           } else if (b !~ /^-/) break
         }
         sc = 0
       }
-      split("", w); nw = 0
+      split("", w); nw = 0; ss0 = ninner
     }
     # The $(...) at i, quoted or not, through its matching paren: quotes are
     # respected, a nested "$(" inside quotes is scanned the same way, and a
@@ -244,13 +271,11 @@ segments() {
       return j
     }
     # sh is the shell context: s came from a -c string or a shell-fed body.
-    # A $(...) whose output a shell runs is lexed in shell context, so a cat
-    # heredoc inside it is commands (#694): at command position, or anywhere
-    # on a line holding a shell word (`eval "$(...)"`, `echo "$(...)" | bash`).
-    # ls0 is where the queue for this line starts.
-    function lex(s, top, sh,   n, i, j, c, d, e, q, op, h, t, p, fed, n0, found, bt, x) {
+    # A $(...) at command position runs its output, so it gets that context
+    # too (#694); endseg gives it to one under eval or piped into a shell.
+    function lex(s, top, sh,   n, i, j, c, d, e, q, op, h, t, p, fed, n0, found, bt, x, a) {
       cur = ""; inw = 0; wq = 0; nw = 0; split("", w); q = ""; nhd = 0; hdnext = 0
-      ctx = sh; lsh = 0; lp = 0; ls0 = ninner
+      ctx = sh; lsh = 0; lp = 0; ss0 = ninner; pp0 = pp1 = 0
       n = length(s)
       for (i = 1; i <= n; i++) {
         c = substr(s, i, 1); d = substr(s, i + 1, 1)
@@ -281,9 +306,7 @@ segments() {
         }
         if (c == "\n") {
           # endseg, not endword: its sudo -s check sets lsh.
-          endseg(); fed = lsh || ctx
-          if (lsh) for (x = ls0; x < ninner; x++) ish[x] = 1
-          lsh = 0; ls0 = ninner
+          endseg(); fed = lsh || ctx; lsh = 0
         }
         if (c == "\n" && nhd) {
           # Each heredoc body line up to its delimiter (<<- strips tabs) is
@@ -308,9 +331,11 @@ segments() {
             p = ""
             # `cat <<EOF |` with a shell on the line after the body: bash
             # carries the pipeline on there, so the last body is fed (#694).
+            # Its command is found past wrappers, as cmdw does (`sudo bash`).
             if (lp && h == nhd - 1) {
-              t = substr(s, i + 1); sub(/^[ \t]*/, "", t); sub(/[ \t\n;&|()<>].*/, "", t)
-              gsub(/[\047"]/, "", t); sub(/.*\//, "", t); if (t ~ SH) fed = 1
+              t = substr(s, i + 1); sub(/[\n;&|()<>].*/, "", t); gsub(/[\047"]/, "", t)
+              sub(/^[ \t]+/, "", t); x = split(t, a, "[ \t]+"); x = cmdw(a, 1, x + 1)
+              t = a[x]; sub(/.*\//, "", t); if (x > 0 && t ~ SH) fed = 1
             }
             if (found && !fed) {
               # With an unquoted delimiter, a $(...) in the body still runs
@@ -324,10 +349,11 @@ segments() {
               }
             }
           }
-          nhd = 0; lp = 0; ls0 = ninner; continue
+          nhd = 0; lp = 0; ss0 = ninner; continue
         }
         if (c ~ /[\n;|()]/ || (c == "&" && d != ">")) {
-          endseg(); lp = c == "|" && d != "|" && substr(s, i - 1, 1) != "|"; continue
+          x = c == "|" && d != "|" && substr(s, i - 1, 1) != "|"
+          endseg(x); lp = x; continue
         }
         if (c ~ /[<>&]/) {
           # 2> and 2>> name a file descriptor; the digits belong to the operator.
@@ -350,11 +376,16 @@ segments() {
       # whatever came after may be a command: exit 3 so the caller blocks.
       if (q != "" && top) bad = 1
       endseg()
-      if (lsh) for (x = ls0; x < ninner; x++) ish[x] = 1
     }
     # Numeric from the start: an unset ninner indexes ish[] as "", not 0.
-    # SH: a word that can read a heredoc as commands.
-    BEGIN { ninner = 0; SH = "^(sh|bash|zsh|ksh|dash|eval|source|\\.|xargs|ssh|su)$" }
+    # SH: a word that can read a heredoc as commands. WV: per wrapper, the
+    # short options that take a value; WL: the long ones, any wrapper.
+    BEGIN {
+      ninner = 0; SH = "^(sh|bash|zsh|ksh|dash|eval|source|\\.|xargs|ssh|su)$"
+      WV["sudo"] = "ugpChDUrtRT"; WV["env"] = "uCPS"; WV["xargs"] = "ILnPdEas"
+      WV["stdbuf"] = "ioe"; WV["timeout"] = "sk"; WV["nice"] = "n"
+      WL = "^--(user|group|prompt|chdir|host|role|type|other-user|close-from|chroot|command-timeout|delimiter|max-args|max-procs|arg-file|max-chars|process-slot-var|input|output|error|signal|kill-after|unset)$"
+    }
     { all = (NR > 1 ? all "\n" : "") $0 }
     END {
       gsub(/[\034\035\036\037]/, "", all)
