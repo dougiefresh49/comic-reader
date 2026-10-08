@@ -48,18 +48,23 @@ fi
 # file, and the guarded list is written the short way. The result goes in NORM
 # rather than to stdout, and nothing here forks: a patch is thousands of
 # tokens, and a subshell plus two seds per token ran a 25-file patch past the
-# 5 s hook timeout (#705). The regex sits in a variable for bash 3.2.
-DOTDOT='[^/]+/\.\./'
+# 5 s hook timeout (#705). One pass over the segments, because bash 3.2's
+# ${p//x/y} is quadratic in the length of p. A `..` with nothing before it is
+# dropped, which only blocks more. Globbing is off from here on, for this split
+# and for the patch split, or a ` * comment` line would expand its *.
+set -f
 normalize_path() {
-  local p=$1 m
-  while [[ $p == *//* ]]; do p=${p//\/\//\/}; done
-  while [[ $p == */./* ]]; do p=${p//\/.\//\/}; done
-  p=${p%/}
-  while [[ $p =~ $DOTDOT ]]; do
-    m=${BASH_REMATCH[0]}
-    p=${p/"$m"/}
+  local IFS=/ seg n=0 lead= segs out=()
+  case "$1" in /*) lead=/ ;; esac
+  segs=($1)
+  for seg in "${segs[@]}"; do
+    case "$seg" in
+    '' | .) ;;
+    ..) [ "$n" -gt 0 ] && n=$((n - 1)) && unset "out[n]" ;;
+    *) out[n]=$seg && n=$((n + 1)) ;;
+    esac
   done
-  NORM=${p#./}
+  NORM="${out[*]}" && NORM=${NORM:+$lead$NORM}
 }
 
 # Match on the path relative to the repo root, so an absolute path and a
@@ -130,20 +135,26 @@ for ((k = 0; k < NR_FILE_RULES; k++)); do
   fi
 done
 
-# Patch tokens get the same normalization, once each, so
-# src/lib/../lib/models.ts in a patch reaches the rule. Over-blocking on a
-# mention is the safe direction for a credit guard. Globbing is off for the
-# split, or a ` * comment` line would expand its * against the cwd.
-set -f
+# Patch tokens get the same normalization, so src/lib/../lib/models.ts in a
+# patch reaches the rule. Over-blocking on a mention is the safe direction for
+# a credit guard. Normalizing keeps every file name, so only a token holding a
+# rule's file name can reach that rule: a patch with none is a pass, and a
+# token with none is never normalized.
+HIT=
+for ((k = 0; k < NR_FILE_RULES; k++)); do
+  F_NAME[k]=${F_TARGET[k]##*/}
+  [[ $PATCH_LINES == *"${F_NAME[k]}"* ]] && HIT=1
+done
+[ -n "$HIT" ] || exit 0
 for TOKEN in $PATCH_LINES; do
-  normalize_path "$TOKEN"
   for ((k = 0; k < NR_FILE_RULES; k++)); do
+    [[ $TOKEN == *"${F_NAME[k]}"* ]] || continue
+    normalize_path "$TOKEN"
     if [ "$NORM" = "${F_TARGET[k]}" ] || [ "$NORM" = "${REPO_ROOT}/${F_TARGET[k]}" ]; then
       printf 'Blocked: %s\n' "${F_REASON[k]}" >&2
       exit 2
     fi
   done
 done
-set +f
 
 exit 0

@@ -42,8 +42,9 @@ hunks() {
   printf '%s' "$out"
 }
 
+# On stdin, not --arg: Linux caps one argument at 128 KiB.
 patch() {
-  jq -cn --arg p "*** Begin Patch"$'\n'"$1"$'\n'"*** End Patch" '{tool_name:"apply_patch",tool_input:{input:$p}}'
+  printf '*** Begin Patch\n%s\n*** End Patch' "$1" | jq -Rsc '{tool_name:"apply_patch",tool_input:{input:.}}'
 }
 
 check edit-relative 2 "$(edit src/lib/models.ts)"
@@ -61,6 +62,19 @@ while [ "$i" -le 400 ]; do
 done
 check patch-400-unguarded 0 "$(patch "$(hunks "${files[@]}")")"
 check patch-400-guarded-last 2 "$(patch "$(hunks "${files[@]}" src/lib/models.ts)")"
+
+# One 40 KB token before the guarded header: bash 3.2's ${p//x/y} is
+# quadratic in it.
+long=$(printf 'a/%.0s' $(seq 20000))
+models=$(hunks src/lib/models.ts)
+check long-token-double-slash 2 "$(patch "+$long//"$'\n'"$models")"
+check long-token-dot 2 "$(patch "+$long/./"$'\n'"$models")"
+check long-token-with-name 2 "$(patch "+$long//src/lib/models.ts"$'\n'"$models")"
+
+# About 100k tokens before the guarded header: 8192 lines of 12 words.
+body=$'+w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12\n'
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13; do body=$body$body; done
+check patch-100k-tokens 2 "$(patch "*** Add File: src/big.ts"$'\n'"$body$models")"
 
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
