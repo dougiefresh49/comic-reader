@@ -219,24 +219,31 @@ export default function ZenComicReader({
   const stopAllRef = useRef<() => void>(() => undefined);
   const cancelPendingRef = useRef<() => void>(() => undefined);
 
-  const exitPanelView = useCallback(() => {
-    clearPanelTimer();
-    // The playing clip must not run on into page view, or its end hands off
-    // to page-view auto-play, which walks the page by itself (#594, #493).
-    stopAllRef.current();
-    cancelPendingRef.current();
-    // A turn may still be loading the next page; it must mount silent.
-    readAloudCarryTo = null;
-    lastPanelLandingTo = null;
-    setPanelViewMode(false);
-    setPanelAutoPlay(false);
-    setPanelViewPreferred(false);
-    const el = focusBeforePanelRef.current;
-    focusBeforePanelRef.current = null;
-    if (el instanceof HTMLElement) {
-      queueMicrotask(() => el.focus());
-    }
-  }, [clearPanelTimer, setPanelViewPreferred]);
+  // Options objects, not flags: onClose and onClick pass a click event.
+  const exitPanelView = useCallback(
+    (opts?: { keepPlaying: true }) => {
+      clearPanelTimer();
+      // The playing clip must not run on into page view, or its end hands off
+      // to page-view auto-play, which walks the page by itself (#594, #493).
+      // The double tap is the exception: the kid asked for that bubble on the
+      // full page, and page view's Auto-play setting decides what follows
+      // (#708).
+      if (!opts?.keepPlaying) stopAllRef.current();
+      cancelPendingRef.current();
+      // A turn may still be loading the next page; it must mount silent.
+      readAloudCarryTo = null;
+      lastPanelLandingTo = null;
+      setPanelViewMode(false);
+      setPanelAutoPlay(false);
+      setPanelViewPreferred(false);
+      const el = focusBeforePanelRef.current;
+      focusBeforePanelRef.current = null;
+      if (el instanceof HTMLElement) {
+        queueMicrotask(() => el.focus());
+      }
+    },
+    [clearPanelTimer, setPanelViewPreferred],
+  );
 
   const togglePanelAutoPlay = useCallback(() => {
     if (panelAutoPlay) {
@@ -307,17 +314,22 @@ export default function ZenComicReader({
     return visibleBubbles.filter((b) => idSet.has(b.id));
   }, [panelViewMode, panels.length, activePanel, visibleBubbles]);
 
-  const enterPanelView = useCallback(() => {
-    if (!panels.length) return;
-    // Page-view playback must not carry in, or the first tap lands on a
-    // playing selected bubble and pauses it (#581).
-    stopAllRef.current();
-    cancelPendingRef.current();
-    focusBeforePanelRef.current = document.activeElement;
-    setPanelIndex(0);
-    setPanelViewMode(true);
-    setPanelViewPreferred(true);
-  }, [panels.length, setPanelIndex, setPanelViewPreferred]);
+  const enterPanelView = useCallback(
+    (opts?: { carryToPanel: number }) => {
+      if (!panels.length) return;
+      // Page-view playback must not carry in, or the first tap lands on a
+      // playing selected bubble and pauses it (#581). The double tap is the
+      // exception: it lands on the playing bubble's panel and lets the clip
+      // finish there, since the kid asked to see that bubble up close (#707).
+      if (opts?.carryToPanel === undefined) stopAllRef.current();
+      cancelPendingRef.current();
+      focusBeforePanelRef.current = document.activeElement;
+      setPanelIndex(opts?.carryToPanel ?? 0);
+      setPanelViewMode(true);
+      setPanelViewPreferred(true);
+    },
+    [panels.length, setPanelIndex, setPanelViewPreferred],
+  );
 
   const handleTogglePanelView = useCallback(() => {
     if (panelViewMode) exitPanelView();
@@ -333,13 +345,6 @@ export default function ZenComicReader({
     enterPanelView();
     setPanelAutoPlay(true);
   }, [enterPanelView, showChrome]);
-
-  const handleDoubleTap = useCallback(() => {
-    handleTogglePanelView();
-  }, [handleTogglePanelView]);
-
-  const doubleTapBinder = useDoubleTap(handleDoubleTap, toggleChrome);
-  const doubleTapProps = doubleTapBinder();
 
   useEffect(() => {
     if (panelViewPreferred && panels.length > 0 && !panelViewMode) {
@@ -510,6 +515,30 @@ export default function ZenComicReader({
   useEffect(() => {
     playBubbleRef.current = playBubble;
   }, [playBubble]);
+
+  // Only the double tap carries a playing bubble across the toggle; with
+  // nothing sounding it toggles as every other control does (#707, #708).
+  const handleDoubleTap = useCallback(() => {
+    if (!isPlaying) return handleTogglePanelView();
+    if (panelViewMode) return exitPanelView({ keepPlaying: true });
+    const playingId = speakingId ?? selectedBubbleId;
+    const idx = panels.findIndex(
+      (p) => playingId !== null && p.bubbleIds.includes(playingId),
+    );
+    enterPanelView(idx >= 0 ? { carryToPanel: idx } : undefined);
+  }, [
+    isPlaying,
+    panelViewMode,
+    speakingId,
+    selectedBubbleId,
+    panels,
+    handleTogglePanelView,
+    exitPanelView,
+    enterPanelView,
+  ]);
+
+  const doubleTapBinder = useDoubleTap(handleDoubleTap, toggleChrome);
+  const doubleTapProps = doubleTapBinder();
 
   const autoAdvancePageCb = useCallback(() => {
     if (autoAdvancePage) navigateNextRef.current?.();
@@ -893,7 +922,7 @@ export default function ZenComicReader({
                 {panels.length > 0 && (
                   <button
                     type="button"
-                    onClick={enterPanelView}
+                    onClick={() => enterPanelView()}
                     aria-label="Enter panel view"
                     title="Panel view"
                     className="flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 text-sm font-semibold text-neutral-200 transition-colors hover:bg-white/15 sm:px-4"
