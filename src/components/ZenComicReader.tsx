@@ -9,7 +9,6 @@ import { highlightColorFor } from "~/lib/highlight-color";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
-import { useWordHighlightSelector } from "~/hooks/useWordHighlight";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
 import { usePinchZoom } from "~/hooks/usePinchZoom";
 import { usePageNavigation } from "~/hooks/usePageNavigation";
@@ -238,6 +237,7 @@ export default function ZenComicReader({
   } = usePanelNavigation({
     panelCount: panels.length,
     enabled: panelViewMode && panels.length > 0,
+    keyboardEnabled: !anySheetOpen,
     onExit: exitPanelView,
     onTogglePanelAutoPlay: togglePanelAutoPlay,
     onPastEnd: () => navigateNextRef.current?.(),
@@ -538,7 +538,7 @@ export default function ZenComicReader({
   );
 
   // Per bubble, never per word: the reader holds whether the selected
-  // bubble's words can light on the art and whether its marker is lit; the word index stays in the
+  // bubble's words can light on the art; the word index stays in the
   // leaves (SpeechBox, BubbleWordHighlight) so a word change does not
   // re-render this component (#87).
   const wordMatch = useMemo(
@@ -552,21 +552,6 @@ export default function ZenComicReader({
   // shows the caption while it plays, and the card goes away when playback
   // ends. One boolean, read everywhere the bar's content is drawn.
   const captionShown = captionBar || (isPlaying && !showInBubble);
-  // The first word with a box: nothing lights on the art before it, so the
-  // border stays at full strength until then.
-  const firstBoxedIndex =
-    wordMatch?.boxesByTimingIndex.findIndex((boxes) => boxes.length > 0) ?? -1;
-  // A boolean that flips once per bubble (when its first boxed word lights
-  // and when the clip ends), never per word.
-  const markerLit = useWordHighlightSelector(
-    wordHighlight,
-    (s) =>
-      firstBoxedIndex >= 0 &&
-      s.bubbleId === selectedBubble?.id &&
-      s.index !== null &&
-      s.index >= firstBoxedIndex,
-  );
-  const inBubbleShowing = showInBubble && markerLit;
   const pageAspect = (() => {
     const image = selectedBubble?.textGeometry?.image;
     return image && image.w > 0 && image.h > 0 ? image.h / image.w : 1;
@@ -747,9 +732,10 @@ export default function ZenComicReader({
                 {displayBubbles.map((bubble) => {
                   if (!bubble.style) return null;
                   const isSelected = selectedBubbleId === bubble.id;
-                  // The marker on the lettering is the feedback while it
-                  // shows, so the selection border steps back.
-                  const softBorder = isSelected && inBubbleShowing;
+                  // The word markers are the feedback when they can show,
+                  // so the selection box draws only for the caption
+                  // fallback (#608).
+                  const boxed = isSelected && !showInBubble;
                   return (
                     <button
                       key={bubble.id}
@@ -759,10 +745,10 @@ export default function ZenComicReader({
                         handleBubbleClick(bubble);
                       }}
                       className={`absolute transition-all duration-300 ${
-                        softBorder
-                          ? "z-10 border-2 border-cyan-400/50"
+                        boxed
+                          ? "z-10 border-4 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]"
                           : isSelected
-                            ? "z-10 border-4 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+                            ? "z-10 border border-transparent"
                             : "z-[5] border border-transparent hover:border-white/30 hover:bg-white/5"
                       }`}
                       style={{

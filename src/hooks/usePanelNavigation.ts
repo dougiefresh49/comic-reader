@@ -10,6 +10,8 @@ export interface UsePanelNavigationOptions {
   panelCount: number;
   /** When false, gestures no-op (single-page full reader uses outer pinch). */
   enabled: boolean;
+  /** When false, Escape/arrows/Space are ignored (e.g. a sheet is open). Gestures still follow `enabled`. */
+  keyboardEnabled?: boolean;
   onExit: () => void;
   onTogglePanelAutoPlay?: () => void;
   /** Called when the user advances past the last panel — wire to next-page nav. */
@@ -30,6 +32,7 @@ export interface UsePanelNavigationResult {
 export function usePanelNavigation({
   panelCount,
   enabled,
+  keyboardEnabled = true,
   onExit,
   onTogglePanelAutoPlay,
   onPastEnd,
@@ -73,7 +76,7 @@ export function usePanelNavigation({
   }, [panelCount, clampIndex, setPanelIndex]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !keyboardEnabled) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -109,7 +112,7 @@ export function usePanelNavigation({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [enabled, onExit, goNext, goPrev, onTogglePanelAutoPlay]);
+  }, [enabled, keyboardEnabled, onExit, goNext, goPrev, onTogglePanelAutoPlay]);
 
   const gestureBind = useGesture(
     {

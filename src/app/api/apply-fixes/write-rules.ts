@@ -66,6 +66,8 @@ export interface WriteContext {
   silent: Set<string>;
   /** The named bubbles whose stored row has `ignored = true`. */
   ignored: Set<string>;
+  /** The stored `bubbles.type` of each named bubble. */
+  type: Map<string, string>;
 }
 
 /** Reads what the rules need. Throws on a failed read: nothing has been written yet. */
@@ -122,10 +124,11 @@ export async function loadWriteContext(
   const bubblePage = new Map<string, number>();
   const silent = new Set<string>();
   const ignored = new Set<string>();
+  const type = new Map<string, string>();
   for (const ids of chunk(Array.from(new Set(need.bubbleIds)), 100)) {
     const { data, error } = await supabaseAdmin
       .from("bubbles")
-      .select("id, page_number, box_2d, silent, ignored")
+      .select("id, page_number, box_2d, silent, ignored, type")
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
       .in("id", ids);
@@ -136,10 +139,12 @@ export async function loadWriteContext(
       box_2d: { confidence?: unknown } | null;
       silent: boolean | null;
       ignored: boolean | null;
+      type: string;
     }[]) {
       bubblePage.set(row.id, row.page_number);
       if (row.silent) silent.add(row.id);
       if (row.ignored) ignored.add(row.id);
+      type.set(row.id, row.type);
       const c = row.box_2d?.confidence;
       if (typeof c === "number") confidence.set(row.id, c);
     }
@@ -152,6 +157,7 @@ export async function loadWriteContext(
     bubblePage,
     silent,
     ignored,
+    type,
   };
 }
 
@@ -442,4 +448,9 @@ export interface SaveResult {
   written: number;
   /** Bubbles that now need audio. */
   needsAudio: number;
+  /**
+   * Pages whose word boxes this Save tried to refresh and could not (#620),
+   * with why. Empty when every refresh landed or no page needed one.
+   */
+  wordBoxesFailed: { page: number; error: string }[];
 }
