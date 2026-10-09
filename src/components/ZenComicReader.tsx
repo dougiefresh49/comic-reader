@@ -686,6 +686,21 @@ export default function ZenComicReader({
       } else {
         playBubble(bubble);
       }
+      if (!panelViewMode) return;
+      // In panel view a tap to pause is the HUD's Pause, so Read resumes the
+      // held clip (#728). A tap that plays hands on to panel read-aloud when
+      // page view's Auto-play is on, as the double tap does (#733). A bubble
+      // with no clip never ends, so it has nothing to hand on from.
+      if (onIt && isPlaying) {
+        readAloudCarryTo = null;
+        setPanelAutoPlay(false);
+      } else if (
+        autoPlayEnabled &&
+        !panelAutoPlay &&
+        hasAudio(groupUnits.get(bubble.id)?.lead ?? bubble)
+      ) {
+        readAloudFromCurrentClip();
+      }
     },
     [
       selectedBubbleId,
@@ -696,6 +711,10 @@ export default function ZenComicReader({
       cancelPending,
       playBubble,
       clearPanelTimer,
+      panelViewMode,
+      autoPlayEnabled,
+      panelAutoPlay,
+      readAloudFromCurrentClip,
     ],
   );
 

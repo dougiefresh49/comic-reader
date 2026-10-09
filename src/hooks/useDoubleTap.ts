@@ -35,6 +35,12 @@ export function useDoubleTap(
             DOUBLE_TAP_MAX_DIST
         ) {
           lastTapRef.current = null;
+          // The double tap claims this tap: it swaps panel view's gesture
+          // handlers for page view's pinch and swipe ones, or back, before
+          // the pointerup. A handler under this one that saw only the down
+          // keeps its start point, and a later pointerup reads it as a swipe
+          // that turns the page (#734).
+          e.stopPropagation();
           if (singleTapTimerRef.current) {
             clearTimeout(singleTapTimerRef.current);
             singleTapTimerRef.current = null;
