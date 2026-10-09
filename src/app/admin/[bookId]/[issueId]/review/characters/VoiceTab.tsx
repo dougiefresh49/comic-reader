@@ -65,6 +65,7 @@ function VoiceRow({
   lockTitle,
   compact,
   playVoiceId,
+  play,
   onPick,
 }: {
   name: string;
@@ -76,6 +77,8 @@ function VoiceRow({
   lockTitle?: string;
   compact?: boolean;
   playVoiceId: string | null;
+  /** A signed-URL take (staged design). Wins over `playVoiceId` when set. */
+  play?: { url: string; playKey: string } | null;
   onPick: () => void;
 }) {
   return (
@@ -122,7 +125,9 @@ function VoiceRow({
           {sub}
         </span>
       </span>
-      {playVoiceId ? (
+      {play ? (
+        <PlayButton url={play.url} playKey={play.playKey} name={name} />
+      ) : playVoiceId ? (
         <PlayButton voiceId={playVoiceId} name={name} />
       ) : (
         <span />
@@ -232,6 +237,13 @@ export function VoiceTab({
   const silenced = state.sitOut || state.removed;
   const pick = state.pick;
   const design = pick?.move.kind === "create_design" ? pick.move : null;
+  const accepted = design ? acceptedFor(design) : undefined;
+  const acceptedTake =
+    design && accepted
+      ? accepted.takes.find(
+          (t) => t.generated_voice_id === design.generated_voice_id,
+        )
+      : undefined;
   const landing =
     pick && model ? (model.landing.get(pick.index) ?? null) : null;
   const slotFor = (v: VoiceOption) =>
@@ -383,9 +395,7 @@ export function VoiceTab({
         {design && (
           <VoiceRow
             name={
-              acceptedFor(design)
-                ? `${state.name} · take ${acceptedFor(design)!.take}`
-                : state.name
+              accepted ? `${state.name} · take ${accepted.take}` : state.name
             }
             sub={
               <>
@@ -403,6 +413,14 @@ export function VoiceTab({
             on={!silenced}
             tabStop
             playVoiceId={null}
+            play={
+              acceptedTake
+                ? {
+                    url: acceptedTake.url,
+                    playKey: `take:${design.generated_voice_id}`,
+                  }
+                : null
+            }
             onPick={onDesign}
           />
         )}

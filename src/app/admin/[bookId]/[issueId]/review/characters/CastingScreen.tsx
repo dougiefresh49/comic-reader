@@ -41,6 +41,7 @@ import {
 } from "./actions";
 import { loadRoster } from "./casting-actions";
 import { CharacterPanel, type PanelTab } from "./CharacterPanel";
+import { acceptedFor } from "./design-sheet/accepted";
 import { DesignSheet, WandIcon } from "./design-sheet/DesignSheet";
 import { PlayButton, PlayerProvider } from "./player";
 import { ReviewSheet } from "./ReviewSheet";
@@ -52,6 +53,7 @@ import {
   characterOf,
   freeFor,
   isPick,
+  isVoiced,
   oneEach,
   lockReason,
   pickMove,
@@ -211,6 +213,39 @@ function Chip({
       </>
     );
   }
+  const design =
+    state.pick?.move.kind === "create_design" ? state.pick.move : null;
+  if (design) {
+    const accepted = acceptedFor(design);
+    const take = accepted?.takes.find(
+      (t) => t.generated_voice_id === design.generated_voice_id,
+    );
+    const label = accepted ? `designed · take ${accepted.take}` : "designed";
+    return (
+      <>
+        {dot(
+          "bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.18)]",
+          "changes at confirm",
+        )}
+        <span className="truncate text-neutral-100">{label}</span>
+        {landing ? (
+          <span className="font-mono text-[11px] text-neutral-500">
+            {landing}
+          </span>
+        ) : null}
+        {take?.url ? (
+          <span className="ml-auto">
+            <PlayButton
+              url={take.url}
+              playKey={`take:${design.generated_voice_id}`}
+              name={label}
+              size="sm"
+            />
+          </span>
+        ) : null}
+      </>
+    );
+  }
   if (card.lines === 0)
     return (
       <>
@@ -254,7 +289,7 @@ function CastCard({
     if (selected) ref.current?.scrollIntoView({ block: "nearest" });
   }, [selected]);
   const unvoiced =
-    !state.voiceId && !state.sitOut && !state.removed && card.lines > 0;
+    !isVoiced(state) && !state.sitOut && !state.removed && card.lines > 0;
   const quiet = state.sitOut || state.removed;
   return (
     <div
