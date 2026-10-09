@@ -772,12 +772,13 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
         >
           Editor →
         </Link>
-        {data.runPaused &&
-          (continued ? (
-            <span className="rounded-sm bg-emerald-700/30 px-3 py-1.5 font-medium text-emerald-200">
-              Pipeline resumed
-            </span>
-          ) : (
+        {/* The badge keys on the click, not the row: a resumed run clears the pause before the refresh lands. */}
+        {continued ? (
+          <span className="rounded-sm bg-emerald-700/30 px-3 py-1.5 font-medium text-emerald-200">
+            Pipeline resumed
+          </span>
+        ) : (
+          data.runPaused && (
             <button
               type="button"
               disabled={pending || data.blocker !== null}
@@ -796,7 +797,8 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
             >
               Continue
             </button>
-          ))}
+          )
+        )}
       </header>
       {data.runPaused && (
         <p className="border-b border-amber-400/30 bg-amber-400/5 px-4 py-2 text-[14px] text-amber-100">
