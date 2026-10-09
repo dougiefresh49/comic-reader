@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { findReadingSource, createIssue } from "./actions";
+import { useState, useEffect, useRef } from "react";
+import { wikiPageUrl } from "~/lib/add-content/wiki";
+import { confirmSource } from "./actions";
+import { SourceConfirm } from "./SourceConfirm";
 
 interface BookInfo {
   id: string;
@@ -23,13 +25,11 @@ interface DownloadProgress {
 export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
   const [issueNumber, setIssueNumber] = useState(bookInfo.nextIssueNumber);
   const [wikiUrl, setWikiUrl] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [confidence, setConfidence] = useState<
-    "high" | "medium" | "low" | null
-  >(null);
-  const [loading, setLoading] = useState(false);
-  const [created, setCreated] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /** Set by Confirm: the saved issue and the URL the downloader will read. */
+  const [confirmed, setConfirmed] = useState<{
+    issueId: string;
+    url: string;
+  } | null>(null);
   const [download, setDownload] = useState<DownloadProgress>({
     status: "",
     current: 0,
@@ -40,59 +40,36 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
   const [downloading, setDownloading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  const buildWikiUrl = useCallback(
-    (num: number) => {
-      if (bookInfo.wikiHost && bookInfo.wikiTitleTemplate) {
-        const title = bookInfo.wikiTitleTemplate.replace(
-          "{number}",
-          String(num),
-        );
-        const host = bookInfo.wikiHost.startsWith("http")
-          ? bookInfo.wikiHost
-          : `https://${bookInfo.wikiHost}`;
-        return `${host}/wiki/${title}`;
-      }
-      return "";
-    },
-    [bookInfo.wikiHost, bookInfo.wikiTitleTemplate],
-  );
-
   useEffect(() => {
-    setWikiUrl(buildWikiUrl(issueNumber));
-  }, [issueNumber, buildWikiUrl]);
+    setWikiUrl(
+      bookInfo.wikiHost && bookInfo.wikiTitleTemplate
+        ? wikiPageUrl(
+            bookInfo.wikiHost,
+            bookInfo.wikiTitleTemplate,
+            issueNumber,
+          )
+        : "",
+    );
+  }, [issueNumber, bookInfo.wikiHost, bookInfo.wikiTitleTemplate]);
 
-  async function handleFindSource() {
-    setLoading(true);
-    setError(null);
-    const result = await findReadingSource(bookInfo.name, issueNumber);
-    if (result.ok) {
-      setSourceUrl(result.data.url);
-      setConfidence(result.data.confidence);
-    } else {
-      setError(result.error);
-    }
-    setLoading(false);
-  }
-
-  async function handleCreate() {
-    setLoading(true);
-    setError(null);
-    const result = await createIssue({
+  async function handleConfirm(checked: {
+    url: string;
+    pageCount: number;
+  }): Promise<string | null> {
+    if (!wikiUrl) return "Add the wiki URL first.";
+    const result = await confirmSource({
       bookId: bookInfo.id,
       issueNumber,
       wikiUrl,
-      sourceUrl,
+      sourceUrl: checked.url,
     });
-    if (result.ok) {
-      setCreated(result.data.id);
-    } else {
-      setError(result.error);
-    }
-    setLoading(false);
+    if (!result.ok) return result.error;
+    setConfirmed({ issueId: result.data.id, url: checked.url });
+    void handleDownloadPages(result.data.id, checked.pageCount);
+    return null;
   }
 
-  async function handleDownloadPages() {
-    if (!created || !sourceUrl) return;
+  async function handleDownloadPages(issueId: string, expectedCount: number) {
     setDownloading(true);
     setDownload({
       status: "Starting...",
@@ -104,15 +81,17 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
 
     const controller = new AbortController();
     abortRef.current = controller;
+    let failed = false;
 
     try {
       const res = await fetch("/api/admin/download-pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // The route reads the URL from the issue row Confirm just saved.
         body: JSON.stringify({
           bookId: bookInfo.id,
-          issueId: created,
-          sourceUrl,
+          issueId,
+          expectedCount,
         }),
         signal: controller.signal,
       });
@@ -121,12 +100,12 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
         const err = (await res
           .json()
           .catch(() => ({ error: "Request failed" }))) as { error: string };
+        failed = true;
         setDownload((d) => ({
           ...d,
           error: err.error,
           done: true,
         }));
-        setDownloading(false);
         return;
       }
 
@@ -152,6 +131,7 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
           };
 
           if (event.type === "error") {
+            failed = true;
             setDownload((d) => ({
               ...d,
               status: event.message,
@@ -177,6 +157,7 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
         }
       }
     } catch (err) {
+      failed = true;
       if ((err as Error).name !== "AbortError") {
         setDownload((d) => ({
           ...d,
@@ -187,16 +168,14 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
     } finally {
       setDownloading(false);
       abortRef.current = null;
+      // Nothing was stored: unlock the source so it can be checked again.
+      if (failed) setConfirmed(null);
     }
   }
 
-  const command = `pnpm scrape-pages -- --url "${sourceUrl}" --book ${bookInfo.id} --issue ${issueNumber}`;
-
-  const confidenceColors = {
-    high: "bg-emerald-700 text-emerald-100",
-    medium: "bg-yellow-700 text-yellow-100",
-    low: "bg-red-700 text-red-100",
-  };
+  const command = confirmed
+    ? `pnpm scrape-pages -- --url "${confirmed.url}" --book ${bookInfo.id} --issue ${issueNumber}`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -210,8 +189,9 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
           <input
             type="number"
             value={issueNumber}
+            disabled={confirmed !== null}
             onChange={(e) => setIssueNumber(Number(e.target.value))}
-            className="w-24 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-100 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+            className="w-24 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-100 focus:ring-2 focus:ring-emerald-600 focus:outline-none disabled:opacity-60"
           />
           <span className="text-sm text-neutral-400">
             Next: #{bookInfo.nextIssueNumber}
@@ -225,123 +205,67 @@ export function AddIssueClient({ bookInfo }: { bookInfo: BookInfo }) {
         <input
           type="url"
           value={wikiUrl}
+          disabled={confirmed !== null}
           onChange={(e) => setWikiUrl(e.target.value)}
           placeholder="https://..."
-          className="w-full rounded-lg bg-neutral-800 px-4 py-2 text-neutral-100 placeholder-neutral-500 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+          className="w-full rounded-lg bg-neutral-800 px-4 py-2 text-neutral-100 placeholder-neutral-500 focus:ring-2 focus:ring-emerald-600 focus:outline-none disabled:opacity-60"
         />
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm text-neutral-400">
-          Reading Source
-        </label>
-        <input
-          type="url"
-          value={sourceUrl}
-          onChange={(e) => setSourceUrl(e.target.value)}
-          placeholder="https://..."
-          className="w-full rounded-lg bg-neutral-800 px-4 py-2 text-neutral-100 placeholder-neutral-500 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-        />
-        <div className="mt-2 flex items-center gap-3">
-          <button
-            onClick={handleFindSource}
-            disabled={loading}
-            className="rounded-lg bg-neutral-700 px-4 py-2 text-sm font-medium text-neutral-100 transition-colors hover:bg-neutral-600 disabled:opacity-50"
-          >
-            {loading ? "Searching..." : "Find Source"}
-          </button>
-          {confidence && (
-            <span
-              className={`rounded px-2 py-1 text-xs font-medium ${confidenceColors[confidence]}`}
-            >
-              {confidence}
-            </span>
-          )}
-        </div>
-      </div>
+      <SourceConfirm
+        key={issueNumber}
+        bookId={bookInfo.id}
+        issueNumber={issueNumber}
+        locked={confirmed !== null}
+        onConfirm={handleConfirm}
+      />
 
-      {error && (
-        <p className="rounded-lg bg-red-900/30 px-4 py-2 text-sm text-red-300">
-          {error}
-        </p>
-      )}
-
-      {!created ? (
-        <button
-          onClick={handleCreate}
-          disabled={loading || !sourceUrl || !wikiUrl}
-          className="rounded-lg bg-emerald-700 px-6 py-2 font-medium text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-        >
-          {loading ? "Creating..." : "Create Issue"}
-        </button>
-      ) : (
-        <div className="space-y-4 rounded-lg bg-neutral-800 p-4">
-          <p className="text-sm font-medium text-emerald-400">
-            Issue created successfully.
-          </p>
-
-          {/* Download Pages section */}
-          <div className="space-y-3 border-t border-neutral-700 pt-3">
-            <div className="flex items-center gap-3">
+      {(downloading || download.done) && (
+        <div className="space-y-2 rounded-lg bg-neutral-800 p-4">
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-neutral-300">{download.status}</p>
+            {downloading && (
               <button
-                onClick={handleDownloadPages}
-                disabled={downloading || download.done}
-                className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-cyan-600 disabled:opacity-50"
+                onClick={() => abortRef.current?.abort()}
+                className="rounded bg-red-700/60 px-3 py-1 text-xs text-red-200 hover:bg-red-600"
               >
-                {downloading
-                  ? "Downloading..."
-                  : download.done
-                    ? "Download Complete"
-                    : "Download Pages"}
+                Cancel
               </button>
-              {downloading && (
-                <button
-                  onClick={() => abortRef.current?.abort()}
-                  className="rounded bg-red-700/60 px-3 py-1 text-xs text-red-200 hover:bg-red-600"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-
-            {(downloading || download.done) && (
-              <div className="space-y-2">
-                <p className="text-sm text-neutral-300">{download.status}</p>
-                {download.total > 0 && (
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-700">
-                    <div
-                      className={`h-full transition-all ${download.error ? "bg-red-500" : "bg-cyan-500"}`}
-                      style={{
-                        width: `${(download.current / download.total) * 100}%`,
-                      }}
-                    />
-                  </div>
-                )}
-                {download.error && (
-                  <p className="text-sm text-red-400">{download.error}</p>
-                )}
-              </div>
             )}
           </div>
-
-          {/* Manual command fallback */}
-          <details className="border-t border-neutral-700 pt-3">
-            <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-300">
-              Manual command (CLI)
-            </summary>
-            <div className="mt-2 space-y-2">
-              <pre className="overflow-x-auto rounded bg-neutral-900 p-3 text-sm text-neutral-200">
-                {command}
-              </pre>
-              <button
-                onClick={() => navigator.clipboard.writeText(command)}
-                className="rounded bg-neutral-700 px-3 py-1 text-xs text-neutral-200 transition-colors hover:bg-neutral-600"
-              >
-                Copy
-              </button>
+          {download.total > 0 && (
+            <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-700">
+              <div
+                className={`h-full transition-all ${download.error ? "bg-red-500" : "bg-cyan-500"}`}
+                style={{
+                  width: `${(download.current / download.total) * 100}%`,
+                }}
+              />
             </div>
-          </details>
+          )}
+          {download.error && (
+            <p className="text-sm text-red-400">{download.error}</p>
+          )}
         </div>
+      )}
+
+      {confirmed && (
+        <details className="border-t border-neutral-700 pt-3">
+          <summary className="cursor-pointer text-sm text-neutral-500 hover:text-neutral-300">
+            Manual command (CLI)
+          </summary>
+          <div className="mt-2 space-y-2">
+            <pre className="overflow-x-auto rounded bg-neutral-900 p-3 text-sm text-neutral-200">
+              {command}
+            </pre>
+            <button
+              onClick={() => navigator.clipboard.writeText(command)}
+              className="rounded bg-neutral-700 px-3 py-1 text-xs text-neutral-200 transition-colors hover:bg-neutral-600"
+            >
+              Copy
+            </button>
+          </div>
+        </details>
       )}
     </div>
   );

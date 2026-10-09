@@ -5,7 +5,12 @@ import { z } from "zod";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { GEMINI_MEDIUM } from "~/lib/models";
-import { updateIssue } from "~/lib/issue-queries";
+import { selectIssue, updateIssue } from "~/lib/issue-queries";
+import {
+  fetchPageImageUrls,
+  isSameIssuePage,
+  MIN_PAGE_IMAGES,
+} from "~/lib/add-content/page-images";
 
 const RAW_BUCKET = "comic-pages-raw";
 
@@ -26,30 +31,51 @@ function encodeEvent(event: ProgressEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
 }
 
+const bodySchema = z.object({
+  bookId: z.string().min(1),
+  issueId: z.string().min(1),
+  /** The page count Doug confirmed on the Check step. */
+  expectedCount: z.number().int().positive(),
+});
+
+/** Cap on pages the browser path visits within one issue's own pagination. */
+const MAX_ISSUE_PAGES = 60;
+
+/**
+ * Stores the pages of the issue's confirmed `source_url`, read from the
+ * `issues` row; the client sends no URL (#792). The image list comes from a
+ * plain fetch first; the browser runs only when that finds too few. Nothing is
+ * stored unless the list matches the count Doug confirmed.
+ */
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as {
-    bookId: string;
-    issueId: string;
-    sourceUrl: string;
-  };
-
-  if (!body.bookId || !body.issueId || !body.sourceUrl) {
-    return Response.json({ error: "missing fields" }, { status: 400 });
-  }
-
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const bbApiKey = process.env.BROWSERBASE_API_KEY;
-  const bbProjectId = process.env.BROWSERBASE_PROJECT_ID;
-
-  if (!geminiKey || !bbApiKey || !bbProjectId) {
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
     return Response.json(
-      {
-        error:
-          "Missing GEMINI_API_KEY, BROWSERBASE_API_KEY, or BROWSERBASE_PROJECT_ID",
-      },
-      { status: 500 },
+      { error: "expected { bookId, issueId, expectedCount }" },
+      { status: 400 },
     );
   }
+  const body = parsed.data;
+
+  const { data: issue, error: issueReadErr } = (await selectIssue(
+    supabaseAdmin,
+    body.bookId,
+    body.issueId,
+    "source_url",
+  ).maybeSingle()) as {
+    data: { source_url: string | null } | null;
+    error: { message: string } | null;
+  };
+  if (issueReadErr) {
+    return Response.json({ error: issueReadErr.message }, { status: 500 });
+  }
+  if (!issue?.source_url) {
+    return Response.json(
+      { error: `${body.bookId}/${body.issueId} has no confirmed source URL` },
+      { status: 404 },
+    );
+  }
+  const sourceUrl = issue.source_url;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -58,124 +84,33 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        send({
-          type: "status",
-          message: "Launching browser via Browserbase...",
-        });
-
-        const { Stagehand } = await import("@browserbasehq/stagehand");
-        const stagehand = new Stagehand({
-          env: "BROWSERBASE",
-          apiKey: bbApiKey,
-          projectId: bbProjectId,
-          model: {
-            modelName: `google/${GEMINI_MEDIUM}`,
-            apiKey: geminiKey,
-          },
-          verbose: 0,
-          disablePino: true,
-          logger: () => undefined,
-        });
-
-        const collectedUrls: string[] = [];
+        send({ type: "status", message: `Reading ${sourceUrl}...` });
+        let collectedUrls: string[] = [];
         try {
-          await stagehand.init();
-
-          const page = stagehand.context.pages()[0];
-          if (!page) throw new Error("No browser page after init");
-
-          send({ type: "status", message: "Navigating to source URL..." });
-          await page.goto(body.sourceUrl, { waitUntil: "load" });
-
-          // Try setting "All pages" reading mode
-          const modeSet = await page.evaluate(() => {
-            const sel =
-              document.querySelector<HTMLSelectElement>("#selectReadType");
-            if (!sel) return false;
-            sel.value = "1";
-            sel.dispatchEvent(new Event("change", { bubbles: true }));
-            return true;
+          collectedUrls = await fetchPageImageUrls(sourceUrl);
+        } catch (err) {
+          send({
+            type: "status",
+            message: `Plain fetch failed: ${err instanceof Error ? err.message : "unknown"}`,
           });
-          if (modeSet) {
-            send({ type: "status", message: "Set reading mode to All Pages" });
-            await new Promise((r) => setTimeout(r, 1500));
-          }
+        }
 
-          send({ type: "status", message: "Scrolling to load all images..." });
-          await scrollToLoadImages(page);
-
-          send({ type: "status", message: "Extracting page image URLs..." });
-
-          const pageSchema = z.object({
-            pages: z
-              .array(
-                z.object({
-                  url: z
-                    .string()
-                    .url()
-                    .describe("Full URL of the comic page image"),
-                  pageNumber: z
-                    .number()
-                    .optional()
-                    .describe("Page number if visible"),
-                }),
-              )
-              .describe("All comic book page images found on this page"),
-          });
-
-          const seenUrls = new Set<string>();
-          let paginationAttempts = 0;
-          const MAX_PAGINATION = 50;
-
-          while (paginationAttempts <= MAX_PAGINATION) {
-            const result = await stagehand.extract(
-              "Extract all comic book page image URLs from this page. Include only the full-size page images, not thumbnails, icons, ads, navigation buttons, or UI elements.",
-              pageSchema,
-            );
-
-            for (const p of result.pages) {
-              if (!seenUrls.has(p.url)) {
-                seenUrls.add(p.url);
-                collectedUrls.push(p.url);
-              }
-            }
-
+        if (collectedUrls.length < MIN_PAGE_IMAGES) {
+          collectedUrls = await collectWithBrowser(sourceUrl, send);
+          if (collectedUrls.length < MIN_PAGE_IMAGES) {
             send({
-              type: "status",
-              message: `Found ${collectedUrls.length} page image(s)...`,
+              type: "error",
+              message: `Found ${collectedUrls.length} page image(s) on the confirmed issue and stopped. Nothing was stored.`,
             });
-
-            if (result.pages.length >= 3) break;
-
-            const observed = await stagehand.observe(
-              "Is there a next page button, next arrow, or pagination control to navigate to more comic pages?",
-            );
-            if (!observed || observed.length === 0) break;
-
-            await stagehand.act(
-              "click the next page button or arrow to go to the next comic page",
-            );
-            await page.waitForLoadState("load");
-            paginationAttempts++;
-          }
-        } finally {
-          try {
-            await stagehand.close();
-          } catch (closeErr) {
-            console.error(
-              "download-pages: stagehand.close() failed:",
-              closeErr,
-            );
+            return;
           }
         }
 
-        if (collectedUrls.length === 0) {
+        if (collectedUrls.length !== body.expectedCount) {
           send({
             type: "error",
-            message:
-              "Could not detect any page images. The site may use canvas rendering or DRM.",
+            message: `Found ${collectedUrls.length} page images, but ${body.expectedCount} were confirmed. Nothing was stored; check the source again.`,
           });
-          controller.close();
           return;
         }
 
@@ -315,6 +250,148 @@ function extFromUrl(url: string): string {
   const clean = url.split("?")[0] ?? url;
   const match = /\.(jpe?g|png|webp|gif)$/i.exec(clean);
   return match ? match[1]!.toLowerCase().replace("jpeg", "jpg") : "jpg";
+}
+
+/** A page's identity for the visited set: the URL without its hash. */
+function pageKey(url: string): string {
+  const u = new URL(url);
+  u.hash = "";
+  return u.href;
+}
+
+/**
+ * The browser path, for sites whose plain HTML lists too few page images. It
+ * reads the confirmed URL and follows only that issue's own pagination
+ * (`isSameIssuePage`): a link to another issue or another site ends the walk.
+ */
+async function collectWithBrowser(
+  sourceUrl: string,
+  send: (event: ProgressEvent) => void,
+): Promise<string[]> {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const bbApiKey = process.env.BROWSERBASE_API_KEY;
+  const bbProjectId = process.env.BROWSERBASE_PROJECT_ID;
+  if (!geminiKey || !bbApiKey || !bbProjectId) {
+    throw new Error(
+      "Missing GEMINI_API_KEY, BROWSERBASE_API_KEY, or BROWSERBASE_PROJECT_ID",
+    );
+  }
+
+  send({ type: "status", message: "Launching browser via Browserbase..." });
+
+  const { Stagehand } = await import("@browserbasehq/stagehand");
+  const stagehand = new Stagehand({
+    env: "BROWSERBASE",
+    apiKey: bbApiKey,
+    projectId: bbProjectId,
+    model: {
+      modelName: `google/${GEMINI_MEDIUM}`,
+      apiKey: geminiKey,
+    },
+    verbose: 0,
+    disablePino: true,
+    logger: () => undefined,
+  });
+
+  const collectedUrls: string[] = [];
+  try {
+    await stagehand.init();
+
+    const page = stagehand.context.pages()[0];
+    if (!page) throw new Error("No browser page after init");
+
+    send({ type: "status", message: "Navigating to source URL..." });
+    await page.goto(sourceUrl, { waitUntil: "load" });
+
+    // Try setting "All pages" reading mode
+    const modeSet = await page.evaluate(() => {
+      const sel = document.querySelector<HTMLSelectElement>("#selectReadType");
+      if (!sel) return false;
+      sel.value = "1";
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    });
+    if (modeSet) {
+      send({ type: "status", message: "Set reading mode to All Pages" });
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+
+    const pageSchema = z.object({
+      pages: z
+        .array(
+          z.object({
+            url: z.string().url().describe("Full URL of the comic page image"),
+            pageNumber: z
+              .number()
+              .optional()
+              .describe("Page number if visible"),
+          }),
+        )
+        .describe("All comic book page images found on this page"),
+    });
+
+    const seenUrls = new Set<string>();
+    const visited = new Set<string>();
+
+    while (visited.size < MAX_ISSUE_PAGES) {
+      // A redirect off the confirmed issue ends the walk before anything is read.
+      const here = await page.evaluate(() => location.href);
+      if (!isSameIssuePage(here, sourceUrl)) {
+        send({
+          type: "status",
+          message: `Left the confirmed issue (now at ${here}); stopped.`,
+        });
+        break;
+      }
+      visited.add(pageKey(here));
+
+      send({ type: "status", message: "Scrolling to load all images..." });
+      await scrollToLoadImages(page);
+
+      send({ type: "status", message: "Extracting page image URLs..." });
+      const result = await stagehand.extract(
+        "Extract all comic book page image URLs from this page. Include only the full-size page images, not thumbnails, icons, ads, navigation buttons, or UI elements.",
+        pageSchema,
+      );
+
+      for (const p of result.pages) {
+        if (!seenUrls.has(p.url)) {
+          seenUrls.add(p.url);
+          collectedUrls.push(p.url);
+        }
+      }
+
+      send({
+        type: "status",
+        message: `Found ${collectedUrls.length} page image(s)...`,
+      });
+
+      if (result.pages.length >= MIN_PAGE_IMAGES) break;
+
+      // Pagination: only this issue's own pages (`?page=2`, `/2/`), never a
+      // next-issue or other-site link.
+      const hrefs = await page.evaluate(() =>
+        Array.from(
+          document.querySelectorAll<HTMLAnchorElement>("a[href]"),
+          (a) => a.href,
+        ),
+      );
+      const next = hrefs.find(
+        (h) => isSameIssuePage(h, sourceUrl) && !visited.has(pageKey(h)),
+      );
+      if (!next) break;
+
+      send({ type: "status", message: `Opening ${next} (same issue)...` });
+      await page.goto(next, { waitUntil: "load" });
+    }
+  } finally {
+    try {
+      await stagehand.close();
+    } catch (closeErr) {
+      console.error("download-pages: stagehand.close() failed:", closeErr);
+    }
+  }
+  return collectedUrls;
 }
 
 interface ScrollablePage {
