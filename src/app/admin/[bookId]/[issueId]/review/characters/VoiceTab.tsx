@@ -438,32 +438,34 @@ export function VoiceTab({
   const undoRef = useRef<HTMLButtonElement>(null);
   /** Where focus goes once the pick clears and the footer unmounts: the confirmed row's radio, or "stop" for the group's Tab stop. */
   const refocus = useRef<HTMLElement | "stop" | null>(null);
-  /** The confirmed row's radio, checked again when the confirm's refresh lands. */
+  /** The confirmed row's radio, watched until the confirm's refresh drops it or the next pick. */
   const confirmed = useRef<HTMLElement | null>(null);
   const tabStop = () =>
     listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
   const cancel = () => {
     refocus.current = "stop";
+    confirmed.current = null;
     setPickedKey(null);
   };
   // After the render that clears the pick, since the Tab stop moves in it.
   useEffect(() => {
+    if (pickedKey) confirmed.current = null;
     const target = refocus.current;
     if (pickedKey || !target) return;
     refocus.current = null;
     (target !== "stop" && target.isConnected ? target : tabStop())?.focus();
   }, [pickedKey]);
-  // Once the confirm lands: if the confirmed row went with the refresh and
-  // focus fell to the body, the list's Tab stop takes it, or Undo on the
-  // request the list gave way to. Focus anywhere else is left alone.
+  // The refresh lands as a new card: if it dropped the confirmed row and
+  // focus fell to the body of a focused page, the list's Tab stop takes it,
+  // or Undo on the request the list gave way to. Focus anywhere else is left alone.
   useEffect(() => {
     const row = confirmed.current;
-    if (!row || busy) return;
+    if (!row || busy || row.isConnected) return;
     confirmed.current = null;
     const active = document.activeElement;
-    if (row.isConnected || (active && active !== document.body)) return;
+    if (!document.hasFocus() || (active && active !== document.body)) return;
     (tabStop() ?? undoRef.current)?.focus();
-  }, [busy]);
+  }, [card, busy]);
   // The footer is sticky at the panel's bottom, so a pick near the end of the
   // list would sit under it: scroll the panel by the overlap, and only then.
   useEffect(() => {
