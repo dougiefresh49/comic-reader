@@ -580,12 +580,46 @@ export function FacesPanel({
   );
 }
 
+const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
+
+/**
+ * Keeps Tab inside `ref`'s box while it is mounted: Tab on the last tabbable
+ * element goes to the first, Shift-Tab on the first goes to the last, and a
+ * Tab from outside the box lands on the first. The list is read at each
+ * keypress, so a button that `busy` disables drops out of it.
+ */
+export function useTabTrap(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const box = ref.current;
+      if (e.key !== "Tab" || e.defaultPrevented || !box) return;
+      const items = [...box.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+        (el) =>
+          el.tabIndex >= 0 &&
+          !el.matches(":disabled") &&
+          el.getClientRects().length > 0,
+      );
+      const i = items.indexOf(document.activeElement as HTMLElement);
+      let next: HTMLElement | undefined;
+      if (i === -1) next = items[0];
+      else if (e.shiftKey && i === 0) next = items.at(-1);
+      else if (!e.shiftKey && i === items.length - 1) next = items[0];
+      else return;
+      e.preventDefault();
+      next?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [ref]);
+}
+
 /**
  * A modal's chrome: the shape of the admin's StartConfirmDialog, a dimmed
  * backdrop that cancels on click, the box in the middle. Escape is the
  * caller's to handle (the character panel's window listener closes the
- * innermost open thing first), so this adds no key listener. `className`
- * sizes and lays out the box; the default is the confirm's 440px.
+ * innermost open thing first), so this adds no Escape listener; Tab stays
+ * inside the box (useTabTrap). `className` sizes and lays out the box; the
+ * default is the confirm's 440px.
  */
 export function DialogFrame({
   role = "dialog",
@@ -602,6 +636,8 @@ export function DialogFrame({
   onCancel: () => void;
   children: React.ReactNode;
 }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  useTabTrap(boxRef);
   return (
     <div
       role={role}
@@ -612,6 +648,7 @@ export function DialogFrame({
       className="fixed inset-0 z-[35] flex items-center justify-center bg-neutral-950/80 p-6"
     >
       <div
+        ref={boxRef}
         onClick={(e) => e.stopPropagation()}
         className={`max-w-full rounded-md border border-neutral-700 bg-neutral-900 p-4 text-[14px] ${className}`}
       >
