@@ -28,6 +28,8 @@ type Rollup = {
   hasCredits: boolean;
   missingCredits: number;
   usd: number;
+  /** Successful calls with no `usd_est` (no rate for the model): not in `usd`. */
+  missingUsd: number;
 };
 
 /** One issue's calls (both ids, as every `issues` read needs), or the calls with no book. */
@@ -77,6 +79,7 @@ function rollUp(rows: CallRow[]): Rollup[] {
       hasCredits: false,
       missingCredits: 0,
       usd: 0,
+      missingUsd: 0,
     };
     g.calls++;
     if (r.ok === false) g.failed++;
@@ -91,7 +94,8 @@ function rollUp(rows: CallRow[]): Rollup[] {
     if (r.provider === "elevenlabs" && r.ok === true && r.credits == null) {
       g.missingCredits++;
     }
-    g.usd += Number(r.usd_est ?? 0);
+    if (r.usd_est != null) g.usd += Number(r.usd_est);
+    else if (r.ok !== false) g.missingUsd++;
     groups.set(key, g);
   }
   return [...groups.values()].sort(
@@ -107,6 +111,10 @@ const creditsLabel = (credits: number, hasCredits: boolean, missing: number) =>
       ? num(credits)
       : "n/a";
 const usd = (n: number) => `$${n.toFixed(n > 0 && n < 0.01 ? 5 : 2)}`;
+const usdLabel = (n: number, missing: number) =>
+  missing > 0
+    ? `${usd(n)} (partial; ${num(missing)} ${missing === 1 ? "call" : "calls"} missing an estimate)`
+    : usd(n);
 
 /** The summary bar and the step-by-model table over `rows`. */
 export function CostReport({
@@ -122,6 +130,7 @@ export function CostReport({
   const totalCredits = groups.reduce((s, g) => s + g.credits, 0);
   const missingCredits = groups.reduce((s, g) => s + g.missingCredits, 0);
   const anyCredits = groups.some((g) => g.hasCredits);
+  const missingUsd = groups.reduce((s, g) => s + g.missingUsd, 0);
 
   const cell = "px-4 py-2 text-neutral-300";
   const numCell = `${cell} text-right tabular-nums`;
@@ -132,7 +141,7 @@ export function CostReport({
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-neutral-300">
           <span>
             <span className="text-neutral-500">{totalLabel} </span>
-            {usd(total)}
+            {usdLabel(total, missingUsd)}
           </span>
           {anyCredits || missingCredits > 0 ? (
             <span>
@@ -184,7 +193,7 @@ export function CostReport({
                   <td className={numCell}>
                     {creditsLabel(g.credits, g.hasCredits, g.missingCredits)}
                   </td>
-                  <td className={numCell}>{usd(g.usd)}</td>
+                  <td className={numCell}>{usdLabel(g.usd, g.missingUsd)}</td>
                 </tr>
               ))
             )}
@@ -199,7 +208,7 @@ export function CostReport({
               <td className={numCell}>
                 {creditsLabel(totalCredits, anyCredits, missingCredits)}
               </td>
-              <td className={numCell}>{usd(total)}</td>
+              <td className={numCell}>{usdLabel(total, missingUsd)}</td>
             </tr>
           </tfoot>
         </table>
