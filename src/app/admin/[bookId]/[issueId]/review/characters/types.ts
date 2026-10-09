@@ -105,7 +105,7 @@ export interface CharacterCard {
   /** The issue's castlist row has `no_audio`: the card shows it silent, with no voice (#410). */
   noAudio: boolean;
   voice: VoiceView | null;
-  /** Active, archived, then needs_clip voices, then appearances no voice holds; starting picks first, then by name. Empty for a card with no Change control. */
+  /** Active, archived, then needs_clip voices, then appearances no voice holds; starting picks first, then by name. Empty for a removed card or one that is not a `characters` row: its Voice tab lists no choices. */
   voicePicks: VoicePick[];
   voiceRequest: PendingVoiceRequest | null;
 }

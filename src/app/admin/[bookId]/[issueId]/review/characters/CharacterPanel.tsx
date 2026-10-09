@@ -217,7 +217,7 @@ export interface CharacterPanelProps {
   cards: CharacterCard[];
   known: KnownCharacter[];
   activeVoices: ActiveVoice[];
-  /** A `characters` row, not removed: the Voice tab gets the Change control. */
+  /** A `characters` row, not removed: the Voice tab lists the choices. */
   canChangeVoice: boolean;
   pullNote: string;
   busy: boolean;

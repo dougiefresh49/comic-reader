@@ -422,8 +422,9 @@ export async function loadCharacters(
     });
   }
 
-  // The appearances of the cards that show the Change control, and of any
-  // voice of theirs whose appearance is filed under another character.
+  // The appearances of the cards whose Voice tab lists the choices (a
+  // `characters` row, not removed), and of any voice of theirs whose
+  // appearance is filed under another character.
   const pickerIds = cards
     .filter((c) => characterIds.has(c.id) && !c.removed)
     .map((c) => c.id);
@@ -462,8 +463,8 @@ export async function loadCharacters(
     ]),
   );
 
-  // The Change control's data, only on cards that are a `characters` row.
-  // Clips are signed only for cards that show the control (not removed).
+  // The Voice tab's choices, only on cards that are a `characters` row.
+  // Clips are signed only for cards not removed.
   await Promise.all(
     cards.map(async (card) => {
       if (!characterIds.has(card.id)) return;
