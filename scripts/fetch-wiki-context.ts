@@ -11,6 +11,7 @@
  */
 
 import { supabase } from "./lib/supabase.js";
+import { wikiPageTitle } from "~/lib/add-content/wiki.js";
 import { fetchWikiContext } from "~/lib/wiki-fetch.js";
 import { listBookIssues, updateIssue } from "~/lib/issue-queries.js";
 import type { Json } from "~/types/database.js";
@@ -129,9 +130,9 @@ async function main() {
       continue;
     }
 
-    const pageTitle = book.wiki_title_template.replace(
-      "{number}",
-      String(issue.number),
+    const pageTitle = wikiPageTitle(
+      book.wiki_title_template,
+      Number(issue.number),
     );
     const { summary, appearances } = await fetchWikiContext(
       book.wiki_host,
