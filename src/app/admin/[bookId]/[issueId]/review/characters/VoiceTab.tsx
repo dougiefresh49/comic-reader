@@ -1,4 +1,4 @@
-// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows, the current voice marked among them, a preview on each row that has one, and a footer once another row is picked.
+// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -272,8 +272,9 @@ export interface VoiceTabProps {
 }
 
 /**
- * The Voice tab: the choices listed from the start, "Its voices", "Other
- * active voices" and "A new designed voice" as radio-style rows, with the
+ * The Voice tab: the choices listed from the start, "Its voices", "A new
+ * designed voice" and "Other active voices" as radio-style rows (the designed
+ * voice sits above the long active list so it is not buried), with the
  * current voice marked among them (the dot rests on it, and it keeps a
  * "current" pill once the dot moves). Picking another row shows a footer:
  * Cancel on the left, one primary button named for the pick on the right,
@@ -418,6 +419,28 @@ export function VoiceTab({
     : null;
   const group = `voice-${card.id}`;
   const cancel = () => setPickedKey(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  // The footer is sticky at the panel's bottom, so a pick near the end of the
+  // list would sit under it: scroll the panel by the overlap, and only then.
+  useEffect(() => {
+    if (!pickedKey) return;
+    const row = listRef.current
+      ?.querySelector('[role="radio"][aria-checked="true"]')
+      ?.closest("li");
+    const footer = footerRef.current;
+    if (!row || !footer) return;
+    const overlap =
+      row.getBoundingClientRect().bottom - footer.getBoundingClientRect().top;
+    if (overlap <= 0) return;
+    let scroller: HTMLElement | null = row.parentElement;
+    while (
+      scroller &&
+      !/auto|scroll/.test(getComputedStyle(scroller).overflowY)
+    )
+      scroller = scroller.parentElement;
+    scroller?.scrollBy({ top: overlap + 8, behavior: "smooth" });
+  }, [pickedKey]);
   const apply = () => {
     if (!picked || !action) return;
     // The dot goes back to the current voice, which the callback is about to change or keep.
@@ -481,6 +504,7 @@ export function VoiceTab({
 
       {listed && (
         <div
+          ref={listRef}
           role="radiogroup"
           aria-label={`Voice for ${card.name}`}
           className={`space-y-4 ${line ? "mt-4" : ""}`}
@@ -569,6 +593,25 @@ export function VoiceTab({
           </section>
 
           <section>
+            <SectionHeading>A new designed voice</SectionHeading>
+            <ul>
+              <ChoiceRow
+                name="New designed voice"
+                source="From the character's description"
+                pills={[]}
+                preview={null}
+                cache={cache}
+                loadingIds={loadingIds}
+                checked={pickedKey === "design"}
+                group={group}
+                onPick={() => setPickedKey("design")}
+                onPlay={playRow}
+                onLookup={lookup}
+              />
+            </ul>
+          </section>
+
+          <section>
             <SectionHeading>Other active voices</SectionHeading>
             {others.length === 0 ? (
               <p className="text-neutral-400">No other active voice.</p>
@@ -601,32 +644,16 @@ export function VoiceTab({
               </ul>
             )}
           </section>
-
-          <section>
-            <SectionHeading>A new designed voice</SectionHeading>
-            <ul>
-              <ChoiceRow
-                name="New designed voice"
-                source="From the character's description"
-                pills={[]}
-                preview={null}
-                cache={cache}
-                loadingIds={loadingIds}
-                checked={pickedKey === "design"}
-                group={group}
-                onPick={() => setPickedKey("design")}
-                onPlay={playRow}
-                onLookup={lookup}
-              />
-            </ul>
-          </section>
         </div>
       )}
 
       {playError && <p className="mt-3 text-amber-300">{playError}</p>}
 
       {listed && picked && action && (
-        <div className="sticky bottom-0 -mx-4 mt-3 -mb-4 border-t border-neutral-800 bg-neutral-950 px-4 py-3">
+        <div
+          ref={footerRef}
+          className="sticky bottom-0 -mx-4 mt-3 -mb-4 border-t border-neutral-800 bg-neutral-950 px-4 py-3"
+        >
           <div className="flex items-center justify-between gap-2">
             <button type="button" onClick={cancel} className={QUIET}>
               Cancel
