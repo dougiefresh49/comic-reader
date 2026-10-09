@@ -438,18 +438,16 @@ export function VoiceTab({
   const undoRef = useRef<HTMLButtonElement>(null);
   /** Where focus goes once the pick clears and the footer unmounts: the confirmed row's radio, or "stop" for the group's Tab stop. */
   const refocus = useRef<HTMLElement | "stop" | null>(null);
-  /** The confirmed row's radio, watched until the confirm's refresh drops it or the next pick. */
+  /** The confirmed row's radio, watched until a refresh drops it (a pick or Cancel since does not matter: the fallback only acts on focus left on the body). */
   const confirmed = useRef<HTMLElement | null>(null);
   const tabStop = () =>
     listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
   const cancel = () => {
     refocus.current = "stop";
-    confirmed.current = null;
     setPickedKey(null);
   };
   // After the render that clears the pick, since the Tab stop moves in it.
   useEffect(() => {
-    if (pickedKey) confirmed.current = null;
     const target = refocus.current;
     if (pickedKey || !target) return;
     refocus.current = null;
