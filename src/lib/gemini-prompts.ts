@@ -143,10 +143,9 @@ ${lastFields}
 
 /**
  * The voice-description prompt (#788): one character's per-line voice
- * snippets into one ElevenLabs Voice Design description. The same text
- * `describeVoices` in `src/workflows/steps/voice.ts` sends, which still
- * builds its own copy until it calls this. Word for word: a change here is
- * kid-facing prompt work.
+ * snippets into one ElevenLabs Voice Design description. The text
+ * `describeVoices` in `src/workflows/steps/voice.ts` sends. Word for word:
+ * a change here is kid-facing prompt work.
  */
 export function voiceDescriptionPrompt(
   name: string,
