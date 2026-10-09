@@ -22,9 +22,16 @@ import {
   setVoice,
   storeVoiceRequest,
   swapIssueVoice,
+  voiceFor,
   type VoiceRequest,
 } from "~/lib/cast";
-import { readVoice, voiceForAppearance } from "~/lib/voice-slots";
+import {
+  VOICE_CLIPS_BUCKET,
+  clipObjectPath,
+  readVoice,
+  voiceForAppearance,
+} from "~/lib/voice-slots";
+import { audioUrl } from "~/lib/storage";
 import { addAlias } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
@@ -45,6 +52,11 @@ export type PickResult =
   | { ok: true; message: string; previousVoiceUuid?: string | null }
   | { ok: false; error: string };
 
+/** `voicePreview`'s answer: a playable URL, null when the voice has no stored audio, or a failure. */
+export type PreviewResult =
+  | { ok: true; url: string | null }
+  | { ok: false; error: string };
+
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
 export type NameTarget =
   | { kind: "existing"; id: string }
@@ -59,7 +71,7 @@ function revalidate({ bookId, issueId }: Scope) {
   revalidatePath(`/admin/${bookId}/${issueId}/review/characters`, "page");
 }
 
-function fail(what: string, err: unknown): ActionResult {
+function fail(what: string, err: unknown): { ok: false; error: string } {
   const message = err instanceof Error ? err.message : String(err);
   console.error(`characters stop, ${what}:`, err);
   return { ok: false, error: message };
@@ -994,6 +1006,75 @@ export async function undoVoiceRequest(args: {
 }
 
 /** Approve: the gate first (it seeds the cast), then the `cluster-review` hook resumes. */
+/**
+ * A playable preview of a voice (#745, owner call O1, option B), read-only
+ * and called on the first Play: a signed URL to the voice's source clip
+ * when it has one (as the loader signs an archived clone's), else the audio
+ * of one bubble in this book already rendered in that voice, else null. A
+ * bubble records its character, not its voice, so the castlist rows of the
+ * book that hold the voice name the (issue, character) pairs, each checked
+ * against the render chain (`voiceFor`), this issue first.
+ */
+export async function voicePreview(args: {
+  scope: Scope;
+  voiceId: string;
+}): Promise<PreviewResult> {
+  try {
+    await requireAdmin();
+    const { scope, voiceId } = args;
+    const voice = await readVoice(supabaseAdmin, voiceId);
+    if (!voice) return { ok: true, url: null };
+    if (voice.source_clip_path) {
+      const signed = await supabaseAdmin.storage
+        .from(VOICE_CLIPS_BUCKET)
+        .createSignedUrl(clipObjectPath(voice.source_clip_path), 3600);
+      if (signed.data?.signedUrl)
+        return { ok: true, url: signed.data.signedUrl };
+      // A clip that will not sign falls through to a rendered bubble.
+      console.warn(
+        `characters stop, signing ${voice.source_clip_path}:`,
+        signed.error?.message,
+      );
+    }
+    const book = await loadBookCast(supabaseAdmin, scope.bookId);
+    const pairs = book.rows
+      .filter(
+        (r) =>
+          r.voice_uuid === voiceId &&
+          voiceFor(book, r.character_id, r.issue_id)?.voiceUuid === voiceId,
+      )
+      .sort((a, b) =>
+        a.issue_id === scope.issueId
+          ? -1
+          : b.issue_id === scope.issueId
+            ? 1
+            : 0,
+      );
+    for (const r of pairs) {
+      const bubble = await supabaseAdmin
+        .from("bubbles")
+        .select("audio_storage_path")
+        .eq("book_id", scope.bookId)
+        .eq("issue_id", r.issue_id)
+        .eq("character_id", r.character_id)
+        .eq("needs_audio", false)
+        .not("audio_storage_path", "is", null)
+        .limit(1)
+        .maybeSingle();
+      must("reading a rendered bubble", bubble.error);
+      const row = bubble.data as { audio_storage_path: string | null } | null;
+      if (row?.audio_storage_path)
+        return {
+          ok: true,
+          url: audioUrl(scope.bookId, r.issue_id, row.audio_storage_path),
+        };
+    }
+    return { ok: true, url: null };
+  } catch (err) {
+    return fail("previewing a voice", err);
+  }
+}
+
 export async function approveCharacters(scope: Scope): Promise<ActionResult> {
   try {
     await requireAdmin();

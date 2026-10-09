@@ -29,6 +29,7 @@ import {
   requestVoice,
   setActiveVoice,
   undoVoiceRequest,
+  voicePreview,
   type ActionResult,
   type NameTarget,
 } from "./actions";
@@ -491,6 +492,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
           franchiseId: data.franchiseId,
         }),
       ),
+    onPreviewVoice: (voiceId: string) => voicePreview({ scope, voiceId }),
     onMoveMany: (faces: FaceView[], target: NameTarget, name: string) =>
       run(`Moving ${faces.length} faces to ${name}`, () =>
         moveFaces({

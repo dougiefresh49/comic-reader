@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { VoiceRequest } from "~/lib/cast";
+import type { PreviewResult } from "./actions";
 import {
   BUTTON,
   ICON_BUTTON,
@@ -72,18 +73,62 @@ const choiceKey = (c: Choice) =>
       ? `active:${c.voice.id}`
       : "design";
 
-/** A Play button for a preview URL. The parent owns the one audio element. */
-function PlayButton({ name, onPlay }: { name: string; onPlay: () => void }) {
+/** What a row knows about its preview before anyone clicks Play. */
+type PreviewSource =
+  | { url: string }
+  /** A `voices` row to ask `voicePreview` about on the first click. */
+  | { voiceId: string };
+
+/** The answers the tab keeps per voice id, once asked: a URL, or null when the voice has no stored audio. */
+type PreviewCache = Record<string, string | null>;
+
+/**
+ * A row's Play: plays a URL it already has; otherwise the first click asks
+ * `voicePreview` (a loading state meanwhile), and a null answer leaves a
+ * muted "no stored audio" mark in its place. The parent owns the one audio
+ * element and the cache.
+ */
+function PreviewPlay({
+  name,
+  source,
+  cache,
+  loadingId,
+  onPlay,
+  onLookup,
+}: {
+  name: string;
+  source: PreviewSource;
+  cache: PreviewCache;
+  loadingId: string | null;
+  onPlay: (name: string, url: string) => void;
+  onLookup: (voiceId: string, name: string) => void;
+}) {
+  const url = "url" in source ? source.url : cache[source.voiceId];
+  if (url === null)
+    return (
+      <span
+        role="img"
+        aria-label={`No stored audio for ${name}`}
+        title="No stored audio for this voice"
+        className={`${ICON_BUTTON} cursor-default text-neutral-700 hover:bg-transparent hover:text-neutral-700`}
+      >
+        <PlayIcon />
+      </span>
+    );
+  const loading = "voiceId" in source && loadingId === source.voiceId;
   return (
     <button
       type="button"
+      disabled={loading}
+      aria-busy={loading || undefined}
       onClick={(e) => {
         e.stopPropagation();
-        onPlay();
+        if (url) onPlay(name, url);
+        else if ("voiceId" in source) onLookup(source.voiceId, name);
       }}
-      aria-label={`Play ${name}`}
-      title={`Play ${name}`}
-      className={ICON_BUTTON}
+      aria-label={loading ? `Finding audio for ${name}` : `Play ${name}`}
+      title={loading ? "Finding audio…" : `Play ${name}`}
+      className={`${ICON_BUTTON} ${loading ? "animate-pulse" : ""}`}
     >
       <PlayIcon />
     </button>
@@ -99,17 +144,23 @@ function ChoiceRow({
   name,
   source,
   pills,
-  previewUrl,
+  preview,
+  cache,
+  loadingId,
   checked,
   disabled = false,
   group,
   onPick,
   onPlay,
+  onLookup,
 }: {
   name: string;
   source: string | null;
   pills: string[];
-  previewUrl: string | null;
+  /** Null: no Play at all (an appearance, the designed-voice row). */
+  preview: PreviewSource | null;
+  cache: PreviewCache;
+  loadingId: string | null;
   checked: boolean;
   /** The current voice: shown for the record, not a choice. */
   disabled?: boolean;
@@ -117,6 +168,7 @@ function ChoiceRow({
   group: string;
   onPick: () => void;
   onPlay: (name: string, url: string) => void;
+  onLookup: (voiceId: string, name: string) => void;
 }) {
   return (
     <li
@@ -172,8 +224,15 @@ function ChoiceRow({
           </span>
         ))}
       </button>
-      {previewUrl !== null && (
-        <PlayButton name={name} onPlay={() => onPlay(name, previewUrl)} />
+      {preview && (
+        <PreviewPlay
+          name={name}
+          source={preview}
+          cache={cache}
+          loadingId={loadingId}
+          onPlay={onPlay}
+          onLookup={onLookup}
+        />
       )}
     </li>
   );
@@ -226,6 +285,7 @@ export interface VoiceTabProps {
   onPickAppearance: (appearanceId: string) => void;
   onCastArchived: (voiceId: string) => void;
   onUndoVoiceRequest: () => void;
+  onPreviewVoice: (voiceId: string) => Promise<PreviewResult>;
 }
 
 /**
@@ -233,8 +293,13 @@ export interface VoiceTabProps {
  * its source in grey, Play when a preview exists, and Change on the right.
  * Change opens the browser in place: "Its voices", "Other active voices" and
  * "A new designed voice" as radio-style rows, and a footer whose one primary
- * button is named for the picked row. Every row's Play renders only when its
- * `previewUrl` is a string; today that is the archived clone's clip.
+ * button is named for the picked row. Play on the current voice and on every
+ * `voices` row: a row with a URL of its own (an archived clone's signed clip
+ * from the loader, or a `previewUrl` override) plays it at once; otherwise
+ * the first click asks `voicePreview` (the source clip signed, else a bubble
+ * of this book rendered in that voice), the answer is kept per voice id, and
+ * null leaves a "no stored audio" mark. Appearances and the designed-voice
+ * row have no Play.
  */
 export function VoiceTab({
   card,
@@ -247,6 +312,7 @@ export function VoiceTab({
   onPickAppearance,
   onCastArchived,
   onUndoVoiceRequest,
+  onPreviewVoice,
 }: VoiceTabProps) {
   const [changing, setChanging] = useState(false);
   const currentId = card.voice?.uuid ?? null;
@@ -260,6 +326,8 @@ export function VoiceTab({
   });
   const [pull, setPull] = useState<"copied" | "failed" | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
+  const [cache, setCache] = useState<PreviewCache>({});
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => audio.current?.pause(), []);
 
@@ -268,8 +336,28 @@ export function VoiceTab({
     setPlayError(null);
     const a = new Audio(url);
     audio.current = a;
-    a.play().catch(() => setPlayError(`Could not play ${name}.`));
+    a.play().catch((err: unknown) => {
+      // A play cut short by the next Play rejects with AbortError: not a failure.
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setPlayError(`Could not play ${name}.`);
+    });
   };
+  /** The first Play on a voice with no URL yet: ask once, keep the answer, play it when there is one. */
+  const lookup = async (voiceId: string, name: string) => {
+    setPlayError(null);
+    setLoadingId(voiceId);
+    const result = await onPreviewVoice(voiceId);
+    setLoadingId(null);
+    if (!result.ok) return setPlayError(result.error);
+    setCache((cur) => ({ ...cur, [voiceId]: result.url }));
+    if (result.url) play(name, result.url);
+  };
+  /** A row's preview source: its own URL when it has one, else its voice id for the lookup. */
+  const sourceOf = (
+    voiceId: string,
+    previewUrl: string | null | undefined,
+  ): PreviewSource =>
+    typeof previewUrl === "string" ? { url: previewUrl } : { voiceId };
 
   const others = activeVoices.filter((v) => v.id !== currentId);
   const choices: Choice[] = [
@@ -324,7 +412,9 @@ export function VoiceTab({
     current && !current.borrowedFrom && currentPick
       ? (currentPick.work ?? "Designed voice")
       : null;
-  const currentPreview = current?.previewUrl ?? null;
+  const currentPreview = current?.uuid
+    ? sourceOf(current.uuid, current.previewUrl)
+    : null;
 
   return (
     <div className="text-[14px]">
@@ -338,10 +428,14 @@ export function VoiceTab({
             <span className="text-neutral-500">, {currentSource}</span>
           )}
         </span>
-        {current && currentPreview !== null && (
-          <PlayButton
+        {current && currentPreview && (
+          <PreviewPlay
             name={current.name}
-            onPlay={() => play(current.name, currentPreview)}
+            source={currentPreview}
+            cache={cache}
+            loadingId={loadingId}
+            onPlay={play}
+            onLookup={lookup}
           />
         )}
         {canChangeVoice && !card.voiceRequest && (
@@ -438,12 +532,17 @@ export function VoiceTab({
                         name={name}
                         source={source || null}
                         pills={pills}
-                        previewUrl={p.kind === "voice" ? p.clipUrl : null}
+                        preview={
+                          p.kind === "voice" ? sourceOf(p.id, p.clipUrl) : null
+                        }
+                        cache={cache}
+                        loadingId={loadingId}
                         checked={pickedKey === key}
                         disabled={current}
                         group={group}
                         onPick={() => setPickedKey(key)}
                         onPlay={play}
+                        onLookup={lookup}
                       />
                     );
                   })}
@@ -465,11 +564,14 @@ export function VoiceTab({
                         name={v.name}
                         source={null}
                         pills={["active"]}
-                        previewUrl={v.previewUrl ?? null}
+                        preview={sourceOf(v.id, v.previewUrl)}
+                        cache={cache}
+                        loadingId={loadingId}
                         checked={pickedKey === key}
                         group={group}
                         onPick={() => setPickedKey(key)}
                         onPlay={play}
+                        onLookup={lookup}
                       />
                     );
                   })}
@@ -484,11 +586,14 @@ export function VoiceTab({
                   name="New designed voice"
                   source="From the character's description"
                   pills={[]}
-                  previewUrl={null}
+                  preview={null}
+                  cache={cache}
+                  loadingId={loadingId}
                   checked={pickedKey === "design"}
                   group={group}
                   onPick={() => setPickedKey("design")}
                   onPlay={play}
+                  onLookup={lookup}
                 />
               </ul>
             </section>

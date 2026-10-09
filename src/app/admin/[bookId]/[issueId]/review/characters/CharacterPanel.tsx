@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { VoiceRequest } from "~/lib/cast";
-import type { NameTarget } from "./actions";
+import type { NameTarget, PreviewResult } from "./actions";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
 import {
@@ -238,6 +238,8 @@ export interface CharacterPanelProps {
   onPickAppearance: (appearanceId: string) => void;
   onCastArchived: (voiceId: string) => void;
   onUndoVoiceRequest: () => void;
+  /** The read-only `voicePreview` action, for a Play with no URL yet. */
+  onPreviewVoice: (voiceId: string) => Promise<PreviewResult>;
 }
 
 /**
@@ -271,6 +273,7 @@ export function CharacterPanel({
   onPickAppearance,
   onCastArchived,
   onUndoVoiceRequest,
+  onPreviewVoice,
 }: CharacterPanelProps) {
   const [renaming, setRenaming] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -342,6 +345,7 @@ export function CharacterPanel({
       onPickAppearance={onPickAppearance}
       onCastArchived={onCastArchived}
       onUndoVoiceRequest={onUndoVoiceRequest}
+      onPreviewVoice={onPreviewVoice}
     />
   );
 
