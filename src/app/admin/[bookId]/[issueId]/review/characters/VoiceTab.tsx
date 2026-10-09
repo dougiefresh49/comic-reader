@@ -1,4 +1,4 @@
-// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick, and Cancel or confirm hands focus back to a row.
+// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick, and Cancel, confirm or Undo request hands focus back to a row (or to Undo, when the undo fails).
 "use client";
 
 import Link from "next/link";
@@ -253,7 +253,7 @@ function VoiceRequestNote({
   scope: { bookId: string; issueId: string };
   busy: boolean;
   onUndo: () => void;
-  /** Undo, for the tab to focus when a confirm gives the list way to this note. */
+  /** Undo, for the tab to focus when a confirm gives the list way to this note, or when an undo fails. */
   undoRef?: React.Ref<HTMLButtonElement>;
 }) {
   const request = card.voiceRequest;
@@ -321,7 +321,8 @@ export interface VoiceTabProps {
  * Cancel on the left, one primary button named for the pick on the right,
  * and under them a line on when the pick takes effect. Cancel puts focus on
  * the group's Tab stop, a confirm on the confirmed row (or Undo, when the
- * list gives way to a request). A voice with no row
+ * list gives way to a request), and Undo request on the Tab stop once the
+ * list is back (on Undo again when the request stays). A voice with no row
  * of its own (none yet, no audio this run, a borrowed voice that is not
  * active) gets one plain line above the list, and a card that cannot change
  * (removed, or a request pending) gets that line in place of the list; the
@@ -463,6 +464,8 @@ export function VoiceTab({
   const refocus = useRef<HTMLElement | "stop" | null>(null);
   /** The confirmed row's radio, watched until a refresh drops it (a pick or Cancel since does not matter: the fallback only acts on focus left on the body). */
   const confirmed = useRef<HTMLElement | null>(null);
+  /** The card Undo request was clicked on, watched until the refresh brings a new one. */
+  const undoneFrom = useRef<CharacterCard | null>(null);
   const tabStop = () =>
     listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
   const cancel = () => {
@@ -483,6 +486,18 @@ export function VoiceTab({
     const row = confirmed.current;
     if (!row || busy || row.isConnected) return;
     confirmed.current = null;
+    const active = document.activeElement;
+    if (!document.hasFocus() || (active && active !== document.body)) return;
+    (tabStop() ?? undoRef.current)?.focus();
+  }, [card, busy]);
+  // Undo is disabled while it runs, which drops its focus to the body. Busy
+  // may clear a render before the refresh lands, so wait for the new card:
+  // then focus on the body of a focused page goes to the list's Tab stop, or
+  // back to Undo when the request stayed. Focus anywhere else is left alone.
+  useEffect(() => {
+    const from = undoneFrom.current;
+    if (!from || busy || from === card) return;
+    undoneFrom.current = null;
     const active = document.activeElement;
     if (!document.hasFocus() || (active && active !== document.body)) return;
     (tabStop() ?? undoRef.current)?.focus();
@@ -604,7 +619,10 @@ export function VoiceTab({
           card={card}
           scope={scope}
           busy={busy}
-          onUndo={onUndoVoiceRequest}
+          onUndo={() => {
+            undoneFrom.current = card;
+            onUndoVoiceRequest();
+          }}
           undoRef={undoRef}
         />
       )}
