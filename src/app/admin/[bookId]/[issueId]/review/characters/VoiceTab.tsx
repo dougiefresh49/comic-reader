@@ -88,6 +88,7 @@ function PreviewPlay({
   source,
   cache,
   loadingIds,
+  tabbable = true,
   onPlay,
   onLookup,
 }: {
@@ -96,6 +97,8 @@ function PreviewPlay({
   cache: PreviewCache;
   /** The voice ids a lookup is out for; each keeps its own button busy. */
   loadingIds: ReadonlySet<string>;
+  /** False: out of the Tab order, for a row in the radio group that is not its Tab stop. */
+  tabbable?: boolean;
   onPlay: (name: string, url: string) => void;
   onLookup: (voiceId: string, name: string) => void;
 }) {
@@ -116,6 +119,7 @@ function PreviewPlay({
     <button
       type="button"
       disabled={loading}
+      tabIndex={tabbable ? undefined : -1}
       aria-busy={loading || undefined}
       onClick={(e) => {
         e.stopPropagation();
@@ -135,7 +139,7 @@ function PreviewPlay({
  * One radio-style row of the list: name in bold, the source in grey, the
  * status pills, and Play when the row has a preview. A click anywhere on the
  * row picks it; the radio button inside carries the keyboard, and only the
- * checked one is in the Tab order. The current voice is a row like the
+ * checked one (with its Play) is in the Tab order. The current voice is a row like the
  * others: the dot rests on it, a pick moves the dot, and its "current" pill
  * stays.
  */
@@ -218,6 +222,7 @@ function ChoiceRow({
           source={preview}
           cache={cache}
           loadingIds={loadingIds}
+          tabbable={tabbable}
           onPlay={onPlay}
           onLookup={onLookup}
         />
