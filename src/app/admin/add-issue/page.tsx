@@ -3,6 +3,8 @@ import { getBookInfo } from "./actions";
 import { AddIssueClient } from "./AddIssueClient";
 
 export const dynamic = "force-dynamic";
+// The Check action may run a browser session (previewSource).
+export const maxDuration = 300;
 
 export default async function AddIssuePage({
   searchParams,

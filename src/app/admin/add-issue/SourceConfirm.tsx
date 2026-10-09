@@ -156,7 +156,9 @@ export function SourceConfirm({
           </div>
           {pageCount < MIN_PAGE_IMAGES && (
             <p className="text-sm text-yellow-300">
-              Too few page images to be a whole issue. Try another source.
+              Too few page images to be a whole issue
+              {preview.pageTitle ? ` (page: "${preview.pageTitle}")` : ""}. Try
+              another source.
             </p>
           )}
           {!locked && (

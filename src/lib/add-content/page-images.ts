@@ -1,7 +1,6 @@
 /**
- * Page images from a source page with one plain HTTP fetch, no browser and no
- * Gemini (#792). The Check step and the downloader share this, so the count
- * Doug confirms is the list the downloader stores.
+ * Page images from a source page's HTML, no browser and no Gemini (#792).
+ * Client-safe; the browser fallback lives in `collect-pages.ts`.
  */
 
 /** Fewer images than this means the page is not a whole issue. */
@@ -29,7 +28,7 @@ function attr(tag: string, name: string): string | null {
   return (m[1] ?? m[2] ?? m[3] ?? "").replace(/&amp;|&#0?38;/g, "&").trim();
 }
 
-/** Madara (grabber.zone and its kin) marks every page image with this class. */
+/** WordPress "Madara" reader sites mark every page image with this class. */
 const READER_IMG_CLASS = /\bwp-manga-chapter-img\b/;
 const UI_IMAGE =
   /logo|icon|avatar|banner|sprite|placeholder|dflazy|loading|thumb|emoji|badge|button|\/ads?\//i;
@@ -77,10 +76,6 @@ export function extractPageImageUrls(html: string, pageUrl: string): string[] {
     }
   }
   return [...new Set(picked.map((i) => i.url))];
-}
-
-export async function fetchPageImageUrls(url: string): Promise<string[]> {
-  return extractPageImageUrls(await fetchHtml(url), url);
 }
 
 /** `og:site_name` up to its first " - " or " | ", else the host. */
