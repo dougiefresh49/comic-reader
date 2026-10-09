@@ -334,7 +334,15 @@ export function VoiceTab({
   /** The voice of the most recent Play click: a lookup that lands for any other voice is kept, not played. */
   const latest = useRef<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => audio.current?.pause(), []);
+  // On unmount, stop what plays and forget the latest click, so a lookup
+  // that lands after the tab closed is cached and never started.
+  useEffect(
+    () => () => {
+      audio.current?.pause();
+      latest.current = null;
+    },
+    [],
+  );
 
   const play = (name: string, url: string) => {
     audio.current?.pause();
@@ -373,7 +381,11 @@ export function VoiceTab({
       next.delete(voiceId);
       return next;
     });
-    if (!result.ok) return setPlayError(result.error);
+    if (!result.ok) {
+      // A failure for a voice the user has moved past says nothing.
+      if (latest.current === voiceId) setPlayError(result.error);
+      return;
+    }
     setCache((cur) => ({ ...cur, [voiceId]: result.url }));
     if (result.url && latest.current === voiceId) play(name, result.url);
   };
