@@ -780,21 +780,43 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         // it just dropped, so that slot can be swapped out again.
         const after = roster ? slotModel(roster, next) : null;
         const free = after ? freeFor(after, null) : 1;
+        // The swap the old pick had, so switching between archived voices
+        // keeps the voice already chosen to swap out.
+        const prior = staged.find(
+          (s) => s.pickFor === card.id && s.move.kind === "archive",
+        )?.move;
         const target =
           slot ??
           (free > 0
             ? undefined
-            : after?.slots.find(
+            : (after?.slots.find(
                 (v) =>
                   v.slot.holder.kind === "repo" &&
                   v.slot.holder.characterId === card.id &&
                   v.slot.lock === "movable" &&
                   v.outBy === null,
-              ));
-        const out =
+              ) ??
+              after?.slots.find(
+                (v) =>
+                  prior?.kind === "archive" &&
+                  v.slot.holder.kind !== "free" &&
+                  v.outBy === null &&
+                  (prior.voice_uuid
+                    ? v.slot.holder.voiceUuid === prior.voice_uuid
+                    : v.slot.holder.elevenLabsId === prior.elevenlabs_id),
+              )));
+        const fresh =
           target && target.slot.holder.kind !== "free"
             ? archiveOf(target.slot)
             : null;
+        // Same voice as the old swap: keep its Back up first and lossy ticks.
+        const out =
+          fresh &&
+          prior?.kind === "archive" &&
+          prior.voice_uuid === fresh.voice_uuid &&
+          (prior.elevenlabs_id ?? null) === (fresh.elevenlabs_id ?? null)
+            ? prior
+            : fresh;
         if (out) next = [...next, { move: out, pickFor: card.id }];
         how = out
           ? ` · swaps out ${target!.slot.holder.kind !== "free" ? target!.slot.holder.name : ""}`

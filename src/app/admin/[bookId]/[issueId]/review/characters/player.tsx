@@ -165,7 +165,10 @@ export function PlayButton({
   return (
     <button
       type="button"
-      disabled={none || busy}
+      // Busy stays focusable (aria-disabled): disabling the focused button
+      // while its preview loads drops keyboard focus to the page.
+      disabled={none}
+      aria-disabled={busy || undefined}
       aria-label={
         none
           ? `No stored audio for ${name}`
@@ -176,6 +179,7 @@ export function PlayButton({
       title={none ? "No stored audio" : isPlaying ? "Stop" : "Play"}
       onClick={(e) => {
         e.stopPropagation();
+        if (busy) return;
         if ("voiceId" in source) {
           if (isPlaying) p.stop();
           else p.playVoice(source.voiceId);
