@@ -3,25 +3,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { VoiceRequest } from "~/lib/cast";
-import { BUTTON, ICON_BUTTON, PRIMARY, QUIET, VoiceLine } from "./shared";
+import {
+  BUTTON,
+  ICON_BUTTON,
+  PRIMARY,
+  QUIET,
+  SVG_ICON,
+  VoiceLine,
+} from "./shared";
 import type { ActiveVoice, CharacterCard, VoicePick } from "./types";
-
-const ICON = {
-  xmlns: "http://www.w3.org/2000/svg",
-  width: 16,
-  height: 16,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-  "aria-hidden": true,
-} as const;
 
 function PlayIcon() {
   return (
-    <svg {...ICON} fill="currentColor" stroke="none">
+    <svg {...SVG_ICON} fill="currentColor" stroke="none">
       <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" />
     </svg>
   );
@@ -29,7 +23,7 @@ function PlayIcon() {
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
-    <svg {...ICON} className={open ? "rotate-180" : ""}>
+    <svg {...SVG_ICON} className={open ? "rotate-180" : ""}>
       <path d="m6 9 6 6 6-6" />
     </svg>
   );
@@ -107,6 +101,8 @@ function ChoiceRow({
   pills,
   previewUrl,
   checked,
+  disabled = false,
+  group,
   onPick,
   onPlay,
 }: {
@@ -115,38 +111,55 @@ function ChoiceRow({
   pills: string[];
   previewUrl: string | null;
   checked: boolean;
+  /** The current voice: shown for the record, not a choice. */
+  disabled?: boolean;
+  /** The radio group's `name`. */
+  group: string;
   onPick: () => void;
   onPlay: (name: string, url: string) => void;
 }) {
   return (
     <li
-      onClick={onPick}
+      onClick={disabled ? undefined : onPick}
       className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
         checked
           ? "border-neutral-300 bg-neutral-800"
-          : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/60"
+          : disabled
+            ? "border-neutral-800 bg-neutral-900/40"
+            : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/60"
       }`}
     >
       <button
         type="button"
         role="radio"
+        name={group}
         aria-checked={checked}
+        aria-disabled={disabled || undefined}
+        disabled={disabled}
         onClick={(e) => {
           e.stopPropagation();
           onPick();
         }}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
       >
         <span
           aria-hidden
           className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-            checked ? "border-white" : "border-neutral-500"
+            checked
+              ? "border-white"
+              : disabled
+                ? "border-neutral-700"
+                : "border-neutral-500"
           }`}
         >
           {checked && <span className="block size-2 rounded-full bg-white" />}
         </span>
         <span className="min-w-0 flex-1 leading-5">
-          <span className="block truncate font-medium text-neutral-100">
+          <span
+            className={`block truncate font-medium ${
+              disabled ? "text-neutral-400" : "text-neutral-100"
+            }`}
+          >
             {name}
           </span>
           {source && (
@@ -236,9 +249,12 @@ export function VoiceTab({
   onUndoVoiceRequest,
 }: VoiceTabProps) {
   const [changing, setChanging] = useState(false);
+  const currentId = card.voice?.uuid ?? null;
+  /** The current voice's own entry: shown under "Its voices" for the record, never a choice. */
+  const isCurrent = (p: VoicePick) => p.kind === "voice" && p.id === currentId;
   const [pickedKey, setPickedKey] = useState<string | null>(() => {
     const start = card.voicePicks.find(
-      (p) => p.kind === "voice" && p.startingPick,
+      (p) => p.kind === "voice" && p.startingPick && !isCurrent(p),
     );
     return start ? `pick:${start.id}` : null;
   });
@@ -255,9 +271,11 @@ export function VoiceTab({
     a.play().catch(() => setPlayError(`Could not play ${name}.`));
   };
 
-  const others = activeVoices.filter((v) => v.id !== card.voice?.uuid);
+  const others = activeVoices.filter((v) => v.id !== currentId);
   const choices: Choice[] = [
-    ...card.voicePicks.map((pick): Choice => ({ section: "pick", pick })),
+    ...card.voicePicks
+      .filter((p) => !isCurrent(p))
+      .map((pick): Choice => ({ section: "pick", pick })),
     ...others.map((voice): Choice => ({ section: "active", voice })),
     { section: "design" },
   ];
@@ -269,6 +287,7 @@ export function VoiceTab({
         ? { label: "Use this voice", kind: "use" as const }
         : { label: "Request this design", kind: "design" as const }
     : null;
+  const group = `voice-${card.id}`;
   const close = () => setChanging(false);
   const apply = () => {
     if (!picked || !action) return;
@@ -292,14 +311,18 @@ export function VoiceTab({
     }
   };
 
-  // The current voice's source: whose it is when borrowed, else the work its clone came from.
+  // The current voice's source: VoiceLine names whose it is when borrowed;
+  // otherwise its own entry says the work it was cloned from, or that it is designed.
   const current = card.voice;
-  const currentWork =
-    current?.uuid && !current.borrowedFrom
-      ? (card.voicePicks.find(
-          (p): p is Extract<VoicePick, { kind: "voice" }> =>
-            p.kind === "voice" && p.id === current.uuid,
-        )?.work ?? null)
+  const currentPick = current?.uuid
+    ? card.voicePicks.find(
+        (p): p is Extract<VoicePick, { kind: "voice" }> =>
+          p.kind === "voice" && p.id === current.uuid,
+      )
+    : undefined;
+  const currentSource =
+    current && !current.borrowedFrom && currentPick
+      ? (currentPick.work ?? "Designed voice")
       : null;
   const currentPreview = current?.previewUrl ?? null;
 
@@ -311,8 +334,8 @@ export function VoiceTab({
       <div className="flex min-h-10 items-center gap-2 rounded-md border border-neutral-700 bg-neutral-950/60 py-1 pr-1 pl-3">
         <span className="min-w-0 flex-1 truncate">
           <VoiceLine card={card} />
-          {currentWork && (
-            <span className="text-neutral-500">, {currentWork}</span>
+          {currentSource && (
+            <span className="text-neutral-500">, {currentSource}</span>
           )}
         </span>
         {current && currentPreview !== null && (
@@ -395,12 +418,18 @@ export function VoiceTab({
                       p.kind === "appearance"
                         ? [p.work, p.voiceActor].filter(Boolean).join(", ")
                         : (p.work ?? "Designed voice");
+                    const current = isCurrent(p);
                     const pills =
                       p.kind === "voice"
                         ? [
+                            ...(current ? ["current"] : []),
                             PICK_STATUS[p.status],
                             ...(p.inBook ? ["in this book"] : []),
                             ...(p.startingPick ? ["lab default"] : []),
+                            // Signing its source clip failed, or it has none: no Play.
+                            ...(p.status === "archived" && !p.clipUrl
+                              ? ["no clip link"]
+                              : []),
                           ]
                         : ["needs a clip"];
                     return (
@@ -411,6 +440,8 @@ export function VoiceTab({
                         pills={pills}
                         previewUrl={p.kind === "voice" ? p.clipUrl : null}
                         checked={pickedKey === key}
+                        disabled={current}
+                        group={group}
                         onPick={() => setPickedKey(key)}
                         onPlay={play}
                       />
@@ -436,6 +467,7 @@ export function VoiceTab({
                         pills={["active"]}
                         previewUrl={v.previewUrl ?? null}
                         checked={pickedKey === key}
+                        group={group}
                         onPick={() => setPickedKey(key)}
                         onPlay={play}
                       />
@@ -454,6 +486,7 @@ export function VoiceTab({
                   pills={[]}
                   previewUrl={null}
                   checked={pickedKey === "design"}
+                  group={group}
                   onPick={() => setPickedKey("design")}
                   onPlay={play}
                 />
@@ -469,12 +502,13 @@ export function VoiceTab({
               onClick={apply}
               className={PRIMARY}
             >
-              {action?.label ?? "Use this voice"}
+              {action?.label ?? "Pick a voice"}
             </button>
             <span className="min-w-0 flex-1 text-neutral-500">
-              {action?.kind === "use"
-                ? "Applied at once, in every issue of the book."
-                : "Made at the voices stop."}
+              {action &&
+                (action.kind === "use"
+                  ? "Applied at once, in every issue of the book."
+                  : "Made at the voices stop.")}
             </span>
             <button type="button" onClick={close} className={QUIET}>
               Cancel

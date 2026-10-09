@@ -9,26 +9,14 @@ import {
   ICON_PRIMARY,
   LooseStrip,
   QUIET,
+  SVG_ICON,
 } from "./shared";
 import type { CharacterCard, FaceView, PageView } from "./types";
-
-const ICON = {
-  xmlns: "http://www.w3.org/2000/svg",
-  width: 16,
-  height: 16,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round",
-  "aria-hidden": true,
-} as const;
 
 /** Stacked checkboxes: select mode. */
 function SelectIcon() {
   return (
-    <svg {...ICON}>
+    <svg {...SVG_ICON}>
       <path d="m3 17 2 2 4-4" />
       <path d="m3 7 2 2 4-4" />
       <path d="M13 6h8" />
@@ -40,7 +28,7 @@ function SelectIcon() {
 
 function CheckIcon() {
   return (
-    <svg {...ICON}>
+    <svg {...SVG_ICON}>
       <path d="M20 6 9 17l-5-5" />
     </svg>
   );
@@ -49,7 +37,7 @@ function CheckIcon() {
 /** An arrow into a box: move to another character. */
 function MoveIcon() {
   return (
-    <svg {...ICON}>
+    <svg {...SVG_ICON}>
       <path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5" />
       <path d="M3 12h12" />
       <path d="m11 8 4 4-4 4" />
@@ -59,7 +47,7 @@ function MoveIcon() {
 
 function TrashIcon() {
   return (
-    <svg {...ICON}>
+    <svg {...SVG_ICON}>
       <path d="M3 6h18" />
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
       <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -71,7 +59,7 @@ function TrashIcon() {
 
 function EyeIcon() {
   return (
-    <svg {...ICON}>
+    <svg {...SVG_ICON}>
       <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
@@ -154,6 +142,7 @@ function PanelFaceTile({
       <button
         type="button"
         role="checkbox"
+        name="face"
         aria-checked={selected}
         aria-label={`Page ${face.page} face`}
         onClick={onToggle}

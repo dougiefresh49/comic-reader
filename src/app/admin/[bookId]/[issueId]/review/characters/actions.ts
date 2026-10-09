@@ -418,9 +418,12 @@ export async function moveFace(args: {
 }
 
 /**
- * Moves a selection of faces to one character (#745): the target is resolved
- * once, each face is written as `moveFace` writes it, and the cast and the
- * page refresh once. A face already on the target is skipped and counted.
+ * Moves a selection of faces to one character (#745): every face is read
+ * before anything is written (a stale id fails the whole move, not half of
+ * it), the target is resolved once and joins the cast before the first
+ * face moves, each face is then written as `moveFace` writes it, and the
+ * page refreshes once. A face already on the target is left alone and
+ * counted; when every face is, nothing is written, as in `moveFace`.
  */
 export async function moveFaces(args: {
   scope: Scope;
@@ -432,31 +435,31 @@ export async function moveFaces(args: {
     await requireAdmin();
     const { scope, detectionIds } = args;
     if (detectionIds.length === 0) throw new Error("no faces were picked");
+    const faces: Awaited<ReturnType<typeof readDetection>>[] = [];
+    for (const detectionId of detectionIds)
+      faces.push(await readDetection(scope, detectionId));
     const who = await resolveTarget(
       scope.bookId,
       args.target,
       args.franchiseId,
     );
-    let moved = 0;
-    let skipped = 0;
-    for (const detectionId of detectionIds) {
-      const face = await readDetection(scope, detectionId);
-      if (face.characterId === who.id) {
-        skipped += 1;
-        continue;
-      }
-      await moveDetection(scope, face, who.id);
-      moved += 1;
-    }
+    const toMove = faces.filter((f) => f.characterId !== who.id);
+    const skipped = faces.length - toMove.length;
+    if (toMove.length === 0)
+      return {
+        ok: true,
+        message: `${faces.length === 1 ? "That face is" : "Those faces are"} already ${who.name}.`,
+      };
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
+    for (const face of toMove) await moveDetection(scope, face, who.id);
     revalidate(scope);
-    const faces = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
+    const count = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
     return {
       ok: true,
       message:
-        `Moved ${faces(moved)} to ${who.name}${who.created ? ", a new character" : ""}.` +
+        `Moved ${count(toMove.length)} to ${who.name}${who.created ? ", a new character" : ""}.` +
         (skipped > 0
-          ? ` ${faces(skipped)} already ${who.name}, left alone.`
+          ? ` ${count(skipped)} already ${who.name}, left alone.`
           : ""),
     };
   } catch (err) {

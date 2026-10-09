@@ -2,6 +2,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { isRoleId } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
 import type { NameTarget } from "./actions";
 import {
@@ -26,9 +27,28 @@ interface Choice {
   key: string;
   name: string;
   target: NameTarget;
-  /** The portrait, for a character of this issue with faces. */
-  face: FaceView | null;
+  /** The portrait: an exemplar crop when the character has one (a small file), else its best face cut from the page. */
+  portrait: { crop: string } | { face: FaceView | null };
   note: "not in this issue" | "new" | null;
+}
+
+/**
+ * A card's portrait for the grid. The exemplar crop comes first: it is the
+ * face the matcher knows, and a 24-tile grid of full pages cut down to
+ * 97px windows asks Chrome to decode every page of the issue at once,
+ * which left tiles blank in one real-input round (#745, fix 1, item 8).
+ */
+function portraitOf(
+  card: CharacterCard,
+  pages: Map<number, PageView>,
+): Choice["portrait"] {
+  const best = bestFace(card.faces, pages);
+  const crop =
+    best?.exemplar?.cropUrl ??
+    [...card.looseExemplars].sort(
+      (a, b) => Number(b.confirmed) - Number(a.confirmed),
+    )[0]?.cropUrl;
+  return crop ? { crop } : { face: best };
 }
 
 /**
@@ -76,18 +96,21 @@ export function MoveDialog({
         key: `existing:${c.id}`,
         name: c.name,
         target: { kind: "existing", id: c.id },
-        face: bestFace(c.faces, pages),
+        portrait: portraitOf(c, pages),
         note: null,
       }));
+    // A face cannot be a role, so a role the book knows is no target either.
     const elsewhere: Choice[] = q
       ? known
-          .filter((k) => !hereIds.has(k.id) && k.id !== card.id)
+          .filter(
+            (k) => !hereIds.has(k.id) && k.id !== card.id && !isRoleId(k.id),
+          )
           .filter((k) => matchesName(k, q))
           .map((k) => ({
             key: `existing:${k.id}`,
             name: k.name,
             target: { kind: "existing", id: k.id },
-            face: null,
+            portrait: { face: null },
             note: "not in this issue",
           }))
       : [];
@@ -101,7 +124,7 @@ export function MoveDialog({
               key: "new",
               name: query.trim(),
               target: { kind: "new", name: query.trim() },
-              face: null,
+              portrait: { face: null },
               note: "new",
             },
           ]
@@ -128,6 +151,7 @@ export function MoveDialog({
       <input
         value={query}
         autoFocus
+        name="search"
         placeholder="Search by name, alias or id"
         aria-label="Search characters"
         onChange={(e) => {
@@ -160,6 +184,7 @@ export function MoveDialog({
                   key={c.key}
                   type="button"
                   role="option"
+                  name="target"
                   aria-selected={selected}
                   onClick={() => setPickedKey(c.key)}
                   className={`flex flex-col gap-1.5 rounded-md border p-1.5 text-left ${
@@ -175,9 +200,18 @@ export function MoveDialog({
                     >
                       +
                     </span>
+                  ) : "crop" in c.portrait ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.portrait.crop}
+                      alt={c.name}
+                      decoding="async"
+                      draggable={false}
+                      className="aspect-square w-full rounded-sm bg-neutral-800 object-cover select-none"
+                    />
                   ) : (
                     <FaceCrop
-                      face={c.face}
+                      face={c.portrait.face}
                       pages={pages}
                       alt={c.name}
                       className="w-full rounded-sm"

@@ -297,20 +297,21 @@ export function CharacterPanel({
     moveOpener.current?.focus();
   }, []);
 
-  // The open panel owns Escape, innermost first: the move dialog, select
-  // mode, the Remove confirm, the page preview, an open Rename, then the
-  // panel. A focused Rename field stops the key itself before it reaches
-  // the window.
+  // The open panel owns Escape, innermost first: the move dialog, then the
+  // Remove confirm and the page preview (overlays, which can sit over select
+  // mode: Remove and a shown face both stay reachable there), then select
+  // mode, an open Rename, then the panel. A focused Rename field stops the
+  // key itself before it reaches the window.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       if (moving) closeMove();
-      else if (selecting) setSelecting(false);
       else if (confirming) {
         setConfirming(false);
         removeRef.current?.focus();
       } else if (shown) setShownId(null);
+      else if (selecting) setSelecting(false);
       else if (renaming) {
         setRenaming(false);
         setDraft(card.name);

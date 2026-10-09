@@ -32,6 +32,19 @@ export const ICON_BUTTON =
 /** ICON_BUTTON in the primary style: the Faces tab's check. */
 export const ICON_PRIMARY =
   "inline-flex size-7 shrink-0 items-center justify-center rounded-sm bg-neutral-100 text-neutral-950 hover:bg-white disabled:bg-neutral-700 disabled:text-neutral-400";
+/** The props of a 16px stroked inline icon: spread onto an `<svg>`, then draw its paths. */
+export const SVG_ICON = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": true,
+} as const;
 
 /** The name picker's match: a slugified query against the id, the name and the aliases. `q` is already slugified. */
 export function matchesName(k: KnownCharacter, q: string): boolean {
