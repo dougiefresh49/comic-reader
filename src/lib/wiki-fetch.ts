@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { wikiPageTitle } from "~/lib/add-content/wiki";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
 import type { Json } from "~/types/database";
 
@@ -223,9 +224,9 @@ export async function fetchAndStoreWikiContext(
     return { summary: issue.wiki_summary, appearances: null };
   }
 
-  const pageTitle = (book.wiki_title_template as string).replace(
-    "{number}",
-    String(issue.number),
+  const pageTitle = wikiPageTitle(
+    book.wiki_title_template as string,
+    Number(issue.number),
   );
   const context = await fetchWikiContext(book.wiki_host as string, pageTitle);
 
