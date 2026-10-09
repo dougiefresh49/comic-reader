@@ -112,4 +112,6 @@ export interface VoicesData {
   portraits: Record<string, Portrait>;
   /** Why Continue would be refused right now, or null when it would pass. */
   blocker: string | null;
+  /** True while an ingest run is paused at this stop (`pipeline_step` `casting`). */
+  runPaused: boolean;
 }

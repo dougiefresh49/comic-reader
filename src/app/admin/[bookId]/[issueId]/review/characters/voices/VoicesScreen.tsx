@@ -1,4 +1,5 @@
 // The voices stop: every voice request and every speaker with no voice, the slot plan for each, Run, samples, and Continue.
+// Continue shows only while a run is paused at casting; the header always links on to the editor (#757).
 "use client";
 
 import Link from "next/link";
@@ -680,6 +681,10 @@ function Section({
   );
 }
 
+/** What Continue does, one sentence for its tooltip and the run note (#757). */
+const CONTINUE_DOES =
+  "resumes the paused run into audio and spends ElevenLabs credits on every bubble that still needs audio.";
+
 export function VoicesScreen({ data }: { data: VoicesData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -765,28 +770,42 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
         >
           {data.blocker ?? "Every item is settled."}
         </span>
+        <Link
+          href={`/admin/${data.bookId}/${data.issueId}/review/editor`}
+          className={BUTTON}
+        >
+          Editor →
+        </Link>
+        {/* The badge keys on the click, not the row: a resumed run clears the pause before the refresh lands. */}
         {continued ? (
           <span className="rounded-sm bg-emerald-700/30 px-3 py-1.5 font-medium text-emerald-200">
             Pipeline resumed
           </span>
         ) : (
-          <button
-            type="button"
-            disabled={pending || data.blocker !== null}
-            title={data.blocker ?? "Resume the pipeline into audio"}
-            onClick={() =>
-              run("Continuing", async () => {
-                const result = await continueRun(scope);
-                if (result.ok) setContinued(true);
-                return result;
-              })
-            }
-            className={PRIMARY}
-          >
-            Continue
-          </button>
+          data.runPaused && (
+            <button
+              type="button"
+              disabled={pending || data.blocker !== null}
+              title={data.blocker ?? `Continue ${CONTINUE_DOES}`}
+              onClick={() =>
+                run("Continuing", async () => {
+                  const result = await continueRun(scope);
+                  if (result.ok) setContinued(true);
+                  return result;
+                })
+              }
+              className={PRIMARY}
+            >
+              Continue
+            </button>
+          )
         )}
       </header>
+      {data.runPaused && (
+        <p className="border-b border-amber-400/30 bg-amber-400/5 px-4 py-2 text-[14px] text-amber-100">
+          The ingest run is paused at this stop. Continue {CONTINUE_DOES}
+        </p>
+      )}
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <p className="mb-4 max-w-3xl text-[15px] text-neutral-400">

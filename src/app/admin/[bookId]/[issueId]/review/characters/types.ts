@@ -149,4 +149,6 @@ export interface CharactersData {
   activeVoices: ActiveVoice[];
   /** Why Approve would be refused right now, or null when it would pass. */
   blocker: string | null;
+  /** True while an ingest run is paused at this stop (`pipeline_step` `review-clusters`). */
+  runPaused: boolean;
 }

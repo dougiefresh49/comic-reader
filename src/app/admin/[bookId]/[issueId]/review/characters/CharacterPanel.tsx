@@ -212,6 +212,8 @@ function PagePreview({
 
 export interface CharacterPanelProps {
   card: CharacterCard;
+  /** The book and issue: the Voice tab's link to the voices stop. */
+  scope: { bookId: string; issueId: string };
   pages: Map<number, PageView>;
   /** Every card of the issue: the move dialog's grid. */
   cards: CharacterCard[];
@@ -253,6 +255,7 @@ export interface CharacterPanelProps {
  */
 export function CharacterPanel({
   card,
+  scope,
   pages,
   cards,
   known,
@@ -339,6 +342,7 @@ export function CharacterPanel({
   const voiceContent = (
     <VoiceTab
       card={card}
+      scope={scope}
       activeVoices={activeVoices}
       canChangeVoice={canChangeVoice}
       pullNote={pullNote}

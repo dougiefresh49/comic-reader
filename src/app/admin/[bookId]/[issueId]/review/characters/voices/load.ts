@@ -59,7 +59,7 @@ export async function loadVoices(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, books(name)",
+    "name, pipeline_step, pipeline_paused, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("voices stop loader, the issue:", issueResult.error);
@@ -67,6 +67,8 @@ export async function loadVoices(
   }
   const issue = issueResult.data as unknown as {
     name: string;
+    pipeline_step: string | null;
+    pipeline_paused: boolean;
     books: { name: string } | null;
   } | null;
   if (!issue) return null;
@@ -346,5 +348,7 @@ export async function loadVoices(
       .sort((a, b) => a.name.localeCompare(b.name)),
     portraits: faces,
     blocker: gate.verdict.ok ? null : gate.verdict.reason,
+    runPaused:
+      issue.pipeline_paused === true && issue.pipeline_step === "casting",
   };
 }

@@ -49,6 +49,8 @@ interface IssueRow {
   number: number;
   /** Slugs of the wiki names this issue's Needs a name section hides (#751). */
   dismissed_wiki_names: string[];
+  pipeline_step: string | null;
+  pipeline_paused: boolean;
   books: { name: string } | null;
 }
 
@@ -150,7 +152,7 @@ export async function loadCharacters(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, number, dismissed_wiki_names, books(name)",
+    "name, number, dismissed_wiki_names, pipeline_step, pipeline_paused, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("characters stop loader, the issue:", issueResult.error);
@@ -579,5 +581,8 @@ export async function loadCharacters(
     known,
     activeVoices,
     blocker,
+    runPaused:
+      issue.pipeline_paused === true &&
+      issue.pipeline_step === "review-clusters",
   };
 }
