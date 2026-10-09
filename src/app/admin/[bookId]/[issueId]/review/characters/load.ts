@@ -1,4 +1,4 @@
-// Loads one issue for the characters stop: the proposed cast, every face, the exemplars and the voices. SELECTs only; the writes are in actions.ts.
+// Loads one issue for the casting page: the proposed cast with each one's lines, every face, the exemplars and the voices. SELECTs only; the writes are in actions.ts and casting-actions.ts.
 import "server-only";
 import { readAliases } from "~/lib/character-aliases";
 import { selectIssue } from "~/lib/issue-queries";
@@ -10,7 +10,6 @@ import {
   loadBookCast,
   proposeCast,
   readBookFranchises,
-  readVoiceRequests,
   ROLE_IDS,
   voiceFor,
   castRow,
@@ -19,28 +18,27 @@ import {
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
 import { chunk } from "~/lib/chunk";
-import {
-  clipObjectPath,
-  readVoices,
-  VOICE_CLIPS_BUCKET,
-  type VoiceRow,
-} from "~/lib/voice-slots";
+import { readVoices, type VoiceRow } from "~/lib/voice-slots";
+import { isProtectedVoice } from "~/lib/voice-slots/types";
+import { audioUrl } from "~/lib/storage";
+import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
+import { readVoicesGate } from "~/server/admin/voices-gate";
 import {
   unknownFaceGroups,
   type UnknownDetection,
 } from "~/server/admin/characters-gate";
 import type {
-  ActiveVoice,
   CharacterCard,
   CharactersData,
   FaceView,
   KnownCharacter,
   LooseExemplar,
   PageView,
+  PauseView,
   Rect,
-  Suggestion,
+  SampleLine,
   UnknownGroupView,
-  VoicePick,
+  VoiceOption,
   VoiceView,
 } from "./types";
 
@@ -89,17 +87,8 @@ interface CharacterRow {
   display_name: string | null;
 }
 
-interface AppearanceRow {
-  id: string;
-  character_id: string;
-  work_id: string;
-  voice_actor: string | null;
-  works: { title: string; year: number } | null;
-}
-
-/** The picker's voice statuses, in list order. */
-const PICK_RANK = { active: 0, archived: 1, needs_clip: 2 } as const;
-type PickStatus = keyof typeof PICK_RANK;
+/** First lines shown in the panel. */
+const SAMPLES = 3;
 
 /** The rows of one read, or a throw: a cut-short list would hide faces. */
 function rows<T>(
@@ -107,36 +96,16 @@ function rows<T>(
   result: { data: unknown; error: unknown; count?: number | null },
 ): T[] {
   if (result.error) {
-    console.error(`characters stop loader, ${what}:`, result.error);
-    throw new Error(`The characters stop could not read ${what}.`);
+    console.error(`casting page loader, ${what}:`, result.error);
+    throw new Error(`The casting page could not read ${what}.`);
   }
   const data = (result.data ?? []) as T[];
   if (typeof result.count === "number" && result.count > data.length) {
     throw new Error(
-      `The characters stop read ${data.length} of ${result.count} ${what}.`,
+      `The casting page read ${data.length} of ${result.count} ${what}.`,
     );
   }
   return data;
-}
-
-/** A signed URL to a lab clip, or null: a clip that will not sign loses its play button, never the page. */
-async function signedClipUrl(sourceClipPath: string): Promise<string | null> {
-  try {
-    const { data, error } = await supabaseAdmin.storage
-      .from(VOICE_CLIPS_BUCKET)
-      .createSignedUrl(clipObjectPath(sourceClipPath), 3600);
-    if (error || !data) {
-      console.warn(
-        `characters stop loader, signing ${sourceClipPath}:`,
-        error?.message,
-      );
-      return null;
-    }
-    return data.signedUrl;
-  } catch (err) {
-    console.warn(`characters stop loader, signing ${sourceClipPath}:`, err);
-    return null;
-  }
 }
 
 function exemplarUrl(cropPath: string): string {
@@ -155,8 +124,8 @@ export async function loadCharacters(
     "name, number, dismissed_wiki_names, pipeline_step, pipeline_paused, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
-    console.error("characters stop loader, the issue:", issueResult.error);
-    throw new Error("The characters stop could not read the issue.");
+    console.error("casting page loader, the issue:", issueResult.error);
+    throw new Error("The casting page could not read the issue.");
   }
   const issue = issueResult.data as unknown as IssueRow | null;
   if (!issue) return null;
@@ -169,8 +138,8 @@ export async function loadCharacters(
     exemplarResult,
     charResult,
     voiceRows,
-    voiceRequests,
     franchises,
+    lines,
   ] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
     proposeCast(supabaseAdmin, bookId, issueId),
@@ -201,8 +170,8 @@ export async function loadCharacters(
       .select("id, display_name", { count: "exact" })
       .order("id"),
     readVoices(supabaseAdmin),
-    readVoiceRequests(supabaseAdmin, bookId, issueId),
     readBookFranchises(supabaseAdmin, bookId),
+    readSpeakerLines(supabaseAdmin, bookId, issueId),
   ]);
   const pageRows = rows<PageRow>("pages", pageResult);
   const panelRows = rows<PanelRow>("panels", panelResult);
@@ -348,38 +317,6 @@ export async function loadCharacters(
     };
   };
 
-  // The picker's voices (#458): every active, archived and needs_clip row
-  // of the character. An archived one a castlist row of this book links is
-  // marked `inBook`: choosing it casts it for this issue and the voices stop
-  // restores it, where an unlinked one is a new clone request (#350). Within
-  // a status, the starting pick first, then by name.
-  const linkedInBook = new Set(
-    book.rows.map((r) => r.voice_uuid).filter((u): u is string => !!u),
-  );
-  const pickRowsOf = new Map<string, (VoiceRow & { status: PickStatus })[]>();
-  for (const v of voiceRows) {
-    if (!v.character_id || !(v.status in PICK_RANK)) continue;
-    pickRowsOf.set(v.character_id, [
-      ...(pickRowsOf.get(v.character_id) ?? []),
-      v as VoiceRow & { status: PickStatus },
-    ]);
-  }
-  for (const list of pickRowsOf.values())
-    list.sort(
-      (a, b) =>
-        PICK_RANK[a.status] - PICK_RANK[b.status] ||
-        Number(b.starting_pick) - Number(a.starting_pick) ||
-        a.display_name.localeCompare(b.display_name),
-    );
-  /** Appearances some `voices` row holds; the picker lists the rest. */
-  const heldAppearances = new Set(
-    voiceRows.map((v) => v.appearance_id).filter((a): a is string => !!a),
-  );
-  const pendingRequest = new Map(
-    voiceRequests
-      .filter((r) => r.status === "pending")
-      .map((r) => [r.characterId, r] as const),
-  );
   const characterIds = new Set(charRows.map((c) => c.id));
   const facesByCharacter = new Map<string, FaceView[]>();
   for (const d of detectionRows) {
@@ -392,7 +329,73 @@ export async function loadCharacters(
     ]);
   }
 
+  // The first lines' rendered audio, one read for every card.
+  const sampleIds = [...lines.values()].flatMap((list) =>
+    list
+      .filter((l) => l.text)
+      .slice(0, SAMPLES)
+      .map((l) => l.bubbleId),
+  );
+  const audioOf = new Map<string, string>();
+  for (const ids of chunk(sampleIds, 100)) {
+    const result = await supabaseAdmin
+      .from("bubbles")
+      .select("id, audio_storage_path, needs_audio")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .in("id", ids);
+    for (const b of rows<{
+      id: string;
+      audio_storage_path: string | null;
+      needs_audio: boolean | null;
+    }>("rendered lines", result))
+      if (b.audio_storage_path && !b.needs_audio)
+        audioOf.set(b.id, audioUrl(bookId, issueId, b.audio_storage_path));
+  }
+  const pageRange = (numbers: number[]): string | null => {
+    if (numbers.length === 0) return null;
+    const lo = Math.min(...numbers);
+    const hi = Math.max(...numbers);
+    return lo === hi ? `${lo}` : `${lo}–${hi}`;
+  };
+
+  const cardOf = (
+    id: string,
+    name: string,
+    group: CharacterCard["group"],
+    extra: Pick<CharacterCard, "sources" | "wikiNames" | "removed">,
+  ): CharacterCard => {
+    const faces = (facesByCharacter.get(id) ?? []).sort(byPage);
+    const said = lines.get(id) ?? [];
+    const samples: SampleLine[] = said
+      .filter((l) => l.text)
+      .slice(0, SAMPLES)
+      .map((l) => ({
+        bubbleId: l.bubbleId,
+        page: l.page,
+        text: l.text,
+        audioUrl: audioOf.get(l.bubbleId) ?? null,
+      }));
+    return {
+      id,
+      name,
+      group,
+      ...extra,
+      known: characterIds.has(id),
+      noAudio: castRow(book, id, issueId)?.no_audio === true,
+      faces,
+      looseExemplars: loose.filter((e) => e.character_id === id).map(looseOf),
+      voice: voiceView(id),
+      lines: said.length,
+      pages: pageRange(
+        said.length > 0 ? said.map((l) => l.page) : faces.map((f) => f.page),
+      ),
+      samples,
+    };
+  };
+
   const cards: CharacterCard[] = [];
+  const earlierCast: CharacterCard[] = [];
   for (const m of proposal.members) {
     const mine = castRow(book, m.id, issueId);
     const removed = mine?.in_issue === false;
@@ -405,119 +408,16 @@ export async function loadCharacters(
           mine?.in_issue === true
         ? "here"
         : "before";
-    // A character cast before with no sign here and taken out of this issue
-    // is not shown; the Add picker still offers it.
-    if (group === "before" && removed) continue;
-    cards.push({
-      id: m.id,
-      name: m.name,
-      group,
+    const card = cardOf(m.id, m.name, group, {
       sources: m.sources,
       wikiNames: m.wikiNames,
       removed,
-      noAudio: mine?.no_audio === true,
-      faces: (facesByCharacter.get(m.id) ?? []).sort(byPage),
-      looseExemplars: loose.filter((e) => e.character_id === m.id).map(looseOf),
-      voice: voiceView(m.id),
-      voicePicks: [],
-      voiceRequest: null,
     });
+    // A character cast before with no sign here and taken out of this issue
+    // has no card; + Add offers it.
+    if (group === "before" && removed) earlierCast.push(card);
+    else cards.push(card);
   }
-
-  // The appearances of the cards whose Voice tab lists the choices (a
-  // `characters` row, not removed), and of any voice of theirs whose
-  // appearance is filed under another character.
-  const pickerIds = cards
-    .filter((c) => characterIds.has(c.id) && !c.removed)
-    .map((c) => c.id);
-  const appearanceRows: AppearanceRow[] = [];
-  const readAppearances = async (
-    column: "character_id" | "id",
-    ids: string[],
-  ) => {
-    for (const part of chunk(ids, 100)) {
-      const result = await supabaseAdmin
-        .from("appearances")
-        .select("id, character_id, work_id, voice_actor, works(title, year)", {
-          count: "exact",
-        })
-        .in(column, part);
-      appearanceRows.push(...rows<AppearanceRow>("appearances", result));
-    }
-  };
-  await readAppearances("character_id", pickerIds);
-  const readIds = new Set(appearanceRows.map((a) => a.id));
-  await readAppearances("id", [
-    ...new Set(
-      pickerIds.flatMap((id) =>
-        (pickRowsOf.get(id) ?? []).flatMap((v) =>
-          v.appearance_id && !readIds.has(v.appearance_id)
-            ? [v.appearance_id]
-            : [],
-        ),
-      ),
-    ),
-  ]);
-  const workOf = new Map(
-    appearanceRows.map((a) => [
-      a.id,
-      a.works ? `${a.works.title} (${a.works.year})` : a.work_id,
-    ]),
-  );
-
-  // The Voice tab's data, only on cards that are a `characters` row: the
-  // pending request on each, the choices only on cards not removed.
-  await Promise.all(
-    cards.map(async (card) => {
-      if (!characterIds.has(card.id)) return;
-      const request = pendingRequest.get(card.id);
-      if (request) {
-        const target = request.targetVoiceUuid;
-        card.voiceRequest = {
-          action: request.action,
-          targetName:
-            request.action === "clone" && target
-              ? (voiceName.get(target) ?? target)
-              : null,
-        };
-      }
-      if (card.removed) return;
-      const voices = await Promise.all(
-        (pickRowsOf.get(card.id) ?? []).map(
-          async (v): Promise<VoicePick> => ({
-            kind: "voice",
-            id: v.id,
-            name: v.display_name,
-            status: v.status,
-            inBook: linkedInBook.has(v.id),
-            work: v.appearance_id
-              ? (workOf.get(v.appearance_id) ?? null)
-              : null,
-            appearanceId: v.appearance_id,
-            startingPick: v.starting_pick,
-            clipUrl:
-              v.status === "archived" && v.source_clip_path
-                ? await signedClipUrl(v.source_clip_path)
-                : null,
-          }),
-        ),
-      );
-      const appearances: VoicePick[] = appearanceRows
-        .filter((a) => a.character_id === card.id && !heldAppearances.has(a.id))
-        .map((a) => ({
-          kind: "appearance" as const,
-          id: a.id,
-          work: workOf.get(a.id) ?? a.work_id,
-          voiceActor: a.voice_actor,
-        }))
-        .sort((a, b) => a.work.localeCompare(b.work));
-      card.voicePicks = [...voices, ...appearances];
-    }),
-  );
-  const activeVoices: ActiveVoice[] = voiceRows
-    .filter((v) => v.status === "active")
-    .map((v) => ({ id: v.id, name: v.display_name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
   // Group order first, so the comparator is one consistent order; then names
   // A to Z, and the roles in their fixed order.
   const rank: Record<CharacterCard["group"], number> = {
@@ -534,35 +434,55 @@ export async function loadCharacters(
     return a.name.localeCompare(b.name);
   });
 
+  const voices: VoiceOption[] = voiceRows
+    .filter((v) => v.status !== "needs_clip")
+    .map((v) => ({
+      id: v.id,
+      name: v.display_name,
+      status: v.status,
+      characterId: v.character_id,
+      kind:
+        v.status === "library"
+          ? "library"
+          : v.appearance_id || (v.source_clip_path && !v.design_prompt)
+            ? "clone"
+            : "designed",
+      labPick: v.starting_pick === true,
+      protected: isProtectedVoice(v),
+    }));
+
   const known: KnownCharacter[] = charRows.map((c) => ({
     id: c.id,
     name: c.display_name ?? c.id,
     aliases: aliasesOf.get(c.id) ?? [],
   }));
 
-  // A wiki name dismissed for this issue (#751) is hidden, never a blocker.
+  // A wiki name dismissed for this issue (#751) is not offered.
   const dismissedSlugs = new Set(issue.dismissed_wiki_names);
-  const suggestions: Suggestion[] = [];
-  const dismissed: Suggestion[] = [];
-  for (const s of proposal.suggestions) {
-    const view: Suggestion = {
-      name: s.name,
-      qualifier: s.qualifier,
-      source: s.source,
-    };
-    if (s.source === "wiki" && dismissedSlugs.has(slugify(s.name)))
-      dismissed.push(view);
-    else suggestions.push(view);
-  }
+  const wikiNames = proposal.suggestions
+    .filter((s) => !dismissedSlugs.has(slugify(s.name)))
+    .map((s) => s.name);
 
-  const inCast = cards.filter((c) => !c.removed).length;
-  const faces = unnamed.length;
-  const blocker =
-    unknown.length > 0
-      ? `${unknown.length} unknown face ${unknown.length === 1 ? "group" : "groups"} (${faces} ${faces === 1 ? "face" : "faces"}) still ${unknown.length === 1 ? "needs" : "need"} a name, or "Not a character".`
-      : inCast === 0
-        ? "The cast is empty: add at least one character."
-        : null;
+  let pause: PauseView | null = null;
+  if (issue.pipeline_paused && issue.pipeline_step === "review-clusters") {
+    const inCast = cards.filter((c) => !c.removed).length;
+    const faces = unnamed.length;
+    pause = {
+      step: "review-clusters",
+      blocker:
+        unknown.length > 0
+          ? `${unknown.length} unknown face ${unknown.length === 1 ? "group" : "groups"} (${faces} ${faces === 1 ? "face" : "faces"}) still ${unknown.length === 1 ? "needs" : "need"} a name, or "Not a character".`
+          : inCast === 0
+            ? "The cast is empty: add at least one character."
+            : null,
+    };
+  } else if (issue.pipeline_paused && issue.pipeline_step === "casting") {
+    const gate = await readVoicesGate(bookId, issueId);
+    pause = {
+      step: "casting",
+      blocker: gate.verdict.ok ? null : gate.verdict.reason,
+    };
+  }
 
   return {
     bookId,
@@ -573,16 +493,11 @@ export async function loadCharacters(
     franchiseId: franchises[0]?.id ?? null,
     pages,
     unknown,
-    // Wiki names and castlist texts no `characters` row knows, as
-    // `proposeCast` reports them: suggestions, never cards.
-    suggestions,
-    dismissed,
     cards,
+    earlierCast,
+    wikiNames,
     known,
-    activeVoices,
-    blocker,
-    runPaused:
-      issue.pipeline_paused === true &&
-      issue.pipeline_step === "review-clusters",
+    voices,
+    pause,
   };
 }

@@ -1,51 +1,29 @@
-// The character panel: the open card in a right column, its actions grouped by job (#743).
+// The character panel (#787): the open card in a right column. The header
+// names it (Rename is staged), Voice and Faces are tabs, and the footer has
+// the card's quick actions. Voice changes are staged; the Faces work saves
+// as it is done, as it always has.
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import type { VoiceRequest } from "~/lib/cast";
-import type { NameTarget, PreviewResult } from "./actions";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import type { NameTarget } from "./actions";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
-import {
-  ConfirmDialog,
-  FaceCrop,
-  ICON_BUTTON,
-  INPUT,
-  PRIMARY,
-  PageWithBox,
-  QUIET,
-  QUIET_DANGER,
-  bestFace,
-  facesLine,
-  useTabTrap,
-} from "./shared";
+import { PageWithBox, useTabTrap } from "./shared";
+import type { CardState } from "./staging";
 import type {
-  ActiveVoice,
   CharacterCard,
   FaceView,
   KnownCharacter,
   PageView,
 } from "./types";
-import { VoiceTab } from "./VoiceTab";
+import { BTN, BTN_GHOST, BTN_SMALL, FOCUS, Icon, Portrait } from "./ui";
+import { VoiceTab, type VoiceTabProps } from "./VoiceTab";
 
-const GROUP_LABEL: Record<CharacterCard["group"], string> = {
-  here: "In this issue",
-  before: "Cast before, no sign here",
-  role: "Role",
-};
-
-export type PanelTab = "faces" | "voice";
+export type PanelTab = "voice" | "faces";
 
 const TABS: { key: PanelTab; label: string }[] = [
-  { key: "faces", label: "Faces" },
   { key: "voice", label: "Voice" },
+  { key: "faces", label: "Faces" },
 ];
 
 /**
@@ -66,8 +44,8 @@ function TabRow({
   onChange: (tab: PanelTab) => void;
 }) {
   const refs = useRef<Record<PanelTab, HTMLButtonElement | null>>({
-    faces: null,
     voice: null,
+    faces: null,
   });
   const step = (from: PanelTab, dir: 1 | -1) => {
     const i = TABS.findIndex((t) => t.key === from);
@@ -105,9 +83,9 @@ function TabRow({
                 step(t.key, -1);
               }
             }}
-            className={`-mb-px flex h-10 items-center gap-1.5 border-b-2 text-[14px] ${
+            className={`-mb-px flex h-9 ${FOCUS} items-center gap-1.5 border-b-2 text-[14px] ${
               selected
-                ? "border-white font-medium text-white"
+                ? "border-amber-400 font-medium text-white"
                 : "border-transparent text-neutral-400 hover:text-neutral-200"
             }`}
           >
@@ -142,26 +120,6 @@ function CloseIcon() {
     >
       <line x1="18" x2="6" y1="6" y2="18" />
       <line x1="6" x2="18" y1="6" y2="18" />
-    </svg>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-      <path d="m15 5 4 4" />
     </svg>
   );
 }
@@ -231,96 +189,69 @@ function PagePreview({
   );
 }
 
-export interface CharacterPanelProps {
+export interface CharacterPanelProps
+  extends Omit<VoiceTabProps, "card" | "state"> {
   card: CharacterCard;
-  /** The book and issue: the Voice tab's link to the voices stop. */
-  scope: { bookId: string; issueId: string };
+  state: CardState;
   pages: Map<number, PageView>;
   /** Every card of the issue: the move dialog's grid. */
   cards: CharacterCard[];
   known: KnownCharacter[];
-  activeVoices: ActiveVoice[];
-  /** A `characters` row, not removed: the Voice tab lists the choices. */
-  canChangeVoice: boolean;
-  pullNote: string;
+  /** A Faces save is running. */
   busy: boolean;
-  /** The open tab, held by the screen so it survives a swap to another card. A role card shows Voice whatever it says. */
+  /** The open tab, held by the screen so it survives a swap to another card. A role shows Voice whatever it says. */
   tab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
+  /** Open with the name field: the card menu's Rename. */
+  renameOnOpen: boolean;
   onClose: () => void;
   onRename: (name: string) => void;
+  onSitOut: () => void;
+  onBackIn: () => void;
   onRemove: () => void;
-  onAddBack: () => void;
-  onConfirm: () => void;
+  onPutBack: () => void;
+  onConfirmFaces: () => void;
   onMove: (face: FaceView, target: NameTarget, name: string) => void;
-  /** A selection from select mode, moved in one action. */
   onMoveMany: (faces: FaceView[], target: NameTarget, name: string) => void;
-  /** A selection from select mode, rejected in one action. */
-  onRejectMany: (faces: FaceView[]) => void;
   onReject: (face: FaceView) => void;
-  onSetVoice: (voice: ActiveVoice) => void;
-  onRequestVoice: (request: VoiceRequest) => void;
-  onPickAppearance: (appearanceId: string) => void;
-  onCastArchived: (voiceId: string) => void;
-  onUndoVoiceRequest: () => void;
-  /** The read-only `voicePreview` action, for a Play with no URL yet. */
-  onPreviewVoice: (voiceId: string) => Promise<PreviewResult>;
+  onRejectMany: (faces: FaceView[]) => void;
 }
 
-/**
- * The open card, in a column to the right of the grid: the identity header
- * (with Rename and Remove from this issue), then Faces and Voice as tabs
- * (FacesTab, VoiceTab). Mounted per card (the screen keys it by card id), so
- * a swap starts the local state over, select mode included; the chosen tab
- * lives in the screen and survives.
- */
-export function CharacterPanel({
-  card,
-  scope,
-  pages,
-  cards,
-  known,
-  activeVoices,
-  canChangeVoice,
-  pullNote,
-  busy,
-  tab,
-  onTabChange,
-  onClose,
-  onRename,
-  onRemove,
-  onAddBack,
-  onConfirm,
-  onMove,
-  onMoveMany,
-  onRejectMany,
-  onReject,
-  onSetVoice,
-  onRequestVoice,
-  onPickAppearance,
-  onCastArchived,
-  onUndoVoiceRequest,
-  onPreviewVoice,
-}: CharacterPanelProps) {
-  const [renaming, setRenaming] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [draft, setDraft] = useState(card.name);
+export function CharacterPanel(props: CharacterPanelProps) {
+  const {
+    card,
+    state,
+    pages,
+    cards,
+    known,
+    busy,
+    tab,
+    onTabChange,
+    renameOnOpen,
+    onClose,
+    onRename,
+    onSitOut,
+    onBackIn,
+    onRemove,
+    onPutBack,
+    onConfirmFaces,
+    onMove,
+    onMoveMany,
+    onReject,
+    onRejectMany,
+    ...voiceProps
+  } = props;
+  const [renaming, setRenaming] = useState(renameOnOpen);
+  const [draft, setDraft] = useState(state.name);
   const [shownId, setShownId] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
   /** The faces the move dialog is open for; null when it is closed. */
   const [moving, setMoving] = useState<FaceView[] | null>(null);
-  /** The control that opened the move dialog, for focus when it closes. */
   const moveOpener = useRef<HTMLElement | null>(null);
-  const removeRef = useRef<HTMLButtonElement>(null);
   const pencilRef = useRef<HTMLButtonElement>(null);
-  const wasRenaming = useRef(false);
+  const wasRenaming = useRef(renameOnOpen);
   const idBase = useId();
   const shown = card.faces.find((f) => f.id === shownId) ?? null;
-  const portrait = useMemo(
-    () => bestFace(card.faces, pages),
-    [card.faces, pages],
-  );
-  // A role has no faces, so it shows Voice whatever the screen's tab says, and leaves it alone.
   const isRole = card.group === "role";
   const shownTab: PanelTab = isRole ? "voice" : tab;
 
@@ -328,239 +259,183 @@ export function CharacterPanel({
     setMoving(null);
     moveOpener.current?.focus();
   }, []);
-
-  // Every way Rename closes (Save, Cancel, Escape in the field or on the
-  // window) lands focus on the pencil, once it is mounted again.
   const closeRename = useCallback(() => {
     setRenaming(false);
-    setDraft(card.name);
-  }, [card.name]);
+    setDraft(state.name);
+  }, [state.name]);
   useEffect(() => {
     if (wasRenaming.current && !renaming) pencilRef.current?.focus();
     wasRenaming.current = renaming;
   }, [renaming]);
 
-  // The open panel owns Escape, innermost first: the move dialog, then the
-  // Remove confirm and the page preview (overlays, which can sit over select
-  // mode: Remove and a shown face both stay reachable there), then select
-  // mode, an open Rename, then the panel. A focused Rename field stops the
-  // key itself before it reaches the window.
+  // The open panel owns Escape, innermost first: the move dialog, the page
+  // preview, select mode, an open Rename, then the panel. A popover or the
+  // Review sheet over it stops the key before it gets here.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       if (moving) closeMove();
-      else if (confirming) {
-        setConfirming(false);
-        removeRef.current?.focus();
-      } else if (shown) setShownId(null);
+      else if (shown) setShownId(null);
       else if (selecting) setSelecting(false);
       else if (renaming) closeRename();
       else onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
-    moving,
-    selecting,
-    confirming,
-    shown,
-    renaming,
-    onClose,
-    closeMove,
-    closeRename,
-  ]);
+  }, [moving, selecting, shown, renaming, onClose, closeMove, closeRename]);
 
-  const voiceContent = (
-    <VoiceTab
-      card={card}
-      scope={scope}
-      activeVoices={activeVoices}
-      canChangeVoice={canChangeVoice}
-      pullNote={pullNote}
-      busy={busy}
-      onSetVoice={onSetVoice}
-      onRequestVoice={onRequestVoice}
-      onPickAppearance={onPickAppearance}
-      onCastArchived={onCastArchived}
-      onUndoVoiceRequest={onUndoVoiceRequest}
-      onPreviewVoice={onPreviewVoice}
-    />
-  );
+  const meta = [
+    `${card.lines} ${card.lines === 1 ? "line" : "lines"}`,
+    card.faces.length > 0
+      ? `${card.faces.length} ${card.faces.length === 1 ? "face" : "faces"}`
+      : null,
+    card.pages ? `p.${card.pages}` : null,
+  ].filter(Boolean);
 
   return (
     <>
       <aside
-        aria-label={card.name}
-        className="fixed top-12 right-0 bottom-0 z-20 flex w-[440px] max-w-full shrink-0 flex-col border-l border-neutral-800 bg-neutral-950 lg:sticky lg:right-auto lg:bottom-auto lg:h-[calc(100vh-3rem)]"
+        aria-label={state.name}
+        className="flex w-[440px] max-w-full shrink-0 flex-col overflow-hidden border-l border-neutral-800 bg-neutral-900"
       >
-        <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4">
-          {/* The name stays in view however far the body scrolls. */}
-          <div className="flex min-w-0 items-baseline gap-2 text-[14px]">
-            <span className="truncate font-medium text-neutral-100">
-              {card.name}
-            </span>
-            <span className="shrink-0 text-neutral-500">
-              {GROUP_LABEL[card.group]}
-            </span>
+        <div className="flex items-start gap-3 border-b border-neutral-800 px-4 pt-3.5 pb-2.5">
+          <Portrait
+            card={card}
+            pages={pages}
+            className="size-16 shrink-0 rounded-lg"
+          />
+          <div className="min-w-0 flex-1">
+            {renaming ? (
+              <form
+                className="flex items-center gap-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setRenaming(false);
+                  onRename(draft.trim());
+                }}
+              >
+                <input
+                  value={draft}
+                  autoFocus
+                  aria-label="Name"
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      e.stopPropagation();
+                      closeRename();
+                    }
+                  }}
+                  className={`h-7 min-w-0 flex-1 rounded-md border border-amber-400 bg-neutral-800 px-1.5 text-[15px] font-semibold text-neutral-100 ${FOCUS}`}
+                />
+                <button type="submit" className={BTN_SMALL}>
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={closeRename}
+                  className={`${BTN_GHOST} h-6 px-2 text-[12px]`}
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <h3 className="flex min-w-0 items-center gap-1.5 text-[16px] leading-tight font-semibold text-neutral-100">
+                <span className="truncate">{state.name}</span>
+                <button
+                  ref={pencilRef}
+                  type="button"
+                  onClick={() => {
+                    setDraft(state.name);
+                    setRenaming(true);
+                  }}
+                  aria-label="Rename"
+                  title="Rename"
+                  className={`${BTN_GHOST} h-6 px-1.5`}
+                >
+                  {Icon.pencil}
+                </button>
+              </h3>
+            )}
+            <div className="mt-1 text-[12px] text-neutral-400 tabular-nums">
+              {meta.join(" · ")}
+              <span className="ml-1 font-mono text-[11px] text-neutral-500">
+                · {card.id}
+              </span>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-2 inline-flex size-8 shrink-0 items-center justify-center rounded-sm text-neutral-400 hover:bg-neutral-800 hover:text-white"
+            className={`${BTN_GHOST} size-7 justify-center px-0`}
           >
             <CloseIcon />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* Identity: who this is, and whether it is in this issue. */}
-          <div className="flex items-start gap-4 px-4 py-4">
-            <FaceCrop
-              face={portrait}
-              pages={pages}
-              alt={card.name}
-              className="size-24 shrink-0 rounded-md"
-            />
-            <div className="min-w-0 flex-1 text-[14px]">
-              {renaming ? (
-                <form
-                  className="flex flex-wrap items-center gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    closeRename();
-                    if (draft.trim() && draft.trim() !== card.name)
-                      onRename(draft);
-                  }}
-                >
-                  <input
-                    value={draft}
-                    autoFocus
-                    aria-label="Display name"
-                    onChange={(e) => setDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        e.stopPropagation();
-                        closeRename();
-                      }
-                    }}
-                    className={`${INPUT} min-w-[160px] flex-1 text-[16px]`}
-                  />
-                  <button type="submit" className={PRIMARY} disabled={busy}>
-                    Save
-                  </button>
-                  <button type="button" className={QUIET} onClick={closeRename}>
-                    Cancel
-                  </button>
-                </form>
-              ) : (
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <h2 className="text-[18px] font-semibold text-neutral-50">
-                    {card.name}
-                  </h2>
-                  <button
-                    ref={pencilRef}
-                    type="button"
-                    onClick={() => {
-                      setDraft(card.name);
-                      setRenaming(true);
-                    }}
-                    aria-label="Rename"
-                    title="Rename"
-                    className={ICON_BUTTON}
-                  >
-                    <PencilIcon />
-                  </button>
-                  <span className="ml-1 text-neutral-500">{card.id}</span>
-                </div>
-              )}
-              {card.wikiNames.length > 0 && (
-                <div className="mt-1 text-neutral-500">
-                  Wiki: {card.wikiNames.join(", ")}
-                </div>
-              )}
-              <div className="mt-1 text-neutral-400">
-                {isRole ? "Role, no faces" : facesLine(card.faces)}
-              </div>
-              {card.removed && (
-                <div className="mt-1 text-amber-300">Out of this issue</div>
-              )}
-              {/* The header's last line: membership, a text button (owner call, decision 430 and PR #744). */}
-              <div className="mt-2 -ml-2">
-                {card.removed ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onAddBack}
-                    className={`${QUIET} h-7`}
-                  >
-                    Add back to this issue
-                  </button>
-                ) : (
-                  <button
-                    ref={removeRef}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setConfirming(true)}
-                    className={`${QUIET_DANGER} h-7`}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+        {!isRole && (
+          <TabRow
+            tab={tab}
+            faces={card.faces.length}
+            idBase={idBase}
+            onChange={onTabChange}
+          />
+        )}
 
-          {!isRole && (
-            <TabRow
-              tab={tab}
-              faces={card.faces.length}
-              idBase={idBase}
-              onChange={onTabChange}
+        <div
+          role={isRole ? undefined : "tabpanel"}
+          id={`${idBase}-panel-${shownTab}`}
+          aria-labelledby={isRole ? undefined : `${idBase}-tab-${shownTab}`}
+          className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-5"
+        >
+          {shownTab === "voice" ? (
+            <VoiceTab card={card} state={state} {...voiceProps} />
+          ) : (
+            <FacesTab
+              card={card}
+              pages={pages}
+              busy={busy}
+              selecting={selecting}
+              onSelectingChange={setSelecting}
+              shownId={shownId}
+              onShow={(id) => setShownId((cur) => (cur === id ? null : id))}
+              onConfirm={onConfirmFaces}
+              onMoveRequest={(faces, opener) => {
+                moveOpener.current = opener;
+                setMoving(faces);
+              }}
+              onReject={onReject}
+              onRejectMany={onRejectMany}
             />
           )}
+        </div>
 
-          {shownTab === "faces" ? (
-            <div
-              role="tabpanel"
-              id={`${idBase}-panel-faces`}
-              aria-labelledby={`${idBase}-tab-faces`}
-              className="px-4 py-4"
-            >
-              <FacesTab
-                card={card}
-                pages={pages}
-                busy={busy}
-                selecting={selecting}
-                onSelectingChange={setSelecting}
-                shownId={shownId}
-                onShow={(id) => setShownId((cur) => (cur === id ? null : id))}
-                onConfirm={onConfirm}
-                onMoveRequest={(faces, opener) => {
-                  moveOpener.current = opener;
-                  setMoving(faces);
-                }}
-                onReject={onReject}
-                onRejectMany={onRejectMany}
-              />
-            </div>
-          ) : isRole ? (
-            <section
-              aria-label="Voice"
-              className="border-t border-neutral-800 px-4 py-4"
-            >
-              {voiceContent}
-            </section>
+        {/* The card's quick actions. #788 adds "Design a voice" here. */}
+        <div className="flex items-center gap-1 border-t border-neutral-800 px-3 py-2.5">
+          {state.sitOut ? (
+            <button type="button" onClick={onBackIn} className={BTN}>
+              Back in
+            </button>
           ) : (
-            <div
-              role="tabpanel"
-              id={`${idBase}-panel-voice`}
-              aria-labelledby={`${idBase}-tab-voice`}
-              className="px-4 py-4"
+            <button type="button" onClick={onSitOut} className={BTN_GHOST}>
+              {Icon.sit} Sit out this run
+            </button>
+          )}
+          <span className="flex-1" />
+          {state.removed ? (
+            <button type="button" onClick={onPutBack} className={BTN}>
+              Put back
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onRemove}
+              className={`${BTN_GHOST} text-red-400 hover:text-red-300`}
             >
-              {voiceContent}
-            </div>
+              Not in this issue
+            </button>
           )}
         </div>
       </aside>
@@ -569,25 +444,8 @@ export function CharacterPanel({
         <PagePreview
           face={shown}
           pages={pages}
-          label={card.name}
+          label={state.name}
           onClose={() => setShownId(null)}
-        />
-      )}
-
-      {confirming && (
-        <ConfirmDialog
-          title={`Remove ${card.name} from this issue?`}
-          body={`${card.name} leaves this issue's cast and keeps its voice, so Add back restores it. Its bubbles and faces here are not changed.`}
-          confirmLabel="Remove"
-          busy={busy}
-          onConfirm={() => {
-            setConfirming(false);
-            onRemove();
-          }}
-          onCancel={() => {
-            setConfirming(false);
-            removeRef.current?.focus();
-          }}
         />
       )}
 

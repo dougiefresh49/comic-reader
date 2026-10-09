@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { loadCharacters } from "./load";
-import { CharactersScreen } from "./CharactersScreen";
+import { CastingScreen } from "./CastingScreen";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +8,10 @@ interface Params {
   params: Promise<{ bookId: string; issueId: string }>;
 }
 
-export default async function CharactersStopPage({ params }: Params) {
+/** The casting page (#787): the characters stop and the voices stop on one page. */
+export default async function CastingPage({ params }: Params) {
   const { bookId, issueId } = await params;
   const data = await loadCharacters(bookId, issueId);
   if (!data) notFound();
-  return <CharactersScreen data={data} />;
+  return <CastingScreen data={data} />;
 }
