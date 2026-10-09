@@ -23,6 +23,7 @@ import {
   castArchivedVoice,
   pickAppearance,
   rejectFace,
+  rejectFaces,
   rejectGroup,
   removeCharacter,
   renameCharacter,
@@ -505,6 +506,10 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     onReject: (face: FaceView) =>
       run(`Dropping the page ${face.page} face`, () =>
         rejectFace({ scope, detectionId: face.id }),
+      ),
+    onRejectMany: (faces: FaceView[]) =>
+      run(`Dropping ${faces.length} faces`, () =>
+        rejectFaces({ scope, detectionIds: faces.map((f) => f.id) }),
       ),
     // Any other voice choice ends the appearance pick Undo would revert.
     onSetVoice: (voice: ActiveVoice) => {
