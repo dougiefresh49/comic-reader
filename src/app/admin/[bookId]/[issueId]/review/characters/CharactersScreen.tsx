@@ -91,7 +91,7 @@ function CharacterCardView({
       type="button"
       onClick={open ? onClose : onOpen}
       aria-expanded={open}
-      className={`flex w-full items-start gap-4 rounded-md border p-4 text-left ${
+      className={`flex w-full scroll-mt-16 scroll-mb-4 items-start gap-4 rounded-md border p-4 text-left ${
         open
           ? "border-neutral-400 bg-neutral-900 ring-1 ring-neutral-400"
           : "border-neutral-800 bg-neutral-900/60 hover:border-neutral-600"

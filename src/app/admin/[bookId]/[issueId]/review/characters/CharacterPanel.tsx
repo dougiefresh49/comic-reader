@@ -416,7 +416,7 @@ function PagePreview({
         type="button"
         onClick={onClose}
         aria-label="Close the page"
-        className="absolute top-4 right-4 inline-flex size-9 items-center justify-center rounded-sm bg-neutral-950/80 text-neutral-300 hover:bg-neutral-800 hover:text-white"
+        className="absolute top-16 right-4 inline-flex size-9 items-center justify-center rounded-sm bg-neutral-950/80 text-neutral-300 hover:bg-neutral-800 hover:text-white"
       >
         <CloseIcon />
       </button>
