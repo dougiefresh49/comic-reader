@@ -141,6 +141,8 @@ export interface CharactersData {
   pages: PageView[];
   unknown: UnknownGroupView[];
   suggestions: Suggestion[];
+  /** Wiki names dismissed for this issue (`issues.dismissed_wiki_names`), hidden from Needs a name until restored. */
+  dismissed: Suggestion[];
   cards: CharacterCard[];
   known: KnownCharacter[];
   /** Every active voice, by display name. */

@@ -578,6 +578,7 @@ export type Database = {
           book_id: string;
           bubble_count: number;
           created_at: string | null;
+          dismissed_wiki_names: string[];
           has_audio: boolean;
           has_timestamps: boolean;
           has_webp: boolean;
@@ -601,6 +602,7 @@ export type Database = {
           book_id: string;
           bubble_count?: number;
           created_at?: string | null;
+          dismissed_wiki_names?: string[];
           has_audio?: boolean;
           has_timestamps?: boolean;
           has_webp?: boolean;
@@ -624,6 +626,7 @@ export type Database = {
           book_id?: string;
           bubble_count?: number;
           created_at?: string | null;
+          dismissed_wiki_names?: string[];
           has_audio?: boolean;
           has_timestamps?: boolean;
           has_webp?: boolean;

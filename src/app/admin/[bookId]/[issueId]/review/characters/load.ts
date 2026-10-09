@@ -38,6 +38,7 @@ import type {
   LooseExemplar,
   PageView,
   Rect,
+  Suggestion,
   UnknownGroupView,
   VoicePick,
   VoiceView,
@@ -46,6 +47,8 @@ import type {
 interface IssueRow {
   name: string;
   number: number;
+  /** Slugs of the wiki names this issue's Needs a name section hides (#751). */
+  dismissed_wiki_names: string[];
   books: { name: string } | null;
 }
 
@@ -147,7 +150,7 @@ export async function loadCharacters(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, number, books(name)",
+    "name, number, dismissed_wiki_names, books(name)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("characters stop loader, the issue:", issueResult.error);
@@ -534,6 +537,21 @@ export async function loadCharacters(
     aliases: aliasesOf.get(c.id) ?? [],
   }));
 
+  // A wiki name dismissed for this issue (#751) is hidden, never a blocker.
+  const dismissedSlugs = new Set(issue.dismissed_wiki_names);
+  const suggestions: Suggestion[] = [];
+  const dismissed: Suggestion[] = [];
+  for (const s of proposal.suggestions) {
+    const view: Suggestion = {
+      name: s.name,
+      qualifier: s.qualifier,
+      source: s.source,
+    };
+    if (s.source === "wiki" && dismissedSlugs.has(slugify(s.name)))
+      dismissed.push(view);
+    else suggestions.push(view);
+  }
+
   const inCast = cards.filter((c) => !c.removed).length;
   const faces = unnamed.length;
   const blocker =
@@ -554,11 +572,8 @@ export async function loadCharacters(
     unknown,
     // Wiki names and castlist texts no `characters` row knows, as
     // `proposeCast` reports them: suggestions, never cards.
-    suggestions: proposal.suggestions.map((s) => ({
-      name: s.name,
-      qualifier: s.qualifier,
-      source: s.source,
-    })),
+    suggestions,
+    dismissed,
     cards,
     known,
     activeVoices,

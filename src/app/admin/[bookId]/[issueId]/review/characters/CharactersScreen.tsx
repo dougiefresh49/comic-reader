@@ -33,6 +33,7 @@ import {
   type ActionResult,
   type NameTarget,
 } from "./actions";
+import { dismissWikiName, restoreWikiName } from "./suggestion-actions";
 import type { VoiceRequest } from "~/lib/cast";
 import { CharacterPanel, type PanelTab } from "./CharacterPanel";
 import {
@@ -265,21 +266,29 @@ function UnknownCardView({
   );
 }
 
+/** What "Is someone known…" does (`nameSuggestion` in actions.ts), shown beside its field and as its title. */
+const KNOWN_HINT =
+  "Pick a character: this name becomes one of their aliases in every book, and they join this issue's cast.";
+
+const suggestionLabel = (s: Suggestion) =>
+  s.qualifier ? `${s.name} (${s.qualifier})` : s.name;
+
 function SuggestionRow({
   suggestion,
   known,
   busy,
   onName,
+  onDismiss,
 }: {
   suggestion: Suggestion;
   known: KnownCharacter[];
   busy: boolean;
   onName: (target: NameTarget, name: string) => void;
+  /** Wiki names only: hide the name for this issue (#751). */
+  onDismiss?: () => void;
 }) {
   const [naming, setNaming] = useState(false);
-  const label = suggestion.qualifier
-    ? `${suggestion.name} (${suggestion.qualifier})`
-    : suggestion.name;
+  const label = suggestionLabel(suggestion);
   return (
     <li className="flex flex-wrap items-center gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-4 py-3 text-[14px]">
       <span className="min-w-0 flex-1">
@@ -292,18 +301,21 @@ function SuggestionRow({
         </span>
       </span>
       {naming ? (
-        <div className="flex w-full max-w-md items-center gap-2">
-          <NameField
-            known={known}
-            placeholder="Who is this?"
-            initial={suggestion.name}
-            autoFocus
-            onPick={(target, name) => {
-              setNaming(false);
-              onName(target, name);
-            }}
-            onCancel={() => setNaming(false)}
-          />
+        <div className="w-full max-w-md">
+          <p className="mb-1.5 text-[13px] text-neutral-500">{KNOWN_HINT}</p>
+          <div className="flex items-center gap-2">
+            <NameField
+              known={known}
+              placeholder="Who is this?"
+              initial={suggestion.name}
+              autoFocus
+              onPick={(target, name) => {
+                setNaming(false);
+                onName(target, name);
+              }}
+              onCancel={() => setNaming(false)}
+            />
+          </div>
         </div>
       ) : (
         <>
@@ -321,10 +333,21 @@ function SuggestionRow({
             type="button"
             disabled={busy}
             onClick={() => setNaming(true)}
+            title={KNOWN_HINT}
             className={BUTTON}
           >
             Is someone known…
           </button>
+          {onDismiss && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDismiss}
+              className={BUTTON}
+            >
+              Dismiss
+            </button>
+          )}
         </>
       )}
     </li>
@@ -368,6 +391,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
   // The panel's open tab, kept here so it survives a swap to another card.
   const [panelTab, setPanelTab] = useState<PanelTab>("faces");
   const [adding, setAdding] = useState(false);
+  const [showDismissed, setShowDismissed] = useState(false);
   const [approved, setApproved] = useState(false);
   const pages = useMemo(
     () => new Map(data.pages.map((p) => [p.number, p])),
@@ -713,11 +737,59 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
                               }),
                             )
                           }
+                          onDismiss={
+                            s.source === "wiki"
+                              ? () =>
+                                  run(`Dismissing ${s.name}`, () =>
+                                    dismissWikiName({ scope, name: s.name }),
+                                  )
+                              : undefined
+                          }
                         />
                       ))}
                     </ul>
                   )}
                 </>
+              )}
+              {data.dismissed.length > 0 && (
+                <div className="mt-3 text-[14px]">
+                  <button
+                    type="button"
+                    aria-expanded={showDismissed}
+                    onClick={() => setShowDismissed((v) => !v)}
+                    className={QUIET}
+                  >
+                    {showDismissed
+                      ? "Hide dismissed"
+                      : `Show ${data.dismissed.length} dismissed`}
+                  </button>
+                  {showDismissed && (
+                    <ul className="mt-2 space-y-2">
+                      {data.dismissed.map((s) => (
+                        <li
+                          key={`${s.name}|${s.qualifier}`}
+                          className="flex flex-wrap items-center gap-3 rounded-md border border-dashed border-neutral-800 px-4 py-2"
+                        >
+                          <span className="min-w-0 flex-1 text-neutral-500">
+                            {suggestionLabel(s)}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() =>
+                              run(`Restoring ${s.name}`, () =>
+                                restoreWikiName({ scope, name: s.name }),
+                              )
+                            }
+                            className={BUTTON}
+                          >
+                            Restore
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </Section>
 
