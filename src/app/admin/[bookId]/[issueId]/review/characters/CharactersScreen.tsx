@@ -58,6 +58,9 @@ import type {
 
 type Note = { text: string; tone: "plain" | "warn" } | null;
 
+/** The DOM id of a card's button, so closing the panel can hand focus back to it. */
+const cardDomId = (cardId: string) => `character-card-${cardId}`;
+
 /** The collapsed card in the grid. The open one is marked and shown in CharacterPanel. */
 function CharacterCardView({
   card,
@@ -76,8 +79,15 @@ function CharacterCardView({
     () => bestFace(card.faces, pages),
     [card.faces, pages],
   );
+  const ref = useRef<HTMLButtonElement>(null);
+  // Opening the panel narrows the grid and reflows it; keep the clicked card on screen.
+  useEffect(() => {
+    if (open) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [open]);
   return (
     <button
+      ref={ref}
+      id={cardDomId(card.id)}
       type="button"
       onClick={open ? onClose : onOpen}
       aria-expanded={open}
@@ -419,6 +429,12 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
 
   const openCard = data.cards.find((c) => c.id === openKey) ?? null;
 
+  /** Closes the panel and hands focus back to the card that opened it. */
+  const closePanel = (cardId: string) => {
+    setOpenKey(null);
+    document.getElementById(cardDomId(cardId))?.focus();
+  };
+
   const cardView = (card: CharacterCard) => (
     <CharacterCardView
       key={card.id}
@@ -426,7 +442,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
       pages={pages}
       open={openKey === card.id}
       onOpen={() => setOpenKey(card.id)}
-      onClose={() => setOpenKey(null)}
+      onClose={() => closePanel(card.id)}
     />
   );
 
@@ -439,7 +455,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     canChangeVoice: !card.removed && characterIds.has(card.id),
     pullNote: `voice-lab pull for comic-reader: ${card.name} (character id "${card.id}") in ${data.bookName} (book "${data.bookId}"), ${data.issueName}. No voice-lab clone is on file for this character; it needs a clip to clone from.`,
     busy: pending,
-    onClose: () => setOpenKey(null),
+    onClose: () => closePanel(card.id),
     onRename: (name: string) =>
       run("Renaming", () =>
         renameCharacter({ scope, characterId: card.id, name }),

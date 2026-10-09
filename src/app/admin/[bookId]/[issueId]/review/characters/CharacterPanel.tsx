@@ -398,7 +398,7 @@ function PagePreview({
       role="dialog"
       aria-label={`Page ${face.page}, ${label}`}
       onClick={onClose}
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-6"
+      className="fixed inset-0 z-[35] flex items-center justify-center bg-black/70 p-6"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -512,9 +512,15 @@ export function CharacterPanel({
         className="fixed top-12 right-0 bottom-0 z-20 flex w-[440px] max-w-full shrink-0 flex-col border-l border-neutral-800 bg-neutral-950 lg:sticky lg:right-auto lg:bottom-auto lg:h-[calc(100vh-3rem)]"
       >
         <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4">
-          <span className="truncate text-[14px] text-neutral-400">
-            {GROUP_LABEL[card.group]}
-          </span>
+          {/* The name stays in view however far the body scrolls, so Remove at the bottom always says who. */}
+          <div className="flex min-w-0 items-baseline gap-2 text-[14px]">
+            <span className="truncate font-medium text-neutral-100">
+              {card.name}
+            </span>
+            <span className="shrink-0 text-neutral-500">
+              {GROUP_LABEL[card.group]}
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -704,6 +710,10 @@ export function CharacterPanel({
             <div className="flex items-center justify-between gap-3">
               {card.removed ? (
                 <span className="text-amber-300">Out of this issue</span>
+              ) : card.group === "before" ? (
+                <span className="text-neutral-400">
+                  In this issue&apos;s cast when you Approve
+                </span>
               ) : (
                 <span className="text-neutral-400">
                   Counted in this issue&apos;s cast
