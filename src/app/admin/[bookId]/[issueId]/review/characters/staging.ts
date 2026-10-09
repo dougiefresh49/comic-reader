@@ -68,6 +68,13 @@ export interface CardState {
   pending: boolean;
 }
 
+/**
+ * True when the card will speak: it has a voice id, or a staged design that
+ * makes one at Confirm. A null `voiceId` alone is not "no voice".
+ */
+export const isVoiced = (state: CardState): boolean =>
+  state.voiceId !== null || state.pick?.move.kind === "create_design";
+
 export function cardState(card: CharacterCard, staged: Staged[]): CardState {
   const state: CardState = {
     name: card.name,
