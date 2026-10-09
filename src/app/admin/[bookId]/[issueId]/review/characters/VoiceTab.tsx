@@ -280,8 +280,9 @@ export interface VoiceTabProps {
  * Cancel on the left, one primary button named for the pick on the right,
  * and under them a line on when the pick takes effect. A voice with no row
  * of its own (none yet, no audio this run, a borrowed voice that is not
- * active) and a card that cannot change (removed, or a request pending)
- * get one plain line instead, with Play. Play on every `voices` row: a row
+ * active) gets one plain line above the list, and a card that cannot change
+ * (removed, or a request pending) gets that line in place of the list; the
+ * line has Play when the voice has an id. Play on every `voices` row: a row
  * with a URL of its own (an archived clone's signed clip from the loader, or
  * a `previewUrl` override) plays it at once; otherwise the first click asks
  * `voicePreview` (the source clip signed, else a bubble of this book
@@ -305,15 +306,8 @@ export function VoiceTab({
   const currentId = card.voice?.uuid ?? null;
   /** The current voice's own entry: marked under "Its voices"; picking it clears the pick. */
   const isCurrent = (p: VoicePick) => p.kind === "voice" && p.id === currentId;
-  /** The row picked instead of the current voice; null keeps the dot on the current voice and hides the footer. */
-  const [pickedKey, setPickedKey] = useState<string | null>(() => {
-    // A card with a voice opens on it. One with none opens on its lab default, so the footer is ready.
-    if (card.voice) return null;
-    const start = card.voicePicks.find(
-      (p) => p.kind === "voice" && p.startingPick,
-    );
-    return start ? `pick:${start.id}` : null;
-  });
+  /** The row picked instead of the current voice; null keeps the dot on the current voice and hides the footer. Nothing is picked on open: the "lab default" pill marks the suggestion. */
+  const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [pull, setPull] = useState<"copied" | "failed" | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const [cache, setCache] = useState<PreviewCache>({});
@@ -571,16 +565,17 @@ export function VoiceTab({
                       preview={
                         p.kind !== "voice"
                           ? null
-                          : p.status === "archived"
+                          : p.status === "archived" && !isThis
                             ? // An archived clone plays its signed clip or nothing: the "no clip link" pill says which.
                               p.clipUrl
                               ? { url: p.clipUrl }
                               : null
-                            : sourceOf(p.id, p.clipUrl)
+                            : // The current voice, whatever its status, asks `voicePreview` when it has no clip: a bubble of this book is rendered in it.
+                              sourceOf(p.id, p.clipUrl)
                       }
                       cache={cache}
                       loadingIds={loadingIds}
-                      checked={isThis ? pickedKey === null : pickedKey === key}
+                      checked={isThis ? !picked : pickedKey === key}
                       group={group}
                       onPick={() => setPickedKey(isThis ? null : key)}
                       onPlay={playRow}
@@ -633,7 +628,7 @@ export function VoiceTab({
                       preview={sourceOf(v.id, v.previewUrl)}
                       cache={cache}
                       loadingIds={loadingIds}
-                      checked={isThis ? pickedKey === null : pickedKey === key}
+                      checked={isThis ? !picked : pickedKey === key}
                       group={group}
                       onPick={() => setPickedKey(isThis ? null : key)}
                       onPlay={playRow}
