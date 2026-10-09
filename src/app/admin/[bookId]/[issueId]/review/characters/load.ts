@@ -48,7 +48,7 @@ interface IssueRow {
   name: string;
   number: number;
   /** Slugs of the wiki names this issue's Needs a name section hides (#751). */
-  dismissed_wiki_names: string[] | null;
+  dismissed_wiki_names: string[];
   books: { name: string } | null;
 }
 
@@ -538,7 +538,7 @@ export async function loadCharacters(
   }));
 
   // A wiki name dismissed for this issue (#751) is hidden, never a blocker.
-  const dismissedSlugs = new Set(issue.dismissed_wiki_names ?? []);
+  const dismissedSlugs = new Set(issue.dismissed_wiki_names);
   const suggestions: Suggestion[] = [];
   const dismissed: Suggestion[] = [];
   for (const s of proposal.suggestions) {

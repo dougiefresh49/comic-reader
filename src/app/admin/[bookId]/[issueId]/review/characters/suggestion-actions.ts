@@ -43,7 +43,7 @@ async function editDismissed(
   ).maybeSingle();
   if (read.error) throw new Error(`reading the issue: ${read.error.message}`);
   if (!read.data) throw new Error(`no issue ${scope.bookId}/${scope.issueId}`);
-  const slugs = read.data.dismissed_wiki_names ?? [];
+  const slugs = read.data.dismissed_wiki_names;
   const { error } = await updateIssue(
     supabaseAdmin,
     scope.bookId,

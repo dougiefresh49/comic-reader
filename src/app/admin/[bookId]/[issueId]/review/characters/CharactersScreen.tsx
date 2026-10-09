@@ -268,7 +268,7 @@ function UnknownCardView({
 
 /** What "Is someone known…" does (`nameSuggestion` in actions.ts), shown beside its field and as its title. */
 const KNOWN_HINT =
-  "Pick a character: this name becomes one of their aliases in every issue, and they join this issue's cast.";
+  "Pick a character: this name becomes one of their aliases in every book, and they join this issue's cast.";
 
 const suggestionLabel = (s: Suggestion) =>
   s.qualifier ? `${s.name} (${s.qualifier})` : s.name;
