@@ -417,7 +417,7 @@ function Choices({
       <div className="flex flex-wrap items-center gap-2">
         <select
           name="active-voice"
-          aria-label="Active voice to use (no slot)"
+          aria-label={`Active voice for ${item.name} (no slot)`}
           className={SELECT}
           value={voiceId}
           disabled={busy}
@@ -574,7 +574,7 @@ function ItemCard({
           {item.action !== "design" && retargets.length > 0 && (
             <select
               name="next-target"
-              aria-label="Voice for Run again"
+              aria-label={`Run again voice for ${item.name}`}
               className={SELECT}
               value={nextTarget}
               disabled={busy}
