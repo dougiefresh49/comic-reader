@@ -1,4 +1,4 @@
-// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick.
+// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick, and Cancel or confirm hands focus back to a row.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -244,10 +244,13 @@ function VoiceRequestNote({
   card,
   busy,
   onUndo,
+  undoRef,
 }: {
   card: CharacterCard;
   busy: boolean;
   onUndo: () => void;
+  /** Undo, for the tab to focus when a confirm gives the list way to this note. */
+  undoRef?: React.Ref<HTMLButtonElement>;
 }) {
   const request = card.voiceRequest;
   if (!request) return null;
@@ -259,7 +262,13 @@ function VoiceRequestNote({
           ? `Wants a voice-lab clone: ${request.targetName ?? "unknown voice"}. ${keeps}`
           : `Wants a new designed voice. ${keeps}`}
       </p>
-      <button type="button" disabled={busy} onClick={onUndo} className={BUTTON}>
+      <button
+        ref={undoRef}
+        type="button"
+        disabled={busy}
+        onClick={onUndo}
+        className={BUTTON}
+      >
         Undo request
       </button>
     </div>
@@ -288,7 +297,9 @@ export interface VoiceTabProps {
  * current voice marked among them (the dot rests on it, and it keeps a
  * "current" pill once the dot moves). Picking another row shows a footer:
  * Cancel on the left, one primary button named for the pick on the right,
- * and under them a line on when the pick takes effect. A voice with no row
+ * and under them a line on when the pick takes effect. Cancel puts focus on
+ * the group's Tab stop, a confirm on the confirmed row (or Undo, when the
+ * list gives way to a request). A voice with no row
  * of its own (none yet, no audio this run, a borrowed voice that is not
  * active) gets one plain line above the list, and a card that cannot change
  * (removed, or a request pending) gets that line in place of the list; the
@@ -422,9 +433,37 @@ export function VoiceTab({
         : { label: "Request this design", kind: "design" as const }
     : null;
   const group = `voice-${card.id}`;
-  const cancel = () => setPickedKey(null);
   const listRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  /** Where focus goes once the pick clears and the footer unmounts: the confirmed row's radio, or "stop" for the group's Tab stop. */
+  const refocus = useRef<HTMLElement | "stop" | null>(null);
+  /** The confirmed row's radio, watched until a refresh drops it (a pick or Cancel since does not matter: the fallback only acts on focus left on the body). */
+  const confirmed = useRef<HTMLElement | null>(null);
+  const tabStop = () =>
+    listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
+  const cancel = () => {
+    refocus.current = "stop";
+    setPickedKey(null);
+  };
+  // After the render that clears the pick, since the Tab stop moves in it.
+  useEffect(() => {
+    const target = refocus.current;
+    if (pickedKey || !target) return;
+    refocus.current = null;
+    (target !== "stop" && target.isConnected ? target : tabStop())?.focus();
+  }, [pickedKey]);
+  // The refresh lands as a new card: if it dropped the confirmed row and
+  // focus fell to the body of a focused page, the list's Tab stop takes it,
+  // or Undo on the request the list gave way to. Focus anywhere else is left alone.
+  useEffect(() => {
+    const row = confirmed.current;
+    if (!row || busy || row.isConnected) return;
+    confirmed.current = null;
+    const active = document.activeElement;
+    if (!document.hasFocus() || (active && active !== document.body)) return;
+    (tabStop() ?? undoRef.current)?.focus();
+  }, [card, busy]);
   // The footer is sticky at the panel's bottom, so a pick near the end of the
   // list would sit under it: scroll the panel by the overlap, and only then.
   useEffect(() => {
@@ -476,7 +515,13 @@ export function VoiceTab({
   };
   const apply = () => {
     if (!picked || !action) return;
-    // The dot goes back to the current voice, which the callback is about to change or keep.
+    // The dot goes back to the current voice, which the callback is about to
+    // change or keep; focus stays on the confirmed row, where the dot lands.
+    const row = listRef.current?.querySelector<HTMLElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    refocus.current = row ?? "stop";
+    confirmed.current = row ?? null;
     setPickedKey(null);
     if (picked.section === "active") return onSetVoice(picked.voice);
     if (picked.section === "design")
@@ -532,7 +577,12 @@ export function VoiceTab({
       )}
 
       {card.voiceRequest && (
-        <VoiceRequestNote card={card} busy={busy} onUndo={onUndoVoiceRequest} />
+        <VoiceRequestNote
+          card={card}
+          busy={busy}
+          onUndo={onUndoVoiceRequest}
+          undoRef={undoRef}
+        />
       )}
 
       {listed && (
