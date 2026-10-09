@@ -61,7 +61,7 @@ import type {
   Suggestion,
 } from "./types";
 
-type Note = { text: string; tone: "plain" | "warn" } | null;
+type Note = { text: string; tone: "plain" | "warn"; busy?: true } | null;
 
 /** The DOM id of a card's button, so closing the panel can hand focus back to it. */
 const cardDomId = (cardId: string) => `character-card-${cardId}`;
@@ -413,7 +413,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
 
   const run = useCallback(
     (label: string, work: () => Promise<ActionResult>) => {
-      setNote({ text: `${label}…`, tone: "plain" });
+      setNote({ text: `${label}…`, tone: "plain", busy: true });
       startTransition(async () => {
         try {
           const result = await work();
@@ -908,7 +908,9 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
               : "border-neutral-600 bg-neutral-950 text-neutral-100"
           }`}
         >
-          {pending ? <span className="text-neutral-400">Saving: </span> : null}
+          {note.busy ? (
+            <span className="text-neutral-400">Saving: </span>
+          ) : null}
           {note.text}
         </div>
       )}

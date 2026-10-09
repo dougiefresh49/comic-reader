@@ -47,7 +47,7 @@ const QUIET =
 const SELECT =
   "h-8 min-w-0 rounded-sm border border-neutral-700 bg-neutral-950 px-2 text-[14px] text-neutral-100 outline-none focus:border-neutral-400";
 
-type Note = { text: string; tone: "plain" | "warn" } | null;
+type Note = { text: string; tone: "plain" | "warn"; busy?: true } | null;
 type Run = (label: string, work: () => Promise<ActionResult>) => void;
 type Scope = { bookId: string; issueId: string };
 
@@ -697,7 +697,7 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
 
   const run = useCallback<Run>(
     (label, work) => {
-      setNote({ text: `${label}…`, tone: "plain" });
+      setNote({ text: `${label}…`, tone: "plain", busy: true });
       startTransition(async () => {
         try {
           const result = await work();
@@ -875,7 +875,9 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
               : "border-neutral-600 bg-neutral-950 text-neutral-100"
           }`}
         >
-          {pending ? <span className="text-neutral-400">Saving: </span> : null}
+          {note.busy ? (
+            <span className="text-neutral-400">Saving: </span>
+          ) : null}
           {note.text}
           {note.tone === "warn" && !pending && (
             <button
