@@ -1,0 +1,1043 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casting · MMPR/TMNT III · Issue 1 (round 2)</title>
+<style>
+  :root{
+    --bg:#0e1012; --sur:#15181b; --raise:#1b1f24; --raise2:#232931; --line:#2a3038; --line2:#353c46;
+    --tx:#e9e7e2; --dim:#9aa1a8; --mute:#6b737b;
+    --amber:#e9b44c; --amber-d:#3a2e12; --green:#5fc07c; --green-d:#15321f; --red:#ea6a5e; --red-d:#43201c;
+    --blue:#6fa8e6; --blue-d:#1a2c42; --lock:#8b949e;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --panel:440px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.4 var(--sans);height:100%}
+  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  button:focus-visible,[tabindex]:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  input,textarea{font:inherit;color:inherit}
+  b{font-weight:600}
+  .mono{font-family:var(--mono)}
+  .dim{color:var(--dim)} .mute{color:var(--mute)}
+  .ic{width:14px;height:14px;display:inline-block;vertical-align:-2px;flex:none}
+
+  /* ---------- frame ---------- */
+  #app{display:grid;grid-template-rows:54px 1fr;grid-template-columns:minmax(0,1fr) 0;height:100vh;min-width:1100px;transition:grid-template-columns .18s ease}
+  #app.panel-open{grid-template-columns:minmax(0,1fr) var(--panel)}
+  header{grid-column:1/3;display:flex;align-items:center;gap:16px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--sur)}
+  header .crumb{color:var(--dim);white-space:nowrap}
+  header .crumb b{color:var(--tx)}
+  header .crumb span{margin:0 6px;color:var(--mute)}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--raise);padding:6px 11px;border-radius:7px;font-weight:500;white-space:nowrap;line-height:1.2}
+  .btn:hover{background:var(--raise2)}
+  .btn.primary{background:var(--amber);color:#1a1300;border-color:var(--amber)}
+  .btn.primary:hover{background:#f2c35f}
+  .btn.primary[disabled],.btn[disabled]{opacity:.45;cursor:not-allowed}
+  .btn.small{padding:3px 8px;font-size:12px;border-radius:6px}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--dim)}
+  .btn.ghost:hover{color:var(--tx);background:var(--raise)}
+  .btn.danger{color:var(--red)}
+  .btn .n{font-family:var(--mono);font-weight:600;background:rgba(0,0,0,.18);border-radius:5px;padding:0 5px;margin-left:2px}
+  .btn.primary .n{background:rgba(0,0,0,.14)}
+
+  /* ---------- slot strip ---------- */
+  #strip{display:flex;align-items:center;gap:10px;margin-left:auto}
+  #strip .segs{display:flex;gap:2px;padding:4px;border-radius:7px;border:1px solid transparent;transition:border-color .12s,background .12s}
+  #strip .segs.can-drop{border-color:var(--amber);background:var(--amber-d)}
+  .seg{width:10px;height:18px;border-radius:2.5px;background:var(--line2);position:relative;cursor:pointer;border:0;padding:0;transition:transform .1s}
+  .seg:hover{transform:translateY(-2px)}
+  .seg.ours{background:#4a7c5a}
+  .seg.lock{background:#3d454f;background-image:repeating-linear-gradient(45deg,transparent 0 2px,#5a636e 2px 3px)}
+  .seg.other{background:#2d4a68}
+  .seg.other.pin{background-image:repeating-linear-gradient(45deg,transparent 0 2px,#4a6a8e 2px 3px)}
+  .seg.in{background:var(--amber)}
+  .seg.out{background:transparent;border:1px dashed var(--red)}
+  .seg.free{background:transparent;border:1px dashed var(--line2)}
+  .seg.over{outline:2px solid var(--amber);outline-offset:1px}
+  .seg.nodrop{opacity:.35;cursor:not-allowed}
+  .seg.carrying{outline:2px solid var(--amber)}
+  #strip .lbl{color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+  #strip .lbl b{color:var(--tx)}
+  #strip .lbl .plus{color:var(--amber)} #strip .lbl .minus{color:var(--red)}
+  #strip .own{display:flex;gap:6px;color:var(--mute);font-size:11px;white-space:nowrap}
+  #strip .own span{display:inline-flex;align-items:center;gap:3px}
+  #strip .own .ic{width:10px;height:10px;color:var(--lock)}
+  #release{display:none;align-items:center;padding:3px 9px;border:1px dashed var(--line2);border-radius:7px;color:var(--mute);font-size:11px;white-space:nowrap}
+  #release.show{display:inline-flex}
+  #release.can-drop{border-color:var(--red);color:var(--red)}
+  #release.over{background:var(--red-d)}
+
+  /* ---------- grid ---------- */
+  #main{overflow:auto;min-width:0;padding:6px 18px 40px}
+  .grp{display:flex;align-items:baseline;gap:10px;padding:18px 2px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+  .grp b{color:var(--dim);font-weight:600}
+  .grp .mono{letter-spacing:0;color:var(--dim)}
+  .grp .hint{text-transform:none;letter-spacing:0;font-size:11px}
+  .grp:first-child{padding-top:10px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+  .card{position:relative;border:1px solid var(--line2);background:var(--raise);border-radius:11px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;transition:border-color .12s,transform .12s,box-shadow .12s;text-align:left;padding:0}
+  .card:hover{border-color:#4a5563;transform:translateY(-1px)}
+  .card.sel{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber)}
+  .card.none{border-color:#5a2d28}
+  .card.pend{border-top:2px solid var(--amber)}
+  .card.sit .face,.card.removed .face{filter:grayscale(1) brightness(.55)}
+  .card.sit .nm,.card.removed .nm{color:var(--dim)}
+  .card.removed{opacity:.5}
+  .card.lost{border-color:var(--red)}
+  .card.can-drop{border-color:var(--amber);background:var(--amber-d)}
+  .card.over{background:#5c4818}
+  .card .face{position:relative;aspect-ratio:1/.82;background:#222;overflow:hidden}
+  .card .face svg{display:block;width:100%;height:100%}
+  .card .face .ln{position:absolute;top:6px;right:7px;font:600 11px var(--mono);color:#fff;background:rgba(0,0,0,.45);border-radius:5px;padding:1px 5px;letter-spacing:0}
+  .card .face .ln.zero{color:#bbb;background:rgba(0,0,0,.3)}
+  .card .face .tag{position:absolute;top:6px;left:7px;font:600 10px var(--sans);color:#1a1300;background:var(--amber);border-radius:5px;padding:1px 5px;letter-spacing:.02em;text-transform:uppercase}
+  .card .nm{position:absolute;left:0;right:0;bottom:0;padding:22px 9px 7px;background:linear-gradient(to top,rgba(10,12,14,.96),rgba(10,12,14,.75) 55%,transparent);font-weight:600;font-size:13px;line-height:1.15;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .vc{display:flex;align-items:center;gap:6px;padding:7px 8px 7px 9px;min-height:32px;font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden}
+  .card .vc .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+  .card .vc .dot.pend{background:var(--amber);box-shadow:0 0 0 3px rgba(233,180,76,.18)}
+  .card .vc .dot.none{background:var(--red)} .card .vc .dot.sit{background:var(--mute)} .card .vc .dot.lib{background:#b0b8c0} .card .vc .dot.standin{background:var(--blue)}
+  .card .vc .t{overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+  .card .vc .t.dimt{color:var(--dim)}
+  .card .vc .slot{font-family:var(--mono);color:var(--mute);font-size:11px}
+  .card .vc .pl{margin-left:auto;width:20px;height:20px;border-radius:5px;display:grid;place-items:center;color:var(--dim);flex:none}
+  .card .vc .pl:hover{color:var(--tx);background:var(--raise2)}
+  .card .vc .pl.playing{color:var(--amber)}
+  .card .more{position:absolute;top:6px;left:7px;width:22px;height:22px;border-radius:6px;background:rgba(10,12,14,.6);color:#fff;display:grid;place-items:center;opacity:0;transition:opacity .12s;z-index:2}
+  .card:hover .more,.card:focus-within .more,.card .more:focus-visible{opacity:1}
+  .card.tagged .more{left:auto;right:7px;top:28px}
+  .card .more:hover{background:rgba(10,12,14,.9)}
+  .card.add{border-style:dashed;background:transparent;align-items:center;justify-content:center;min-height:150px;color:var(--mute);gap:6px;font-weight:500}
+  .card.add:hover{color:var(--tx);border-color:#4a5563}
+  .card.add .plus{width:34px;height:34px;border-radius:50%;border:1px dashed var(--line2);display:grid;place-items:center;font-size:20px;line-height:1}
+
+  /* ---------- side panel ---------- */
+  #panel{border-left:1px solid var(--line);background:var(--sur);display:flex;flex-direction:column;min-height:0;overflow:hidden;width:var(--panel)}
+  #app:not(.panel-open) #panel{display:none}
+  #panel .ph{display:flex;gap:12px;padding:14px 16px 10px;align-items:flex-start;border-bottom:1px solid var(--line)}
+  #panel .ph .big{width:64px;height:64px;border-radius:10px;overflow:hidden;flex:none;background:#222}
+  #panel .ph .big svg{width:100%;height:100%;display:block}
+  #panel .ph h3{margin:0;font-size:16px;font-weight:600;line-height:1.2;display:flex;align-items:center;gap:8px;min-width:0}
+  #panel .ph h3 input{font-size:16px;font-weight:600;background:var(--raise);border:1px solid var(--amber);border-radius:6px;padding:2px 6px;width:200px}
+  #panel .ph .meta{color:var(--dim);font-size:12px;margin-top:3px;font-variant-numeric:tabular-nums}
+  #panel .ph .meta .mono{color:var(--mute);font-size:11px}
+  #panel .ph .close{margin-left:auto;width:28px;height:28px;border-radius:7px;color:var(--dim);display:grid;place-items:center;flex:none}
+  #panel .ph .close:hover{background:var(--raise);color:var(--tx)}
+  .tabs{display:flex;gap:2px;padding:8px 16px 0;border-bottom:1px solid var(--line)}
+  .tabs button{padding:7px 10px;border-bottom:2px solid transparent;color:var(--dim);font-weight:500;margin-bottom:-1px;display:flex;gap:6px;align-items:center}
+  .tabs button .mono{color:var(--mute);font-size:11px}
+  .tabs button.on{color:var(--tx);border-color:var(--amber)}
+  #pbody{overflow:auto;flex:1;padding:12px 16px 20px}
+  #pfoot{display:flex;gap:4px;padding:10px 12px;border-top:1px solid var(--line);background:var(--sur);white-space:nowrap}
+  #pfoot .btn{padding:5px 8px;font-size:12px}
+  .sec{margin-bottom:16px}
+  .sec h4{margin:0 0 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:600;display:flex;align-items:baseline;gap:8px}
+  .sec h4 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400;color:var(--dim)}
+
+  /* voice choice rows */
+  .vrow{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;margin-bottom:5px;background:var(--raise);cursor:pointer;transition:border-color .12s,background .12s;width:100%;text-align:left}
+  .vrow:hover{border-color:#4a5563}
+  .vrow.on{border-color:var(--amber);background:#241e10}
+  .vrow .rad{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--mute);display:grid;place-items:center}
+  .vrow.on .rad{border-color:var(--amber)} .vrow.on .rad::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--amber)}
+  .vrow .nm{display:flex;flex-direction:column;min-width:0;gap:1px}
+  .vrow .nm .t{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vrow .nm .s{color:var(--dim);font-size:11.5px;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden}
+  .vrow .nm .s .bk{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+  .vrow .nm .s .bk.no{background:transparent;border:1px solid var(--red)}
+  .vrow .nm .s .bk.prompt{background:var(--blue)}
+  .vrow .nm .s .slotn{font-family:var(--mono);color:var(--mute)}
+  .vrow .nm .s .tag{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:0 5px;border-radius:4px;background:var(--raise2);color:var(--dim)}
+  .vrow .nm .s .tag.now{background:var(--green-d);color:var(--green)}
+  .vrow .nm .s .tag.new{background:var(--amber-d);color:var(--amber)}
+  .vrow .nm .s .tag.lab{background:var(--blue-d);color:var(--blue)}
+  .vrow .pl{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--dim)}
+  .vrow .pl:hover{color:var(--tx);background:var(--raise2)} .vrow .pl.playing{color:var(--amber)}
+  .vrow.design{border-style:dashed;background:transparent}
+  .vrow.design .rad{border-style:dashed}
+  .vrow.design:hover{background:var(--raise)}
+  .vrow.exp{grid-template-columns:18px 1fr auto}
+  .vrow.exp .rad{border:0;color:var(--dim)}
+  .vlist{margin:0 0 10px 0;display:none}
+  .vlist.open{display:block}
+  .vlist .vrow{padding:6px 10px;margin-bottom:4px}
+  .vlist .vrow .nm .t{font-weight:500}
+  .vlist .vrow .nm .s{font-size:11px}
+  .vlist .vrow.locked{opacity:.5;cursor:not-allowed}
+  .search{width:100%;background:var(--raise);border:1px solid var(--line2);border-radius:8px;padding:6px 10px;margin-bottom:6px}
+  .search::placeholder{color:var(--mute)}
+
+  /* slot source block */
+  .slotbox{border:1px solid #6a5420;background:#1f1a0f;border-radius:10px;padding:10px 12px;margin-top:4px}
+  .slotbox h4{color:var(--amber);margin-bottom:8px}
+  .segc{display:flex;gap:4px;margin-bottom:8px}
+  .segc button{flex:1;padding:6px 8px;border:1px solid var(--line2);border-radius:7px;background:var(--raise);font-weight:500;color:var(--dim)}
+  .segc button.on{border-color:var(--amber);color:var(--tx);background:#2a2211}
+  .segc button[disabled]{opacity:.4;cursor:not-allowed}
+  .segc button .mono{color:var(--mute);margin-left:4px}
+  .bk-line{display:flex;align-items:center;gap:8px;padding:6px 2px 0;color:var(--dim);font-size:12px}
+  .bk-line.lossy{color:var(--red)}
+  .bk-line input{accent-color:var(--amber);width:14px;height:14px;margin:0}
+  .bk-line .tip{margin-left:auto;color:var(--mute);cursor:help;border-bottom:1px dotted var(--mute)}
+
+  /* faces tab */
+  .exg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .ex{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--line2);aspect-ratio:1;background:#222;cursor:pointer}
+  .ex svg{display:block;width:100%;height:100%}
+  .ex .ef{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:3px 6px;background:rgba(0,0,0,.55);font:11px var(--mono);color:#ddd}
+  .ex .ck{width:18px;height:18px;border-radius:5px;border:1px solid #777;display:grid;place-items:center;font-size:11px;color:transparent;background:rgba(0,0,0,.4)}
+  .ex.ok{border-color:var(--green)} .ex.ok .ck{background:var(--green);border-color:var(--green);color:#062}
+  .ex.ok svg{filter:none} .ex:not(.ok) svg{filter:saturate(.6) brightness(.8)}
+  .lines{border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .line{display:grid;grid-template-columns:36px 1fr 26px;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .line:last-child{border-bottom:0}
+  .line .pg{font:11px var(--mono);color:var(--mute)} .line .tx{font-size:12.5px}
+  .line .cue{color:var(--amber)}
+  .line .pl{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--dim)}
+  .line .pl:hover{color:var(--tx);background:var(--raise2)} .line .pl.playing{color:var(--amber)}
+  .desc{color:var(--dim);font-size:12px;border-left:2px solid var(--line2);padding:2px 10px;margin:4px 0 0}
+
+  /* popover menu */
+  .pop{position:fixed;z-index:60;background:var(--raise);border:1px solid var(--line2);border-radius:9px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:5px;min-width:180px;display:none}
+  .pop.open{display:block}
+  .pop button.mi{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border-radius:6px;text-align:left;white-space:nowrap}
+  .pop button.mi:hover{background:var(--raise2)}
+  .pop button.mi.danger{color:var(--red)}
+  .pop .sep{height:1px;background:var(--line);margin:4px 2px}
+  .pop .ttl{padding:6px 10px 4px;font-size:11px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase}
+  .pop .ttl b{color:var(--tx);letter-spacing:0;text-transform:none;font-size:12px}
+  .pop .kv{padding:2px 10px;color:var(--dim);font-size:12px;display:flex;gap:8px}
+  .pop .kv .k{color:var(--mute);min-width:52px}
+  .pop .mini{display:flex;align-items:center;gap:8px;padding:5px 10px}
+  .pop .mini .av{width:22px;height:22px;border-radius:5px;overflow:hidden;flex:none} .pop .mini .av svg{width:100%;height:100%;display:block}
+  .pop input.search{margin:4px 0 6px}
+  .pop .list{max-height:260px;overflow:auto}
+
+  /* drawers (design sheet) and the review sheet */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:none}
+  .scrim.open{display:block}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:520px;background:var(--sur);border-left:1px solid var(--line);z-index:50;transform:translateX(100%);transition:transform .18s ease;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .dh{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .dh h3{margin:0;font-size:15px;font-weight:600}
+  .dh .close{margin-left:auto;width:28px;height:28px;border-radius:7px;color:var(--dim);display:grid;place-items:center}
+  .dh .close:hover{background:var(--raise);color:var(--tx)}
+  .db{overflow:auto;flex:1;padding:14px 18px}
+  .df{display:flex;align-items:center;gap:10px;padding:12px 18px;border-top:1px solid var(--line)}
+  .fieldhead{display:flex;align-items:baseline;gap:8px;margin-bottom:5px;font-weight:600}
+  .fieldhead .r{margin-left:auto;font-weight:400;color:var(--dim);font-size:12px;display:flex;gap:8px;align-items:center}
+  textarea{width:100%;background:var(--raise);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;resize:vertical;line-height:1.45}
+  textarea.magic{border-color:#6a5420}
+  .note{color:var(--dim);font-size:12px;margin-top:5px}
+  .note.red{color:var(--red)}
+  .takes{display:flex;flex-direction:column;gap:5px}
+  .take{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;background:var(--raise);cursor:pointer}
+  .take.sel{border-color:var(--amber);background:#241e10}
+  .take input{accent-color:var(--amber);margin:0}
+  .take .tn{font-weight:600} .take .td{color:var(--dim);font-size:12px;margin-left:8px}
+  .take .play{width:28px;height:28px;border-radius:6px;display:grid;place-items:center;color:var(--dim)}
+  .take .play:hover{background:var(--raise2);color:var(--tx)} .take .play.playing{color:var(--amber)}
+  .opt{display:grid;grid-template-columns:18px 1fr;gap:10px;padding:8px 10px;border:1px solid var(--line2);border-radius:9px;margin-bottom:5px;background:var(--raise);cursor:pointer}
+  .opt.sel{border-color:var(--amber);background:#241e10}
+  .opt input{accent-color:var(--amber);margin:2px 0 0}
+  .opt .ot{font-weight:600} .opt .od{color:var(--dim);font-size:12px}
+  .spin{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .sheet{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:30px}
+  .sheet.open{display:flex}
+  .sheet .panel{width:720px;max-height:90vh;background:var(--sur);border:1px solid var(--line2);border-radius:14px;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+  .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+  .sum>div{background:var(--raise);border:1px solid var(--line);border-radius:9px;padding:9px 12px}
+  .sum .k{color:var(--mute);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+  .sum .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+  .sum .v small{font-size:11px;color:var(--dim);font-weight:400;margin-left:5px}
+  .sum .red .v{color:var(--red)}
+  ol.steps{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  ol.steps li{display:grid;grid-template-columns:24px 1fr auto 28px;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);transition:background .2s}
+  ol.steps li:last-child{border-bottom:0}
+  ol.steps li .i{font:11px var(--mono);color:var(--mute);text-align:right}
+  ol.steps li .st{min-width:0}
+  ol.steps li .st .s{color:var(--dim);font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  ol.steps li .cost{font:12px var(--mono);color:var(--dim);white-space:nowrap}
+  ol.steps li .x{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;color:var(--mute)}
+  ol.steps li .x:hover{background:var(--raise2);color:var(--red)}
+  ol.steps li.run{background:var(--amber-d)} ol.steps li.done{background:var(--green-d)} ol.steps li.done .i{color:var(--green)}
+  ol.steps li.lossy{background:#2a1b19}
+  ol.steps li .bk{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--dim);cursor:pointer}
+  ol.steps li .bk input{accent-color:var(--amber);margin:0}
+  ol.steps li .bk.lossy{color:var(--red)}
+  .warn{border:1px solid #5a2d28;background:var(--red-d);border-radius:9px;padding:8px 12px;margin:10px 0 0;font-size:12px;color:var(--red);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .warn .btn{font-size:11px;padding:2px 7px;color:var(--tx)}
+  .empty{color:var(--mute);padding:30px;text-align:center}
+
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(10px);background:var(--raise2);border:1px solid var(--line2);color:var(--tx);padding:8px 14px;border-radius:9px;font-size:12.5px;opacity:0;transition:opacity .15s,transform .15s;pointer-events:none;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  .toast.bad{border-color:#5a2d28;color:var(--red)}
+  .flash{animation:fl .7s ease}
+  @keyframes fl{0%{box-shadow:0 0 0 0 rgba(233,180,76,.9)}100%{box-shadow:0 0 0 12px rgba(233,180,76,0)}}
+  kbd{font:11px var(--mono);background:var(--raise2);border:1px solid var(--line2);border-radius:4px;padding:0 5px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="crumb">Admin <span>/</span> MMPR/TMNT III, Issue 1 <span>/</span> <b>Casting</b></div>
+    <button class="btn small ghost" id="btnFaces" title="Faces that still need a name"></button>
+    <div id="strip">
+      <div class="segs" id="segs" data-target="strip" aria-label="Voice slots"></div>
+      <div class="lbl" id="stripLbl"></div>
+      <div class="own" id="stripOwn" aria-label="Slots held by other projects"></div>
+      <div id="release" data-target="release">free the slot</div>
+    </div>
+    <button class="btn" id="btnAdd">+ Add</button>
+    <button class="btn primary" id="btnReview">Review <span class="n" id="reviewN">0</span></button>
+  </header>
+
+  <main id="main" aria-label="Cast"></main>
+
+  <aside id="panel" aria-label="Character">
+    <div class="ph">
+      <div class="big" id="pAv"></div>
+      <div style="min-width:0;flex:1">
+        <h3 id="pName"></h3>
+        <div class="meta" id="pMeta"></div>
+      </div>
+      <button class="close" id="pClose" aria-label="Close">✕</button>
+    </div>
+    <div class="tabs" id="pTabs">
+      <button data-tab="voice" class="on">Voice</button>
+      <button data-tab="faces">Faces <span class="mono" id="pFacesN"></span></button>
+    </div>
+    <div id="pbody"></div>
+    <div id="pfoot"></div>
+  </aside>
+</div>
+
+<div class="pop" id="pop" role="menu"></div>
+<div class="scrim" id="scrim"></div>
+
+<!-- design sheet -->
+<div class="drawer" id="designDrawer" role="dialog" aria-modal="true" aria-labelledby="ddTitle">
+  <div class="dh"><div><h3 id="ddTitle">Design a voice</h3><div class="dim" id="ddSub"></div></div><button class="close" id="ddClose" aria-label="Close">✕</button></div>
+  <div class="db" id="ddBody"></div>
+  <div class="df" id="ddFoot"></div>
+</div>
+
+<!-- review & confirm -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <div class="panel">
+    <div class="dh"><h3 id="shTitle">Review</h3><span class="dim" id="shSub"></span><button class="close" id="shClose" style="margin-left:auto" aria-label="Close">✕</button></div>
+    <div class="db" id="shBody"></div>
+    <div class="df" id="shFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+/* ======================================================================
+   MOCK DATA, shaped like tmnt-mmpr-iii / issue-1 (static; nothing is real).
+   Reused from round 1's A, plus a `look` per character for the drawn face.
+   look: [kind, base colour, accent colour, extra]
+   kinds: ranger (helmet+visor) · turtle (bandana) · human · robot · mask · helm · beast · tube · role
+   ====================================================================== */
+const kindOf=(k,l)=>k==='role'?'role':l>=10?'lead':l>=3?'sup':l>=1?'one':'silent';
+const C = (id,name,kind,lines,faces,pages,col,ini,desc,voice,look,extra={})=>({id,name,kind:kindOf(kind,lines),lines,faces,pages,col,ini,desc,voice,look,...extra});
+const CHARS = [
+  C('green-ranger','Green Ranger','lead',30,30,'5–23','#2f9a55','GR','Tommy Oliver, the Green Ranger. Teenage martial artist, cocky and warm, quick to laugh mid-fight.','v-green',['ranger','#2f9a55','#e4c04a','shield'],{samples:[[4,'[shouting] COME ON! IS THIS ALL YOU\'VE GOT?'],[4,'KEE-YAH!'],[5,'[frustrated grunts] SO MUCH for reaching the Command Center.']]}),
+  C('leonardo','Leonardo','lead',19,14,'5–23','#2f6fcf','L','Leader of the turtles. Measured, earnest, a little stiff; the one who says the plan out loud.','v-leo',['turtle','#4e9a4a','#2f6fcf'],{samples:[[5,'Guys. Formation. Now.'],[11,'[low] We hold the line until the Rangers are through.'],[22,'[relieved] Okay. Okay. Everybody breathe.']]}),
+  C('raphael','Raphael','lead',22,17,'7–24','#c73b2f','R','Hot-headed turtle. Gravel in the voice, Brooklyn vowels, jokes that are half threats.','v-raph',['turtle','#3f8a3f','#c73b2f','scowl'],{samples:[[7,'[growling] You wanna go, tin can?'],[12,'Heh. Cute helmet.'],[20,'[yelling] LEO, LEFT!']]}),
+  C('shredder','Shredder','lead',15,12,'15–22','#6e7781','S','Oroku Saki. Cold, precise, theatrical menace; speaks slowly and never raises his voice until he does.','v-shred',['helm','#8a929c','#3a3f47','blades'],{samples:[[15,'[quiet] You have something that belongs to me.'],[16,'The Foot does not retreat. The Foot regroups.'],[22,'[roaring] ENOUGH!']]}),
+  C('donatello','Donatello','lead',10,10,'6–13','#7b4fbf','D','The tech turtle. Fast, nasal, excited by machines; trails off into muttering when he thinks.','v-don',['turtle','#5aa04e','#7b4fbf'],{samples:[[6,'[excited] The grid resonance is, wait, wait, that\'s not possible.'],[7,'Okay so if I invert the, hmm.'],[12,'[muttering] Three, two, and... there.']]}),
+  C('red-ranger','Red Ranger','lead',11,14,'8–24','#d6453a','RR','Jason, the Red Ranger. Steady team captain; clipped, confident, radio-crisp delivery.','v-red',['ranger','#d6453a','#f0f0f0'],{samples:[[8,'Rangers, on me.'],[12,'[firm] We do this together or not at all.'],[24,'[tired] Good work, everyone.']]}),
+  C('bebop','Bebop','lead',8,6,'18–21','#b86b4d','B','Mutant warthog henchman. Loud, dim, giggly; a sidekick who thinks he\'s the brains.','v-bebop',['beast','#b86b4d','#7a3fb0','mohawk'],{samples:[[18,'[giggling] Oh this is gonna be GOOD, Rocksteady.'],[19,'Uh. Boss? It\'s doing the thing again.'],[21,'[whining] I didn\'t touch nothin\'!']]}),
+  C('michelangelo','Michelangelo','lead',6,8,'9–23','#e8902a','M','The party turtle. Surfer drawl, big grin you can hear, every line ends up a joke.','v-mikey',['turtle','#62a84e','#e8902a','grin'],{samples:[[9,'Dudes. DUDES. They have a giant robot.'],[11,'[laughing] Cowabunga, Rangers!'],[23,'[mouth full] Pizza break?']]}),
+  C('pink-ranger','Pink Ranger','sup',9,21,'8–23','#e0689f','PR','Kimberly, the Pink Ranger. Bright, quick, sarcastic in a friendly way; gymnast\'s energy.','v-pink',['ranger','#e0689f','#f0f0f0'],{samples:[[8,'[surprised] Wait, they can throw fireballs now?'],[8,'I wanna throw fireballs.'],[10,'[sarcastic] Honestly, how does he fill out his purple pajama posse?']]}),
+  C('rocksteady','Rocksteady','sup',9,5,'18–21','#8d939a','RS','Mutant rhino henchman. Deep, booming, nasal; slow-witted, snorts when he laughs; thick Brooklyn accent.','v-rock',['beast','#8d939a','#4a5560','horn'],{samples:[[18,'[confident, snorts] Consider it a TEST DRIVE, Bebop. [darkly enthusiastic] Let\'s have SOME FUN!'],[19,'[Shouting] SHADOW GRID-- ACTIVATE!'],[19,'[excited] I AIN\'T felt this GOOD since our first MUTATION.']]}),
+  C('karai','Karai','sup',3,10,'7–16','#2a2f3a','K','Shredder\'s lieutenant. Low, dry, controlled; a knife in a velvet sleeve.','v-karai',['human','#e8c4a0','#1a1d24','bob'],{samples:[[7,'[cool] You were told to wait.'],[15,'Father. The Rangers are here.'],[16,'[quiet] Then we end it tonight.']]}),
+  C('yellow-ranger','Yellow Ranger','sup',9,15,'6–13','#e2b93b','YR','Trini, the Yellow Ranger. Calm, kind, precise; the one who notices the detail everyone missed.','v-yellow',['ranger','#e2b93b','#f0f0f0'],{samples:[[6,'That symbol. I\'ve seen it before.'],[12,'[gentle] Hey. Look at me. We\'ve got this.'],[13,'Left side. Now.']]}),
+  C('foot-soldier','Foot Soldier','sup',2,31,'3–15','#3d3356','FS','Foot Clan grunt. Interchangeable; muffled under a mask; short barks and grunts.','v-foot',['mask','#2a2438','#5a4a7a'],{samples:[[3,'[muffled] Intruders!'],[8,'[grunt] Hyah!'],[15,'[panicked] Fall back! FALL BACK!']]}),
+  C('blue-ranger','Blue Ranger','sup',5,8,'12–13','#3b7dd8','BR','Billy, the Blue Ranger. Earnest brain of the Rangers; long words, soft delivery, a bit of a stammer when excited.','v-blue',['ranger','#3b7dd8','#f0f0f0'],{samples:[[12,'[fast] The morphological grid is, is destabilizing!'],[12,'Donatello, your readings?'],[13,'[awed] Fascinating.']]}),
+  C('lord-zedd','Lord Zedd','sup',10,7,'16–24','#b0322c','LZ','Lord Zedd. Rasping, metallic, imperial; every sentence a decree.','v-zedd',['helm','#b0322c','#c0c6cc','grill'],{samples:[[16,'[rasping] Bring me the Green Ranger.'],[18,'You disappoint me, Shredder.'],[24,'[seething] This is not over.']]}),
+  C('master-splinter','Master Splinter','sup',9,9,'12–23','#8a6a4a','MS','Splinter. Old, warm, patient rat sensei; soft Japanese-inflected English; pauses before the point.','v-splinter',['beast','#8a6a4a','#5a3f2a','rat'],{samples:[[12,'[calm] Patience, my sons.'],[14,'A warrior who fights alone has already lost.'],[23,'[proud] You did well.']]}),
+  C('foot-elite','Foot Elite','sup',11,10,'8–15','#5a4a7a','FE','Elite Foot ninja. Sharper than the grunts; clipped commands, no wasted words.','v-footelite',['mask','#3a3050','#c0392b','elite'],{samples:[[8,'[hissing] Take the Ranger. Leave the rest.'],[10,'Flank.'],[15,'[cold] The master will not be pleased.']]}),
+  C('black-ranger','Black Ranger','sup',1,2,'12–13','#4a4f5a','BK','Zack, the Black Ranger. Loose, funny, dancer\'s rhythm in his speech.','v-black',['ranger','#2b2f36','#f0f0f0'],{samples:[[12,'[laughing] Ohhh, no no no, not today!'],[13,'Hip hop kido, baby.']]}),
+  C('warbunny','Warbunny','sup',11,12,'6–20','#3aa69a','W','Warbunny. Big, strange, childlike brute; sing-song menace.','v-warbunny',['beast','#3aa69a','#1f6f66','ears'],{samples:[[6,'[sing-song] Bunny wants to PLAY.'],[15,'[confused] Why they running?'],[20,'[roar] WARBUNNY SMASH!']]}),
+  C('putty','Putty Foot Soldier','sup',3,25,'3–23','#7a7f86','PF','','',['mask','#8a8f96','#5a5f66','putty'],{samples:[[3,'[gurgle] Blub-lub-lub.'],[8,'[clay noise] Hrrrngh.'],[11,'[gurgle] Bluh?']]}),
+  C('armored-villain','Armored Villain','sup',0,0,'off-panel','#555b66','AV','Unnamed armored villain, voice only. Booming through a helmet, distorted.','v-armored',['helm','#555b66','#2a2e36'],{samples:[[16,'[distorted] The grid is ours.'],[18,'[booming] Kneel.']]}),
+  C('grace-sterling','Grace Sterling','sup',0,0,'off-panel','#9a6f8e','GS','','',['human','#f0d0b8','#c8b090','updo'],{samples:[[2,'[TV] This is Grace Sterling, live from downtown Angel Grove.'],[2,'[TV] Authorities are asking residents to stay indoors.'],[24,'[TV] And the city breathes a sigh of relief.']]}),
+  C('alpha-5','Alpha 5','one',2,1,'12','#c9473f','A5','Alpha 5. Fretful robot assistant; high, fast, "ay-yi-yi" energy.','v-alpha',['robot','#d8d8dc','#c9473f'],{samples:[[12,'Ay-yi-yi-yi-yi! Zordon, the sensors!'],[12,'[fretting] Oh, this is bad, this is very bad.']]}),
+  C('zordon','Zordon','one',6,1,'12','#4f8fd6','Z','Zordon. Vast, slow, echoing; a voice from a tube of light.','l-zordon',['tube','#4f8fd6','#9ad0ff'],{samples:[[12,'[echoing] Rangers. The turtles are allies.'],[12,'Trust them, as you trust each other.']]}),
+  C('dr-boyd','Dr. Boyd','one',0,0,'off-panel','#6b8a5a','DB','','',['human','#d8a888','#3a2a1a','glasses'],{samples:[[14,'[radio] The readings are off the chart, I, I can\'t explain it.'],[14,'[radio] Get out of there!']]}),
+  C('rita-repulsa','Rita Repulsa','one',0,0,'off-panel','#a0714f','RR','Rita Repulsa. Shrieking, nasal, gleefully evil; headache-fueled cackle.','v-rita',['human','#e0c0a8','#6a3a7a','cones'],{samples:[[17,'[shrieking] I have a HEADACHE!'],[17,'[cackling] Make my monster GROW!']]}),
+  C('rezar','Rezar','one',1,0,'off-panel','#7b5a3a','RZ','','',['beast','#7b5a3a','#4a3520','rock'],{samples:[[19,'[gruff] You\'re late.']]}),
+  C('rock-soldier','Rock Soldier','one',1,0,'off-panel','#6a6a62','RK','','',['beast','#6a6a62','#45453e','rock'],{samples:[[20,'[bark] Move!']]}),
+  C('soldier','Soldier','one',1,0,'off-panel','#5f6b5a','SO','','',['mask','#5f6b5a','#2f3a2a','cap'],{samples:[[21,'[radio] Perimeter\'s breached, repeat, perimeter\'s breached!']]}),
+  C('narrator','Narrator','role',24,0,'captions','#2e3238','N','The narrator. Even, warm, unhurried; reads the captions.','l-narr',['role','#2e3238','#c8ccd2','caption'],{samples:[[1,'Angel Grove. Tuesday. It had been a quiet week.'],[5,'Meanwhile, beneath the city...'],[24,'To be continued.']]}),
+  C('off-panel','Off-panel','role',4,0,'captions','#2e3238','OP','Off-panel speech with no named speaker. Neutral adult, mid pitch, close-miked, slightly urgent.','',['role','#2e3238','#c8ccd2','off'],{samples:[[9,'[off] Did you see that?'],[9,'[off] Run!'],[13,'[off] Somebody call someone!']]}),
+  C('crowd','Crowd','role',2,0,'captions','#2e3238','CR','A crowd: layered murmurs, gasps and cheers, no single voice in front.','',['role','#2e3238','#c8ccd2','crowd'],{samples:[[13,'[crowd] Gasp!'],[24,'[crowd] Cheers!']]}),
+];
+// the book's cast from earlier issues, not in this one: what "+ Add" offers first
+const KNOWN = [
+  C('krang','Krang','sup',0,0,'',  '#d070a0','KR','Krang. Shrill, wet, impatient brain in a robot belly.','',['beast','#e080b0','#a04070','brain']),
+  C('april-oneil','April O\'Neil','sup',0,0,'','#d9843a','AO','April O\'Neil. Reporter; quick, warm, unflappable.','',['human','#f0c8a8','#d9843a','pony']),
+  C('casey-jones','Casey Jones','sup',0,0,'','#7a8aa0','CJ','Casey Jones. Hockey-mask vigilante; loud, goofy, Brooklyn.','',['mask','#e8e8e8','#3a3f47','hockey']),
+  C('goldar','Goldar','sup',0,0,'','#c9a227','GD','Goldar. Growling, gold-armored ape warrior.','',['helm','#c9a227','#7a5a10']),
+  C('bulk','Bulk','sup',0,0,'','#8a6a5a','BU','Bulk. Big, bossy, easily scared.','',['human','#e8c0a0','#4a3020','bandana']),
+  C('skull','Skull','sup',0,0,'','#6a6a7a','SK','Skull. Bulk\'s sidekick; nasal snicker.','',['human','#e8d0c0','#1a1a1a','spiky']),
+];
+// voices: slot (1..30) or null; owner: comic | another project; backup: clip | snap | prompt | null
+const V = (id,name,origin,slot,backup,extra={})=>({id,name,origin,slot,backup,owner:'comic',status:slot?'active':'archived',...extra});
+const VOICES = [
+  V('v-mikey','Michelangelo','clone',1,'clip',{prot:true,forChar:'michelangelo'}),
+  V('v-don','Donatello','clone',2,'clip',{prot:true,forChar:'donatello'}),
+  V('v-raph','Raphael','clone',3,'clip',{prot:true,forChar:'raphael'}),
+  V('v-splinter','Master Splinter','clone',4,'clip',{prot:true,forChar:'master-splinter'}),
+  V('v-leo','Leonardo','design',5,'prompt',{forChar:'leonardo'}),
+  V('v-shred','Shredder','clone',6,'clip',{forChar:'shredder'}),
+  V('v-red','Red Ranger','design',7,'prompt',{forChar:'red-ranger'}),
+  V('v-green','Green Ranger','design',8,null,{forChar:'green-ranger',why:'designed in the ElevenLabs UI, no prompt on file'}),
+  V('v-bebop','Bebop','design',9,'prompt',{forChar:'bebop'}),
+  V('v-pink','Pink Ranger','design',10,'prompt',{forChar:'pink-ranger'}),
+  V('v-rock','Rocksteady','design',11,'prompt',{forChar:'rocksteady'}),
+  V('v-karai','Karai','clone',12,'clip',{forChar:'karai'}),
+  V('v-yellow','Yellow Ranger','design',13,'prompt',{forChar:'yellow-ranger'}),
+  V('v-foot','Foot Soldier','design',14,'prompt',{forChar:'foot-soldier'}),
+  V('v-blue','Blue Ranger','design',15,'prompt',{forChar:'blue-ranger'}),
+  V('v-zedd','Lord Zedd','design',16,'prompt',{forChar:'lord-zedd'}),
+  V('v-footelite','Foot Elite','design',17,'prompt',{forChar:'foot-elite'}),
+  V('v-black','Black Ranger','design',18,'prompt',{forChar:'black-ranger'}),
+  V('v-warbunny','Warbunny','design',19,'prompt',{forChar:'warbunny'}),
+  V('v-armored','Armored Villain','design',20,'prompt',{forChar:'armored-villain'}),
+  V('v-alpha','Alpha 5','design',21,'prompt',{forChar:'alpha-5'}),
+  V('v-rita','Rita Repulsa','design',22,'prompt',{forChar:'rita-repulsa'}),
+  // other projects
+  V('o-june','Grandma June','clone',23,'clip',{owner:'Bedtime Tales',pinned:true}),
+  V('o-ortiz','Coach Ortiz','clone',24,'snap',{owner:'Bedtime Tales'}),
+  V('o-lab03','Lab scratch 03','design',25,'prompt',{owner:'voice-lab'}),
+  V('o-lab07','Lab scratch 07','design',26,null,{owner:'voice-lab',why:'made in the ElevenLabs UI, no prompt on file'}),
+  V('o-ben','Ad read (Ben)','clone',27,null,{owner:'Podcast',why:'no source clip on file'}),
+  V('o-rosa','Abuela Rosa','clone',28,'clip',{owner:'Spanish reader',pinned:true}),
+  // slots 29, 30 free
+  // archived (restorable, no slot)
+  V('b-green93','Green Ranger (Tommy) (1993)','clone',null,'clip',{forChar:'green-ranger',lab:true}),
+  V('b-pink93','Pink Ranger (Kimberly) (1993)','clone',null,'clip',{forChar:'pink-ranger',lab:true}),
+  V('b-rock12','Rocksteady (2012)','clone',null,'clip',{forChar:'rocksteady',lab:true}),
+  V('b-shred90','Shredder (1990)','clone',null,'clip',{forChar:'shredder'}),
+  V('b-krang','Krang','design',null,'prompt',{forChar:'krang'}),
+  V('b-rita93','Rita Repulsa (1993)','design',null,'prompt',{forChar:'rita-repulsa'}),
+  V('b-april','April O\'Neil (2012)','clone',null,'clip',{forChar:'april-oneil',lab:true}),
+  V('b-casey','Casey Jones (2012)','clone',null,'clip',{forChar:'casey-jones',lab:true}),
+  // library (no slot)
+  V('l-narr','Bill, warm storyteller','library',null,'library',{status:'library',lib:true}),
+  V('l-zordon','Deep announcer','library',null,'library',{status:'library',lib:true}),
+  V('l-radio','Radio dispatcher','library',null,'library',{status:'library',lib:true}),
+];
+// faces that still need a name
+const FACES = [
+  {id:'f1',page:12,look:['robot','#d8d8dc','#c9473f'],hint:'red, boxy, antenna'},
+  {id:'f2',page:19,look:['beast','#8d939a','#4a5560','horn'],hint:'grey, horn'},
+];
+const SLOTS = 30, MONTHLY_MAX = 95, MONTHLY_USED = 2;
+const BOOK = 'tmnt-mmpr-iii', ISSUE = 'issue-1';
+
+/* ======================================================================
+   FACES: a drawn avatar per character, parametric so 32 read as 32 people
+   ====================================================================== */
+const $ = s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SVG = {
+  play:'<svg class="ic" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg>',
+  stop:'<svg class="ic" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>',
+  wand:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 14l8-8"/><path d="M11 2v2M11 7v2M9 4.5h2M12.5 4.5h2"/></svg>',
+  lock:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>',
+  more:'<svg class="ic" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.6"/><circle cx="8" cy="8" r="1.6"/><circle cx="13" cy="8" r="1.6"/></svg>',
+  chev:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 3l5 5-5 5"/></svg>',
+  pencil:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-8 8H3v-3z"/></svg>',
+  sit:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h10M5 13V8h6v5M8 3v3"/></svg>',
+  out:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
+};
+// rgb helpers for shading
+function shade(hex,amt){ const n=parseInt(hex.slice(1),16); let r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt; r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b)); return '#'+((r<<16)|(g<<8)|b).toString(16).padStart(6,'0'); }
+let gid=0;
+function face(look, seed=0){
+  const [kind,base,acc,extra]=look; const g='g'+(gid++);
+  const bg = shade(base,-70), bg2 = shade(base,-95);
+  const tilt = ((seed*37)%9)-4; // a small per-crop tilt so exemplars differ
+  let body='';
+  const eyes=(c='#111',w=7)=>`<ellipse cx="42" cy="50" rx="${w}" ry="${w*1.15}" fill="#fff"/><ellipse cx="60" cy="50" rx="${w}" ry="${w*1.15}" fill="#fff"/><circle cx="43" cy="51" r="3.2" fill="${c}"/><circle cx="61" cy="51" r="3.2" fill="${c}"/>`;
+  const mouth=(kind)=>kind==='grin'?`<path d="M38 66 Q51 80 64 66" stroke="#2a1a10" stroke-width="3" fill="#3a1a14"/>`:kind==='scowl'?`<path d="M40 70 Q51 63 62 70" stroke="#2a1a10" stroke-width="3" fill="none"/>`:`<path d="M42 68 Q51 73 60 68" stroke="#2a1a10" stroke-width="2.6" fill="none"/>`;
+  if(kind==='ranger'){
+    body=`<ellipse cx="51" cy="56" rx="31" ry="35" fill="${base}"/><path d="M20 52 Q51 36 82 52 L82 70 Q51 60 20 70z" fill="#111" opacity=".9"/><path d="M26 54 Q51 42 76 54" stroke="${shade(base,60)}" stroke-width="2.5" fill="none"/><rect x="38" y="74" width="26" height="9" rx="3" fill="#c8ccd2"/><path d="M42 78h18" stroke="#6a6e74" stroke-width="1.5"/>${extra==='shield'?`<path d="M34 86 L51 96 L68 86 L68 100 L34 100z" fill="${acc}"/>`:''}`;
+  } else if(kind==='turtle'){
+    body=`<ellipse cx="51" cy="58" rx="33" ry="34" fill="${base}"/><path d="M14 52 Q51 40 88 52 L86 62 Q51 56 16 62z" fill="${acc}"/><path d="M86 50 L100 44 L96 58z M88 56 L102 62 L94 66z" fill="${acc}"/>${eyes('#111',6)}${mouth(extra||'')}<path d="M30 86 Q51 92 72 86" stroke="${shade(base,-40)}" stroke-width="3" fill="none"/>`;
+  } else if(kind==='human'){
+    const hair = extra==='bob'?`<path d="M18 60 Q18 18 51 18 Q84 18 84 60 L80 60 Q80 34 51 30 Q22 34 22 60z" fill="${acc}"/>`
+      : extra==='updo'?`<path d="M22 50 Q22 14 51 14 Q80 14 80 50 Q66 28 51 30 Q36 28 22 50z" fill="${acc}"/><circle cx="51" cy="14" r="9" fill="${acc}"/>`
+      : extra==='cones'?`<path d="M30 40 L22 2 L44 36z M72 40 L80 2 L58 36z" fill="${acc}"/><path d="M24 44 Q51 26 78 44" fill="${acc}"/>`
+      : extra==='pony'?`<path d="M20 52 Q20 18 51 18 Q82 18 82 52 Q64 30 51 30 Q38 30 20 52z" fill="${acc}"/><path d="M78 40 Q96 50 84 84" stroke="${acc}" stroke-width="9" fill="none" stroke-linecap="round"/>`
+      : extra==='spiky'?`<path d="M20 44 L28 14 L38 36 L46 10 L54 36 L62 12 L70 36 L80 18 L82 46z" fill="${acc}"/>`
+      : extra==='bandana'?`<path d="M18 46 Q51 26 84 46 L84 56 Q51 46 18 56z" fill="${acc}"/><path d="M84 50 L100 40 L96 60z" fill="${acc}"/>`
+      : `<path d="M20 50 Q22 18 51 18 Q80 18 82 50 Q66 32 51 32 Q36 32 20 50z" fill="${acc}"/>`;
+    body=`<ellipse cx="51" cy="58" rx="29" ry="34" fill="${base}"/>${hair}${eyes()}${mouth(extra==='bob'?'scowl':'')}${extra==='glasses'?`<circle cx="42" cy="50" r="10" fill="none" stroke="#222" stroke-width="2.2"/><circle cx="60" cy="50" r="10" fill="none" stroke="#222" stroke-width="2.2"/><path d="M52 50h-2" stroke="#222" stroke-width="2"/>`:''}`;
+  } else if(kind==='robot'){
+    body=`<ellipse cx="51" cy="40" rx="30" ry="9" fill="${acc}"/><path d="M24 40 Q24 14 51 14 Q78 14 78 40z" fill="${acc}"/><rect x="24" y="44" width="54" height="44" rx="12" fill="${base}"/><rect x="31" y="54" width="40" height="12" rx="4" fill="#222"/><path d="M34 60h34" stroke="#f3d35a" stroke-width="2.5" stroke-dasharray="4 3"/><rect x="38" y="72" width="26" height="6" rx="2" fill="#555"/><path d="M51 14v-8" stroke="${acc}" stroke-width="3"/><circle cx="51" cy="5" r="3" fill="#f3d35a"/>`;
+  } else if(kind==='mask'){
+    const eye = extra==='elite'?`<path d="M28 50 L46 46 L46 56 L28 58z M74 50 L56 46 L56 56 L74 58z" fill="#fff"/>`
+      : extra==='hockey'?`<circle cx="40" cy="48" r="6" fill="#111"/><circle cx="62" cy="48" r="6" fill="#111"/><g fill="#111"><circle cx="38" cy="66" r="2.4"/><circle cx="46" cy="70" r="2.4"/><circle cx="56" cy="70" r="2.4"/><circle cx="64" cy="66" r="2.4"/><circle cx="51" cy="76" r="2.4"/></g>`
+      : extra==='putty'?`<ellipse cx="41" cy="50" rx="6" ry="4" fill="#222"/><ellipse cx="61" cy="50" rx="6" ry="4" fill="#222"/><path d="M38 68 Q51 62 64 68" stroke="#222" stroke-width="2.5" fill="none"/><path d="M26 34 q6 -10 12 0 q6 10 12 0 q6 -10 12 0 q6 10 12 0" stroke="${acc}" stroke-width="3" fill="none"/>`
+      : extra==='cap'?`${eyes()}<path d="M22 40 Q51 24 80 40 L84 44 L18 44z" fill="${acc}"/><path d="M42 68 Q51 72 60 68" stroke="#2a1a10" stroke-width="2.5" fill="none"/>`
+      : `<path d="M28 50 Q51 44 74 50 L74 58 Q51 52 28 58z" fill="#fff" opacity=".9"/><circle cx="42" cy="54" r="2.4" fill="#111"/><circle cx="60" cy="54" r="2.4" fill="#111"/>`;
+    body=`<ellipse cx="51" cy="58" rx="31" ry="36" fill="${base}"/>${extra==='hockey'||extra==='cap'||extra==='putty'?'':`<path d="M20 44 Q51 30 82 44 L82 100 L20 100z" fill="${shade(base,-14)}"/>`}${eye}${extra==='elite'?`<path d="M34 24 Q51 14 68 24" stroke="${acc}" stroke-width="4" fill="none"/>`:''}`;
+  } else if(kind==='helm'){
+    body=`<path d="M22 100 L22 46 Q22 18 51 18 Q80 18 80 46 L80 100z" fill="${base}"/><path d="M30 56 L46 52 L46 60 L30 62z M72 56 L56 52 L56 60 L72 62z" fill="${extra==='grill'?'#ff5a3a':'#2a0d0d'}"/>${extra==='blades'?`<path d="M14 36 L26 20 L30 40z M88 36 L76 20 L72 40z M36 10 L51 0 L66 10 L51 20z" fill="${acc}"/>`:''}${extra==='grill'?`<rect x="34" y="68" width="34" height="20" rx="3" fill="${acc}"/><g stroke="#1a1a1a" stroke-width="2"><path d="M40 70v16M48 70v16M56 70v16M64 70v16"/></g>`:`<path d="M32 70 Q51 66 70 70 L70 86 Q51 90 32 86z" fill="${shade(base,-30)}"/><path d="M36 76h30M36 82h30" stroke="${shade(base,20)}" stroke-width="1.5"/>`}`;
+  } else if(kind==='beast'){
+    const E = extra||'';
+    const top = E==='mohawk'?`<path d="M44 26 L48 4 L54 4 L58 26z" fill="${acc}"/><path d="M36 28 Q51 10 66 28" fill="${acc}"/>`
+      : E==='horn'?`<path d="M44 44 L51 10 L58 44z" fill="#e8e4d8"/>`
+      : E==='ears'?`<path d="M30 40 Q22 0 44 30z M72 40 Q80 0 58 30z" fill="${base}" stroke="${acc}" stroke-width="2"/>`
+      : E==='rat'?`<circle cx="24" cy="30" r="12" fill="${base}"/><circle cx="78" cy="30" r="12" fill="${base}"/><circle cx="24" cy="30" r="6" fill="${acc}"/><circle cx="78" cy="30" r="6" fill="${acc}"/>`
+      : E==='brain'?`<path d="M26 56 Q26 20 51 20 Q76 20 76 56z" fill="${base}"/><path d="M34 36 q8 -10 16 0 q8 10 16 0 M30 48 q8 -10 16 0 q8 10 16 0 M34 58 q8 -10 16 0 q8 10 16 0" stroke="${acc}" stroke-width="3" fill="none"/>`
+      : E==='rock'?`<path d="M18 92 L14 48 L30 22 L56 16 L84 34 L88 68 L74 94z" fill="${base}"/><path d="M30 22 L44 44 L56 16 M14 48 L44 44 L74 94 M44 44 L84 34" stroke="${acc}" stroke-width="2" fill="none"/>`
+      : '';
+    const snout = E==='mohawk'?`<ellipse cx="51" cy="72" rx="20" ry="13" fill="${shade(base,30)}"/><circle cx="44" cy="72" r="3" fill="#222"/><circle cx="58" cy="72" r="3" fill="#222"/><path d="M34 60 L30 48 M68 60 L72 48" stroke="#e8e4d8" stroke-width="4"/>`
+      : E==='horn'?`<ellipse cx="51" cy="74" rx="22" ry="12" fill="${shade(base,20)}"/><circle cx="43" cy="74" r="3" fill="#222"/><circle cx="59" cy="74" r="3" fill="#222"/>`
+      : E==='rat'?`<path d="M51 86 L36 70 L66 70z" fill="${shade(base,20)}"/><circle cx="51" cy="86" r="4" fill="#222"/><path d="M20 80 L40 78 M20 90 L40 84 M82 80 L62 78 M82 90 L62 84" stroke="#ccc" stroke-width="1.2"/>`
+      : E==='ears'?`<path d="M44 70 Q51 78 58 70" stroke="#222" stroke-width="2.5" fill="none"/><rect x="46" y="74" width="4" height="7" fill="#fff"/><rect x="52" y="74" width="4" height="7" fill="#fff"/>`
+      : E==='brain'?`<ellipse cx="51" cy="74" rx="14" ry="8" fill="#5a1a3a"/><path d="M40 72 Q51 80 62 72" stroke="#fff" stroke-width="2" fill="none"/>`
+      : E==='rock'?`<path d="M38 72 L62 70 L58 80 L42 80z" fill="#222"/>`:'';
+    const head = E==='rock'||E==='brain'?'':`<ellipse cx="51" cy="58" rx="33" ry="34" fill="${base}"/>`;
+    body=`${head}${top}${E==='rock'?`<rect x="34" y="48" width="12" height="7" fill="#fff"/><rect x="56" y="48" width="12" height="7" fill="#fff"/>`:E==='brain'?`${eyes('#111',5)}`:eyes('#111',6)}${snout}`;
+  } else if(kind==='tube'){
+    body=`<rect x="14" y="4" width="74" height="100" rx="18" fill="${shade(base,-30)}" opacity=".6"/><ellipse cx="51" cy="56" rx="28" ry="34" fill="${acc}" opacity=".9"/><ellipse cx="51" cy="56" rx="20" ry="26" fill="${base}"/><ellipse cx="42" cy="50" rx="5" ry="7" fill="#fff" opacity=".9"/><ellipse cx="60" cy="50" rx="5" ry="7" fill="#fff" opacity=".9"/><path d="M40 70 Q51 76 62 70" stroke="#fff" stroke-width="2" fill="none" opacity=".8"/><g stroke="${acc}" stroke-width="1.5" opacity=".5"><path d="M18 20h66M18 36h66M18 84h66"/></g>`;
+  } else { // role
+    body = extra==='caption'?`<rect x="14" y="26" width="74" height="40" rx="4" fill="#f3efe2"/><path d="M22 38h58M22 46h50M22 54h40" stroke="#555" stroke-width="3"/>`
+      : extra==='off'?`<path d="M16 28 Q16 16 28 16 L76 16 Q88 16 88 28 L88 60 Q88 72 76 72 L46 72 L30 88 L34 72 L28 72 Q16 72 16 60z" fill="#f3efe2"/><path d="M28 36h46M28 48h34" stroke="#999" stroke-width="3" stroke-dasharray="6 4"/>`
+      : `<circle cx="28" cy="52" r="12" fill="${acc}" opacity=".5"/><circle cx="51" cy="44" r="14" fill="${acc}" opacity=".8"/><circle cx="74" cy="52" r="12" fill="${acc}" opacity=".5"/><path d="M8 100 Q8 70 28 70 Q40 70 44 80 Q46 60 51 60 Q58 60 58 80 Q62 70 74 70 Q94 70 94 100z" fill="${acc}" opacity=".7"/>`;
+  }
+  return `<svg viewBox="0 0 102 102" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${bg}"/><stop offset="1" stop-color="${bg2}"/></linearGradient></defs><rect width="102" height="102" fill="url(#${g})"/><path d="M-10 ${30+seed*6} L112 ${8+seed*4}" stroke="rgba(0,0,0,.25)" stroke-width="10"/><g transform="rotate(${tilt} 51 60) translate(0 ${seed%2?4:0})">${body}</g></svg>`;
+}
+
+/* ======================================================================
+   STATE: base data never changes until Confirm; `moves` is the only mutable thing.
+   move kinds: pick · free · sitout · remove · rename · add · face
+   ====================================================================== */
+let moves = [];
+let designs = {};   // charId -> accepted design {take,prompt,text,mode,credits}
+let faceOk = {};
+let sel = null, tab = 'voice', expanded = false, renaming = false, slotSearch = '';
+let VW;
+
+function view(){
+  const chars = CHARS.map(c=>({...c,lost:false,sit:!!c.sitBase,removed:!!c.removedBase,pick:null,tags:[]}));
+  const voices = VOICES.map(v=>({...v}));
+  const faces = FACES.map(f=>({...f}));
+  const ch=id=>chars.find(c=>c.id===id), vo=id=>voices.find(v=>v.id===id);
+  const freeSlot=(want)=>{ if(want&&!voices.some(v=>v.slot===want)) return want; for(let n=1;n<=SLOTS;n++) if(!voices.some(v=>v.slot===n)) return n; return null; };
+  const archive=(id,m)=>{ const v=vo(id); if(!v||!v.slot) return; v.wasSlot=v.slot; v.slot=null; v.status='archived'; v.pend='out'; v.outBy=m; chars.forEach(c=>{ if(c.voice===id){ c.voice=''; c.lost=true; } }); };
+  for(const m of moves){
+    if(m.t==='add'){ const k=KNOWN.find(x=>x.id===m.charId); const base = k?{...k}:{id:m.charId,name:m.name,lines:0,faces:0,pages:'',col:'#6b737b',ini:'',desc:'',voice:'',look:['human','#d8b8a0','#3a2a1a'],samples:[]}; chars.push({...base,kind:'silent',lost:false,sit:false,removed:false,added:true,pick:null,tags:[]}); }
+    else if(m.t==='rename'){ const c=ch(m.charId); if(c) c.name=m.name; }
+    else if(m.t==='free'){ archive(m.voiceId,m); }
+    else if(m.t==='sitout'){ const c=ch(m.charId); c.sit=true; c.lost=false; }
+    else if(m.t==='remove'){ ch(m.charId).removed=true; }
+    else if(m.t==='face'){ const f=faces.find(f=>f.id===m.faceId); f.done=true; f.to=m.charId; if(m.charId){ const c=ch(m.charId); c.faces+=1; } }
+    else if(m.t==='pick'){
+      const c=ch(m.charId); let vid=m.voiceId;
+      if(m.needsSlot){
+        let n=null;
+        if(m.slot.kind==='swap'&&m.slot.out){ const ov=vo(m.slot.out); n=ov.slot; archive(m.slot.out,m); }
+        else if(m.slot.kind==='free') n=freeSlot(m.slot.n);
+        m.slotN=n;
+        if(m.design){ vid='d-'+m.charId; voices.push({id:vid,name:`${c.name} · take ${m.design.take}`,origin:'design',slot:n,backup:'prompt',owner:'comic',status:n?'active':'archived',pend:'in',forChar:m.charId,runOnly:m.design.mode==='run',newDesign:true}); }
+        else { const v=vo(vid); v.slot=n; v.status=n?'active':'archived'; v.pend='in'; }
+      }
+      c.voice=vid; c.lost=false; c.sit=false; c.pick=m;
+    }
+  }
+  const used=voices.filter(v=>v.slot).length;
+  return {chars,voices,faces,used,free:SLOTS-used,ch,vo,speakers:vid=>chars.filter(c=>c.voice===vid&&!c.removed)};
+}
+const baseUsed = ()=>VOICES.filter(v=>v.slot).length;
+const locked = v => v.prot || v.pinned;
+const lockWhy = v => v.prot?'v2 voice, locked':`pinned by ${v.owner}`;
+const kindWord = v => v.origin==='clone'?'clone':v.origin==='design'?'designed':'library';
+const backupWord = v => v.backup==='clip'||v.backup==='snap'?'backed up':v.backup==='prompt'?'prompt kept':v.backup==='library'?'':'no backup';
+const backupTip = v => v.backup==='clip'?'source clip in the bucket: exact restore':v.backup==='snap'?'samples copied at confirm: exact restore':v.backup==='prompt'?'re-designed from its prompt on restore: close, not identical':v.why||'nothing on file to restore from';
+const charOf = v => VW.chars.find(c=>c.id===v.forChar) || CHARS.find(c=>c.id===v.forChar) || KNOWN.find(c=>c.id===v.forChar);
+
+function pendingFor(id){ return moves.filter(m=>m.charId===id && m.t!=='add'); }
+function removeMoves(pred){ moves=moves.filter(m=>!pred(m)); }
+
+/* ======================================================================
+   RENDER: header strip, grid, panel
+   ====================================================================== */
+function render(){ VW=view(); renderStrip(); renderGrid(); renderPanel(); $('#reviewN').textContent=moves.length; $('#btnReview').disabled=!moves.length; const open=VW.faces.filter(f=>!f.done).length; $('#btnFaces').style.display=open?'':'none'; $('#btnFaces').innerHTML=`Faces <span class="n">${open}</span>`; }
+
+function renderStrip(){
+  const {voices,used}=VW; let html='';
+  for(let n=1;n<=SLOTS;n++){
+    const v=voices.find(x=>x.slot===n); const out=voices.find(x=>x.pend==='out'&&x.wasSlot===n);
+    let cls='seg', title=`${n} · free`;
+    if(v){ cls+=v.pend==='in'?' in':v.prot?' lock':v.owner!=='comic'?' other'+(v.pinned?' pin':''):' ours'; title=`${n} · ${v.name}${v.owner!=='comic'?' · '+v.owner:''} · ${kindWord(v)} · ${backupWord(v)}${v.prot?' · v2, locked':v.pinned?' · pinned':''}${v.pend==='in'?' · after confirm':''}`; }
+    else if(out){ cls+=' out'; title=`${n} · ${out.name} · freed at confirm`; }
+    else cls+=' free';
+    const drag = v&&!locked(v)&&v.pend!=='in';
+    html+=`<button class="${cls}" data-slot="${n}" ${drag?'draggable="true" data-carry="slot" data-id="'+v.id+'"':''} title="${esc(title)}" aria-label="${esc(title)}"></button>`;
+  }
+  $('#segs').innerHTML=html;
+  const own={}; voices.filter(v=>v.slot&&v.owner!=='comic').forEach(v=>{ const o=own[v.owner]||(own[v.owner]={n:0,pin:false}); o.n++; if(v.pinned) o.pin=true; });
+  $('#stripOwn').innerHTML=Object.entries(own).map(([k,o])=>`<span>${esc(k)} ${o.n}${o.pin?SVG.lock:''}</span>`).join('<span>·</span>');
+  const b=baseUsed();
+  $('#stripLbl').innerHTML = used===b ? `<b>${used}</b>/30` : `<b>${used}</b>/30 <span class="${used>b?'plus':'minus'}">${used>b?'+':'−'}${Math.abs(used-b)}</span>`;
+}
+
+const GROUPS=[['lead','Leads','10+ lines'],['sup','Supporting','3–9 lines'],['one','One-offs','1–2 lines'],['silent','No lines','silent here'],['role','Roles','captions']];
+function renderGrid(){
+  const {chars}=VW; let html='';
+  for(const [k,label,hint] of GROUPS){
+    const list=chars.filter(c=>c.kind===k);
+    if(!list.length) continue;
+    html+=`<div class="grp"><b>${label}</b><span class="mono">${list.length}</span><span class="hint">${hint}</span></div><div class="cards">${list.map(cardHtml).join('')}${k==='silent'?`<button class="card add" id="addCard" data-act="add"><span class="plus">+</span>Add</button>`:''}</div>`;
+  }
+  $('#main').innerHTML=html;
+}
+function chipFor(c){
+  const v=VW.vo(c.voice);
+  if(c.removed) return `<span class="dot sit"></span><span class="t dimt">not in issue</span>`;
+  if(c.sit) return `<span class="dot sit"></span><span class="t dimt">sitting out</span>`;
+  if(v){
+    const own=v.forChar===c.id, pend=!!c.pick, dot=pend?'pend':v.lib?'lib':own?'':'standin';
+    const t=v.lib?esc(v.name):own?kindWord(v):'as '+esc(v.name);
+    return `<span class="dot ${dot}" title="${pend?'changes at confirm':''}"></span><span class="t${v.lib?' dimt':''}">${t}</span>${v.slot?`<span class="slot">${v.slot}</span>`:''}${playBtn('voice:'+v.id)}`;
+  }
+  if(c.lost) return `<span class="dot none"></span><span class="t">lost its voice</span>`;
+  if(c.lines===0&&!c.added) return `<span class="dot sit"></span><span class="t dimt">none needed</span>`;
+  return `<span class="dot none"></span><span class="t">no voice</span>`;
+}
+function cardHtml(c){
+  const v=VW.vo(c.voice); const pend=pendingFor(c.id).length>0;
+  const cls=['card', sel===c.id?'sel':'', c.sit?'sit':'', c.removed?'removed':'', c.lost?'lost':'', (!v&&!c.sit&&!c.removed&&(c.lines>0))?'none':'', pend?'pend':'', c.added?'tagged':''].filter(Boolean).join(' ');
+  return `<div class="${cls}" data-act="open" data-id="${c.id}" data-target="card" role="button" tabindex="0" draggable="${!c.removed}" data-carry="char" aria-label="${esc(c.name)}">
+    <div class="face">${face(c.look)}<span class="ln${c.lines?'':' zero'}" title="${c.lines} lines">${c.lines}</span>${c.added?'<span class="tag">new</span>':''}<button class="more" data-act="menu" data-id="${c.id}" aria-label="More" title="Actions">${SVG.more}</button><div class="nm">${esc(c.name)}</div></div>
+    <div class="vc">${chipFor(c)}</div></div>`;
+}
+function playBtn(key,cls='pl'){ return `<button class="${cls}" data-play="${key}" aria-label="Play" title="Play (never changes the pick)">${SVG.play}</button>`; }
+
+/* ======================================================================
+   SIDE PANEL: faces + voice choices. Every voice row is the pick.
+   ====================================================================== */
+function openChar(id,opts={}){ sel=id; tab=opts.tab||'voice'; expanded=false; renaming=!!opts.rename; slotSearch=''; $('#app').classList.add('panel-open'); render(); if(renaming){ const i=$('#renameIn'); if(i){ i.focus(); i.select(); } } }
+function closePanel(){ sel=null; renaming=false; $('#app').classList.remove('panel-open'); render(); }
+
+function voiceRows(c){
+  // every voice this character has, or could use: own active, own archived (incl. the lab's clones), an accepted design
+  const own = VW.voices.filter(v=>v.forChar===c.id && !v.lib);
+  const rows = own.map(v=>({v,own:true}));
+  const d=designs[c.id]; if(d && !VW.voices.some(v=>v.id==='d-'+c.id)) rows.push({design:d,id:'design:'+c.id});
+  return rows;
+}
+function vrow(v,c,o={}){
+  const on = o.on; const base = CHARS.find(x=>x.id===c.id)?.voice===v.id || (c.added&&false);
+  const tags = [];
+  if(v.pend==='in'||v.newDesign) tags.push('<span class="tag new">new</span>'); else if(base && v.slot) tags.push('<span class="tag now">now</span>');
+  if(v.lab) tags.push('<span class="tag lab">lab pick</span>');
+  if(v.runOnly) tags.push('<span class="tag">this run</span>');
+  if(v.prot) tags.push(`<span class="tag" title="v2 voice, locked">${SVG.lock}</span>`);
+  const sub = v.lib ? 'library · no slot' : `${kindWord(v)}${v.slot?` · <span class="slotn">slot ${v.slot}</span>`:v.pend==='out'?' · freed':' · archived'}`;
+  const bk = v.lib ? '' : `<span class="bk${v.backup?(v.backup==='prompt'?' prompt':''):' no'}" title="${esc(backupTip(v))}"></span>`;
+  const speaks = o.speakers && o.speakers.length ? `<span class="mute">· ${o.speakers.map(s=>esc(s.name)).join(', ')}</span>` : '';
+  return `<div class="vrow${on?' on':''}${o.locked?' locked':''}" role="radio" aria-checked="${on?'true':'false'}" tabindex="0" data-act="${o.act||'pick'}" data-id="${v.id}" ${o.locked?'aria-disabled="true" title="'+esc(lockWhy(v))+'"':''}>
+    <span class="rad"></span><span class="nm"><span class="t">${esc(v.name)}</span><span class="s">${bk}${sub}${tags.join('')}${speaks}</span></span>${playBtn('voice:'+v.id)}</div>`;
+}
+
+function renderPanel(){
+  if(!sel){ return; }
+  const c=VW.ch(sel); if(!c){ closePanel(); return; }
+  const v=VW.vo(c.voice);
+  $('#pAv').innerHTML=face(c.look);
+  $('#pName').innerHTML = renaming
+    ? `<input id="renameIn" value="${esc(c.name)}" aria-label="Name"><button class="btn small" data-act="renameOk">Save</button><button class="btn small ghost" data-act="renameNo">Cancel</button>`
+    : `${esc(c.name)}<button class="btn small ghost" data-act="rename" data-id="${c.id}" title="Rename" aria-label="Rename">${SVG.pencil}</button>`;
+  $('#pMeta').innerHTML = `${c.lines} lines${c.faces?` · ${c.faces} faces · p.${c.pages}`:c.pages?` · ${c.pages}`:''} <span class="mono">· ${c.id}</span>`;
+  $('#pFacesN').textContent=c.faces||'';
+  $$('#pTabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
+  $('#pbody').innerHTML = tab==='voice'?voiceTab(c,v):facesTab(c);
+  $('#pfoot').innerHTML = `<button class="btn" data-act="design" data-id="${c.id}">${SVG.wand} Design a voice</button>
+    ${c.sit?`<button class="btn" data-act="unsit" data-id="${c.id}">Back in</button>`:`<button class="btn ghost" data-act="sit" data-id="${c.id}">${SVG.sit} Sit out this run</button>`}
+    <span style="flex:1"></span>
+    ${c.removed?`<button class="btn" data-act="unremove" data-id="${c.id}">Put back</button>`:`<button class="btn ghost danger" data-act="remove" data-id="${c.id}">Not in this issue</button>`}`;
+  const s=$('#slotSearch'); if(s&&document.activeElement!==s&&slotSearch){ s.value=slotSearch; }
+}
+
+function voiceTab(c,v){
+  const rows=voiceRows(c);
+  const cur = c.voice;
+  let html=`<div class="sec"><h4>Voices${c.sit?'<span class="r">sitting out</span>':c.removed?'<span class="r">not in this issue</span>':''}</h4>`;
+  html += rows.map(r=> r.v ? vrow(r.v,c,{on:cur===r.v.id&&!c.sit&&!c.removed})
+    : `<div class="vrow" role="radio" aria-checked="false" tabindex="0" data-act="pickDesign" data-id="${c.id}"><span class="rad"></span><span class="nm"><span class="t">${esc(c.name)} · take ${r.design.take}</span><span class="s"><span class="bk prompt" title="re-designed from its prompt on restore"></span>designed · needs a slot<span class="tag new">new</span>${r.design.mode==='run'?'<span class="tag">this run</span>':''}</span></span>${playBtn('take:'+c.id)}</div>`).join('');
+  html += `<div class="vrow design" role="button" tabindex="0" data-act="design" data-id="${c.id}"><span class="rad">${SVG.wand}</span><span class="nm"><span class="t">Design a voice</span><span class="s">${c.desc?'draft from its description':'from scratch'} · three takes</span></span><span></span></div>`;
+  // another voice: stand-ins and library
+  const others = VW.voices.filter(x=>x.slot && x.owner==='comic' && x.forChar!==c.id && !x.prot);
+  const lib = VW.voices.filter(x=>x.lib);
+  const otherOn = v && !rows.some(r=>r.v&&r.v.id===v.id);
+  html += `<div class="vrow exp${otherOn?' on':''}" role="button" tabindex="0" aria-expanded="${expanded}" data-act="expand"><span class="rad">${expanded?'<span style="display:inline-block;transform:rotate(90deg)">'+SVG.chev+'</span>':SVG.chev}</span><span class="nm"><span class="t">${otherOn?'as '+esc(v.name):'Another voice'}</span><span class="s">${otherOn?(v.lib?'library · no slot':'stand-in · no slot'):`${others.length} active · ${lib.length} library`}</span></span><span></span></div>
+    <div class="vlist${expanded?' open':''}">${lib.map(x=>vrow(x,c,{on:cur===x.id})).join('')}${others.map(x=>vrow(x,c,{on:cur===x.id,speakers:VW.speakers(x.id).filter(s=>s.id!==c.id)})).join('')}</div>`;
+  html += slotBox(c);
+  html += `</div>`;
+  if(c.samples&&c.samples.length) html += `<div class="sec"><h4>Lines<span class="r">${c.lines} · first ${Math.min(3,c.samples.length)}</span></h4><div class="lines">${c.samples.slice(0,3).map(([p,t])=>`<div class="line"><span class="pg">p.${p}</span><span class="tx">${esc(t).replace(/\[(.*?)\]/g,'<span class="cue">[$1]</span>')}</span>${playBtn('line:'+c.id)}</div>`).join('')}</div></div>`;
+  return html;
+}
+
+// the inline "where does the slot come from" block, shown only when the pick needs one
+function slotBox(c){
+  const m=c.pick; if(!m||!m.needsSlot) return '';
+  const free = VW.free + (m.slot.kind==='free'&&m.slotN?1:0); // free slots not counting the one this pick takes
+  const kind = m.slot.kind;
+  let html=`<div class="slotbox"><h4>Slot<span class="r">${free} free</span></h4>
+    <div class="segc"><button data-act="slotFree" ${free?'':'disabled'} class="${kind==='free'?'on':''}">Free${m.slotN&&kind==='free'?`<span class="mono">${m.slotN}</span>`:''}</button><button data-act="slotSwap" class="${kind==='swap'?'on':''}">Swap out</button></div>`;
+  if(kind==='swap'){
+    const own = VW.voices.find(x=>x.forChar===c.id && (x.slot||x.outBy===m) && x.id!==m.voiceId);
+    let cands = VW.voices.filter(x=>(x.slot||x.outBy===m) && x.pend!=='in' && !x.lib).map(x=>({v:x,own:!!own&&x.id===own.id,locked:!!locked(x),n:x.slot||x.wasSlot}));
+    cands.sort((a,b)=>(b.own-a.own)||(a.locked-b.locked)||((b.v.owner==='comic')-(a.v.owner==='comic'))||(a.n-b.n));
+    const q=slotSearch.toLowerCase();
+    if(q) cands=cands.filter(x=>x.v.name.toLowerCase().includes(q)||(x.v.owner||'').toLowerCase().includes(q));
+    const sv = m.slot.out ? VW.voices.find(x=>x.id===m.slot.out) : null;
+    html += `<input class="search" id="slotSearch" placeholder="Search voices" value="${esc(slotSearch)}" aria-label="Search voices">
+      <div class="vlist open" style="max-height:230px;overflow:auto">${cands.map(x=>{
+        const on = m.slot.out===x.v.id; const sp=VW.speakers(x.v.id).filter(s=>s.id!==c.id);
+        const sub = `${x.v.owner!=='comic'?esc(x.v.owner)+' · ':''}${kindWord(x.v)} · <span class="slotn">slot ${x.n}</span>${x.own?'<span class="tag now">its own</span>':''}${on&&sp.length?`<span style="color:var(--red)">· leaves ${sp.map(s=>esc(s.name)).join(', ')} silent</span>`:''}`;
+        return `<div class="vrow${on?' on':''}${x.locked?' locked':''}" role="radio" aria-checked="${on}" tabindex="0" data-act="slotOut" data-id="${x.v.id}" ${x.locked?'aria-disabled="true" title="'+esc(lockWhy(x.v))+'"':''}><span class="rad">${x.locked?SVG.lock:''}</span><span class="nm"><span class="t">${esc(x.v.name)}</span><span class="s"><span class="bk${x.v.backup?(x.v.backup==='prompt'?' prompt':''):' no'}" title="${esc(backupTip(x.v))}"></span>${sub}</span></span>${playBtn('voice:'+x.v.id)}</div>`; }).join('')}</div>`;
+    if(sv){
+      html += sv.backup
+        ? `<label class="bk-line"><input type="checkbox" data-act="bkToggle" ${m.slot.backup!==false?'checked':''}> Back up first <span class="tip" title="${esc(backupTip(sv))}">${backupWord(sv)}</span></label>`
+        : `<label class="bk-line lossy"><input type="checkbox" data-act="lossyToggle" ${m.slot.lossyOk?'checked':''}> Archive anyway <span class="tip" title="${esc(backupTip(sv))}">no backup · lost</span></label>`;
+    } else html += `<div class="bk-line lossy">Pick a voice to swap out</div>`;
+  } else if(!m.slotN){ html += `<div class="bk-line lossy">No free slot · swap one out</div>`; }
+  return html+`</div>`;
+}
+
+function facesTab(c){
+  if(!c.faces) return `<div class="empty">No faces this issue</div>`;
+  for(let i=0;i<6;i++) if(faceOk[c.id+i]===undefined) faceOk[c.id+i]=i<4;
+  const n=[0,1,2,3,4,5].filter(i=>faceOk[c.id+i]).length;
+  return `<div class="sec"><h4>Exemplars<span class="r" id="exN">${n} of 6</span></h4><div class="exg">${[0,1,2,3,4,5].map(i=>`<div class="ex${faceOk[c.id+i]?' ok':''}" data-act="exok" data-id="${c.id}${i}">${face(c.look,i+1)}<div class="ef"><span>p.${(c.pages||'').split('–')[0]||'?'}</span><span class="ck">✓</span></div></div>`).join('')}</div></div>`;
+}
+
+/* ======================================================================
+   ACTIONS: picks, quick actions, menus, add, faces, drag and drop
+   ====================================================================== */
+function defaultSlot(c){
+  const own = VW.voices.find(x=>x.forChar===c.id && x.slot && !locked(x));
+  if(VW.free>0) return {kind:'free'};
+  return {kind:'swap',out:own?own.id:null,backup:true,lossyOk:false};
+}
+function setPick(charId,voiceId,extra={}){
+  const c=VW.ch(charId); const v=VW.vo(voiceId);
+  removeMoves(m=>m.charId===charId&&(m.t==='pick'||m.t==='sitout'));
+  const needsSlot = extra.design ? true : !!(v && !v.slot && !v.lib);
+  const m={t:'pick',charId,voiceId,needsSlot,...extra};
+  if(needsSlot) m.slot = extra.slot || defaultSlot(c);
+  moves.push(m); render();
+  const name = extra.design ? `take ${extra.design.take}` : v.name;
+  toast(needsSlot ? (m.slot.kind==='free'?`${c.name} → ${name} · takes a free slot`:m.slot.out?`${c.name} → ${name} · swaps out ${VW.vo(m.slot.out).name}`:`${c.name} → ${name} · pick a voice to swap out`) : `${c.name} → ${name}`);
+}
+function onAct(act,id,el,ev){
+  const c = sel ? VW.ch(sel) : null;
+  if(act==='open'){ if(sel===id) return; openChar(id); }
+  else if(act==='menu'){ ev.stopPropagation(); quickMenu(id,el); }
+  else if(act==='add'){ ev.stopPropagation(); addMenu(el); }
+  else if(act==='design'){ openDesign(id||sel); }
+  else if(act==='sit'){ removeMoves(m=>m.charId===id&&(m.t==='sitout'||m.t==='pick')); moves.push({t:'sitout',charId:id}); render(); closePop(); }
+  else if(act==='unsit'){ removeMoves(m=>m.t==='sitout'&&m.charId===id); render(); closePop(); }
+  else if(act==='remove'){ removeMoves(m=>m.charId===id&&m.t!=='add'); moves.push({t:'remove',charId:id}); render(); closePop(); }
+  else if(act==='unremove'){ removeMoves(m=>m.t==='remove'&&m.charId===id); render(); closePop(); }
+  else if(act==='rename'){ closePop(); openChar(id,{rename:true}); }
+  else if(act==='renameOk'){ const nm=$('#renameIn').value.trim(); removeMoves(m=>m.t==='rename'&&m.charId===sel); if(nm&&nm!==CHARS.concat(KNOWN).find(x=>x.id===sel)?.name) moves.push({t:'rename',charId:sel,name:nm}); renaming=false; render(); }
+  else if(act==='renameNo'){ renaming=false; render(); }
+  else if(act==='tab'){ tab=id; render(); }
+  else if(act==='expand'){ expanded=!expanded; render(); }
+  else if(act==='exok'){ faceOk[id]=!faceOk[id]; render(); }
+  else if(act==='pick'){
+    const v=VW.vo(id); const base=CHARS.find(x=>x.id===c.id);
+    if(c.pick&&c.pick.voiceId===id&&!c.pick.design){ removeMoves(m=>m===c.pick); render(); toast('Back to how it is'); return; }
+    if(!c.pick && base && base.voice===id && !c.sit && !c.removed){ return; }
+    if(base && base.voice===id && v.slot){ removeMoves(m=>m.charId===c.id&&(m.t==='pick'||m.t==='sitout')); render(); return; }
+    setPick(c.id,id);
+  }
+  else if(act==='pickDesign'){ const d=designs[id]; setPick(id,'design:'+id,{design:d}); }
+  else if(act==='slotFree'){ c.pick.slot={kind:'free'}; render(); }
+  else if(act==='slotSwap'){ if(c.pick.slot.kind!=='swap'){ const own=VW.voices.find(x=>x.forChar===c.id&&x.slot&&!locked(x)&&x.id!==c.pick.voiceId); c.pick.slot={kind:'swap',out:own?own.id:null,backup:true,lossyOk:false}; render(); } }
+  else if(act==='slotOut'){ c.pick.slot={kind:'swap',out:id,backup:true,lossyOk:false}; render(); }
+  else if(act==='bkToggle'){ c.pick.slot.backup=el.checked; render(); }
+  else if(act==='lossyToggle'){ c.pick.slot.lossyOk=el.checked; render(); }
+  else if(act==='freeSlot'){ const v=VW.vo(id); removeMoves(m=>m.t==='free'&&m.voiceId===id); moves.push({t:'free',voiceId:id,backup:true,lossyOk:false}); render(); closePop(); toast(`${v.name} is freed at confirm${v.backup?', backed up first':' · no backup'}`,!v.backup); }
+  else if(act==='keepSlot'){ removeMoves(m=>m.t==='free'&&m.voiceId===id); render(); closePop(); }
+  else if(act==='addKnown'){ moves.push({t:'add',charId:id}); closePop(); render(); openChar(id); }
+  else if(act==='addNew'){ const nm=$('#addIn').value.trim(); if(!nm) return; const cid='new-'+nm.toLowerCase().replace(/[^a-z0-9]+/g,'-'); moves.push({t:'add',charId:cid,name:nm}); closePop(); render(); openChar(cid,{tab:'voice'}); }
+  else if(act==='faceTo'){ const [fid,cid]=id.split('|'); removeMoves(m=>m.t==='face'&&m.faceId===fid); moves.push({t:'face',faceId:fid,charId:cid||null}); render(); closePop(); }
+  else if(act==='undo'){ const m=moves[+id]; if(!m) return; moves.splice(+id,1); render(); if($('#sheet').classList.contains('open')) openReview(); }
+  else if(act==='rvBk'){ const m=moves[+id]; if(m.t==='free') m.backup=el.checked; else m.slot.backup=el.checked; render(); openReview(); }
+  else if(act==='rvLossy'){ const m=moves[+id]; if(m.t==='free') m.lossyOk=el.checked; else m.slot.lossyOk=el.checked; render(); openReview(); }
+  else if(act==='rvSit'){ removeMoves(m=>m.charId===id&&(m.t==='sitout'||m.t==='pick')); moves.push({t:'sitout',charId:id}); render(); openReview(); }
+}
+
+/* ---- popovers ---- */
+function openPop(html,anchor,w){ // anchor: the element that was clicked
+  const p=$('#pop'); p.innerHTML=html; p.classList.add('open'); if(w) p.style.width=w+'px'; else p.style.width='';
+  p.style.maxHeight=(innerHeight-20)+'px'; p.style.overflowY='auto';
+  const r=anchor.getBoundingClientRect();
+  p.style.left='0px'; p.style.top='0px';
+  const pw=p.offsetWidth, ph=p.offsetHeight;
+  let x=r.left, y=r.bottom+6;
+  if(x+pw>innerWidth-10) x=r.right-pw;            // flip left
+  if(y+ph>innerHeight-10) y=r.top-6-ph;           // flip up
+  x=Math.max(10,Math.min(x,innerWidth-10-pw)); y=Math.max(10,Math.min(y,innerHeight-10-ph));
+  p.style.left=x+'px'; p.style.top=y+'px';
+  const f=p.querySelector('input'); if(f) f.focus();
+}
+function closePop(){ $('#pop').classList.remove('open'); }
+function quickMenu(id,anchor){
+  const c=VW.ch(id);
+  openPop(`<div class="ttl"><b>${esc(c.name)}</b></div>
+    <button class="mi" data-act="design" data-id="${id}">${SVG.wand} Design a voice</button>
+    ${c.sit?`<button class="mi" data-act="unsit" data-id="${id}">${SVG.sit} Back in</button>`:`<button class="mi" data-act="sit" data-id="${id}">${SVG.sit} Sit out this run</button>`}
+    <button class="mi" data-act="rename" data-id="${id}">${SVG.pencil} Rename</button>
+    <div class="sep"></div>
+    ${c.removed?`<button class="mi" data-act="unremove" data-id="${id}">Put back in the issue</button>`:`<button class="mi danger" data-act="remove" data-id="${id}">${SVG.out} Not in this issue</button>`}`,anchor);
+}
+function slotMenu(n,anchor){
+  const v=VW.voices.find(x=>x.slot===n); const out=VW.voices.find(x=>x.pend==='out'&&x.wasSlot===n);
+  if(!v&&!out){ openPop(`<div class="ttl">Slot ${n} <b>free</b></div><div class="kv dim" style="padding-bottom:6px">drop a card here</div>`,anchor); return; }
+  const x=v||out; const ch=x.forChar?charOf(x):null; const sp=VW.speakers(x.id);
+  const freeM = moves.find(m=>m.t==='free'&&m.voiceId===x.id);
+  openPop(`<div class="ttl">Slot ${n} <b>${esc(x.name)}</b></div>
+    ${ch?`<div class="mini"><span class="av">${face(ch.look)}</span><span>${esc(ch.name)}</span></div>`:''}
+    <div class="kv"><span class="k">owner</span>${esc(x.owner)}${x.pinned?' · pinned':''}${x.prot?' · v2, locked':''}</div>
+    <div class="kv"><span class="k">kind</span>${kindWord(x)}</div>
+    <div class="kv"><span class="k">backup</span><span title="${esc(backupTip(x))}">${backupWord(x)}</span></div>
+    ${sp.length?`<div class="kv"><span class="k">speaks</span>${sp.map(s=>esc(s.name)).join(', ')}</div>`:''}
+    <div class="sep"></div>
+    ${ch&&(CHARS.some(k=>k.id===ch.id)||VW.chars.some(k=>k.id===ch.id))?`<button class="mi" data-act="open" data-id="${ch.id}">Open ${esc(ch.name)}</button>`:''}
+    ${locked(x)?`<div class="kv mute">${SVG.lock} ${lockWhy(x)}</div>`:x.pend==='in'?`<div class="kv mute">new at confirm</div>`:freeM?`<button class="mi" data-act="keepSlot" data-id="${x.id}">Keep it</button>`:x.pend==='out'?`<div class="kv mute">freed by ${esc(VW.ch(x.outBy.charId)?.name||'a pick')}</div>`:`<button class="mi danger" data-act="freeSlot" data-id="${x.id}">${SVG.out} Free this slot${x.backup?'':' · lost'}</button>`}`,anchor);
+}
+function addMenu(anchor){
+  const have=new Set(VW.chars.map(c=>c.id));
+  const list=KNOWN.filter(k=>!have.has(k.id));
+  const row=k=>{ const bv=VW.voices.find(v=>v.forChar===k.id&&!v.slot); return `<button class="mi" data-act="addKnown" data-id="${k.id}"><span class="av" style="width:22px;height:22px;border-radius:5px;overflow:hidden;display:inline-block">${face(k.look)}</span><span>${esc(k.name)}</span><span class="mute" style="margin-left:auto;font-size:11px">${bv?'archived voice':'cast before'}</span></button>`; };
+  openPop(`<input class="search" id="addIn" placeholder="Name" aria-label="Name"><div class="list" id="addList">${list.map(row).join('')}</div><div class="sep"></div><button class="mi" data-act="addNew" id="addNewBtn" disabled style="opacity:.5">${SVG.pencil} New character</button>`,anchor,260);
+  $('#addIn').oninput=e=>{ const q=e.target.value.trim().toLowerCase(); $$('#addList .mi').forEach(b=>{ b.style.display=b.textContent.toLowerCase().includes(q)?'':'none'; }); const nb=$('#addNewBtn'); nb.disabled=!q; nb.style.opacity=q?'1':'.5'; nb.innerHTML=`${SVG.pencil} New: ${esc(e.target.value.trim())||'…'}`; };
+  $('#addIn').onkeydown=e=>{ if(e.key==='Enter'&&e.target.value.trim()) onAct('addNew'); };
+}
+function facesMenu(anchor){
+  const open=VW.faces.filter(f=>!f.done);
+  openPop(`<div class="ttl">Faces <b>${open.length}</b></div>${open.map(f=>`<div class="mini" style="gap:10px"><span class="av" style="width:44px;height:44px;border-radius:7px">${face(f.look)}</span><span class="mono dim" style="min-width:34px">p.${f.page}</span><select data-face="${f.id}" aria-label="Who is this" style="background:var(--raise);color:var(--tx);border:1px solid var(--line2);border-radius:6px;padding:4px 6px;max-width:150px"><option value="">Who?</option>${VW.chars.filter(c=>c.kind!=='role'&&!c.removed).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}<option value="__none">Not a character</option></select></div>`).join('')}`,anchor,320);
+  $$('#pop select').forEach(s=>s.onchange=()=>{ const v=s.value; if(!v) return; onAct('faceTo',s.dataset.face+'|'+(v==='__none'?'':v)); });
+}
+
+/* ---- drag and drop: a card onto the strip, a slot onto "free the slot" ---- */
+let carry=null;
+function slotWanted(c){ // what this character has waiting for a slot
+  if(c.pick&&c.pick.needsSlot) return {voiceId:c.pick.voiceId,design:c.pick.design};
+  const d=designs[c.id]; if(d) return {voiceId:'design:'+c.id,design:d};
+  const b=VW.voices.find(v=>v.forChar===c.id&&!v.slot&&!v.lib&&v.pend!=='out'); if(b) return {voiceId:b.id};
+  return null;
+}
+document.addEventListener('dragstart',e=>{
+  const el=e.target.closest('[data-carry]'); if(!el) return;
+  carry={type:el.dataset.carry,id:el.dataset.id}; el.classList.add('carrying');
+  e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',carry.id);
+  if(carry.type==='char'){ const c=VW.ch(carry.id); const w=slotWanted(c); $('#segs').classList.add('can-drop'); if(!w){ $$('.seg').forEach(s=>s.classList.add('nodrop')); } else $$('.seg').forEach(s=>{ const v=VW.voices.find(x=>x.slot===+s.dataset.slot); if(v&&(locked(v)||v.pend==='in')) s.classList.add('nodrop'); }); }
+  if(carry.type==='slot'){ $('#release').classList.add('show','can-drop'); }
+});
+document.addEventListener('dragend',()=>{ carry=null; $$('.carrying,.can-drop,.over,.nodrop').forEach(x=>x.classList.remove('carrying','can-drop','over','nodrop')); $('#release').classList.remove('show'); });
+document.addEventListener('dragover',e=>{ const t=e.target.closest('.seg,#release'); if(!carry||!t) return; if(t.classList.contains('nodrop')) return; e.preventDefault(); t.classList.add('over'); });
+document.addEventListener('dragleave',e=>{ const t=e.target.closest('.seg,#release'); if(t) t.classList.remove('over'); });
+document.addEventListener('drop',e=>{
+  const t=e.target.closest('.seg,#release'); if(!carry||!t) return; e.preventDefault();
+  if(carry.type==='char'&&t.classList.contains('seg')){
+    const c=VW.ch(carry.id); const w=slotWanted(c); const n=+t.dataset.slot; const v=VW.voices.find(x=>x.slot===n);
+    if(!w){ toast(`${c.name} has nothing waiting for a slot`,true); return; }
+    if(v&&locked(v)){ toast(lockWhy(v),true); return; }
+    const slot = v ? {kind:'swap',out:v.id,backup:true,lossyOk:false} : {kind:'free',n};
+    setPick(c.id,w.voiceId,{design:w.design,slot}); openChar(c.id); flashSlot(n);
+  }
+  if(carry.type==='slot'&&t.id==='release'){ onAct('freeSlot',carry.id); }
+});
+function flashSlot(n){ requestAnimationFrame(()=>{ const s=document.querySelector(`.seg[data-slot="${n}"]`); if(s){ s.classList.add('flash'); setTimeout(()=>s.classList.remove('flash'),700); } }); }
+
+/* ---- fake playback: a visible playing state, never a move ---- */
+let playT=null, playing=null;
+function playFake(btn){
+  if(playing){ playing.classList.remove('playing'); playing.innerHTML=SVG.play; clearTimeout(playT); if(playing===btn){ playing=null; return; } }
+  playing=btn; btn.classList.add('playing'); btn.innerHTML=SVG.stop;
+  playT=setTimeout(()=>{ btn.classList.remove('playing'); btn.innerHTML=SVG.play; playing=null; },1600);
+}
+
+/* ---- one click handler ---- */
+document.addEventListener('click',e=>{
+  const pl=e.target.closest('[data-play]'); if(pl){ e.stopPropagation(); playFake(pl); return; }
+  const seg=e.target.closest('.seg'); if(seg){ e.stopPropagation(); slotMenu(+seg.dataset.slot,seg); return; }
+  const tb=e.target.closest('#pTabs button'); if(tb){ onAct('tab',tb.dataset.tab); return; }
+  const a=e.target.closest('[data-act]');
+  if(a){ if(a.classList.contains('locked')) return; if(a.tagName!=='INPUT') e.stopPropagation(); onAct(a.dataset.act,a.dataset.id,a,e); return; }
+  if(!e.target.closest('#pop')) closePop();
+});
+document.addEventListener('change',e=>{ const a=e.target.closest('input[data-act]'); if(a) onAct(a.dataset.act,a.dataset.id,a,e); });
+document.addEventListener('input',e=>{ if(e.target.id==='slotSearch'){ slotSearch=e.target.value; const v=e.target.value; render(); const s=$('#slotSearch'); if(s){ s.value=v; s.focus(); s.setSelectionRange(v.length,v.length); } } });
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ if($('#pop').classList.contains('open')) closePop(); else if($('#sheet').classList.contains('open')||$('#designDrawer').classList.contains('open')) closeAll(); else if(sel) closePanel(); }
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('card')&&!e.target.classList.contains('add')){ e.preventDefault(); onAct('open',e.target.dataset.id); }
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('vrow')){ e.preventDefault(); e.target.click(); }
+  if(e.key==='Enter'&&e.target.id==='renameIn') onAct('renameOk');
+});
+$('#pClose').onclick=closePanel;
+$('#btnAdd').onclick=e=>{ e.stopPropagation(); addMenu(e.currentTarget); };
+$('#btnFaces').onclick=e=>{ e.stopPropagation(); facesMenu(e.currentTarget); };
+
+/* ======================================================================
+   DESIGN SHEET (A's, trimmed): draft → edit → three takes → listen → accept
+   ====================================================================== */
+function openDrawer(sel){ $('#scrim').classList.add('open'); $(sel).classList.add('open'); const f=$(sel).querySelector('textarea,button.close'); if(f) f.focus(); }
+function closeAll(){ $('#scrim').classList.remove('open'); $$('.drawer.open').forEach(d=>d.classList.remove('open')); $('#sheet').classList.remove('open'); }
+$('#scrim').onclick=closeAll; $('#ddClose').onclick=closeAll; $('#shClose').onclick=closeAll;
+
+let D=null;
+function openDesign(charId){
+  const c=VW.ch(charId); closePop();
+  const prev=designs[charId];
+  D={charId,mode:prev?prev.mode:'keep',prompt:prev?prev.prompt:'',text:prev?prev.text:defaultPreview(c),takes:null,take:prev?prev.take:0,busy:false,credits:prev?prev.credits:0};
+  $('#ddTitle').textContent=`Design a voice · ${c.name}`;
+  $('#ddSub').textContent=`${c.lines} line${c.lines===1?'':'s'}${c.kind==='one'?' · one-off':''}`;
+  renderDesign(); openDrawer('#designDrawer');
+}
+function defaultPreview(c){ let t=(c.samples||[]).map(s=>s[1]).join(' '); const pad=' Hold on, let me say that again, slower, so you can hear the whole voice. And once more with some feeling in it!'; while(t.length<100) t+=pad; return t.trim(); }
+function renderDesign(){
+  const c=VW.ch(D.charId); const n=D.prompt.length, pn=D.text.length;
+  $('#ddBody').innerHTML=`
+    <div class="sec">
+      <div class="fieldhead"><label for="dprompt">Prompt</label><div class="r"><span>${n}</span><button class="btn small" id="magic" ${D.busy?'disabled':''}>${SVG.wand} ${D.prompt?'Draft again':'Draft'}</button></div></div>
+      <textarea id="dprompt" class="magic" rows="5" placeholder="Age, pitch, accent, energy">${esc(D.prompt)}</textarea>
+      ${c.desc?`<div class="note" title="voices.description on file">From: “${esc(c.desc)}”</div>`:`<div class="note">Nothing on file</div>`}
+    </div>
+    <div class="sec">
+      <div class="fieldhead"><label for="dtext">Preview text</label><div class="r"><span style="color:${pn<100||pn>1000?'var(--red)':'inherit'}">${pn} · 100–1000</span></div></div>
+      <textarea id="dtext" rows="3">${esc(D.text)}</textarea>
+      <div class="note">Its own lines · ~${pn} credits for three takes</div>
+    </div>
+    <div class="sec">
+      <button class="btn primary" id="gen" ${(!D.prompt.trim()||pn<100||pn>1000||D.busy)?'disabled':''}>${D.busy?'<span class="spin"></span> Generating':D.takes?'Three more takes':'Generate three takes'}</button>
+      ${D.takes?`<div class="takes" style="margin-top:10px">${D.takes.map((t,i)=>`<label class="take${D.take===i+1?' sel':''}"><input type="radio" name="take" value="${i+1}" ${D.take===i+1?'checked':''}><span><span class="tn">Take ${i+1}</span><span class="td">${t}</span></span>${playBtn('take '+(i+1),'play')}</label>`).join('')}</div>`:''}
+    </div>
+    <div class="sec"><h4>At confirm</h4>
+      <label class="opt${D.mode==='keep'?' sel':''}"><input type="radio" name="mode" value="keep" ${D.mode==='keep'?'checked':''}><span><div class="ot">Keep as ${esc(c.name)}'s voice</div><div class="od">One slot · prompt kept</div></span></label>
+      <label class="opt${D.mode==='run'?' sel':''}"><input type="radio" name="mode" value="run" ${D.mode==='run'?'checked':''}><span><div class="ot">This run only</div><div class="od">One slot until its ${c.lines===1?'line renders':c.lines+' lines render'} · then freed</div></span></label>
+      <div class="note red" title="ElevenLabs: an unsaved design can only say its preview text">Unsaved takes only say the preview text</div>
+    </div>`;
+  $('#ddFoot').innerHTML=`<button class="btn primary" id="accept" ${D.take?'':'disabled'}>Accept take ${D.take||'…'}</button><span class="dim" style="font-size:12px">Saved at confirm</span><span style="flex:1"></span><button class="btn ghost" id="ddCancel">Cancel</button>`;
+  $('#dprompt').oninput=e=>{ D.prompt=e.target.value; $('#gen').disabled=!D.prompt.trim()||D.text.length<100||D.text.length>1000; };
+  $('#dtext').oninput=e=>{ D.text=e.target.value; renderDesign(); $('#dtext').focus(); $('#dtext').setSelectionRange(D.text.length,D.text.length); };
+  $('#magic').onclick=magicWrite; $('#gen').onclick=generate;
+  $$('input[name=take]').forEach(r=>r.onchange=()=>{ D.take=+r.value; renderDesign(); });
+  $$('input[name=mode]').forEach(r=>r.onchange=()=>{ D.mode=r.value; renderDesign(); });
+  $('#accept').onclick=acceptDesign; $('#ddCancel').onclick=closeAll;
+}
+function magicWrite(){
+  const c=VW.ch(D.charId); const draft=draftPrompt(c); D.busy=true; renderDesign();
+  const ta=$('#dprompt'); ta.value=''; let i=0;
+  const tick=()=>{ i+=3; ta.value=draft.slice(0,i); if(i<draft.length) setTimeout(tick,12); else { D.prompt=draft; D.busy=false; renderDesign(); $('#dprompt').focus(); } };
+  tick();
+}
+function draftPrompt(c){
+  const d=c.desc||`${c.name}.`;
+  const has=(t,...w)=>new RegExp(`\\b(?:${w.join('|')})\\b`,'i').test(t); // whole words or phrases only
+  const dv=d.replace(/\b(?:out loud|aloud)\b/gi,''); // "says it out loud" is not a loud voice
+  const age=has(d,'old','older','elder','sensei','grandma')?'older':has(d,'teens?','teenage','young','kids?')?'late teens':'adult';
+  const sex=has(d+' '+c.name,'she','her','kimberly','trini','karai','rita','grace','june','rosa','april')?'female':'male';
+  const pace=has(d,'slow','slowly','patient','unhurried','measured')?'slow':has(d,'fast','quick','quickly','fretful','excited')?'fast':'medium';
+  const tone=has(dv,'menace','menacing','cold','coldly','evil','rasp','raspy','imperial')?'low, menacing':has(dv,'warm','warmly','kind','kindly','gentle','gently','calm','calmly')?'warm':has(dv,'loud','booming','boom','shouts?','shouting','roars?','roaring')?'loud, booming':'clear';
+  return `${age} ${sex} voice, ${tone}, ${pace} pace. ${d} American English unless the description says otherwise. Comic-book delivery: performs the bracketed cues, lands the exclamation points, no narration voice.`;
+}
+function generate(){ D.busy=true; D.takes=null; D.take=0; renderDesign(); setTimeout(()=>{ D.busy=false; D.credits+=D.text.length; D.takes=['closest to the prompt','a touch deeper, slower','brighter, more energy']; renderDesign(); toast(`Three takes ready (mock) · ~${D.text.length} credits`); },1600); }
+function acceptDesign(){
+  const c=VW.ch(D.charId);
+  designs[D.charId]={take:D.take,prompt:D.prompt,text:D.text,mode:D.mode,credits:D.credits};
+  closeAll(); setPick(c.id,'design:'+c.id,{design:designs[D.charId]}); if(sel!==c.id) openChar(c.id);
+}
+
+/* ======================================================================
+   REVIEW & CONFIRM: the one place the list of moves is shown, in run order
+   ====================================================================== */
+function reviewLines(){
+  const L=[]; const idx=m=>moves.indexOf(m);
+  const outLine=(m,voiceId)=>{ const v=VW.vo(voiceId); const bk = m.t==='free'?m.backup:m.slot.backup; const ok = m.t==='free'?m.lossyOk:m.slot.lossyOk; const sp=VW.speakers(voiceId).filter(s=>!(m.t==='pick'&&s.id===m.charId)); const lost=VW.chars.filter(c=>c.lost&&CHARS.find(b=>b.id===c.id)?.voice===voiceId);
+    L.push({m,i:idx(m),cls:!v.backup&&!ok?'lossy':'',t:`Archive ${esc(v.name)}`,sub:[v.owner!=='comic'?esc(v.owner):'', kindWord(v), v.backup?`<label class="bk"><input type="checkbox" data-act="rvBk" data-id="${idx(m)}" ${bk!==false?'checked':''}> back up first</label>`:`<label class="bk lossy"><input type="checkbox" data-act="rvLossy" data-id="${idx(m)}" ${ok?'checked':''}> archive anyway · lost</label>`, lost.length?`<span style="color:var(--red)">leaves ${lost.map(s=>esc(s.name)).join(', ')} silent</span>`:''].filter(Boolean),cost:'0'}); };
+  for(const m of moves){ if(m.t==='free') outLine(m,m.voiceId); else if(m.t==='pick'&&m.needsSlot&&m.slot.kind==='swap'&&m.slot.out) outLine(m,m.slot.out); }
+  for(const m of moves){ if(m.t==='pick'&&m.needsSlot){ const c=VW.ch(m.charId); const v=VW.vo(m.design?'d-'+m.charId:m.voiceId);
+    L.push({m,i:idx(m),cls:m.slotN?'':'lossy',t:m.design?`Create ${esc(c.name)} · take ${m.design.take}`:`Bring back ${esc(v.name)}`,sub:[m.slotN?`slot ${m.slotN}`:'<span style="color:var(--red)">no slot</span>', `for ${esc(c.name)}`, m.design&&m.design.mode==='run'?'this run only':''].filter(Boolean),cost:m.design?`~${m.design.credits} spent`:'0'}); } }
+  for(const m of moves){ if(m.t==='pick'&&!m.needsSlot){ const c=VW.ch(m.charId), v=VW.vo(m.voiceId); L.push({m,i:idx(m),t:`Cast ${esc(c.name)} as ${esc(v.name)}`,sub:[v.lib?'library':'stand-in','no slot'],cost:'0'}); } }
+  for(const m of moves){ const c=m.charId&&VW.ch(m.charId);
+    if(m.t==='sitout') L.push({m,i:idx(m),t:`Sit out ${esc(c.name)}`,sub:[`${c.lines} line${c.lines===1?'':'s'} stay${c.lines===1?'s':''} silent`],cost:''});
+    else if(m.t==='remove') L.push({m,i:idx(m),t:`Not in this issue: ${esc(c.name)}`,sub:['castlist row kept'],cost:''});
+    else if(m.t==='rename') L.push({m,i:idx(m),t:`Rename ${esc(CHARS.concat(KNOWN).find(x=>x.id===m.charId)?.name||'')} → ${esc(m.name)}`,sub:[],cost:''});
+    else if(m.t==='add') L.push({m,i:idx(m),t:`Add ${esc(c.name)}`,sub:['to the cast'],cost:''});
+    else if(m.t==='face'){ const f=FACES.find(f=>f.id===m.faceId); L.push({m,i:idx(m),t:`Face p.${f.page} → ${m.charId?esc(VW.ch(m.charId).name):'not a character'}`,sub:[],cost:''}); } }
+  return L;
+}
+function blockers(){
+  const b=[];
+  const lossy=moves.filter(m=>(m.t==='free'&&!VW.vo(m.voiceId).backup&&!m.lossyOk)||(m.t==='pick'&&m.needsSlot&&m.slot.kind==='swap'&&m.slot.out&&!VW.vo(m.slot.out).backup&&!m.slot.lossyOk));
+  if(lossy.length) b.push({t:`${lossy.length} archive${lossy.length===1?'':'s'} with no backup · tick “archive anyway” or undo`});
+  const noslot=moves.filter(m=>m.t==='pick'&&m.needsSlot&&!m.slotN);
+  for(const m of noslot) b.push({t:`${esc(VW.ch(m.charId).name)}: no slot`,chars:[]});
+  const unvoiced=VW.chars.filter(c=>!c.removed&&!c.sit&&!c.voice&&c.lines>0);
+  if(unvoiced.length) b.push({t:`${unvoiced.length} with lines and no voice`,chars:unvoiced});
+  return b;
+}
+function openReview(){
+  const L=reviewLines(), B=blockers();
+  const adds=moves.filter(m=>m.t==='pick'&&m.needsSlot).length;
+  const outs=L.filter(l=>l.t.startsWith('Archive')); const lost=outs.filter(l=>l.cls==='lossy').length;
+  const credits=Object.values(designs).reduce((n,d)=>n+d.credits,0);
+  const changes=adds+outs.length;
+  $('#shSub').textContent=`${BOOK} / ${ISSUE}`;
+  $('#shBody').innerHTML=`
+    <div class="sum">
+      <div><div class="k">Slots after</div><div class="v">${VW.used}<small>· of 30</small></div></div>
+      <div><div class="k">Created</div><div class="v">${adds}</div></div>
+      <div class="${lost?'red':''}"><div class="k">Archived</div><div class="v">${outs.length}<small>${outs.length?lost?`· ${lost} lost`:'· backed up':''}</small></div></div>
+      <div><div class="k">Credits</div><div class="v">~${credits}<small>previews</small></div></div>
+    </div>
+    ${L.length?`<ol class="steps" id="steps">${L.map((l,n)=>`<li class="${l.cls||''}"><span class="i">${n+1}</span><span class="st">${l.t}<div class="s">${l.sub.join('<span class="mute">·</span>')}</div></span><span class="cost">${l.cost}</span><button class="x" data-act="undo" data-id="${l.i}" title="Undo" aria-label="Undo">✕</button></li>`).join('')}</ol>
+    <div class="note">${changes} of this month's ${MONTHLY_MAX} changes${MONTHLY_USED?` · ${MONTHLY_USED} used`:''} · lines render at the audio step</div>`:`<div class="empty">Nothing to confirm</div>`}
+    ${B.map(b=>`<div class="warn">${b.t}${(b.chars||[]).map(c=>`<button class="btn small" data-act="rvSit" data-id="${c.id}">Sit out ${esc(c.name)}</button>`).join('')}</div>`).join('')}`;
+  $('#shFoot').innerHTML=`<button class="btn primary" id="go" ${B.length||!L.length?'disabled':''}>Confirm ${L.length?L.length:''}</button><span class="dim" style="font-size:12px">${lost?`<span style="color:var(--red)">${lost} cannot come back</span>`:outs.length?'Everything archived can come back':''}</span><span style="flex:1"></span><button class="btn ghost" id="shBack">Back</button>`;
+  $('#go').onclick=runSave; $('#shBack').onclick=closeAll;
+  $('#scrim').classList.add('open'); $('#sheet').classList.add('open');
+}
+function runSave(){
+  const lis=$$('#steps li'); $('#go').disabled=true; $('#go').innerHTML='<span class="spin"></span> Running'; $$('#steps .x').forEach(x=>x.style.visibility='hidden');
+  let i=0; const step=()=>{ if(i>0) lis[i-1].classList.replace('run','done'); if(i<lis.length){ lis[i].classList.add('run'); i++; setTimeout(step,450); } else done(); };
+  step();
+}
+function done(){
+  $('#shFoot').innerHTML=`<span style="color:var(--green);font-weight:600">Done</span><span class="dim" style="font-size:12px">${VW.chars.filter(c=>!c.removed&&!c.sit).reduce((n,c)=>n+c.lines,0)} lines to the audio step</span><span style="flex:1"></span><button class="btn" id="shDone">Close</button>`;
+  $('#shDone').onclick=()=>{ closeAll(); bake(); };
+}
+function bake(){
+  const v=VW;
+  VOICES.length=0; v.voices.forEach(x=>{ delete x.pend; delete x.outBy; delete x.wasSlot; delete x.newDesign; VOICES.push(x); });
+  v.chars.forEach(cv=>{ let c=CHARS.find(x=>x.id===cv.id); if(!c){ c={...cv}; delete c.pick; delete c.tags; delete c.added; CHARS.push(c); } c.name=cv.name; c.voice=cv.voice; c.sitBase=cv.sit; c.removedBase=cv.removed; });
+  FACES.splice(0,FACES.length,...v.faces.filter(f=>!f.done));
+  moves=[]; designs={}; render(); toast('Confirmed (mock) · the account now matches the strip');
+}
+$('#btnReview').onclick=openReview;
+
+let toastT; function toast(msg,bad){ const t=$('#toast'); t.textContent=msg; t.classList.toggle('bad',!!bad); t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),bad?4200:2600); }
+
+render();
+</script>
+</body>
+</html>
