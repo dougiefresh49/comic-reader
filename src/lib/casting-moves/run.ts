@@ -11,7 +11,6 @@ import {
   renameCharacter,
   setIssueVoice,
   setNoAudio,
-  voiceFor,
 } from "~/lib/cast";
 import type { LlmCallMeta } from "~/lib/llm-usage";
 import {
@@ -694,20 +693,26 @@ async function runAdd(
         if (!freedBy)
           return failed(`adding ${name} was refused: ${added.reason}`);
         // The record names the archived voice and the id its DELETE took,
-        // so a reconcile can finish it; the bring-back takes that voice's
-        // claim again, fresh, so no other run restores it meanwhile.
+        // so a reconcile can finish it. The bring-back holds that voice's
+        // claim so no other run restores it meanwhile: the claim this move
+        // already holds when it is a restore of that same voice, else a
+        // fresh one.
         await rec.record({
           archived: freedBy.row.id,
           archivedElevenLabsId: freedBy.row.current_elevenlabs_id ?? undefined,
         });
         const now = await readVoice(sb, freedBy.row.id);
+        const heldHere =
+          m.kind === "restore" && m.voice_uuid === freedBy.row.id;
         let back: { ok: true } | { ok: false; why: string };
         try {
-          back = now
-            ? await withVoiceClaims(sb, [{ row: now, op: "restore" }], () =>
-                bringBack(deps, rec, now, freedBy.deleteConfirmed),
-              )
-            : { ok: false, why: `${freedBy.row.display_name}: row not found` };
+          back = !now
+            ? { ok: false, why: `${freedBy.row.display_name}: row not found` }
+            : heldHere
+              ? await bringBack(deps, rec, now, freedBy.deleteConfirmed)
+              : await withVoiceClaims(sb, [{ row: now, op: "restore" }], () =>
+                  bringBack(deps, rec, now, freedBy.deleteConfirmed),
+                );
         } catch (err) {
           if (!(err instanceof VoiceHeldError)) throw err;
           back = {

@@ -3,7 +3,6 @@ import { slugify } from "~/lib/character-id";
 import {
   loadBookCast,
   renderVoice,
-  voiceFor,
   type BookCast,
   type CastRow,
   type CastVoiceRow,
@@ -128,8 +127,8 @@ export type CastScope = "issue" | "later";
  * Why casting `to` for the character would replace one of the owner's v2
  * voices, or null. It reads every castlist row of the character the cast
  * writes (this issue's, and for `later` the book's later issues'), whatever
- * their `no_audio` or `in_issue`, and the voice the render chain lends the
- * issue when its own row holds none.
+ * their `no_audio` or `in_issue`, and the voice the issue inherits when its
+ * own row holds none, also read past `no_audio` and `in_issue`.
  */
 export function castAwayReason(
   book: BookCast,
@@ -149,8 +148,23 @@ export function castAwayReason(
             (book.issueNumber.get(r.issue_id) ?? 0) > here)),
     )
     .flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : []));
-  const lent = voiceFor(book, characterId, issueId);
-  if (lent?.from === characterId) held.push(lent.voiceUuid);
+  // The voice the issue inherits when its own row holds none: the book's
+  // latest row with a voice, as the render chain finds it, but read
+  // whatever any row's `no_audio` or `in_issue` (`voiceFor` stops there).
+  const ownHere = book.rows.some(
+    (r) =>
+      r.issue_id === issueId && r.character_id === characterId && r.voice_uuid,
+  );
+  if (!ownHere) {
+    const lent = book.rows
+      .filter((r) => r.character_id === characterId && r.voice_uuid)
+      .sort(
+        (a, b) =>
+          (book.issueNumber.get(b.issue_id) ?? 0) -
+          (book.issueNumber.get(a.issue_id) ?? 0),
+      )[0];
+    if (lent) held.push(lent.voice_uuid!);
+  }
   for (const uuid of held) {
     if (uuid === to) continue;
     const name = protectedName(uuid);
@@ -539,11 +553,17 @@ export async function planMovesDetail(
     }
   };
 
-  /** Takes a slot for add move `i`: a free one first, then one an archive placed earlier freed, then the next archive staged later. */
+  /**
+   * Takes a slot for add move `i`: one an archive placed before it freed
+   * (linked in `slotFrom`, so a refused add brings that voice back), else a
+   * free one, else the next archive staged later, pulled in front of it.
+   * An add that could run ahead of an archive while a slot was free
+   * already did (`canGoFirst`).
+   */
   const takeSlot = async (
     i: number,
   ): Promise<Pick<PlanStep, "slot" | "slotFromMove">> => {
-    if (pristineFree > 0) {
+    if (freed.length === 0 && pristineFree > 0) {
       pristineFree--;
       return { slot: "free", slotFromMove: null };
     }
@@ -751,11 +771,23 @@ export async function planMovesDetail(
     }
   };
 
-  /** An add that may run before an archive: not a restore of a voice an archive still to be placed frees. */
-  const canGoFirst = (j: number) => {
+  /** The character a move names, the one an `add_character` creates included. */
+  const characterOf = (m: Move | undefined): string | null => {
+    if (!m || moveShapeError(m)) return null;
+    if (m.kind === "add_character") return m.character_id ?? slugify(m.name);
+    return "character_id" in m ? m.character_id : null;
+  };
+  /**
+   * Whether add `j` may run ahead of archive `i` and every move still
+   * unplaced between them, ending in the same state: never a restore of a
+   * voice an archive still to be placed frees, and never past a move that
+   * names the add's character (its `add_character`, or an earlier pick,
+   * which the staged last pick has to follow).
+   */
+  const canGoFirst = (i: number, j: number) => {
     const mj = moves[j];
     if (!mj || moveShapeError(mj) || !isAddMove(mj)) return false;
-    return !(
+    if (
       mj.kind === "restore" &&
       moves.some(
         (mk, k) =>
@@ -763,7 +795,13 @@ export async function planMovesDetail(
           mk?.kind === "archive" &&
           mk.voice_uuid === mj.voice_uuid,
       )
-    );
+    )
+      return false;
+    const who = mj.character_id;
+    if (!who) return true;
+    for (let k = i + 1; k < j; k++)
+      if (!placed.has(k) && characterOf(moves[k]) === who) return false;
+    return true;
   };
 
   for (let i = 0; i < moves.length; i++) {
@@ -780,7 +818,7 @@ export async function planMovesDetail(
       // Add first while a slot is free, as `carryOut` does: a refused add
       // stops the run before this archive deletes anything.
       for (let j = i + 1; pristineFree > 0 && j < moves.length; j++)
-        if (!placed.has(j) && canGoFirst(j))
+        if (!placed.has(j) && canGoFirst(i, j))
           await placeOther(j, moves[j] as Exclude<Move, ArchiveMove>);
       await placeArchive(i, m);
       continue;

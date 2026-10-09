@@ -152,19 +152,23 @@ async function reconcileMove(
       case "adding": {
         const found = await matchLostAdd(deps, op);
         if (op.back) {
-          // The id goes only onto the state the bring-back found: archived, no id.
-          if (
+          // The id goes only onto the state the bring-back found: archived,
+          // no id. A row that already holds this very id was recorded by the
+          // bring-back itself before the run stopped: nothing to write.
+          const writable =
+            archivedRow?.status === "archived" &&
+            archivedRow.current_elevenlabs_id === null;
+          const recorded =
             found.ok &&
-            !(
-              archivedRow?.status === "archived" &&
-              archivedRow.current_elevenlabs_id === null
-            )
-          )
+            archivedRow?.status === "active" &&
+            archivedRow.current_elevenlabs_id === found.id;
+          if (found.ok && !writable && !recorded)
             return await settle(
               "needs_attention",
               `${found.id} is a restore of ${archivedRow?.display_name ?? op.archived}, but that row is ${archivedRow?.status ?? "gone"} with ${archivedRow?.current_elevenlabs_id ?? "no id"} now; nothing was written (delete ${found.id} on ElevenLabs by hand if it is a duplicate)`,
             );
-          if (found.ok) await markRestored(sb, archivedRow!, found.id);
+          if (found.ok && writable)
+            await markRestored(sb, archivedRow, found.id);
           if (found.ok || opts.notAdded)
             return await settle(
               "failed",
