@@ -81,6 +81,8 @@ export function DesignSheet({
   const [prompt, setPrompt] = useState(staged?.design_prompt ?? "");
   /** The `description` on file (else `design_prompt`), quoted by the "From:" line. */
   const [onFile, setOnFile] = useState<string | null>(null);
+  /** The voice snippets the prompt was drafted from by Gemini; null for none. */
+  const [drafted, setDrafted] = useState<string[] | null>(null);
   const [previewText, setPreviewText] = useState(staged?.preview_text ?? "");
   const [ownLines, setOwnLines] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -180,7 +182,8 @@ export function DesignSheet({
           setDraftError(r.error);
           return;
         }
-        setPrompt(r.data);
+        setPrompt(r.data.prompt);
+        setDrafted(r.data.snippets);
         clearTakes();
       })
       .catch((err: unknown) => setDraftError(message(err)))
@@ -304,11 +307,15 @@ export function DesignSheet({
             />
             {draftError ? (
               <div className={`${NOTE} text-red-400`}>{draftError}</div>
+            ) : drafted ? (
+              <div className={NOTE} title="voice notes from its lines">
+                From: “{drafted.join(" · ")}”
+              </div>
             ) : onFile ? (
               <div className={NOTE} title="voices.description on file">
                 From: “{onFile}”
               </div>
-            ) : !loading ? (
+            ) : !loading && !prompt.trim() ? (
               <div className={NOTE}>Nothing on file</div>
             ) : null}
           </section>

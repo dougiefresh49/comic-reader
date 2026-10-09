@@ -148,14 +148,18 @@ export async function startDesign(
  * voice snippets from this issue, named as `describeVoices` names it.
  * Writes nothing.
  */
-export async function draftVoicePrompt(
-  args: Who & { again: boolean },
-): Promise<DesignResult<string>> {
+export async function draftVoicePrompt(args: Who & { again: boolean }): Promise<
+  DesignResult<{
+    prompt: string;
+    /** The voice snippets a Gemini draft was made from; null for the prompt on file. */
+    snippets: string[] | null;
+  }>
+> {
   try {
     await requireAdmin();
     const { bookId, issueId, characterId, again } = args;
     const stored = again ? null : (await readOnFile(characterId)).prompt;
-    if (stored) return { ok: true, data: stored };
+    if (stored) return { ok: true, data: { prompt: stored, snippets: null } };
 
     const input = await loadVoiceDescriptionPlanInput(
       supabaseAdmin as SupabaseClient<Database>,
@@ -187,7 +191,7 @@ export async function draftVoicePrompt(
     );
     const prompt = response.text?.trim();
     if (!prompt) throw new Error("Gemini returned no draft");
-    return { ok: true, data: prompt };
+    return { ok: true, data: { prompt, snippets } };
   } catch (err) {
     return fail("drafting", err);
   }
