@@ -1,819 +1,606 @@
-// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick, and Cancel, confirm or Undo request hands focus back to a row (or to Undo, when the undo fails).
+// The panel's Voice tab (#787): every voice is a radio row and one click is
+// the pick. A pick that needs a slot shows the Slot box (Free or Swap out).
+// Then the character's first lines. Every change here is staged.
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import type { VoiceRequest } from "~/lib/cast";
-import type { PreviewResult } from "./actions";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ArchiveMove, Roster, RosterSlot } from "~/lib/casting-moves";
+import { PlayButton } from "./player";
 import {
-  BUTTON,
-  ICON_BUTTON,
-  PRIMARY,
-  QUIET,
-  SVG_ICON,
-  VoiceLine,
-} from "./shared";
-import type { ActiveVoice, CharacterCard, VoicePick } from "./types";
+  backupWord,
+  freeFor,
+  holderName,
+  lockReason,
+  takesSlot,
+  type CardState,
+  type SlotModel,
+  type Staged,
+} from "./staging";
+import type { CharacterCard, SampleLine, VoiceOption } from "./types";
+import { FOCUS, Icon, LABEL } from "./ui";
 
-function PlayIcon() {
-  return (
-    <svg {...SVG_ICON} fill="currentColor" stroke="none">
-      <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" />
-    </svg>
-  );
-}
+const TAG = "rounded px-1.5 text-[10px] font-semibold tracking-wide uppercase";
+const TAG_NOW = `${TAG} bg-emerald-400/15 text-emerald-300`;
+const TAG_NEW = `${TAG} bg-amber-400/15 text-amber-300`;
+const TAG_LAB = `${TAG} bg-sky-400/15 text-sky-300`;
 
-const PILL =
-  "shrink-0 rounded-full border border-neutral-700 px-1.5 text-[11px] leading-4 tracking-[0.04em] text-neutral-400 uppercase";
-/** The one pill that stays on the current voice's row when the dot moves to a pick. */
-const CURRENT_PILL =
-  "shrink-0 rounded-full border border-neutral-400 px-1.5 text-[11px] leading-4 tracking-[0.04em] text-neutral-200 uppercase";
-
-/** What the primary button does for the chosen entry of "Its voices". */
-function pickAction(pick: VoicePick): {
-  label: string;
-  kind: "use" | "cast" | "clone" | "clip" | "design";
-} {
-  if (pick.kind === "appearance")
-    return { label: "Ask voice-lab for a clip", kind: "clip" };
-  if (pick.status === "active") return { label: "Use this voice", kind: "use" };
-  // Already a voice of this book: cast here, and the voices stop restores it.
-  if (pick.status === "archived" && pick.inBook)
-    return { label: "Use in this issue", kind: "cast" };
-  if (pick.status === "archived")
-    return { label: "Request this clone", kind: "clone" };
-  return pick.appearanceId
-    ? { label: "Ask voice-lab for a clip", kind: "clip" }
-    : { label: "Request this design", kind: "design" };
-}
-
-const PICK_STATUS: Record<
-  Extract<VoicePick, { kind: "voice" }>["status"],
-  string
-> = {
-  active: "active",
-  archived: "archived",
-  needs_clip: "needs a clip",
+const ARROWS: Record<string, number> = {
+  ArrowDown: 1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
 };
 
-/** A row of the browser: which section, which entry. */
-type Choice =
-  | { section: "pick"; pick: VoicePick }
-  | { section: "active"; voice: ActiveVoice }
-  | { section: "design" };
-
-const choiceKey = (c: Choice) =>
-  c.section === "pick"
-    ? `pick:${c.pick.id}`
-    : c.section === "active"
-      ? `active:${c.voice.id}`
-      : "design";
-
-/** What a row knows about its preview before anyone clicks Play. */
-type PreviewSource =
-  | { url: string }
-  /** A `voices` row to ask `voicePreview` about on the first click. */
-  | { voiceId: string };
-
-/** The answers the tab keeps per voice id, once asked: a URL, or null when the voice has no stored audio. */
-type PreviewCache = Record<string, string | null>;
-
 /**
- * A row's Play: plays a URL it already has; otherwise the first click asks
- * `voicePreview` (a loading state meanwhile), and a null answer leaves a
- * muted "no stored audio" mark in its place. The parent owns the one audio
- * element and the cache.
+ * A radio group's arrow keys (#754's behavior): from a row, Up/Left and
+ * Down/Right move focus to the previous or next row that is not locked,
+ * wrapping, and select it. A key pressed on a row's Play never gets here.
  */
-function PreviewPlay({
-  name,
-  source,
-  cache,
-  loadingIds,
-  tabbable = true,
-  onPlay,
-  onLookup,
-}: {
-  name: string;
-  source: PreviewSource;
-  cache: PreviewCache;
-  /** The voice ids a lookup is out for; each keeps its own button busy. */
-  loadingIds: ReadonlySet<string>;
-  /** False: out of the Tab order, for a row in the radio group that is not its Tab stop. */
-  tabbable?: boolean;
-  onPlay: (name: string, url: string) => void;
-  onLookup: (voiceId: string, name: string) => void;
-}) {
-  const url = "url" in source ? source.url : cache[source.voiceId];
-  if (url === null)
-    return (
-      <span
-        role="img"
-        aria-label={`No stored audio for ${name}`}
-        title="No stored audio for this voice"
-        className="inline-flex size-7 shrink-0 cursor-default items-center justify-center rounded-sm text-neutral-700"
-      >
-        <PlayIcon />
-      </span>
-    );
-  const loading = "voiceId" in source && loadingIds.has(source.voiceId);
-  return (
-    <button
-      type="button"
-      disabled={loading}
-      tabIndex={tabbable ? undefined : -1}
-      aria-busy={loading || undefined}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (url) onPlay(name, url);
-        else if ("voiceId" in source) onLookup(source.voiceId, name);
-      }}
-      aria-label={loading ? `Finding audio for ${name}` : `Play ${name}`}
-      title={loading ? "Finding audio…" : `Play ${name}`}
-      className={`${ICON_BUTTON} ${loading ? "animate-pulse" : ""}`}
-    >
-      <PlayIcon />
-    </button>
-  );
+function onRadioArrows(e: React.KeyboardEvent<HTMLElement>) {
+  const step = ARROWS[e.key];
+  const from = e.target as HTMLElement;
+  if (!step || from.getAttribute("role") !== "radio") return;
+  const rows = [
+    ...e.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="radio"]:not([aria-disabled="true"])',
+    ),
+  ];
+  const i = rows.indexOf(from);
+  if (i < 0) return;
+  e.preventDefault();
+  const to = rows[(i + step + rows.length) % rows.length]!;
+  to.focus();
+  if (to.getAttribute("aria-checked") !== "true") to.click();
 }
 
-/**
- * One radio-style row of the list: name in bold, the source in grey, the
- * status pills, and Play when the row has a preview. A click anywhere on the
- * row picks it; the radio button inside carries the keyboard, and only the
- * checked one (with its Play) is in the Tab order. The current voice is a row like the
- * others: the dot rests on it, a pick moves the dot, and its "current" pill
- * stays.
- */
-function ChoiceRow({
+/** One radio row: the dot, the name, a grey line of facts, and Play. Only the group's tab stop is in the Tab order. */
+function VoiceRow({
   name,
-  source,
-  pills,
-  preview,
-  cache,
-  loadingIds,
-  checked,
-  tabbable,
-  group,
+  sub,
+  on,
+  tabStop,
+  locked,
+  lockTitle,
+  compact,
+  playVoiceId,
   onPick,
-  onPlay,
-  onLookup,
 }: {
   name: string;
-  source: string | null;
-  pills: string[];
-  /** Null: no Play at all (an appearance, the designed-voice row). */
-  preview: PreviewSource | null;
-  cache: PreviewCache;
-  loadingIds: ReadonlySet<string>;
-  checked: boolean;
-  /** The group's one Tab stop (roving tabindex): the checked row, or the first row when none is checked. */
-  tabbable: boolean;
-  /** The radio group's `name`. */
-  group: string;
+  sub: React.ReactNode;
+  on: boolean;
+  /** The group's one Tab stop: the checked row, else the first. */
+  tabStop: boolean;
+  locked?: boolean;
+  lockTitle?: string;
+  compact?: boolean;
+  playVoiceId: string | null;
   onPick: () => void;
-  onPlay: (name: string, url: string) => void;
-  onLookup: (voiceId: string, name: string) => void;
 }) {
   return (
-    <li
-      onClick={onPick}
-      className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
-        checked
-          ? "border-neutral-300 bg-neutral-800"
-          : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/60"
-      }`}
+    <div
+      role="radio"
+      aria-checked={on}
+      aria-disabled={locked ? true : undefined}
+      tabIndex={tabStop && !locked ? 0 : -1}
+      title={locked ? lockTitle : undefined}
+      onClick={() => {
+        if (!locked) onPick();
+      }}
+      onKeyDown={(e) => {
+        if (locked || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        onPick();
+      }}
+      className={`grid w-full grid-cols-[18px_1fr_auto] items-center gap-2.5 rounded-lg border text-left ${
+        compact ? "mb-1 px-2.5 py-1.5" : "mb-1.5 px-2.5 py-2"
+      } ${
+        on
+          ? "border-amber-400 bg-amber-400/10"
+          : "border-neutral-700 bg-neutral-900 hover:border-neutral-500"
+      } ${locked ? "cursor-not-allowed opacity-50" : "cursor-pointer"} ${FOCUS}`}
     >
-      <button
-        type="button"
-        role="radio"
-        name={group}
-        aria-checked={checked}
-        tabIndex={tabbable ? 0 : -1}
-        onClick={(e) => {
-          e.stopPropagation();
-          onPick();
-        }}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      <span
+        className={`grid size-4 place-items-center rounded-full border-[1.5px] ${
+          on ? "border-amber-400" : "border-neutral-500"
+        }`}
       >
-        <span
-          aria-hidden
-          className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-            checked ? "border-white" : "border-neutral-500"
-          }`}
-        >
-          {checked && <span className="block size-2 rounded-full bg-white" />}
-        </span>
-        <span className="min-w-0 flex-1 leading-5">
-          <span className="block truncate font-medium text-neutral-100">
-            {name}
-          </span>
-          {source && (
-            <span className="block truncate text-neutral-500">{source}</span>
-          )}
-        </span>
-        {pills.map((p) => (
-          <span key={p} className={p === "current" ? CURRENT_PILL : PILL}>
-            {p}
-          </span>
-        ))}
-      </button>
-      {preview && (
-        <PreviewPlay
-          name={name}
-          source={preview}
-          cache={cache}
-          loadingIds={loadingIds}
-          tabbable={tabbable}
-          onPlay={onPlay}
-          onLookup={onLookup}
-        />
-      )}
-    </li>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <h4 className="mb-1.5 text-[12px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-      {children}
-    </h4>
-  );
-}
-
-/** A pending voice request on the card, with Undo. */
-function VoiceRequestNote({
-  card,
-  scope,
-  busy,
-  onUndo,
-  undoRef,
-}: {
-  card: CharacterCard;
-  /** The book and issue, for the link to the voices stop. */
-  scope: { bookId: string; issueId: string };
-  busy: boolean;
-  onUndo: () => void;
-  /** Undo, for the tab to focus when a confirm gives the list way to this note, or when an undo fails. */
-  undoRef?: React.Ref<HTMLButtonElement>;
-}) {
-  const request = card.voiceRequest;
-  if (!request) return null;
-  const voiceLabel =
-    card.voice != null &&
-    card.name.trim().toLowerCase() === card.voice.name.trim().toLowerCase()
-      ? "its current voice"
-      : (card.voice?.name ?? "no voice");
-  const keeps = (
-    <>
-      It is made at the{" "}
-      <Link
-        href={`/admin/${scope.bookId}/${scope.issueId}/review/characters/voices`}
-        className="underline hover:text-sky-50"
-      >
-        voices stop
-      </Link>
-      ; {card.name} keeps {voiceLabel} until then.
-    </>
-  );
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-sky-400/40 bg-sky-400/5 px-3 py-2 text-[14px]">
-      <p className="min-w-0 flex-1 text-sky-100">
-        {request.action === "clone" ? (
-          <>
-            Wants a voice-lab clone: {request.targetName ?? "unknown voice"}.{" "}
-            {keeps}
-          </>
+        {locked ? (
+          <span className="text-neutral-400">{Icon.lock}</span>
         ) : (
-          <>Wants a new designed voice. {keeps}</>
+          on && <span className="size-2 rounded-full bg-amber-400" />
         )}
-      </p>
-      <button
-        ref={undoRef}
-        type="button"
-        disabled={busy}
-        onClick={onUndo}
-        className={BUTTON}
-      >
-        Undo request
-      </button>
+      </span>
+      <span className="flex min-w-0 flex-col gap-px">
+        <span
+          className={`truncate text-[13px] text-neutral-100 ${compact ? "font-medium" : "font-semibold"}`}
+        >
+          {name}
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5 truncate text-[11.5px] text-neutral-400">
+          {sub}
+        </span>
+      </span>
+      {playVoiceId ? (
+        <PlayButton voiceId={playVoiceId} name={name} />
+      ) : (
+        <span />
+      )}
     </div>
+  );
+}
+
+function SlotNumber({ n }: { n: number | null | undefined }) {
+  return n ? (
+    <span className="font-mono text-neutral-500">slot {n}</span>
+  ) : null;
+}
+
+/** The lines section: page, text with its [cues] in amber, Play when the bubble has audio. */
+function Lines({ card }: { card: CharacterCard }) {
+  if (card.samples.length === 0) return null;
+  return (
+    <section className="mt-4">
+      <h4 className={`mb-1.5 flex items-baseline ${LABEL}`}>
+        Lines
+        <span className="ml-auto font-normal tracking-normal text-neutral-400 normal-case">
+          {card.lines} · first {card.samples.length}
+        </span>
+      </h4>
+      <div className="overflow-hidden rounded-lg border border-neutral-800">
+        {card.samples.map((l: SampleLine) => (
+          <div
+            key={l.bubbleId}
+            className="grid grid-cols-[36px_1fr_28px] items-center gap-2 border-b border-neutral-800 px-2.5 py-1.5 last:border-b-0"
+          >
+            <span className="font-mono text-[11px] text-neutral-500">
+              p.{l.page}
+            </span>
+            <span className="text-[12.5px] text-neutral-200">
+              {l.text.split(/(\[[^\]]*\])/g).map((part, i) =>
+                part.startsWith("[") ? (
+                  <span key={i} className="text-amber-300">
+                    {part}
+                  </span>
+                ) : (
+                  part
+                ),
+              )}
+            </span>
+            {l.audioUrl ? (
+              <PlayButton
+                url={l.audioUrl}
+                playKey={`line:${l.bubbleId}`}
+                name={`page ${l.page} line`}
+              />
+            ) : (
+              <span />
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
 export interface VoiceTabProps {
   card: CharacterCard;
-  /** The book and issue: the pending request note links to the voices stop. */
-  scope: { bookId: string; issueId: string };
-  activeVoices: ActiveVoice[];
-  /** A `characters` row, not removed: the tab lists the choices. */
-  canChangeVoice: boolean;
-  pullNote: string;
-  busy: boolean;
-  onSetVoice: (voice: ActiveVoice) => void;
-  onRequestVoice: (request: VoiceRequest) => void;
-  onPickAppearance: (appearanceId: string) => void;
-  onCastArchived: (voiceId: string) => void;
-  onUndoVoiceRequest: () => void;
-  onPreviewVoice: (voiceId: string) => Promise<PreviewResult>;
+  state: CardState;
+  staged: Staged[];
+  voices: VoiceOption[];
+  roster: Roster | null;
+  model: SlotModel | null;
+  /** Voice id to the characters on the board whose voice it is now. */
+  speakers: Map<string, string[]>;
+  onPick: (voice: VoiceOption) => void;
+  onSlotFree: () => void;
+  onSlotSwap: (slot: RosterSlot) => void;
+  onSwapFlags: (
+    patch: Partial<Pick<ArchiveMove, "backup" | "lossy_ok">>,
+  ) => void;
 }
 
-/**
- * The Voice tab: the choices listed from the start, "Its voices", "A new
- * designed voice" and "Other active voices" as radio-style rows (the designed
- * voice sits above the long active list so it is not buried), with the
- * current voice marked among them (the dot rests on it, and it keeps a
- * "current" pill once the dot moves). Picking another row shows a footer:
- * Cancel on the left, one primary button named for the pick on the right,
- * and under them a line on when the pick takes effect. Cancel puts focus on
- * the group's Tab stop, a confirm on the confirmed row (or Undo, when the
- * list gives way to a request), and Undo request on the Tab stop once the
- * list is back (on Undo again when the request stays). A voice with no row
- * of its own (none yet, no audio this run, a borrowed voice that is not
- * active) gets one plain line above the list, and a card that cannot change
- * (removed, or a request pending) gets that line in place of the list; the
- * line has Play when the voice has an id. Play on every `voices` row: a row
- * with a URL of its own (an archived clone's signed clip from the loader, or
- * a `previewUrl` override) plays it at once; otherwise the first click asks
- * `voicePreview` (the source clip signed, else a bubble of this book
- * rendered in that voice), the answer is kept per voice id, and null leaves
- * a "no stored audio" mark. Appearances and the designed-voice row have no
- * Play.
- */
 export function VoiceTab({
   card,
-  scope,
-  activeVoices,
-  canChangeVoice,
-  pullNote,
-  busy,
-  onSetVoice,
-  onRequestVoice,
-  onPickAppearance,
-  onCastArchived,
-  onUndoVoiceRequest,
-  onPreviewVoice,
+  state,
+  staged,
+  voices,
+  roster,
+  model,
+  speakers,
+  onPick,
+  onSlotFree,
+  onSlotSwap,
+  onSwapFlags,
 }: VoiceTabProps) {
-  const currentId = card.voice?.uuid ?? null;
-  /** The current voice's own entry: marked under "Its voices"; picking it clears the pick. */
-  const isCurrent = (p: VoicePick) => p.kind === "voice" && p.id === currentId;
-  /** The row picked instead of the current voice; null keeps the dot on the current voice and hides the footer. Nothing is picked on open: the "lab default" pill marks the suggestion. */
-  const [pickedKey, setPickedKey] = useState<string | null>(null);
-  const [pull, setPull] = useState<"copied" | "failed" | null>(null);
-  const [playError, setPlayError] = useState<string | null>(null);
-  const [cache, setCache] = useState<PreviewCache>({});
-  const [loadingIds, setLoadingIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
-  /** The voice of the most recent Play click: a lookup that lands for any other voice is kept, not played. */
-  const latest = useRef<string | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  // On unmount, stop what plays and forget the latest click, so a lookup
-  // that lands after the tab closed is cached and never started.
-  useEffect(
-    () => () => {
-      audio.current?.pause();
-      latest.current = null;
-    },
-    [],
-  );
+  const [expanded, setExpanded] = useState(false);
+  const [swapMode, setSwapMode] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const play = (name: string, url: string) => {
-    audio.current?.pause();
-    setPlayError(null);
-    const a = new Audio(url);
-    audio.current = a;
-    a.play().catch((err: unknown) => {
-      // A play cut short by the next Play rejects with AbortError: not a failure.
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      setPlayError(`Could not play ${name}.`);
-    });
-  };
-  /** A row's own URL, played at once; a lookup still out for another voice then keeps its answer quiet. */
-  const playRow = (name: string, url: string) => {
-    latest.current = null;
-    play(name, url);
-  };
-  /**
-   * The first Play on a voice with no URL yet: ask once, keep the answer,
-   * and play it only when this is still the most recent click. A failed
-   * ask (a refused answer or a transport error) shows one line and leaves
-   * the row playable, so the next click asks again.
-   */
-  const lookup = async (voiceId: string, name: string) => {
-    setPlayError(null);
-    latest.current = voiceId;
-    setLoadingIds((cur) => new Set(cur).add(voiceId));
-    let result: PreviewResult;
-    try {
-      result = await onPreviewVoice(voiceId);
-    } catch {
-      result = { ok: false, error: `Could not find audio for ${name}.` };
-    }
-    setLoadingIds((cur) => {
-      const next = new Set(cur);
-      next.delete(voiceId);
-      return next;
-    });
-    if (!result.ok) {
-      // A failure for a voice the user has moved past says nothing.
-      if (latest.current === voiceId) setPlayError(result.error);
-      return;
-    }
-    setCache((cur) => ({ ...cur, [voiceId]: result.url }));
-    if (result.url && latest.current === voiceId) play(name, result.url);
-  };
-  /** A row's preview source: its own URL when it has one, else its voice id for the lookup. */
-  const sourceOf = (
-    voiceId: string,
-    previewUrl: string | null | undefined,
-  ): PreviewSource =>
-    typeof previewUrl === "string" ? { url: previewUrl } : { voiceId };
+  const slotOf = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of roster?.slots ?? [])
+      if (s.holder.kind !== "free" && s.holder.voiceUuid)
+        m.set(s.holder.voiceUuid, s.index);
+    return m;
+  }, [roster]);
+  const base = card.voice?.uuid ?? null;
+  const silenced = state.sitOut || state.removed;
+  const pick = state.pick;
+  const landing =
+    pick && model ? (model.landing.get(pick.index) ?? null) : null;
+  const slotFor = (v: VoiceOption) =>
+    pick?.move.kind === "restore" && pick.move.voice_uuid === v.id
+      ? landing
+      : slotOf.get(v.id);
 
-  const current = card.voice;
-  const currentPick = currentId
-    ? card.voicePicks.find(
-        (p): p is Extract<VoicePick, { kind: "voice" }> =>
-          p.kind === "voice" && p.id === currentId,
-      )
-    : undefined;
-  // The current voice is marked where it lives: under "Its voices" when it is
-  // one of them, else among the active voices (a borrowed one).
-  const others = currentPick
-    ? activeVoices.filter((v) => v.id !== currentId)
-    : activeVoices;
-  const currentInList = !!currentPick || others.some((v) => v.id === currentId);
-  /** The list shows for a card that can change and has no request pending. */
-  const listed = canChangeVoice && !card.voiceRequest;
-  const choices: Choice[] = [
-    ...card.voicePicks
-      .filter((p) => !isCurrent(p))
-      .map((pick): Choice => ({ section: "pick", pick })),
-    ...others
-      .filter((v) => v.id !== currentId)
-      .map((voice): Choice => ({ section: "active", voice })),
-    { section: "design" },
-  ];
-  const picked = choices.find((c) => choiceKey(c) === pickedKey) ?? null;
-  const action = picked
-    ? picked.section === "pick"
-      ? pickAction(picked.pick)
-      : picked.section === "active"
-        ? { label: "Use this voice", kind: "use" as const }
-        : { label: "Request this design", kind: "design" as const }
-    : null;
-  const group = `voice-${card.id}`;
-  const listRef = useRef<HTMLDivElement>(null);
-  const footerRef = useRef<HTMLDivElement>(null);
-  const undoRef = useRef<HTMLButtonElement>(null);
-  /** Where focus goes once the pick clears and the footer unmounts: the confirmed row's radio, or "stop" for the group's Tab stop. */
-  const refocus = useRef<HTMLElement | "stop" | null>(null);
-  /** The confirmed row's radio, watched until a refresh drops it (a pick or Cancel since does not matter: the fallback only acts on focus left on the body). */
-  const confirmed = useRef<HTMLElement | null>(null);
-  /** The card Undo request was clicked on, watched until the refresh brings a new one. */
-  const undoneFrom = useRef<CharacterCard | null>(null);
-  const tabStop = () =>
-    listRef.current?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]');
-  const cancel = () => {
-    refocus.current = "stop";
-    setPickedKey(null);
-  };
-  // After the render that clears the pick, since the Tab stop moves in it.
-  useEffect(() => {
-    const target = refocus.current;
-    if (pickedKey || !target) return;
-    refocus.current = null;
-    (target !== "stop" && target.isConnected ? target : tabStop())?.focus();
-  }, [pickedKey]);
-  // The refresh lands as a new card: if it dropped the confirmed row and
-  // focus fell to the body of a focused page, the list's Tab stop takes it,
-  // or Undo on the request the list gave way to. Focus anywhere else is left alone.
-  useEffect(() => {
-    const row = confirmed.current;
-    if (!row || busy || row.isConnected) return;
-    confirmed.current = null;
-    const active = document.activeElement;
-    if (!document.hasFocus() || (active && active !== document.body)) return;
-    (tabStop() ?? undoRef.current)?.focus();
-  }, [card, busy]);
-  // Undo is disabled while it runs, which drops its focus to the body. Busy
-  // may clear a render before the refresh lands, so wait for the new card:
-  // then focus on the body of a focused page goes to the list's Tab stop, or
-  // back to Undo when the request stayed. Focus anywhere else is left alone.
-  useEffect(() => {
-    const from = undoneFrom.current;
-    if (!from || busy || from === card) return;
-    undoneFrom.current = null;
-    const active = document.activeElement;
-    if (!document.hasFocus() || (active && active !== document.body)) return;
-    (tabStop() ?? undoRef.current)?.focus();
-  }, [card, busy]);
-  // The footer is sticky at the panel's bottom, so a pick near the end of the
-  // list would sit under it: scroll the panel by the overlap, and only then.
-  useEffect(() => {
-    if (!pickedKey) return;
-    const row = listRef.current
-      ?.querySelector('[role="radio"][aria-checked="true"]')
-      ?.closest("li");
-    const footer = footerRef.current;
-    if (!row || !footer) return;
-    const overlap =
-      row.getBoundingClientRect().bottom - footer.getBoundingClientRect().top;
-    if (overlap <= 0) return;
-    let scroller: HTMLElement | null = row.parentElement;
-    while (
-      scroller &&
-      !/auto|scroll/.test(getComputedStyle(scroller).overflowY)
+  const own = voices
+    .filter(
+      (v) =>
+        v.characterId === card.id &&
+        (v.status === "active" || v.status === "archived"),
     )
-      scroller = scroller.parentElement;
-    scroller?.scrollBy({ top: overlap + 8, behavior: "smooth" });
-  }, [pickedKey]);
-  /** With nothing checked (the current voice has no row, nothing picked), the first row is the Tab stop. */
-  const noneChecked = !picked && !currentInList;
-  const firstKey = card.voicePicks[0]
-    ? `pick:${card.voicePicks[0].id}`
-    : "design";
-  /**
-   * The arrow keys move the pick like a native radio group: Down/Right to the
-   * next row, Up/Left to the previous, wrapping. The target is focused and
-   * clicked, so an arrow pick runs the row's own `onPick`. Keys on anything
-   * but a radio (a row's Play) are left alone.
-   */
-  const onArrow = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const step =
-      e.key === "ArrowDown" || e.key === "ArrowRight"
-        ? 1
-        : e.key === "ArrowUp" || e.key === "ArrowLeft"
-          ? -1
-          : 0;
-    if (!step) return;
-    const radios = Array.from(
-      listRef.current?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
+    .sort(
+      (a, b) =>
+        Number(b.id === base) - Number(a.id === base) ||
+        Number(b.status === "active") - Number(a.status === "active") ||
+        Number(b.labPick) - Number(a.labPick) ||
+        a.name.localeCompare(b.name),
     );
-    const from = radios.indexOf(e.target as HTMLElement);
-    if (from < 0) return;
-    e.preventDefault();
-    const to = radios[(from + step + radios.length) % radios.length];
-    to?.focus();
-    to?.click();
-  };
-  const apply = () => {
-    if (!picked || !action) return;
-    // The dot goes back to the current voice, which the callback is about to
-    // change or keep; focus stays on the confirmed row, where the dot lands.
-    const row = listRef.current?.querySelector<HTMLElement>(
-      '[role="radio"][aria-checked="true"]',
-    );
-    refocus.current = row ?? "stop";
-    confirmed.current = row ?? null;
-    setPickedKey(null);
-    if (picked.section === "active") return onSetVoice(picked.voice);
-    if (picked.section === "design")
-      return onRequestVoice({ action: "design" });
-    const p = picked.pick;
-    if (p.kind === "appearance") return onPickAppearance(p.id);
-    switch (action.kind) {
-      case "use":
-        return onSetVoice({ id: p.id, name: p.name });
-      case "cast":
-        return onCastArchived(p.id);
-      case "clone":
-        return onRequestVoice({ action: "clone", targetVoiceUuid: p.id });
-      case "clip":
-        return p.appearanceId && onPickAppearance(p.appearanceId);
-      case "design":
-        return onRequestVoice({ action: "design" });
-    }
-  };
-
-  // The plain line: VoiceLine names whose the voice is when borrowed;
-  // otherwise its own entry says the work it was cloned from, or that it is designed.
-  const currentSource =
-    current && !current.borrowedFrom && currentPick
-      ? (currentPick.work ?? "Designed voice")
+  const others = voices
+    .filter(
+      (v) => v.status === "active" && v.characterId !== card.id && !v.protected,
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const library = voices
+    .filter((v) => v.status === "library")
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const current = voices.find((v) => v.id === state.voiceId);
+  const otherOn =
+    !silenced && current && !own.some((v) => v.id === current.id)
+      ? current
       : null;
-  const currentPreview = current?.uuid
-    ? sourceOf(current.uuid, current.previewUrl)
-    : null;
-  const line = !listed || !currentInList;
+
+  const sub = (v: VoiceOption) => (
+    <>
+      <span>{v.kind}</span>
+      {v.status === "archived" && !slotFor(v) && <span>· archived</span>}
+      {slotFor(v) ? <span>·</span> : null}
+      <SlotNumber n={slotFor(v)} />
+      {pick?.move.kind === "restore" && pick.move.voice_uuid === v.id ? (
+        <span className={TAG_NEW}>new</span>
+      ) : (
+        v.id === base &&
+        v.status === "active" && <span className={TAG_NOW}>now</span>
+      )}
+      {v.labPick && v.status === "archived" && (
+        <span className={TAG_LAB}>lab pick</span>
+      )}
+      {v.protected && (
+        <span title="v2 voice, locked" className="text-neutral-500">
+          {Icon.lock}
+        </span>
+      )}
+    </>
+  );
+
+  // The Slot box: only when the pick takes a slot.
+  const needsSlot = pick && takesSlot(pick.move) && model && roster;
+  const tied = staged.findIndex(
+    (s) => s.pickFor === card.id && s.move.kind === "archive",
+  );
+  const tiedMove = tied >= 0 ? (staged[tied]!.move as ArchiveMove) : null;
+  const tiedSlot =
+    tied >= 0 ? model?.slots.find((v) => v.outBy === tied)?.slot : undefined;
+  const free = model && pick ? freeFor(model, pick.index) : 0;
+  // An undone swap (Review's ✕, the strip's Keep it) puts the box back on Free.
+  const hadTied = useRef(false);
+  useEffect(() => {
+    if (hadTied.current && !tiedMove) setSwapMode(false);
+    hadTied.current = tiedMove !== null;
+  }, [tiedMove]);
+  const mode: "free" | "swap" =
+    tiedMove || swapMode || free === 0 ? "swap" : "free";
+  // Its own voice, unless a staged archive already frees that slot (as `pick` chooses).
+  const ownSlot = model?.slots.find(
+    (v) =>
+      v.slot.holder.kind === "repo" &&
+      v.slot.holder.characterId === card.id &&
+      v.slot.lock === "movable" &&
+      v.outBy === null,
+  )?.slot;
+
+  const q = search.trim().toLowerCase();
+  const candidates = (model?.slots ?? [])
+    .filter(
+      (v) =>
+        v.slot.holder.kind !== "free" &&
+        (v.outBy === null ? v.inBy === null : v.outBy === tied),
+    )
+    .map((v) => v.slot)
+    .filter(
+      (s) =>
+        !q ||
+        holderName(s).toLowerCase().includes(q) ||
+        (s.holder.kind === "outside" &&
+          s.holder.owner.toLowerCase().includes(q)),
+    )
+    .sort((a, b) => {
+      const isOwn = (s: RosterSlot) =>
+        s.holder.kind === "repo" && s.holder.characterId === card.id ? 1 : 0;
+      const locked = (s: RosterSlot) => (s.lock === "movable" ? 0 : 1);
+      const outside = (s: RosterSlot) => (s.holder.kind === "outside" ? 1 : 0);
+      return (
+        isOwn(b) - isOwn(a) ||
+        locked(a) - locked(b) ||
+        outside(a) - outside(b) ||
+        a.index - b.index
+      );
+    });
+  // Each radio group's one Tab stop: its checked row, else its first.
+  const shownVoices = [...own, ...(expanded ? [...library, ...others] : [])];
+  const voiceStop =
+    shownVoices.find((v) => !silenced && v.id === state.voiceId)?.id ??
+    shownVoices[0]?.id;
+  const swapStop =
+    candidates.find((s) => s.index === tiedSlot?.index)?.index ??
+    candidates.find((s) => s.lock === "movable")?.index;
+  const silentIfSwapped =
+    tiedSlot && tiedSlot.holder.kind !== "free" && tiedSlot.holder.voiceUuid
+      ? (speakers.get(tiedSlot.holder.voiceUuid) ?? []).filter(
+          (n) => n !== card.name,
+        )
+      : [];
 
   return (
-    <div className="text-[14px]">
-      {line && (
-        <div className="flex min-h-8 items-center gap-2">
-          <span className="min-w-0 flex-1 truncate">
-            <VoiceLine card={card} />
-            {currentSource && (
-              <span className="text-neutral-500">, {currentSource}</span>
-            )}
-          </span>
-          {current && currentPreview && (
-            <PreviewPlay
-              name={current.name}
-              source={currentPreview}
-              cache={cache}
-              loadingIds={loadingIds}
-              onPlay={playRow}
-              onLookup={lookup}
-            />
+    <div>
+      <section role="radiogroup" aria-label="Voices" onKeyDown={onRadioArrows}>
+        <h4 className={`mb-1.5 flex items-baseline ${LABEL}`}>
+          Voices
+          {silenced && (
+            <span className="ml-auto font-normal tracking-normal text-neutral-400 normal-case">
+              {state.removed ? "not in this issue" : "sitting out"}
+            </span>
           )}
-        </div>
-      )}
-
-      {card.voiceRequest && (
-        <VoiceRequestNote
-          card={card}
-          scope={scope}
-          busy={busy}
-          onUndo={() => {
-            undoneFrom.current = card;
-            onUndoVoiceRequest();
+        </h4>
+        {own.map((v) => (
+          <VoiceRow
+            key={v.id}
+            name={v.name}
+            sub={sub(v)}
+            on={!silenced && state.voiceId === v.id}
+            tabStop={v.id === voiceStop}
+            playVoiceId={v.id}
+            onPick={() => onPick(v)}
+          />
+        ))}
+        {/* #788 mounts its "Design a voice" row here, with its sheet. */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((x) => !x)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            setExpanded((x) => !x);
           }}
-          undoRef={undoRef}
-        />
-      )}
-
-      {listed && (
-        <div
-          ref={listRef}
-          role="radiogroup"
-          aria-label={`Voice for ${card.name}`}
-          onKeyDown={onArrow}
-          className={`space-y-4 ${line ? "mt-4" : ""}`}
+          className={`mb-1.5 grid cursor-pointer grid-cols-[18px_1fr] items-center gap-2.5 rounded-lg border px-2.5 py-2 ${
+            otherOn
+              ? "border-amber-400 bg-amber-400/10"
+              : "border-neutral-700 bg-neutral-900 hover:border-neutral-500"
+          } ${FOCUS}`}
         >
-          <section>
-            <SectionHeading>Its voices</SectionHeading>
-            {card.voicePicks.length === 0 ? (
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-neutral-300">No voice-lab clone on file.</p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigator.clipboard.writeText(pullNote).then(
-                      () => setPull("copied"),
-                      () => setPull("failed"),
-                    )
-                  }
-                  className={BUTTON}
-                >
-                  Request a pull
-                </button>
-                {pull === "copied" && (
-                  <span className="text-emerald-300">
-                    Copied a note for voice-lab.
-                  </span>
-                )}
-                {pull === "failed" && (
-                  <p className="w-full text-amber-300">
-                    Could not copy. The note: {pullNote}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <ul className="space-y-1">
-                {card.voicePicks.map((p) => {
-                  const key = `pick:${p.id}`;
-                  const name = p.kind === "voice" ? p.name : card.name;
-                  const source =
-                    p.kind === "appearance"
-                      ? [p.work, p.voiceActor].filter(Boolean).join(", ")
-                      : (p.work ?? "Designed voice");
-                  const isThis = isCurrent(p);
-                  const checked = isThis ? !picked : pickedKey === key;
-                  const pills =
-                    p.kind === "voice"
-                      ? isThis
-                        ? // The one pill that says it all: a current voice is active and in this book.
-                          ["current"]
-                        : [
-                            PICK_STATUS[p.status],
-                            ...(p.inBook ? ["in this book"] : []),
-                            ...(p.startingPick ? ["lab default"] : []),
-                            // Signing its source clip failed, or it has none: no Play.
-                            ...(p.status === "archived" && !p.clipUrl
-                              ? ["no clip link"]
-                              : []),
-                          ]
-                      : ["needs a clip"];
-                  return (
-                    <ChoiceRow
-                      key={key}
-                      name={name}
-                      source={source || null}
-                      pills={pills}
-                      preview={
-                        p.kind !== "voice"
-                          ? null
-                          : p.status === "archived" && !isThis
-                            ? // An archived clone plays its signed clip or nothing: the "no clip link" pill says which.
-                              p.clipUrl
-                              ? { url: p.clipUrl }
-                              : null
-                            : // The current voice, whatever its status, asks `voicePreview` when it has no clip: a bubble of this book is rendered in it.
-                              sourceOf(p.id, p.clipUrl)
-                      }
-                      cache={cache}
-                      loadingIds={loadingIds}
-                      checked={checked}
-                      tabbable={checked || (noneChecked && key === firstKey)}
-                      group={group}
-                      onPick={() => setPickedKey(isThis ? null : key)}
-                      onPlay={playRow}
-                      onLookup={lookup}
-                    />
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
-          <section>
-            <SectionHeading>A new designed voice</SectionHeading>
-            <ul>
-              <ChoiceRow
-                name="New designed voice"
-                source="From the character's description"
-                pills={[]}
-                preview={null}
-                cache={cache}
-                loadingIds={loadingIds}
-                checked={pickedKey === "design"}
-                tabbable={
-                  pickedKey === "design" ||
-                  (noneChecked && firstKey === "design")
-                }
-                group={group}
-                onPick={() => setPickedKey("design")}
-                onPlay={playRow}
-                onLookup={lookup}
-              />
-            </ul>
-          </section>
-
-          <section>
-            <SectionHeading>Other active voices</SectionHeading>
-            {others.length === 0 ? (
-              <p className="text-neutral-400">No other active voice.</p>
-            ) : (
-              <ul className="space-y-1">
-                {others.map((v) => {
-                  const key = `active:${v.id}`;
-                  const isThis = v.id === currentId;
-                  const checked = isThis ? !picked : pickedKey === key;
-                  return (
-                    <ChoiceRow
-                      key={key}
-                      name={v.name}
-                      source={
-                        isThis && current?.borrowedFrom
-                          ? `${current.borrowedFrom}'s voice`
-                          : null
-                      }
-                      pills={isThis ? ["current"] : ["active"]}
-                      preview={sourceOf(v.id, v.previewUrl)}
-                      cache={cache}
-                      loadingIds={loadingIds}
-                      checked={checked}
-                      tabbable={checked}
-                      group={group}
-                      onPick={() => setPickedKey(isThis ? null : key)}
-                      onPlay={playRow}
-                      onLookup={lookup}
-                    />
-                  );
-                })}
-              </ul>
-            )}
-          </section>
+          <span
+            className={`text-neutral-400 transition-transform ${expanded ? "rotate-90" : ""}`}
+          >
+            {Icon.chev}
+          </span>
+          <span className="flex min-w-0 flex-col gap-px">
+            <span className="truncate text-[13px] font-semibold text-neutral-100">
+              {otherOn ? `as ${otherOn.name}` : "Another voice"}
+            </span>
+            <span className="truncate text-[11.5px] text-neutral-400">
+              {otherOn
+                ? otherOn.status === "library"
+                  ? "library · no slot"
+                  : "stand-in · no slot"
+                : `${others.length} active · ${library.length} library`}
+            </span>
+          </span>
         </div>
-      )}
+        {expanded && (
+          <div className="mb-2.5 pl-0">
+            {[...library, ...others].map((v) => {
+              const says = (speakers.get(v.id) ?? []).filter(
+                (n) => n !== card.name,
+              );
+              return (
+                <VoiceRow
+                  key={v.id}
+                  compact
+                  name={v.name}
+                  sub={
+                    <>
+                      <span>{v.status === "library" ? "library" : v.kind}</span>
+                      {slotOf.get(v.id) && <span>·</span>}
+                      <SlotNumber n={slotOf.get(v.id)} />
+                      {says.length > 0 && (
+                        <span className="truncate text-neutral-500">
+                          · {says.join(", ")}
+                        </span>
+                      )}
+                    </>
+                  }
+                  on={!silenced && state.voiceId === v.id}
+                  tabStop={v.id === voiceStop}
+                  playVoiceId={v.id}
+                  onPick={() => onPick(v)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </section>
 
-      {playError && <p className="mt-3 text-amber-300">{playError}</p>}
-
-      {listed && picked && action && (
-        <div
-          ref={footerRef}
-          className="sticky bottom-0 -mx-4 mt-3 -mb-4 border-t border-neutral-800 bg-neutral-950 px-4 py-3"
+      {needsSlot && (
+        <section
+          aria-label="Slot"
+          className="mt-1 rounded-xl border border-amber-700/60 bg-amber-950/30 px-3 py-2.5"
         >
-          <div className="flex items-center justify-between gap-2">
-            <button type="button" onClick={cancel} className={QUIET}>
-              Cancel
+          <h4 className={`mb-2 flex items-baseline ${LABEL} text-amber-400`}>
+            Slot
+            <span className="ml-auto font-normal tracking-normal text-neutral-400 normal-case">
+              {free} free
+            </span>
+          </h4>
+          <div className="mb-2 flex gap-1">
+            <button
+              type="button"
+              disabled={free === 0}
+              aria-pressed={mode === "free"}
+              onClick={() => {
+                setSwapMode(false);
+                onSlotFree();
+              }}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-[13px] font-medium disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS} ${
+                mode === "free"
+                  ? "border-amber-400 bg-amber-400/10 text-neutral-100"
+                  : "border-neutral-700 bg-neutral-900 text-neutral-400"
+              }`}
+            >
+              Free
+              {mode === "free" && landing ? (
+                <span className="ml-1.5 font-mono text-neutral-500">
+                  · {landing}
+                </span>
+              ) : null}
             </button>
             <button
               type="button"
-              disabled={busy}
-              onClick={apply}
-              className={PRIMARY}
+              aria-pressed={mode === "swap"}
+              onClick={() => {
+                setSwapMode(true);
+                if (!tiedMove && ownSlot) onSlotSwap(ownSlot);
+              }}
+              className={`flex-1 rounded-md border px-2 py-1.5 text-[13px] font-medium ${FOCUS} ${
+                mode === "swap"
+                  ? "border-amber-400 bg-amber-400/10 text-neutral-100"
+                  : "border-neutral-700 bg-neutral-900 text-neutral-400"
+              }`}
             >
-              {action.label}
+              Swap out
             </button>
           </div>
-          <p className="mt-1.5 text-neutral-500">
-            {action.kind === "use"
-              ? "Applied at once, in every issue of the book."
-              : "Made at the voices stop."}
-          </p>
-        </div>
+          {mode === "swap" && (
+            <>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search voices"
+                aria-label="Search voices"
+                className={`mb-1.5 h-8 w-full rounded-md border border-neutral-700 bg-neutral-900 px-2.5 text-[13px] text-neutral-100 placeholder:text-neutral-500 ${FOCUS}`}
+              />
+              <div
+                role="radiogroup"
+                aria-label="Voice to swap out"
+                onKeyDown={onRadioArrows}
+                className="max-h-[230px] overflow-y-auto"
+              >
+                {candidates.map((s) => {
+                  const h = s.holder;
+                  if (h.kind === "free") return null;
+                  const why = lockReason(s);
+                  const isOwn =
+                    s.holder.kind === "repo" &&
+                    s.holder.characterId === card.id;
+                  const kind = voices.find((v) => v.id === h.voiceUuid)?.kind;
+                  return (
+                    <VoiceRow
+                      key={s.index}
+                      compact
+                      name={h.name}
+                      on={tiedSlot?.index === s.index}
+                      tabStop={s.index === swapStop}
+                      locked={why !== null}
+                      lockTitle={why ?? undefined}
+                      sub={
+                        <>
+                          {s.backup && (
+                            <span
+                              title={backupWord(s.backup)}
+                              className={`size-1.5 shrink-0 rounded-full ${
+                                s.backup === "ready"
+                                  ? "bg-emerald-400"
+                                  : s.backup === "at confirm"
+                                    ? "bg-sky-400"
+                                    : "border border-red-400"
+                              }`}
+                            />
+                          )}
+                          {h.kind === "outside" && <span>{h.owner} ·</span>}
+                          {kind && <span>{kind} ·</span>}
+                          <SlotNumber n={s.index} />
+                          {s.backup && <span>· {backupWord(s.backup)}</span>}
+                          {isOwn && <span className={TAG_NOW}>its own</span>}
+                          {why && <span className="truncate">· {why}</span>}
+                        </>
+                      }
+                      playVoiceId={h.voiceUuid}
+                      onPick={() => onSlotSwap(s)}
+                    />
+                  );
+                })}
+              </div>
+              {tiedMove && tiedSlot ? (
+                <>
+                  {silentIfSwapped.length > 0 && (
+                    <p className="pt-1.5 text-[12px] text-red-400">
+                      Leaves {silentIfSwapped.join(", ")} silent
+                    </p>
+                  )}
+                  {tiedSlot.backup === "lossy" ? (
+                    <label className="flex items-center gap-2 pt-1.5 text-[12px] text-red-400">
+                      <input
+                        type="checkbox"
+                        checked={tiedMove.lossy_ok}
+                        onChange={(e) =>
+                          onSwapFlags({ lossy_ok: e.target.checked })
+                        }
+                        className={`size-3.5 accent-amber-400 ${FOCUS}`}
+                      />
+                      Archive anyway
+                      <span className="ml-auto text-neutral-500">
+                        no backup · lost
+                      </span>
+                    </label>
+                  ) : (
+                    <label className="flex items-center gap-2 pt-1.5 text-[12px] text-neutral-300">
+                      <input
+                        type="checkbox"
+                        checked={tiedMove.backup}
+                        onChange={(e) =>
+                          onSwapFlags({ backup: e.target.checked })
+                        }
+                        className={`size-3.5 accent-amber-400 ${FOCUS}`}
+                      />
+                      Back up first
+                      <span className="ml-auto text-neutral-500">
+                        {backupWord(tiedSlot.backup)}
+                      </span>
+                    </label>
+                  )}
+                </>
+              ) : (
+                <p className="pt-1.5 text-[12px] text-red-400">
+                  Pick a voice to swap out
+                </p>
+              )}
+            </>
+          )}
+        </section>
       )}
+
+      <Lines card={card} />
     </div>
   );
 }

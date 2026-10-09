@@ -1,12 +1,11 @@
-// Pieces the character cards, the unknown groups and the character panel share: the button classes, face crops, the name picker and the face tiles.
+// Pieces the casting page's Faces work shares: the button classes, face crops, the name picker, the face tiles and the dialog frame.
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageCrop } from "~/components/review-editor/PageCrop";
 import { slugify } from "~/lib/character-id";
 import type { NameTarget } from "./actions";
 import type {
-  CharacterCard,
   FaceView,
   KnownCharacter,
   LooseExemplar,
@@ -19,11 +18,6 @@ export const PRIMARY =
   "inline-flex h-8 shrink-0 items-center rounded-sm bg-neutral-100 px-3 text-[14px] font-medium whitespace-nowrap text-neutral-950 hover:bg-white disabled:bg-neutral-700 disabled:text-neutral-400";
 export const QUIET =
   "inline-flex h-8 shrink-0 items-center rounded-sm px-2 text-[14px] whitespace-nowrap text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:text-neutral-600 disabled:hover:bg-transparent";
-export const DANGER =
-  "inline-flex h-8 shrink-0 items-center rounded-sm border border-red-500/40 px-3 text-[14px] whitespace-nowrap text-red-200 hover:border-red-400 hover:bg-red-500/10 disabled:border-neutral-800 disabled:text-neutral-600 disabled:hover:bg-transparent";
-/** QUIET in red: a destructive text button with no border (the panel's Remove from this issue). */
-export const QUIET_DANGER =
-  "inline-flex h-8 shrink-0 items-center rounded-sm px-2 text-[14px] whitespace-nowrap text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:text-neutral-600 disabled:hover:bg-transparent";
 export const INPUT =
   "h-8 w-full rounded-sm border border-neutral-700 bg-neutral-950 px-2 text-[14px] text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400";
 /** A square icon-only button, 28px: the panel's Rename pencil, the tiles' toolbar. Pair with an `aria-label` and a `title`. */
@@ -62,13 +56,6 @@ export function isExactName(k: KnownCharacter, q: string): boolean {
     slugify(k.name) === q ||
     k.aliases.some((a) => slugify(a) === q)
   );
-}
-
-/** "1 face on page 3", "4 faces on pages 1, 2". */
-export function facesLine(faces: FaceView[]): string {
-  if (faces.length === 0) return "No faces in this issue";
-  const pages = [...new Set(faces.map((f) => f.page))].sort((a, b) => a - b);
-  return `${faces.length} ${faces.length === 1 ? "face" : "faces"} on ${pages.length === 1 ? "page" : "pages"} ${pages.join(", ")}`;
 }
 
 /** The most portrait-like face: close to square, not panel-sized, confident. */
@@ -466,24 +453,6 @@ export function LooseStrip({ items }: { items: LooseExemplar[] }) {
   );
 }
 
-/** The card's voice, as the collapsed card and the panel both state it. */
-export function VoiceLine({ card }: { card: CharacterCard }) {
-  if (card.noAudio)
-    return <span className="text-neutral-300">No audio this run</span>;
-  if (card.voice)
-    return (
-      <span className="text-neutral-300">
-        {card.voice.name}
-        {card.voice.borrowedFrom && (
-          <span className="text-neutral-500">
-            , {card.voice.borrowedFrom}&apos;s
-          </span>
-        )}
-      </span>
-    );
-  return <span className="text-amber-300/90">No voice yet</span>;
-}
-
 /** The face tiles and the loose exemplars. The parent owns which face is shown and draws the page. */
 export function FaceTiles({
   faces,
@@ -654,53 +623,5 @@ export function DialogFrame({
         {children}
       </div>
     </div>
-  );
-}
-
-/** A yes-or-no confirm over the screen, in the DialogFrame, without StartConfirmDialog's typed check. */
-export function ConfirmDialog({
-  title,
-  body,
-  confirmLabel,
-  busy = false,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  body: string;
-  confirmLabel: string;
-  busy?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const headingId = useId();
-  const bodyId = useId();
-  return (
-    <DialogFrame
-      role="alertdialog"
-      labelledBy={headingId}
-      describedBy={bodyId}
-      onCancel={onCancel}
-    >
-      <h2 id={headingId} className="text-[16px] font-medium text-neutral-100">
-        {title}
-      </h2>
-      <p id={bodyId} className="text-neutral-400">
-        {body}
-      </p>
-      <div className="flex justify-end gap-2">
-        <button type="button" autoFocus onClick={onCancel} className={BUTTON}>
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onConfirm}
-          className={DANGER}
-        >
-          {confirmLabel}
-        </button>
-      </div>
-    </DialogFrame>
   );
 }
