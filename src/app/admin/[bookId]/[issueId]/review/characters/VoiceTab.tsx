@@ -5,6 +5,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ArchiveMove, Roster, RosterSlot } from "~/lib/casting-moves";
+import { acceptedFor } from "./design-sheet/accepted";
+import { DesignVoiceRow } from "./design-sheet/DesignSheet";
 import { PlayButton } from "./player";
 import {
   backupWord,
@@ -197,6 +199,8 @@ export interface VoiceTabProps {
   onSwapFlags: (
     patch: Partial<Pick<ArchiveMove, "backup" | "lossy_ok">>,
   ) => void;
+  /** Opens the design sheet for the character. */
+  onDesign: () => void;
 }
 
 export function VoiceTab({
@@ -211,6 +215,7 @@ export function VoiceTab({
   onSlotFree,
   onSlotSwap,
   onSwapFlags,
+  onDesign,
 }: VoiceTabProps) {
   const [expanded, setExpanded] = useState(false);
   const [swapMode, setSwapMode] = useState(false);
@@ -226,6 +231,7 @@ export function VoiceTab({
   const base = card.voice?.uuid ?? null;
   const silenced = state.sitOut || state.removed;
   const pick = state.pick;
+  const design = pick?.move.kind === "create_design" ? pick.move : null;
   const landing =
     pick && model ? (model.landing.get(pick.index) ?? null) : null;
   const slotFor = (v: VoiceOption) =>
@@ -338,9 +344,10 @@ export function VoiceTab({
     });
   // Each radio group's one Tab stop: its checked row, else its first.
   const shownVoices = [...own, ...(expanded ? [...library, ...others] : [])];
-  const voiceStop =
-    shownVoices.find((v) => !silenced && v.id === state.voiceId)?.id ??
-    shownVoices[0]?.id;
+  const voiceStop = design
+    ? null
+    : (shownVoices.find((v) => !silenced && v.id === state.voiceId)?.id ??
+      shownVoices[0]?.id);
   const swapStop =
     candidates.find((s) => s.index === tiedSlot?.index)?.index ??
     candidates.find((s) => s.lock === "movable")?.index;
@@ -373,7 +380,40 @@ export function VoiceTab({
             onPick={() => onPick(v)}
           />
         ))}
-        {/* #788 mounts its "Design a voice" row here, with its sheet. */}
+        {design && (
+          <VoiceRow
+            name={
+              acceptedFor(design)
+                ? `${state.name} · take ${acceptedFor(design)!.take}`
+                : state.name
+            }
+            sub={
+              <>
+                <span>designed</span>
+                {landing ? <span>·</span> : null}
+                <SlotNumber n={landing} />
+                <span className={TAG_NEW}>new</span>
+                {design.run_only && (
+                  <span className={`${TAG} bg-neutral-800 text-neutral-400`}>
+                    this run
+                  </span>
+                )}
+              </>
+            }
+            on={!silenced}
+            tabStop
+            playVoiceId={null}
+            onPick={onDesign}
+          />
+        )}
+        <DesignVoiceRow
+          sub={`${
+            own.some((v) => v.kind === "designed")
+              ? "draft from its description · "
+              : ""
+          }three takes`}
+          onOpen={onDesign}
+        />
         <div
           role="button"
           tabIndex={0}

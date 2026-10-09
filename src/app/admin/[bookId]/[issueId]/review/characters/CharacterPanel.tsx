@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTabTrap } from "~/hooks/useTabTrap";
 import type { NameTarget } from "./actions";
+import { WandIcon } from "./design-sheet/DesignSheet";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
 import { PageWithBox } from "./shared";
@@ -431,8 +432,11 @@ export function CharacterPanel(props: CharacterPanelProps) {
           )}
         </div>
 
-        {/* The card's quick actions. #788 adds "Design a voice" here. */}
+        {/* The card's quick actions. */}
         <div className="flex items-center gap-1 border-t border-neutral-800 px-3 py-2.5">
+          <button type="button" onClick={voiceProps.onDesign} className={BTN}>
+            {WandIcon} Design a voice
+          </button>
           {state.sitOut ? (
             <button type="button" onClick={onBackIn} className={BTN}>
               Back in
