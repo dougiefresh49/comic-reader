@@ -4,7 +4,7 @@ Research for [#696](https://github.com/dougiefresh49/comic-reader/issues/696). T
 
 ## Recommendation
 
-Leave group balloons on one lead speaker (option A) and build nothing now. Issues 1 and 2 hold one clear group balloon and one maybe out of 457 bubbles. Every option that lets a kid hear the turtles' own voices together costs 200 to 550 lines, and ElevenLabs offers no documented way to render several voices on the same words at once. When group lines start to matter, build option D: a group cast entry whose clip is a mix of its members' takes, with the lead's timings driving the highlight. It keeps the speaker step, the editor picker and the reader as they are.
+Leave group balloons on one lead speaker (option A) and build nothing now. Issues 1 and 2 hold one clear group balloon and one maybe out of 457 bubbles. Every option that lets a kid hear the turtles' own voices together costs 210 to 500 lines, and ElevenLabs offers no documented way to render several voices on the same words at once. When group lines start to matter, build option D: a group cast entry whose clip is a mix of its members' takes, with the lead's timings driving the highlight. It keeps the speaker step, the editor picker and the reader as they are.
 
 ## How often it happens
 
@@ -17,7 +17,7 @@ Leave group balloons on one lead speaker (option A) and build nothing now. Issue
 - The six zord calls before POWER-BUNGA!!! on page 12 are one balloon and one speaker each, so they are not group balloons.
 - IT'S MORPHIN TIME! can be read as the whole team's call, but the text alone can't settle it; the page art can.
 - A regex over text, `emotion` and `ai_reasoning` for together, unison, chorus and everyone found about 19 ordinary uses ("WE LET EVERYONE DOWN") and no group-voice cue.
-- Issue-3 (200 bubbles, no audio yet) has no clear candidate. `tmnt-mmpr-iii` is the only book in the DB.
+- Issue-3 (200 bubbles, no audio yet) has no clear candidate. `tmnt-mmpr-iii` is the only book with bubble rows in the DB.
 
 ## What ElevenLabs can do
 
@@ -36,8 +36,8 @@ It can't render several voices on the same words at the same moment as a documen
 |---|---|---|---|---|
 | **A** | Leave it: one lead speaker per group balloon (today) | 0 | 0 | Michelangelo alone |
 | **B** | A group cast entry ("Turtles") with its own designed voice | 0 to 40 | one voice slot and a Voice Design run; one take per render | one synthetic voice, not the turtles |
-| **C** | A list of speakers on each bubble; render each take, mix them | 350 to 550 | N takes per render | the four turtles together |
-| **D** | A group cast entry whose clip is a mix of its members' takes | 200 to 300 | N takes per render | the four turtles together |
+| **C** | A list of speakers on each bubble; render each take, mix them | 300 to 500 | N takes per render | the four turtles together |
+| **D** | A group cast entry whose clip is a mix of its members' takes | 210 to 330 | N takes per render | the four turtles together |
 | **E** | Text to Dialogue with `[overlapping]`, one request for all members | about 150 on top of D's data model | a paid test first, about 100 credits | unknown until tested |
 
 ### A. Lead speaker (today)
@@ -46,12 +46,12 @@ Nothing changes. The lead's take drives audio and highlight as for any bubble. T
 
 ### B. Group cast entry with its own voice
 
-A `characters` row such as `turtles` with a castlist row and a voice. `createCharacter` (`src/lib/cast.ts:896`) already makes the row, and `SpeakerPicker.tsx` and the save path need no change. Making it a fourth role beside narrator, off-panel and crowd (`ROLE_IDS`, `src/lib/cast.ts:30`) touches the editor loader, the characters screen and the get-context prompt, about 20 lines. The catch is that Voice Design makes one voice, so the line still sounds like one person, and it is no longer any turtle a kid knows. The existing `crowd` role already covers many unnamed voices (decision row 229).
+A `characters` row such as `turtles` with a castlist row and a voice. `createCharacter` (`src/lib/cast.ts:896`) already makes the row, and `SpeakerPicker.tsx` and the save path need no change. Making it a fourth role beside narrator, off-panel and crowd (`ROLE_IDS`, `src/lib/cast.ts:31`) touches the editor loader, the characters screen and the get-context prompt, about 20 lines. The catch is that Voice Design makes one voice, so the line still sounds like one person, and it is no longer any turtle a kid knows. The existing `crowd` role already covers many unnamed voices (decision row 229 made the role, and `src/lib/gemini-prompts.ts:61` tells get-context to use it for many unnamed voices at once).
 
 ### C. A speaker list per bubble
 
-- **Data.** `bubbles.speakers` (jsonb or a join table) beside `character_id`, plus changes to `save_review_edits` and the `switch_*_audio_take` RPCs.
-- **Speaker step.** The get-context reply becomes a list (`src/lib/gemini-prompts.ts:61-68`, `src/workflows/steps/vision-rows.ts:484-545`). That is a prompt edit, so it is kid-facing taste work.
+- **Data.** A `bubbles.speakers` jsonb column beside `character_id`. `save_review_edits` already writes any `bubbles` column, and `switch_bubble_audio_take` already stores one clip and one alignment, so neither changes. A join table instead would need `save_review_edits` extended.
+- **Speaker step.** The get-context reply becomes a list: the speaker rule (`src/lib/gemini-prompts.ts:61-68`), the reply's `speaker` field (`:134`), the parsed type (`src/workflows/steps/vision-rows.ts:33`), the row writer (`vision-rows.ts:484-545`) and the editor's analyze path (`src/server/actions/review/analyze-bubble.ts:186`). That is a prompt edit, so it is kid-facing taste work.
 - **Editor.** Multi-select in `SpeakerPicker.tsx`, `model.ts` and the inspector, plus the save shape.
 - **Render.** `renderVoice` for N characters, N renders in `generation.ts` and `regenerate-audio.ts`, and a new mixer.
 
@@ -60,9 +60,9 @@ The reader is unchanged if the result is one mixed file with the lead's alignmen
 ### D. Group cast entry, mixed from its members (the one to build if needed)
 
 - **Data.** A group is a cast entry, a `characters` row with a member list (a `members text[]` column or a small join table), so the speaker step, the closed cast list, the picker and the save path all treat it as one speaker.
-- **Render.** Where `renderVoice` (`src/lib/cast.ts:317-363`) meets a group, it expands it to its members. One render function makes N `convertWithTimestamps` takes, mixes them, and stores one clip with the lead's alignment, the same shape `src/lib/render-group-audio.ts` uses for joined balloons. The generation step, the editor's regenerate and `scripts/render-bubble.ts` call it.
+- **Render.** Where `renderVoice` (`src/lib/cast.ts:317-358`) meets a group, it expands it to its members. One render function makes N `convertWithTimestamps` takes, mixes them, and stores one clip with the lead's alignment on the one bubble, which `switch_bubble_audio_take` already does. The generation step and the editor's regenerate call it. `src/lib/render-group-audio.ts` is the model for a shared render function both paths call.
 - **Characters screen.** It gains a way to set a group's members.
-- **Rough split.** Migration 20 to 40 lines, render expansion 40 to 60, mixer 80 to 120, regenerate and other call sites 30 to 50, characters screen 40 to 60.
+- **Rough split.** About 210 to 330 lines: migration 20 to 40 lines, render expansion 40 to 60, mixer 80 to 120, regenerate and other call sites 30 to 50, characters screen 40 to 60.
 
 The four protected v2 voices are only used for renders, never edited, so the standing approvals allow it.
 
@@ -77,8 +77,8 @@ All takes say the same words, so one lead take drives the marker, and the other 
 - **Lead.** The bubble's first-listed member, or the group's first member in D. Its `alignment` is stored in `audio_timestamps` as now, and `useWordHighlight.ts` lights words off it unchanged.
 - **Offset.** Shift each other take so its first character starts when the lead's does, from each take's `character_start_times_seconds[0]`.
 - **Length drift.** A short shout drifts by tens of milliseconds, which nobody sees. For a longer line, stretch each take to the lead's speech span with ffmpeg `atempo` when the gap passes about 80 ms, then pad to the longest.
-- **Gain.** Mix with `amix` and normalize, about -6 dB per voice for four, so the result is no louder than one take.
-- **Tooling.** `ffmpeg-static` and `fluent-ffmpeg` are already dependencies (`package.json:97-98`), used today only by scripts.
+- **Gain.** Four takes of the same shout sum to about +12 dB over one. `amix` normalizes by default, dividing by the input count (about -12 dB for four), which brings the mix back to about one take's loudness.
+- **Tooling.** `ffmpeg-static` and `fluent-ffmpeg` are in `devDependencies` (`package.json:97-98`), imported today only by `scripts/export-episode-mp4.ts` and `scripts/clip-audio-segments.ts`. A mixer in the app's render path moves them to `dependencies` and needs a check that the ffmpeg binary ships in the Vercel build.
 - **Merged alignment.** Averaging the takes' timings buys nothing when the words are identical and adds code, so skip it.
 
 ## When to reopen
