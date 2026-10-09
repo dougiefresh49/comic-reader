@@ -15,6 +15,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { useTabTrap } from "~/hooks/useTabTrap";
 import type {
   ArchiveMove,
   Move,
@@ -41,7 +42,7 @@ import { loadRoster } from "./casting-actions";
 import { CharacterPanel, type PanelTab } from "./CharacterPanel";
 import { PlayButton, PlayerProvider } from "./player";
 import { ReviewSheet } from "./ReviewSheet";
-import { FacesPanel, NameField, matchesName, useTabTrap } from "./shared";
+import { FacesPanel, NameField, matchesName } from "./shared";
 import { SlotStrip, type Carry } from "./SlotStrip";
 import {
   archiveOf,
