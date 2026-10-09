@@ -463,8 +463,8 @@ export async function loadCharacters(
     ]),
   );
 
-  // The Voice tab's choices, only on cards that are a `characters` row.
-  // Clips are signed only for cards not removed.
+  // The Voice tab's data, only on cards that are a `characters` row: the
+  // pending request on each, the choices only on cards not removed.
   await Promise.all(
     cards.map(async (card) => {
       if (!characterIds.has(card.id)) return;
