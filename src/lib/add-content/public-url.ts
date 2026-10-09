@@ -16,7 +16,7 @@ export function isPublicHttpUrl(raw: string): boolean {
   const host = url.hostname
     .toLowerCase()
     .replace(/^\[|\]$/g, "")
-    .replace(/\.$/, "");
+    .replace(/\.+$/, "");
   if (
     host === "localhost" ||
     /\.(localhost|local|internal)\.?$/.test(host) ||

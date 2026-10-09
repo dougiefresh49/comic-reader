@@ -148,11 +148,11 @@ export async function POST(req: NextRequest) {
             if (
               imgResponse.ok &&
               (!isPublicHttpUrl(imgResponse.url) ||
-                !landedType.startsWith("image/"))
+                /^(text|application\/(json|xml))/i.test(landedType))
             ) {
               send({
                 type: "page",
-                message: `Skipped page ${num}: not an image from a public URL (${landedType || "no type"})`,
+                message: `Skipped page ${num}: not an image from a public URL (${landedType})`,
                 current: ++finished,
                 total: collectedUrls.length,
               });

@@ -61,7 +61,7 @@ export async function fetchWikiCoverUrl(
   const api = `${wikiOrigin(wikiHost)}/api.php?${params}`;
   if (!isPublicHttpUrl(api)) return null;
   try {
-    const res = await fetch(api);
+    const res = await fetch(api, { redirect: "error" });
     if (!res.ok) return null;
     const data = (await res.json()) as PageImagesResponse;
     const pages = Object.values(data.query?.pages ?? {});

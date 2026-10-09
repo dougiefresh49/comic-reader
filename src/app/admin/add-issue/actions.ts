@@ -89,17 +89,23 @@ export interface BookSearchInfo {
   wiki_title_template: string | null;
 }
 
-async function loadBookSearchInfo(bookId: string): Promise<BookSearchInfo> {
+/** The saved book's row; `unsaved` only when no row exists yet. */
+async function loadBookSearchInfo(
+  bookId: string,
+  unsaved?: BookSearchInfo,
+): Promise<BookSearchInfo> {
   const { data, error } = (await supabaseAdmin
     .from("books")
     .select("name, wiki_host, wiki_title_template")
     .eq("id", bookId)
-    .single()) as {
+    .maybeSingle()) as {
     data: BookSearchInfo | null;
     error: { message: string } | null;
   };
-  if (error || !data) throw new Error(error?.message ?? "Book not found");
-  return data;
+  if (error) throw new Error(error.message);
+  const book = data ?? unsaved;
+  if (!book) throw new Error("Book not found");
+  return book;
 }
 
 /** The wiki title as words; the book name only when the book has no template. */
@@ -125,12 +131,12 @@ export async function findReadingSource(args: {
   bookId: string;
   issueNumber: number;
   extraContext?: string;
-  /** An unsaved book's search fields, used instead of reading its row. */
+  /** An unsaved book's search fields, used only when it has no row yet. */
   book?: BookSearchInfo;
 }): Promise<Result<ReadingSource>> {
   try {
     await requireAdmin();
-    const book = args.book ?? (await loadBookSearchInfo(args.bookId));
+    const book = await loadBookSearchInfo(args.bookId, args.book);
     const title = issueSearchTitle(book, args.issueNumber);
     const extraContext = args.extraContext?.trim().slice(0, 300) ?? "";
 
@@ -195,7 +201,7 @@ export async function previewSource(args: {
   bookId: string;
   issueNumber: number;
   url: string;
-  /** An unsaved book's search fields, used instead of reading its row. */
+  /** An unsaved book's search fields, used only when it has no row yet. */
   book?: BookSearchInfo;
 }): Promise<Result<SourcePreview>> {
   try {
@@ -204,7 +210,7 @@ export async function previewSource(args: {
     if (!isPublicHttpUrl(url.href)) {
       return { ok: false, error: "The source must be a public http(s) URL." };
     }
-    const book = args.book ?? (await loadBookSearchInfo(args.bookId));
+    const book = await loadBookSearchInfo(args.bookId, args.book);
 
     const [collected, wikiCoverUrl] = await Promise.all([
       collectPageImages(url.href),

@@ -44,13 +44,13 @@ export async function collectPageImages(
   let imageUrls: string[] = [];
   try {
     const fetched = await fetchHtml(url);
-    if (new URL(fetched.finalUrl).origin !== new URL(url).origin) {
+    if ("movedTo" in fetched) {
       // Another site answers for this URL: no browser session on a dead end.
       return {
         imageUrls: [],
         siteName: siteNameFrom(null, url),
         via: "fetch",
-        pageTitle: `This URL moves to ${fetched.finalUrl}; check that URL instead`,
+        pageTitle: `This URL moves to ${fetched.movedTo}; check that URL instead`,
       };
     }
     if (isSameIssuePage(fetched.finalUrl, url)) {

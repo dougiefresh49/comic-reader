@@ -12,13 +12,15 @@ const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
 
 /**
- * GET a page as a browser would, following up to 5 redirects by hand so each
- * hop passes `assertPublicHttpUrl`. Returns where it landed; the caller decides
- * whether that is still the confirmed issue.
+ * GET a page as a browser would, following up to 5 same-origin redirects by
+ * hand so each hop passes `assertPublicHttpUrl`. A redirect to another origin
+ * stops there and comes back as `movedTo`, whatever that site would answer.
+ * Returns where it landed; the caller decides whether that is still the
+ * confirmed issue.
  */
 export async function fetchHtml(
   url: string,
-): Promise<{ html: string; finalUrl: string }> {
+): Promise<{ html: string; finalUrl: string } | { movedTo: string }> {
   let current = url;
   for (let hop = 0; hop <= 5; hop++) {
     assertPublicHttpUrl(current);
@@ -28,7 +30,9 @@ export async function fetchHtml(
     });
     const location = res.headers.get("location");
     if (res.status >= 300 && res.status < 400 && location) {
-      current = new URL(location, current).href;
+      const next = new URL(location, current);
+      if (next.origin !== new URL(url).origin) return { movedTo: next.href };
+      current = next.href;
       continue;
     }
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${current}`);
@@ -59,23 +63,19 @@ function pageNumber(url: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
-/** The URLs whose file numbers form the longest consecutive run. */
-function pageNumberRun(urls: string[]): string[] {
+/** The length of the longest run of consecutive file numbers. */
+function pageNumberRun(urls: string[]): number {
   const nums = new Set(
     urls.map(pageNumber).filter((n): n is number => n !== null),
   );
-  let start = 0;
   let best = 0;
   for (const n of nums) {
     if (nums.has(n - 1)) continue;
     let len = 1;
     while (nums.has(n + len)) len++;
-    if (len > best) [start, best] = [n, len];
+    best = Math.max(best, len);
   }
-  return urls.filter((u) => {
-    const n = pageNumber(u);
-    return n !== null && n >= start && n < start + best;
-  });
+  return best;
 }
 
 /**
@@ -119,9 +119,14 @@ export function extractPageImageUrls(html: string, pageUrl: string): string[] {
       groups.set(dir, [...(groups.get(dir) ?? []), img]);
     }
     for (const group of groups.values()) {
-      const run = new Set(pageNumberRun(group.map((i) => i.url)));
-      if (run.size > picked.length && run.size >= MIN_PAGE_IMAGES) {
-        picked = group.filter((i) => run.has(i.url));
+      // The run is the evidence; every numbered image in the group is a page,
+      // so a gap in the numbering (no 0002) never drops page 1.
+      const numbered = group.filter((i) => pageNumber(i.url) !== null);
+      if (
+        numbered.length > picked.length &&
+        pageNumberRun(numbered.map((i) => i.url)) >= MIN_PAGE_IMAGES
+      ) {
+        picked = numbered;
       }
     }
   }
