@@ -66,19 +66,14 @@ export interface PageDoc {
 }
 
 /**
- * The voice an added character takes: its own active voice, another
- * character's, or a new one to be made later. `voiceId` is `voices.id`; a
- * voice is never picked by its display name (decisions row 153).
+ * A character added to the cast in the editor (#416), held until Save. The
+ * id is the `characters.id` it is expected to have; Save decides whether the
+ * name is new (`planCastAdds`). It starts with the voice the Characters
+ * screen would give it; the editor sets no voice.
  */
-export type VoiceChoice =
-  | { kind: "own"; voiceId: string }
-  | { kind: "borrow"; voiceId: string }
-  | { kind: "new" };
-
 export interface AddedCast {
   id: string;
   name: string;
-  voice: VoiceChoice;
 }
 
 export interface Doc {

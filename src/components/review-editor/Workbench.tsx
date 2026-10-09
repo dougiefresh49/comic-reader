@@ -20,7 +20,7 @@ import {
 import { useAnalyze, type AnalyzePhase } from "./analyze";
 import { Canvas, type CanvasHandle, type Tool } from "./Canvas";
 import { Inspector, Key, type Actions, type ListenView } from "./Inspector";
-import { findCast, needYou, newId, ownVoice, plural, slug } from "./lib";
+import { findCast, needYou, newId, plural, slug } from "./lib";
 import { takesDropped, useListen, type SavedRow } from "./listen";
 import {
   addBubble,
@@ -404,22 +404,16 @@ function Editor({ data, initialPage }: WorkbenchProps) {
   );
   const page = pagesByNumber.get(pageNumber) ?? data.pages[0];
 
-  const voiceById = useMemo(
-    () => new Map(data.voices.map((v) => [v.id, v])),
-    [data.voices],
-  );
   const cast = useMemo<CastMember[]>(() => {
+    // An added character shows the voice it will start with: a known
+    // character's own, else none.
     const added: CastMember[] = doc.addedCast.map((c, i) => ({
       id: c.id,
       name: c.name,
       aliases: [],
       kind: "character",
       tint: data.cast.length + i,
-      voice:
-        c.voice.kind === "new"
-          ? null
-          : (voiceById.get(c.voice.voiceId) ?? null),
-      newVoice: c.voice.kind === "new",
+      voice: data.known.find((k) => k.id === c.id)?.voice ?? null,
       portrait: null,
     }));
     return [
@@ -428,7 +422,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       ),
       ...data.cast.filter((c) => c.kind === "role"),
     ];
-  }, [data.cast, doc.addedCast, voiceById]);
+  }, [data.cast, data.known, doc.addedCast]);
   const castById = useMemo(() => new Map(cast.map((c) => [c.id, c])), [cast]);
 
   const panels = useMemo(() => pagePanels(doc, pageNumber), [doc, pageNumber]);
@@ -1371,7 +1365,7 @@ function Editor({ data, initialPage }: WorkbenchProps) {
       apply("speaker change", (d) => setSpeaker(d, id, castId));
       setPicker({ open: false, addName: null });
     },
-    addCast: (name, voice, knownId, bubbleId, raw) => {
+    addCast: (name, knownId, bubbleId, raw) => {
       const row = knownId ? data.known.find((k) => k.id === knownId) : null;
       setPicker({ open: false, addName: null });
       // A name that already names someone in the cast picks that entry; it
@@ -1383,30 +1377,19 @@ function Editor({ data, initialPage }: WorkbenchProps) {
         say(`${existing.name} is already in the cast.`);
         return;
       }
-      // A known character keeps its `characters` id and display name.
-      const id = row?.id ?? (slug(name) || "character");
+      // A known character keeps its `characters` id and display name. Save
+      // decides again whether the name is new, and writes the character and
+      // its castlist row with the bubbles (#416).
+      const id = row?.id ?? slug(name);
+      if (!id) return;
       const display = row?.name ?? name;
-      const voiceName =
-        voice.kind === "new" ? "" : (voiceById.get(voice.voiceId)?.name ?? "");
-      // The form says "Another voice" when the character has its own, and
-      // "Borrow" when it has none.
-      const hasOwn = ownVoice(name, data.known, data.voices) !== null;
       const single = raw && !/,|&|\/|\band\b/i.test(raw) ? raw : undefined;
       apply("add character", (d) =>
-        setSpeaker(
-          addCast(d, { id, name: display, voice }, single),
-          bubbleId,
-          id,
-        ),
+        setSpeaker(addCast(d, { id, name: display }, single), bubbleId, id),
       );
+      const voice = row?.voice?.name;
       say(
-        voice.kind === "new"
-          ? `${display} joins the cast with a new voice, made in a later step.`
-          : voice.kind === "own"
-            ? `${display} joins the cast with the voice ${voiceName}.`
-            : hasOwn
-              ? `${display} joins the cast with another voice, ${voiceName}.`
-              : `${display} joins the cast, borrowing the voice ${voiceName}.`,
+        `${display} joins the cast when you save, ${voice ? `with the voice ${voice}` : "with no voice yet"}.`,
       );
     },
     openPicker: (addName) => openField("speaker", addName),

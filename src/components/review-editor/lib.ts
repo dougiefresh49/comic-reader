@@ -63,7 +63,7 @@ export function findCast(name: string, cast: CastMember[]): CastMember | null {
 
 /** What to show for a cast member's voice, or null when it has none. */
 export function voiceLabel(member: CastMember): string | null {
-  return member.voice?.name ?? (member.newVoice ? "New voice" : null);
+  return member.voice?.name ?? null;
 }
 
 /**

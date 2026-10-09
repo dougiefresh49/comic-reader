@@ -85,8 +85,6 @@ export interface CastMember {
   tint: number;
   /** The active voice it uses today, or null when it has none. */
   voice: VoiceOption | null;
-  /** Added in the browser with a new voice still to be made. */
-  newVoice?: boolean;
   portrait: Portrait | null;
 }
 

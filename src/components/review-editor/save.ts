@@ -42,7 +42,9 @@ function playOrder(doc: Doc, page: number) {
 }
 
 /**
- * The rows a Save writes to turn `base` into `doc`. A bubble is in the
+ * The rows a Save writes to turn `base` into `doc`. Characters added to the
+ * cast since `base` go as `cast.add`, by the id their bubbles name and the
+ * typed name (#416), whether or not a bubble still names them. A bubble is in the
  * database when the baseline holds it and does not mark it deleted, so a
  * bubble restored (or un-deleted by an undo) after a Save goes back in as an
  * insert under its own id. Play order is written as `sort_order` for every
@@ -56,11 +58,17 @@ function playOrder(doc: Doc, page: number) {
  * words writes the original cues again.
  * `groupId` is written as `group_id` whenever it differs (#451); the Save
  * route works out which group clips that leaves stale.
- * `auto` and the added cast have no column and are not written.
+ * `auto` has no column and is not written.
  */
 export function buildSave(base: Doc, doc: Doc): SaveEdits {
+  const saved = new Set(base.addedCast.map((c) => c.id));
   const out: SaveEdits = {
     bubbles: { add: [], update: [], remove: [] },
+    cast: {
+      add: doc.addedCast
+        .filter((c) => !saved.has(c.id))
+        .map((c) => ({ id: c.id, name: c.name })),
+    },
     panels: { add: [], update: [], remove: [] },
   };
   if (base === doc) return out;
@@ -167,8 +175,9 @@ export function buildSave(base: Doc, doc: Doc): SaveEdits {
 
 /** How many rows a Save would write. */
 export function saveCount(edits: SaveEdits): number {
-  const { bubbles, panels } = edits;
+  const { bubbles, cast, panels } = edits;
   return (
+    (cast?.add.length ?? 0) +
     bubbles.add.length +
     bubbles.update.length +
     bubbles.remove.length +

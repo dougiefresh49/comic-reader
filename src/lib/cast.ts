@@ -509,8 +509,8 @@ async function proposeFrom(
   return { members: sorted, suggestions };
 }
 
-/** The voice a new castlist row starts with: the character's latest castlist voice in the book, else its active `voices` row. */
-async function startingVoice(
+/** The voice a new castlist row starts with: the character's latest castlist voice in the book, else its active `voices` row. Exported for the review editor's Save, which writes the row in its own transaction. */
+export async function startingVoice(
   client: Client,
   book: BookCast,
   characterId: string,

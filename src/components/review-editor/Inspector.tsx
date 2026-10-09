@@ -26,7 +26,6 @@ import {
   type IssueFlag,
   type PanelDoc,
   type Sel,
-  type VoiceChoice,
 } from "./model";
 import { PageCrop } from "./PageCrop";
 import { cuesOf } from "./save";
@@ -50,7 +49,6 @@ export interface Actions {
   setSpeaker: (id: string, castId: string) => void;
   addCast: (
     name: string,
-    voice: VoiceChoice,
     knownId: string | null,
     bubbleId: string,
     raw: string | null,
@@ -735,15 +733,10 @@ function BubbleInspector(
             current={b.speakerId}
             pages={pagesByNumber}
             voices={data.voices}
-            slotsUsed={data.slotsUsed}
-            slotsTotal={data.slotsTotal}
-            newVoices={
-              doc.addedCast.filter((c) => c.voice.kind === "new").length
-            }
             addName={picker.addName}
             onPick={(id) => actions.setSpeaker(b.id, id)}
-            onAdd={(name, voice, knownId) =>
-              actions.addCast(name, voice, knownId, b.id, b.rawSpeaker)
+            onAdd={(name, knownId) =>
+              actions.addCast(name, knownId, b.id, b.rawSpeaker)
             }
             onClose={actions.closePicker}
           />
@@ -1186,9 +1179,6 @@ function PageInspector(props: InspectorProps) {
   );
   const firstFlag = allFlags[0];
   const flaggedPages = new Set(allFlags.map((f) => f.page)).size;
-  const newVoices = doc.addedCast
-    .filter((c) => c.voice.kind === "new")
-    .map((c) => c.name);
   const noVoice = Array.from(
     new Set(
       Object.values(doc.bubbles)
@@ -1327,15 +1317,8 @@ function PageInspector(props: InspectorProps) {
 
         <div className="rounded-sm border border-neutral-800 p-2 text-[11px] text-neutral-400">
           <div className="text-neutral-300">
-            Voice slots: {data.slotsUsed} of {data.slotsTotal} in use
-            {newVoices.length > 0
-              ? `, ${data.slotsUsed + newVoices.length} with the new voices`
-              : ""}
-            .
+            Voice slots: {data.slotsUsed} of {data.slotsTotal} in use.
           </div>
-          {newVoices.length > 0 && (
-            <div>New voices to make: {newVoices.join(", ")}.</div>
-          )}
           {noVoice.length > 0 && (
             <div className="text-amber-300">
               No voice yet: {noVoice.join(", ")}.
