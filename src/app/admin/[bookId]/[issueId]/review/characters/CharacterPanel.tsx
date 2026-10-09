@@ -436,6 +436,26 @@ function CloseIcon() {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
+
 /** Show: the page with the face boxed, large over the screen. Click outside, the X or Escape closes it. */
 function PagePreview({
   face,
@@ -709,41 +729,23 @@ export function CharacterPanel({
                   </button>
                 </form>
               ) : (
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <h2 className="text-[18px] font-semibold text-neutral-50">
                     {card.name}
                   </h2>
-                  <span className="text-neutral-500">{card.id}</span>
                   <button
                     type="button"
                     onClick={() => {
                       setDraft(card.name);
                       setRenaming(true);
                     }}
-                    className={`${QUIET} h-7`}
+                    aria-label="Rename"
+                    title="Rename"
+                    className="inline-flex size-7 items-center justify-center rounded-sm text-neutral-400 hover:bg-neutral-800 hover:text-white"
                   >
-                    Rename
+                    <PencilIcon />
                   </button>
-                  {card.removed ? (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={onAddBack}
-                      className={`${QUIET} h-7`}
-                    >
-                      Add back to this issue
-                    </button>
-                  ) : (
-                    <button
-                      ref={removeRef}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setConfirming(true)}
-                      className={`${QUIET_DANGER} h-7`}
-                    >
-                      Remove from this issue
-                    </button>
-                  )}
+                  <span className="ml-1 text-neutral-500">{card.id}</span>
                 </div>
               )}
               {card.wikiNames.length > 0 && (
@@ -757,6 +759,29 @@ export function CharacterPanel({
               {card.removed && (
                 <div className="mt-1 text-amber-300">Out of this issue</div>
               )}
+              {/* The header's last line: membership, a text button (owner call, decision 430 and PR #744). */}
+              <div className="mt-2 -ml-2">
+                {card.removed ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onAddBack}
+                    className={`${QUIET} h-7`}
+                  >
+                    Add back to this issue
+                  </button>
+                ) : (
+                  <button
+                    ref={removeRef}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setConfirming(true)}
+                    className={`${QUIET_DANGER} h-7`}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
