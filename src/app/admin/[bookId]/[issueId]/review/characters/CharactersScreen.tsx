@@ -385,6 +385,10 @@ function Section({
 
 const GRID = "grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3";
 
+/** What Approve does, one sentence for its tooltip and the run note (#757). */
+const APPROVE_DOES =
+  "seeds the cast as shown and resumes the paused run. Gemini then reads every page (paid), the run stops at page review, writes voice descriptions, then pauses at the voices stop if any voice work is open.";
+
 export function CharactersScreen({ data }: { data: CharactersData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -650,10 +654,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
             <button
               type="button"
               disabled={pending || data.blocker !== null}
-              title={
-                data.blocker ??
-                "Seeds the cast as shown and resumes the paused run. Gemini then reads every page (paid), the run stops at page review, writes voice descriptions and pauses again at the voices stop."
-              }
+              title={data.blocker ?? `Approve the cast ${APPROVE_DOES}`}
               onClick={() =>
                 run("Approving", async () => {
                   const result = await approveCharacters(scope);
@@ -670,9 +671,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
       </header>
       {data.runPaused && (
         <p className="border-b border-amber-400/30 bg-amber-400/5 px-4 py-2 text-[14px] text-amber-100">
-          The ingest run is paused at this stop. Approve the cast seeds the cast
-          and resumes it: Gemini reads every page (paid), the run stops at page
-          review, then pauses again at the voices stop.
+          The ingest run is paused at this stop. Approve the cast {APPROVE_DOES}
         </p>
       )}
 
@@ -688,7 +687,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
 
             <Section
               title="Needs a name"
-              blurb="Faces with no character, and wiki names the book does not know. Faces block Approve; wiki names do not."
+              blurb="Faces with no character, and wiki names the book does not know. Faces block the run's Approve; wiki names do not."
               count={needs + data.suggestions.length}
             >
               {needs === 0 && data.suggestions.length === 0 ? (

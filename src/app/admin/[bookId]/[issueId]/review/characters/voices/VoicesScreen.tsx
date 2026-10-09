@@ -681,6 +681,10 @@ function Section({
   );
 }
 
+/** What Continue does, one sentence for its tooltip and the run note (#757). */
+const CONTINUE_DOES =
+  "resumes the paused run into audio and spends ElevenLabs credits on every bubble that still needs audio.";
+
 export function VoicesScreen({ data }: { data: VoicesData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -782,10 +786,7 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
             <button
               type="button"
               disabled={pending || data.blocker !== null}
-              title={
-                data.blocker ??
-                "Resumes the paused run into audio: ElevenLabs credits on every bubble that still needs audio."
-              }
+              title={data.blocker ?? `Continue ${CONTINUE_DOES}`}
               onClick={() =>
                 run("Continuing", async () => {
                   const result = await continueRun(scope);
@@ -802,8 +803,7 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
       </header>
       {data.runPaused && (
         <p className="border-b border-amber-400/30 bg-amber-400/5 px-4 py-2 text-[14px] text-amber-100">
-          The ingest run is paused at this stop. Continue resumes it into audio:
-          ElevenLabs credits on every bubble that still needs audio.
+          The ingest run is paused at this stop. Continue {CONTINUE_DOES}
         </p>
       )}
 
