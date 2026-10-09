@@ -1,4 +1,4 @@
-// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked.
+// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -88,6 +88,7 @@ function PreviewPlay({
   source,
   cache,
   loadingIds,
+  tabbable = true,
   onPlay,
   onLookup,
 }: {
@@ -96,6 +97,8 @@ function PreviewPlay({
   cache: PreviewCache;
   /** The voice ids a lookup is out for; each keeps its own button busy. */
   loadingIds: ReadonlySet<string>;
+  /** False: out of the Tab order, for a row in the radio group that is not its Tab stop. */
+  tabbable?: boolean;
   onPlay: (name: string, url: string) => void;
   onLookup: (voiceId: string, name: string) => void;
 }) {
@@ -116,6 +119,7 @@ function PreviewPlay({
     <button
       type="button"
       disabled={loading}
+      tabIndex={tabbable ? undefined : -1}
       aria-busy={loading || undefined}
       onClick={(e) => {
         e.stopPropagation();
@@ -134,9 +138,10 @@ function PreviewPlay({
 /**
  * One radio-style row of the list: name in bold, the source in grey, the
  * status pills, and Play when the row has a preview. A click anywhere on the
- * row picks it; the radio button inside carries the keyboard. The current
- * voice is a row like the others: the dot rests on it, a pick moves the dot,
- * and its "current" pill stays.
+ * row picks it; the radio button inside carries the keyboard, and only the
+ * checked one (with its Play) is in the Tab order. The current voice is a row like the
+ * others: the dot rests on it, a pick moves the dot, and its "current" pill
+ * stays.
  */
 function ChoiceRow({
   name,
@@ -146,6 +151,7 @@ function ChoiceRow({
   cache,
   loadingIds,
   checked,
+  tabbable,
   group,
   onPick,
   onPlay,
@@ -159,6 +165,8 @@ function ChoiceRow({
   cache: PreviewCache;
   loadingIds: ReadonlySet<string>;
   checked: boolean;
+  /** The group's one Tab stop (roving tabindex): the checked row, or the first row when none is checked. */
+  tabbable: boolean;
   /** The radio group's `name`. */
   group: string;
   onPick: () => void;
@@ -179,6 +187,7 @@ function ChoiceRow({
         role="radio"
         name={group}
         aria-checked={checked}
+        tabIndex={tabbable ? 0 : -1}
         onClick={(e) => {
           e.stopPropagation();
           onPick();
@@ -213,6 +222,7 @@ function ChoiceRow({
           source={preview}
           cache={cache}
           loadingIds={loadingIds}
+          tabbable={tabbable}
           onPlay={onPlay}
           onLookup={onLookup}
         />
@@ -435,6 +445,35 @@ export function VoiceTab({
       scroller = scroller.parentElement;
     scroller?.scrollBy({ top: overlap + 8, behavior: "smooth" });
   }, [pickedKey]);
+  /** With nothing checked (the current voice has no row, nothing picked), the first row is the Tab stop. */
+  const noneChecked = !picked && !currentInList;
+  const firstKey = card.voicePicks[0]
+    ? `pick:${card.voicePicks[0].id}`
+    : "design";
+  /**
+   * The arrow keys move the pick like a native radio group: Down/Right to the
+   * next row, Up/Left to the previous, wrapping. The target is focused and
+   * clicked, so an arrow pick runs the row's own `onPick`. Keys on anything
+   * but a radio (a row's Play) are left alone.
+   */
+  const onArrow = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step =
+      e.key === "ArrowDown" || e.key === "ArrowRight"
+        ? 1
+        : e.key === "ArrowUp" || e.key === "ArrowLeft"
+          ? -1
+          : 0;
+    if (!step) return;
+    const radios = Array.from(
+      listRef.current?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [],
+    );
+    const from = radios.indexOf(e.target as HTMLElement);
+    if (from < 0) return;
+    e.preventDefault();
+    const to = radios[(from + step + radios.length) % radios.length];
+    to?.focus();
+    to?.click();
+  };
   const apply = () => {
     if (!picked || !action) return;
     // The dot goes back to the current voice, which the callback is about to change or keep.
@@ -501,6 +540,7 @@ export function VoiceTab({
           ref={listRef}
           role="radiogroup"
           aria-label={`Voice for ${card.name}`}
+          onKeyDown={onArrow}
           className={`space-y-4 ${line ? "mt-4" : ""}`}
         >
           <section>
@@ -541,6 +581,7 @@ export function VoiceTab({
                       ? [p.work, p.voiceActor].filter(Boolean).join(", ")
                       : (p.work ?? "Designed voice");
                   const isThis = isCurrent(p);
+                  const checked = isThis ? !picked : pickedKey === key;
                   const pills =
                     p.kind === "voice"
                       ? isThis
@@ -575,7 +616,8 @@ export function VoiceTab({
                       }
                       cache={cache}
                       loadingIds={loadingIds}
-                      checked={isThis ? !picked : pickedKey === key}
+                      checked={checked}
+                      tabbable={checked || (noneChecked && key === firstKey)}
                       group={group}
                       onPick={() => setPickedKey(isThis ? null : key)}
                       onPlay={playRow}
@@ -598,6 +640,10 @@ export function VoiceTab({
                 cache={cache}
                 loadingIds={loadingIds}
                 checked={pickedKey === "design"}
+                tabbable={
+                  pickedKey === "design" ||
+                  (noneChecked && firstKey === "design")
+                }
                 group={group}
                 onPick={() => setPickedKey("design")}
                 onPlay={playRow}
@@ -615,6 +661,7 @@ export function VoiceTab({
                 {others.map((v) => {
                   const key = `active:${v.id}`;
                   const isThis = v.id === currentId;
+                  const checked = isThis ? !picked : pickedKey === key;
                   return (
                     <ChoiceRow
                       key={key}
@@ -628,7 +675,8 @@ export function VoiceTab({
                       preview={sourceOf(v.id, v.previewUrl)}
                       cache={cache}
                       loadingIds={loadingIds}
-                      checked={isThis ? !picked : pickedKey === key}
+                      checked={checked}
+                      tabbable={checked}
                       group={group}
                       onPick={() => setPickedKey(isThis ? null : key)}
                       onPlay={playRow}
