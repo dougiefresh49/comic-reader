@@ -57,7 +57,34 @@ export interface SlotStatus {
   max_voice_add_edits: number;
 }
 
+/**
+ * The owner's v2 voices (AGENTS.md, "Voice slots"): every `voices` row with
+ * `status = 'active'` for one of these characters is never re-cloned,
+ * swapped out, archived or deleted, and its ElevenLabs voice is never
+ * edited. The voice-lab import skips their rows; the archive guard and the
+ * casting moves refuse them.
+ */
+export const PROTECTED_CHARACTER_IDS: ReadonlySet<string> = new Set([
+  "michelangelo",
+  "donatello",
+  "raphael",
+  "master-splinter",
+]);
+
+/** True for an active row of a protected character (`PROTECTED_CHARACTER_IDS`). */
+export function isProtectedVoice(voice: {
+  status: string;
+  character_id: string | null;
+}): boolean {
+  return (
+    voice.status === "active" &&
+    voice.character_id !== null &&
+    PROTECTED_CHARACTER_IDS.has(voice.character_id)
+  );
+}
+
 export type ArchiveRefusal =
+  | "protected"
   | "not active"
   | "room consumer"
   | "keep_active"

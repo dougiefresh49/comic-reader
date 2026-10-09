@@ -18,63 +18,112 @@ export interface DesignVoiceInput {
   meta: LlmCallMeta;
 }
 
+/** One Voice Design take: an unsaved voice that can say its preview text only. */
+export interface DesignPreview {
+  /** What `createFromPreview` turns into a voice. */
+  generated_voice_id: string;
+  /** The take's audio, base64. */
+  audio_base_64: string;
+  media_type: string;
+  duration_secs: number | null;
+}
+
+export interface DesignPreviewsResult {
+  previews: DesignPreview[];
+  /** The text the takes say: the preview text sent, or the one ElevenLabs wrote. */
+  text: string;
+}
+
 const JSON_HEADERS = { "Content-Type": "application/json" };
+const DESIGN_MODEL = "eleven_ttv_v3";
 
 /**
- * A new Voice Design voice: the headroom check, then the preview request
- * and the create that takes the slot, each logged to `llm_calls`. No retry.
- * A failed preview creates nothing, so it throws `ElevenLabsRefusedError`,
- * as does a non-2xx create; a create that times out or answers without a
- * `voice_id` throws anything else, and the voice may exist.
+ * Voice Design's previews: `POST /v1/text-to-voice/design`, three takes from
+ * one description. Takes no slot; charges credits for the preview text,
+ * logged to `llm_calls`. `previewText` null lets ElevenLabs write the text.
+ * Any failure throws `ElevenLabsRefusedError`: a preview is not a voice, so
+ * nothing holds a slot whatever happened.
  */
-export async function designVoice(
+export async function designPreviews(
   deps: VoiceSlotsDeps,
-  input: DesignVoiceInput,
-): Promise<{ voice_id: string }> {
-  await requireHeadroom(deps, 1);
-
-  let generatedId: string | undefined;
+  description: string,
+  previewText: string | null,
+  opts: { seed?: number; meta?: LlmCallMeta } = {},
+): Promise<DesignPreviewsResult> {
   try {
-    const preview = await recordElevenLabsCall(
-      { ...input.meta, model: "eleven_ttv_v3" },
+    const r = await recordElevenLabsCall(
+      { ...(opts.meta ?? { step: "design-previews" }), model: DESIGN_MODEL },
       null,
       () =>
         el(deps, "/v1/text-to-voice/design", {
           method: "POST",
           headers: JSON_HEADERS,
           body: JSON.stringify({
-            voice_description: input.description,
-            model_id: "eleven_ttv_v3",
-            auto_generate_text: true,
+            voice_description: description,
+            model_id: DESIGN_MODEL,
+            ...(previewText
+              ? { text: previewText }
+              : { auto_generate_text: true }),
+            ...(opts.seed !== undefined ? { seed: opts.seed } : {}),
           }),
         }),
     );
-    if (!preview.ok)
-      throw await failure(preview, "POST /v1/text-to-voice/design");
-    const body = (await preview.json()) as {
-      previews?: { generated_voice_id?: string }[];
+    if (!r.ok) throw await failure(r, "POST /v1/text-to-voice/design");
+    const body = (await r.json()) as {
+      previews?: Partial<DesignPreview>[];
+      text?: string;
     };
-    generatedId = body.previews?.[0]?.generated_voice_id;
-    if (!generatedId) throw new Error("no preview returned");
+    const previews = (body.previews ?? []).flatMap((p) =>
+      p.generated_voice_id
+        ? [
+            {
+              generated_voice_id: p.generated_voice_id,
+              audio_base_64: p.audio_base_64 ?? "",
+              media_type: p.media_type ?? "audio/mpeg",
+              duration_secs: p.duration_secs ?? null,
+            },
+          ]
+        : [],
+    );
+    if (previews.length === 0) throw new Error("no preview returned");
+    return { previews, text: body.text ?? previewText ?? "" };
   } catch (err) {
-    // A preview is not a voice: nothing holds a slot yet.
     throw new ElevenLabsRefusedError(
       `Voice Design preview failed, no voice created: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
 
+/**
+ * Saves one Voice Design take as a voice: `POST /v1/text-to-voice`, which
+ * takes a slot. The headroom check runs first. No retry. A non-2xx reply
+ * throws `ElevenLabsRefusedError`; a timeout or a reply without a
+ * `voice_id` throws anything else, and the voice may exist (`opToken` is
+ * sent as the `OP_LABEL` label so a lost reply can be matched).
+ */
+export async function createFromPreview(
+  deps: VoiceSlotsDeps,
+  generatedVoiceId: string,
+  name: string,
+  description: string,
+  opts: { opToken?: string; meta?: LlmCallMeta } = {},
+): Promise<{ voice_id: string }> {
+  await requireHeadroom(deps, 1);
   const created = await recordElevenLabsCall(
-    { ...input.meta, model: "text-to-voice" },
+    {
+      ...(opts.meta ?? { step: "create-from-preview" }),
+      model: "text-to-voice",
+    },
     null,
     () =>
       el(deps, "/v1/text-to-voice", {
         method: "POST",
         headers: JSON_HEADERS,
         body: JSON.stringify({
-          voice_name: input.name,
-          voice_description: input.description,
-          generated_voice_id: generatedId,
-          ...(input.opToken ? { labels: { [OP_LABEL]: input.opToken } } : {}),
+          voice_name: name,
+          voice_description: description,
+          generated_voice_id: generatedVoiceId,
+          ...(opts.opToken ? { labels: { [OP_LABEL]: opts.opToken } } : {}),
         }),
       }),
   );
@@ -86,4 +135,26 @@ export async function designVoice(
   const body = (await created.json()) as { voice_id?: string };
   if (!body.voice_id) throw new Error("POST /v1/text-to-voice: no voice_id");
   return { voice_id: body.voice_id };
+}
+
+/**
+ * A new Voice Design voice in one go, the voices stop's design: the headroom
+ * check, `designPreviews` with text ElevenLabs writes, then
+ * `createFromPreview` on the first take. Errors as those two throw them.
+ */
+export async function designVoice(
+  deps: VoiceSlotsDeps,
+  input: DesignVoiceInput,
+): Promise<{ voice_id: string }> {
+  await requireHeadroom(deps, 1);
+  const { previews } = await designPreviews(deps, input.description, null, {
+    meta: input.meta,
+  });
+  return createFromPreview(
+    deps,
+    previews[0]!.generated_voice_id,
+    input.name,
+    input.description,
+    { opToken: input.opToken, meta: input.meta },
+  );
 }

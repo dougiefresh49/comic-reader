@@ -71,7 +71,11 @@ import {
   insertCandidateVoice,
   updateVoiceFacts,
 } from "~/lib/voice-slots/import";
-import type { VoiceRow } from "~/lib/voice-slots/types";
+// The owner's v2 voices: the active rows of these characters take no import write.
+import {
+  PROTECTED_CHARACTER_IDS,
+  type VoiceRow,
+} from "~/lib/voice-slots/types";
 import {
   insertAppearances,
   readAppearances,
@@ -104,17 +108,6 @@ import {
   readVoiceLookups,
   type ClipAudio,
 } from "./lib/voice-lookups.js";
-
-/**
- * The owner's v2 voices (AGENTS.md, "Voice slots"): the active rows of these
- * characters take no import write.
- */
-const PROTECTED_CHARACTER_IDS = new Set([
-  "michelangelo",
-  "donatello",
-  "raphael",
-  "master-splinter",
-]);
 
 const FIXTURES = path.resolve("fixtures/voice-lab");
 

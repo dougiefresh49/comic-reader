@@ -24,8 +24,6 @@ import {
 } from "~/lib/cast";
 import {
   ArchiveRecordError,
-  ElevenLabsHeadroomError,
-  ElevenLabsRefusedError,
   activateDesignedVoice,
   archiveRefusals,
   archiveVoice,
@@ -33,7 +31,6 @@ import {
   CLAIM_STALE_MS,
   claimHeld,
   designDescriptions,
-  findOpVoices,
   finishArchive,
   issueNeeds,
   listVoices,
@@ -45,12 +42,23 @@ import {
   readVoice,
   readVoices,
   restoreVoice,
-  withVoiceOperationClaim,
   type SlotStatus,
   type VoiceClaimOperation,
   type VoiceRow,
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots";
+import {
+  KNOWN_OUTCOME_PHASES,
+  VoiceHeldError,
+  bringBack,
+  classify,
+  errorMessage as message,
+  matchLostAdd,
+  withVoiceClaims,
+  type Added,
+  type OpRecord,
+  type Recorder as OpRecorder,
+} from "~/lib/voice-slots/operation";
 import {
   ownRowStop,
   readSpeakerLines,
@@ -184,46 +192,15 @@ async function readDescriptions(
 
 /**
  * A `carryOut` in flight, kept in `casting_tasks.operation` (decisions rows
- * 263 and 264) while `status` keeps its plain value: the claim's token, a
- * `rev` that changes on every write (each write is a compare-and-swap on
- * it), the last phase reached, and what `reconcile` needs. Phases: `claimed` (nothing spent on ElevenLabs),
- * `archiving` (DELETE sent), `archived` (DELETE confirmed), `adding` (add
- * sent, `before` and `name` recorded), `added` (ElevenLabs id known),
- * `retiring` (the item's voice is recorded; the outgoing voice's DELETE is
- * sent) and `retired` (that DELETE confirmed, its registry write failed).
- * `back` marks an add that restores the archived voice instead of making
- * the item's voice. The row's `operation_at` is when a live run last wrote
- * the record, on the database clock. A run that returns clears it only at
- * `claimed`, `archived`, `added` or `retired` (`markStopped`); at
- * `archiving`, `retiring` and `adding` it stays, since a request that timed
- * out may still land.
+ * 263 and 264) while `status` keeps its plain value. The record and its
+ * phases are `~/lib/voice-slots/operation`'s, shared with the casting moves.
+ * The row's `operation_at` is when a live run last wrote the record, on the
+ * database clock. A run that returns clears it only at `claimed`,
+ * `archived`, `added` or `retired` (`markStopped`); at `archiving`,
+ * `retiring` and `adding` it stays, since a request that timed out may
+ * still land.
  */
-export interface OpRecord {
-  token: string;
-  rev: string;
-  phase:
-    | "claimed"
-    | "archiving"
-    | "archived"
-    | "adding"
-    | "added"
-    | "retiring"
-    | "retired";
-  back?: boolean;
-  /** The claim wrote the request fields on a casting-step row; a give-back clears them. */
-  converted?: boolean;
-  /** `voices.id` archived for the item. */
-  archived?: string;
-  /** `voices.id` of the voice the item replaces, for the metadata copy. */
-  replaces?: string;
-  /** Its ElevenLabs id before the DELETE. */
-  archivedElevenLabsId?: string;
-  /** ElevenLabs ids on the account before the add. */
-  before?: string[];
-  /** The name the add used. */
-  name?: string;
-  elevenLabsId?: string;
-}
+export type { OpRecord };
 
 /**
  * The task row fields this module reads. `database.ts` types `operation` as
@@ -567,24 +544,6 @@ export type CarryOutResult =
       warnings: string[];
     };
 
-type Added =
-  | { kind: "added"; elevenLabsId: string; recorded: boolean }
-  | { kind: "refused"; reason: string }
-  | { kind: "uncertain"; reason: string };
-
-const message = (err: unknown) =>
-  err instanceof Error ? err.message : String(err);
-
-/** A 4xx or a pre-send refusal added nothing; a 5xx, a timeout or an unread reply may have. */
-function classify(err: unknown): Added {
-  if (
-    (err instanceof ElevenLabsRefusedError && (err.status ?? 0) < 500) ||
-    err instanceof ElevenLabsHeadroomError
-  )
-    return { kind: "refused", reason: message(err) };
-  return { kind: "uncertain", reason: message(err) };
-}
-
 type ItemKey = Pick<
   VoiceWorkItem,
   "bookId" | "issueId" | "characterId" | "action" | "target"
@@ -758,7 +717,7 @@ async function markStopped(
   item: ItemKey,
   op: OpRecord,
 ): Promise<void> {
-  if (!["claimed", "archived", "added", "retired"].includes(op.phase)) return;
+  if (!KNOWN_OUTCOME_PHASES.includes(op.phase)) return;
   const rev = op.rev;
   try {
     await client
@@ -903,7 +862,7 @@ export async function carryOut(
  * needs the row to hold the last status this run wrote, so a second run
  * that took the row stops this one before it spends.
  */
-interface Recorder {
+interface Recorder extends OpRecorder {
   op: OpRecord;
   /** Records the next phase. */
   record: (next: Partial<OpRecord>) => Promise<void>;
@@ -929,73 +888,6 @@ function recorder(sb: SupabaseClient, item: ItemKey, op: OpRecord): Recorder {
         ...(to === "pending" && op.converted ? { request: null } : {}),
       }),
   };
-}
-
-/**
- * Restores the voice archived for the item after its add was refused (the
- * spec's one paid recovery, run inside `carryOut` under the archive row's
- * claim), as a recorded add: an `adding` record with `back`, a fresh token
- * and the inventory, so a lost reply is matched like any add and reconcile
- * can finish the rows. A refusal puts the record back at `archived`.
- */
-async function bringBack(
-  deps: VoiceSlotsDeps,
-  rec: Recorder,
-  voice: VoiceRow,
-  deleteConfirmed: boolean,
-): Promise<{ ok: true } | { ok: false; why: string }> {
-  let before: string[];
-  try {
-    before = (await listVoices(deps)).map((v) => v.voice_id);
-  } catch (err) {
-    return {
-      ok: false,
-      why: `could not list the account's voices before restoring ${voice.display_name}: ${message(err)}`,
-    };
-  }
-  await rec.record({
-    phase: "adding",
-    back: true,
-    token: randomUUID(),
-    before,
-    name: voice.display_name,
-    archived: voice.id,
-  });
-  const row = await readVoice(deps.supabase, voice.id);
-  if (!row) return { ok: false, why: `${voice.display_name}: row not found` };
-  let added: Added;
-  try {
-    const r = await restoreVoice(deps, row, {
-      execute: true,
-      // Only while the row still holds the id whose DELETE was confirmed.
-      deleteConfirmed:
-        deleteConfirmed &&
-        row.current_elevenlabs_id === rec.op.archivedElevenLabsId,
-      opToken: rec.op.token,
-    });
-    added =
-      r.executed && r.newElevenLabsId
-        ? { kind: "added", elevenLabsId: r.newElevenLabsId, recorded: true }
-        : { kind: "refused", reason: r.refusals.join(", ") };
-  } catch (err) {
-    added = classify(err);
-  }
-  if (added.kind === "added") return { ok: true };
-  if (added.kind === "refused") {
-    await rec.record({ phase: "archived", back: undefined });
-    return {
-      ok: false,
-      why: `restoring ${voice.display_name} was refused: ${added.reason}`,
-    };
-  }
-  const found = await matchLostAdd(deps, rec.op);
-  if (!found.ok)
-    return {
-      ok: false,
-      why: `restoring ${voice.display_name}: the reply was lost (${added.reason}); ${found.why}`,
-    };
-  await markRestored(deps.supabase, row, found.id);
-  return { ok: true };
 }
 
 /**
@@ -1367,63 +1259,22 @@ async function carryOutClaimed(
   // a design that changes no existing row.
   const stored =
     fresh.action === "design" ? await readStoredDesign(sb, characterId) : null;
-  const claims: { row: VoiceRow; op: VoiceClaimOperation }[] = [];
-  const hold = (row: VoiceRow | null, op: VoiceClaimOperation) => {
-    if (row && !claims.some((c) => c.row.id === row.id))
-      claims.push({ row, op });
-  };
-  hold(archiveRow, "archive");
-  hold(
-    fresh.target ?? (fresh.action === "design" ? fresh.replaces : null),
-    fresh.action,
-  );
-  hold(stored, "design");
-  let started = false;
-  let claiming: VoiceRow | null = null;
-  const claimed = claims.reduceRight<() => Promise<CarryOutResult>>(
-    (inner, c) => () => {
-      claiming = c.row;
-      return withVoiceOperationClaim(sb, c.row, c.op, inner);
+  const claims: { row: VoiceRow | null; op: VoiceClaimOperation }[] = [
+    { row: archiveRow, op: "archive" },
+    {
+      row: fresh.target ?? (fresh.action === "design" ? fresh.replaces : null),
+      op: fresh.action,
     },
-    () => {
-      started = true;
-      return run();
-    },
-  );
+    { row: stored, op: "design" },
+  ];
   try {
-    return await claimed();
+    return await withVoiceClaims(sb, claims, run);
   } catch (err) {
-    if (started || !claiming) throw err;
+    if (!(err instanceof VoiceHeldError)) throw err;
     // Nothing was spent: another run holds the row, or changed it first.
     return refuse(
-      `${(claiming as VoiceRow).display_name} is held by another run (${message(err)}); nothing was spent, plan again once it finishes`,
+      `${err.voice.display_name} is held by another run (${err.message}); nothing was spent, plan again once it finishes`,
     );
-  }
-}
-
-/** The one voice a lost add made, by its token, name and the inventory before it. */
-async function matchLostAdd(
-  deps: VoiceSlotsDeps,
-  op: OpRecord,
-): Promise<{ ok: true; id: string } | { ok: false; why: string }> {
-  if (!op.before || !op.name)
-    return { ok: false, why: "the add's inventory was not recorded" };
-  try {
-    const ids = await findOpVoices(deps, {
-      token: op.token,
-      name: op.name,
-      before: op.before,
-    });
-    if (ids.length === 1) return { ok: true, id: ids[0]! };
-    return {
-      ok: false,
-      why:
-        ids.length === 0
-          ? `no new ElevenLabs voice named "${op.name}" carries this add's token`
-          : `${ids.length} new voices carry this add's token`,
-    };
-  } catch (err) {
-    return { ok: false, why: `the lookup failed: ${message(err)}` };
   }
 }
 

@@ -817,9 +817,11 @@ export async function setVoice(
 }
 
 /**
- * Casts a voice for a character in one issue and the rest of the book: the
- * issue's row is inserted when it has none (with `in_issue` true), then every
- * row of the character in the book points at the voice. Returns the rows
+ * Casts a voice for a character in one issue and the book's later issues
+ * (#786): the issue's row is inserted when it has none (with `in_issue`
+ * true), then the character's rows in every issue with a higher
+ * `issues.number` point at the voice. Earlier issues keep their voice: they
+ * are rendered, and `bubbles.voice_id` records what played. Returns the rows
  * written.
  */
 export async function castVoiceInBook(
@@ -829,8 +831,26 @@ export async function castVoiceInBook(
   characterId: string,
   voiceUuid: string,
 ): Promise<number> {
+  if (!(await voiceExists(client, voiceUuid)))
+    throw new Error(`cast: no voice ${voiceUuid}`);
+  const issues = await listBookIssues(client, bookId, "id, number");
+  must("reading the book's issues", issues.error);
+  const here = (issues.data ?? []).find((i) => i.id === issueId);
+  if (!here) throw new Error(`cast: no issue ${bookId}/${issueId}`);
+  const later = (issues.data ?? [])
+    .filter((i) => i.number > here.number)
+    .map((i) => i.id);
   await setIssueVoice(client, bookId, issueId, characterId, voiceUuid);
-  return setVoice(client, bookId, characterId, voiceUuid);
+  if (later.length === 0) return 1;
+  const { data, error } = await db(client)
+    .from("castlist")
+    .update({ voice_uuid: voiceUuid })
+    .eq("book_id", bookId)
+    .eq("character_id", characterId)
+    .in("issue_id", later)
+    .select("issue_id");
+  must(`casting ${characterId} in the book's later issues`, error);
+  return 1 + (data?.length ?? 0);
 }
 
 /** A castlist row anywhere in the database, for the slot planner: which books and issues hold each voice. */
