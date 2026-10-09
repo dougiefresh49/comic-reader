@@ -33,7 +33,7 @@ function sameRect(a: BubbleDoc["rect"], b: BubbleDoc["rect"]): boolean {
 }
 
 /** The added characters a live bubble names: what a Save of `doc` sends. */
-function namedAdds(doc: Doc): Doc["addedCast"] {
+export function namedAdds(doc: Doc): Doc["addedCast"] {
   const named = new Set(
     Object.values(doc.bubbles).flatMap((b) =>
       !b.deleted && b.speakerId ? [b.speakerId] : [],
@@ -54,8 +54,9 @@ function playOrder(doc: Doc, page: number) {
 /**
  * The rows a Save writes to turn `base` into `doc`. A character added to the
  * cast goes as `cast.add`, by the id its bubbles name and the typed name
- * (#416), once a live bubble names it and until a Save has sent it; an add
- * the reviewer abandoned writes nothing. A bubble is in the
+ * (#416), once a live bubble names it and until a Save has sent it (the
+ * baseline's `addedCast` holds only what was sent); an add the reviewer
+ * abandoned writes nothing. A bubble is in the
  * database when the baseline holds it and does not mark it deleted, so a
  * bubble restored (or un-deleted by an undo) after a Save goes back in as an
  * insert under its own id. Play order is written as `sort_order` for every
@@ -72,7 +73,7 @@ function playOrder(doc: Doc, page: number) {
  * `auto` has no column and is not written.
  */
 export function buildSave(base: Doc, doc: Doc): SaveEdits {
-  const saved = new Set(namedAdds(base).map((c) => c.id));
+  const saved = new Set(base.addedCast.map((c) => c.id));
   const out: SaveEdits = {
     bubbles: { add: [], update: [], remove: [] },
     cast: {

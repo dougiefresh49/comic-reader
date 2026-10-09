@@ -10,6 +10,7 @@ import {
   type Mint,
   type Sel,
 } from "./model";
+import { namedAdds } from "./save";
 
 interface HistoryEntry {
   doc: Doc;
@@ -68,7 +69,9 @@ export type EditorAction =
    */
   | { type: "saving" }
   /**
-   * A Save landed: the document it sent is the new baseline. Edits made
+   * A Save landed: the document it sent is the new baseline, holding in
+   * `addedCast` only the added characters the Save sent (`namedAdds`), so an
+   * add no bubble named stays a pending edit and is stored with them. Edits made
    * while the Save was in flight stay pending, and undo stops at the saved
    * document: an undo past it would re-dirty rows already in the database
    * (#653). The redo stack goes too, and the next typed edit opens a new step.
@@ -256,9 +259,13 @@ export function reducer(state: EditorState, action: EditorAction): EditorState {
         // is lost, and the history goes with it.
         else if (state.past.length >= LIMIT) past = state.past;
       }
+      const sent = namedAdds(action.base);
       return {
         ...state,
-        base: action.base,
+        base:
+          sent.length === action.base.addedCast.length
+            ? action.base
+            : { ...action.base, addedCast: sent },
         past,
         future: [],
         coalesce: null,

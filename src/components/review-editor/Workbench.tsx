@@ -406,16 +406,20 @@ function Editor({ data, initialPage }: WorkbenchProps) {
 
   const cast = useMemo<CastMember[]>(() => {
     // An added character shows the voice it will start with: a known
-    // character's own, else none.
-    const added: CastMember[] = doc.addedCast.map((c, i) => ({
-      id: c.id,
-      name: c.name,
-      aliases: [],
-      kind: "character",
-      tint: data.cast.length + i,
-      voice: data.known.find((k) => k.id === c.id)?.voice ?? null,
-      portrait: null,
-    }));
+    // character's own, else none. One a Save already wrote is in the loaded
+    // cast after a reload, and is listed once.
+    const loaded = new Set(data.cast.map((c) => c.id));
+    const added: CastMember[] = doc.addedCast
+      .filter((c) => !loaded.has(c.id))
+      .map((c, i) => ({
+        id: c.id,
+        name: c.name,
+        aliases: [],
+        kind: "character",
+        tint: data.cast.length + i,
+        voice: data.known.find((k) => k.id === c.id)?.voice ?? null,
+        portrait: null,
+      }));
     return [
       ...[...data.cast.filter((c) => c.kind === "character"), ...added].sort(
         (a, b) => a.name.localeCompare(b.name),

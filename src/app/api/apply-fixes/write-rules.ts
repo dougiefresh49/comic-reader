@@ -640,8 +640,10 @@ export async function planCastAdds(
   const joining = new Set<string>();
   for (const add of adds) {
     const name = add.name.trim();
-    const own = book.resolve(add.id);
-    const found = own?.id === add.id ? own : book.resolve(name);
+    // `formOf` holds every `characters` id: an exact lookup, not the name rule.
+    const found = book.formOf.has(add.id)
+      ? { id: add.id, display_name: null }
+      : book.resolve(name);
     const id = found?.id ?? slugify(name);
     if (!id)
       throw new Error(`"${add.name}" is not a name a character can have.`);
