@@ -1,5 +1,6 @@
 // The characters stop: the cast and its faces on one screen, in four groups. Every action saves when made.
 // The open card lives in CharacterPanel, a column to the right of the grid (#743).
+// The header always links on to the voices stop; Approve shows only while a run is paused at review-clusters (#757).
 "use client";
 
 import Link from "next/link";
@@ -486,6 +487,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
   /** Everything the panel does for one card, wired to the server actions. */
   const panelProps = (card: CharacterCard) => ({
     card,
+    scope,
     pages,
     cards: data.cards,
     known: data.known,
@@ -632,30 +634,45 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
         >
           {data.blocker ?? `Cast of ${castCount}. Nothing needs you.`}
         </span>
-        {approved ? (
-          <span className="rounded-sm bg-emerald-700/30 px-3 py-1.5 font-medium text-emerald-200">
-            Pipeline resumed
-          </span>
-        ) : (
-          <button
-            type="button"
-            disabled={pending || data.blocker !== null}
-            title={
-              data.blocker ?? "Seed the cast as shown and resume the pipeline"
-            }
-            onClick={() =>
-              run("Approving", async () => {
-                const result = await approveCharacters(scope);
-                if (result.ok) setApproved(true);
-                return result;
-              })
-            }
-            className={PRIMARY}
-          >
-            Approve the cast
-          </button>
-        )}
+        <Link
+          href={`/admin/${data.bookId}/${data.issueId}/review/characters/voices`}
+          className={BUTTON}
+        >
+          Voices →
+        </Link>
+        {data.runPaused &&
+          (approved ? (
+            <span className="rounded-sm bg-emerald-700/30 px-3 py-1.5 font-medium text-emerald-200">
+              Pipeline resumed
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={pending || data.blocker !== null}
+              title={
+                data.blocker ??
+                "Seeds the cast as shown and resumes the paused run. Gemini then reads every page (paid), the run stops at page review, writes voice descriptions and pauses again at the voices stop."
+              }
+              onClick={() =>
+                run("Approving", async () => {
+                  const result = await approveCharacters(scope);
+                  if (result.ok) setApproved(true);
+                  return result;
+                })
+              }
+              className={PRIMARY}
+            >
+              Approve the cast
+            </button>
+          ))}
       </header>
+      {data.runPaused && (
+        <p className="border-b border-amber-400/30 bg-amber-400/5 px-4 py-2 text-[14px] text-amber-100">
+          The ingest run is paused at this stop. Approve the cast seeds the cast
+          and resumes it: Gemini reads every page (paid), the run stops at page
+          review, then pauses again at the voices stop.
+        </p>
+      )}
 
       <div className="flex items-start">
         <main className="min-w-0 flex-1 px-4 py-8">

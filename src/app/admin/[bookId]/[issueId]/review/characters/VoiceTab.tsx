@@ -1,6 +1,7 @@
 // The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked; the rows are one Tab stop and the arrow keys move the pick, and Cancel or confirm hands focus back to a row.
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { VoiceRequest } from "~/lib/cast";
 import type { PreviewResult } from "./actions";
@@ -242,11 +243,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 /** A pending voice request on the card, with Undo. */
 function VoiceRequestNote({
   card,
+  scope,
   busy,
   onUndo,
   undoRef,
 }: {
   card: CharacterCard;
+  /** The book and issue, for the link to the voices stop. */
+  scope: { bookId: string; issueId: string };
   busy: boolean;
   onUndo: () => void;
   /** Undo, for the tab to focus when a confirm gives the list way to this note. */
@@ -254,13 +258,29 @@ function VoiceRequestNote({
 }) {
   const request = card.voiceRequest;
   if (!request) return null;
-  const keeps = `It is made at the voices stop; ${card.name} keeps ${card.voice?.name ?? "no voice"} until then.`;
+  const keeps = (
+    <>
+      It is made at the{" "}
+      <Link
+        href={`/admin/${scope.bookId}/${scope.issueId}/review/characters/voices`}
+        className="underline hover:text-sky-50"
+      >
+        voices stop
+      </Link>
+      ; {card.name} keeps {card.voice?.name ?? "no voice"} until then.
+    </>
+  );
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md border border-sky-400/40 bg-sky-400/5 px-3 py-2 text-[14px]">
       <p className="min-w-0 flex-1 text-sky-100">
-        {request.action === "clone"
-          ? `Wants a voice-lab clone: ${request.targetName ?? "unknown voice"}. ${keeps}`
-          : `Wants a new designed voice. ${keeps}`}
+        {request.action === "clone" ? (
+          <>
+            Wants a voice-lab clone: {request.targetName ?? "unknown voice"}.{" "}
+            {keeps}
+          </>
+        ) : (
+          <>Wants a new designed voice. {keeps}</>
+        )}
       </p>
       <button
         ref={undoRef}
@@ -277,6 +297,8 @@ function VoiceRequestNote({
 
 export interface VoiceTabProps {
   card: CharacterCard;
+  /** The book and issue: the pending request note links to the voices stop. */
+  scope: { bookId: string; issueId: string };
   activeVoices: ActiveVoice[];
   /** A `characters` row, not removed: the tab lists the choices. */
   canChangeVoice: boolean;
@@ -313,6 +335,7 @@ export interface VoiceTabProps {
  */
 export function VoiceTab({
   card,
+  scope,
   activeVoices,
   canChangeVoice,
   pullNote,
@@ -579,6 +602,7 @@ export function VoiceTab({
       {card.voiceRequest && (
         <VoiceRequestNote
           card={card}
+          scope={scope}
           busy={busy}
           onUndo={onUndoVoiceRequest}
           undoRef={undoRef}
