@@ -106,7 +106,8 @@ export function parseAppearancesFromHtml(html: string): AppearanceEntry[] {
   }
 
   if (entries.length === 0) {
-    const liRegex = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+    // Text up to the next list tag, so a nested <li> is its own entry.
+    const liRegex = /<li\b[^>]*>([\s\S]*?)(?=<\/?(?:li|ul|ol)\b)/gi;
     let liMatch;
     while ((liMatch = liRegex.exec(html)) !== null) {
       const text = stripHtml(liMatch[1] ?? "").trim();
@@ -126,6 +127,25 @@ export function parseAppearancesFromHtml(html: string): AppearanceEntry[] {
   }
 
   return entries;
+}
+
+// A flat Appearances section may group entries under bold labels
+// ("Characters:", "Races and species:", "Locations"). Keep the Characters
+// group only; a section without that label is returned whole.
+function charactersGroupHtml(html: string): string {
+  const label = /<(?:p|dt)\b[^>]*>\s*<b>/gi;
+  let start = -1;
+  let m;
+  while ((m = label.exec(html)) !== null) {
+    if (start < 0) {
+      if (/^\s*characters/i.test(html.slice(label.lastIndex))) {
+        start = label.lastIndex;
+      }
+    } else {
+      return html.slice(start, m.index);
+    }
+  }
+  return start < 0 ? html : html.slice(start);
 }
 
 export async function fetchWikiContext(
@@ -176,7 +196,9 @@ export async function fetchWikiContext(
       if (/location/i.test(child.line)) continue;
       const html = await fetchSectionHtml(wikiHost, pageTitle, child.index);
       if (html) {
-        const entries = parseAppearancesFromHtml(html);
+        const entries = parseAppearancesFromHtml(
+          relevantChildren.length > 0 ? html : charactersGroupHtml(html),
+        );
         for (const e of entries) {
           if (!allNames.some((a) => a.name === e.name)) {
             allNames.push(e);
