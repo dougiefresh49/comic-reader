@@ -6,6 +6,7 @@ import { Chip, Cover, FIELD, MONO, Spinner, btn } from "../add/ui";
 import {
   findReadingSource,
   previewSource,
+  type BookSearchInfo,
   type SourcePreview,
 } from "./actions";
 
@@ -43,6 +44,7 @@ export function SourceConfirm({
   issueNumber,
   searchTitle,
   fromWikiTitle,
+  book,
   onChecked,
 }: {
   bookId: string;
@@ -50,6 +52,8 @@ export function SourceConfirm({
   /** The title the first search uses, shown while it runs. */
   searchTitle: string;
   fromWikiTitle: boolean;
+  /** An unsaved book's search fields; a saved book is read by `bookId`. */
+  book?: BookSearchInfo;
   onChecked: (checked: CheckedSource | null) => void;
 }) {
   const [found, setFound] = useState<Found | null>(null);
@@ -80,6 +84,7 @@ export function SourceConfirm({
       bookId,
       issueNumber,
       extraContext: extra || undefined,
+      book,
     });
     if (result.ok) setFound(result.data);
     else setNothingFor({ query, error: result.error });
@@ -90,7 +95,12 @@ export function SourceConfirm({
     if (!found) return;
     setChecking(true);
     setCheckError(null);
-    const result = await previewSource({ bookId, issueNumber, url: found.url });
+    const result = await previewSource({
+      bookId,
+      issueNumber,
+      url: found.url,
+      book,
+    });
     if (result.ok) {
       setPreview(result.data);
       onChecked(

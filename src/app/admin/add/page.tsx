@@ -16,9 +16,15 @@ export const maxDuration = 300;
 export default async function AddContentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ book?: string; issue?: string }>;
+  searchParams: Promise<{ book?: string; issue?: string; stopped?: string }>;
 }) {
-  const { book: bookParam, issue: issueParam } = await searchParams;
+  const {
+    book: bookParam,
+    issue: issueParam,
+    stopped: stoppedParam,
+  } = await searchParams;
+  // `<bookId>/<issueId>` of an online download stopped from Saving.
+  const [stoppedBook, stoppedIssue] = stoppedParam?.split("/") ?? [];
 
   const [booksRes, issuesRes] = await Promise.all([
     supabaseAdmin
@@ -87,6 +93,11 @@ export default async function AddContentPage({
       books={books}
       issues={issues}
       resume={resume ? { bookId: resume.bookId, issueId: resume.id } : null}
+      stopped={
+        stoppedBook && stoppedIssue
+          ? { bookId: stoppedBook, issueId: stoppedIssue }
+          : null
+      }
       initialBookId={bookParam ?? null}
       initialIssueId={issueParam ?? null}
     />
