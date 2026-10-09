@@ -32,7 +32,7 @@ import {
   type NameTarget,
 } from "./actions";
 import type { VoiceRequest } from "~/lib/cast";
-import { CharacterPanel } from "./CharacterPanel";
+import { CharacterPanel, type PanelTab } from "./CharacterPanel";
 import {
   BUTTON,
   DANGER,
@@ -363,6 +363,8 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
   const [pending, startTransition] = useTransition();
   const [note, setNote] = useState<Note>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  // The panel's open tab, kept here so it survives a swap to another card.
+  const [panelTab, setPanelTab] = useState<PanelTab>("faces");
   const [adding, setAdding] = useState(false);
   const [approved, setApproved] = useState(false);
   const pages = useMemo(
@@ -455,6 +457,8 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
     canChangeVoice: !card.removed && characterIds.has(card.id),
     pullNote: `voice-lab pull for comic-reader: ${card.name} (character id "${card.id}") in ${data.bookName} (book "${data.bookId}"), ${data.issueName}. No voice-lab clone is on file for this character; it needs a clip to clone from.`,
     busy: pending,
+    tab: panelTab,
+    onTabChange: setPanelTab,
     onClose: () => closePanel(card.id),
     onRename: (name: string) =>
       run("Renaming", () =>

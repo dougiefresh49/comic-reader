@@ -1,18 +1,19 @@
 // The character panel: the open card in a right column, its actions grouped by job (#743).
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { VoiceRequest } from "~/lib/cast";
 import type { NameTarget } from "./actions";
 import {
   BUTTON,
-  DANGER,
+  ConfirmDialog,
   FaceCrop,
   FaceTiles,
   INPUT,
   PRIMARY,
   PageWithBox,
   QUIET,
+  QUIET_DANGER,
   VoiceLine,
   bestFace,
   facesLine,
@@ -330,32 +331,88 @@ const GROUP_LABEL: Record<CharacterCard["group"], string> = {
   role: "Role",
 };
 
-/** One job's block: a small title, its block-wide action on the right, then the content. */
-function Block({
-  title,
-  action,
-  quiet = false,
-  children,
+export type PanelTab = "faces" | "voice";
+
+const TABS: { key: PanelTab; label: string }[] = [
+  { key: "faces", label: "Faces" },
+  { key: "voice", label: "Voice" },
+];
+
+/**
+ * The two jobs as text tabs under the identity header: the open one white
+ * with a 2px underline, the other grey, a hairline under the row. Left and
+ * Right move between them when a tab has focus.
+ */
+function TabRow({
+  tab,
+  faces,
+  idBase,
+  onChange,
 }: {
-  title: string;
-  action?: React.ReactNode;
-  /** The destructive block at the bottom: set apart on a darker surface. */
-  quiet?: boolean;
-  children: React.ReactNode;
+  tab: PanelTab;
+  /** Shown after the Faces label: "Faces 6". */
+  faces: number;
+  idBase: string;
+  onChange: (tab: PanelTab) => void;
 }) {
+  const refs = useRef<Record<PanelTab, HTMLButtonElement | null>>({
+    faces: null,
+    voice: null,
+  });
+  const step = (from: PanelTab, dir: 1 | -1) => {
+    const i = TABS.findIndex((t) => t.key === from);
+    const next = TABS[(i + dir + TABS.length) % TABS.length]!.key;
+    onChange(next);
+    refs.current[next]?.focus();
+  };
   return (
-    <section
-      aria-label={title}
-      className={`border-t border-neutral-800 px-4 py-4 ${quiet ? "bg-neutral-900/50" : ""}`}
+    <div
+      role="tablist"
+      aria-label="Jobs"
+      className="flex gap-5 border-b border-neutral-800 px-4"
     >
-      <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
-        <h3 className="text-[12px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-          {title}
-        </h3>
-        {action}
-      </div>
-      {children}
-    </section>
+      {TABS.map((t) => {
+        const selected = t.key === tab;
+        return (
+          <button
+            key={t.key}
+            ref={(el) => {
+              refs.current[t.key] = el;
+            }}
+            type="button"
+            role="tab"
+            id={`${idBase}-tab-${t.key}`}
+            aria-selected={selected}
+            aria-controls={`${idBase}-panel-${t.key}`}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(t.key)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight") {
+                e.preventDefault();
+                step(t.key, 1);
+              } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                step(t.key, -1);
+              }
+            }}
+            className={`-mb-px flex h-10 items-center gap-1.5 border-b-2 text-[14px] ${
+              selected
+                ? "border-white font-medium text-white"
+                : "border-transparent text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            {t.label}
+            {t.key === "faces" && (
+              <span
+                className={selected ? "text-neutral-400" : "text-neutral-500"}
+              >
+                {faces}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -429,10 +486,13 @@ export interface CharacterPanelProps {
   pages: Map<number, PageView>;
   known: KnownCharacter[];
   activeVoices: ActiveVoice[];
-  /** A `characters` row, not removed: the Voice block gets the Change control. */
+  /** A `characters` row, not removed: the Voice tab gets the Change control. */
   canChangeVoice: boolean;
   pullNote: string;
   busy: boolean;
+  /** The open tab, held by the screen so it survives a swap to another card. A role card shows Voice whatever it says. */
+  tab: PanelTab;
+  onTabChange: (tab: PanelTab) => void;
   onClose: () => void;
   onRename: (name: string) => void;
   onRemove: () => void;
@@ -448,9 +508,10 @@ export interface CharacterPanelProps {
 }
 
 /**
- * The open card, in a column to the right of the grid: identity, then Faces,
- * then Voice, then the issue membership set apart at the bottom. Mounted per
- * card (the screen keys it by card id), so a swap starts the state over.
+ * The open card, in a column to the right of the grid: the identity header
+ * (with Rename and Remove from this issue), then Faces and Voice as tabs.
+ * Mounted per card (the screen keys it by card id), so a swap starts the
+ * local state over; the chosen tab lives in the screen and survives.
  */
 export function CharacterPanel({
   card,
@@ -460,6 +521,8 @@ export function CharacterPanel({
   canChangeVoice,
   pullNote,
   busy,
+  tab,
+  onTabChange,
   onClose,
   onRename,
   onRemove,
@@ -475,8 +538,11 @@ export function CharacterPanel({
 }: CharacterPanelProps) {
   const [renaming, setRenaming] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState(card.name);
   const [shownId, setShownId] = useState<string | null>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
+  const idBase = useId();
   const shown = card.faces.find((f) => f.id === shownId) ?? null;
   const portrait = useMemo(
     () => bestFace(card.faces, pages),
@@ -487,15 +553,21 @@ export function CharacterPanel({
     card.looseExemplars.filter((e) => !e.confirmed).length;
   const exemplars =
     card.faces.filter((f) => f.exemplar).length + card.looseExemplars.length;
+  // A role has no faces, so it shows Voice whatever the screen's tab says, and leaves it alone.
+  const isRole = card.group === "role";
+  const shownTab: PanelTab = isRole ? "voice" : tab;
 
-  // The open panel owns Escape, innermost first: the page preview, then an
-  // open Rename, then the panel. A focused Rename or Move field stops the
-  // key itself before it reaches the window.
+  // The open panel owns Escape, innermost first: the Remove confirm, the page
+  // preview, an open Rename, then the panel. A focused Rename or Move field
+  // stops the key itself before it reaches the window.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
-      if (shown) setShownId(null);
+      if (confirming) {
+        setConfirming(false);
+        removeRef.current?.focus();
+      } else if (shown) setShownId(null);
       else if (renaming) {
         setRenaming(false);
         setDraft(card.name);
@@ -503,7 +575,64 @@ export function CharacterPanel({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [shown, renaming, card.name, onClose]);
+  }, [confirming, shown, renaming, card.name, onClose]);
+
+  const voiceContent = (
+    <>
+      <div className="flex min-h-7 items-center justify-between gap-3">
+        <span className="min-w-0 truncate">
+          <VoiceLine card={card} />
+        </span>
+        {canChangeVoice && !card.voiceRequest && !changing && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setChanging(true)}
+            className={`${QUIET} h-7`}
+          >
+            Change
+          </button>
+        )}
+      </div>
+      {card.voiceRequest ? (
+        <VoiceRequestNote
+          card={card}
+          busy={busy}
+          onUndo={() => {
+            setChanging(canChangeVoice);
+            onUndoVoiceRequest();
+          }}
+        />
+      ) : (
+        canChangeVoice &&
+        changing && (
+          <VoiceChoices
+            card={card}
+            activeVoices={activeVoices}
+            pullNote={pullNote}
+            busy={busy}
+            onKeep={() => setChanging(false)}
+            onSetVoice={(v) => {
+              setChanging(false);
+              onSetVoice(v);
+            }}
+            onRequest={(request) => {
+              setChanging(false);
+              onRequestVoice(request);
+            }}
+            onPickAppearance={(appearanceId) => {
+              setChanging(false);
+              onPickAppearance(appearanceId);
+            }}
+            onCastArchived={(voiceId) => {
+              setChanging(false);
+              onCastArchived(voiceId);
+            }}
+          />
+        )
+      )}
+    </>
+  );
 
   return (
     <>
@@ -512,7 +641,7 @@ export function CharacterPanel({
         className="fixed top-12 right-0 bottom-0 z-20 flex w-[440px] max-w-full shrink-0 flex-col border-l border-neutral-800 bg-neutral-950 lg:sticky lg:right-auto lg:bottom-auto lg:h-[calc(100vh-3rem)]"
       >
         <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-neutral-800 px-4">
-          {/* The name stays in view however far the body scrolls, so Remove at the bottom always says who. */}
+          {/* The name stays in view however far the body scrolls. */}
           <div className="flex min-w-0 items-baseline gap-2 text-[14px]">
             <span className="truncate font-medium text-neutral-100">
               {card.name}
@@ -532,7 +661,7 @@ export function CharacterPanel({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* Identity: who this is. */}
+          {/* Identity: who this is, and whether it is in this issue. */}
           <div className="flex items-start gap-4 px-4 py-4">
             <FaceCrop
               face={portrait}
@@ -595,6 +724,26 @@ export function CharacterPanel({
                   >
                     Rename
                   </button>
+                  {card.removed ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={onAddBack}
+                      className={`${QUIET} h-7`}
+                    >
+                      Add back to this issue
+                    </button>
+                  ) : (
+                    <button
+                      ref={removeRef}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setConfirming(true)}
+                      className={`${QUIET_DANGER} h-7`}
+                    >
+                      Remove from this issue
+                    </button>
+                  )}
                 </div>
               )}
               {card.wikiNames.length > 0 && (
@@ -603,27 +752,41 @@ export function CharacterPanel({
                 </div>
               )}
               <div className="mt-1 text-neutral-400">
-                {card.group === "role"
-                  ? "Role, no faces"
-                  : facesLine(card.faces)}
-                {exemplars > 0 && (
-                  <>
-                    {" · "}
-                    {exemplars} {exemplars === 1 ? "exemplar" : "exemplars"}
-                    {unconfirmed > 0
-                      ? `, ${unconfirmed} unconfirmed`
-                      : ", all confirmed"}
-                  </>
-                )}
+                {isRole ? "Role, no faces" : facesLine(card.faces)}
               </div>
+              {card.removed && (
+                <div className="mt-1 text-amber-300">Out of this issue</div>
+              )}
             </div>
           </div>
 
-          {card.group !== "role" && (
-            <Block
-              title="Faces"
-              action={
-                card.faces.length > 0 && (
+          {!isRole && (
+            <TabRow
+              tab={tab}
+              faces={card.faces.length}
+              idBase={idBase}
+              onChange={onTabChange}
+            />
+          )}
+
+          {shownTab === "faces" ? (
+            <div
+              role="tabpanel"
+              id={`${idBase}-panel-faces`}
+              aria-labelledby={`${idBase}-tab-faces`}
+              className="px-4 py-4"
+            >
+              <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
+                <span className="text-[14px] text-neutral-500">
+                  {exemplars === 0
+                    ? "No exemplars yet"
+                    : `${exemplars} ${exemplars === 1 ? "exemplar" : "exemplars"}${
+                        unconfirmed > 0
+                          ? `, ${unconfirmed} unconfirmed`
+                          : ", all confirmed"
+                      }`}
+                </span>
+                {card.faces.length > 0 && (
                   <button
                     type="button"
                     disabled={busy}
@@ -633,9 +796,8 @@ export function CharacterPanel({
                   >
                     Faces are right
                   </button>
-                )
-              }
-            >
+                )}
+              </div>
               <FaceTiles
                 faces={card.faces}
                 loose={card.looseExemplars}
@@ -648,98 +810,27 @@ export function CharacterPanel({
                 onMove={onMove}
                 onReject={onReject}
               />
-            </Block>
+            </div>
+          ) : isRole ? (
+            <section
+              aria-label="Voice"
+              className="border-t border-neutral-800 px-4 py-4"
+            >
+              <h3 className="mb-3 text-[12px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
+                Voice
+              </h3>
+              {voiceContent}
+            </section>
+          ) : (
+            <div
+              role="tabpanel"
+              id={`${idBase}-panel-voice`}
+              aria-labelledby={`${idBase}-tab-voice`}
+              className="px-4 py-4"
+            >
+              {voiceContent}
+            </div>
           )}
-
-          <Block title="Voice">
-            <div className="flex min-h-7 items-center justify-between gap-3">
-              <span className="min-w-0 truncate">
-                <VoiceLine card={card} />
-              </span>
-              {canChangeVoice && !card.voiceRequest && !changing && (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setChanging(true)}
-                  className={`${QUIET} h-7`}
-                >
-                  Change
-                </button>
-              )}
-            </div>
-            {card.voiceRequest ? (
-              <VoiceRequestNote
-                card={card}
-                busy={busy}
-                onUndo={() => {
-                  setChanging(canChangeVoice);
-                  onUndoVoiceRequest();
-                }}
-              />
-            ) : (
-              canChangeVoice &&
-              changing && (
-                <VoiceChoices
-                  card={card}
-                  activeVoices={activeVoices}
-                  pullNote={pullNote}
-                  busy={busy}
-                  onKeep={() => setChanging(false)}
-                  onSetVoice={(v) => {
-                    setChanging(false);
-                    onSetVoice(v);
-                  }}
-                  onRequest={(request) => {
-                    setChanging(false);
-                    onRequestVoice(request);
-                  }}
-                  onPickAppearance={(appearanceId) => {
-                    setChanging(false);
-                    onPickAppearance(appearanceId);
-                  }}
-                  onCastArchived={(voiceId) => {
-                    setChanging(false);
-                    onCastArchived(voiceId);
-                  }}
-                />
-              )
-            )}
-          </Block>
-
-          <Block title="Membership" quiet>
-            <div className="flex items-center justify-between gap-3">
-              {card.removed ? (
-                <span className="text-amber-300">Out of this issue</span>
-              ) : card.group === "before" ? (
-                <span className="text-neutral-400">
-                  In this issue&apos;s cast when you Approve
-                </span>
-              ) : (
-                <span className="text-neutral-400">
-                  Counted in this issue&apos;s cast
-                </span>
-              )}
-              {card.removed ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onAddBack}
-                  className={BUTTON}
-                >
-                  Add back to this issue
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={onRemove}
-                  className={DANGER}
-                >
-                  Remove from this issue
-                </button>
-              )}
-            </div>
-          </Block>
         </div>
       </aside>
 
@@ -749,6 +840,23 @@ export function CharacterPanel({
           pages={pages}
           label={card.name}
           onClose={() => setShownId(null)}
+        />
+      )}
+
+      {confirming && (
+        <ConfirmDialog
+          title={`Remove ${card.name} from this issue?`}
+          body={`${card.name} leaves this issue's cast and keeps its voice, so Add back restores it. Its bubbles and faces here are not changed.`}
+          confirmLabel="Remove"
+          busy={busy}
+          onConfirm={() => {
+            setConfirming(false);
+            onRemove();
+          }}
+          onCancel={() => {
+            setConfirming(false);
+            removeRef.current?.focus();
+          }}
         />
       )}
     </>

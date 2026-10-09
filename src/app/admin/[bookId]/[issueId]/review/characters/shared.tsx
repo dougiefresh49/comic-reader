@@ -1,7 +1,7 @@
 // Pieces the character cards, the unknown groups and the character panel share: the button classes, face crops, the name picker and the face tiles.
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { PageCrop } from "~/components/review-editor/PageCrop";
 import { slugify } from "~/lib/character-id";
 import type { NameTarget } from "./actions";
@@ -21,6 +21,9 @@ export const QUIET =
   "inline-flex h-8 shrink-0 items-center rounded-sm px-2 text-[14px] whitespace-nowrap text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:text-neutral-600 disabled:hover:bg-transparent";
 export const DANGER =
   "inline-flex h-8 shrink-0 items-center rounded-sm border border-red-500/40 px-3 text-[14px] whitespace-nowrap text-red-200 hover:border-red-400 hover:bg-red-500/10 disabled:border-neutral-800 disabled:text-neutral-600 disabled:hover:bg-transparent";
+/** QUIET in red: a destructive text button with no border (the panel's Remove from this issue). */
+export const QUIET_DANGER =
+  "inline-flex h-8 shrink-0 items-center rounded-sm px-2 text-[14px] whitespace-nowrap text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:text-neutral-600 disabled:hover:bg-transparent";
 export const INPUT =
   "h-8 w-full rounded-sm border border-neutral-700 bg-neutral-950 px-2 text-[14px] text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400";
 
@@ -548,6 +551,66 @@ export function FacesPanel({
         onReject={onReject}
       />
       {shown && <PageWithBox face={shown} pages={pages} label={label} />}
+    </div>
+  );
+}
+
+/**
+ * A yes-or-no confirm over the screen: the shape and chrome of the admin's
+ * StartConfirmDialog without its typed check. Clicking the backdrop cancels.
+ * Escape is the caller's to handle (the character panel's window listener
+ * closes the innermost open thing first), so this adds no key listener.
+ */
+export function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  busy = false,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const headingId = useId();
+  const bodyId = useId();
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby={headingId}
+      aria-describedby={bodyId}
+      onClick={onCancel}
+      className="fixed inset-0 z-[35] flex items-center justify-center bg-neutral-950/80 p-6"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-[440px] max-w-full space-y-3 rounded-md border border-neutral-700 bg-neutral-900 p-4 text-[14px]"
+      >
+        <h2 id={headingId} className="text-[16px] font-medium text-neutral-100">
+          {title}
+        </h2>
+        <p id={bodyId} className="text-neutral-400">
+          {body}
+        </p>
+        <div className="flex justify-end gap-2">
+          <button type="button" autoFocus onClick={onCancel} className={BUTTON}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onConfirm}
+            className={DANGER}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
