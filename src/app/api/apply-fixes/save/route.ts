@@ -22,6 +22,7 @@ import {
   bubbleInsert,
   bubbleUpdate,
   boxRowsByPage,
+  CastConflict,
   groupGained,
   groupLeft,
   leavesGroupClip,
@@ -188,18 +189,16 @@ export async function POST(req: NextRequest) {
   const { bookId, issueId, bubbles, panels } = parsed.data;
 
   // Characters added in the editor (#416): which are new and who joins the
-  // cast is decided here, and each bubble that names one names the
-  // `characters.id` it stands for.
+  // cast is decided here. Each added id is an existing row's or the new
+  // row's, so the bubbles that name it are written as they are.
   let cast: CastPlan;
   try {
     cast = await planCastAdds(bookId, issueId, parsed.data.cast?.add ?? []);
   } catch (e) {
-    return fail(`Nothing was saved: ${(e as Error).message}`, 500);
-  }
-  for (const edit of [...bubbles.add, ...bubbles.update.map((b) => b.set)]) {
-    const id = edit.speaker?.characterId;
-    const to = id ? cast.ids.get(id) : undefined;
-    if (edit.speaker && to) edit.speaker = { ...edit.speaker, characterId: to };
+    return fail(
+      `Nothing was saved: ${(e as Error).message}`,
+      e instanceof CastConflict ? 409 : 500,
+    );
   }
 
   let ctx: WriteContext;

@@ -602,17 +602,22 @@ export type CastOp =
 export interface CastPlan {
   /** `add_character` writes first, then `add_to_cast`. */
   ops: CastOp[];
-  /** The `characters.id` each added entry's id stands for. */
-  ids: Map<string, string>;
   /** The display name of each character this Save creates, by id. */
   created: Map<string, string>;
 }
+
+/** The editor and the database disagree on who an added name is; the Save is refused. */
+export class CastConflict extends Error {}
 
 /**
  * What adding these characters writes, decided at Save time with the
  * Characters screen's rule (`resolveTarget`): a typed name that already names
  * a character (its id, display name or an alias) is that character, never a
- * second row. A new one gets `slugify(name)` as its id, the typed name as its
+ * second row. A `characters` row whose id is the added id is that character.
+ * Otherwise the name decides: a name that resolves to a row the editor did
+ * not pick, or a new name whose slug is not the added id, is a
+ * `CastConflict`, so the bubbles that name the added id never point
+ * elsewhere. A new one gets `slugify(name)` as its id, the typed name as its
  * display name and the book's first franchise. Each joins the issue's cast
  * unless it is in it already; a castlist row it does not have yet starts with
  * the voice `addToCast` would give it (`startingVoice`), none for a new
@@ -625,7 +630,7 @@ export async function planCastAdds(
   issueId: string,
   adds: CastAdd[],
 ): Promise<CastPlan> {
-  const plan: CastPlan = { ops: [], ids: new Map(), created: new Map() };
+  const plan: CastPlan = { ops: [], created: new Map() };
   if (adds.length === 0) return plan;
   const [book, franchises] = await Promise.all([
     loadBookCast(supabaseAdmin, bookId),
@@ -635,10 +640,17 @@ export async function planCastAdds(
   const joining = new Set<string>();
   for (const add of adds) {
     const name = add.name.trim();
-    const found = book.resolve(name);
+    const own = book.resolve(add.id);
+    const found = own?.id === add.id ? own : book.resolve(name);
     const id = found?.id ?? slugify(name);
     if (!id)
       throw new Error(`"${add.name}" is not a name a character can have.`);
+    if (id !== add.id)
+      throw new CastConflict(
+        found
+          ? `"${name}" is the character ${found.display_name ?? found.id}, which the editor did not know about. Reload the editor and pick it from the cast.`
+          : `"${name}" does not match the character the editor added (${add.id}). Reload the editor and add it again.`,
+      );
     if (!found && !plan.created.has(id)) {
       plan.created.set(id, name);
       plan.ops.push({
@@ -648,7 +660,6 @@ export async function planCastAdds(
         franchise_id: franchiseId,
       });
     }
-    plan.ids.set(add.id, id);
     if (!castRow(book, id, issueId)?.in_issue) joining.add(id);
   }
   if (joining.size === 0) return plan;
