@@ -102,22 +102,10 @@ export default async function AdminDashboardPage() {
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link
-              href="/admin/add-book"
-              className="rounded bg-cyan-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-600 sm:px-4 sm:py-2 sm:text-sm"
-            >
-              + Add Book
-            </Link>
-            <Link
-              href="/admin/add-issue"
-              className="rounded bg-indigo-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-600 sm:px-4 sm:py-2 sm:text-sm"
-            >
-              + Add Issue
-            </Link>
-            <Link
-              href="/admin/new-issue"
+              href="/admin/add"
               className="rounded bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-600 sm:px-4 sm:py-2 sm:text-sm"
             >
-              + Upload Pages
+              + Add content
             </Link>
           </div>
         </header>
@@ -216,7 +204,7 @@ function BookSection({
             </Link>
           )}
           <Link
-            href={`/admin/add-issue?book=${book.id}`}
+            href={`/admin/add?book=${book.id}`}
             className="rounded bg-indigo-700/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-600"
           >
             + Issue

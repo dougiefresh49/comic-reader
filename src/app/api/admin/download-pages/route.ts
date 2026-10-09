@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         if (collectedUrls.length !== body.expectedCount) {
           send({
             type: "error",
-            message: `Found ${collectedUrls.length} page images, but ${body.expectedCount} were confirmed. Nothing was stored; check the source again.`,
+            message: `Found ${collectedUrls.length} page images, but ${body.expectedCount} were confirmed. Nothing was stored. Go back to Find online and check again.`,
           });
           return;
         }
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
 
         send({
           type: "status",
-          message: `Uploading ${collectedUrls.length} pages (raw + WebP) to storage...`,
+          message: `Saving ${collectedUrls.length} pages…`,
           total: collectedUrls.length,
         });
 
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
             ) {
               send({
                 type: "page",
-                message: `Skipped page ${num}: not an image from a public URL (${landedType})`,
+                message: `Page ${num} not saved: not an image from a public URL (${landedType})`,
                 current: ++finished,
                 total: collectedUrls.length,
               });
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
             if (!imgResponse.ok) {
               send({
                 type: "page",
-                message: `Failed to download page ${num}: HTTP ${imgResponse.status}`,
+                message: `Page ${num} not saved: HTTP ${imgResponse.status}`,
                 current: ++finished,
                 total: collectedUrls.length,
               });
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
             if (rawResult.error) {
               send({
                 type: "page",
-                message: `Raw upload failed for page ${num}: ${rawResult.error.message}`,
+                message: `Page ${num} not saved: ${rawResult.error.message}`,
                 current: ++finished,
                 total: collectedUrls.length,
               });
@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
             }
 
             try {
-              const { width, height, failures } = await storePageImage({
+              const { failures } = await storePageImage({
                 bookId: body.bookId,
                 issueId: body.issueId,
                 pageNumber,
@@ -197,14 +197,14 @@ export async function POST(req: NextRequest) {
               uploaded++;
               send({
                 type: "page",
-                message: `Uploaded page ${num} (${width}×${height})${watermarkLeft(failures)}`,
+                message: `Saved ${uploaded} of ${collectedUrls.length} pages${failures.length > 0 ? ` (page ${num}${watermarkLeft(failures)})` : ""}`,
                 current: ++finished,
                 total: collectedUrls.length,
               });
             } catch (err) {
               send({
                 type: "page",
-                message: `WebP/pages failed for page ${num}: ${err instanceof Error ? err.message : "unknown"} (raw OK)`,
+                message: `Page ${num} not saved: ${err instanceof Error ? err.message : "unknown"}`,
                 current: ++finished,
                 total: collectedUrls.length,
               });
@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
           } catch (err) {
             send({
               type: "page",
-              message: `Error on page ${num}: ${err instanceof Error ? err.message : "unknown"}`,
+              message: `Page ${num} not saved: ${err instanceof Error ? err.message : "unknown"}`,
               current: ++finished,
               total: collectedUrls.length,
             });
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
 
         send({
           type: "done",
-          message: `Successfully uploaded ${uploaded}/${collectedUrls.length} pages`,
+          message: `Saved ${uploaded} of ${collectedUrls.length} pages`,
           current: uploaded,
           total: collectedUrls.length,
         });
