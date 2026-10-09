@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { CreateDesignMove } from "~/lib/casting-moves";
 import { PlayButton, usePlayer } from "../player";
-import { useTabTrap } from "../shared";
+import { useTabTrap } from "~/hooks/useTabTrap";
 import type { CharacterCard } from "../types";
 import { BTN_GHOST, BTN_PRIMARY, BTN_SMALL, FOCUS, LABEL } from "../ui";
 import {
