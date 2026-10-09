@@ -110,7 +110,7 @@ function PreviewPlay({
         role="img"
         aria-label={`No stored audio for ${name}`}
         title="No stored audio for this voice"
-        className={`${ICON_BUTTON} cursor-default text-neutral-700 hover:bg-transparent hover:text-neutral-700`}
+        className="inline-flex size-7 shrink-0 cursor-default items-center justify-center rounded-sm text-neutral-700"
       >
         <PlayIcon />
       </span>
@@ -515,16 +515,18 @@ export function VoiceTab({
                     const current = isCurrent(p);
                     const pills =
                       p.kind === "voice"
-                        ? [
-                            ...(current ? ["current"] : []),
-                            PICK_STATUS[p.status],
-                            ...(p.inBook ? ["in this book"] : []),
-                            ...(p.startingPick ? ["lab default"] : []),
-                            // Signing its source clip failed, or it has none: no Play.
-                            ...(p.status === "archived" && !p.clipUrl
-                              ? ["no clip link"]
-                              : []),
-                          ]
+                        ? current
+                          ? // The one pill that says it all: a current voice is active and in this book.
+                            ["current"]
+                          : [
+                              PICK_STATUS[p.status],
+                              ...(p.inBook ? ["in this book"] : []),
+                              ...(p.startingPick ? ["lab default"] : []),
+                              // Signing its source clip failed, or it has none: no Play.
+                              ...(p.status === "archived" && !p.clipUrl
+                                ? ["no clip link"]
+                                : []),
+                            ]
                         : ["needs a clip"];
                     return (
                       <ChoiceRow
