@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
   useTransition,
@@ -52,6 +53,18 @@ type Run = (label: string, work: () => Promise<ActionResult>) => void;
 type Scope = { bookId: string; issueId: string };
 
 const FREE = "free";
+// The Archive select's placeholder, when the plan has no voice it can archive and no slot is free (#770).
+const PICK = "";
+
+const freeOfferedFor = (item: ItemView, slots: SlotsView): boolean =>
+  slots.free > 0 || item.outgoing?.kind === "free slot";
+
+/** What the Archive select starts on: the plan's pick only when it can be archived. */
+function presetOf(item: ItemView, slots: SlotsView): string {
+  const out = item.outgoing;
+  if (out?.kind === "archive" && out.refusals.length === 0) return out.id;
+  return freeOfferedFor(item, slots) ? FREE : PICK;
+}
 
 const refOf = (item: ItemView): ItemRef => ({
   characterId: item.characterId,
@@ -147,19 +160,29 @@ function SlotPlan({
   busy: boolean;
   onRun: (archive: VoiceRef | null) => void;
 }) {
-  const planned = item.outgoing?.kind === "archive" ? item.outgoing.id : FREE;
-  const [picked, setPicked] = useState(planned);
+  const preset = presetOf(item, slots);
+  const [picked, setPicked] = useState(preset);
+  const selectId = useId();
   const choice = item.choices.find((c) => c.id === picked) ?? null;
-  const freeOffered = slots.free > 0 || item.outgoing?.kind === "free slot";
+  const freeOffered = freeOfferedFor(item, slots);
+  const refused = (choice?.refusals.length ?? 0) > 0;
   const order =
-    item.outgoing?.kind === "archive" && item.outgoing.id === picked
+    !refused && item.outgoing?.kind === "archive" && item.outgoing.id === picked
       ? item.outgoing.order
       : null;
-  const blocked =
-    item.refusals.length > 0 ||
-    (choice?.refusals.length ?? 0) > 0 ||
-    (picked === FREE && slots.free === 0) ||
-    (picked !== FREE && !choice);
+  // Why Run is off, first match wins; null means Run may go.
+  const why =
+    item.refusals[0] ??
+    (choice && refused
+      ? `${choice.name} cannot be archived; pick another voice${freeOffered ? " or a free slot" : ""}`
+      : picked === FREE
+        ? slots.free === 0
+          ? "No free slot: pick a voice to archive"
+          : null
+        : !choice
+          ? "Pick a voice to archive"
+          : null);
+  const blocked = why !== null;
 
   return (
     <div className="mt-3 space-y-2 rounded-md border border-neutral-800 bg-neutral-950/60 p-3">
@@ -173,14 +196,21 @@ function SlotPlan({
           The plan found no slot for this item. Pick a voice to archive.
         </p>
       )}
-      <label className="flex flex-wrap items-center gap-2">
+      <label htmlFor={selectId} className="flex flex-wrap items-center gap-2">
         <span className="text-neutral-400">Archive</span>
         <select
+          id={selectId}
+          name="archive-voice"
           className={SELECT}
           value={picked}
           disabled={busy}
           onChange={(e) => setPicked(e.target.value)}
         >
+          {preset === PICK && (
+            <option value={PICK} disabled>
+              Pick a voice to archive…
+            </option>
+          )}
           {freeOffered && (
             <option value={FREE}>nothing, use a free slot</option>
           )}
@@ -188,7 +218,8 @@ function SlotPlan({
             <option key={c.id} value={c.id}>
               {c.name}
               {c.id === item.replaces?.id ? " (the voice it replaces)" : ""}
-              {c.id === planned ? " (planned)" : ""}
+              {c.id === preset ? " (planned)" : ""}
+              {c.refusals.length > 0 ? " (cannot be archived)" : ""}
             </option>
           ))}
         </select>
@@ -211,16 +242,25 @@ function SlotPlan({
           type="button"
           className={PRIMARY}
           disabled={busy || blocked}
+          title={why ?? undefined}
           onClick={() =>
             onRun(choice ? { id: choice.id, name: choice.name } : null)
           }
         >
-          {choice ? `Run, archive ${choice.name}` : "Run, free slot"}
+          {picked === FREE
+            ? "Run, free slot"
+            : choice && !refused
+              ? `Run, archive ${choice.name}`
+              : "Run"}
         </button>
-        {picked !== FREE && (
-          <span className="text-neutral-500">
-            Nothing is archived until you click Run.
-          </span>
+        {why ? (
+          <span className="text-amber-200">{why}</span>
+        ) : (
+          picked !== FREE && (
+            <span className="text-neutral-500">
+              Nothing is archived until you click Run.
+            </span>
+          )
         )}
       </div>
     </div>
@@ -624,7 +664,7 @@ function ItemCard({
         <Reasons items={item.warnings} tone="note" />
         {item.needsSlot && data.slots ? (
           <SlotPlan
-            key={item.outgoing?.kind === "archive" ? item.outgoing.id : FREE}
+            key={presetOf(item, data.slots)}
             item={item}
             slots={data.slots}
             busy={busy}
