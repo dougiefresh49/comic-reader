@@ -52,7 +52,8 @@ export function bookIdFromTitle(title: string): string {
   if (id.length <= 60) return id;
   const cut = id.slice(0, 60);
   // A cut that lands inside a word drops that word.
-  const whole = id[60] === "-" ? cut : cut.slice(0, cut.lastIndexOf("-"));
+  const lastDash = cut.lastIndexOf("-");
+  const whole = id[60] === "-" || lastDash < 0 ? cut : cut.slice(0, lastDash);
   return whole.replace(/-+$/, "") || cut.replace(/-+$/, "");
 }
 
