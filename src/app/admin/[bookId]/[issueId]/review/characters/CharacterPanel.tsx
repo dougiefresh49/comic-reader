@@ -232,6 +232,8 @@ export interface CharacterPanelProps {
   onMove: (face: FaceView, target: NameTarget, name: string) => void;
   /** A selection from select mode, moved in one action. */
   onMoveMany: (faces: FaceView[], target: NameTarget, name: string) => void;
+  /** A selection from select mode, rejected in one action. */
+  onRejectMany: (faces: FaceView[]) => void;
   onReject: (face: FaceView) => void;
   onSetVoice: (voice: ActiveVoice) => void;
   onRequestVoice: (request: VoiceRequest) => void;
@@ -267,6 +269,7 @@ export function CharacterPanel({
   onConfirm,
   onMove,
   onMoveMany,
+  onRejectMany,
   onReject,
   onSetVoice,
   onRequestVoice,
@@ -510,6 +513,7 @@ export function CharacterPanel({
                   setMoving(faces);
                 }}
                 onReject={onReject}
+                onRejectMany={onRejectMany}
               />
             </div>
           ) : isRole ? (
