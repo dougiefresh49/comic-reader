@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { slugify } from "~/lib/character-id";
 import {
+  latestVoicedRow,
   loadBookCast,
   renderVoice,
   type BookCast,
@@ -149,21 +150,15 @@ export function castAwayReason(
             (book.issueNumber.get(r.issue_id) ?? 0) > here)),
     )
     .flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : []));
-  // The voice the issue inherits when its own row holds none: the book's
-  // latest row with a voice, as the render chain finds it, but read
-  // whatever any row's `no_audio` or `in_issue` (`voiceFor` stops there).
+  // The voice the issue inherits when its own row holds none: the render
+  // chain's `latestVoicedRow`, which reads whatever any row's `no_audio` or
+  // `in_issue` (`voiceFor` stops there).
   const ownHere = book.rows.some(
     (r) =>
       r.issue_id === issueId && r.character_id === characterId && r.voice_uuid,
   );
   if (!ownHere) {
-    const lent = book.rows
-      .filter((r) => r.character_id === characterId && r.voice_uuid)
-      .sort(
-        (a, b) =>
-          (book.issueNumber.get(b.issue_id) ?? 0) -
-          (book.issueNumber.get(a.issue_id) ?? 0),
-      )[0];
+    const lent = latestVoicedRow(book, characterId);
     if (lent) held.push(lent.voice_uuid!);
   }
   for (const uuid of held) {
@@ -309,6 +304,7 @@ export async function planMovesDetail(
         id: v.id,
         current_elevenlabs_id: v.current_elevenlabs_id,
         status: v.status,
+        run_only: v.run_only,
       });
   const sim: BookCast = { ...book, rows, voices: states };
   const thisNumber = book.issueNumber.get(issueId) ?? 0;
@@ -354,8 +350,19 @@ export async function planMovesDetail(
         ...patch,
       });
   };
-  const setState = (id: string, status: string, elevenLabsId: string | null) =>
-    states.set(id, { id, status, current_elevenlabs_id: elevenLabsId });
+  /** `runOnly` is the voice's own `voices.run_only`, or the design move's: a "this run only" voice is never inherited (#806). */
+  const setState = (
+    id: string,
+    status: string,
+    elevenLabsId: string | null,
+    runOnly: boolean,
+  ) =>
+    states.set(id, {
+      id,
+      status,
+      current_elevenlabs_id: elevenLabsId,
+      run_only: runOnly,
+    });
 
   const blockers: Blocker[] = [];
   const block = (moveIndex: number | null, code: BlockerCode, reason: string) =>
@@ -546,7 +553,7 @@ export async function planMovesDetail(
     // A hard refusal never runs: the cast and the slots stay as they are.
     if (hard) return;
     if (row) {
-      setState(row.id, "archived", null);
+      setState(row.id, "archived", null, row.run_only);
       archivedHere.set(row.id, { moveIndex: i, lossy });
     }
     if (acct) archivedOutside.set(acct.voice_id, i);
@@ -640,7 +647,12 @@ export async function planMovesDetail(
           castAway(i, m.character_id, m.voice_uuid, "later");
         }
         if (row)
-          setState(row.id, "active", row.current_elevenlabs_id ?? "restored");
+          setState(
+            row.id,
+            "active",
+            row.current_elevenlabs_id ?? "restored",
+            row.run_only,
+          );
         if (row && m.character_id) setVoiceIn(m.character_id, row.id, "later");
         adds++;
         step(i, "restore", label, {
@@ -666,7 +678,7 @@ export async function planMovesDetail(
         replacesProtected(i, m);
         castAway(i, m.character_id, null, m.run_only ? "issue" : "later");
         const key = `design:${i}`;
-        setState(key, "active", key);
+        setState(key, "active", key, m.run_only);
         setVoiceIn(m.character_id, key, m.run_only ? "issue" : "later");
         adds++;
         step(

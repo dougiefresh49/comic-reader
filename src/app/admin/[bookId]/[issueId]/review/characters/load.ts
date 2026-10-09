@@ -291,7 +291,7 @@ export async function loadCharacters(
   // with: its latest active `voices` row, so the card does not change on Approve.
   const startingVoice = new Map<string, VoiceRow>();
   for (const v of voiceRows
-    .filter((v) => v.status === "active" && v.character_id)
+    .filter((v) => v.status === "active" && !v.run_only && v.character_id)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))) {
     if (!startingVoice.has(v.character_id!))
       startingVoice.set(v.character_id!, v);

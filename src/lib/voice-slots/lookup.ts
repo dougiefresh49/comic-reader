@@ -20,6 +20,8 @@ export interface VoiceState {
   id: string;
   current_elevenlabs_id: string | null;
   status: string;
+  /** A "this run only" voice: its own issue renders with it, no other issue inherits it (#806). */
+  run_only: boolean;
 }
 
 /** The `voices` rows these ids name, in chunks that keep the URL short. */
@@ -32,7 +34,7 @@ export async function readVoiceStates(
   for (let i = 0; i < list.length; i += 200) {
     const { data, error } = await db(client)
       .from("voices")
-      .select("id, current_elevenlabs_id, status")
+      .select("id, current_elevenlabs_id, status, run_only")
       .in("id", list.slice(i, i + 200));
     if (error) fail("reading voices by id", error);
     for (const v of data ?? []) out.set(v.id, v);
@@ -40,7 +42,11 @@ export async function readVoiceStates(
   return out;
 }
 
-/** The character's newest `active` voice, or null. */
+/**
+ * The character's newest `active` voice, or null. A "this run only" voice
+ * (`voices.run_only`) is skipped, so a new castlist row never starts with
+ * one (#806).
+ */
 export async function newestActiveVoiceOf(
   client: Client,
   characterId: string,
@@ -50,6 +56,7 @@ export async function newestActiveVoiceOf(
     .select("id")
     .eq("character_id", characterId)
     .eq("status", "active")
+    .eq("run_only", false)
     .order("created_at", { ascending: false })
     .limit(1);
   if (error) fail(`reading the voice of ${characterId}`, error);

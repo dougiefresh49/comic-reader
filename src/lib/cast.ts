@@ -86,6 +86,8 @@ export interface CastVoiceRow {
   id: string;
   current_elevenlabs_id: string | null;
   status: string;
+  /** A "this run only" voice: its own issue renders with it, no other issue inherits it (#806). Absent counts as false. */
+  run_only?: boolean;
 }
 
 export interface CharacterRow {
@@ -238,13 +240,24 @@ export function castRow(
   );
 }
 
-/** The latest issue's row in the book that holds a voice for the character. A "no audio" row silences its own issue only and still lends its voice here. */
-function latestVoicedRow(
+/**
+ * The latest issue's row in the book that holds a voice for the character:
+ * the voice another issue inherits. A "no audio" row silences its own issue
+ * only and still lends its voice here. A "this run only" voice
+ * (`voices.run_only`) is never inherited, so its row is skipped (#806); a
+ * voice missing from `book.voices` counts as a regular one.
+ */
+export function latestVoicedRow(
   book: BookCast,
   characterId: string,
 ): CastRow | undefined {
   return book.rows
-    .filter((r) => r.character_id === characterId && r.voice_uuid)
+    .filter(
+      (r) =>
+        r.character_id === characterId &&
+        r.voice_uuid &&
+        !book.voices.get(r.voice_uuid)?.run_only,
+    )
     .sort(
       (a, b) =>
         (book.issueNumber.get(b.issue_id) ?? 0) -
@@ -306,7 +319,8 @@ function chainStep(
  * 2. The issue's row has `in_issue` false: no audio, removed from this issue.
  * 3. The issue's row has `no_audio` true: no audio by choice, nothing borrowed.
  * 4. That row's voice; with no row or no voice there, the latest issue's row
- *    in the book that has one.
+ *    in the book that has one. A "this run only" voice renders in its own
+ *    issue's row and is never inherited (#806).
  * 5. Still none and the character has `form_of`: steps 2 to 4 for that
  *    character, once.
  * 6. The `voices` row: active renders with `current_elevenlabs_id`; anything
