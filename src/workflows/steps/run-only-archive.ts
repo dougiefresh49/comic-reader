@@ -25,6 +25,7 @@ export async function archiveRunOnlyVoices(
     const { createTypedStepClient } = await import("../step-utils");
     const { runMoves } = await import("~/lib/casting-moves");
     const { readCastVoiceLinks } = await import("~/lib/cast");
+    const { readVoices } = await import("~/lib/voice-slots");
     const supabase = await createTypedStepClient();
 
     // Every book's castlist rows: the ones casting a voice here, and the
@@ -41,20 +42,13 @@ export async function archiveRunOnlyVoices(
     ];
     if (castHere.length === 0) return summary;
 
-    // No voices-module reader returns `run_only` yet (`VoiceRow` leaves it
-    // out), so this one narrow read stays here.
-    // eslint-disable-next-line no-restricted-syntax
-    const voices = await supabase
-      .from("voices")
-      .select("id, display_name")
-      .in("id", castHere)
-      .eq("run_only", true)
-      .eq("status", "active");
-    if (voices.error)
-      throw new Error(`reading voices: ${voices.error.message}`);
+    const here = new Set(castHere);
+    const voices = (await readVoices(supabase)).filter(
+      (v) => here.has(v.id) && v.run_only && v.status === "active",
+    );
 
-    for (const v of voices.data) {
-      const name = `${v.display_name ?? "?"} (${v.id})`;
+    for (const v of voices) {
+      const name = `${v.display_name} (${v.id})`;
       const elsewhere = cast.filter(
         (c) =>
           c.voice_uuid === v.id &&

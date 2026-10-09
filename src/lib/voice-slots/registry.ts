@@ -34,6 +34,7 @@ function toVoiceRow(raw: Record<string, unknown>): VoiceRow {
       ? (raw.consumers as string[])
       : ["comic"],
     keep_active: Boolean(raw.keep_active),
+    run_only: raw.run_only === true,
     created_at: String(raw.created_at),
     archived_at: (raw.archived_at as string | null) ?? null,
   };

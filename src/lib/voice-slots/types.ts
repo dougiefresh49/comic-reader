@@ -25,6 +25,8 @@ export interface VoiceRow {
   labels: Record<string, string> | null;
   consumers: string[];
   keep_active: boolean;
+  /** Made for one issue's run; the audio step archives it (#790). */
+  run_only: boolean;
   created_at: string;
   archived_at: string | null;
 }
