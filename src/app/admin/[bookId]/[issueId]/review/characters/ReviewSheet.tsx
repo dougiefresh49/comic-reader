@@ -302,7 +302,12 @@ export function ReviewSheet({
                           {s.slot === "free" && <span>free slot</span>}
                           {s.slot === "freed" && (
                             <span>
-                              slot from move {(s.slotFromMove ?? 0) + 1}
+                              slot from step{" "}
+                              {steps.findIndex(
+                                (a) =>
+                                  a.kind === "archive" &&
+                                  a.moveIndex === s.slotFromMove,
+                              ) + 1}
                             </span>
                           )}
                           {s.slot === "frees" && <span>frees a slot</span>}
@@ -347,23 +352,28 @@ export function ReviewSheet({
                           ))}
                         </span>
                       </span>
-                      <button
-                        type="button"
-                        disabled={phase.kind === "running"}
-                        onClick={() => onUndo(s.moveIndex)}
-                        aria-label={`Undo: ${s.label}`}
-                        title="Undo"
-                        className={`grid size-6 place-items-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400 ${FOCUS}`}
-                      >
-                        ✕
-                      </button>
+                      {/* A backup step is undone with its archive's ✕. */}
+                      {s.kind === "backup" ? (
+                        <span />
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={phase.kind === "running"}
+                          onClick={() => onUndo(s.moveIndex)}
+                          aria-label={`Undo: ${s.label}`}
+                          title="Undo"
+                          className={`grid size-6 place-items-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400 ${FOCUS}`}
+                        >
+                          ✕
+                        </button>
+                      )}
                     </li>
                   );
                 })}
               </ol>
               <p className="mt-1.5 text-[12px] text-neutral-400">
-                {plan.headroom.adds} of {plan.headroom.left} changes left this
-                month · lines render at the audio step
+                uses {plan.headroom.adds} of the {plan.headroom.left} adds left
+                this month · lines render at the audio step
               </p>
               {plan.blockers.map((b, i) => {
                 const who =
@@ -461,7 +471,7 @@ export function ReviewSheet({
               >
                 {phase.kind === "running"
                   ? "Running…"
-                  : `Confirm${steps.length ? ` ${steps.length}` : ""}`}
+                  : `Confirm${staged.length ? ` ${staged.length}` : ""}`}
               </button>
               <span className="text-[12px] text-neutral-400">
                 {lost > 0 ? (

@@ -268,12 +268,14 @@ export function VoiceTab({
   }, [tiedMove]);
   const mode: "free" | "swap" =
     tiedMove || swapMode || free === 0 ? "swap" : "free";
-  const ownSlot = roster?.slots.find(
-    (s) =>
-      s.holder.kind === "repo" &&
-      s.holder.characterId === card.id &&
-      s.lock === "movable",
-  );
+  // Its own voice, unless a staged archive already frees that slot (as `pick` chooses).
+  const ownSlot = model?.slots.find(
+    (v) =>
+      v.slot.holder.kind === "repo" &&
+      v.slot.holder.characterId === card.id &&
+      v.slot.lock === "movable" &&
+      v.outBy === null,
+  )?.slot;
 
   const q = search.trim().toLowerCase();
   const candidates = (model?.slots ?? [])
@@ -479,9 +481,22 @@ export function VoiceTab({
                       lockTitle={why ?? undefined}
                       sub={
                         <>
+                          {s.backup && (
+                            <span
+                              title={backupWord(s.backup)}
+                              className={`size-1.5 shrink-0 rounded-full ${
+                                s.backup === "ready"
+                                  ? "bg-emerald-400"
+                                  : s.backup === "at confirm"
+                                    ? "bg-sky-400"
+                                    : "border border-red-400"
+                              }`}
+                            />
+                          )}
                           {h.kind === "outside" && <span>{h.owner} ·</span>}
                           {kind && <span>{kind} ·</span>}
                           <SlotNumber n={s.index} />
+                          {s.backup && <span>· {backupWord(s.backup)}</span>}
                           {isOwn && <span className={TAG_NOW}>its own</span>}
                           {why && <span className="truncate">· {why}</span>}
                         </>

@@ -20,6 +20,8 @@ import type { CharacterCard, VoiceOption } from "./types";
 export interface Staged {
   move: Move;
   pickFor?: string;
+  /** The free slot a card was dropped on: where the strip draws its add. Never sent; a move names no slot. */
+  slotHint?: number;
 }
 
 /** A move that sets a character's voice. */
@@ -218,7 +220,7 @@ export function slotModel(roster: Roster, staged: Staged[]): SlotModel {
   });
   const landing = new Map<number, number | null>();
   let adds = 0;
-  staged.forEach(({ move }, i) => {
+  staged.forEach(({ move, slotHint }, i) => {
     if (!takesSlot(move)) return;
     adds++;
     const who = characterOf(move);
@@ -228,6 +230,12 @@ export function slotModel(roster: Roster, staged: Staged[]): SlotModel {
     );
     const target =
       tied ??
+      slots.find(
+        (v) =>
+          v.inBy === null &&
+          v.slot.holder.kind === "free" &&
+          v.slot.index === slotHint,
+      ) ??
       slots.find((v) => v.inBy === null && v.slot.holder.kind === "free") ??
       slots.find(
         (v) =>

@@ -792,7 +792,13 @@ export function CastingScreen({ data }: { data: CharactersData }) {
             ? " · takes a free slot"
             : " · pick a voice to swap out";
       }
-      next = [...next, { move: m }];
+      // A card dropped on a free segment lands there on the strip.
+      next = [
+        ...next,
+        slot?.slot.holder.kind === "free"
+          ? { move: m, slotHint: slot.slot.index }
+          : { move: m },
+      ];
     }
     if (card.noAudio)
       next = [
@@ -870,12 +876,17 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   };
   const remove = (card: CharacterCard) => {
     if (addedIds.has(card.id)) {
-      setStaged((s) => s.filter((x) => !forChar(card.id)(x)));
+      setStaged((s) =>
+        withoutPick(s, card.id).filter((x) => !forChar(card.id)(x)),
+      );
       if (openId === card.id) setOpenId(null);
       return;
     }
     setStaged((s) => [
-      ...s.filter((x) => !forChar(card.id)(x) || x.move.kind === "rename"),
+      // The pick's swap archive and back_in go with it (`withoutPick`).
+      ...withoutPick(s, card.id).filter(
+        (x) => !forChar(card.id)(x) || x.move.kind === "rename",
+      ),
       ...(card.removed
         ? []
         : [
@@ -958,7 +969,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         .sort((a, b) => Number(b.labPick) - Number(a.labPick))[0];
     if (!waiting) return say(`${st.name} has nothing waiting for a slot`, true);
     pick(card, waiting, {
-      slot: v.slot.holder.kind === "free" ? undefined : v,
+      slot: v,
       keep: true,
     });
     setTab("voice");
