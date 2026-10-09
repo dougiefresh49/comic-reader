@@ -1005,7 +1005,6 @@ export async function undoVoiceRequest(args: {
   }
 }
 
-/** Approve: the gate first (it seeds the cast), then the `cluster-review` hook resumes. */
 /**
  * A playable preview of a voice (#745, owner call O1, option B), read-only
  * and called on the first Play: a signed URL to the voice's source clip
@@ -1075,6 +1074,7 @@ export async function voicePreview(args: {
   }
 }
 
+/** Approve: the gate first (it seeds the cast), then the `cluster-review` hook resumes. */
 export async function approveCharacters(scope: Scope): Promise<ActionResult> {
   try {
     await requireAdmin();

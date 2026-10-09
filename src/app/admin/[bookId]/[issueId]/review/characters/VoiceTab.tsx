@@ -92,14 +92,15 @@ function PreviewPlay({
   name,
   source,
   cache,
-  loadingId,
+  loadingIds,
   onPlay,
   onLookup,
 }: {
   name: string;
   source: PreviewSource;
   cache: PreviewCache;
-  loadingId: string | null;
+  /** The voice ids a lookup is out for; each keeps its own button busy. */
+  loadingIds: ReadonlySet<string>;
   onPlay: (name: string, url: string) => void;
   onLookup: (voiceId: string, name: string) => void;
 }) {
@@ -115,7 +116,7 @@ function PreviewPlay({
         <PlayIcon />
       </span>
     );
-  const loading = "voiceId" in source && loadingId === source.voiceId;
+  const loading = "voiceId" in source && loadingIds.has(source.voiceId);
   return (
     <button
       type="button"
@@ -146,7 +147,7 @@ function ChoiceRow({
   pills,
   preview,
   cache,
-  loadingId,
+  loadingIds,
   checked,
   disabled = false,
   group,
@@ -160,7 +161,7 @@ function ChoiceRow({
   /** Null: no Play at all (an appearance, the designed-voice row). */
   preview: PreviewSource | null;
   cache: PreviewCache;
-  loadingId: string | null;
+  loadingIds: ReadonlySet<string>;
   checked: boolean;
   /** The current voice: shown for the record, not a choice. */
   disabled?: boolean;
@@ -229,7 +230,7 @@ function ChoiceRow({
           name={name}
           source={preview}
           cache={cache}
-          loadingId={loadingId}
+          loadingIds={loadingIds}
           onPlay={onPlay}
           onLookup={onLookup}
         />
@@ -327,7 +328,11 @@ export function VoiceTab({
   const [pull, setPull] = useState<"copied" | "failed" | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const [cache, setCache] = useState<PreviewCache>({});
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [loadingIds, setLoadingIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  /** The voice of the most recent Play click: a lookup that lands for any other voice is kept, not played. */
+  const latest = useRef<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => () => audio.current?.pause(), []);
 
@@ -342,15 +347,35 @@ export function VoiceTab({
       setPlayError(`Could not play ${name}.`);
     });
   };
-  /** The first Play on a voice with no URL yet: ask once, keep the answer, play it when there is one. */
+  /** A row's own URL, played at once; a lookup still out for another voice then keeps its answer quiet. */
+  const playRow = (name: string, url: string) => {
+    latest.current = null;
+    play(name, url);
+  };
+  /**
+   * The first Play on a voice with no URL yet: ask once, keep the answer,
+   * and play it only when this is still the most recent click. A failed
+   * ask (a refused answer or a transport error) shows one line and leaves
+   * the row playable, so the next click asks again.
+   */
   const lookup = async (voiceId: string, name: string) => {
     setPlayError(null);
-    setLoadingId(voiceId);
-    const result = await onPreviewVoice(voiceId);
-    setLoadingId(null);
+    latest.current = voiceId;
+    setLoadingIds((cur) => new Set(cur).add(voiceId));
+    let result: PreviewResult;
+    try {
+      result = await onPreviewVoice(voiceId);
+    } catch {
+      result = { ok: false, error: `Could not find audio for ${name}.` };
+    }
+    setLoadingIds((cur) => {
+      const next = new Set(cur);
+      next.delete(voiceId);
+      return next;
+    });
     if (!result.ok) return setPlayError(result.error);
     setCache((cur) => ({ ...cur, [voiceId]: result.url }));
-    if (result.url) play(name, result.url);
+    if (result.url && latest.current === voiceId) play(name, result.url);
   };
   /** A row's preview source: its own URL when it has one, else its voice id for the lookup. */
   const sourceOf = (
@@ -433,8 +458,8 @@ export function VoiceTab({
             name={current.name}
             source={currentPreview}
             cache={cache}
-            loadingId={loadingId}
-            onPlay={play}
+            loadingIds={loadingIds}
+            onPlay={playRow}
             onLookup={lookup}
           />
         )}
@@ -535,15 +560,22 @@ export function VoiceTab({
                         source={source || null}
                         pills={pills}
                         preview={
-                          p.kind === "voice" ? sourceOf(p.id, p.clipUrl) : null
+                          p.kind !== "voice"
+                            ? null
+                            : p.status === "archived"
+                              ? // An archived clone plays its signed clip or nothing: the "no clip link" pill says which.
+                                p.clipUrl
+                                ? { url: p.clipUrl }
+                                : null
+                              : sourceOf(p.id, p.clipUrl)
                         }
                         cache={cache}
-                        loadingId={loadingId}
+                        loadingIds={loadingIds}
                         checked={pickedKey === key}
                         disabled={current}
                         group={group}
                         onPick={() => setPickedKey(key)}
-                        onPlay={play}
+                        onPlay={playRow}
                         onLookup={lookup}
                       />
                     );
@@ -568,11 +600,11 @@ export function VoiceTab({
                         pills={["active"]}
                         preview={sourceOf(v.id, v.previewUrl)}
                         cache={cache}
-                        loadingId={loadingId}
+                        loadingIds={loadingIds}
                         checked={pickedKey === key}
                         group={group}
                         onPick={() => setPickedKey(key)}
-                        onPlay={play}
+                        onPlay={playRow}
                         onLookup={lookup}
                       />
                     );
@@ -590,11 +622,11 @@ export function VoiceTab({
                   pills={[]}
                   preview={null}
                   cache={cache}
-                  loadingId={loadingId}
+                  loadingIds={loadingIds}
                   checked={pickedKey === "design"}
                   group={group}
                   onPick={() => setPickedKey("design")}
-                  onPlay={play}
+                  onPlay={playRow}
                   onLookup={lookup}
                 />
               </ul>
