@@ -6,12 +6,13 @@ import {
   markArchived,
   readCastlist,
 } from "./registry";
-import type {
-  ArchiveRefusal,
-  ArchiveResult,
-  IssueTarget,
-  VoiceRow,
-  VoiceSlotsDeps,
+import {
+  isProtectedVoice,
+  type ArchiveRefusal,
+  type ArchiveResult,
+  type IssueTarget,
+  type VoiceRow,
+  type VoiceSlotsDeps,
 } from "./types";
 
 export const ROOM_CONSUMER = "room";
@@ -21,7 +22,22 @@ export interface ArchiveGuardOptions {
   needs?: Set<string>;
   /** ElevenLabs ids to leave alone (`--exclude-ids`). */
   excludeIds?: Set<string>;
+  /**
+   * The owner accepted losing the voice (a casting move's `lossy_ok`): the
+   * backup refusals (snapshot, bucket copy, description, labels) are
+   * skipped. Every other refusal still holds.
+   */
+  lossyOk?: boolean;
 }
+
+/** The refusals that only say the voice could not come back; `lossyOk` waives them. */
+const BACKUP_REFUSALS: ReadonlySet<ArchiveRefusal> = new Set([
+  "no snapshot",
+  "bucket copy missing",
+  "md5 mismatch",
+  "no description",
+  "no labels",
+]);
 
 export interface ArchiveOptions extends ArchiveGuardOptions {
   /** The issue about to be worked. Computes `needs` when not given. */
@@ -37,6 +53,7 @@ export function archiveRefusalsCheap(
   opts: ArchiveGuardOptions = {},
 ): ArchiveRefusal[] {
   const refusals: ArchiveRefusal[] = [];
+  if (isProtectedVoice(voice)) refusals.push("protected");
   if (voice.status !== "active" || !voice.current_elevenlabs_id)
     refusals.push("not active");
   if (voice.consumers.includes(ROOM_CONSUMER)) refusals.push("room consumer");
@@ -50,7 +67,9 @@ export function archiveRefusalsCheap(
     refusals.push("no snapshot");
   refusals.push(...metadataRefusals(voice));
   if (opts.needs?.has(voice.id)) refusals.push("needed by issue");
-  return refusals;
+  return opts.lossyOk
+    ? refusals.filter((r) => !BACKUP_REFUSALS.has(r))
+    : refusals;
 }
 
 /**
@@ -64,7 +83,7 @@ export async function archiveRefusals(
   opts: ArchiveGuardOptions = {},
 ): Promise<ArchiveRefusal[]> {
   const cheap = archiveRefusalsCheap(voice, opts);
-  if (cheap.length > 0) return cheap;
+  if (cheap.length > 0 || opts.lossyOk) return cheap;
   const stored = await checkSnapshot(deps.supabase, voice);
   if (stored.status === "missing") return ["bucket copy missing"];
   if (stored.status === "mismatch") return ["md5 mismatch"];
@@ -87,6 +106,7 @@ export async function archiveVoice(
   const refusals = await archiveRefusals(deps, voice, {
     needs,
     excludeIds: opts.excludeIds,
+    lossyOk: opts.lossyOk,
   });
   const ok = refusals.length === 0;
   if (!ok || !opts.execute) return { voice, ok, refusals, executed: false };

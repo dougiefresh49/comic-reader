@@ -14,6 +14,24 @@ export type Database = {
   };
   public: {
     Tables: {
+      account_voice_owners: {
+        Row: {
+          elevenlabs_id: string;
+          pinned: boolean;
+          project_name: string;
+        };
+        Insert: {
+          elevenlabs_id: string;
+          pinned?: boolean;
+          project_name: string;
+        };
+        Update: {
+          elevenlabs_id?: string;
+          pinned?: boolean;
+          project_name?: string;
+        };
+        Relationships: [];
+      };
       aliases: {
         Row: {
           alias: string;
@@ -340,6 +358,97 @@ export type Database = {
           {
             foreignKeyName: "bubbles_voice_id_fkey";
             columns: ["voice_id"];
+            isOneToOne: false;
+            referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      casting_moves: {
+        Row: {
+          backup: boolean;
+          book_id: string;
+          character_id: string | null;
+          created_at: string;
+          design_prompt: string | null;
+          generated_voice_id: string | null;
+          id: string;
+          issue_id: string;
+          kind: string;
+          lossy_ok: boolean;
+          operation: Json | null;
+          operation_at: string | null;
+          payload: Json | null;
+          preview_text: string | null;
+          replaces_voice_uuid: string | null;
+          run_id: string;
+          run_only: boolean;
+          seq: number;
+          status: string;
+          voice_uuid: string | null;
+        };
+        Insert: {
+          backup?: boolean;
+          book_id: string;
+          character_id?: string | null;
+          created_at?: string;
+          design_prompt?: string | null;
+          generated_voice_id?: string | null;
+          id?: string;
+          issue_id: string;
+          kind: string;
+          lossy_ok?: boolean;
+          operation?: Json | null;
+          operation_at?: string | null;
+          payload?: Json | null;
+          preview_text?: string | null;
+          replaces_voice_uuid?: string | null;
+          run_id: string;
+          run_only?: boolean;
+          seq: number;
+          status?: string;
+          voice_uuid?: string | null;
+        };
+        Update: {
+          backup?: boolean;
+          book_id?: string;
+          character_id?: string | null;
+          created_at?: string;
+          design_prompt?: string | null;
+          generated_voice_id?: string | null;
+          id?: string;
+          issue_id?: string;
+          kind?: string;
+          lossy_ok?: boolean;
+          operation?: Json | null;
+          operation_at?: string | null;
+          payload?: Json | null;
+          preview_text?: string | null;
+          replaces_voice_uuid?: string | null;
+          run_id?: string;
+          run_only?: boolean;
+          seq?: number;
+          status?: string;
+          voice_uuid?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "casting_moves_book_id_issue_id_fkey";
+            columns: ["book_id", "issue_id"];
+            isOneToOne: false;
+            referencedRelation: "issues";
+            referencedColumns: ["book_id", "id"];
+          },
+          {
+            foreignKeyName: "casting_moves_replaces_voice_uuid_fkey";
+            columns: ["replaces_voice_uuid"];
+            isOneToOne: false;
+            referencedRelation: "voices";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "casting_moves_voice_uuid_fkey";
+            columns: ["voice_uuid"];
             isOneToOne: false;
             referencedRelation: "voices";
             referencedColumns: ["id"];
@@ -1182,6 +1291,7 @@ export type Database = {
           labels: Json | null;
           operation_claim: string | null;
           operation_claimed_at: string | null;
+          run_only: boolean;
           source_clip_md5: string | null;
           source_clip_path: string | null;
           starting_pick: boolean | null;
@@ -1203,6 +1313,7 @@ export type Database = {
           labels?: Json | null;
           operation_claim?: string | null;
           operation_claimed_at?: string | null;
+          run_only?: boolean;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
           starting_pick?: boolean | null;
@@ -1224,6 +1335,7 @@ export type Database = {
           labels?: Json | null;
           operation_claim?: string | null;
           operation_claimed_at?: string | null;
+          run_only?: boolean;
           source_clip_md5?: string | null;
           source_clip_path?: string | null;
           starting_pick?: boolean | null;
