@@ -193,7 +193,13 @@ export async function fetchWikiContext(
     const targets =
       relevantChildren.length > 0 ? relevantChildren : [appearancesSection];
     for (const child of targets) {
-      if (/location/i.test(child.line)) continue;
+      // Characters only: skip groups like "Species" or "Objects, vehicles, and weapons".
+      if (
+        /\b(?:location|species|race|object|vehicle|weapon|item|technique)/i.test(
+          child.line,
+        )
+      )
+        continue;
       const html = await fetchSectionHtml(wikiHost, pageTitle, child.index);
       if (html) {
         const entries = parseAppearancesFromHtml(
