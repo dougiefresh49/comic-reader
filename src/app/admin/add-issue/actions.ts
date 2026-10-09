@@ -5,7 +5,20 @@ import { GEMINI_MEDIUM } from "~/lib/models";
 import { createPartFromText } from "@google/genai";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { generateContentLogged } from "~/lib/llm-usage";
-import { insertIssue, listBookIssues, selectIssue } from "~/lib/issue-queries";
+import {
+  insertIssue,
+  listBookIssues,
+  selectIssue,
+  updateIssue,
+} from "~/lib/issue-queries";
+import { collectPageImages } from "~/lib/add-content/collect-pages";
+import { countIssuePages } from "~/lib/add-content/issue-pages";
+import { isPublicHttpUrl } from "~/lib/add-content/public-url";
+import {
+  fetchWikiCoverUrl,
+  wikiPageTitle,
+  wikiTitleWords,
+} from "~/lib/add-content/wiki";
 import { requireAdmin } from "~/server/admin/require-admin";
 
 type Ok<T> = { ok: true; data: T };
@@ -70,20 +83,66 @@ export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
 
 // ─── findReadingSource ───────────────────────────────────────────────────────
 
+export interface BookSearchInfo {
+  name: string;
+  wiki_host: string | null;
+  wiki_title_template: string | null;
+}
+
+/** The saved book's row; `unsaved` only when no row exists yet. */
+async function loadBookSearchInfo(
+  bookId: string,
+  unsaved?: BookSearchInfo,
+): Promise<BookSearchInfo> {
+  const { data, error } = (await supabaseAdmin
+    .from("books")
+    .select("name, wiki_host, wiki_title_template")
+    .eq("id", bookId)
+    .maybeSingle()) as {
+    data: BookSearchInfo | null;
+    error: { message: string } | null;
+  };
+  if (error) throw new Error(error.message);
+  const book = data ?? unsaved;
+  if (!book) throw new Error("Book not found");
+  return book;
+}
+
+/** The wiki title as words; the book name only when the book has no template. */
+function issueSearchTitle(book: BookSearchInfo, issueNumber: number): string {
+  return book.wiki_title_template
+    ? wikiTitleWords(book.wiki_title_template, issueNumber)
+    : `${book.name} Issue ${issueNumber}`;
+}
+
 interface ReadingSource {
   url: string;
   siteName: string;
   confidence: "high" | "medium" | "low";
+  /** What was searched, shown beside the result. */
+  query: string;
 }
 
-export async function findReadingSource(
-  bookTitle: string,
-  issueNumber: number,
-): Promise<Result<ReadingSource>> {
-  const prompt = `Find a URL where I can read "${bookTitle}" issue #${issueNumber} online for free. Return ONLY a JSON object with these fields: { "url": string, "siteName": string, "confidence": "high" | "medium" | "low" }. No explanation, no markdown fences.`;
-
+/**
+ * The Gemini grounded search for the issue, by its wiki title plus any extra
+ * context typed after a first result (#792). No site is preferred.
+ */
+export async function findReadingSource(args: {
+  bookId: string;
+  issueNumber: number;
+  extraContext?: string;
+  /** An unsaved book's search fields, used only when it has no row yet. */
+  book?: BookSearchInfo;
+}): Promise<Result<ReadingSource>> {
   try {
     await requireAdmin();
+    const book = await loadBookSearchInfo(args.bookId, args.book);
+    const title = issueSearchTitle(book, args.issueNumber);
+    const extraContext = args.extraContext?.trim().slice(0, 300) ?? "";
+
+    const query = extraContext ? `"${title}" ${extraContext}` : `"${title}"`;
+    const prompt = `Find a URL where I can read the comic ${query} online for free. It must be that exact issue (issue #${args.issueNumber}), not another issue or another series with a similar name.${extraContext ? ` Extra context: ${extraContext}.` : ""} Return ONLY a JSON object with these fields: { "url": string, "siteName": string, "confidence": "high" | "medium" | "low" }. No explanation, no markdown fences.`;
+
     const response = await generateContentLogged(
       getGeminiClient(),
       {
@@ -103,13 +162,78 @@ export async function findReadingSource(
 
     // Strip markdown fences if Gemini ignores instruction
     const cleaned = text.replace(/^```json?\n?/i, "").replace(/\n?```$/i, "");
-    const parsed = JSON.parse(cleaned) as ReadingSource;
+    const parsed = JSON.parse(cleaned) as Omit<ReadingSource, "query">;
 
     if (!parsed.url || !parsed.siteName) {
       return { ok: false, error: "Gemini response missing required fields" };
     }
 
-    return { ok: true, data: parsed };
+    return {
+      ok: true,
+      data: { ...parsed, query: `web search: ${query}` },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Unknown error",
+    };
+  }
+}
+
+// ─── previewSource ───────────────────────────────────────────────────────────
+
+export interface SourcePreview {
+  siteName: string;
+  /** The title the browser read ended on, when a browser was needed. */
+  pageTitle: string | null;
+  url: string;
+  imageUrls: string[];
+  firstImageUrl: string | null;
+  wikiCoverUrl: string | null;
+}
+
+/**
+ * The Check step: the page images the downloader would store (a plain fetch,
+ * or a browser session when the site blocks one), and the wiki cover to
+ * compare with. No writes (#792).
+ */
+export async function previewSource(args: {
+  bookId: string;
+  issueNumber: number;
+  url: string;
+  /** An unsaved book's search fields, used only when it has no row yet. */
+  book?: BookSearchInfo;
+}): Promise<Result<SourcePreview>> {
+  try {
+    await requireAdmin();
+    const url = new URL(args.url.trim());
+    if (!isPublicHttpUrl(url.href)) {
+      return { ok: false, error: "The source must be a public http(s) URL." };
+    }
+    const book = await loadBookSearchInfo(args.bookId, args.book);
+
+    const [collected, wikiCoverUrl] = await Promise.all([
+      collectPageImages(url.href),
+      book.wiki_host && book.wiki_title_template
+        ? fetchWikiCoverUrl(
+            book.wiki_host,
+            wikiPageTitle(book.wiki_title_template, args.issueNumber),
+          )
+        : Promise.resolve(null),
+    ]);
+    const { imageUrls } = collected;
+
+    return {
+      ok: true,
+      data: {
+        siteName: collected.siteName,
+        pageTitle: collected.pageTitle,
+        url: url.href,
+        imageUrls,
+        firstImageUrl: imageUrls[0] ?? null,
+        wikiCoverUrl,
+      },
+    };
   } catch (e) {
     return {
       ok: false,
@@ -170,4 +294,55 @@ export async function createIssue(
   }
 
   return { ok: true, data: { id: data.id } };
+}
+
+// ─── confirmSource ───────────────────────────────────────────────────────────
+
+/**
+ * Confirm: save the checked URL as the issue's `source_url`, creating the row
+ * when it does not exist yet. The downloader reads the URL from that row. An
+ * issue that already has pages is refused, so a confirm never leads to a
+ * download over stored pages.
+ */
+export async function confirmSource(
+  args: CreateIssueArgs,
+): Promise<Result<{ id: string }>> {
+  try {
+    await requireAdmin();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  const issueId = `issue-${args.issueNumber}`;
+  const { data: existing, error: lookupErr } = (await selectIssue(
+    supabaseAdmin,
+    args.bookId,
+    issueId,
+    "id, page_count",
+  ).maybeSingle()) as {
+    data: { id: string; page_count: number | null } | null;
+    error: { message: string } | null;
+  };
+  if (lookupErr) return { ok: false, error: lookupErr.message };
+  if (!isPublicHttpUrl(args.sourceUrl)) {
+    return { ok: false, error: "The source must be a public http(s) URL." };
+  }
+  let pageRows: number;
+  try {
+    pageRows = await countIssuePages(args.bookId, issueId);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  const pages = Math.max(pageRows, existing?.page_count ?? 0);
+  if (pages > 0) {
+    return {
+      ok: false,
+      error: `${issueId} already has ${pages} pages in ${args.bookId}.`,
+    };
+  }
+  if (!existing) return createIssue(args);
+  const { error } = await updateIssue(supabaseAdmin, args.bookId, issueId, {
+    source_url: args.sourceUrl,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: { id: issueId } };
 }
