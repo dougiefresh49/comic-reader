@@ -219,7 +219,9 @@ export function Decision({
           : !choice
             ? archivable
               ? "Pick a voice to archive"
-              : "No slot, and nothing here can be archived"
+              : slots.free > 0
+                ? `${slots.free === 1 ? "The free slot is planned for another item" : "The free slots are planned for other items"}, and nothing here can be archived`
+                : "No slot, and nothing here can be archived"
             : refused
               ? `${choice.name} cannot be archived: ${archiveWhy(choice.refusals)}`
               : null;
