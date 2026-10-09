@@ -103,6 +103,9 @@ export function usePinchZoom({
       if (disabled) return;
       const pointers = pointerMapRef.current;
       const prev = pointers.get(e.pointerId);
+      // Only track pointers this hook saw go down; a hovering mouse or pen
+      // must not count toward a pinch or pass onPointerUp's check.
+      if (!prev) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (pointers.size === 2 && pinchRef.current) {
