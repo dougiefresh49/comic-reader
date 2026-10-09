@@ -5,10 +5,11 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useTabTrap } from "~/hooks/useTabTrap";
 import type { NameTarget } from "./actions";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
-import { PageWithBox, useTabTrap } from "./shared";
+import { PageWithBox } from "./shared";
 import type { CardState } from "./staging";
 import type {
   CharacterCard,

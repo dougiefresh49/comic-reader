@@ -5,6 +5,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { useTabTrap } from "~/hooks/useTabTrap";
 import type {
   ArchiveMove,
   Blocker,
@@ -12,7 +13,6 @@ import type {
   RunResult,
 } from "~/lib/casting-moves";
 import { confirmMoves, reviewMoves } from "./casting-actions";
-import { useTabTrap } from "./shared";
 import { characterOf, type Staged } from "./staging";
 import { BTN, BTN_GHOST, BTN_PRIMARY, BTN_SMALL, FOCUS, LABEL } from "./ui";
 

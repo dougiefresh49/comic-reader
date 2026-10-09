@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTabTrap } from "~/hooks/useTabTrap";
 
 function counted(n: number, noun: string): string {
   return `${n} ${n === 1 ? noun : `${noun}s`}`;
@@ -30,7 +31,10 @@ export function StartConfirmDialog({
   const [typed, setTyped] = useState("");
   const headingId = useId();
   const inputId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
   const matches = typed.trim() === issueId;
+
+  useTabTrap(formRef);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -49,6 +53,7 @@ export function StartConfirmDialog({
       onClick={onCancel}
     >
       <form
+        ref={formRef}
         className="w-[440px] max-w-[94vw] space-y-3 rounded border border-neutral-700 bg-neutral-900 p-4 text-left text-sm"
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
