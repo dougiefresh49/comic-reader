@@ -406,14 +406,7 @@ export function VoiceTab({
             onPick={onDesign}
           />
         )}
-        <DesignVoiceRow
-          sub={`${
-            own.some((v) => v.kind === "designed")
-              ? "draft from its description · "
-              : ""
-          }three takes`}
-          onOpen={onDesign}
-        />
+        <DesignVoiceRow characterId={card.id} onOpen={onDesign} />
         <div
           role="button"
           tabIndex={0}

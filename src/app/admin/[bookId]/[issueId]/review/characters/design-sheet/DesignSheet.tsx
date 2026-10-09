@@ -15,7 +15,7 @@ import {
   draftVoicePrompt,
   generateVoicePreviews,
   startDesign,
-  type DraftSource,
+  voiceOnFile,
   type Take,
 } from "./actions";
 import { acceptedFor, rememberAccepted } from "./accepted";
@@ -49,23 +49,6 @@ function Spinner() {
   );
 }
 
-function fromLine(s: DraftSource): { text: string; title: string } {
-  if (s.kind === "gemini")
-    return {
-      text: `From: its ${s.snippets} ${s.snippets === 1 ? "line" : "lines"} in this issue, by Gemini`,
-      title: "the voice notes on its lines here",
-    };
-  return s.kind === "design_prompt"
-    ? {
-        text: `From: ${s.voiceName}'s design prompt`,
-        title: "voices.design_prompt on file",
-      }
-    : {
-        text: `From: ${s.voiceName}'s description`,
-        title: "voices.description on file",
-      };
-}
-
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
@@ -96,9 +79,8 @@ export function DesignSheet({
 
   const [loading, setLoading] = useState(true);
   const [prompt, setPrompt] = useState(staged?.design_prompt ?? "");
-  const [source, setSource] = useState<DraftSource | null>(
-    kept?.source ?? null,
-  );
+  /** The `description` on file (else `design_prompt`), quoted by the "From:" line. */
+  const [onFile, setOnFile] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState(staged?.preview_text ?? "");
   const [ownLines, setOwnLines] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -135,12 +117,10 @@ export function DesignSheet({
           return;
         }
         setOwnLines(r.data.previewText);
+        setOnFile(r.data.onFile);
         if (!staged) {
           setPreviewText(r.data.previewText);
-          if (r.data.draft) {
-            setPrompt(r.data.draft.prompt);
-            setSource(r.data.draft.source);
-          }
+          if (r.data.prompt) setPrompt(r.data.prompt);
         }
       })
       .catch((err: unknown) => live && setDraftError(message(err)))
@@ -200,8 +180,7 @@ export function DesignSheet({
           setDraftError(r.error);
           return;
         }
-        setPrompt(r.data.prompt);
-        setSource(r.data.source);
+        setPrompt(r.data);
         clearTakes();
       })
       .catch((err: unknown) => setDraftError(message(err)))
@@ -237,7 +216,7 @@ export function DesignSheet({
       run_only: mode === "run",
       replaces_voice_uuid: card.voice?.uuid ?? null,
     };
-    rememberAccepted({ move, take, takes: made.takes, source });
+    rememberAccepted({ move, take, takes: made.takes });
     onAccept(move);
   };
 
@@ -248,7 +227,6 @@ export function DesignSheet({
     !generating &&
     !drafting &&
     !loading;
-  const from = source ? fromLine(source) : null;
   const lines = card.lines;
   const oneOff = card.group !== "role" && lines >= 1 && lines <= 2;
 
@@ -316,7 +294,7 @@ export function DesignSheet({
               id={`${headingId}-prompt`}
               rows={5}
               value={prompt}
-              readOnly={drafting}
+              readOnly={drafting || generating}
               placeholder="Age, pitch, accent, energy"
               onChange={(e) => {
                 setPrompt(e.target.value);
@@ -326,9 +304,9 @@ export function DesignSheet({
             />
             {draftError ? (
               <div className={`${NOTE} text-red-400`}>{draftError}</div>
-            ) : from ? (
-              <div className={NOTE} title={from.title}>
-                {from.text}
+            ) : onFile ? (
+              <div className={NOTE} title="voices.description on file">
+                From: “{onFile}”
               </div>
             ) : !loading ? (
               <div className={NOTE}>Nothing on file</div>
@@ -357,6 +335,7 @@ export function DesignSheet({
               id={`${headingId}-text`}
               rows={3}
               value={previewText}
+              readOnly={generating}
               onChange={(e) => {
                 setPreviewText(e.target.value);
                 if (made) clearTakes();
@@ -494,14 +473,32 @@ export function DesignSheet({
   );
 }
 
-/** The Voice tab's "Design a voice" row: a dashed row that opens the sheet. */
+/**
+ * The Voice tab's "Design a voice" row: a dashed row that opens the sheet.
+ * Its sub-line says whether a description is on file (a free read).
+ */
 export function DesignVoiceRow({
-  sub,
+  characterId,
   onOpen,
 }: {
-  sub: string;
+  characterId: string;
   onOpen: () => void;
 }) {
+  const [described, setDescribed] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    setDescribed(null);
+    voiceOnFile({ characterId })
+      .then((r) => live && setDescribed(r.ok ? r.data !== null : false))
+      .catch(() => live && setDescribed(false));
+    return () => {
+      live = false;
+    };
+  }, [characterId]);
+  const sub =
+    described === null
+      ? "\u00a0"
+      : `${described ? "draft from its description" : "from scratch"} · three takes`;
   return (
     <div
       role="button"

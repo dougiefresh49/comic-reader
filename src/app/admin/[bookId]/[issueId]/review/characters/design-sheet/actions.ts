@@ -1,9 +1,9 @@
 "use server";
 
 /**
- * The design sheet's calls (#788). `startDesign` reads only. `draftVoicePrompt`
- * is free when it returns a prompt on file and otherwise makes one logged
- * GEMINI_MEDIUM call; it writes nothing. `generateVoicePreviews` spends
+ * The design sheet's calls (#788). `startDesign` and `voiceOnFile` read
+ * only. `draftVoicePrompt` is free when it returns a prompt on file and
+ * otherwise makes one logged GEMINI_MEDIUM call; it writes nothing. `generateVoicePreviews` spends
  * ElevenLabs credits (about one per preview-text character for the three
  * takes) and stores the takes' audio in the private previews bucket. No voice
  * is created here: an accepted take is a staged `create_design` move, and
@@ -43,19 +43,11 @@ export type DesignResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
-/** Where a draft came from, for the sheet's "From:" line. */
-export type DraftSource =
-  | { kind: "design_prompt" | "description"; voiceName: string }
-  | { kind: "gemini"; snippets: number };
-
-export interface Draft {
-  prompt: string;
-  source: DraftSource;
-}
-
 export interface DesignStart {
-  /** The prompt on file, or null when there is none. */
-  draft: Draft | null;
+  /** The prompt on file (`design_prompt`, else `description`), or null. */
+  prompt: string | null;
+  /** What the "From:" line quotes: the `description` on file, else the `design_prompt`, or null. */
+  onFile: string | null;
   /** The character's own lines in reading order, padded and capped. */
   previewText: string;
 }
@@ -87,8 +79,15 @@ const STATUS_RANK: Record<string, number> = {
   library: 3,
 };
 
-/** The character's `design_prompt` on file, else its `description`: its active voice's first, then the newest. */
-async function storedDraft(characterId: string): Promise<Draft | null> {
+/**
+ * The character's voice text on file, from its `voices` rows (a `needs_clip`
+ * stored design counts), its active voice's first, then the newest: the
+ * prompt Draft starts from (`design_prompt`, else `description`) and the
+ * text the "From:" line quotes (`description`, else `design_prompt`).
+ */
+async function readOnFile(
+  characterId: string,
+): Promise<{ prompt: string | null; onFile: string | null }> {
   const voices = await readCharacterVoices(supabaseAdmin, [characterId]);
   const rows = (
     await Promise.all(voices.map((v) => readVoice(supabaseAdmin, v.id)))
@@ -99,15 +98,23 @@ async function storedDraft(characterId: string): Promise<Draft | null> {
         (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9) ||
         b.created_at.localeCompare(a.created_at),
     );
-  for (const kind of ["design_prompt", "description"] as const) {
-    const row = rows.find((r) => r[kind]?.trim());
-    if (row)
-      return {
-        prompt: row[kind]!.trim(),
-        source: { kind, voiceName: row.display_name },
-      };
+  const first = (kind: "design_prompt" | "description") =>
+    rows.find((r) => r[kind]?.trim())?.[kind]?.trim() ?? null;
+  const prompt = first("design_prompt") ?? first("description");
+  const onFile = first("description") ?? first("design_prompt");
+  return { prompt, onFile };
+}
+
+/** The text on file the "From:" line would quote, for the Voice tab's row. Reads only. */
+export async function voiceOnFile(args: {
+  characterId: string;
+}): Promise<DesignResult<string | null>> {
+  try {
+    await requireAdmin();
+    return { ok: true, data: (await readOnFile(args.characterId)).onFile };
+  } catch (err) {
+    return fail("reading what is on file", err);
   }
-  return null;
 }
 
 /** What the sheet opens with: the prompt on file and the default preview text. Reads only. */
@@ -117,14 +124,14 @@ export async function startDesign(
   try {
     await requireAdmin();
     const { bookId, issueId, characterId } = args;
-    const [draft, lines] = await Promise.all([
-      storedDraft(characterId),
+    const [onFile, lines] = await Promise.all([
+      readOnFile(characterId),
       readSpeakerLines(supabaseAdmin, bookId, issueId),
     ]);
     return {
       ok: true,
       data: {
-        draft,
+        ...onFile,
         previewText: defaultPreviewText(
           (lines.get(characterId) ?? []).map((l) => l.text),
         ),
@@ -137,16 +144,17 @@ export async function startDesign(
 
 /**
  * Draft: the prompt on file, free, unless `again`; else one GEMINI_MEDIUM
- * call with the voice-description prompt over the character's voice
- * snippets from this issue. Writes nothing.
+ * call with the pipeline's voice-description prompt over the character's
+ * voice snippets from this issue, named as `describeVoices` names it.
+ * Writes nothing.
  */
 export async function draftVoicePrompt(
   args: Who & { again: boolean },
-): Promise<DesignResult<Draft>> {
+): Promise<DesignResult<string>> {
   try {
     await requireAdmin();
     const { bookId, issueId, characterId, again } = args;
-    const stored = again ? null : await storedDraft(characterId);
+    const stored = again ? null : (await readOnFile(characterId)).prompt;
     if (stored) return { ok: true, data: stored };
 
     const input = await loadVoiceDescriptionPlanInput(
@@ -154,9 +162,9 @@ export async function draftVoicePrompt(
       bookId,
       issueId,
     );
-    const snippets =
-      input.groups.find((g) => g.characterId === characterId)?.snippets ?? [];
-    if (snippets.length === 0)
+    const group = input.groups.find((g) => g.characterId === characterId);
+    const snippets = group?.snippets ?? [];
+    if (!group || snippets.length === 0)
       return {
         ok: false,
         error: again
@@ -164,30 +172,22 @@ export async function draftVoicePrompt(
           : "Nothing on file, and no lines in this issue to draft from",
       };
 
-    const { data: row, error } = await supabaseAdmin
-      .from("characters")
-      .select("display_name")
-      .eq("id", characterId)
-      .maybeSingle();
-    if (error) throw new Error(`reading ${characterId}: ${error.message}`);
-    const name =
-      (row as { display_name: string | null } | null)?.display_name ??
-      characterId;
-
     const response = await generateContentLogged(
       getGeminiClient(),
       {
         model: GEMINI_MEDIUM,
-        contents: [createPartFromText(voiceDescriptionPrompt(name, snippets))],
+        contents: [
+          // The name `describeVoices` passes: the group's first raw speaker string.
+          createPartFromText(
+            voiceDescriptionPrompt(group.resolvedName, snippets),
+          ),
+        ],
       },
       { step: "draft-voice-prompt", bookId, issueId },
     );
     const prompt = response.text?.trim();
     if (!prompt) throw new Error("Gemini returned no draft");
-    return {
-      ok: true,
-      data: { prompt, source: { kind: "gemini", snippets: snippets.length } },
-    };
+    return { ok: true, data: prompt };
   } catch (err) {
     return fail("drafting", err);
   }

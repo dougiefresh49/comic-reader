@@ -4,14 +4,13 @@
 // sent anywhere; the staged `create_design` move is the record.
 
 import type { CreateDesignMove } from "~/lib/casting-moves";
-import type { DraftSource, Take } from "./actions";
+import type { Take } from "./actions";
 
 export interface Accepted {
   move: CreateDesignMove;
   /** The take picked, from 1. */
   take: number;
   takes: Take[];
-  source: DraftSource | null;
 }
 
 const accepted = new Map<string, Accepted>();
