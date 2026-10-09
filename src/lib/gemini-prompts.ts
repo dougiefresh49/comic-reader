@@ -140,3 +140,26 @@ ${lastFields}
 \`\`\`
 `;
 }
+
+/**
+ * The voice-description prompt (#788): one character's per-line voice
+ * snippets into one ElevenLabs Voice Design description. The same text
+ * `describeVoices` in `src/workflows/steps/voice.ts` sends, which still
+ * builds its own copy until it calls this. Word for word: a change here is
+ * kid-facing prompt work.
+ */
+export function voiceDescriptionPrompt(
+  name: string,
+  snippets: string[],
+): string {
+  const list = snippets.map((s, idx) => `${idx + 1}. ${s}`).join("\n");
+
+  return `Consolidate these voice description snippets into a single, concise voice description suitable for ElevenLabs voice design. Focus on tone, pitch, accent, and speaking style. Keep it under 100 words.
+
+Character: "${name}"
+
+Snippets:
+${list}
+
+Return ONLY the consolidated description as plain text — no JSON, no markdown.`;
+}

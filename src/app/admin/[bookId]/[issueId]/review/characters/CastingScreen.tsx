@@ -18,6 +18,7 @@ import {
 import { useTabTrap } from "~/hooks/useTabTrap";
 import type {
   ArchiveMove,
+  CreateDesignMove,
   Move,
   Roster,
   RosterSlot,
@@ -40,6 +41,7 @@ import {
 } from "./actions";
 import { loadRoster } from "./casting-actions";
 import { CharacterPanel, type PanelTab } from "./CharacterPanel";
+import { DesignSheet, WandIcon } from "./design-sheet/DesignSheet";
 import { PlayButton, PlayerProvider } from "./player";
 import { ReviewSheet } from "./ReviewSheet";
 import { FacesPanel, NameField, matchesName } from "./shared";
@@ -626,6 +628,8 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   >(null);
   const [facesOpen, setFacesOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  /** The character the design sheet is open for. */
+  const [designFor, setDesignFor] = useState<string | null>(null);
   const [carry, setCarry] = useState<Carry | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [resumed, setResumed] = useState(false);
@@ -755,16 +759,23 @@ export function CastingScreen({ data }: { data: CharactersData }) {
 
   const forChar = (id: string) => (s: Staged) => characterOf(s.move) === id;
 
-  /** A voice pick. A slot comes free when one is, else from swapping out its own voice. */
+  /** A voice pick, or an accepted design. A slot comes free when one is, else from swapping out its own voice. */
   const pick = (
     card: CharacterCard,
-    voice: VoiceOption,
+    choice: VoiceOption | CreateDesignMove,
     opts: { slot?: SlotView; keep?: boolean } = {},
   ) => {
     const { slot } = opts;
     const st = stateOf(card);
     const base = card.voice?.uuid ?? null;
-    if (st.pick && pickVoiceId(st.pick.move) === voice.id && !opts.keep) {
+    const design = "generated_voice_id" in choice ? choice : null;
+    const voice = design ? null : (choice as VoiceOption);
+    if (
+      voice &&
+      st.pick &&
+      pickVoiceId(st.pick.move) === voice.id &&
+      !opts.keep
+    ) {
       setStaged((s) => withoutPick(s, card.id));
       say("Back to how it is");
       return;
@@ -772,10 +783,12 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     let next = withoutPick(staged, card.id).filter(
       (s) => !(forChar(card.id)(s) && s.move.kind === "sit_out"),
     );
-    const isBase = voice.id === base && voice.status === "active";
+    const isBase =
+      voice !== null && voice.id === base && voice.status === "active";
+    const label = voice ? voice.name : "a new design";
     let how = "";
     if (!isBase) {
-      const m = pickMove(card, voice);
+      const m = design ?? pickMove(card, voice!);
       if (takesSlot(m)) {
         // Read the slots from the list without the old pick, whose archive
         // it just dropped, so that slot can be swapped out again.
@@ -843,11 +856,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         { move: { kind: "back_in", character_id: card.id }, pickFor: card.id },
       ];
     setStaged(next);
-    say(
-      isBase
-        ? `${st.name} → ${voice.name}`
-        : `${st.name} → ${voice.name}${how}`,
-    );
+    say(isBase ? `${st.name} → ${label}` : `${st.name} → ${label}${how}`);
   };
 
   const setSlotFree = (cid: string) =>
@@ -1064,6 +1073,9 @@ export function CastingScreen({ data }: { data: CharactersData }) {
 
   const menuCard =
     menu?.kind === "card" ? cards.find((c) => c.id === menu.id) : undefined;
+  const designCard = designFor
+    ? cards.find((c) => c.id === designFor)
+    : undefined;
 
   return (
     <PlayerProvider
@@ -1295,6 +1307,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
               model={model}
               speakers={speakers}
               onPick={(v) => pick(openCard, v)}
+              onDesign={() => setDesignFor(openCard.id)}
               onSlotFree={() => setSlotFree(openCard.id)}
               onSlotSwap={(slot) => setSlotSwap(openCard.id, slot)}
               onSwapFlags={(patch) => {
@@ -1317,6 +1330,16 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           <div className="px-2.5 pt-1.5 pb-1 text-[12px] font-semibold text-neutral-100">
             {nameOf(menuCard.id)}
           </div>
+          <button
+            type="button"
+            className={MENU_ITEM}
+            onClick={() => {
+              setMenu(null);
+              setDesignFor(menuCard.id);
+            }}
+          >
+            {WandIcon} Design a voice
+          </button>
           {stateOf(menuCard).sitOut ? (
             <button
               type="button"
@@ -1397,6 +1420,26 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           busy={busy}
           run={run}
           onClose={() => setFacesOpen(false)}
+        />
+      )}
+
+      {designCard && (
+        <DesignSheet
+          key={designCard.id}
+          scope={scope}
+          card={designCard}
+          name={nameOf(designCard.id)}
+          staged={(() => {
+            const m = stateOf(designCard).pick?.move;
+            return m?.kind === "create_design" ? m : null;
+          })()}
+          onAccept={(move) => {
+            pick(designCard, move);
+            setDesignFor(null);
+            setTab("voice");
+            if (openId !== designCard.id) open(designCard.id);
+          }}
+          onClose={() => setDesignFor(null)}
         />
       )}
 
