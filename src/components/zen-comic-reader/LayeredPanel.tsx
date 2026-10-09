@@ -113,33 +113,23 @@ export function LayeredPanel({
   }
 
   const fgPaths = allPolys.map((p) => polyToSvgPath(p, bbox));
-  const bgPath = `M 0 0 L 1 0 L 1 1 L 0 1 Z ${fgPaths.join(" ")}`;
   const fgPath = fgPaths.join(" ");
 
   return (
     <>
       <svg className="absolute" width="0" height="0" aria-hidden>
         <defs>
-          <clipPath id={`${clipId}-bg`} clipPathUnits="objectBoundingBox">
-            <path d={bgPath} clipRule="evenodd" fillRule="evenodd" />
-          </clipPath>
           <clipPath id={`${clipId}-fg`} clipPathUnits="objectBoundingBox">
             <path d={fgPath} />
           </clipPath>
         </defs>
       </svg>
 
-      {/* A spread's background copy stays whole (#724). Its foreground
-          polygons are cut at the seam, and where a cut-out edge and the
-          foreground edge share a device pixel the two partial coverages
-          leave a dark 1px line. The foreground copy on top still hides
-          the effects behind the characters. */}
-      <PageArt
-        pageImage={pageImage}
-        spread={spread}
-        alt=""
-        style={spread ? undefined : { clipPath: `url(#${clipId}-bg)` }}
-      />
+      {/* The background copy stays whole: cutting the polygons out of it
+          left a dark outline wherever a cut-out edge and the foreground
+          edge shared a device pixel (#731). The foreground copy on top is
+          what hides the effects behind the characters. */}
+      <PageArt pageImage={pageImage} spread={spread} alt="" />
 
       {effectsSlot}
 
