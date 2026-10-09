@@ -258,6 +258,11 @@ function VoiceRequestNote({
 }) {
   const request = card.voiceRequest;
   if (!request) return null;
+  const voiceLabel =
+    card.voice != null &&
+    card.name.trim().toLowerCase() === card.voice.name.trim().toLowerCase()
+      ? "its current voice"
+      : (card.voice?.name ?? "no voice");
   const keeps = (
     <>
       It is made at the{" "}
@@ -267,7 +272,7 @@ function VoiceRequestNote({
       >
         voices stop
       </Link>
-      ; {card.name} keeps {card.voice?.name ?? "no voice"} until then.
+      ; {card.name} keeps {voiceLabel} until then.
     </>
   );
   return (
