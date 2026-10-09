@@ -1,4 +1,4 @@
-// The panel's Faces tab (#745): the exemplar summary with two icon buttons, the face tiles with an icon toolbar each, and a select mode that moves several faces at once.
+// The panel's Faces tab (#745): the exemplar summary with two icon buttons, the face tiles with an icon toolbar each, and a select mode that moves or rejects several faces at once.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -327,7 +327,7 @@ export function FacesTab({
         )}
       </div>
 
-      {selecting && (
+      {selecting && card.faces.length > 0 && (
         <div className="mb-3 flex h-9 items-center justify-between gap-2 rounded-sm border border-neutral-700 bg-neutral-900 px-2 text-[14px]">
           <span className="text-neutral-300">{selected.length} selected</span>
           <div className="flex items-center gap-1">
@@ -335,7 +335,7 @@ export function FacesTab({
               type="button"
               disabled={busy || selected.length === 0}
               onClick={(e) => onMoveRequest(selected, e.currentTarget)}
-              aria-label={`Move ${selectedFaces}…`}
+              aria-label={`Move ${selectedFaces} to another character`}
               title={`Move ${selectedFaces} to another character`}
               className={ICON_BUTTON}
             >

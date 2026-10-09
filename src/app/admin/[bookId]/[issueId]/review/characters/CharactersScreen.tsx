@@ -508,8 +508,9 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
         rejectFace({ scope, detectionId: face.id }),
       ),
     onRejectMany: (faces: FaceView[]) =>
-      run(`Dropping ${faces.length} faces`, () =>
-        rejectFaces({ scope, detectionIds: faces.map((f) => f.id) }),
+      run(
+        `Dropping ${faces.length} ${faces.length === 1 ? "face" : "faces"}`,
+        () => rejectFaces({ scope, detectionIds: faces.map((f) => f.id) }),
       ),
     // Any other voice choice ends the appearance pick Undo would revert.
     onSetVoice: (voice: ActiveVoice) => {
