@@ -40,6 +40,8 @@ export interface VoiceView {
   borrowedFrom: string | null;
   /** The `voices` row id, when the castlist or the starting voice names one. */
   uuid: string | null;
+  /** A per-row preview override; left unset, the Voice tab asks `voicePreview` on the first Play. */
+  previewUrl?: string | null;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface PendingVoiceRequest {
 export interface ActiveVoice {
   id: string;
   name: string;
+  /** A per-row preview override; left unset, the Voice tab asks `voicePreview` on the first Play. */
+  previewUrl?: string | null;
 }
 
 export type CardGroup = "here" | "before" | "role";

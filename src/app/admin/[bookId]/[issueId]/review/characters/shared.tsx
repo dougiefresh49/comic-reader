@@ -26,6 +26,43 @@ export const QUIET_DANGER =
   "inline-flex h-8 shrink-0 items-center rounded-sm px-2 text-[14px] whitespace-nowrap text-red-400 hover:bg-red-500/10 hover:text-red-300 disabled:text-neutral-600 disabled:hover:bg-transparent";
 export const INPUT =
   "h-8 w-full rounded-sm border border-neutral-700 bg-neutral-950 px-2 text-[14px] text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-neutral-400";
+/** A square icon-only button, 28px: the panel's Rename pencil, the tiles' toolbar. Pair with an `aria-label` and a `title`. */
+export const ICON_BUTTON =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-sm text-neutral-400 hover:bg-neutral-800 hover:text-white disabled:text-neutral-600 disabled:hover:bg-transparent";
+/** ICON_BUTTON in the primary style: the Faces tab's check. */
+export const ICON_PRIMARY =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-sm bg-neutral-100 text-neutral-950 hover:bg-white disabled:bg-neutral-700 disabled:text-neutral-400";
+/** The props of a 16px stroked inline icon: spread onto an `<svg>`, then draw its paths. */
+export const SVG_ICON = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+  "aria-hidden": true,
+} as const;
+
+/** The name picker's match: a slugified query against the id, the name and the aliases. `q` is already slugified. */
+export function matchesName(k: KnownCharacter, q: string): boolean {
+  return (
+    k.id.includes(q) ||
+    slugify(k.name).includes(q) ||
+    k.aliases.some((a) => slugify(a).includes(q))
+  );
+}
+
+/** The query names this row outright, so "New character" is not offered. */
+export function isExactName(k: KnownCharacter, q: string): boolean {
+  return (
+    k.id === q ||
+    slugify(k.name) === q ||
+    k.aliases.some((a) => slugify(a) === q)
+  );
+}
 
 /** "1 face on page 3", "4 faces on pages 1, 2". */
 export function facesLine(faces: FaceView[]): string {
@@ -125,21 +162,9 @@ export function NameField({
   const q = slugify(value);
   const matches = useMemo(() => {
     if (!q) return [] as KnownCharacter[];
-    return known
-      .filter(
-        (k) =>
-          k.id.includes(q) ||
-          slugify(k.name).includes(q) ||
-          k.aliases.some((a) => slugify(a).includes(q)),
-      )
-      .slice(0, 6);
+    return known.filter((k) => matchesName(k, q)).slice(0, 6);
   }, [known, q]);
-  const exact = known.find(
-    (k) =>
-      k.id === q ||
-      slugify(k.name) === q ||
-      k.aliases.some((a) => slugify(a) === q),
-  );
+  const exact = known.find((k) => isExactName(k, q));
   const rows: { label: string; target: NameTarget; name: string }[] = [
     ...matches.map((m) => ({
       label: m.name,
@@ -556,11 +581,47 @@ export function FacesPanel({
 }
 
 /**
- * A yes-or-no confirm over the screen: the shape and chrome of the admin's
- * StartConfirmDialog without its typed check. Clicking the backdrop cancels.
- * Escape is the caller's to handle (the character panel's window listener
- * closes the innermost open thing first), so this adds no key listener.
+ * A modal's chrome: the shape of the admin's StartConfirmDialog, a dimmed
+ * backdrop that cancels on click, the box in the middle. Escape is the
+ * caller's to handle (the character panel's window listener closes the
+ * innermost open thing first), so this adds no key listener. `className`
+ * sizes and lays out the box; the default is the confirm's 440px.
  */
+export function DialogFrame({
+  role = "dialog",
+  labelledBy,
+  describedBy,
+  className = "w-[440px] space-y-3",
+  onCancel,
+  children,
+}: {
+  role?: "dialog" | "alertdialog";
+  labelledBy: string;
+  describedBy?: string;
+  className?: string;
+  onCancel: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      role={role}
+      aria-modal="true"
+      aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
+      onClick={onCancel}
+      className="fixed inset-0 z-[35] flex items-center justify-center bg-neutral-950/80 p-6"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`max-w-full rounded-md border border-neutral-700 bg-neutral-900 p-4 text-[14px] ${className}`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** A yes-or-no confirm over the screen, in the DialogFrame, without StartConfirmDialog's typed check. */
 export function ConfirmDialog({
   title,
   body,
@@ -579,38 +640,31 @@ export function ConfirmDialog({
   const headingId = useId();
   const bodyId = useId();
   return (
-    <div
+    <DialogFrame
       role="alertdialog"
-      aria-modal="true"
-      aria-labelledby={headingId}
-      aria-describedby={bodyId}
-      onClick={onCancel}
-      className="fixed inset-0 z-[35] flex items-center justify-center bg-neutral-950/80 p-6"
+      labelledBy={headingId}
+      describedBy={bodyId}
+      onCancel={onCancel}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-[440px] max-w-full space-y-3 rounded-md border border-neutral-700 bg-neutral-900 p-4 text-[14px]"
-      >
-        <h2 id={headingId} className="text-[16px] font-medium text-neutral-100">
-          {title}
-        </h2>
-        <p id={bodyId} className="text-neutral-400">
-          {body}
-        </p>
-        <div className="flex justify-end gap-2">
-          <button type="button" autoFocus onClick={onCancel} className={BUTTON}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onConfirm}
-            className={DANGER}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+      <h2 id={headingId} className="text-[16px] font-medium text-neutral-100">
+        {title}
+      </h2>
+      <p id={bodyId} className="text-neutral-400">
+        {body}
+      </p>
+      <div className="flex justify-end gap-2">
+        <button type="button" autoFocus onClick={onCancel} className={BUTTON}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onConfirm}
+          className={DANGER}
+        >
+          {confirmLabel}
+        </button>
       </div>
-    </div>
+    </DialogFrame>
   );
 }

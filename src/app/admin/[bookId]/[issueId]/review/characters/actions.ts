@@ -22,9 +22,16 @@ import {
   setVoice,
   storeVoiceRequest,
   swapIssueVoice,
+  voiceFor,
   type VoiceRequest,
 } from "~/lib/cast";
-import { readVoice, voiceForAppearance } from "~/lib/voice-slots";
+import {
+  VOICE_CLIPS_BUCKET,
+  clipObjectPath,
+  readVoice,
+  voiceForAppearance,
+} from "~/lib/voice-slots";
+import { audioUrl } from "~/lib/storage";
 import { addAlias } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
@@ -45,6 +52,11 @@ export type PickResult =
   | { ok: true; message: string; previousVoiceUuid?: string | null }
   | { ok: false; error: string };
 
+/** `voicePreview`'s answer: a playable URL, null when the voice has no stored audio, or a failure. */
+export type PreviewResult =
+  | { ok: true; url: string | null }
+  | { ok: false; error: string };
+
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
 export type NameTarget =
   | { kind: "existing"; id: string }
@@ -59,7 +71,7 @@ function revalidate({ bookId, issueId }: Scope) {
   revalidatePath(`/admin/${bookId}/${issueId}/review/characters`, "page");
 }
 
-function fail(what: string, err: unknown): ActionResult {
+function fail(what: string, err: unknown): { ok: false; error: string } {
   const message = err instanceof Error ? err.message : String(err);
   console.error(`characters stop, ${what}:`, err);
   return { ok: false, error: message };
@@ -352,6 +364,42 @@ export async function rejectGroup(args: {
  * character's only face on the page; either way it is confirmed for the new
  * character. Any other loose exemplar on that page stays, unconfirmed.
  */
+/**
+ * The writes of one face move: the detection goes to `to`, verified; its
+ * exemplar follows, confirmed; the page's loose exemplars settle. Both move
+ * actions call this, so a batch writes exactly what a single move does.
+ */
+async function moveDetection(
+  scope: Scope,
+  face: { id: string; characterId: string | null; page: number },
+  to: string,
+): Promise<void> {
+  const moved = await supabaseAdmin
+    .from("panel_character_detections")
+    .update({
+      character_id: to,
+      suggested_name: null,
+      human_verified: true,
+    })
+    .eq("id", face.id);
+  must("moving the face", moved.error);
+  const exemplar = await supabaseAdmin
+    .from("character_face_exemplars")
+    .update({
+      character_id: to,
+      suggested_name: null,
+      is_confirmed: true,
+    })
+    .eq("book_id", scope.bookId)
+    .eq("source_issue", scope.issueId)
+    .eq("detection_id", face.id);
+  must("moving the face's exemplar", exemplar.error);
+  await settleLooseExemplars(scope, face.characterId, face.page, {
+    kind: "move",
+    to,
+  });
+}
+
 export async function moveFace(args: {
   scope: Scope;
   detectionId: string;
@@ -369,30 +417,7 @@ export async function moveFace(args: {
     );
     if (face.characterId === who.id)
       return { ok: true, message: `That face is already ${who.name}.` };
-    const moved = await supabaseAdmin
-      .from("panel_character_detections")
-      .update({
-        character_id: who.id,
-        suggested_name: null,
-        human_verified: true,
-      })
-      .eq("id", detectionId);
-    must("moving the face", moved.error);
-    const exemplar = await supabaseAdmin
-      .from("character_face_exemplars")
-      .update({
-        character_id: who.id,
-        suggested_name: null,
-        is_confirmed: true,
-      })
-      .eq("book_id", scope.bookId)
-      .eq("source_issue", scope.issueId)
-      .eq("detection_id", detectionId);
-    must("moving the face's exemplar", exemplar.error);
-    await settleLooseExemplars(scope, face.characterId, face.page, {
-      kind: "move",
-      to: who.id,
-    });
+    await moveDetection(scope, face, who.id);
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
     return {
@@ -401,6 +426,56 @@ export async function moveFace(args: {
     };
   } catch (err) {
     return fail("moving a face", err);
+  }
+}
+
+/**
+ * Moves a selection of faces to one character (#745): every face is read
+ * before anything is written (a stale id fails the whole move, not half of
+ * it), the target is resolved once and joins the cast before the first
+ * face moves, each face is then written as `moveFace` writes it, and the
+ * page refreshes once. A face already on the target is left alone and
+ * counted; when every face is, nothing is written, as in `moveFace`.
+ */
+export async function moveFaces(args: {
+  scope: Scope;
+  detectionIds: string[];
+  target: NameTarget;
+  franchiseId: string | null;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { scope, detectionIds } = args;
+    if (detectionIds.length === 0) throw new Error("no faces were picked");
+    const faces: Awaited<ReturnType<typeof readDetection>>[] = [];
+    for (const detectionId of detectionIds)
+      faces.push(await readDetection(scope, detectionId));
+    const who = await resolveTarget(
+      scope.bookId,
+      args.target,
+      args.franchiseId,
+    );
+    const toMove = faces.filter((f) => f.characterId !== who.id);
+    const skipped = faces.length - toMove.length;
+    if (toMove.length === 0)
+      return {
+        ok: true,
+        message: `${faces.length === 1 ? "That face is" : "Those faces are"} already ${who.name}.`,
+      };
+    await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
+    for (const face of toMove) await moveDetection(scope, face, who.id);
+    revalidate(scope);
+    const count = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
+    return {
+      ok: true,
+      message:
+        `Moved ${count(toMove.length)} to ${who.name}${who.created ? ", a new character" : ""}.` +
+        (skipped > 0
+          ? ` ${count(skipped)} already ${who.name}, left alone.`
+          : ""),
+    };
+  } catch (err) {
+    return fail("moving faces", err);
   }
 }
 
@@ -927,6 +1002,75 @@ export async function undoVoiceRequest(args: {
     };
   } catch (err) {
     return fail("undoing a voice request", err);
+  }
+}
+
+/**
+ * A playable preview of a voice (#745, owner call O1, option B), read-only
+ * and called on the first Play: a signed URL to the voice's source clip
+ * when it has one (as the loader signs an archived clone's), else the audio
+ * of one bubble in this book already rendered in that voice, else null. A
+ * bubble records its character, not its voice, so the castlist rows of the
+ * book that hold the voice name the (issue, character) pairs, each checked
+ * against the render chain (`voiceFor`), this issue first.
+ */
+export async function voicePreview(args: {
+  scope: Scope;
+  voiceId: string;
+}): Promise<PreviewResult> {
+  try {
+    await requireAdmin();
+    const { scope, voiceId } = args;
+    const voice = await readVoice(supabaseAdmin, voiceId);
+    if (!voice) return { ok: true, url: null };
+    if (voice.source_clip_path) {
+      const signed = await supabaseAdmin.storage
+        .from(VOICE_CLIPS_BUCKET)
+        .createSignedUrl(clipObjectPath(voice.source_clip_path), 3600);
+      if (signed.data?.signedUrl)
+        return { ok: true, url: signed.data.signedUrl };
+      // A clip that will not sign falls through to a rendered bubble.
+      console.warn(
+        `characters stop, signing ${voice.source_clip_path}:`,
+        signed.error?.message,
+      );
+    }
+    const book = await loadBookCast(supabaseAdmin, scope.bookId);
+    const pairs = book.rows
+      .filter(
+        (r) =>
+          r.voice_uuid === voiceId &&
+          voiceFor(book, r.character_id, r.issue_id)?.voiceUuid === voiceId,
+      )
+      .sort((a, b) =>
+        a.issue_id === scope.issueId
+          ? -1
+          : b.issue_id === scope.issueId
+            ? 1
+            : 0,
+      );
+    for (const r of pairs) {
+      const bubble = await supabaseAdmin
+        .from("bubbles")
+        .select("audio_storage_path")
+        .eq("book_id", scope.bookId)
+        .eq("issue_id", r.issue_id)
+        .eq("character_id", r.character_id)
+        .eq("needs_audio", false)
+        .not("audio_storage_path", "is", null)
+        .limit(1)
+        .maybeSingle();
+      must("reading a rendered bubble", bubble.error);
+      const row = bubble.data as { audio_storage_path: string | null } | null;
+      if (row?.audio_storage_path)
+        return {
+          ok: true,
+          url: audioUrl(scope.bookId, r.issue_id, row.audio_storage_path),
+        };
+    }
+    return { ok: true, url: null };
+  } catch (err) {
+    return fail("previewing a voice", err);
   }
 }
 
