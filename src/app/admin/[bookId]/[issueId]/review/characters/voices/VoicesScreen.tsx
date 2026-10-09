@@ -1,4 +1,4 @@
-// The voices stop: every voice request and every speaker with no voice, the slot plan for each, Run, samples, and Continue.
+// The voices stop: every voice request and every speaker with no voice, each card one decision (#779: the voice, what it costs, one action), samples, and Continue.
 // Continue shows only while a run is paused at casting; the header always links on to the editor (#757).
 "use client";
 
@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
-  useId,
   useMemo,
   useState,
   useTransition,
@@ -16,62 +15,39 @@ import { PageCrop } from "~/components/review-editor/PageCrop";
 import {
   acceptVoice,
   checkAgain,
-  chooseVoice,
   clearNoAudio,
   continueRun,
   noAudio,
-  playSample,
   restoreVoice,
   runAgain,
-  runItem,
-  pickActiveVoice,
-  type ActionResult,
-  type ItemRef,
 } from "./actions";
-import type {
-  ItemView,
-  LeftWithout,
-  Portrait,
-  SampleLine,
-  SlotsView,
-  VoiceRef,
-  VoicesData,
-} from "./types";
+import { Reasons, Samples } from "./bits";
+import { Decision, decisionKey, presetCounts } from "./Decision";
+import {
+  BUTTON,
+  PRIMARY,
+  QUIET,
+  SELECT,
+  plain,
+  refOf,
+  type Note,
+  type Run,
+  type Scope,
+} from "./shared";
+import type { ItemView, Portrait, VoicesData } from "./types";
 
-// The characters stop's (#349) button and layout classes, so the two stops look alike.
-const BUTTON =
-  "inline-flex h-8 shrink-0 items-center rounded-sm border border-neutral-700 px-3 text-[14px] whitespace-nowrap text-neutral-200 hover:border-neutral-500 hover:bg-neutral-800 disabled:border-neutral-800 disabled:text-neutral-600 disabled:hover:bg-transparent";
-const PRIMARY =
-  "inline-flex h-8 shrink-0 items-center rounded-sm bg-neutral-100 px-3 text-[14px] font-medium whitespace-nowrap text-neutral-950 hover:bg-white disabled:bg-neutral-700 disabled:text-neutral-400";
-const QUIET =
-  "inline-flex h-8 shrink-0 items-center rounded-sm px-2 text-[14px] whitespace-nowrap text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100 disabled:text-neutral-600 disabled:hover:bg-transparent";
-const SELECT =
-  "h-8 min-w-0 rounded-sm border border-neutral-700 bg-neutral-950 px-2 text-[14px] text-neutral-100 outline-none focus:border-neutral-400";
-
-type Note = { text: string; tone: "plain" | "warn"; busy?: true } | null;
-type Run = (label: string, work: () => Promise<ActionResult>) => void;
-type Scope = { bookId: string; issueId: string };
-
-const FREE = "free";
-// The Archive select's placeholder, when the plan has no voice it can archive and no slot is free (#770).
-const PICK = "";
-
-const freeOfferedFor = (item: ItemView, slots: SlotsView): boolean =>
-  slots.free > 0 || item.outgoing?.kind === "free slot";
-
-/** What the Archive select starts on: the plan's pick only when it can be archived. */
-function presetOf(item: ItemView, slots: SlotsView): string {
-  const out = item.outgoing;
-  if (out?.kind === "archive" && out.refusals.length === 0) return out.id;
-  return freeOfferedFor(item, slots) ? FREE : PICK;
+function sourceLine(item: ItemView): string {
+  const lines = `${item.lines} ${item.lines === 1 ? "line" : "lines"}`;
+  if (item.source === "request")
+    return `Asked for on the Characters screen. ${lines}.`;
+  if (item.source === "archived voice")
+    return `Its voice is archived. ${lines}.`;
+  return `No voice. ${lines}.`;
 }
 
-const refOf = (item: ItemView): ItemRef => ({
-  characterId: item.characterId,
-  action: item.action,
-  targetId: item.target?.id ?? null,
-  designedVoices: item.designedVoices,
-});
+/** Warnings the pending card states in its own words (the replaced voice that stays active is said under the slot pick). */
+const cardWarnings = (item: ItemView): string[] =>
+  item.warnings.filter((w) => !w.includes("cannot be archived ("));
 
 function Avatar({ name, portrait }: { name: string; portrait?: Portrait }) {
   if (!portrait)
@@ -91,400 +67,6 @@ function Avatar({ name, portrait }: { name: string; portrait?: Portrait }) {
       alt={name}
       className="size-16 shrink-0 rounded-md bg-neutral-800"
     />
-  );
-}
-
-function sourceLine(item: ItemView): string {
-  const lines = `${item.lines} ${item.lines === 1 ? "line" : "lines"}`;
-  if (item.source === "request")
-    return `Asked for at the characters stop. ${lines}.`;
-  if (item.source === "archived voice")
-    return `Its voice is archived. ${lines}.`;
-  return `No voice. ${lines}.`;
-}
-
-function choiceLine(item: ItemView): string {
-  // Not a request and not planned: the plan's default is not on offer.
-  if (item.source !== "request" && !item.needsSlot && !item.refusals.length)
-    return "Nothing chosen yet.";
-  if (item.action === "design") return "Now: a new designed voice.";
-  const name = item.target?.name ?? "a voice not found";
-  return item.action === "restore"
-    ? `Now: restore ${name}.`
-    : `Now: clone ${name}.`;
-}
-
-function Leaves({ leaves }: { leaves: LeftWithout[] }) {
-  if (leaves.length === 0)
-    return (
-      <p className="text-neutral-400">
-        No castlist row is left without a voice.
-      </p>
-    );
-  return (
-    <div className="text-amber-200">
-      Leaves without a voice:
-      <ul className="mt-1 list-disc pl-5 text-neutral-300">
-        {leaves.map((l) => (
-          <li key={`${l.bookId}/${l.issueId}/${l.character}`}>
-            {l.character}, {l.bookId} / {l.issueId}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function Reasons({ items, tone }: { items: string[]; tone: "warn" | "note" }) {
-  if (items.length === 0) return null;
-  return (
-    <ul
-      className={`space-y-0.5 ${tone === "warn" ? "text-amber-200" : "text-neutral-400"}`}
-    >
-      {items.map((r) => (
-        <li key={r}>{r}</li>
-      ))}
-    </ul>
-  );
-}
-
-/** The slot plan for one slot-taking item, with the voice Run would archive and a way to pick another. */
-function SlotPlan({
-  item,
-  slots,
-  busy,
-  onRun,
-}: {
-  item: ItemView;
-  slots: SlotsView;
-  busy: boolean;
-  onRun: (archive: VoiceRef | null) => void;
-}) {
-  const preset = presetOf(item, slots);
-  const [picked, setPicked] = useState(preset);
-  const selectId = useId();
-  const choice = item.choices.find((c) => c.id === picked) ?? null;
-  const freeOffered = freeOfferedFor(item, slots);
-  const refused = (choice?.refusals.length ?? 0) > 0;
-  const order =
-    !refused && item.outgoing?.kind === "archive" && item.outgoing.id === picked
-      ? item.outgoing.order
-      : null;
-  // Why Run is off, first match wins; null means Run may go.
-  const why =
-    item.refusals[0] ??
-    (choice && refused
-      ? `${choice.name} cannot be archived; pick another voice${freeOffered ? " or a free slot" : ""}`
-      : picked === FREE
-        ? slots.free === 0
-          ? "No free slot: pick a voice to archive"
-          : null
-        : !choice
-          ? "Pick a voice to archive"
-          : null);
-  const blocked = why !== null;
-
-  return (
-    <div className="mt-3 space-y-2 rounded-md border border-neutral-800 bg-neutral-950/60 p-3">
-      <p className="text-neutral-300">
-        Takes a slot: {slots.used} of {slots.limit} used, {slots.free} free.
-        Add/edit {slots.addEditUsed} of {slots.addEditMax} used,{" "}
-        {slots.headroom} left.
-      </p>
-      {item.outgoing === null && (
-        <p className="text-amber-200">
-          The plan found no slot for this item. Pick a voice to archive.
-        </p>
-      )}
-      <label htmlFor={selectId} className="flex flex-wrap items-center gap-2">
-        <span className="text-neutral-400">Archive</span>
-        <select
-          id={selectId}
-          name="archive-voice"
-          className={SELECT}
-          value={picked}
-          disabled={busy}
-          onChange={(e) => setPicked(e.target.value)}
-        >
-          {preset === PICK && (
-            <option value={PICK} disabled>
-              Pick a voice to archive…
-            </option>
-          )}
-          {freeOffered && (
-            <option value={FREE}>nothing, use a free slot</option>
-          )}
-          {item.choices.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-              {c.id === item.replaces?.id ? " (the voice it replaces)" : ""}
-              {c.id === preset ? " (planned)" : ""}
-              {c.refusals.length > 0 ? " (cannot be archived)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      {choice && (
-        <>
-          {order && (
-            <p className="text-neutral-400">
-              {order === "add first"
-                ? `Adds the new voice first, then archives ${choice.name}.`
-                : `Archives ${choice.name} first. If the add is refused, ${choice.name} is restored.`}
-            </p>
-          )}
-          <Leaves leaves={choice.leaves} />
-          <Reasons items={choice.refusals} tone="warn" />
-        </>
-      )}
-      <div className="flex flex-wrap items-center gap-2 pt-1">
-        <button
-          type="button"
-          className={PRIMARY}
-          disabled={busy || blocked}
-          title={why ?? undefined}
-          onClick={() =>
-            onRun(choice ? { id: choice.id, name: choice.name } : null)
-          }
-        >
-          {picked === FREE
-            ? "Run, free slot"
-            : choice && !refused
-              ? `Run, archive ${choice.name}`
-              : "Run"}
-        </button>
-        {why ? (
-          <span className="text-amber-200">{why}</span>
-        ) : (
-          picked !== FREE && (
-            <span className="text-neutral-500">
-              Nothing is archived until you click Run.
-            </span>
-          )
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Samples({
-  scope,
-  item,
-  busy,
-  setNote,
-}: {
-  scope: Scope;
-  item: ItemView;
-  busy: boolean;
-  setNote: (n: Note) => void;
-}) {
-  const [playing, setPlaying] = useState<string | null>(null);
-  if (!item.voice || item.samples.length === 0) return null;
-  const play = async (line: SampleLine) => {
-    setPlaying(line.bubbleId);
-    setNote({
-      text: `Playing page ${line.page} in ${item.voice?.name}…`,
-      tone: "plain",
-    });
-    let result;
-    try {
-      result = await playSample({
-        scope,
-        characterId: item.characterId,
-        bubbleId: line.bubbleId,
-      });
-    } catch (err) {
-      // The call can throw before the action runs (fetch refused, network down).
-      setPlaying(null);
-      setNote({
-        text: err instanceof Error ? err.message : String(err),
-        tone: "warn",
-      });
-      return;
-    }
-    if (!result.ok) {
-      setPlaying(null);
-      setNote({ text: result.error, tone: "warn" });
-      return;
-    }
-    const audio = new Audio(`data:audio/mpeg;base64,${result.audio}`);
-    audio.onended = () => setPlaying(null);
-    audio.onerror = () => setPlaying(null);
-    setNote(null);
-    await audio.play().catch(() => setPlaying(null));
-  };
-  return (
-    <div className="mt-3">
-      <div className="mb-1 text-neutral-400">
-        Hear {item.voice.name} (test audio, not saved):
-      </div>
-      <ul className="space-y-1">
-        {item.samples.map((line) => (
-          <li key={line.bubbleId} className="flex items-start gap-2">
-            <button
-              type="button"
-              className={BUTTON}
-              disabled={busy || playing !== null}
-              onClick={() => void play(line)}
-            >
-              {playing === line.bubbleId ? "Playing" : "Play"}
-            </button>
-            <span className="pt-1 text-neutral-300">
-              <span className="text-neutral-500">p.{line.page}</span>{" "}
-              {line.text}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** What he can choose for an unsettled item: a clone, a design, an active voice, keep, or no audio. */
-function Choices({
-  scope,
-  item,
-  active,
-  busy,
-  run,
-}: {
-  scope: Scope;
-  item: ItemView;
-  active: VoiceRef[];
-  busy: boolean;
-  run: Run;
-}) {
-  const [voiceId, setVoiceId] = useState("");
-  const voice = active.find((v) => v.id === voiceId);
-  const ref = refOf(item);
-  return (
-    <div className="mt-3 space-y-3">
-      {item.candidates.length > 0 && (
-        <div>
-          <div className="mb-1 text-neutral-400">voice-lab clones</div>
-          <ul className="space-y-1.5">
-            {item.candidates.map((c) => {
-              const chosen =
-                item.action !== "design" && item.target?.id === c.id;
-              return (
-                <li key={c.id} className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-32 text-neutral-200">
-                    {c.name}
-                    {c.labDefault && (
-                      <span className="text-neutral-500"> (lab default)</span>
-                    )}
-                  </span>
-                  {c.clipUrl ? (
-                    <audio
-                      controls
-                      preload="none"
-                      src={c.clipUrl}
-                      className="h-8 max-w-56"
-                    />
-                  ) : (
-                    <span className="text-neutral-500">no clip</span>
-                  )}
-                  {chosen ? (
-                    <span className="text-emerald-300">chosen</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={BUTTON}
-                      disabled={busy}
-                      onClick={() =>
-                        run(`Choosing ${c.name}`, () =>
-                          chooseVoice({
-                            scope,
-                            characterId: item.characterId,
-                            choice: { kind: "clone", voice: c },
-                          }),
-                        )
-                      }
-                    >
-                      Use this clone
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
-        {!(item.action === "design" && item.source === "request") && (
-          <button
-            type="button"
-            className={BUTTON}
-            disabled={busy}
-            onClick={() =>
-              run("Choosing a new designed voice", () =>
-                chooseVoice({
-                  scope,
-                  characterId: item.characterId,
-                  choice: { kind: "design" },
-                }),
-              )
-            }
-          >
-            Design a new voice
-          </button>
-        )}
-        {item.replaces && (
-          <button
-            type="button"
-            className={BUTTON}
-            disabled={busy}
-            onClick={() =>
-              run(`Keeping ${item.replaces!.name}`, () =>
-                pickActiveVoice({ scope, item: ref, voice: item.replaces! }),
-              )
-            }
-          >
-            Keep {item.replaces.name}
-          </button>
-        )}
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={busy}
-          onClick={() =>
-            run("No audio this run", () => noAudio({ scope, item: ref }))
-          }
-        >
-          No audio this run
-        </button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          name="active-voice"
-          aria-label={`Active voice for ${item.name} (no slot)`}
-          className={SELECT}
-          value={voiceId}
-          disabled={busy}
-          onChange={(e) => setVoiceId(e.target.value)}
-        >
-          <option value="">An active voice, no slot…</option>
-          {active.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          className={BUTTON}
-          disabled={busy || !voice}
-          onClick={() =>
-            voice &&
-            run(`Using ${voice.name}`, () =>
-              pickActiveVoice({ scope, item: ref, voice }),
-            )
-          }
-        >
-          Use
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -539,7 +121,7 @@ function ItemCard({
             href={`/admin/${scope.bookId}/${scope.issueId}/review/editor`}
             className="underline hover:text-amber-100"
           >
-            pages stop
+            review editor
           </Link>
           , or skip it for this run.
         </p>
@@ -580,7 +162,7 @@ function ItemCard({
               type="button"
               className={BUTTON}
               disabled={busy}
-              title="Adds the voice back from its bucket copy; takes a slot"
+              title="Adds the voice back from its backup copy; takes a slot"
               onClick={() =>
                 run(`Restoring ${archived.name}`, () =>
                   restoreVoice({ scope, voiceId: archived.id }),
@@ -599,7 +181,9 @@ function ItemCard({
         <p className="text-emerald-300">
           Made: {item.voice?.name ?? item.target?.name ?? "a new voice"}.
         </p>
-        <Samples scope={scope} item={item} busy={busy} setNote={setNote} />
+        <div className="mt-3">
+          <Samples scope={scope} item={item} busy={busy} setNote={setNote} />
+        </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -652,45 +236,27 @@ function ItemCard({
         <p className="text-neutral-300">
           Voice: {item.voice?.name ?? "none active"}.
         </p>
-        <Samples scope={scope} item={item} busy={busy} setNote={setNote} />
+        <div className="mt-3">
+          <Samples scope={scope} item={item} busy={busy} setNote={setNote} />
+        </div>
       </div>
     );
   } else {
     body = (
-      <div className="mt-2">
-        <p className={item.noDefault ? "text-amber-200" : "text-neutral-300"}>
-          {item.noDefault ?? choiceLine(item)}
-        </p>
-        <Reasons items={item.warnings} tone="note" />
-        {item.needsSlot && data.slots ? (
-          <SlotPlan
-            key={presetOf(item, data.slots)}
-            item={item}
-            slots={data.slots}
-            busy={busy}
-            onRun={(archive) =>
-              run(
-                archive ? `Running, archiving ${archive.name}` : "Running",
-                () =>
-                  runItem({
-                    scope,
-                    item: ref,
-                    archiveVoiceId: archive?.id ?? null,
-                  }),
-              )
-            }
-          />
-        ) : (
-          <div className="mt-2">
-            <Reasons items={item.refusals} tone="warn" />
-          </div>
+      <div className="mt-2 space-y-2">
+        {item.noDefault && (
+          <p className="text-amber-200">{plain(item.noDefault)}</p>
         )}
-        <Choices
+        <Reasons items={cardWarnings(item)} tone="note" />
+        <Decision
+          key={decisionKey(item, data.slots)}
           scope={scope}
           item={item}
+          slots={data.slots}
           active={data.active}
           busy={busy}
           run={run}
+          setNote={setNote}
         />
       </div>
     );
@@ -794,11 +360,14 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
     />
   );
   const s = data.slots;
+  // What the cards start on, not the plan's own archives: a card whose planned archive is refused starts on the free slot.
+  const counts = presetCounts(data.items, s);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-[14px] text-neutral-200">
-      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-neutral-800 bg-neutral-950/95 px-4 backdrop-blur">
-        <nav className="flex min-w-0 items-center gap-1.5 text-neutral-500">
+      {/* The status wraps (min-w-0, no truncate) instead of being cut off; the header grows with it (#779). */}
+      <header className="sticky top-0 z-30 flex min-h-12 items-center gap-3 border-b border-neutral-800 bg-neutral-950/95 px-4 py-2 backdrop-blur">
+        <nav className="flex max-w-[55%] min-w-0 shrink-0 items-center gap-1.5 text-neutral-500">
           <Link href="/admin" className="hover:text-neutral-100">
             Admin
           </Link>
@@ -819,12 +388,12 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
           <span>/</span>
           <span className="shrink-0 text-neutral-100">Voices</span>
         </nav>
-        <span className="flex-1" />
         <span
-          className={`hidden truncate sm:inline ${data.blocker ? "text-amber-200" : "text-emerald-300"}`}
+          className={`hidden min-w-0 flex-1 text-right sm:block ${data.blocker ? "text-amber-200" : "text-emerald-300"}`}
         >
-          {data.blocker ?? "Every item is settled."}
+          {plain(data.blocker ?? "Every item is settled.")}
         </span>
+        <span className="flex-1 sm:hidden" />
         <Link
           href={`/admin/${data.bookId}/${data.issueId}/review/editor`}
           className={BUTTON}
@@ -864,17 +433,18 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
 
       <main className="mx-auto max-w-5xl px-4 py-8">
         <p className="mb-4 max-w-3xl text-[15px] text-neutral-400">
-          The voice work for {data.issueName}: every voice asked for at the
-          characters stop, and every speaker with no voice. Pick a voice for
-          each, check the slot plan, Run, and hear a few lines before the audio
-          is made. Nothing is archived or made until you click Run.
+          The voice work for {data.issueName}: every voice asked for on the
+          Characters screen, and every speaker with no voice. Pick a voice for
+          each, read what it costs, then add it and hear a few lines before the
+          audio is made. Nothing is added or archived until you click Add.
         </p>
         {s && (
           <p className="mb-2 text-neutral-300">
-            Slots: {s.used} of {s.limit} used, {s.free} free. Add/edit:{" "}
-            {s.addEditUsed} of {s.addEditMax} used. The whole list needs{" "}
-            {s.adds} {s.adds === 1 ? "add" : "adds"} and {s.archives}{" "}
-            {s.archives === 1 ? "archive" : "archives"}.
+            Voice slots: {s.used} of {s.limit} used, {s.free} free. Voice
+            changes this month: {s.addEditUsed} of {s.addEditMax}. This list
+            needs {counts.adds} {counts.adds === 1 ? "voice" : "voices"} added
+            and {counts.archives} {counts.archives === 1 ? "voice" : "voices"}{" "}
+            archived.
           </p>
         )}
         {data.planError && (
@@ -900,14 +470,14 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
         </Section>
         <Section
           title="To decide"
-          blurb="Pick a voice for each. A clone or a new design takes a slot; an active voice does not."
+          blurb="Pick a voice for each. A clone or a new designed voice takes a slot; a voice already active does not."
           items={by("pending")}
         >
           {card}
         </Section>
         <Section
           title="Made"
-          blurb="Hear a few lines, then accept the voice or run the item again."
+          blurb="Hear a few lines, then accept the voice or run the item again with another."
           items={by("made")}
         >
           {card}
