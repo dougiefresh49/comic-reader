@@ -8,6 +8,10 @@ import {
   MIN_PAGE_IMAGES,
   siteNameFrom,
 } from "~/lib/add-content/page-images";
+import {
+  assertPublicHttpUrl,
+  isPublicHttpUrl,
+} from "~/lib/add-content/public-url";
 
 /**
  * The page images of one confirmed issue URL (#792). The Check step and the
@@ -35,11 +39,19 @@ export async function collectPageImages(
   url: string,
   onStatus: (message: string) => void = () => undefined,
 ): Promise<CollectedPages> {
+  assertPublicHttpUrl(url);
   let html: string | null = null;
   let imageUrls: string[] = [];
   try {
-    html = await fetchHtml(url);
-    imageUrls = extractPageImageUrls(html, url);
+    const fetched = await fetchHtml(url);
+    if (isSameIssuePage(fetched.finalUrl, url)) {
+      html = fetched.html;
+      imageUrls = publicOnly(extractPageImageUrls(html, url), onStatus);
+    } else {
+      onStatus(
+        `Plain fetch landed on ${fetched.finalUrl}, not the confirmed issue; using the browser.`,
+      );
+    }
   } catch (err) {
     onStatus(
       `Plain fetch failed (${err instanceof Error ? err.message : "unknown"}); using the browser.`,
@@ -60,11 +72,23 @@ export async function collectPageImages(
   }
   const browser = await collectWithBrowser(url, onStatus);
   return {
-    imageUrls: browser.imageUrls,
+    imageUrls: publicOnly(browser.imageUrls, onStatus),
     siteName: siteNameFrom(browser.headHtml, url),
     via: "browser",
     pageTitle: browser.pageTitle,
   };
+}
+
+/**
+ * Drops image URLs the server must not fetch. The downloader fetches only
+ * what this returns, so the check covers every image fetch.
+ */
+function publicOnly(urls: string[], onStatus: (m: string) => void): string[] {
+  const kept = urls.filter(isPublicHttpUrl);
+  if (kept.length < urls.length) {
+    onStatus(`Dropped ${urls.length - kept.length} non-public image URL(s).`);
+  }
+  return kept;
 }
 
 /** A page's identity for the visited set: the URL without its hash. */
@@ -148,12 +172,17 @@ async function collectWithBrowser(
       await closeStrays();
       return isSameIssuePage(page.url(), sourceUrl);
     };
+    /** New images from our tab; none if the tab left the issue around it. */
     const extract = async () => {
       await scrollToLoadImages(page);
-      await closeStrays();
+      if (!(await onIssue(sourceUrl))) return 0;
       const result = await stagehand.extract(EXTRACT_INSTRUCTION, pageSchema, {
         page,
       });
+      if (!isSameIssuePage(page.url(), sourceUrl)) {
+        onStatus(`Left the issue during extraction (now at ${page.url()}).`);
+        return 0;
+      }
       const before = collected.length;
       for (const p of result.pages) {
         if (!collected.includes(p.url)) collected.push(p.url);
@@ -194,7 +223,7 @@ async function collectWithBrowser(
         )
         .catch(() => undefined);
       await new Promise((r) => setTimeout(r, 1500));
-      if (await onIssue(page.url())) found += await extract();
+      found += await extract();
     }
 
     // Pagination: only this issue's own pages (`?page=2`, `/2/`), never a

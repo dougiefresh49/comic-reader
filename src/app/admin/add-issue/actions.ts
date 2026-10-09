@@ -12,6 +12,8 @@ import {
   updateIssue,
 } from "~/lib/issue-queries";
 import { collectPageImages } from "~/lib/add-content/collect-pages";
+import { countIssuePages } from "~/lib/add-content/issue-pages";
+import { isPublicHttpUrl } from "~/lib/add-content/public-url";
 import {
   fetchWikiCoverUrl,
   wikiPageTitle,
@@ -195,8 +197,8 @@ export async function previewSource(args: {
   try {
     await requireAdmin();
     const url = new URL(args.url.trim());
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return { ok: false, error: "The source must be an http(s) URL." };
+    if (!isPublicHttpUrl(url.href)) {
+      return { ok: false, error: "The source must be a public http(s) URL." };
     }
     const book = await loadBookSearchInfo(args.bookId);
 
@@ -311,13 +313,23 @@ export async function confirmSource(
     error: { message: string } | null;
   };
   if (lookupErr) return { ok: false, error: lookupErr.message };
-  if (!existing) return createIssue(args);
-  if ((existing.page_count ?? 0) > 0) {
+  if (!isPublicHttpUrl(args.sourceUrl)) {
+    return { ok: false, error: "The source must be a public http(s) URL." };
+  }
+  let pageRows: number;
+  try {
+    pageRows = await countIssuePages(args.bookId, issueId);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+  const pages = Math.max(pageRows, existing?.page_count ?? 0);
+  if (pages > 0) {
     return {
       ok: false,
-      error: `${issueId} already has ${existing.page_count} pages in ${args.bookId}.`,
+      error: `${issueId} already has ${pages} pages in ${args.bookId}.`,
     };
   }
+  if (!existing) return createIssue(args);
   const { error } = await updateIssue(supabaseAdmin, args.bookId, issueId, {
     source_url: args.sourceUrl,
   });

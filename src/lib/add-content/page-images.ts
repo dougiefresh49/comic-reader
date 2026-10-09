@@ -3,19 +3,38 @@
  * Client-safe; the browser fallback lives in `collect-pages.ts`.
  */
 
+import { assertPublicHttpUrl } from "~/lib/add-content/public-url";
+
 /** Fewer images than this means the page is not a whole issue. */
 export const MIN_PAGE_IMAGES = 3;
 
 const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36";
 
-export async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, {
-    headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "text/html" },
-    redirect: "follow",
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  return res.text();
+/**
+ * GET a page as a browser would, following up to 5 redirects by hand so each
+ * hop passes `assertPublicHttpUrl`. Returns where it landed; the caller decides
+ * whether that is still the confirmed issue.
+ */
+export async function fetchHtml(
+  url: string,
+): Promise<{ html: string; finalUrl: string }> {
+  let current = url;
+  for (let hop = 0; hop <= 5; hop++) {
+    assertPublicHttpUrl(current);
+    const res = await fetch(current, {
+      headers: { "User-Agent": BROWSER_USER_AGENT, Accept: "text/html" },
+      redirect: "manual",
+    });
+    const location = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && location) {
+      current = new URL(location, current).href;
+      continue;
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${current}`);
+    return { html: await res.text(), finalUrl: current };
+  }
+  throw new Error(`Too many redirects fetching ${url}`);
 }
 
 function attr(tag: string, name: string): string | null {
@@ -33,11 +52,31 @@ const READER_IMG_CLASS = /\bwp-manga-chapter-img\b/;
 const UI_IMAGE =
   /logo|icon|avatar|banner|sprite|placeholder|dflazy|loading|thumb|emoji|badge|button|\/ads?\//i;
 
+/** Longest run of consecutive numbers among the files' trailing numbers. */
+function pageNumberRun(urls: string[]): number {
+  const nums = new Set<number>();
+  for (const u of urls) {
+    const file = new URL(u).pathname.split("/").pop() ?? "";
+    const m = /(\d+)\D*$/.exec(file.replace(/\.[a-z0-9]+$/i, ""));
+    if (m) nums.add(Number(m[1]));
+  }
+  let best = 0;
+  for (const n of nums) {
+    if (nums.has(n - 1)) continue;
+    let len = 1;
+    while (nums.has(n + len)) len++;
+    best = Math.max(best, len);
+  }
+  return best;
+}
+
 /**
  * Page image URLs in document order. Lazy-load attributes win over `src`
  * (which often holds a placeholder). When the page uses the reader class, only
- * those images count; otherwise UI-looking images are dropped and the largest
- * group sharing one directory is taken as the pages.
+ * those images count. Otherwise UI-looking images are dropped and the largest
+ * same-directory group counts only if at least MIN_PAGE_IMAGES of its file
+ * names run in page-number order; without that evidence it returns none, so
+ * the browser path or the short-count stop takes over.
  */
 export function extractPageImageUrls(html: string, pageUrl: string): string[] {
   const images: Array<{ url: string; reader: boolean; ui: boolean }> = [];
@@ -72,7 +111,12 @@ export function extractPageImageUrls(html: string, pageUrl: string): string[] {
       groups.set(dir, [...(groups.get(dir) ?? []), img]);
     }
     for (const group of groups.values()) {
-      if (group.length > picked.length) picked = group;
+      if (
+        group.length > picked.length &&
+        pageNumberRun(group.map((i) => i.url)) >= MIN_PAGE_IMAGES
+      ) {
+        picked = group;
+      }
     }
   }
   return [...new Set(picked.map((i) => i.url))];
@@ -90,10 +134,15 @@ export function siteNameFrom(html: string | null, url: string): string {
   return name ?? new URL(url).hostname.replace(/^www\./, "");
 }
 
+const PAGE_PARAMS = new Set(["page", "p", "pg"]);
+const PAGE_SUFFIX = /^\/(?:page\/)?\d+$/i;
+
 /**
  * True when `candidate` is the confirmed issue page or its own pagination:
- * same origin, and the path is the confirmed path or under it
- * (`?page=2`, `/2/`). `issue-1` never matches `issue-10` or `issue-2`.
+ * same origin; every query param of the confirmed URL kept with the same value,
+ * plus at most `page`/`p`/`pg`; and the confirmed path, or it followed by a
+ * page number (`/2`, `/page/2`). `issue-1` never matches `issue-10`,
+ * `issue-2` or `?issue=2`.
  */
 export function isSameIssuePage(candidate: string, confirmed: string): boolean {
   let a: URL;
@@ -105,7 +154,19 @@ export function isSameIssuePage(candidate: string, confirmed: string): boolean {
     return false;
   }
   if (a.origin !== b.origin) return false;
+  const values = (u: URL, k: string) =>
+    u.searchParams.getAll(k).sort().join("\0");
+  for (const k of new Set([
+    ...a.searchParams.keys(),
+    ...b.searchParams.keys(),
+  ])) {
+    if (PAGE_PARAMS.has(k.toLowerCase())) continue;
+    if (values(a, k) !== values(b, k)) return false;
+  }
   const base = b.pathname.replace(/\/+$/, "");
   const path = a.pathname.replace(/\/+$/, "");
-  return path === base || path.startsWith(`${base}/`);
+  return (
+    path === base ||
+    (path.startsWith(`${base}/`) && PAGE_SUFFIX.test(path.slice(base.length)))
+  );
 }

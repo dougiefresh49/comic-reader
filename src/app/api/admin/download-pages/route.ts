@@ -6,6 +6,7 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
 import { collectPageImages } from "~/lib/add-content/collect-pages";
+import { countIssuePages } from "~/lib/add-content/issue-pages";
 import { MIN_PAGE_IMAGES } from "~/lib/add-content/page-images";
 
 // A browser read plus three-at-a-time storage can run for minutes.
@@ -80,6 +81,15 @@ export async function POST(req: NextRequest) {
       };
 
       try {
+        const existingPages = await countIssuePages(body.bookId, body.issueId);
+        if (existingPages > 0) {
+          send({
+            type: "error",
+            message: `${body.bookId}/${body.issueId} already has ${existingPages} pages. Nothing was stored.`,
+          });
+          return;
+        }
+
         send({ type: "status", message: `Reading ${sourceUrl}...` });
         const collected = await collectPageImages(sourceUrl, (message) =>
           send({ type: "status", message }),
