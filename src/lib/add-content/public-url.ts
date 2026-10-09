@@ -13,7 +13,10 @@ export function isPublicHttpUrl(raw: string): boolean {
     return false;
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return false;
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const host = url.hostname
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
   if (
     host === "localhost" ||
     /\.(localhost|local|internal)\.?$/.test(host) ||

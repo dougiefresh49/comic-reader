@@ -7,6 +7,8 @@
  * both. Client-safe: no server imports.
  */
 
+import { isPublicHttpUrl } from "./public-url";
+
 /** The page title, underscores kept: `DC_X_Sonic_the_Hedgehog_Issue_1`. */
 export function wikiPageTitle(template: string, issueNumber: number): string {
   return template
@@ -56,8 +58,10 @@ export async function fetchWikiCoverUrl(
     redirects: "1",
     format: "json",
   });
+  const api = `${wikiOrigin(wikiHost)}/api.php?${params}`;
+  if (!isPublicHttpUrl(api)) return null;
   try {
-    const res = await fetch(`${wikiOrigin(wikiHost)}/api.php?${params}`);
+    const res = await fetch(api);
     if (!res.ok) return null;
     const data = (await res.json()) as PageImagesResponse;
     const pages = Object.values(data.query?.pages ?? {});

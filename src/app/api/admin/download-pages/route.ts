@@ -8,6 +8,7 @@ import { selectIssue, updateIssue } from "~/lib/issue-queries";
 import { collectPageImages } from "~/lib/add-content/collect-pages";
 import { countIssuePages } from "~/lib/add-content/issue-pages";
 import { MIN_PAGE_IMAGES } from "~/lib/add-content/page-images";
+import { isPublicHttpUrl } from "~/lib/add-content/public-url";
 
 // A browser read plus three-at-a-time storage can run for minutes.
 export const maxDuration = 300;
@@ -112,6 +113,16 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // The read above can take minutes; re-check just before the first write.
+        const pagesNow = await countIssuePages(body.bookId, body.issueId);
+        if (pagesNow > 0) {
+          send({
+            type: "error",
+            message: `${body.bookId}/${body.issueId} got ${pagesNow} pages while reading. Nothing was stored.`,
+          });
+          return;
+        }
+
         send({
           type: "status",
           message: `Uploading ${collectedUrls.length} pages (raw + WebP) to storage...`,
@@ -133,6 +144,20 @@ export async function POST(req: NextRequest) {
 
           try {
             const imgResponse = await fetch(imgUrl);
+            const landedType = imgResponse.headers.get("content-type") ?? "";
+            if (
+              imgResponse.ok &&
+              (!isPublicHttpUrl(imgResponse.url) ||
+                !landedType.startsWith("image/"))
+            ) {
+              send({
+                type: "page",
+                message: `Skipped page ${num}: not an image from a public URL (${landedType || "no type"})`,
+                current: ++finished,
+                total: collectedUrls.length,
+              });
+              return;
+            }
             if (!imgResponse.ok) {
               send({
                 type: "page",

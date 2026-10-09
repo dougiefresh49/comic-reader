@@ -53,21 +53,29 @@ const UI_IMAGE =
   /logo|icon|avatar|banner|sprite|placeholder|dflazy|loading|thumb|emoji|badge|button|\/ads?\//i;
 
 /** Longest run of consecutive numbers among the files' trailing numbers. */
-function pageNumberRun(urls: string[]): number {
-  const nums = new Set<number>();
-  for (const u of urls) {
-    const file = new URL(u).pathname.split("/").pop() ?? "";
-    const m = /(\d+)\D*$/.exec(file.replace(/\.[a-z0-9]+$/i, ""));
-    if (m) nums.add(Number(m[1]));
-  }
+function pageNumber(url: string): number | null {
+  const file = new URL(url).pathname.split("/").pop() ?? "";
+  const m = /(\d+)\D*$/.exec(file.replace(/\.[a-z0-9]+$/i, ""));
+  return m ? Number(m[1]) : null;
+}
+
+/** The URLs whose file numbers form the longest consecutive run. */
+function pageNumberRun(urls: string[]): string[] {
+  const nums = new Set(
+    urls.map(pageNumber).filter((n): n is number => n !== null),
+  );
+  let start = 0;
   let best = 0;
   for (const n of nums) {
     if (nums.has(n - 1)) continue;
     let len = 1;
     while (nums.has(n + len)) len++;
-    best = Math.max(best, len);
+    if (len > best) [start, best] = [n, len];
   }
-  return best;
+  return urls.filter((u) => {
+    const n = pageNumber(u);
+    return n !== null && n >= start && n < start + best;
+  });
 }
 
 /**
@@ -111,11 +119,9 @@ export function extractPageImageUrls(html: string, pageUrl: string): string[] {
       groups.set(dir, [...(groups.get(dir) ?? []), img]);
     }
     for (const group of groups.values()) {
-      if (
-        group.length > picked.length &&
-        pageNumberRun(group.map((i) => i.url)) >= MIN_PAGE_IMAGES
-      ) {
-        picked = group;
+      const run = new Set(pageNumberRun(group.map((i) => i.url)));
+      if (run.size > picked.length && run.size >= MIN_PAGE_IMAGES) {
+        picked = group.filter((i) => run.has(i.url));
       }
     }
   }
@@ -134,7 +140,8 @@ export function siteNameFrom(html: string | null, url: string): string {
   return name ?? new URL(url).hostname.replace(/^www\./, "");
 }
 
-const PAGE_PARAMS = new Set(["page", "p", "pg"]);
+// Pagination and reading-mode params (`readType`, set by `#selectReadType`).
+const PAGE_PARAMS = new Set(["page", "p", "pg", "readtype"]);
 const PAGE_SUFFIX = /^\/(?:page\/)?\d+$/i;
 
 /**

@@ -83,7 +83,7 @@ export async function getBookInfo(bookId: string): Promise<Result<BookInfo>> {
 
 // ─── findReadingSource ───────────────────────────────────────────────────────
 
-interface BookSearchInfo {
+export interface BookSearchInfo {
   name: string;
   wiki_host: string | null;
   wiki_title_template: string | null;
@@ -125,10 +125,12 @@ export async function findReadingSource(args: {
   bookId: string;
   issueNumber: number;
   extraContext?: string;
+  /** An unsaved book's search fields, used instead of reading its row. */
+  book?: BookSearchInfo;
 }): Promise<Result<ReadingSource>> {
   try {
     await requireAdmin();
-    const book = await loadBookSearchInfo(args.bookId);
+    const book = args.book ?? (await loadBookSearchInfo(args.bookId));
     const title = issueSearchTitle(book, args.issueNumber);
     const extraContext = args.extraContext?.trim().slice(0, 300) ?? "";
 
@@ -193,6 +195,8 @@ export async function previewSource(args: {
   bookId: string;
   issueNumber: number;
   url: string;
+  /** An unsaved book's search fields, used instead of reading its row. */
+  book?: BookSearchInfo;
 }): Promise<Result<SourcePreview>> {
   try {
     await requireAdmin();
@@ -200,7 +204,7 @@ export async function previewSource(args: {
     if (!isPublicHttpUrl(url.href)) {
       return { ok: false, error: "The source must be a public http(s) URL." };
     }
-    const book = await loadBookSearchInfo(args.bookId);
+    const book = args.book ?? (await loadBookSearchInfo(args.bookId));
 
     const [collected, wikiCoverUrl] = await Promise.all([
       collectPageImages(url.href),

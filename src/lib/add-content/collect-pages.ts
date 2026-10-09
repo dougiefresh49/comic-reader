@@ -44,9 +44,21 @@ export async function collectPageImages(
   let imageUrls: string[] = [];
   try {
     const fetched = await fetchHtml(url);
+    if (new URL(fetched.finalUrl).origin !== new URL(url).origin) {
+      // Another site answers for this URL: no browser session on a dead end.
+      return {
+        imageUrls: [],
+        siteName: siteNameFrom(null, url),
+        via: "fetch",
+        pageTitle: `This URL moves to ${fetched.finalUrl}; check that URL instead`,
+      };
+    }
     if (isSameIssuePage(fetched.finalUrl, url)) {
       html = fetched.html;
-      imageUrls = publicOnly(extractPageImageUrls(html, url), onStatus);
+      imageUrls = publicOnly(
+        extractPageImageUrls(html, fetched.finalUrl),
+        onStatus,
+      );
     } else {
       onStatus(
         `Plain fetch landed on ${fetched.finalUrl}, not the confirmed issue; using the browser.`,
@@ -81,7 +93,7 @@ export async function collectPageImages(
 
 /**
  * Drops image URLs the server must not fetch. The downloader fetches only
- * what this returns, so the check covers every image fetch.
+ * what this returns, and re-checks where each image fetch lands.
  */
 function publicOnly(urls: string[], onStatus: (m: string) => void): string[] {
   const kept = urls.filter(isPublicHttpUrl);
