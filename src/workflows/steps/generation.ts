@@ -172,7 +172,7 @@ export async function generateAudioBatch(
 
   for (const {
     bubble,
-    lookup: { elevenLabsId: voiceId },
+    lookup: { elevenLabsId: voiceId, voiceUuid },
   } of sendPlan.toSend) {
     const request = buildTtsRequest({
       text: (bubble.text_with_cues ?? bubble.ocr_text)!,
@@ -229,6 +229,7 @@ export async function generateAudioBatch(
       .from("bubbles")
       .update({
         audio_storage_path: storagePath,
+        voice_id: voiceUuid,
         needs_audio: false,
         updated_at: new Date().toISOString(),
       })

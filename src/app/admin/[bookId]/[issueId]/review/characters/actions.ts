@@ -1051,10 +1051,13 @@ export async function undoVoiceRequest(args: {
  * A playable preview of a voice (#745, owner call O1, option B), read-only
  * and called on the first Play: a signed URL to the voice's source clip
  * when it has one (as the loader signs an archived clone's), else the audio
- * of one bubble in this book already rendered in that voice, else null. A
- * bubble records its character, not its voice, so the castlist rows of the
- * book that hold the voice name the (issue, character) pairs, each checked
- * against the render chain (`voiceFor`), this issue first.
+ * of one bubble in this book already rendered in that voice, else null.
+ * A bubble whose `voice_id` records this voice comes first, this issue
+ * first (#748). Audio rendered before `voice_id` existed reads null
+ * (unknown): only those bubbles are matched the old way, through the
+ * castlist rows of the book that hold the voice, each (issue, character)
+ * pair checked against the render chain (`voiceFor`), this issue first. A
+ * bubble whose `voice_id` names another voice never plays for this one.
  */
 export async function voicePreview(args: {
   scope: Scope;
@@ -1077,6 +1080,29 @@ export async function voicePreview(args: {
         signed.error?.message,
       );
     }
+    const rendered = (issueId?: string) => {
+      const q = supabaseAdmin
+        .from("bubbles")
+        .select("issue_id, audio_storage_path")
+        .eq("book_id", scope.bookId)
+        .eq("voice_id", voiceId)
+        .eq("needs_audio", false)
+        .not("audio_storage_path", "is", null);
+      return (issueId ? q.eq("issue_id", issueId) : q).limit(1).maybeSingle();
+    };
+    for (const issueId of [scope.issueId, undefined]) {
+      const found = await rendered(issueId);
+      must("reading a bubble rendered in this voice", found.error);
+      const hit = found.data as {
+        issue_id: string;
+        audio_storage_path: string | null;
+      } | null;
+      if (hit?.audio_storage_path)
+        return {
+          ok: true,
+          url: audioUrl(scope.bookId, hit.issue_id, hit.audio_storage_path),
+        };
+    }
     const book = await loadBookCast(supabaseAdmin, scope.bookId);
     const pairs = book.rows
       .filter(
@@ -1098,6 +1124,7 @@ export async function voicePreview(args: {
         .eq("book_id", scope.bookId)
         .eq("issue_id", r.issue_id)
         .eq("character_id", r.character_id)
+        .is("voice_id", null)
         .eq("needs_audio", false)
         .not("audio_storage_path", "is", null)
         .limit(1)

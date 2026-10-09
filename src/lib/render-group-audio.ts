@@ -229,6 +229,7 @@ export async function renderGroupAudio({
       p_member_ids: memberIds,
       p_lead_id: leadId,
       p_audio_storage_path: path,
+      p_voice_id: voice.voiceUuid,
       p_alignment: normalizeAlignment(
         response.alignment as AlignmentRaw | null | undefined,
       ),

@@ -1,7 +1,7 @@
 import { renderVoice, type BookCast } from "~/lib/cast";
 
 export type ResolveSpeakerVoiceResult =
-  | { ok: true; voiceId: string }
+  | { ok: true; voiceId: string; voiceUuid: string }
   | { ok: false; error: string };
 
 /**
@@ -16,7 +16,12 @@ export function resolveSpeakerVoice(
   bubble: { speaker: string | null; character_id: string | null },
 ): ResolveSpeakerVoiceResult {
   const found = renderVoice(book, bubble.character_id, issueId);
-  if (found.ok) return { ok: true, voiceId: found.elevenLabsId };
+  if (found.ok)
+    return {
+      ok: true,
+      voiceId: found.elevenLabsId,
+      voiceUuid: found.voiceUuid,
+    };
   const who = `speaker '${bubble.speaker ?? "(none)"}'${bubble.character_id ? ` (${bubble.character_id})` : ""}`;
   switch (found.reason) {
     case "unassigned":
