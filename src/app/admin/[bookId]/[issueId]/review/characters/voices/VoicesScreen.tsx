@@ -694,12 +694,20 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
     (label, work) => {
       setNote({ text: `${label}…`, tone: "plain" });
       startTransition(async () => {
-        const result = await work();
-        setNote(
-          result.ok
-            ? { text: result.message, tone: "plain" }
-            : { text: result.error, tone: "warn" },
-        );
+        try {
+          const result = await work();
+          setNote(
+            result.ok
+              ? { text: result.message, tone: "plain" }
+              : { text: result.error, tone: "warn" },
+          );
+        } catch (err) {
+          // The call can throw before the action runs (fetch refused, network down).
+          setNote({
+            text: err instanceof Error ? err.message : String(err),
+            tone: "warn",
+          });
+        }
         router.refresh();
       });
     },
