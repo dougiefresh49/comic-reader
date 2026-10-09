@@ -170,7 +170,9 @@ export async function fetchWikiContext(
       : childSections;
 
     const allNames: AppearanceEntry[] = [];
-    for (const child of relevantChildren) {
+    const targets =
+      relevantChildren.length > 0 ? relevantChildren : [appearancesSection];
+    for (const child of targets) {
       if (/location/i.test(child.line)) continue;
       const html = await fetchSectionHtml(wikiHost, pageTitle, child.index);
       if (html) {
