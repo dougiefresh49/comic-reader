@@ -17,7 +17,6 @@ interface CreateUrlBody {
 
 interface InitIssueBody {
   bookId: string;
-  bookName?: string;
   issueId: string;
   issueName?: string;
   number: number;
@@ -26,12 +25,15 @@ interface InitIssueBody {
 interface FinalizeBody {
   bookId: string;
   issueId: string;
+  /** Pages 1..count are the issue; any other raw file is a leftover. */
+  count: number;
 }
 
 // POST: { mode: "init" | "url" | "finalize" } + payload
-// init      → creates books row only if missing, creates the issues row; 409 if the issue exists
+// init      → takes an issue with no pages: creates the issues row, or keeps
+//             the one the Add content flow saved; 409 if the issue has pages
 // url       → returns signed upload URL for one file
-// finalize  → convert raw sources to WebP, upsert pages rows, set page_count
+// finalize  → convert raw pages 1..count to WebP, upsert pages rows, set page_count
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as
     | ({ mode: "url" } & CreateUrlBody)
@@ -43,40 +45,60 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "missing fields" }, { status: 400 });
     }
     // Refuse before any write, so a refused init leaves the DB untouched.
-    const alreadyExists = (status: string | null) =>
+    const hasPages = () =>
       Response.json(
         {
-          error: `${body.issueId} already exists in ${body.bookId}${status ? ` (status ${status})` : ""}. This uploader only creates new issues; pick an unused issue number.`,
+          error: `${body.issueId} already has pages in ${body.bookId}. Pages from disk fill an issue that has none.`,
         },
         { status: 409 },
       );
+    const { data: book, error: bookErr } = await supabaseAdmin
+      .from("books")
+      .select("id")
+      .eq("id", body.bookId)
+      .maybeSingle();
+    if (bookErr) {
+      return Response.json({ error: bookErr.message }, { status: 500 });
+    }
+    if (!book) {
+      return Response.json(
+        { error: `No book ${body.bookId}. Save the book first.` },
+        { status: 404 },
+      );
+    }
     const { data: existing, error: lookupErr } = await selectIssue(
       supabaseAdmin,
       body.bookId,
       body.issueId,
-      "id, status",
+      "id, page_count",
     ).maybeSingle();
     if (lookupErr) {
       return Response.json({ error: lookupErr.message }, { status: 500 });
     }
-    if (existing) {
-      return alreadyExists(existing.status);
-    }
-    if (body.bookName) {
-      // Existing book is never changed (a racing init cannot overwrite it either).
-      const { error: bookErr } = await supabaseAdmin.from("books").upsert(
-        {
-          id: body.bookId,
-          name: body.bookName,
-          slug: body.bookId,
-        },
-        { onConflict: "id", ignoreDuplicates: true },
-      );
-      if (bookErr) {
-        return Response.json({ error: bookErr.message }, { status: 500 });
-      }
-    }
     const sourcePath = `${body.bookId}/${body.issueId}/source/`;
+    if (existing) {
+      // An issue saved with no pages yet takes them here (#793); one that has
+      // pages, by its count or by its `pages` rows, is refused.
+      const { count, error: pagesErr } = await supabaseAdmin
+        .from("pages")
+        .select("id", { count: "exact", head: true })
+        .eq("book_id", body.bookId)
+        .eq("issue_id", body.issueId);
+      if (pagesErr) {
+        return Response.json({ error: pagesErr.message }, { status: 500 });
+      }
+      if (existing.page_count > 0 || (count ?? 0) > 0) return hasPages();
+      const { error: updateErr } = await updateIssue(
+        supabaseAdmin,
+        body.bookId,
+        body.issueId,
+        { source_pages_path: sourcePath },
+      );
+      if (updateErr) {
+        return Response.json({ error: updateErr.message }, { status: 500 });
+      }
+      return Response.json({ ok: true, sourcePath });
+    }
     // insert, not upsert: a racing init that lost the check above hits the
     // primary key (23505) instead of overwriting the row.
     const { error: issueErr } = await insertIssue(supabaseAdmin, {
@@ -88,7 +110,14 @@ export async function POST(req: NextRequest) {
       source_pages_path: sourcePath,
     });
     if (issueErr) {
-      if (issueErr.code === "23505") return alreadyExists(null);
+      if (issueErr.code === "23505") {
+        return Response.json(
+          {
+            error: `${body.issueId} was just created in ${body.bookId}; try again.`,
+          },
+          { status: 409 },
+        );
+      }
       return Response.json({ error: issueErr.message }, { status: 500 });
     }
     return Response.json({ ok: true, sourcePath });
@@ -119,13 +148,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.mode === "finalize") {
-    if (!body.bookId || !body.issueId) {
+    if (
+      !body.bookId ||
+      !body.issueId ||
+      !Number.isInteger(body.count) ||
+      body.count < 1
+    ) {
       return Response.json({ error: "missing fields" }, { status: 400 });
     }
 
     const prefix = `${body.bookId}/${body.issueId}/source`;
     const listLimit = 1000;
-    const files: { name: string }[] = [];
+    const files: { name: string; updated_at?: string | null }[] = [];
     for (let offset = 0; ; offset += listLimit) {
       const { data: page, error: listError } = await supabaseAdmin.storage
         .from(RAW_BUCKET)
@@ -138,20 +172,30 @@ export async function POST(req: NextRequest) {
       if (batch.length < listLimit) break;
     }
 
-    const pageFiles = files
-      .map((f) => {
-        const match = /^page-(\d+)\.[a-z0-9]+$/i.exec(f.name);
-        if (!match) return null;
-        return { name: f.name, pageNumber: parseInt(match[1]!, 10) };
-      })
-      .filter((f): f is { name: string; pageNumber: number } => f !== null)
-      .sort((a, b) => a.pageNumber - b.pageNumber);
-
-    if (pageFiles.length === 0) {
-      return Response.json(
-        { error: `No source pages found at ${prefix}/` },
-        { status: 400 },
-      );
+    // Pages 1..count, the newest file of each: an earlier attempt may have
+    // left more pages, or the same page under another extension.
+    const newest = new Map<number, { name: string; updated: string }>();
+    for (const f of files) {
+      const match = /^page-(\d+)\.[a-z0-9]+$/i.exec(f.name);
+      if (!match) continue;
+      const pageNumber = parseInt(match[1]!, 10);
+      if (pageNumber < 1 || pageNumber > body.count) continue;
+      const updated = f.updated_at ?? "";
+      const seen = newest.get(pageNumber);
+      if (!seen || updated > seen.updated) {
+        newest.set(pageNumber, { name: f.name, updated });
+      }
+    }
+    const pageFiles: { name: string; pageNumber: number }[] = [];
+    for (let pageNumber = 1; pageNumber <= body.count; pageNumber++) {
+      const file = newest.get(pageNumber);
+      if (!file) {
+        return Response.json(
+          { error: `Page ${pageNumber} is missing from ${prefix}/` },
+          { status: 400 },
+        );
+      }
+      pageFiles.push({ name: file.name, pageNumber });
     }
 
     let stored = 0;
@@ -214,6 +258,9 @@ export async function POST(req: NextRequest) {
       {
         page_count: stored,
         has_webp: true,
+        // The same step the confirmed download sets; Start Pipeline reads it
+        // as not started (`isUnstartedStep`).
+        pipeline_step: "pages-downloaded",
       },
     );
 
