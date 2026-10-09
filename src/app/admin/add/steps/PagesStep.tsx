@@ -16,7 +16,7 @@ export function pagesStep(f: Flow): StepView | null {
         <Choice
           icon={<GlobeIcon className="mb-1.5 h-[26px] w-[26px]" />}
           title="Find online"
-          sub="Searches the open web from the wiki title"
+          sub="Searches the open web for this issue"
           onClick={f.openOnline}
         />
         <Choice

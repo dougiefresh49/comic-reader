@@ -47,8 +47,8 @@ export function bookStep(f: Flow): StepView {
     <>
       {stoppedIssue && stoppedBook && (
         <p className="mb-3 text-[12.5px] text-amber-400">
-          {stoppedBook.name} · Issue {stoppedIssue.number}: pages may still be
-          arriving. The admin page shows them when done.
+          {stoppedBook.name} · Issue {stoppedIssue.number}: still downloading.
+          The admin page shows the pages when it finishes.
         </p>
       )}
       {resumeIssue && resumeBook && (
@@ -207,9 +207,6 @@ export function newBookStep(f: Flow): StepView {
               validate={f.bookIdProblem}
               onKeep={(id) => f.setDraft((d) => (d ? { ...d, id } : d))}
             />
-            {idProblem && (
-              <p className="mt-1.5 text-xs text-amber-400">{idProblem}</p>
-            )}
             <div className="mt-4 flex items-center gap-2">
               <button
                 type="button"

@@ -91,7 +91,9 @@ export function confirmStep(f: Flow): StepView | null {
       <Heading title="Confirm" />
       <div className="mb-3.5 inline-flex items-center gap-1.5 text-[13px] text-neutral-400">
         <span className="h-2 w-2 rounded-full border-[1.5px] border-neutral-500" />
-        Nothing is saved yet. This is what Confirm writes.
+        {book.isNew && f.issueIsNew
+          ? "Nothing is saved yet. This is what Confirm writes."
+          : "Nothing new is saved yet. This is what Confirm writes."}
       </div>
       <WriteList>
         <WriteRow

@@ -10,6 +10,8 @@ export interface PageProgress {
   total: number;
   /** The latest event message, or the file being sent. */
   detail: string;
+  /** Set once the upload's finalize runs, which cannot be stopped. */
+  finalizing?: boolean;
 }
 
 type Outcome =
@@ -161,6 +163,7 @@ export async function uploadPages(args: {
     current: files.length,
     total: files.length,
     detail: "storing as WebP…",
+    finalizing: true,
   });
   const fin = await post(
     { mode: "finalize", bookId, issueId, count: files.length },

@@ -4,10 +4,39 @@ import pLimit from "p-limit";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { insertIssue, selectIssue, updateIssue } from "~/lib/issue-queries";
+import { countIssuePages } from "~/lib/add-content/issue-pages";
 
 export const maxDuration = 300;
 
 const RAW_BUCKET = "comic-pages-raw";
+
+/**
+ * The pages an issue holds: its `page_count`, or its `pages` rows when those
+ * run ahead (a store that stopped part way). Null when the issue row is gone.
+ */
+async function pagesHeld(
+  bookId: string,
+  issueId: string,
+): Promise<{ pages: number } | null> {
+  const { data: row, error } = await selectIssue(
+    supabaseAdmin,
+    bookId,
+    issueId,
+    "page_count",
+  ).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) return null;
+  const rows = await countIssuePages(bookId, issueId);
+  return { pages: Math.max(row.page_count, rows) };
+}
+
+const hasPagesError = (bookId: string, issueId: string) =>
+  Response.json(
+    {
+      error: `${issueId} already has pages in ${bookId}. Pages from disk fill an issue that has none.`,
+    },
+    { status: 409 },
+  );
 
 interface CreateUrlBody {
   bookId: string;
@@ -45,13 +74,6 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "missing fields" }, { status: 400 });
     }
     // Refuse before any write, so a refused init leaves the DB untouched.
-    const hasPages = () =>
-      Response.json(
-        {
-          error: `${body.issueId} already has pages in ${body.bookId}. Pages from disk fill an issue that has none.`,
-        },
-        { status: 409 },
-      );
     const { data: book, error: bookErr } = await supabaseAdmin
       .from("books")
       .select("id")
@@ -79,15 +101,18 @@ export async function POST(req: NextRequest) {
     if (existing) {
       // An issue saved with no pages yet takes them here (#793); one that has
       // pages, by its count or by its `pages` rows, is refused.
-      const { count, error: pagesErr } = await supabaseAdmin
-        .from("pages")
-        .select("id", { count: "exact", head: true })
-        .eq("book_id", body.bookId)
-        .eq("issue_id", body.issueId);
-      if (pagesErr) {
-        return Response.json({ error: pagesErr.message }, { status: 500 });
+      let held: { pages: number } | null;
+      try {
+        held = await pagesHeld(body.bookId, body.issueId);
+      } catch (e) {
+        return Response.json(
+          { error: e instanceof Error ? e.message : String(e) },
+          { status: 500 },
+        );
       }
-      if (existing.page_count > 0 || (count ?? 0) > 0) return hasPages();
+      if ((held?.pages ?? 0) > 0) {
+        return hasPagesError(body.bookId, body.issueId);
+      }
       const { error: updateErr } = await updateIssue(
         supabaseAdmin,
         body.bookId,
@@ -156,6 +181,25 @@ export async function POST(req: NextRequest) {
     ) {
       return Response.json({ error: "missing fields" }, { status: 400 });
     }
+
+    // The same refusal as init, before the first write: another writer may
+    // have stored pages since init ran.
+    let held: { pages: number } | null;
+    try {
+      held = await pagesHeld(body.bookId, body.issueId);
+    } catch (e) {
+      return Response.json(
+        { error: e instanceof Error ? e.message : String(e) },
+        { status: 500 },
+      );
+    }
+    if (!held) {
+      return Response.json(
+        { error: `No issue ${body.issueId} in ${body.bookId}.` },
+        { status: 404 },
+      );
+    }
+    if (held.pages > 0) return hasPagesError(body.bookId, body.issueId);
 
     const prefix = `${body.bookId}/${body.issueId}/source`;
     const listLimit = 1000;
@@ -239,6 +283,17 @@ export async function POST(req: NextRequest) {
     await Promise.all(pageFiles.map((file) => limit(() => storeOne(file))));
 
     if (errors.length > 0) {
+      // Some pages stored: record the rows that exist, so the issue never
+      // reads as "no pages yet" while it holds some.
+      const rows = await countIssuePages(body.bookId, body.issueId).catch(
+        () => stored,
+      );
+      if (rows > 0) {
+        await updateIssue(supabaseAdmin, body.bookId, body.issueId, {
+          page_count: rows,
+          has_webp: true,
+        });
+      }
       return Response.json(
         {
           error: `finalize failed for ${errors.length} page(s)`,

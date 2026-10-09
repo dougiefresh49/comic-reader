@@ -22,7 +22,13 @@ export interface FlowIssue {
   id: string;
   number: number;
   pageCount: number;
+  /**
+   * Highest stored `pages` row number. Rows land before `page_count`, so a
+   * store that stopped part way has rows and a count of 0.
+   */
+  storedPages: number;
   pipelineStep: string | null;
+  status: string;
   createdAt: string | null;
   /** Page 1 when the issue has pages, else null. */
   cover: string | null;
@@ -31,15 +37,47 @@ export interface FlowIssue {
 /** `books.id` for a new book: lowercase letters, digits and single dashes. */
 export const BOOK_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/**
+ * A new book's id from its title: lowercase words joined by single dashes
+ * (`/`, `:` and every other separator become a dash), at most 60 characters,
+ * cut back to the last whole word. Always matches `BOOK_ID` when the title
+ * has a letter or digit.
+ */
+export function bookIdFromTitle(title: string): string {
+  const id = title
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (id.length <= 60) return id;
+  const cut = id.slice(0, 60);
+  // A cut that lands inside a word drops that word.
+  const whole = id[60] === "-" ? cut : cut.slice(0, cut.lastIndexOf("-"));
+  return whole.replace(/-+$/, "") || cut.replace(/-+$/, "");
+}
+
 /** `issues.id`: `issue-N`, N from 1. The issue actions derive the id from N. */
 export const ISSUE_ID = /^issue-([1-9]\d*)$/;
 
 /**
- * An issue can take pages here when it has none and no run has started.
- * One with pages, or one in the pipeline, is shown but not picked.
+ * Where an issue stands for the Issue step. `empty`: saved with no pages and
+ * no `pages` rows, the only state that can take pages here. `unfinished`:
+ * rows stored but no count, a store that stopped part way. `pipeline`: a run
+ * between pages-downloaded and complete. `pages`: anything else with pages.
  */
+export type IssueState = "empty" | "unfinished" | "pipeline" | "pages";
+
+export function issueState(issue: FlowIssue): IssueState {
+  const step = issue.pipelineStep;
+  const ready = step === "complete" || issue.status === "ready";
+  if (!isUnstartedStep(step) && !ready) return "pipeline";
+  if (issue.pageCount > 0 || ready) return "pages";
+  return issue.storedPages > 0 ? "unfinished" : "empty";
+}
+
+/** An issue can take pages here only when it has none stored at all. */
 export function isPickable(issue: FlowIssue): boolean {
-  return issue.pageCount === 0 && isUnstartedStep(issue.pipelineStep);
+  return issueState(issue) === "empty";
 }
 
 export function nextIssueNumber(issues: FlowIssue[]): number {

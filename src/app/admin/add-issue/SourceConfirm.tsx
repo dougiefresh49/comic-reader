@@ -13,8 +13,19 @@ import {
 interface Found {
   url: string;
   siteName: string;
-  query: string;
-  confidence: "high" | "medium" | "low";
+  /** The search that found it; null for a pasted URL. */
+  query: string | null;
+  confidence: "high" | "medium" | "low" | null;
+}
+
+/** An http(s) URL typed or pasted in, or null. */
+function parseUrl(text: string): URL | null {
+  try {
+    const url = new URL(text.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 /** What a passed check hands on: the URL Confirm saves and what it holds. */
@@ -68,31 +79,71 @@ export function SourceConfirm({
   const [preview, setPreview] = useState<SourcePreview | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [pasted, setPasted] = useState("");
   const started = useRef(false);
+  /**
+   * Bumped by every search, pasted URL and check. A reply lands only while
+   * its number is still the latest and the panel is mounted, so a slow check
+   * of an old result never reaches `onChecked`.
+   */
+  const latest = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const current = (n: number) => mounted.current && latest.current === n;
 
-  async function search() {
-    const extra = context.trim();
-    const query = extra ? `"${searchTitle}" ${extra}` : `"${searchTitle}"`;
-    setLastQuery(query);
-    setSearching(true);
+  /** A new result: whatever was checked before no longer counts. */
+  function reset() {
     setFound(null);
     setNothingFor(null);
     setPreview(null);
+    setChecking(false);
     setCheckError(null);
     onChecked(null);
+  }
+
+  async function search() {
+    const n = ++latest.current;
+    const extra = context.trim();
+    const query = extra ? `"${searchTitle}" ${extra}` : `"${searchTitle}"`;
+    setLastQuery(query);
+    reset();
+    setSearching(true);
     const result = await findReadingSource({
       bookId,
       issueNumber,
       extraContext: extra || undefined,
       book,
     });
+    if (!current(n)) return;
     if (result.ok) setFound(result.data);
     else setNothingFor({ query, error: result.error });
     setSearching(false);
   }
 
+  /** A pasted URL replaces the result and needs Check pages like a found one. */
+  function takePasted() {
+    const url = parseUrl(pasted);
+    if (!url) return;
+    latest.current++;
+    reset();
+    setSearching(false);
+    setFound({
+      url: url.href,
+      siteName: url.hostname.replace(/^www\./, ""),
+      query: null,
+      confidence: null,
+    });
+    setPasted("");
+  }
+
   async function check() {
     if (!found) return;
+    const n = ++latest.current;
     setChecking(true);
     setCheckError(null);
     const result = await previewSource({
@@ -101,6 +152,7 @@ export function SourceConfirm({
       url: found.url,
       book,
     });
+    if (!current(n)) return;
     if (result.ok) {
       setPreview(result.data);
       onChecked(
@@ -139,6 +191,33 @@ export function SourceConfirm({
     );
   }
 
+  const paste = (
+    <div className="mt-3">
+      <div className="mb-1.5 text-[11px] font-semibold tracking-[.08em] text-neutral-500 uppercase">
+        Or paste a URL
+      </div>
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          takePasted();
+        }}
+      >
+        <input
+          type="url"
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder="https://…"
+          aria-label="Or paste a URL"
+          className={`${FIELD} max-w-[560px] flex-1 font-mono`}
+        />
+        <button type="submit" disabled={!parseUrl(pasted)} className={btn()}>
+          Use this URL
+        </button>
+      </form>
+    </div>
+  );
+
   const refine = (
     <div className="mt-4 border-t border-[#2a2a2a] pt-3.5">
       <div className="mb-1.5 text-[11px] font-semibold tracking-[.08em] text-neutral-500 uppercase">
@@ -167,7 +246,7 @@ export function SourceConfirm({
           No source found
         </div>
         <div className="text-[12.5px] text-neutral-400">
-          Nothing found for{" "}
+          No usable result for{" "}
           <b className="font-medium text-neutral-100">
             {nothingFor?.query ?? lastQuery}
           </b>
@@ -178,6 +257,7 @@ export function SourceConfirm({
           </div>
         )}
         {refine}
+        {paste}
       </div>
     );
   }
@@ -204,22 +284,26 @@ export function SourceConfirm({
         >
           {found.url}
         </a>
-        <Chip
-          tone={
-            found.confidence === "high"
-              ? "ok"
-              : found.confidence === "medium"
-                ? "warn"
-                : "bad"
-          }
-        >
-          {found.confidence}
-        </Chip>
+        {found.confidence && (
+          <Chip
+            tone={
+              found.confidence === "high"
+                ? "ok"
+                : found.confidence === "medium"
+                  ? "warn"
+                  : "bad"
+            }
+          >
+            {found.confidence}
+          </Chip>
+        )}
       </div>
-      <QueryLine
-        query={shownQuery(found.query)}
-        fromWikiTitle={fromWikiTitle}
-      />
+      {found.query && (
+        <QueryLine
+          query={shownQuery(found.query)}
+          fromWikiTitle={fromWikiTitle}
+        />
+      )}
 
       {preview?.pageTitle && (
         <div className="mt-1.5 text-[12.5px] text-neutral-400">
@@ -269,6 +353,7 @@ export function SourceConfirm({
         <p className="mt-2.5 text-[12.5px] text-red-300">{checkError}</p>
       )}
       {refine}
+      {paste}
     </div>
   );
 }

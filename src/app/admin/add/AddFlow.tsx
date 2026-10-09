@@ -6,13 +6,14 @@ import { wikiPageUrl, wikiTitleWords } from "~/lib/add-content/wiki";
 import { createBook, searchForBook } from "../add-book/actions";
 import { confirmSource, createIssue } from "../add-issue/actions";
 import { SourceConfirm, type CheckedSource } from "../add-issue/SourceConfirm";
-import { wikiCover } from "./actions";
+import { bookExists, wikiCover } from "./actions";
 import { type DiskFile } from "./DiskPages";
 import {
   BOOK_ID,
   DISK_TYPES,
   ISSUE_ID,
   isPickable,
+  issueState,
   naturalCompare,
   nextIssueNumber,
   type FlowBook,
@@ -106,12 +107,15 @@ export function AddFlow({
     startBook?.id ?? null,
   );
   const [draft, setDraft] = useState<NewBook | null>(null);
-  /** Set once Confirm has written the draft book, so a retry skips it. */
-  const [bookWritten, setBookWritten] = useState(false);
+  /**
+   * The book ids and `book/issue` keys this page has written, so a retry
+   * skips exactly those rows and an edited id is never taken for saved.
+   */
+  const [writtenBooks, setWrittenBooks] = useState<string[]>([]);
   const [issueNumber, setIssueNumber] = useState<number | null>(
     startIssue?.number ?? null,
   );
-  const [issueWritten, setIssueWritten] = useState(false);
+  const [writtenIssues, setWrittenIssues] = useState<string[]>([]);
   const [pages, setPages] = useState<PagesChoice | null>(null);
   const [checked, setChecked] = useState<CheckedSource | null>(null);
   /** Mounts Find online; a new value starts a new search. */
@@ -120,6 +124,8 @@ export function AddFlow({
   const [skipped, setSkipped] = useState(0);
   const [save, setSave] = useState<SaveState>(IDLE_SAVE);
   const abortRef = useRef<AbortController | null>(null);
+  /** Set while Confirm runs, so a second click cannot start a second save. */
+  const saving = useRef(false);
 
   // New book search (state C).
   const [query, setQuery] = useState("");
@@ -146,7 +152,7 @@ export function AddFlow({
           cover: draft.cover,
           wikiHost: draft.result.wikiHost,
           wikiTitleTemplate: draft.result.wikiTitleTemplate,
-          isNew: !bookWritten,
+          isNew: !writtenBooks.includes(draft.id),
         }
       : saved
         ? {
@@ -163,7 +169,8 @@ export function AddFlow({
   const number = issueNumber ?? next;
   const issueId = `issue-${number}`;
   const existingIssue = bookIssues.find((i) => i.number === number);
-  const issueIsNew = !existingIssue && !issueWritten;
+  const issueIsNew =
+    !existingIssue && !writtenIssues.includes(`${book?.id}/${issueId}`);
   const searchTitle = book?.wikiTitleTemplate
     ? wikiTitleWords(book.wikiTitleTemplate, number)
     : `${book?.name ?? ""} Issue ${number}`;
@@ -188,7 +195,6 @@ export function AddFlow({
     if (id === "new") usedDraft.current = draft;
     if (changed) {
       setIssueNumber(null);
-      setIssueWritten(false);
       clearPages();
     }
     setBookChoice(id);
@@ -207,7 +213,6 @@ export function AddFlow({
     );
     if (!iss) return;
     clearPages();
-    setIssueWritten(false);
     setBookChoice(resume.bookId);
     setIssueNumber(iss.number);
     setStep("pages");
@@ -219,7 +224,6 @@ export function AddFlow({
     setSearching(true);
     setSearchError(null);
     setDraft(null);
-    setBookWritten(false);
     const res = await searchForBook(q);
     setSearching(false);
     if (!res.ok) {
@@ -249,9 +253,9 @@ export function AddFlow({
     if (!m) return "issue-, then a number";
     const iss = bookIssues.find((i) => i.number === Number(m[1]));
     if (iss && !isPickable(iss)) {
-      return iss.pageCount > 0
-        ? `${id} already has pages`
-        : `${id} is in the pipeline`;
+      return issueState(iss) === "pipeline"
+        ? `${id} is in the pipeline`
+        : `${id} already has pages`;
     }
     return null;
   }
@@ -295,7 +299,16 @@ export function AddFlow({
   // ─── Confirm: book, then issue, then pages, in that order ────────────────
 
   async function confirmAndSave() {
-    if (!book || !pages) return;
+    if (!book || !pages || saving.current) return;
+    saving.current = true;
+    try {
+      await runSave(book, pages);
+    } finally {
+      saving.current = false;
+    }
+  }
+
+  async function runSave(book: BookView, pages: PagesChoice) {
     const controller = new AbortController();
     abortRef.current = controller;
     setSave({
@@ -320,9 +333,21 @@ export function AddFlow({
         seriesName: r.seriesName,
         volumeNumber: r.volumeNumber,
       });
-      if (!res.ok) return fail("book", res.error);
-      setBookWritten(true);
-      setSave((s) => ({ ...s, book: "saved", issue: "saving" }));
+      // The books row goes in before the franchise links; when only the links
+      // failed, the book is saved and the save carries on.
+      const exists = res.ok || (await bookExists(book.id).catch(() => false));
+      if (!exists) return fail("book", res.ok ? "" : res.error);
+      setWrittenBooks((w) => [...w, book.id]);
+      setSave((s) => ({
+        ...s,
+        book: "saved",
+        issue: "saving",
+        // A retry finds the row this page wrote before: no warning for that.
+        warnings:
+          res.ok || res.error.includes("books_pkey")
+            ? []
+            : [`Franchise links not saved: ${res.error}`],
+      }));
     }
 
     const wikiUrl =
@@ -347,7 +372,7 @@ export function AddFlow({
       });
       if (!res.ok) return fail("issue", res.error);
     }
-    setIssueWritten(true);
+    setWrittenIssues((w) => [...w, `${book.id}/${issueId}`]);
     if (pages.kind === "none") {
       setSave((s) => ({ ...s, issue: "saved", pages: "saved" }));
       setStep("done");
@@ -380,7 +405,7 @@ export function AddFlow({
         ...s,
         pages: "saved",
         stored: res.stored,
-        warnings: res.warnings,
+        warnings: [...s.warnings, ...res.warnings],
       }));
       setStep("done");
     } catch (e) {
@@ -392,9 +417,9 @@ export function AddFlow({
   }
 
   /**
-   * Stop keeps what is saved; the resume banner picks it up. An online
-   * download goes on storing on the server after the abort, so the Book step
-   * says so for that issue (`?stopped=`).
+   * Stop (disk) or Leave (online) keeps what is saved. An online download
+   * goes on storing on the server after the abort, so the Book step says so
+   * for that issue (`?stopped=`) and offers no Continue on it.
    */
   function stop() {
     abortRef.current?.abort();

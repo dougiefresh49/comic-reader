@@ -353,6 +353,7 @@ export function IdLine({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   if (draft === null) {
+    const current = validate(value);
     return (
       <div className="mt-4 flex items-center gap-2 text-xs text-neutral-500">
         <span>{label}</span>
@@ -368,6 +369,7 @@ export function IdLine({
         >
           edit
         </button>
+        {current && <span className="text-amber-400">{current}</span>}
       </div>
     );
   }

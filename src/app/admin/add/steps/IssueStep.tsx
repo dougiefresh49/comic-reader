@@ -1,7 +1,6 @@
 "use client";
 
-import { isUnstartedStep } from "~/lib/pipeline-steps";
-import { ISSUE_ID, isPickable } from "../model";
+import { ISSUE_ID, issueState } from "../model";
 import { Chip, Context, Cover, Heading, IdLine, btn } from "../ui";
 import {
   Back,
@@ -36,7 +35,8 @@ export function issueStep(f: Flow): StepView | null {
       />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
         {bookIssues.map((iss) => {
-          const pickable = isPickable(iss);
+          const state = issueState(iss);
+          const pickable = state === "empty";
           const selected = pickable && iss.number === number;
           const inner = (
             <>
@@ -48,12 +48,18 @@ export function issueStep(f: Flow): StepView | null {
               />
               <span className={CARD_NAME}>Issue {iss.number}</span>
               <span className={CARD_META}>
-                {pickable ? (
+                {state === "empty" ? (
                   <Chip tone="none">no pages</Chip>
-                ) : isUnstartedStep(iss.pipelineStep) ? (
-                  <Chip tone="ok">{iss.pageCount} pages</Chip>
-                ) : (
+                ) : state === "unfinished" ? (
+                  <Chip tone="warn">
+                    {iss.storedPages} pages stored · unfinished
+                  </Chip>
+                ) : state === "pipeline" ? (
                   <Chip tone="run">in pipeline</Chip>
+                ) : (
+                  <Chip tone="ok">
+                    {Math.max(iss.pageCount, iss.storedPages)} pages
+                  </Chip>
                 )}
               </span>
             </>

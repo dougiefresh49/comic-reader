@@ -37,9 +37,12 @@ export function savingStep(f: Flow): StepView | null {
       );
     if (row === "saving") return <Spinner />;
     if (row === "error")
-      return <span className="text-red-300">{save.error}</span>;
+      return <span className={`${MONO} text-red-300`}>{save.error}</span>;
     return null;
   };
+  const franchiseNote = save.warnings.find((w) =>
+    w.startsWith("Franchise links not saved"),
+  );
   const progress = save.progress;
   const total = pages.kind === "online" ? pages.source.pageCount : files.length;
 
@@ -50,13 +53,15 @@ export function savingStep(f: Flow): StepView | null {
       <WriteRow
         k="Pages"
         title={
-          save.pages === "saved"
-            ? `${save.stored} of ${total}`
-            : `${progress?.current ?? 0} of ${progress?.total ?? total}`
+          save.pages === "error"
+            ? "Pages not saved"
+            : save.pages === "saved"
+              ? `${save.stored} of ${total}`
+              : `${progress?.current ?? 0} of ${progress?.total ?? total}`
         }
       >
         {save.pages === "error" ? (
-          <span className="text-red-300">{save.error}</span>
+          <span className={`${MONO} text-red-300`}>{save.error}</span>
         ) : (
           <span className={`${MONO} truncate text-neutral-500`}>
             {progress?.detail ?? ""}
@@ -80,6 +85,9 @@ export function savingStep(f: Flow): StepView | null {
       <WriteList>
         <WriteRow k="Book" title={book.name}>
           {status(save.book)}
+          {franchiseNote && (
+            <span className={`${MONO} text-amber-400`}>{franchiseNote}</span>
+          )}
         </WriteRow>
         <WriteRow k="Issue" title={`Issue ${f.number}`}>
           {status(save.issue)}
@@ -88,6 +96,8 @@ export function savingStep(f: Flow): StepView | null {
       </WriteList>
     </>
   );
+  // Online: the server finishes the download whatever the browser does, so
+  // the button only leaves. Disk: Stop holds until finalize, which runs on.
   const footer = save.error ? (
     <>
       <button
@@ -97,14 +107,27 @@ export function savingStep(f: Flow): StepView | null {
       >
         ← Back
       </button>
+      <Note>
+        Rows marked saved exist. Back, then Confirm and save to try again.
+      </Note>
       <Spacer />
     </>
+  ) : pages.kind === "online" ? (
+    <>
+      <Note>
+        The download keeps going after you leave. It finishes on its own.
+      </Note>
+      <Spacer />
+      <button type="button" onClick={f.stop} className={btn("ghost")}>
+        Leave
+      </button>
+    </>
+  ) : progress?.finalizing ? (
+    <Spacer />
   ) : (
     <>
       <Note>
-        {pages.kind === "online"
-          ? "Stop keeps what is saved. Pages may still arrive after Stop."
-          : "Stop keeps what is saved. You can continue later from the book."}
+        Stop keeps what is saved. You can continue later from the book.
       </Note>
       <Spacer />
       <button type="button" onClick={f.stop} className={btn("ghost")}>
@@ -149,7 +172,8 @@ export function doneStep(f: Flow): StepView | null {
           </div>
           {pages.kind !== "none" && save.stored < expected && (
             <div className="mt-1 text-[12.5px] text-amber-400">
-              {expected - save.stored} of {expected} pages did not store.
+              {expected - save.stored} of {expected} pages did not store. Check
+              the issue on the admin page before Start Pipeline.
             </div>
           )}
           {save.warnings.map((w) => (

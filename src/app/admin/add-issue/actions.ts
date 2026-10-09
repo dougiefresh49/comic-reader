@@ -155,9 +155,23 @@ export async function findReadingSource(args: {
       { step: "admin:add-issue:find-source" },
     );
 
-    const text = response.text?.trim();
+    // `response.text` reads the first candidate only; a reply that spent its
+    // budget thinking can leave that empty while another part holds text.
+    let text = response.text?.trim() ?? "";
     if (!text) {
-      return { ok: false, error: "Gemini returned empty response" };
+      text = (response.candidates ?? [])
+        .flatMap((c) => c.content?.parts ?? [])
+        .filter((p) => !p.thought)
+        .map((p) => p.text ?? "")
+        .join("")
+        .trim();
+    }
+    if (!text) {
+      const reason = response.candidates?.[0]?.finishReason ?? "none given";
+      return {
+        ok: false,
+        error: `Search came back empty (finish reason: ${reason})`,
+      };
     }
 
     // Strip markdown fences if Gemini ignores instruction

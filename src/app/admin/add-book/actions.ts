@@ -7,6 +7,7 @@ import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { requireAdmin } from "~/server/admin/require-admin";
+import { bookIdFromTitle } from "../add/model";
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: string };
@@ -29,16 +30,6 @@ export interface BookSearchResult {
   totalIssues: number;
   wikiTitleTemplate: string;
   suggestedSlug: string;
-}
-
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
 }
 
 /**
@@ -132,7 +123,7 @@ Return JSON only, no markdown.`;
         volumeNumber: series.data ? volumeOrNull(parsed.volumeNumber) : null,
         seriesId: series.data?.id ?? null,
         seriesIsNew: series.data?.isNew ?? false,
-        suggestedSlug: generateSlug(parsed.title),
+        suggestedSlug: bookIdFromTitle(parsed.title),
       },
     };
   } catch (e) {

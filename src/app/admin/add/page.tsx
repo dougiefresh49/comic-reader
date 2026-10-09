@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { listAllIssues } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
+import { getStoredPageCounts } from "~/server";
 import { AddFlow } from "./AddFlow";
 import { isPickable, type FlowBook, type FlowIssue } from "./model";
 
@@ -26,7 +27,7 @@ export default async function AddContentPage({
   // `<bookId>/<issueId>` of an online download stopped from Saving.
   const [stoppedBook, stoppedIssue] = stoppedParam?.split("/") ?? [];
 
-  const [booksRes, issuesRes] = await Promise.all([
+  const [booksRes, issuesRes, stored] = await Promise.all([
     supabaseAdmin
       .from("books")
       .select(
@@ -46,10 +47,11 @@ export default async function AddContentPage({
     }>,
     listAllIssues(
       supabaseAdmin,
-      "id, book_id, number, page_count, pipeline_step, created_at",
+      "id, book_id, number, page_count, pipeline_step, status, created_at",
     )
       .order("book_id")
       .order("number"),
+    getStoredPageCounts(),
   ]);
   if (booksRes.error) throw new Error(`books: ${booksRes.error.message}`);
   if (issuesRes.error) throw new Error(`issues: ${issuesRes.error.message}`);
@@ -59,7 +61,9 @@ export default async function AddContentPage({
     id: row.id,
     number: row.number,
     pageCount: row.page_count,
+    storedPages: stored[row.book_id]?.[row.id] ?? 0,
     pipelineStep: row.pipeline_step,
+    status: row.status,
     createdAt: row.created_at,
     cover: row.page_count > 0 ? pageImageUrl(row.book_id, row.id, 1) : null,
   }));
@@ -77,13 +81,19 @@ export default async function AddContentPage({
   }));
 
   // Resume: the newest issue of an unpublished book that is saved with no
-  // pages yet.
+  // pages yet. Not the issue whose download was just left running: it is
+  // still storing, so it is not waiting on anyone.
   const draftBooks = new Set(
     books.filter((b) => !b.published).map((b) => b.id),
   );
   const resume =
     issues
-      .filter((i) => draftBooks.has(i.bookId) && isPickable(i))
+      .filter(
+        (i) =>
+          draftBooks.has(i.bookId) &&
+          isPickable(i) &&
+          !(i.bookId === stoppedBook && i.id === stoppedIssue),
+      )
       .sort((a, b) =>
         (b.createdAt ?? "").localeCompare(a.createdAt ?? ""),
       )[0] ?? null;
