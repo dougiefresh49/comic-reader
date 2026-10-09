@@ -480,6 +480,31 @@ export async function moveFaces(args: {
 }
 
 /**
+ * The writes of one face reject: its exemplar (by `detection_id`, crop
+ * included) and the detection are deleted, then the page's loose exemplars
+ * settle. Both reject actions call this, so a batch writes exactly what a
+ * single reject does. Returns the crop warnings, never throws on them.
+ */
+async function rejectDetection(
+  scope: Scope,
+  face: { id: string; characterId: string | null; page: number },
+): Promise<string[]> {
+  const warnings: string[] = [];
+  const byDetection = await deleteExemplars(supabaseAdmin, [face.id]);
+  if (byDetection) warnings.push(byDetection);
+  const dropped = await supabaseAdmin
+    .from("panel_character_detections")
+    .delete()
+    .eq("id", face.id);
+  must("dropping the face", dropped.error);
+  const loose = await settleLooseExemplars(scope, face.characterId, face.page, {
+    kind: "reject",
+  });
+  if (loose) warnings.push(loose);
+  return warnings;
+}
+
+/**
  * Rejects the clicked face: its exemplar (by `detection_id`, crop included)
  * and the detection are deleted. A loose exemplar on that page goes too when
  * this was the character's only face there; otherwise it stays, unconfirmed.
@@ -492,21 +517,7 @@ export async function rejectFace(args: {
     await requireAdmin();
     const { scope, detectionId } = args;
     const face = await readDetection(scope, detectionId);
-    const warnings: string[] = [];
-    const byDetection = await deleteExemplars(supabaseAdmin, [detectionId]);
-    if (byDetection) warnings.push(byDetection);
-    const dropped = await supabaseAdmin
-      .from("panel_character_detections")
-      .delete()
-      .eq("id", detectionId);
-    must("dropping the face", dropped.error);
-    const loose = await settleLooseExemplars(
-      scope,
-      face.characterId,
-      face.page,
-      { kind: "reject" },
-    );
-    if (loose) warnings.push(loose);
+    const warnings = await rejectDetection(scope, face);
     revalidate(scope);
     return done(
       `Dropped the page ${face.page} face.`,
@@ -514,6 +525,37 @@ export async function rejectFace(args: {
     );
   } catch (err) {
     return fail("rejecting a face", err);
+  }
+}
+
+/**
+ * Rejects a selection of faces (#749): every face is read before anything is
+ * written (a stale id fails the whole reject, not half of it), each face is
+ * then written as `rejectFace` writes it, one after another, and the page
+ * refreshes once.
+ */
+export async function rejectFaces(args: {
+  scope: Scope;
+  detectionIds: string[];
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { scope, detectionIds } = args;
+    if (detectionIds.length === 0) throw new Error("no faces were picked");
+    const faces: Awaited<ReturnType<typeof readDetection>>[] = [];
+    for (const detectionId of detectionIds)
+      faces.push(await readDetection(scope, detectionId));
+    const warnings: string[] = [];
+    for (const face of faces)
+      warnings.push(...(await rejectDetection(scope, face)));
+    revalidate(scope);
+    const n = faces.length;
+    return done(
+      `Dropped ${n} ${n === 1 ? "face" : "faces"}.`,
+      warnings.length > 0 ? warnings.join(" ") : null,
+    );
+  } catch (err) {
+    return fail("rejecting faces", err);
   }
 }
 

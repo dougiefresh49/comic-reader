@@ -3,7 +3,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  BUTTON,
   FaceCrop,
   ICON_BUTTON,
   ICON_PRIMARY,
@@ -229,14 +228,17 @@ export interface FacesTabProps {
   /** Opens the move dialog for these faces; focus returns to `opener` when it closes. */
   onMoveRequest: (faces: FaceView[], opener: HTMLElement) => void;
   onReject: (face: FaceView) => void;
+  /** Rejects the selection in one action. */
+  onRejectMany: (faces: FaceView[]) => void;
 }
 
 /**
  * The Faces tab. The header reads the exemplar summary on the left, and on
  * the right the select icon and the primary check ("Faces are right"). Select
- * mode turns the tiles into checkboxes under a bar with "N selected", Move…
- * and Done. The selection is the ids still on the card, so a face that has
- * moved away drops out of the count by itself.
+ * mode turns the tiles into checkboxes under a bar with "N selected", the
+ * tiles' Move and Reject icons, and Done. The selection is the ids still on
+ * the card, so a face that has moved away or been rejected drops out of the
+ * count by itself.
  */
 export function FacesTab({
   card,
@@ -249,11 +251,12 @@ export function FacesTab({
   onConfirm,
   onMoveRequest,
   onReject,
+  onRejectMany,
 }: FacesTabProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const selectRef = useRef<HTMLButtonElement>(null);
   const wasSelecting = useRef(false);
-  // Leaving select mode unmounts Done and the Move… bar; a focus they held goes back to the select icon.
+  // Leaving select mode unmounts Done and the bar's icons; a focus they held goes back to the select icon.
   useEffect(() => {
     if (
       wasSelecting.current &&
@@ -265,6 +268,7 @@ export function FacesTab({
   }, [selecting]);
 
   const selected = card.faces.filter((f) => selectedIds.has(f.id));
+  const selectedFaces = `${selected.length} ${selected.length === 1 ? "face" : "faces"}`;
   const unconfirmed =
     card.faces.filter((f) => f.exemplar && !f.exemplar.confirmed).length +
     card.looseExemplars.filter((e) => !e.confirmed).length;
@@ -331,14 +335,26 @@ export function FacesTab({
               type="button"
               disabled={busy || selected.length === 0}
               onClick={(e) => onMoveRequest(selected, e.currentTarget)}
-              className={`${BUTTON} h-7`}
+              aria-label={`Move ${selectedFaces}…`}
+              title={`Move ${selectedFaces} to another character`}
+              className={ICON_BUTTON}
             >
-              Move…
+              <MoveIcon />
+            </button>
+            <button
+              type="button"
+              disabled={busy || selected.length === 0}
+              onClick={() => onRejectMany(selected)}
+              aria-label={`Reject ${selectedFaces}`}
+              title={`Reject ${selectedFaces}: not this character, not anyone`}
+              className={`${ICON_BUTTON} hover:text-red-200`}
+            >
+              <TrashIcon />
             </button>
             <button
               type="button"
               onClick={() => onSelectingChange(false)}
-              className={`${QUIET} h-7`}
+              className={`${QUIET} ml-1 h-7`}
             >
               Done
             </button>
