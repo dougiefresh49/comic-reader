@@ -1,0 +1,1742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Callboard — TMNT × MMPR III, Issue 1</title>
+<style>
+  :root {
+    --ink: #1c140e;
+    --paper: #f4efe4;
+    --manila: #f7f1e2;
+    --cork: #a56d3e;
+    --cork-deep: #7a4e2c;
+    --brass: #c6a15a;
+    --brass-hot: #f0d48a;
+    --iron: #24282b;
+    --steel: #3c4946;
+    --stamp: #8f2d22;
+    --wing: #100e0c;
+    --face: "American Typewriter", "Rockwell", "Iowan Old Style", Palatino, serif;
+    --mark: Copperplate, "Copperplate Gothic Light", Didot, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--wing);
+    color: var(--ink);
+    font-family: var(--face);
+    font-size: 15px;
+    line-height: 1.25;
+  }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:focus-visible, [tabindex]:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+    outline: 2px solid #8a5a12;
+    outline-offset: 2px;
+  }
+  .stage {
+    width: min(1440px, calc(100vw - 20px));
+    height: calc(100vh - 20px);
+    margin: 10px auto;
+    display: grid;
+    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-rows: 52px minmax(0, 1fr) 56px;
+    background: var(--paper);
+    position: relative;
+    box-shadow: 0 0 0 1px #3a2a18, 0 20px 50px rgba(0,0,0,.45);
+  }
+  .screw {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #f0d48a, #8a6a32 55%, #3a2a14);
+    z-index: 5; pointer-events: none;
+  }
+  .screw.a { top: 8px; left: 8px; } .screw.b { top: 8px; right: 8px; }
+  .screw.c { bottom: 8px; left: 8px; } .screw.d { bottom: 8px; right: 8px; }
+
+  .top {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 18px;
+    background: #16130f;
+    color: var(--brass-hot);
+    border-bottom: 3px solid #3a2a18;
+  }
+  .brand {
+    font-family: var(--mark);
+    letter-spacing: .22em;
+    font-size: 15px;
+  }
+  .top .book {
+    font-family: var(--mark);
+    letter-spacing: .08em;
+    font-size: 11px;
+    color: #b7a27a;
+  }
+  .count {
+    margin-left: auto;
+    font-family: var(--mark);
+    letter-spacing: .14em;
+    font-size: 12px;
+    color: var(--brass-hot);
+  }
+  .count b { color: #fff8e8; font-weight: 400; }
+  #lamp {
+    min-width: 180px;
+    font-size: 12px;
+    letter-spacing: .04em;
+    color: #f0d48a;
+  }
+  #lamp:not(:empty)::before {
+    content: "";
+    display: inline-block;
+    width: 7px; height: 7px; margin-right: 6px;
+    border-radius: 50%;
+    background: var(--stamp);
+    box-shadow: 0 0 0 3px rgba(143,45,34,.35);
+    vertical-align: middle;
+  }
+  .callbtn {
+    background: var(--brass);
+    color: #1c140e;
+    border: 0;
+    padding: 7px 12px;
+    font-family: var(--mark);
+    letter-spacing: .14em;
+    font-size: 12px;
+  }
+  .callbtn:hover { background: var(--brass-hot); }
+
+  .bill {
+    background: var(--paper);
+    border-right: 1px solid #d9cbb0;
+    min-height: 0;
+    overflow: auto;
+    position: relative;
+  }
+  .bill::before {
+    content: "";
+    position: absolute; inset: 0 auto 0 0; width: 3px;
+    background: var(--stamp);
+    pointer-events: none;
+  }
+  .mast {
+    padding: 16px 16px 10px 18px;
+    border-bottom: 1px solid rgba(28,20,14,.16);
+  }
+  .mast .kicker {
+    font-family: var(--mark);
+    letter-spacing: .18em;
+    font-size: 11px;
+    color: var(--stamp);
+  }
+  .mast h1 {
+    margin: 4px 0 0;
+    font-family: var(--mark);
+    font-weight: 400;
+    font-size: 18px;
+    letter-spacing: .06em;
+    line-height: 1.15;
+  }
+  .mast p {
+    margin: 6px 0 0;
+    font-family: var(--mark);
+    letter-spacing: .16em;
+    font-size: 11px;
+  }
+  .company { columns: 2; column-gap: 8px; }
+  .row {
+    break-inside: avoid;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 26px;
+    gap: 6px;
+    align-items: baseline;
+    padding: 5px 8px 5px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(28,20,14,.1);
+    background: transparent;
+    text-align: left;
+    width: 100%;
+    cursor: grab;
+  }
+  .row .ln { font-variant-numeric: tabular-nums; color: #8a5a2a; font-size: 12px; }
+  .row .nm { white-space: normal; }
+  .row .st {
+    font-family: var(--mark);
+    font-size: 10px;
+    letter-spacing: .06em;
+    color: #6b5344;
+    text-align: right;
+  }
+  .row.is-locked .nm { color: #3a4044; }
+  .row.is-hold .st { color: #3c4946; }
+  .row.is-wish .st { color: var(--stamp); }
+  .row.is-sit .st { color: var(--stamp); }
+  .row.is-hand { background: #efe2c4; }
+  .row.is-focus { box-shadow: inset 3px 0 0 #8a5a12; }
+  .adder {
+    display: flex; gap: 6px;
+    padding: 8px 12px 12px;
+  }
+  .adder input {
+    flex: 1;
+    border: 0;
+    border-bottom: 1px solid #c8b89a;
+    background: transparent;
+    padding: 6px 2px;
+  }
+  .adder button {
+    border: 0; background: transparent;
+    font-family: var(--mark); letter-spacing: .12em; font-size: 11px;
+  }
+
+  .plate { padding: 14px 14px 28px 18px; }
+  .back {
+    border: 0; background: transparent; padding: 0;
+    font-family: var(--mark); letter-spacing: .16em; font-size: 11px;
+    color: #6b5344;
+  }
+  .plate h2 { margin: 8px 0 0; font-size: 26px; font-weight: 400; line-height: 1; }
+  .sub {
+    margin: 6px 0 10px;
+    font-family: var(--mark);
+    letter-spacing: .08em;
+    font-size: 11px;
+    color: #6b5344;
+  }
+  .bio {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #3a2c22;
+  }
+  .faces { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .crop {
+    width: 84px;
+    background: var(--manila);
+    border: 1px solid #d9cbb0;
+  }
+  .crop .pic {
+    height: 72px;
+    position: relative;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(255,236,210,.9) 0 18%, transparent 19%),
+      radial-gradient(#1c140e 0.7px, transparent 0.8px);
+    background-size: auto, 4px 4px;
+  }
+  .crop .pic span {
+    position: absolute; left: 4px; bottom: 3px;
+    font-family: var(--mark); font-size: 10px; letter-spacing: .08em;
+    background: rgba(244,239,228,.88); padding: 1px 3px;
+  }
+  .crop .ops { display: flex; }
+  .crop .ops button, .crop select {
+    flex: 1; border: 0; border-top: 1px solid #d9cbb0;
+    background: #fffaf0; font-size: 10px; padding: 3px 0;
+    font-family: var(--mark); letter-spacing: .06em;
+    width: 100%;
+  }
+  .crop.is-out { opacity: .35; }
+  .sec {
+    font-family: var(--mark);
+    letter-spacing: .16em;
+    font-size: 11px;
+    margin: 12px 0 6px;
+  }
+  .aud {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(28,20,14,.1);
+    font-size: 13px;
+  }
+  .aud .kind { font-family: var(--mark); font-size: 10px; letter-spacing: .08em; color: #6b5344; }
+  .lineplay {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    gap: 6px;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 12px;
+  }
+  .verbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .verbs button, .ghostbtn, .bak, .mini {
+    border: 1px solid #1c140e;
+    background: transparent;
+    padding: 6px 8px;
+    font-family: var(--mark);
+    letter-spacing: .1em;
+    font-size: 11px;
+  }
+  .verbs button.on, .bak.on, .mini.on { background: #1c140e; color: var(--paper); }
+  .bak.off { background: var(--stamp); color: #fff; border-color: var(--stamp); }
+  .covers { max-height: 140px; overflow: auto; border-top: 1px solid rgba(28,20,14,.12); }
+  .covers button {
+    display: block; width: 100%; text-align: left;
+    border: 0; border-bottom: 1px solid rgba(28,20,14,.08);
+    background: transparent; padding: 5px 2px; font-size: 13px;
+  }
+  .using {
+    display: inline-block;
+    margin: 6px 0;
+    border: 2px solid var(--stamp);
+    color: var(--stamp);
+    font-family: var(--mark);
+    letter-spacing: .12em;
+    font-size: 12px;
+    padding: 3px 6px;
+  }
+  .honesty {
+    margin: 8px 0 0;
+    font-size: 12px;
+    letter-spacing: .02em;
+  }
+
+  .board {
+    min-width: 0; min-height: 0;
+    display: flex; flex-direction: column;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(255,220,170,.28), transparent 58%),
+      repeating-linear-gradient(0deg, rgba(80,40,16,.05) 0 1px, transparent 1px 3px),
+      var(--cork);
+    position: relative;
+  }
+  .board-h {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 8px 12px 0;
+    font-family: var(--mark);
+    letter-spacing: .2em;
+    font-size: 12px;
+    color: #2a160c;
+  }
+  .rails { overflow: auto; padding: 4px 10px 0; flex: 0 0 auto; }
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(15, minmax(0, 1fr));
+    gap: 3px;
+    margin-bottom: 6px;
+  }
+  .hook {
+    min-height: 0;
+    padding: 3px 1px 6px;
+    display: flex; flex-direction: column; align-items: center;
+    position: relative;
+  }
+  .hook.is-locked { background: linear-gradient(#32373b, #1e2224); }
+  .hook.is-hold { background: linear-gradient(#465550, #2a3532); }
+  .hn {
+    font-family: var(--mark);
+    font-size: 11px;
+    letter-spacing: .12em;
+    color: #2a160c;
+  }
+  .hook.is-locked .hn, .hook.is-hold .hn { color: var(--brass-hot); }
+  .peg {
+    width: 16px; height: 8px; margin-top: 2px;
+    border: 2px solid #7a5a28;
+    border-bottom: none;
+    border-radius: 9px 9px 0 0;
+    background: linear-gradient(#f0d48a, #8a6230);
+  }
+  .hook.is-locked .peg, .hook.is-hold .peg {
+    border-color: #111;
+    background: linear-gradient(#d9d3c4, #8a8478);
+  }
+  .string { width: 1px; height: 8px; background: #3a2716; }
+  .hook.is-locked .string, .hook.is-hold .string { background: #111; }
+  .tag {
+    width: calc(100% - 2px);
+    background: var(--manila);
+    color: var(--ink);
+    padding: 2px 4px 6px;
+    box-shadow: 2px 3px 0 rgba(40,20,8,.25);
+    transform: rotate(var(--tilt, 0deg));
+    cursor: grab;
+    position: relative;
+    text-align: center;
+  }
+  .tag::before {
+    content: "";
+    display: block;
+    width: 7px; height: 7px; margin: 3px auto 3px;
+    border-radius: 50%;
+    background: #1a120c;
+    box-shadow: inset 0 0 0 1.5px var(--brass);
+  }
+  .tag .who {
+    display: block;
+    font-family: "Avenir Next Condensed", "DIN Alternate", "Arial Narrow", var(--face);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+  .tag .who.tiny { font-size: 10px; letter-spacing: -0.04em; }
+  .tag .meta {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--mark);
+    font-size: 9px;
+    letter-spacing: .12em;
+  }
+  .hook.is-locked .tag {
+    background: #1c2023;
+    color: #f4ead8;
+    transform: none;
+    box-shadow: none;
+  }
+  .hook.is-locked .tag::before { background: #c6a15a; box-shadow: none; }
+  .hook.is-hold .tag { background: #d5ddd8; color: #12201c; }
+  .seal {
+    position: absolute; top: 2px; right: 2px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--stamp);
+  }
+  .freeword {
+    margin-top: 8px;
+    font-family: var(--mark);
+    letter-spacing: .14em;
+    font-size: 10px;
+    color: #2a160c;
+  }
+  .hook.is-armed { box-shadow: inset 0 0 0 2px var(--brass-hot); }
+  .hook.is-focus { box-shadow: inset 0 0 0 2px #2a160c; }
+  .hook.is-armed.is-focus { box-shadow: inset 0 0 0 2px #fff4d4, inset 0 0 0 4px #2a160c; }
+  .hook.over { outline: 2px solid #f0d48a; outline-offset: -2px; }
+  .hook.over-no { outline: 2px solid var(--stamp); outline-offset: -2px; }
+  .hook.shake { animation: shake .4s linear; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  .play {
+    border: 0; background: transparent; padding: 2px;
+    width: 22px; height: 16px; position: relative;
+  }
+  .tri {
+    display: block; width: 0; height: 0;
+    border-left: 7px solid currentColor;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    margin: 0 auto;
+  }
+  .bars { display: none; gap: 2px; height: 12px; align-items: flex-end; justify-content: center; }
+  .bars b { display: block; width: 2px; background: currentColor; height: 100%; transform-origin: bottom; animation: bar .6s ease-in-out infinite alternate; }
+  .bars b:nth-child(2) { animation-delay: .15s; height: 70%; }
+  .bars b:nth-child(3) { animation-delay: .3s; height: 90%; }
+  @keyframes bar { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
+  .play.is-playing .tri { display: none; }
+  .play.is-playing .bars { display: flex; }
+  .tag .play { color: inherit; position: absolute; left: 1px; bottom: 1px; }
+
+  .bench {
+    flex: 1;
+    min-height: 128px;
+    background: linear-gradient(#6a4428, #24160e);
+    color: #f0e2c4;
+    display: flex;
+    flex-direction: column;
+    border-top: 3px solid #e6c98a;
+  }
+  .bench.over { outline: 2px solid var(--brass-hot); outline-offset: -4px; }
+  .bench-label {
+    font-family: var(--mark);
+    letter-spacing: .22em;
+    font-size: 11px;
+    padding: 8px 12px 0;
+    color: #f0d48a;
+  }
+  .bench-tags {
+    flex: 1;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 8px 12px 12px;
+    align-content: flex-start;
+  }
+  .bench .tag { cursor: grab; }
+  .bench .tag .who { color: var(--ink); }
+  .empty-bench {
+    font-family: var(--mark);
+    letter-spacing: .2em;
+    font-size: 11px;
+    color: rgba(240,212,138,.55);
+    align-self: center;
+  }
+
+  .cmd {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px;
+    background: #16130f;
+    color: var(--brass-hot);
+    border-top: 3px solid #3a2a18;
+  }
+  .cmd button {
+    background: transparent;
+    color: var(--brass-hot);
+    border: 1px solid #6b5430;
+    padding: 6px 8px;
+    font-family: var(--mark);
+    letter-spacing: .1em;
+    font-size: 11px;
+  }
+  .cmd button:hover:not(:disabled) { background: #2a2118; }
+  .cmd button:disabled { opacity: .35; cursor: default; }
+  .cmd kbd {
+    font-family: var(--face);
+    font-size: 9px;
+    letter-spacing: 0;
+    opacity: .7;
+    margin-left: 4px;
+  }
+  .inhand {
+    margin-left: auto;
+    font-family: var(--mark);
+    letter-spacing: .12em;
+    font-size: 12px;
+    color: #fff8e8;
+  }
+  .inhand:empty { display: none; }
+
+  .booth, .review {
+    position: fixed;
+    z-index: 30;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 -12px 40px rgba(0,0,0,.4);
+  }
+  .booth[hidden] { display: none !important; }
+  .booth {
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(1440px, calc(100vw - 20px));
+    bottom: 66px;
+    height: 320px;
+    border-top: 8px solid #2a1c10;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 12px 16px 14px;
+  }
+  .booth h2, .review h2 {
+    margin: 0;
+    font-family: var(--mark);
+    font-weight: 400;
+    letter-spacing: .14em;
+    font-size: 14px;
+  }
+  .booth h2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .booth h2 button {
+    border: 1px solid #1c140e; background: transparent;
+    padding: 4px 8px; font-family: var(--mark); letter-spacing: .12em; font-size: 11px;
+  }
+  .booth label, .review .k {
+    font-family: var(--mark);
+    letter-spacing: .14em;
+    font-size: 10px;
+    display: block;
+    margin: 8px 0 4px;
+  }
+  textarea {
+    width: 100%;
+    resize: none;
+    border: 1px solid #c8b89a;
+    background: #fffaf0;
+    padding: 6px 8px;
+  }
+  #prompt { height: 68px; }
+  #line { height: 52px; }
+  .rowbtns { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+  .rowbtns button, .review .save {
+    border: 0; background: #1c140e; color: var(--paper);
+    padding: 8px 12px;
+    font-family: var(--mark); letter-spacing: .12em; font-size: 12px;
+  }
+  .rowbtns button.ghost, .review .save.ghost {
+    background: transparent; color: var(--ink); border: 1px solid #1c140e;
+  }
+  .rowbtns button:disabled { opacity: .4; }
+  #line-count.short { color: var(--stamp); }
+  .previews { display: flex; gap: 8px; margin-top: 8px; }
+  .pv {
+    flex: 1;
+    border: 1px solid #1c140e;
+    padding: 8px;
+    background: #fffaf0;
+    min-height: 120px;
+  }
+  .pv.is-acc { background: #1c140e; color: var(--paper); }
+  .pv .tone { font-family: var(--mark); letter-spacing: .14em; font-size: 12px; }
+  .pv .ops { display: flex; gap: 6px; margin-top: 10px; }
+  .pv button { border: 1px solid currentColor; background: transparent; padding: 4px 6px; font-family: var(--mark); letter-spacing: .08em; font-size: 10px; color: inherit; }
+  .booth .honesty { margin-top: 8px; }
+
+  .review {
+    inset: 16px;
+    overflow: auto;
+    padding: 28px 36px 48px;
+  }
+  .review header { display: flex; justify-content: space-between; align-items: baseline; }
+  .nums {
+    display: flex; gap: 22px;
+    margin: 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--stamp);
+  }
+  .nums div { font-family: var(--mark); letter-spacing: .12em; font-size: 12px; }
+  .nums b { display: block; font-family: var(--face); font-size: 28px; letter-spacing: 0; font-weight: 400; }
+  .review section { margin: 14px 0; }
+  .review ul { margin: 4px 0 0; padding: 0; list-style: none; }
+  .review li { padding: 3px 0; border-bottom: 1px solid rgba(28,20,14,.1); font-size: 14px; }
+  .review .save { margin-top: 16px; }
+  .called {
+    position: absolute; right: 64px; top: 72px;
+    border: 4px solid var(--stamp); color: var(--stamp);
+    font-family: var(--mark); letter-spacing: .22em;
+    font-size: 32px; padding: 6px 12px;
+    transform: rotate(-8deg);
+    pointer-events: none;
+  }
+  .warn { color: var(--stamp); font-family: var(--mark); letter-spacing: .06em; }
+
+  .ghost {
+    position: fixed; z-index: 70; pointer-events: none;
+    width: 86px; padding: 8px 6px;
+    background: var(--manila); color: var(--ink);
+    text-align: center; font-size: 12px;
+    box-shadow: 4px 8px 0 rgba(0,0,0,.3);
+    transform: translate(-40%, -20%) rotate(-6deg);
+  }
+  body.dragging, body.dragging * { cursor: grabbing !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .bars b, .hook.shake { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <i class="screw a"></i><i class="screw b"></i><i class="screw c"></i><i class="screw d"></i>
+  <header class="top" id="top"></header>
+  <div class="bill" id="bill"></div>
+  <div class="board" id="board"></div>
+  <footer class="cmd" id="cmd"></footer>
+</div>
+<div class="booth" id="booth" hidden></div>
+<div class="review" id="review" hidden></div>
+<div class="ghost" id="ghost" hidden></div>
+<script>
+const PROTECTED = new Set(["michelangelo", "donatello", "raphael", "master-splinter"]);
+
+const CAST = [
+  { id: "michelangelo", name: "Michelangelo", lines: 6, hook: 1, faceCount: 8, pages: [9, 11, 12, 13, 23],
+    description: "young, high-energy surfer dude turtle. Playful, enthusiastic",
+    voice: { kind: "clone", vid: "923f2795", snap: true, lbl: true, room: true } },
+  { id: "donatello", name: "Donatello", lines: 10, hook: 2, faceCount: 10, pages: [6, 7, 12, 13],
+    description: "Young adult American male. Higher pitch, slight nasal, fast-paced",
+    voice: { kind: "clone", vid: "43692987", snap: true, lbl: true, room: true } },
+  { id: "raphael", name: "Raphael", lines: 22, hook: 3, faceCount: 17, pages: [7, 12, 14, 17, 18, 19],
+    description: "Young adult male. Thick Brooklyn accent, gravel and rasp",
+    voice: { kind: "clone", vid: "ec805e5f", snap: true, lbl: true, room: true } },
+  { id: "master-splinter", name: "Master Splinter", lines: 9, hook: 4, faceCount: 9, pages: [12, 14, 22, 23],
+    description: "Middle-aged to older male. Deep bass, resonant, commanding, stoic",
+    voice: { kind: "clone", vid: "edf04d8f", snap: true, lbl: true, room: true } },
+  { id: "leonardo", name: "Leonardo", lines: 19, hook: 5, faceCount: 14, pages: [5, 8, 10, 11, 12, 22],
+    description: "clear young adult male, American accent, disciplined and authoritative",
+    voice: { kind: "design", vid: "2849377a", snap: false, lbl: false, room: true } },
+  { id: "shredder", name: "Shredder", lines: 15, hook: 6, faceCount: 12, pages: [15, 16, 18, 22],
+    description: "The imperious rival, commanding, cutting, theatrically disdainful",
+    voice: { kind: "clone", vid: "a4cbde49", snap: true, lbl: true, room: true } },
+  { id: "karai", name: "Karai", lines: 3, hook: 7, faceCount: 10, pages: [7, 15, 16],
+    description: "The tactician: sharp, cool, surgically precise",
+    voice: { kind: "clone", vid: "f5be0f7c", snap: true, lbl: true, room: true } },
+  { id: "green-ranger", name: "Green Ranger", lines: 30, hook: 8, faceCount: 30, pages: [5, 8, 9, 10, 11, 14],
+    description: "confident, heroic young adult male, American accent, strong disciplined tone",
+    voice: { kind: "design", vid: "61485979", snap: false, lbl: false, room: false },
+    alts: [{ id: "gr-tommy", name: "Green Ranger (Tommy) (1993)" }],
+    samples: [
+      ["p.4", "[shouting] COME ON! IS THIS ALL YOU'VE GOT?"],
+      ["p.4", "KEE-YAH!"],
+      ["p.5", "[frustrated grunts] SO MUCH for reaching the Command Center."]
+    ] },
+  { id: "narrator", name: "Narrator", lines: 24, hook: 9, role: true, faceCount: 0, pages: [],
+    description: "refined, aristocratic RP English accent, classic timeless",
+    voice: { kind: "clone", vid: "135303b1", snap: true, lbl: true, room: false } },
+  { id: "foot-elite", name: "Foot Elite", lines: 11, hook: 10, faceCount: 10, pages: [8, 10, 15],
+    description: "deep, disciplined, authoritative male, calm yet menacing",
+    voice: { kind: "design", vid: "42425998", snap: false, lbl: false, room: false } },
+  { id: "red-ranger", name: "Red Ranger", lines: 11, hook: 11, faceCount: 14, pages: [8, 10, 11, 12, 17, 22],
+    description: "heroic and confident young adult male, natural leadership",
+    voice: { kind: "design", vid: "424a22c2", snap: false, lbl: false, room: false } },
+  { id: "warbunny", name: "Warbunny", lines: 11, hook: 12, faceCount: 12, pages: [6, 7, 15, 20],
+    description: "deep, booming, gravelly, guttural male, monstrous and brutish",
+    voice: { kind: "design", vid: "d70e8453", snap: false, lbl: false, room: false } },
+  { id: "lord-zedd", name: "Lord Zedd", lines: 10, hook: 13, faceCount: 7, pages: [16, 18, 22, 23, 24],
+    description: "deep, gravelly, booming, terrifying male, commanding",
+    voice: { kind: "design", vid: "c635bd99", snap: false, lbl: false, room: false } },
+  { id: "pink-ranger", name: "Pink Ranger", lines: 9, hook: 14, faceCount: 21, pages: [8, 10, 11, 12, 14, 23],
+    description: "clear, youthful American female, articulate and natural",
+    voice: { kind: "design", vid: "176f9066", snap: false, lbl: false, room: false },
+    wish: { id: "pink-kim", name: "Pink Ranger (Kimberly) (1993)" } },
+  { id: "rocksteady", name: "Rocksteady", lines: 9, hook: 15, faceCount: 5, pages: [18, 19, 21],
+    description: "deep, gravelly, brutish male, rough street-thug accent",
+    voice: { kind: "design", vid: "62aff4c5", snap: false, lbl: false, room: false },
+    wish: { id: "rs-2012", name: "Rocksteady (2012)" },
+    samples: [
+      ["p.18", "[confident, snorts] Consider it a TEST DRIVE, Bebop. [darkly enthusiastic] Let's have SOME FUN!"],
+      ["p.19", "[Shouting] SHADOW GRID-- ACTIVATE!"],
+      ["p.19", "[excited] I AIN'T felt this GOOD since our first MUTATION."]
+    ] },
+  { id: "yellow-ranger", name: "Yellow Ranger", lines: 9, hook: 16, faceCount: 15, pages: [6, 7, 12, 13],
+    description: "young, energetic female, clear American accent, lively",
+    voice: { kind: "design", vid: "f8f5aad5", snap: false, lbl: false, room: false } },
+  { id: "bebop", name: "Bebop", lines: 8, hook: 17, faceCount: 6, pages: [18, 19, 20, 21],
+    description: "nasally, medium-pitched mutated warthog male, thick Brooklyn accent",
+    voice: { kind: "design", vid: "154dafc3", snap: false, lbl: true, room: false } },
+  { id: "zordon", name: "Zordon", lines: 6, hook: 18, faceCount: 1, pages: [12],
+    description: "deep, booming, resonant, authoritative, wise male presence",
+    voice: { kind: "design", vid: "2e4991ba", snap: false, lbl: false, room: false } },
+  { id: "blue-ranger", name: "Blue Ranger", lines: 5, hook: 19, faceCount: 8, pages: [12, 13],
+    description: "youthful, intelligent male, clear, calm and measured",
+    voice: { kind: "design", vid: "5a68421b", snap: false, lbl: false, room: false } },
+  { id: "alpha-5", name: "Alpha 5", lines: 2, hook: 20, faceCount: 1, pages: [12],
+    description: "high-pitched robotic voice, electronic filter, neurotic and anxious",
+    voice: { kind: "design", vid: "1c27f794", snap: false, lbl: false, room: false } },
+  { id: "foot-soldier", name: "Foot Soldier", lines: 2, hook: 21, faceCount: 31, pages: [3, 5, 8, 9, 10, 11],
+    description: "fanatical, raspy male, gruff, muffled by a mask",
+    voice: { kind: "design", vid: "c8a525e3", snap: false, lbl: false, room: false } },
+  { id: "black-ranger", name: "Black Ranger", lines: 1, hook: 22, faceCount: 2, pages: [12, 13],
+    description: "young adult male, clear American, smooth, confident",
+    voice: { kind: "design", vid: "8180324a", snap: false, lbl: false, room: false } },
+  { id: "armored-villain", name: "Armored Villain", lines: 0, hook: 23, faceCount: 0, pages: [],
+    description: "deep, booming, gravelly male, metallic rasp, aggressive",
+    voice: { kind: "design", vid: "f6edfdcf", snap: false, lbl: false, room: false } },
+  { id: "dr-boyd", name: "Dr. Boyd", lines: 0, hook: 24, faceCount: 0, pages: [],
+    description: "intelligent, articulate male, American, professional demeanor",
+    voice: { kind: "design", vid: "9962584c", snap: false, lbl: false, room: false } },
+  { id: "grace-sterling", name: "Grace Sterling", lines: 0, hook: 25, faceCount: 0, pages: [],
+    description: "mature, authoritative, cold female, crisp American accent",
+    voice: { kind: "design", vid: "30909cfa", snap: false, lbl: false, room: false } },
+  { id: "rezar", name: "Rezar", lines: 0, hook: 26, faceCount: 0, pages: [],
+    description: "deep, gravelly, brutish male, aggressive and loud, dim-witted thug",
+    voice: { kind: "design", vid: "83684fec", snap: false, lbl: false, room: false } },
+  { id: "rita-repulsa", name: "Rita Repulsa", lines: 0, hook: 27, faceCount: 0, pages: [],
+    description: "shrill, raspy female, theatrical, wicked and commanding",
+    voice: { kind: "design", vid: "cda973f2", snap: false, lbl: false, room: false } },
+  { id: "rock-soldier", name: "Rock Soldier", lines: 0, hook: 28, faceCount: 0, pages: [],
+    description: "deep, heavy, gravelly male, grinding-stones sound",
+    voice: { kind: "design", vid: "09edcc55", snap: false, lbl: false, room: false } },
+  { id: "soldier", name: "Soldier", lines: 0, hook: 29, faceCount: 0, pages: [],
+    description: "",
+    voice: { kind: "design", vid: "8ae5854c", snap: false, lbl: false, room: false } },
+  { id: "putty-foot-soldier", name: "Putty Foot Soldier", lines: 0, hook: null, faceCount: 25, pages: [3, 5, 8, 11, 23],
+    description: "thick, clay-muffled male, short-breathed, eager and dim",
+    voice: null },
+  { id: "off-panel", name: "Off-panel", lines: 0, hook: null, role: true, oneOff: true, faceCount: 0, pages: [],
+    description: "a dry, close voice just out of frame, American, unprojected",
+    voice: null },
+  { id: "crowd", name: "Crowd", lines: 0, hook: null, role: true, oneOff: true, faceCount: 0, pages: [],
+    description: "a layered murmur of many adult voices, no single speaker, restless",
+    voice: null }
+];
+
+const state = {
+  focus: { zone: "cast", index: 0 },
+  picked: null,
+  plate: null,
+  booth: null,
+  draft: null,
+  review: false,
+  called: false,
+  playing: null,
+  sends: [],
+  addName: "",
+  standOpen: false,
+  fromKey: false
+};
+
+let playGen = 0;
+let drag = null;
+let swallow = false;
+const initialHook = new Map();
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function byId(id) { return CAST.find((c) => c.id === id); }
+function billOrder() {
+  return CAST.slice().sort((a, b) => b.lines - a.lines || a.name.localeCompare(b.name));
+}
+function occupant(n) {
+  return CAST.find((c) => c.place === "hook" && c.hook === n) || null;
+}
+function canLeave(ch) {
+  if (!ch) return false;
+  if (ch.place !== "hook") return true;
+  if (PROTECTED.has(ch.id)) return false;
+  if (ch.voice && ch.voice.room) return false;
+  return true;
+}
+function holdingCount() {
+  return CAST.filter((c) => c.place === "hook").length;
+}
+function altsOf(ch) {
+  const list = (ch.alts || []).slice();
+  if (ch.wish) list.unshift(ch.wish);
+  return list;
+}
+function defaultLine(ch) {
+  return ch.name + " speaks the preview and only the preview. An unsaved design cannot read the rest of the issue, so this line is long enough to send.";
+}
+function magicPrompt(ch) {
+  if (!ch.description) return "";
+  return ch.name + ". " + ch.description + ". Keep the same age, accent, and pace on every line. No music and no sound effects.";
+}
+function hue(id, page) {
+  let h = page * 17;
+  for (const c of id) h = (h * 33 + c.charCodeAt(0)) % 360;
+  return h;
+}
+function pad(n) { return String(n).padStart(2, "0"); }
+
+function finishPerson(c) {
+  c.place = c.hook ? "hook" : "wait";
+  c.backup = true;
+  c.standIn = null;
+  c.useAlt = null;
+  c.design = null;
+  c.releaseAfter = !!c.oneOff;
+  c.oneOff = !!c.oneOff;
+  c.role = !!c.role;
+  c.faces = (c.pages || []).slice(0, 6).map((page, i) => ({
+    id: c.id + "-" + page + "-" + i,
+    page,
+    state: "in",
+    movedTo: null
+  }));
+  c.samples = c.samples || [];
+  c.alts = c.alts || [];
+}
+
+function statusWord(ch) {
+  if (ch.place === "hook" && PROTECTED.has(ch.id)) return "Locked";
+  if (ch.place === "hook" && ch.voice && ch.voice.room) return "Room holds it";
+  if (ch.place === "hook" && ch.useAlt) return "Using " + ch.useAlt.name;
+  if (ch.place === "hook" && ch.design && ch.design.accepted) return "Preview " + ch.design.accepted + " pinned";
+  if (ch.place === "hook" && ch.wish) return "Wish " + ch.wish.name;
+  if (ch.place === "hook") return "Hook " + pad(ch.hook);
+  if (ch.place === "bench") return "Sitting this run";
+  if (ch.place === "cover" && ch.standIn) {
+    const as = byId(ch.standIn);
+    return "Stands in as " + (as ? as.name : "");
+  }
+  if (ch.role) return "Role";
+  return "Waiting";
+}
+function billMark(ch) {
+  if (ch.place === "hook") return pad(ch.hook);
+  if (ch.place === "bench") return "OUT";
+  if (ch.place === "cover") return "AS";
+  return "·";
+}
+
+function focusedChar() {
+  if (state.plate) return byId(state.plate);
+  if (state.focus.zone === "cast") return billOrder()[state.focus.index] || null;
+  if (state.focus.zone === "hook") return occupant(state.focus.n);
+  if (state.focus.zone === "bench") {
+    const list = CAST.filter((c) => c.place === "bench");
+    return list[state.focus.index] || null;
+  }
+  return null;
+}
+
+function placeTarget() {
+  if (state.focus.zone === "hook") return state.focus.n;
+  for (let n = 1; n <= 30; n++) if (!occupant(n)) return n;
+  return null;
+}
+
+function place(id, hookN) {
+  const ch = byId(id);
+  if (!ch || hookN < 1 || hookN > 30) return false;
+  if (ch.place === "hook" && ch.hook === hookN) return true;
+  const occ = occupant(hookN);
+  if (occ && !canLeave(occ)) return false;
+  state.called = false;
+  if (occ && ch.place === "hook") {
+    const prev = ch.hook;
+    occ.hook = prev;
+    ch.hook = hookN;
+    return true;
+  }
+  if (occ) {
+    occ.place = "bench";
+    occ.hook = null;
+    occ.backup = true;
+    occ.standIn = null;
+  }
+  ch.hook = hookN;
+  ch.place = "hook";
+  ch.standIn = null;
+  return true;
+}
+
+function sitOut(id) {
+  const ch = byId(id);
+  if (!ch || !canLeave(ch)) return false;
+  state.called = false;
+  ch.place = "bench";
+  ch.hook = null;
+  ch.standIn = null;
+  ch.backup = true;
+  return true;
+}
+
+function setBackup(id, on) {
+  const ch = byId(id);
+  if (!ch) return;
+  state.called = false;
+  ch.backup = on;
+}
+
+function useAlt(id, altId) {
+  const ch = byId(id);
+  const alt = altsOf(ch).find((a) => a.id === altId);
+  if (!ch || !alt || !canLeave(ch)) return false;
+  state.called = false;
+  ch.useAlt = alt;
+  if (ch.design) ch.design.accepted = null;
+  return true;
+}
+
+function keepCurrent(id) {
+  const ch = byId(id);
+  if (!ch) return;
+  state.called = false;
+  ch.useAlt = null;
+  if (ch.design) ch.design.accepted = null;
+}
+
+function setStandIn(id, asId) {
+  const ch = byId(id);
+  const as = byId(asId);
+  if (!ch || !as || as.id === ch.id || !canLeave(ch)) return false;
+  if (!(as.place === "hook" && as.voice)) return false;
+  state.called = false;
+  ch.standIn = asId;
+  ch.place = "cover";
+  ch.hook = null;
+  ch.useAlt = null;
+  ch.oneOff = true;
+  if (ch.design) ch.design.accepted = null;
+  state.standOpen = false;
+  return true;
+}
+
+function setPlaying(token, label) {
+  const gen = ++playGen;
+  state.playing = token ? { token, label } : null;
+  paintPlaying();
+  if (token) {
+    setTimeout(() => {
+      if (gen === playGen) setPlaying(null, "");
+    }, 2400);
+  }
+}
+
+function paintPlaying() {
+  document.querySelectorAll("[data-play]").forEach((el) => {
+    el.classList.toggle("is-playing", !!(state.playing && el.dataset.play === state.playing.token));
+  });
+  const lamp = document.getElementById("lamp");
+  if (lamp) lamp.textContent = state.playing ? "Playing " + state.playing.label + "  ·  not a choice" : "";
+}
+
+function openBooth(id) {
+  const ch = byId(id);
+  if (!ch || (ch.place === "hook" && !canLeave(ch))) return;
+  state.booth = id;
+  state.draft = {
+    prompt: (ch.design && ch.design.prompt) || "",
+    line: (ch.design && ch.design.line) || defaultLine(ch)
+  };
+  render();
+  const p = document.getElementById("prompt");
+  if (p) p.focus();
+}
+
+function sendDesign() {
+  const ch = byId(state.booth);
+  if (!ch || !state.draft) return;
+  const prompt = state.draft.prompt.trim();
+  const line = state.draft.line.trim();
+  if (!prompt || line.length < 100) return;
+  state.called = false;
+  ch.design = {
+    prompt, line,
+    previews: [
+      { id: "A", tone: "Closer" },
+      { id: "B", tone: "Drier" },
+      { id: "C", tone: "Lower" }
+    ],
+    accepted: null
+  };
+  state.sends.push({ name: ch.name, n: line.length });
+  render();
+}
+
+function acceptPreview(pv) {
+  const ch = byId(state.booth);
+  if (!ch || !ch.design) return;
+  state.called = false;
+  ch.design.accepted = pv;
+  ch.useAlt = null;
+  if (ch.oneOff) ch.releaseAfter = true;
+  render();
+}
+
+function backupPhrase(ch) {
+  const v = ch.voice;
+  if (!v) return "";
+  if (!ch.backup) return "skip backup · cannot restore";
+  const bits = [];
+  bits.push(v.snap ? "backup on file" : "snapshot first");
+  if (!v.lbl) bits.push("stamp labels");
+  if (!ch.description) bits.push("no description on the row");
+  return bits.join(" · ");
+}
+
+function buildPlan() {
+  const creates = [];
+  const archives = [];
+  const sits = [];
+  const covers = [];
+  const skipped = [];
+  const faceNotes = [];
+  const warns = [];
+  const wishes = [];
+  const bolted = [];
+
+  for (const ch of CAST) {
+    const start = initialHook.get(ch.id);
+    const had = !!ch.voice;
+    if (PROTECTED.has(ch.id)) bolted.push(ch.name);
+    if (ch.place === "bench") {
+      sits.push(ch);
+      if (start && had) archives.push({ ch, why: "sat out" });
+    } else if (ch.place === "cover" && ch.standIn) {
+      covers.push(ch);
+      if (start && had) archives.push({ ch, why: "stood aside" });
+    } else if (ch.place === "hook") {
+      if (ch.useAlt) {
+        if (had) archives.push({ ch, why: "replaced" });
+        creates.push({ ch, how: "Restore " + ch.useAlt.name, kind: "restore" });
+      } else if (ch.design && ch.design.accepted) {
+        if (had) archives.push({ ch, why: "redesigned" });
+        creates.push({ ch, how: "Design preview " + ch.design.accepted, kind: "design" });
+      } else if (!had) {
+        warns.push(ch.name + " is on hook " + pad(ch.hook) + " with no voice.");
+      } else if (ch.wish) {
+        wishes.push(ch.name + " keeps the current voice. " + ch.wish.name + " stays a wish.");
+      }
+    } else if ((ch.design && ch.design.accepted) || ch.useAlt) {
+      skipped.push(ch);
+    }
+    for (const f of ch.faces) {
+      if (f.state === "out") faceNotes.push(ch.name + " · drop the face on p." + f.page);
+      if (f.movedTo) faceNotes.push(ch.name + " · p." + f.page + " moves to " + f.movedTo);
+    }
+  }
+
+  const holding = holdingCount();
+  const release = creates.filter((c) => c.ch.releaseAfter).length;
+  return {
+    creates, archives, sits, covers, skipped, faceNotes, warns, wishes, bolted,
+    holding, free: 30 - holding, release,
+    was: 29
+  };
+}
+
+function render() {
+  const order = billOrder();
+  const holding = holdingCount();
+  const free = 30 - holding;
+  const fc = focusedChar();
+  const target = state.picked ? placeTarget() : null;
+
+  document.getElementById("top").innerHTML =
+    '<div class="brand">CALLBOARD</div>' +
+    '<div class="book">TMNT × MMPR III · ISSUE 1</div>' +
+    '<div id="lamp"></div>' +
+    '<div class="count"><b>' + holding + '</b> HOLDING · <b>' + free + '</b> FREE</div>' +
+    '<button type="button" class="callbtn" data-act="review">The call</button>';
+
+  document.getElementById("bill").innerHTML = state.plate ? plateHTML(byId(state.plate)) : companyHTML(order);
+
+  document.getElementById("board").innerHTML = boardHTML();
+
+  const pickId = state.picked || (fc && fc.id);
+  const pickCh = pickId ? byId(pickId) : null;
+  const sitCh = state.picked ? byId(state.picked) : fc;
+  document.getElementById("cmd").innerHTML =
+    '<button type="button" data-act="pick"' + (fc ? "" : " disabled") + '>Pick<kbd>enter</kbd></button>' +
+    '<button type="button" data-act="place"' + (state.picked && target ? "" : " disabled") + '>Place' +
+      (state.picked && target ? " on " + pad(target) : "") + '</button>' +
+    '<button type="button" data-act="sit"' + (sitCh && canLeave(sitCh) ? "" : " disabled") + '>Sit out<kbd>s</kbd></button>' +
+    '<button type="button" data-act="design"' + (pickCh && canLeave(pickCh) ? "" : " disabled") + '>Design<kbd>d</kbd></button>' +
+    '<button type="button" data-act="play-focus"' + (fc && fc.voice ? "" : " disabled") + '>Play<kbd>p</kbd></button>' +
+    '<div class="inhand">' + (state.picked ? "IN HAND · " + esc(byId(state.picked).name) : "") + '</div>';
+
+  const booth = document.getElementById("booth");
+  if (state.booth && byId(state.booth)) {
+    booth.hidden = false;
+    booth.innerHTML = boothHTML(byId(state.booth));
+  } else {
+    booth.hidden = true;
+    booth.innerHTML = "";
+  }
+  const review = document.getElementById("review");
+  if (state.review) {
+    review.hidden = false;
+    review.innerHTML = reviewHTML();
+  } else {
+    review.hidden = true;
+    review.innerHTML = "";
+  }
+  paintPlaying();
+  if (state.fromKey) {
+    const key = state.focus.zone === "hook"
+      ? "hook-" + state.focus.n
+      : state.focus.zone === "bench"
+        ? "bench-" + state.focus.index
+        : "cast-" + state.focus.index;
+    const el = document.querySelector('[data-focus-key="' + key + '"]');
+    if (el) el.focus();
+  }
+}
+
+function companyHTML(order) {
+  const rows = order.map((ch, i) => {
+    const cls = ["row"];
+    if (PROTECTED.has(ch.id) && ch.place === "hook") cls.push("is-locked");
+    else if (ch.voice && ch.voice.room && ch.place === "hook") cls.push("is-hold");
+    if (ch.wish && !ch.useAlt) cls.push("is-wish");
+    if (ch.place === "bench") cls.push("is-sit");
+    if (state.picked === ch.id) cls.push("is-hand");
+    if (state.focus.zone === "cast" && state.focus.index === i) cls.push("is-focus");
+    return '<div class="' + cls.join(" ") + '" role="button" tabindex="0" data-open="' + esc(ch.id) +
+      '" data-drag="1" data-drag-id="' + esc(ch.id) + '" data-focus-key="cast-' + i + '">' +
+      '<span class="ln">' + (ch.lines ? ch.lines : "–") + '</span>' +
+      '<span class="nm">' + esc(ch.name) + '</span>' +
+      '<span class="st" title="' + esc(statusWord(ch)) + '">' + esc(billMark(ch)) + '</span></div>';
+  }).join("");
+  return '<div class="mast"><div class="kicker">In the issue</div>' +
+    '<h1>' + CAST.length + '</h1><p>TMNT × MMPR III · ISSUE 1</p></div>' +
+    '<div class="company">' + rows + '</div>' +
+    '<div class="adder"><input id="add-name" placeholder="Add a name" value="' + esc(state.addName) + '" autocomplete="off">' +
+    '<button type="button" data-act="add">Add</button></div>';
+}
+
+function plateHTML(ch) {
+  if (!ch) return "";
+  const locked = ch.place === "hook" && !canLeave(ch);
+  const faces = ch.faces.map((f) => {
+    const h = hue(ch.id, f.page);
+    return '<div class="crop' + (f.state === "out" ? " is-out" : "") + '">' +
+      '<div class="pic" style="background-color:hsl(' + h + ',28%,38%)"><span>p.' + f.page + '</span></div>' +
+      '<div class="ops">' +
+      '<button type="button" data-act="confirm-face" data-id="' + esc(ch.id) + '" data-face="' + esc(f.id) + '">' +
+        (f.state === "in" && !f.movedTo ? "In" : "Back") + '</button>' +
+      '<button type="button" data-act="reject-face" data-id="' + esc(ch.id) + '" data-face="' + esc(f.id) + '">Drop</button>' +
+      '</div>' +
+      '<select data-move-face="' + esc(f.id) + '" data-id="' + esc(ch.id) + '" aria-label="Move face">' +
+      '<option value="">Move</option>' +
+      CAST.filter((o) => o.id !== ch.id).map((o) => '<option value="' + esc(o.id) + '">' + esc(o.name) + '</option>').join("") +
+      '</select></div>';
+  }).join("");
+  const faceLine = ch.role && !ch.faceCount
+    ? "Role · no faces"
+    : (ch.faceCount ? ch.faceCount + " faces" : "No faces");
+  const voiceLine = !ch.voice
+    ? "No voice"
+    : ch.voice.kind + " · " + ch.voice.vid + (ch.voice.snap ? " · backup on file" : " · no backup") +
+      (ch.voice.room ? " · Room" : "");
+  let aud = "";
+  if (ch.voice) {
+    aud += '<div class="aud"><div><div class="kind">ON THE HOOK</div>' + esc(ch.name) + '</div>' +
+      '<button type="button" class="mini" data-act="keep" data-id="' + esc(ch.id) + '">Keep</button>' +
+      playBtn("cur:" + ch.id, ch.name) + '</div>';
+  }
+  for (const alt of altsOf(ch)) {
+    const wish = ch.wish && ch.wish.id === alt.id;
+    aud += '<div class="aud"><div><div class="kind">' + (wish ? "WISH" : "LAB") + '</div>' + esc(alt.name) + '</div>' +
+      (locked ? '<span></span>' : '<button type="button" class="mini' + (ch.useAlt && ch.useAlt.id === alt.id ? " on" : "") +
+        '" data-act="use-alt" data-id="' + esc(ch.id) + '" data-alt="' + esc(alt.id) + '">Use</button>') +
+      playBtn("alt:" + alt.id, alt.name) + '</div>';
+  }
+  const lines = (ch.samples || []).map((s, i) =>
+    '<div class="lineplay"><span>' + esc(s[0]) + '</span><span>' + esc(s[1]) + '</span>' +
+    playBtn("line:" + ch.id + ":" + i, ch.name + " " + s[0]) + '</div>'
+  ).join("");
+  const using = ch.useAlt
+    ? '<div class="using">USING ' + esc(ch.useAlt.name) + '</div>'
+    : (ch.design && ch.design.accepted ? '<div class="using">PINNED PREVIEW ' + esc(ch.design.accepted) + '</div>' : "");
+  const stand = state.standOpen ? '<div class="covers">' +
+    CAST.filter((o) => o.place === "hook" && o.voice && o.id !== ch.id).map((o) =>
+      '<button type="button" data-act="standin" data-id="' + esc(ch.id) + '" data-as="' + esc(o.id) + '">' + esc(o.name) + '</button>'
+    ).join("") + '</div>' : "";
+  const holdNote = locked
+    ? (PROTECTED.has(ch.id) ? "Locked. Room shares it." : "Held by Room. This hook does not move.")
+    : "";
+  return '<div class="plate">' +
+    '<button type="button" class="back" data-act="company">Company</button>' +
+    '<h2>' + esc(ch.name) + '</h2>' +
+    '<div class="sub">' + ch.lines + ' LINES · ' + esc(voiceLine) + ' · ' + esc(faceLine) +
+      (ch.place === "hook" ? " · HOOK " + pad(ch.hook) : "") + '</div>' +
+    (holdNote ? '<div class="honesty">' + esc(holdNote) + '</div>' : "") +
+    (ch.description ? '<div class="bio">' + esc(ch.description) + '</div>' : '<div class="bio">No description stored.</div>') +
+    (using) +
+    '<div class="verbs">' +
+      (locked ? "" :
+        '<button type="button" data-act="pick-id" data-id="' + esc(ch.id) + '">Pick</button>' +
+        '<button type="button" data-act="sit-id" data-id="' + esc(ch.id) + '">Sit out</button>' +
+        '<button type="button" data-act="design-id" data-id="' + esc(ch.id) + '">Design</button>' +
+        '<button type="button" data-act="toggle-stand" data-id="' + esc(ch.id) + '">Stand in</button>' +
+        '<button type="button" class="' + (ch.oneOff ? "on" : "") + '" data-act="oneoff" data-id="' + esc(ch.id) + '">' +
+          (ch.oneOff ? "One-off" : "Principal") + '</button>' +
+        (ch.design && ch.design.accepted ?
+          '<button type="button" class="' + (ch.releaseAfter ? "on" : "") + '" data-act="release" data-id="' + esc(ch.id) + '">' +
+          (ch.releaseAfter ? "Free after" : "Keep slot") + '</button>' : "") +
+        (willArchive(ch) ?
+          '<button type="button" class="bak ' + (ch.backup ? "on" : "off") + '" data-act="backup" data-id="' + esc(ch.id) + '">' +
+          (ch.backup ? "Backup" : "Skip") + '</button>' : "")) +
+    '</div>' + stand +
+    (ch.oneOff ? '<div class="honesty">An unsaved preview cannot speak the part. Stand in, or save onto a hook.</div>' : "") +
+    (aud ? '<div class="sec">Voice</div>' + aud : "") +
+    (lines ? '<div class="sec">Lines</div>' + lines : "") +
+    (ch.faces.length ? '<div class="sec">Faces</div><div class="faces">' + faces + '</div>' : "") +
+    '</div>';
+}
+
+function willArchive(ch) {
+  const start = initialHook.get(ch.id);
+  if (!start || !ch.voice) return false;
+  if (ch.place !== "hook") return true;
+  if (ch.useAlt) return true;
+  if (ch.design && ch.design.accepted) return true;
+  return false;
+}
+
+function playBtn(token, label) {
+  return '<button type="button" class="play" data-act="play" data-token="' + esc(token) +
+    '" data-label="' + esc(label) + '" data-play="' + esc(token) + '" aria-label="Play ' + esc(label) + '">' +
+    '<i class="tri"></i><span class="bars"><b></b><b></b><b></b></span></button>';
+}
+
+function boardHTML() {
+  const armed = !!state.picked;
+  let rails = "";
+  for (let row = 0; row < 2; row++) {
+    let cells = "";
+    for (let i = 1; i <= 15; i++) {
+      const n = row * 15 + i;
+      const ch = occupant(n);
+      const prot = ch && PROTECTED.has(ch.id);
+      const hold = ch && ch.voice && ch.voice.room && !prot;
+      const cls = ["hook"];
+      if (prot) cls.push("is-locked");
+      else if (hold) cls.push("is-hold");
+      else if (!ch) cls.push("is-empty");
+      if (armed && (!ch || canLeave(ch))) cls.push("is-armed");
+      if (state.focus.zone === "hook" && state.focus.n === n) cls.push("is-focus");
+      const tilt = prot ? 0 : ((n * 13) % 7) - 3;
+      let inner = '<b class="hn">' + pad(n) + '</b><i class="peg"></i>';
+      if (ch) {
+        const drag = canLeave(ch) ? ' data-drag="1" data-drag-id="' + esc(ch.id) + '"' : "";
+        const meta = prot ? "LOCKED" : hold ? "HOLD" : ch.useAlt ? "USE" : (ch.design && ch.design.accepted ? "PIN" : (ch.wish ? "WISH" : (ch.voice ? ch.voice.kind.toUpperCase() : "OPEN")));
+        inner += '<i class="string"></i><div class="tag" style="--tilt:' + tilt + 'deg" title="' + esc(ch.name) + '"' + drag + ' data-focus-key="hook-' + n + '" tabindex="0">' +
+          (ch.wish && !ch.useAlt ? '<i class="seal"></i>' : "") +
+          '<em class="who' + (ch.name.length > 11 ? " tiny" : "") + '">' + esc(ch.name) + '</em><span class="meta">' + meta + '</span>' +
+          playBtn("cur:" + ch.id, ch.name) + '</div>';
+      } else {
+        inner += '<div class="freeword" data-focus-key="hook-' + n + '" tabindex="0">Free</div>';
+      }
+      cells += '<div class="' + cls.join(" ") + '" data-hook="' + n + '">' + inner + '</div>';
+    }
+    rails += '<div class="rail">' + cells + '</div>';
+  }
+  const bench = CAST.filter((c) => c.place === "bench");
+  const tags = bench.map((ch, i) => {
+    const bak = ch.voice
+      ? '<button type="button" class="bak ' + (ch.backup ? "on" : "off") + '" data-act="backup" data-id="' + esc(ch.id) + '">' +
+        (ch.backup ? "Backup" : "Skip") + '</button>'
+      : '<span class="meta">SIT</span>';
+    return '<div class="tag" data-drag="1" data-drag-id="' + esc(ch.id) + '" data-focus-key="bench-' + i + '" tabindex="0" style="--tilt:0deg">' +
+      '<em class="who">' + esc(ch.name) + '</em>' + bak + '</div>';
+  }).join("");
+  return '<div class="board-h"><span>HOOKS</span><span>' + (30 - holdingCount()) + ' FREE</span></div>' +
+    '<div class="rails">' + rails + '</div>' +
+    '<div class="bench" data-drop="bench"><div class="bench-label">Sitting this run</div><div class="bench-tags">' +
+    (tags || '<div class="empty-bench">EMPTY</div>') + '</div></div>';
+}
+
+function boothHTML(ch) {
+  const d = state.draft || { prompt: "", line: "" };
+  const n = d.line.trim().length;
+  const ready = d.prompt.trim() && n >= 100;
+  const pvs = (ch.design && ch.design.previews) || [];
+  const cards = pvs.map((pv) => {
+    const acc = ch.design.accepted === pv.id;
+    return '<div class="pv' + (acc ? " is-acc" : "") + '"><div class="tone">' + pv.id + ' · ' + esc(pv.tone) + '</div>' +
+      '<div class="ops">' +
+      '<button type="button" class="play" data-act="play" data-token="pv:' + pv.id + '" data-label="preview ' + pv.id + '" data-play="pv:' + pv.id + '">Play</button>' +
+      '<button type="button" data-act="accept" data-pv="' + pv.id + '">' + (acc ? "Accepted" : "Accept") + '</button></div></div>';
+  }).join("");
+  const pin = ch.design && ch.design.accepted;
+  const need = pin && ch.place !== "hook" ? " Needs a hook." : "";
+  return '<div><h2>Design · ' + esc(ch.name) + ' <button type="button" class="ghost" data-act="close-booth">Close</button></h2>' +
+    '<label for="prompt">Prompt</label>' +
+    '<textarea id="prompt">' + esc(d.prompt) + '</textarea>' +
+    '<label for="line">Preview line</label>' +
+    '<textarea id="line">' + esc(d.line) + '</textarea>' +
+    '<div class="rowbtns">' +
+    '<button type="button" data-act="magic"' + (ch.description ? "" : " disabled") + '>' +
+      (ch.description ? "Magic write" : "No bio") + '</button>' +
+    '<button type="button" id="send" data-act="send"' + (ready ? "" : " disabled") + '>Send</button>' +
+    '<span id="line-count" class="' + (n < 100 ? "short" : "") + '">' + n + '</span></div>' +
+    '<div class="honesty">Preview speaks this line only. Save takes the hook.' + need + '</div></div>' +
+    '<div><label>Three previews · one charge</label><div class="previews">' +
+    (cards || '<div class="pv"><div class="tone">Nothing sent</div></div>') + '</div></div>';
+}
+
+function reviewHTML() {
+  const plan = buildPlan();
+  const blocked = plan.warns.length > 0 || plan.holding > 30;
+  const li = (items) => items.length ? "<ul>" + items.map((t) => "<li>" + esc(t) + "</li>").join("") + "</ul>" : "<ul><li>—</li></ul>";
+  const createLines = plan.creates.map((c) => {
+    const slot = c.ch.voice ? "same slot" : "takes a slot at save";
+    const rel = c.ch.releaseAfter ? " · free the hook after render" : "";
+    return c.ch.name + " · hook " + pad(c.ch.hook) + " · " + c.how + " · " + slot + rel;
+  });
+  const archLines = plan.archives.map((a) => {
+    const follow = a.why === "replaced" || a.why === "redesigned"
+      ? "issue-2 takes the new voice"
+      : "issue-2 loses " + a.ch.name;
+    return a.ch.name + " · " + a.why + " · " + backupPhrase(a.ch) + " · " + follow;
+  });
+  const sitLines = plan.sits.map((ch) => ch.name + " · no audio this issue" + (ch.voice ? "" : " · no slot to free"));
+  const coverLines = plan.covers.map((ch) => {
+    const as = byId(ch.standIn);
+    return ch.name + " · speaks as " + (as ? as.name : "?") + " · this issue only · no new slot";
+  });
+  const skipLines = plan.skipped.map((ch) => ch.name + " · preview pinned · not on a hook · not saved");
+  const credits = state.sends.reduce((s, x) => s + x.n, 0);
+  const creditLine = state.sends.length
+    ? state.sends.length + " design send" + (state.sends.length > 1 ? "s" : "") + " · " + credits + " characters · creates " +
+      plan.creates.length + " · snapshots " + plan.archives.filter((a) => a.ch.backup && a.ch.voice && !a.ch.voice.snap).length +
+      " · archives " + plan.archives.length
+    : "No design send yet · creates " + plan.creates.length + " · archives " + plan.archives.length;
+  return '<header><h2>The call</h2><button type="button" class="back" data-act="close-review">Close</button></header>' +
+    (state.called ? '<div class="called">Called</div>' : "") +
+    '<div class="nums">' +
+    '<div>Was<b>' + plan.was + '</b></div>' +
+    '<div>Holding<b>' + plan.holding + '</b></div>' +
+    '<div>Free<b>' + plan.free + '</b></div>' +
+    '<div>After render<b>' + (plan.holding - plan.release) + '</b></div></div>' +
+    '<section><div class="k">Saved at this step</div>' + li(createLines) + '</section>' +
+    '<section><div class="k">Archived</div>' + li(archLines) + '</section>' +
+    '<section><div class="k">Sitting this run</div>' + li(sitLines) + '</section>' +
+    '<section><div class="k">Stand-ins</div>' + li(coverLines) + '</section>' +
+    '<section><div class="k">Wishes not taken</div>' + li(plan.wishes) + '</section>' +
+    '<section><div class="k">Pinned, not saved</div>' + li(skipLines) + '</section>' +
+    '<section><div class="k">Faces</div>' + li(plan.faceNotes) + '</section>' +
+    '<section><div class="k">Credits</div><ul><li>' + esc(creditLine) + ' · slot saves are not credits</li></ul></section>' +
+    '<section><div class="k">Bolted</div><ul><li>' + esc(plan.bolted.join(", ")) + '</li></ul></section>' +
+    (plan.warns.length ? '<p class="warn">' + esc(plan.warns[0]) + '</p>' : "") +
+    '<button type="button" class="save" data-act="commit"' + (blocked ? " disabled" : "") + '>' +
+    (state.called ? "Called" : "Save this call") + '</button>';
+}
+
+function handleAct(el) {
+  const act = el.dataset.act;
+  const id = el.dataset.id;
+  state.fromKey = false;
+  if (act === "review") { state.review = true; render(); return; }
+  if (act === "close-review") { state.review = false; render(); return; }
+  if (act === "close-booth") { state.booth = null; render(); return; }
+  if (act === "company") { state.plate = null; state.standOpen = false; render(); return; }
+  if (act === "pick") {
+    const ch = focusedChar();
+    if (ch) state.picked = ch.id;
+    render(); return;
+  }
+  if (act === "pick-id") { state.picked = id; render(); return; }
+  if (act === "place") {
+    const t = placeTarget();
+    if (state.picked && t) {
+      const ok = place(state.picked, t);
+      if (!ok) shake(t);
+      else state.picked = null;
+    }
+    render(); return;
+  }
+  if (act === "sit" || act === "sit-id") {
+    const ch = act === "sit-id" ? byId(id) : (state.picked ? byId(state.picked) : focusedChar());
+    if (ch) sitOut(ch.id);
+    if (state.picked === (ch && ch.id)) state.picked = null;
+    render(); return;
+  }
+  if (act === "design" || act === "design-id") {
+    const ch = act === "design-id" ? byId(id) : (state.picked ? byId(state.picked) : focusedChar());
+    if (ch) openBooth(ch.id);
+    return;
+  }
+  if (act === "play" || act === "play-focus") {
+    if (act === "play-focus") {
+      const ch = focusedChar();
+      if (ch && ch.voice) setPlaying("cur:" + ch.id, ch.name);
+    } else {
+      setPlaying(el.dataset.token, el.dataset.label);
+    }
+    return;
+  }
+  if (act === "backup") {
+    const ch = byId(id);
+    if (ch) setBackup(id, !ch.backup);
+    render(); return;
+  }
+  if (act === "use-alt") { useAlt(id, el.dataset.alt); render(); return; }
+  if (act === "keep") { keepCurrent(id); render(); return; }
+  if (act === "toggle-stand") { state.standOpen = !state.standOpen; render(); return; }
+  if (act === "standin") { setStandIn(id, el.dataset.as); render(); return; }
+  if (act === "oneoff") {
+    const ch = byId(id);
+    if (ch) {
+      state.called = false;
+      ch.oneOff = !ch.oneOff;
+      if (ch.oneOff) ch.releaseAfter = true;
+    }
+    render(); return;
+  }
+  if (act === "release") {
+    const ch = byId(id);
+    if (ch) { state.called = false; ch.releaseAfter = !ch.releaseAfter; }
+    render(); return;
+  }
+  if (act === "confirm-face" || act === "reject-face") {
+    const ch = byId(id);
+    const f = ch && ch.faces.find((x) => x.id === el.dataset.face);
+    if (f) {
+      state.called = false;
+      if (act === "reject-face") { f.state = "out"; f.movedTo = null; }
+      else { f.state = "in"; f.movedTo = null; }
+    }
+    render(); return;
+  }
+  if (act === "magic") {
+    const ch = byId(state.booth);
+    if (ch && state.draft) state.draft.prompt = magicPrompt(ch);
+    render();
+    const p = document.getElementById("prompt");
+    if (p) { p.focus(); p.setSelectionRange(p.value.length, p.value.length); }
+    return;
+  }
+  if (act === "send") { sendDesign(); return; }
+  if (act === "accept") { acceptPreview(el.dataset.pv); return; }
+  if (act === "add") { commitAdd(); return; }
+  if (act === "commit") {
+    const plan = buildPlan();
+    if (!plan.warns.length && plan.holding <= 30) state.called = true;
+    render();
+  }
+}
+
+function commitAdd() {
+  const input = document.getElementById("add-name");
+  const name = (input ? input.value : state.addName).trim();
+  if (!name) return;
+  let id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  if (!id) id = "person";
+  if (byId(id)) id = id + "-2";
+  const c = {
+    id, name, lines: 0, hook: null, faceCount: 0, pages: [],
+    description: "", voice: null, padding: true
+  };
+  finishPerson(c);
+  CAST.push(c);
+  state.addName = "";
+  state.called = false;
+  state.plate = id;
+  render();
+}
+
+function onHookClick(n) {
+  state.focus = { zone: "hook", n };
+  state.fromKey = false;
+  if (state.picked) {
+    const ok = place(state.picked, n);
+    if (!ok) shake(n);
+    else state.picked = null;
+    render();
+    return;
+  }
+  const occ = occupant(n);
+  if (occ) state.plate = occ.id;
+  render();
+}
+
+function shake(n) {
+  const el = document.querySelector('[data-hook="' + n + '"]');
+  if (!el) return;
+  el.classList.remove("shake");
+  void el.offsetWidth;
+  el.classList.add("shake");
+}
+
+function openPlate(id) {
+  state.plate = id;
+  state.standOpen = false;
+  const i = billOrder().findIndex((c) => c.id === id);
+  if (i >= 0) state.focus = { zone: "cast", index: i };
+  render();
+}
+
+document.addEventListener("click", (e) => {
+  if (swallow) { swallow = false; return; }
+  const act = e.target.closest("[data-act]");
+  if (act) { handleAct(act); return; }
+  const hook = e.target.closest("[data-hook]");
+  if (hook) { onHookClick(+hook.dataset.hook); return; }
+  const row = e.target.closest("[data-open]");
+  if (row) openPlate(row.dataset.open);
+});
+
+document.addEventListener("change", (e) => {
+  const sel = e.target.closest("[data-move-face]");
+  if (!sel || !sel.value) return;
+  const ch = byId(sel.dataset.id);
+  const f = ch && ch.faces.find((x) => x.id === sel.dataset.moveFace);
+  const dest = byId(sel.value);
+  if (!f || !dest) return;
+  state.called = false;
+  f.movedTo = dest.name;
+  f.state = "out";
+  dest.faces.push({ id: f.id + "-to-" + dest.id, page: f.page, state: "in", movedTo: null });
+  render();
+});
+
+document.addEventListener("input", (e) => {
+  if (e.target.id === "prompt" || e.target.id === "line") {
+    if (!state.draft) state.draft = { prompt: "", line: "" };
+    state.draft[e.target.id === "prompt" ? "prompt" : "line"] = e.target.value;
+    const n = state.draft.line.trim().length;
+    const el = document.getElementById("line-count");
+    if (el) {
+      el.textContent = String(n);
+      el.classList.toggle("short", n < 100);
+    }
+    const send = document.getElementById("send");
+    if (send) send.disabled = !(state.draft.prompt.trim() && n >= 100);
+  } else if (e.target.id === "add-name") {
+    state.addName = e.target.value;
+  }
+});
+
+document.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  const el = e.target.closest("[data-drag]");
+  if (!el) return;
+  if (e.target.closest("button, input, textarea, select")) return;
+  const id = el.dataset.dragId;
+  const ch = byId(id);
+  if (!ch || !canLeave(ch)) return;
+  drag = { id, x: e.clientX, y: e.clientY, moved: false };
+});
+
+window.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  if (!drag.moved) {
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+    drag.moved = true;
+    document.body.classList.add("dragging");
+    const g = document.getElementById("ghost");
+    g.hidden = false;
+    g.textContent = byId(drag.id).name;
+  }
+  const g = document.getElementById("ghost");
+  g.style.left = e.clientX + "px";
+  g.style.top = e.clientY + "px";
+  document.querySelectorAll(".over, .over-no").forEach((n) => n.classList.remove("over", "over-no"));
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  const hook = hit && hit.closest("[data-hook]");
+  const bench = hit && hit.closest("[data-drop='bench']");
+  const target = hook || bench;
+  if (!target) return;
+  if (target.dataset.hook) {
+    const occ = occupant(+target.dataset.hook);
+    target.classList.add(occ && !canLeave(occ) ? "over-no" : "over");
+  } else target.classList.add("over");
+});
+
+window.addEventListener("pointerup", () => {
+  if (!drag) return;
+  const moved = drag.moved;
+  const id = drag.id;
+  const over = document.querySelector(".over, .over-no");
+  drag = null;
+  document.getElementById("ghost").hidden = true;
+  document.body.classList.remove("dragging");
+  document.querySelectorAll(".over, .over-no").forEach((n) => n.classList.remove("over", "over-no"));
+  if (!moved) return;
+  swallow = true;
+  if (over && over.dataset.hook) {
+    const n = +over.dataset.hook;
+    const ok = place(id, n);
+    if (!ok) shake(n);
+    else if (state.picked === id) state.picked = null;
+  } else if (over && over.dataset.drop === "bench") {
+    sitOut(id);
+    if (state.picked === id) state.picked = null;
+  }
+  render();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea, select")) {
+    if (e.key === "Escape") e.target.blur();
+    if (e.key === "Enter" && e.target.id === "add-name") { e.preventDefault(); commitAdd(); }
+    return;
+  }
+  const order = billOrder();
+  if (e.key === "Escape") {
+    if (state.review) state.review = false;
+    else if (state.booth) state.booth = null;
+    else if (state.plate) { state.plate = null; state.standOpen = false; }
+    else state.picked = null;
+    render();
+    return;
+  }
+  if (e.key === "Enter") {
+    e.preventDefault();
+    state.fromKey = true;
+    if (state.focus.zone === "hook") {
+      if (state.picked) {
+        const ok = place(state.picked, state.focus.n);
+        if (!ok) shake(state.focus.n);
+        else state.picked = null;
+      } else {
+        const occ = occupant(state.focus.n);
+        if (occ) state.plate = occ.id;
+      }
+    } else if (state.focus.zone === "cast") {
+      const ch = order[state.focus.index];
+      if (ch) state.picked = ch.id;
+    } else if (state.focus.zone === "bench") {
+      const list = CAST.filter((c) => c.place === "bench");
+      if (list[state.focus.index]) state.picked = list[state.focus.index].id;
+    }
+    render();
+    return;
+  }
+  if (e.key === "s" || e.key === "S") {
+    const ch = state.picked ? byId(state.picked) : focusedChar();
+    if (ch) sitOut(ch.id);
+    render(); return;
+  }
+  if (e.key === "d" || e.key === "D") {
+    const ch = state.picked ? byId(state.picked) : focusedChar();
+    if (ch) openBooth(ch.id);
+    return;
+  }
+  if (e.key === "p" || e.key === "P") {
+    const ch = focusedChar();
+    if (ch && ch.voice) setPlaying("cur:" + ch.id, ch.name);
+    return;
+  }
+  if (e.key === "r" || e.key === "R") { state.review = true; render(); return; }
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+  e.preventDefault();
+  state.fromKey = true;
+  if (state.focus.zone === "cast") {
+    if (e.key === "ArrowDown") state.focus.index = Math.min(order.length - 1, state.focus.index + 1);
+    if (e.key === "ArrowUp") state.focus.index = Math.max(0, state.focus.index - 1);
+    if (e.key === "ArrowRight") state.focus = { zone: "hook", n: 1 };
+    if (e.key === "ArrowLeft") state.focus.index = Math.max(0, state.focus.index - 1);
+  } else if (state.focus.zone === "hook") {
+    if (e.key === "ArrowRight") state.focus.n = Math.min(30, state.focus.n + 1);
+    if (e.key === "ArrowLeft") {
+      if (state.focus.n === 1) state.focus = { zone: "cast", index: 0 };
+      else state.focus.n -= 1;
+    }
+    if (e.key === "ArrowDown") state.focus.n = Math.min(30, state.focus.n + 15);
+    if (e.key === "ArrowUp") state.focus.n = Math.max(1, state.focus.n - 15);
+  }
+  render();
+});
+
+function selfCheck() {
+  const fails = [];
+  const hold0 = holdingCount();
+  if (hold0 !== 29) fails.push("start holding " + hold0);
+  if (30 - hold0 !== 1) fails.push("start free");
+  if (CAST.length !== 32) fails.push("cast " + CAST.length);
+  if (sitOut("raphael")) fails.push("raphael sat");
+  if (sitOut("leonardo")) fails.push("leonardo sat");
+  if (!sitOut("soldier")) fails.push("soldier not sat");
+  const soldier = byId("soldier");
+  if (!soldier.backup) fails.push("backup default off");
+  if (soldier.place !== "bench") fails.push("soldier place");
+  if (holdingCount() !== 28) fails.push("holding after sit " + holdingCount());
+  setBackup("soldier", false);
+  if (soldier.backup) fails.push("skip failed");
+  const before = byId("rocksteady").useAlt;
+  useAlt("rocksteady", "rs-2012");
+  setPlaying("line:rocksteady:0", "Rocksteady p.18");
+  if (!byId("rocksteady").useAlt || byId("rocksteady").useAlt.id !== "rs-2012") fails.push("play dropped use");
+  if (before) fails.push("wish was preselected");
+  if (!place("putty-foot-soldier", 30)) fails.push("putty not placed");
+  if (place("putty-foot-soldier", 3)) fails.push("putty took raphael");
+  if (occupant(30).id !== "putty-foot-soldier") fails.push("hook 30");
+  const plan1 = buildPlan();
+  if (!plan1.warns.some((w) => w.includes("Putty"))) fails.push("no hollow warn");
+  openBooth("putty-foot-soldier");
+  state.draft.prompt = magicPrompt(byId("putty-foot-soldier"));
+  if (!state.draft.prompt.includes("clay-muffled")) fails.push("magic");
+  sendDesign();
+  if (!byId("putty-foot-soldier").design || state.sends.length !== 1) fails.push("send");
+  if (byId("putty-foot-soldier").place !== "hook") fails.push("send moved him");
+  acceptPreview("B");
+  const plan2 = buildPlan();
+  if (plan2.warns.length) fails.push("warns " + plan2.warns.join(";"));
+  if (!plan2.creates.some((c) => c.ch.id === "putty-foot-soldier" && c.kind === "design")) fails.push("no create");
+  if (!plan2.archives.some((a) => a.ch.id === "soldier" && a.ch.backup === false)) fails.push("no skip archive");
+  if (plan2.holding !== 29) fails.push("holding end " + plan2.holding);
+  setStandIn("crowd", "foot-soldier");
+  const plan3 = buildPlan();
+  if (!plan3.covers.some((c) => c.id === "crowd")) fails.push("no standin");
+  if (plan3.creates.some((c) => c.ch.id === "crowd")) fails.push("standin took a slot");
+  const green = byId("green-ranger");
+  const redHook = byId("red-ranger").hook;
+  const greenHook = green.hook;
+  if (!place("green-ranger", redHook)) fails.push("swap failed");
+  if (byId("red-ranger").hook !== greenHook || green.hook !== redHook) fails.push("swap hooks");
+  if (buildPlan().archives.some((a) => a.ch.id === "green-ranger" || a.ch.id === "red-ranger")) fails.push("swap archived");
+  return fails.length ? fails.join(" | ") : "ok";
+}
+
+CAST.forEach((c) => {
+  finishPerson(c);
+  if (c.hook) initialHook.set(c.id, c.hook);
+});
+
+window.Callboard = {
+  state, CAST, place, sitOut, setBackup, useAlt, setPlaying, buildPlan, canLeave, selfCheck, byId
+};
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,1025 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Callboard · MMPR/TMNT III · Issue 1 · Casting (candidate A)</title>
+<style>
+  :root{
+    --bg:#0e1012; --sur:#15181b; --raise:#1b1f24; --raise2:#222830; --line:#2a3038; --line2:#353c46;
+    --tx:#e9e7e2; --dim:#9aa1a8; --mute:#6b737b;
+    --amber:#e9b44c; --amber-d:#4a3a14; --green:#5fc07c; --green-d:#15321f; --red:#ea6a5e; --red-d:#43201c;
+    --blue:#6fa8e6; --blue-d:#1a2c42; --lock:#8b949e;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.4 var(--sans);height:100%}
+  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  b{font-weight:600}
+  .mono{font-family:var(--mono)}
+  .dim{color:var(--dim)} .mute{color:var(--mute)}
+  .sr{position:absolute;left:-9999px}
+
+  /* ---------- frame ---------- */
+  #app{display:grid;grid-template-rows:52px 1fr 30px;grid-template-columns:390px minmax(0,1fr) 300px;height:100vh;min-width:1180px}
+  header{grid-column:1/4;display:flex;align-items:center;gap:18px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--sur)}
+  header .crumb{color:var(--dim);white-space:nowrap}
+  header .crumb b{color:var(--tx)}
+  header .crumb span{margin:0 6px;color:var(--mute)}
+  #meter{display:flex;align-items:center;gap:10px;margin-left:auto}
+  #meter .segs{display:flex;gap:2px}
+  #meter .seg{width:9px;height:16px;border-radius:2px;background:var(--line2)}
+  #meter .seg.ours{background:#4a7c5a}
+  #meter .seg.lock{background:#3d454f;background-image:repeating-linear-gradient(45deg,transparent 0 2px,#5a636e 2px 3px)}
+  #meter .seg.other{background:#2d4a68}
+  #meter .seg.plan{background:var(--amber)}
+  #meter .seg.out{background:transparent;border:1px dashed var(--red)}
+  #meter .seg.free{background:transparent;border:1px dashed var(--line2)}
+  #meter .lbl{color:var(--dim);white-space:nowrap}
+  #meter .lbl b{color:var(--tx)}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--raise);padding:6px 11px;border-radius:7px;font-weight:500;white-space:nowrap}
+  .btn:hover{background:var(--raise2)}
+  .btn.primary{background:var(--amber);color:#1a1300;border-color:var(--amber)}
+  .btn.primary:hover{background:#f2c35f}
+  .btn.primary[disabled]{background:#3a3425;color:#8f8358;border-color:#3a3425;cursor:not-allowed}
+  .btn.small{padding:3px 8px;font-size:12px;border-radius:6px}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--dim)}
+  .btn.ghost:hover{color:var(--tx);background:var(--raise)}
+  .btn.danger{color:var(--red);border-color:#5a2d28}
+
+  footer{grid-column:1/4;display:flex;align-items:center;gap:14px;padding:0 18px;border-top:1px solid var(--line);background:var(--sur);color:var(--dim);font-size:12px}
+  footer .carry{color:var(--amber)}
+  footer kbd{font:11px var(--mono);background:var(--raise2);border:1px solid var(--line2);border-radius:4px;padding:0 5px;margin:0 1px}
+
+  /* ---------- cast column ---------- */
+  #cast{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+  .colhead{display:flex;align-items:baseline;gap:8px;padding:12px 16px 8px}
+  .colhead h2{font-size:14px;margin:0;font-weight:600}
+  .colhead .n{color:var(--dim);font-family:var(--mono)}
+  .colhead .right{margin-left:auto;display:flex;gap:6px}
+  #castScroll{overflow:auto;flex:1;padding:0 10px 14px}
+  .tray{margin:6px 6px 10px;border:1px dashed var(--line2);border-radius:9px;padding:8px 10px;min-height:44px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;transition:border-color .15s,background .15s}
+  .tray .tl{color:var(--dim);font-size:12px;width:100%;display:flex;align-items:center;gap:8px;white-space:nowrap}
+  .tray .tl b{color:var(--tx)}
+  .tray.can-drop{border-color:var(--amber);background:var(--amber-d)}
+  .tray.over{border-color:var(--amber);background:#5c4818}
+  .face{width:52px;height:52px;border-radius:7px;overflow:hidden;position:relative;border:1px solid var(--line2);cursor:grab;flex:none}
+  .face svg{display:block;width:100%;height:100%}
+  .face .pg{position:absolute;right:3px;bottom:2px;font:10px var(--mono);color:#fff;text-shadow:0 1px 2px #000}
+  .face.carrying{outline:2px solid var(--amber);outline-offset:1px}
+  #facebin{margin-left:auto;display:flex;align-items:center;padding:3px 8px;border:1px dashed var(--line2);border-radius:7px;color:var(--mute);font-size:11px;white-space:nowrap}
+  #facebin.can-drop{border-color:var(--red);color:var(--red)}
+  #facebin.over{background:var(--red-d)}
+
+  .grp{padding:10px 6px 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);display:flex;gap:8px;align-items:baseline}
+  .grp .hint{text-transform:none;letter-spacing:0;color:var(--mute);font-size:11px;margin-left:auto}
+  .row{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:6px 8px;border-radius:9px;border:1px solid transparent;position:relative}
+  .row:hover{background:var(--raise)}
+  .row.can-drop{border-color:var(--amber);background:var(--amber-d)}
+  .row.over{background:#5c4818}
+  .row.lost{background:#2a1b19;border-color:#4a2824}
+  .row.removed{opacity:.45}
+  .row.sit{opacity:.75}
+  .av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:12px;color:#fff;position:relative;flex:none;text-shadow:0 1px 1px rgba(0,0,0,.4);cursor:grab;border:0;padding:0}
+  .av.sm{width:18px;height:18px;font-size:8px;border-radius:50%}
+  .av .band{position:absolute;left:0;right:0;top:40%;height:22%;opacity:.9}
+  .av.carrying{outline:2px solid var(--amber);outline-offset:2px}
+  .row .nm{display:flex;flex-direction:column;min-width:0}
+  .row .nm button.name{text-align:left;font-weight:600;font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .nm button.name:hover{text-decoration:underline}
+  .row .nm .meta{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .vc{display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:200px}
+  .chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);border-radius:999px;padding:2px 8px 2px 6px;font-size:11px;white-space:nowrap;max-width:200px;background:var(--raise)}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+  .chip.on{border-color:#2c5a3b}
+  .chip.standin .dot{background:var(--blue)}
+  .chip.lib .dot{background:#b0b8c0}
+  .chip.none{border-color:#5a2d28;color:var(--red)} .chip.none .dot{background:var(--red)}
+  .chip.sit{color:var(--dim);border-style:dashed} .chip.sit .dot{background:var(--mute)}
+  .chip.q{border-color:#6a5420;color:var(--amber);background:#2a2211;cursor:grab}
+  .chip.q .dot{background:var(--amber)}
+  .chip.q.carrying{outline:2px solid var(--amber);outline-offset:1px}
+  .chip.q.placed{opacity:.5;cursor:default;text-decoration:line-through}
+  .chip .x{overflow:hidden;text-overflow:ellipsis}
+  .chip button.pl{width:14px;height:14px;display:grid;place-items:center;color:var(--dim)}
+  .chip button.pl:hover{color:var(--tx)}
+  .rowacts{display:flex;gap:4px}
+  .rowacts .btn{font-size:11px;padding:2px 7px}
+
+  /* ---------- roster ---------- */
+  #roster{display:flex;flex-direction:column;min-height:0;min-width:0}
+  #rosterScroll{overflow:auto;flex:1;padding:0 16px 16px}
+  .legend{display:flex;gap:14px;color:var(--dim);font-size:11px;align-items:center;flex-wrap:wrap}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  #grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+  .tile{position:relative;min-width:0;border:1px solid var(--line2);background:var(--raise);border-radius:9px;min-height:76px;padding:7px 8px 6px;display:flex;flex-direction:column;gap:3px;transition:border-color .12s,background .12s,transform .12s}
+  .tile .top{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--mute);font-family:var(--mono)}
+  .tile .top .own{margin-left:auto;font-family:var(--sans);color:var(--blue);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px}
+  .tile .top .lk{margin-left:auto;color:var(--lock);display:inline-flex;gap:4px;align-items:center;font-family:var(--sans);font-size:10.5px}
+  .tile .top .lk svg{width:11px;height:11px}
+  .tile .vn{font-weight:600;font-size:12.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:grab}
+  .tile .vn:active{cursor:grabbing}
+  .tile .bot{display:flex;align-items:center;gap:4px;margin-top:auto;min-height:18px}
+  .tile .bot .sp{display:flex;gap:2px}
+  .tile .bot .orig{font-size:10.5px;color:var(--dim);margin-left:auto;white-space:nowrap}
+  .tile .bk{width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+  .tile .bk.no{background:transparent;border:1px solid var(--red)}
+  .tile.free{border-style:dashed;background:transparent;justify-content:center;align-items:center;color:var(--mute);font-size:12px}
+  .tile.free .top{position:absolute;top:7px;left:8px}
+  .tile.locked{background:#171a1e;border-color:#2b3139}
+  .tile.locked .vn{cursor:not-allowed;color:#c9ced3}
+  .tile.other{border-color:#2d4a68;background:#161d26}
+  .tile.other.locked{background:#141a21}
+  .tile.plan{border-color:var(--amber);background:#2a2211}
+  .tile.out{border-color:var(--red);border-style:dashed;background:#1f1513;opacity:.8}
+  .tile.out .vn{text-decoration:line-through;color:var(--dim)}
+  .tile.can-drop{border-color:var(--amber);box-shadow:inset 0 0 0 1px var(--amber)}
+  .tile.over{background:#5c4818;transform:scale(1.02)}
+  .tile.nodrop{opacity:.45}
+  .tile.flash{animation:fl .6s}
+  @keyframes fl{0%{box-shadow:0 0 0 0 var(--amber)}100%{box-shadow:0 0 0 12px transparent}}
+  .tile.shake{animation:sh .35s}
+  @keyframes sh{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .tile .hear{position:absolute;right:6px;top:22px;width:20px;height:20px;border-radius:50%;background:var(--raise2);display:none;place-items:center;color:var(--dim)}
+  .tile:hover .hear,.tile .hear:focus-visible{display:grid}
+  .tile .hear.playing{display:grid;color:var(--amber)}
+  .tile.carrying{outline:2px solid var(--amber);outline-offset:1px}
+
+  .shelf{display:flex;gap:16px;margin-top:16px}
+  .shelf>div{flex:1;border:1px dashed var(--line2);border-radius:9px;padding:10px 12px;min-height:84px}
+  .shelf .sh{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .shelf .sh b{font-size:12px}
+  .shelf .sh .n{color:var(--dim);font-family:var(--mono)}
+  .shelf .sh .hint{color:var(--mute);font-size:11px;margin-left:auto}
+  .shelf .items{display:flex;flex-wrap:wrap;gap:6px}
+  #bench.can-drop{border-color:var(--red);background:var(--red-d)}
+  #bench.over{background:#5a2a24}
+  .bchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line2);background:var(--raise);border-radius:7px;padding:4px 8px;font-size:11.5px;cursor:grab}
+  .bchip .dot{width:7px;height:7px;border-radius:50%;background:var(--mute)}
+  .bchip.carrying{outline:2px solid var(--amber);outline-offset:1px}
+  .bchip.placed{opacity:.5;text-decoration:line-through;cursor:default}
+  .bchip.pend{border-color:var(--red);border-style:dashed}
+  .bchip .sm{color:var(--dim)}
+  .lchip{cursor:default}
+  .lchip.can-drop{border-color:var(--amber);background:var(--amber-d)}
+  .lchip.over{background:#5c4818}
+
+  /* ---------- moves rail ---------- */
+  #rail{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--sur)}
+  #moves{overflow:auto;flex:1;padding:0 12px}
+  .mv{border:1px solid var(--line2);border-radius:9px;padding:8px 10px;margin-bottom:8px;background:var(--raise);font-size:12px;position:relative}
+  .mv .t{padding-right:18px;line-height:1.35}
+  .mv .t b{font-weight:600}
+  .mv .sub{color:var(--dim);margin-top:4px;line-height:1.35}
+  .mv .x{position:absolute;right:6px;top:6px;width:18px;height:18px;border-radius:5px;color:var(--mute);display:grid;place-items:center}
+  .mv .x:hover{background:var(--raise2);color:var(--tx)}
+  .mv label{display:flex;align-items:center;gap:7px;margin-top:6px;color:var(--dim);cursor:pointer}
+  .mv label input{accent-color:var(--green);margin:0}
+  .mv.lossy{border-color:#5a2d28}
+  .mv.lossy label{color:var(--red)}
+  .mv.lossy label input{accent-color:var(--red)}
+  .mv .n{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--raise2);font:10.5px var(--mono);color:var(--dim);margin-right:6px;vertical-align:-4px}
+  .empty{color:var(--mute);font-size:12px;padding:14px 4px;line-height:1.5}
+  #railfoot{border-top:1px solid var(--line);padding:12px}
+  #tally{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:12px;color:var(--dim);margin-bottom:10px}
+  #tally b{color:var(--tx);font-family:var(--mono);font-weight:500;text-align:right}
+  #tally .warn{color:var(--red)} #tally .warn b{color:var(--red)}
+  #blockers{color:var(--red);font-size:12px;margin-bottom:8px;line-height:1.4}
+
+  /* ---------- drawers / sheets ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:40}
+  .scrim.open{display:block}
+  .drawer{position:fixed;top:0;right:0;bottom:0;width:520px;background:var(--sur);border-left:1px solid var(--line);z-index:50;transform:translateX(102%);transition:transform .2s ease;display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer .dh{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .drawer .dh h3{margin:0;font-size:15px;font-weight:600}
+  .drawer .dh .close{margin-left:auto;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--dim)}
+  .drawer .dh .close:hover{background:var(--raise);color:var(--tx)}
+  .drawer .db{overflow:auto;flex:1;padding:16px 18px}
+  .drawer .df{border-top:1px solid var(--line);padding:12px 18px;display:flex;gap:8px;align-items:center}
+  .sec{margin-bottom:18px}
+  .sec h4{margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);display:flex;align-items:baseline;gap:8px}
+  .sec h4 .r{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--dim)}
+  .line{display:flex;gap:10px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--line)}
+  .line:last-child{border-bottom:0}
+  .line .pg{font:11px var(--mono);color:var(--mute);width:34px;flex:none;padding-top:2px}
+  .line .tx{flex:1}
+  .line .tx .cue{color:var(--amber)}
+  .play{width:24px;height:24px;border-radius:50%;background:var(--raise2);display:grid;place-items:center;color:var(--dim);flex:none}
+  .play:hover{color:var(--tx)}
+  .play.playing{color:var(--amber);background:#3a2e12}
+  .bars{display:inline-flex;gap:2px;align-items:flex-end;height:12px;margin-left:6px;vertical-align:middle}
+  .bars i{width:2px;background:var(--amber);height:4px;animation:bar .5s infinite alternate}
+  .bars i:nth-child(2){animation-delay:.1s}.bars i:nth-child(3){animation-delay:.2s}.bars i:nth-child(4){animation-delay:.05s}.bars i:nth-child(5){animation-delay:.15s}
+  @keyframes bar{to{height:12px}}
+  textarea,input[type=text]{width:100%;font:13px/1.45 var(--sans);color:var(--tx);background:var(--raise);border:1px solid var(--line2);border-radius:8px;padding:9px 10px;resize:vertical}
+  textarea:focus,input[type=text]:focus{outline:2px solid var(--amber);border-color:transparent}
+  textarea.magic{caret-color:var(--amber)}
+  .fieldhead{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .fieldhead label{font-weight:600;font-size:12.5px}
+  .fieldhead .r{margin-left:auto;display:flex;gap:6px;align-items:center;color:var(--mute);font-size:11px}
+  .takes{display:grid;gap:6px}
+  .take{display:flex;align-items:center;gap:10px;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;background:var(--raise);cursor:pointer}
+  .take.sel{border-color:var(--amber);background:#2a2211}
+  .take input{accent-color:var(--amber);margin:0}
+  .take .tn{font-weight:600;width:52px}
+  .take .td{color:var(--dim);font-size:11.5px;flex:1}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line2);border-radius:8px;margin-bottom:6px;cursor:pointer;background:var(--raise)}
+  .opt.sel{border-color:var(--amber);background:#2a2211}
+  .opt input{accent-color:var(--amber);margin:3px 0 0}
+  .opt .ot{font-weight:600} .opt .od{color:var(--dim);font-size:11.5px;margin-top:2px}
+  .note{font-size:12px;color:var(--dim);border-left:2px solid var(--line2);padding:2px 10px;margin:10px 0}
+  .note.red{border-color:var(--red);color:#e9a9a2}
+  .spin{width:14px;height:14px;border:2px solid var(--line2);border-top-color:var(--amber);border-radius:50%;animation:sp .8s linear infinite;display:inline-block;vertical-align:-3px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .exg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .ex{border:1px solid var(--line2);border-radius:7px;overflow:hidden;position:relative;background:var(--raise)}
+  .ex svg{display:block;width:100%;aspect-ratio:1}
+  .ex .ef{display:flex;align-items:center;gap:4px;padding:4px 6px;font-size:11px;color:var(--dim)}
+  .ex .ef .ck{margin-left:auto;width:18px;height:18px;border-radius:5px;border:1px solid var(--line2);display:grid;place-items:center;color:transparent}
+  .ex.ok .ef .ck{background:var(--green-d);border-color:#2c5a3b;color:var(--green)}
+  .ex .ef .ck:hover{border-color:var(--tx)}
+
+  /* popover menu */
+  .pop{position:fixed;z-index:60;background:var(--raise2);border:1px solid var(--line2);border-radius:9px;padding:6px;min-width:260px;box-shadow:0 10px 30px rgba(0,0,0,.5);display:none}
+  .pop.open{display:block}
+  .pop .ph{font-size:11px;color:var(--mute);padding:4px 8px 6px}
+  .pop button{display:block;width:100%;text-align:left;padding:7px 9px;border-radius:6px;font-size:12.5px}
+  .pop button:hover,.pop button:focus-visible{background:var(--raise);outline:none}
+  .pop button .s{display:block;color:var(--dim);font-size:11px;margin-top:1px}
+  .pop button[disabled]{opacity:.5;cursor:not-allowed}
+
+  /* review sheet */
+  .sheet{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center}
+  .sheet.open{display:flex}
+  .sheet .panel{width:720px;max-height:88vh;background:var(--sur);border:1px solid var(--line2);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .sheet .panel .dh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  .sheet .panel .dh h3{margin:0;font-size:16px}
+  .sheet .panel .db{padding:16px 20px;overflow:auto}
+  .sheet .panel .df{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .sum>div{border:1px solid var(--line2);border-radius:9px;padding:10px 12px;background:var(--raise)}
+  .sum .k{color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+  .sum .v{font:600 20px var(--mono);margin-top:2px}
+  .sum .v small{font:12px var(--sans);color:var(--dim);margin-left:4px}
+  .sum .red .v{color:var(--red)}
+  ol.steps{margin:0;padding:0 0 0 2px;list-style:none;counter-reset:s}
+  ol.steps li{counter-increment:s;display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  ol.steps li:before{content:counter(s);font:11px var(--mono);color:var(--dim);width:22px;height:22px;border:1px solid var(--line2);border-radius:50%;display:grid;place-items:center;flex:none}
+  ol.steps li.done:before{content:"✓";color:var(--green);border-color:#2c5a3b;background:var(--green-d)}
+  ol.steps li.run:before{content:"";border-color:var(--amber);border-top-color:transparent;animation:sp .8s linear infinite}
+  ol.steps li .st{flex:1} ol.steps li .st .s{color:var(--dim);font-size:11.5px}
+  ol.steps li .cost{color:var(--mute);font:11px var(--mono);white-space:nowrap}
+
+  .toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:#2a2f36;border:1px solid var(--line2);padding:8px 14px;border-radius:8px;font-size:12.5px;z-index:80;opacity:0;transition:opacity .15s;pointer-events:none;max-width:520px;text-align:center}
+  .toast.show{opacity:1}
+  .toast.bad{border-color:#5a2d28;color:#f0b3ac}
+  .dragging{opacity:.5}
+  .ic{width:12px;height:12px;vertical-align:-2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="crumb">Admin <span>/</span> MMPR/TMNT III, Issue 1 <span>/</span> <b>Casting</b></div>
+    <div id="hdrnote" class="dim"></div>
+    <div id="meter"></div>
+    <button class="btn" id="btnFaces" title="Faces that still need a name">Faces</button>
+    <button class="btn primary" id="btnReview">Review &amp; save</button>
+  </header>
+
+  <!-- ===== CAST ===== -->
+  <section id="cast" aria-label="Cast">
+    <div class="colhead"><h2>In this issue</h2><span class="n" id="castN">32</span>
+      <div class="right"><button class="btn small ghost" id="btnAddChar">+ Add a character</button></div></div>
+    <div id="castScroll">
+      <div class="tray" id="facetray" data-target="facetray"></div>
+      <div id="castList"></div>
+      <div class="tray" id="sitout" data-target="sitout" tabindex="-1"></div>
+      <div id="removedList"></div>
+    </div>
+  </section>
+
+  <!-- ===== ROSTER ===== -->
+  <section id="roster" aria-label="Roster">
+    <div class="colhead"><h2>Roster</h2><span class="n" id="rosterN">28 of 30</span>
+      <div class="legend" style="margin-left:14px">
+        <span><i style="background:#4a7c5a"></i>this book</span>
+        <span><i style="background:#2d4a68"></i>other project</span>
+        <span><i style="background:#3d454f;background-image:repeating-linear-gradient(45deg,transparent 0 2px,#5a636e 2px 3px)"></i>locked</span>
+        <span><i style="border:1px dashed var(--line2)"></i>free</span>
+        <span><i style="background:var(--amber)"></i>after save</span>
+        <span><i style="width:7px;height:7px;border-radius:50%;background:var(--green)"></i>backed up</span>
+        <span><i style="width:7px;height:7px;border-radius:50%;border:1px solid var(--red)"></i>no backup</span>
+      </div>
+    </div>
+    <div id="rosterScroll">
+      <div id="grid"></div>
+      <div class="shelf">
+        <div id="bench" data-target="bench">
+          <div class="sh"><b>Bench</b><span class="n" id="benchN"></span><span class="hint">archived voices. Drag one onto a slot to bring it back. Drag a roster voice here to move it out.</span></div>
+          <div class="items" id="benchItems"></div>
+        </div>
+        <div id="library">
+          <div class="sh"><b>Library</b><span class="n" id="libN"></span><span class="hint">stock voices, no slot. Drop a character on one.</span></div>
+          <div class="items" id="libItems"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== MOVES ===== -->
+  <aside id="rail" aria-label="Moves">
+    <div class="colhead"><h2>Moves</h2><span class="n" id="movesN">0</span>
+      <div class="right"><button class="btn small ghost" id="btnClear">Clear</button></div></div>
+    <div id="moves"></div>
+    <div id="railfoot">
+      <div id="tally"></div>
+      <div id="blockers"></div>
+      <button class="btn primary" id="btnReview2" style="width:100%;justify-content:center">Review &amp; save</button>
+    </div>
+  </aside>
+
+  <footer><span id="status">Drag a character onto a voice, or a voice onto a slot. Nothing saves until you review.</span>
+    <span style="margin-left:auto">pick with <kbd>Space</kbd> · place with <kbd>Enter</kbd> · <kbd>Esc</kbd> cancels</span></footer>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<!-- character drawer -->
+<div class="drawer" id="charDrawer" role="dialog" aria-modal="true" aria-labelledby="cdTitle">
+  <div class="dh"><div id="cdAv"></div><div><h3 id="cdTitle"></h3><div class="dim" id="cdSub"></div></div><button class="close" id="cdClose" aria-label="Close">✕</button></div>
+  <div class="db" id="cdBody"></div>
+  <div class="df" id="cdFoot"></div>
+</div>
+
+<!-- design drawer -->
+<div class="drawer" id="designDrawer" role="dialog" aria-modal="true" aria-labelledby="ddTitle">
+  <div class="dh"><div><h3 id="ddTitle">Design a voice</h3><div class="dim" id="ddSub"></div></div><button class="close" id="ddClose" aria-label="Close">✕</button></div>
+  <div class="db" id="ddBody"></div>
+  <div class="df" id="ddFoot"></div>
+</div>
+
+<div class="pop" id="pop" role="menu"></div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+  <div class="panel">
+    <div class="dh"><h3 id="shTitle">Review &amp; save</h3><span class="dim" id="shSub"></span><button class="close btn ghost small" id="shClose" style="margin-left:auto">✕</button></div>
+    <div class="db" id="shBody"></div>
+    <div class="df" id="shFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ======================================================================
+   MOCK DATA, shaped like tmnt-mmpr-iii / issue-1 (static; nothing is real)
+   ====================================================================== */
+const kindOf=(k,l)=>k==='role'?'role':l>=10?'lead':l>=3?'sup':l>=1?'one':'silent';
+const C = (id,name,kind,lines,faces,pages,col,ini,desc,voice,extra={})=>({id,name,kind:kindOf(kind,lines),lines,faces,pages,col,ini,desc,voice,...extra});
+const CHARS = [
+  // leads (10+ lines)
+  C('green-ranger','Green Ranger','lead',30,30,'5–23','#2f9a55','GR','Tommy Oliver, the Green Ranger. Teenage martial artist, cocky and warm, quick to laugh mid-fight.','v-green',{samples:[[4,'[shouting] COME ON! IS THIS ALL YOU\'VE GOT?'],[4,'KEE-YAH!'],[5,'[frustrated grunts] SO MUCH for reaching the Command Center.']]}),
+  C('leonardo','Leonardo','lead',19,14,'5–23','#2f6fcf','L','Leader of the turtles. Measured, earnest, a little stiff; the one who says the plan out loud.','v-leo',{band:'#1f4fa8',samples:[[5,'Guys. Formation. Now.'],[11,'[low] We hold the line until the Rangers are through.'],[22,'[relieved] Okay. Okay. Everybody breathe.']]}),
+  C('raphael','Raphael','lead',22,17,'7–24','#c73b2f','R','Hot-headed turtle. Gravel in the voice, Brooklyn vowels, jokes that are half threats.','v-raph',{band:'#8f1f16',samples:[[7,'[growling] You wanna go, tin can?'],[12,'Heh. Cute helmet.'],[20,'[yelling] LEO, LEFT!']]}),
+  C('shredder','Shredder','lead',15,12,'15–22','#6e7781','S','Oroku Saki. Cold, precise, theatrical menace; speaks slowly and never raises his voice until he does.','v-shred',{samples:[[15,'[quiet] You have something that belongs to me.'],[16,'The Foot does not retreat. The Foot regroups.'],[22,'[roaring] ENOUGH!']]}),
+  C('donatello','Donatello','lead',10,10,'6–13','#7b4fbf','D','The tech turtle. Fast, nasal, excited by machines; trails off into muttering when he thinks.','v-don',{band:'#5a2fa0',samples:[[6,'[excited] The grid resonance is, wait, wait, that\'s not possible.'],[7,'Okay so if I invert the, hmm.'],[12,'[muttering] Three, two, and... there.']]}),
+  C('red-ranger','Red Ranger','lead',11,14,'8–24','#d6453a','RR','Jason, the Red Ranger. Steady team captain; clipped, confident, radio-crisp delivery.','v-red',{samples:[[8,'Rangers, on me.'],[12,'[firm] We do this together or not at all.'],[24,'[tired] Good work, everyone.']]}),
+  C('bebop','Bebop','lead',8,6,'18–21','#b86b4d','B','Mutant warthog henchman. Loud, dim, giggly; a sidekick who thinks he\'s the brains.','v-bebop',{samples:[[18,'[giggling] Oh this is gonna be GOOD, Rocksteady.'],[19,'Uh. Boss? It\'s doing the thing again.'],[21,'[whining] I didn\'t touch nothin\'!']]}),
+  C('michelangelo','Michelangelo','lead',6,8,'9–23','#e8902a','M','The party turtle. Surfer drawl, big grin you can hear, every line ends up a joke.','v-mikey',{band:'#c56d10',samples:[[9,'Dudes. DUDES. They have a giant robot.'],[11,'[laughing] Cowabunga, Rangers!'],[23,'[mouth full] Pizza break?']]}),
+  // supporting (3–9)
+  C('pink-ranger','Pink Ranger','sup',9,21,'8–23','#e0689f','PR','Kimberly, the Pink Ranger. Bright, quick, sarcastic in a friendly way; gymnast\'s energy.','v-pink',{ready:{key:'clone:pink-ranger',name:'Pink Ranger (Kimberly) (1993)',origin:'clone',backup:'clip',note:'voice-lab clone, the lab\'s pick'},samples:[[8,'[surprised] Wait, they can throw fireballs now?'],[8,'I wanna throw fireballs.'],[10,'[sarcastic] Honestly, how does he fill out his purple pajama posse?']]}),
+  C('rocksteady','Rocksteady','sup',9,5,'18–21','#8d939a','RS','Mutant rhino henchman. Deep, booming, nasal; slow-witted, snorts when he laughs; thick Brooklyn accent.','v-rock',{ready:{key:'clone:rocksteady',name:'Rocksteady (2012)',origin:'clone',backup:'clip',note:'voice-lab clone'},samples:[[18,'[confident, snorts] Consider it a TEST DRIVE, Bebop. [darkly enthusiastic] Let\'s have SOME FUN!'],[19,'[Shouting] SHADOW GRID-- ACTIVATE!'],[19,'[excited] I AIN\'T felt this GOOD since our first MUTATION.']]}),
+  C('karai','Karai','sup',3,10,'7–16','#2a2f3a','K','Shredder\'s lieutenant. Low, dry, controlled; a knife in a velvet sleeve.','v-karai',{samples:[[7,'[cool] You were told to wait.'],[15,'Father. The Rangers are here.'],[16,'[quiet] Then we end it tonight.']]}),
+  C('yellow-ranger','Yellow Ranger','sup',9,15,'6–13','#e2b93b','YR','Trini, the Yellow Ranger. Calm, kind, precise; the one who notices the detail everyone missed.','v-yellow',{samples:[[6,'That symbol. I\'ve seen it before.'],[12,'[gentle] Hey. Look at me. We\'ve got this.'],[13,'Left side. Now.']]}),
+  C('foot-soldier','Foot Soldier','sup',2,31,'3–15','#3d3356','FS','Foot Clan grunt. Interchangeable; muffled under a mask; short barks and grunts.','v-foot',{samples:[[3,'[muffled] Intruders!'],[8,'[grunt] Hyah!'],[15,'[panicked] Fall back! FALL BACK!']]}),
+  C('blue-ranger','Blue Ranger','sup',5,8,'12–13','#3b7dd8','BR','Billy, the Blue Ranger. Earnest brain of the Rangers; long words, soft delivery, a bit of a stammer when excited.','v-blue',{samples:[[12,'[fast] The morphological grid is, is destabilizing!'],[12,'Donatello, your readings?'],[13,'[awed] Fascinating.']]}),
+  C('lord-zedd','Lord Zedd','sup',10,7,'16–24','#b0322c','LZ','Lord Zedd. Rasping, metallic, imperial; every sentence a decree.','v-zedd',{samples:[[16,'[rasping] Bring me the Green Ranger.'],[18,'You disappoint me, Shredder.'],[24,'[seething] This is not over.']]}),
+  C('master-splinter','Master Splinter','sup',9,9,'12–23','#8a6a4a','MS','Splinter. Old, warm, patient rat sensei; soft Japanese-inflected English; pauses before the point.','v-splinter',{samples:[[12,'[calm] Patience, my sons.'],[14,'A warrior who fights alone has already lost.'],[23,'[proud] You did well.']]}),
+  C('foot-elite','Foot Elite','sup',11,10,'8–15','#5a4a7a','FE','Elite Foot ninja. Sharper than the grunts; clipped commands, no wasted words.','v-footelite',{samples:[[8,'[hissing] Take the Ranger. Leave the rest.'],[10,'Flank.'],[15,'[cold] The master will not be pleased.']]}),
+  C('black-ranger','Black Ranger','sup',1,2,'12–13','#4a4f5a','BK','Zack, the Black Ranger. Loose, funny, dancer\'s rhythm in his speech.','v-black',{samples:[[12,'[laughing] Ohhh, no no no, not today!'],[13,'Hip hop kido, baby.']]}),
+  C('warbunny','Warbunny','sup',11,12,'6–20','#3aa69a','W','Warbunny. Big, strange, childlike brute; sing-song menace.','v-warbunny',{samples:[[6,'[sing-song] Bunny wants to PLAY.'],[15,'[confused] Why they running?'],[20,'[roar] WARBUNNY SMASH!']]}),
+  C('putty','Putty Foot Soldier','sup',3,25,'3–23','#7a7f86','PF','','',{samples:[[3,'[gurgle] Blub-lub-lub.'],[8,'[clay noise] Hrrrngh.'],[11,'[gurgle] Bluh?']]}),
+  C('armored-villain','Armored Villain','sup',0,0,'off-panel','#555b66','AV','Unnamed armored villain, voice only. Booming through a helmet, distorted.','v-armored',{samples:[[16,'[distorted] The grid is ours.'],[18,'[booming] Kneel.']]}),
+  C('grace-sterling','Grace Sterling','sup',0,0,'off-panel','#9a6f8e','GS','','',{samples:[[2,'[TV] This is Grace Sterling, live from downtown Angel Grove.'],[2,'[TV] Authorities are asking residents to stay indoors.'],[24,'[TV] And the city breathes a sigh of relief.']]}),
+  // one-offs (1–2 lines)
+  C('alpha-5','Alpha 5','one',2,1,'12','#c9473f','A5','Alpha 5. Fretful robot assistant; high, fast, "ay-yi-yi" energy.','v-alpha',{samples:[[12,'Ay-yi-yi-yi-yi! Zordon, the sensors!'],[12,'[fretting] Oh, this is bad, this is very bad.']]}),
+  C('zordon','Zordon','one',6,1,'12','#4f8fd6','Z','Zordon. Vast, slow, echoing; a voice from a tube of light.','v-zordon',{samples:[[12,'[echoing] Rangers. The turtles are allies.'],[12,'Trust them, as you trust each other.']]}),
+  C('dr-boyd','Dr. Boyd','one',0,0,'off-panel','#6b8a5a','DB','','',{samples:[[14,'[radio] The readings are off the chart, I, I can\'t explain it.'],[14,'[radio] Get out of there!']]}),
+  C('rita-repulsa','Rita Repulsa','one',0,0,'off-panel','#a0714f','RR','Rita Repulsa. Shrieking, nasal, gleefully evil; headache-fueled cackle.','v-rita',{samples:[[17,'[shrieking] I have a HEADACHE!'],[17,'[cackling] Make my monster GROW!']]}),
+  C('rezar','Rezar','one',1,0,'off-panel','#7b5a3a','RZ','','',{samples:[[19,'[gruff] You\'re late.']]}),
+  C('rock-soldier','Rock Soldier','one',1,0,'off-panel','#6a6a62','RK','','',{samples:[[20,'[bark] Move!']]}),
+  C('soldier','Soldier','one',1,0,'off-panel','#5f6b5a','SO','','',{samples:[[21,'[radio] Perimeter\'s breached, repeat, perimeter\'s breached!']]}),
+  // roles
+  C('narrator','Narrator','role',24,0,'captions','#2e3238','N','The narrator. Even, warm, unhurried; reads the captions.','v-narr',{samples:[[1,'Angel Grove. Tuesday. It had been a quiet week.'],[5,'Meanwhile, beneath the city...'],[24,'To be continued.']]}),
+  C('off-panel','Off-panel','role',4,0,'captions','#2e3238','OP','Off-panel speech with no named speaker. Neutral adult, mid pitch, close-miked, slightly urgent.','',{samples:[[9,'[off] Did you see that?'],[9,'[off] Run!'],[13,'[off] Somebody call someone!']]}),
+  C('crowd','Crowd','role',2,0,'captions','#2e3238','CR','A crowd: layered murmurs, gasps and cheers, no single voice in front.','',{samples:[[13,'[crowd] Gasp!'],[24,'[crowd] Cheers!']]}),
+];
+// voices: slot (1..30) or null; owner: comic | the other project; backup: clip | prompt | null
+const V = (id,name,origin,slot,backup,extra={})=>({id,name,origin,slot,backup,owner:'comic',status:slot?'active':'archived',...extra});
+const VOICES = [
+  V('v-mikey','Michelangelo','clone',1,'clip',{prot:true}),
+  V('v-don','Donatello','clone',2,'clip',{prot:true}),
+  V('v-raph','Raphael','clone',3,'clip',{prot:true}),
+  V('v-splinter','Master Splinter','clone',4,'clip',{prot:true}),
+  V('v-leo','Leonardo','design',5,'prompt'),
+  V('v-shred','Shredder','clone',6,'clip'),
+  V('v-red','Red Ranger','design',7,'prompt'),
+  V('v-green','Green Ranger','design',8,null,{why:'designed in the ElevenLabs UI; no prompt on file'}),
+  V('v-bebop','Bebop','design',9,'prompt'),
+  V('v-pink','Pink Ranger','design',10,'prompt'),
+  V('v-rock','Rocksteady','design',11,'prompt'),
+  V('v-karai','Karai','clone',12,'clip'),
+  V('v-yellow','Yellow Ranger','design',13,'prompt'),
+  V('v-foot','Foot Soldier','design',14,'prompt'),
+  V('v-blue','Blue Ranger','design',15,'prompt'),
+  V('v-zedd','Lord Zedd','design',16,'prompt'),
+  V('v-footelite','Foot Elite','design',17,'prompt'),
+  V('v-black','Black Ranger','design',18,'prompt'),
+  V('v-warbunny','Warbunny','design',19,'prompt'),
+  V('v-armored','Armored Villain','design',20,'prompt'),
+  V('v-alpha','Alpha 5','design',21,'prompt'),
+  V('v-rita','Rita Repulsa','design',22,'prompt'),
+  // other projects
+  V('o-june','Grandma June','clone',23,'clip',{owner:'Bedtime Tales',pinned:true}),
+  V('o-ortiz','Coach Ortiz','clone',24,'snap',{owner:'Bedtime Tales'}),
+  V('o-lab03','Lab scratch 03','design',25,'prompt',{owner:'voice-lab'}),
+  V('o-lab07','Lab scratch 07','design',26,null,{owner:'voice-lab',why:'made in the ElevenLabs UI; no prompt on file'}),
+  V('o-ben','Ad read (Ben)','clone',27,null,{owner:'Podcast',why:'no source clip on file'}),
+  V('o-rosa','Abuela Rosa','clone',28,'clip',{owner:'Spanish reader',pinned:true}),
+  // slots 29, 30 free
+  // bench (archived, restorable)
+  V('b-green93','Green Ranger (Tommy) (1993)','clone',null,'clip',{note:'the lab\'s pick'}),
+  V('b-shred90','Shredder (1990)','clone',null,'clip'),
+  V('b-krang','Krang','design',null,'prompt'),
+  V('b-rita93','Rita Repulsa (1993)','design',null,'prompt'),
+  // library (no slot)
+  V('l-narr','Bill, warm storyteller','library',null,'library',{status:'library',lib:true}),
+  V('l-zordon','Deep announcer','library',null,'library',{status:'library',lib:true}),
+  V('l-radio','Radio dispatcher','library',null,'library',{status:'library',lib:true}),
+];
+// castlist overrides for library voices
+CHARS.find(c=>c.id==='narrator').voice='l-narr';
+CHARS.find(c=>c.id==='zordon').voice='l-zordon';
+// faces that still need a name (screenshot 6's work)
+const FACES = [
+  {id:'f1',page:12,hue:'#c9473f',hint:'red, boxy, antenna'},
+  {id:'f2',page:19,hue:'#8d939a',hint:'grey, horn'},
+];
+const SLOTS = 30, MONTHLY_MAX = 95, MONTHLY_USED = 0;
+const BOOK = 'tmnt-mmpr-iii', ISSUE = 'issue-1';
+
+/* ======================================================================
+   STATE: base data never changes; `moves` is the only mutable thing.
+   ====================================================================== */
+let moves = [];          // ordered list; the rail shows it; Save runs it
+let designs = {};        // charId -> accepted design {take, prompt, text, mode, credits}
+let carry = null;        // what is being carried: {type, id, label}
+let faceOk = {};         // exemplar confirmations (per-character faces work)
+const clone = o => JSON.parse(JSON.stringify(o));
+
+function view(){
+  const chars = clone(CHARS).map(c=>({...c,lost:false,sit:!!c.sitBase,removed:!!c.removedBase,faces:c.faces}));
+  const voices = clone(VOICES);
+  const faces = clone(FACES);
+  const ch = id => chars.find(c=>c.id===id);
+  const vo = id => voices.find(v=>v.id===id);
+  const archive = (id,m)=>{ const v=vo(id); if(!v) return; v.status='archived'; v.slot=null; v.pend='out'; v.outMove=m;
+    chars.forEach(c=>{ if(c.voice===id){ c.voice=''; c.lost=true; } }); };
+  for(const m of moves){
+    if(m.t==='archive'){ archive(m.voiceId,m); }
+    else if(m.t==='add'){
+      const was = m.replace? chars.filter(c=>c.voice===m.replace).map(c=>c.id) : [];
+      if(m.replace) archive(m.replace,m);
+      const nv = {id:m.q.key,name:m.q.name,origin:m.q.origin,slot:m.slot,backup:m.q.backup,owner:'comic',status:'active',pend:'in',runOnly:!!m.runOnly,forChar:m.q.forChar};
+      voices.push(nv); for(const id of [m.q.forChar,...was]){ const c=ch(id); if(c){ c.voice=nv.id; c.lost=false; c.sit=false; } }
+    }
+    else if(m.t==='restore'){ const was = m.replace? chars.filter(c=>c.voice===m.replace).map(c=>c.id) : []; if(m.replace) archive(m.replace,m); const v=vo(m.voiceId); v.status='active'; v.slot=m.slot; v.pend='in'; for(const id of [m.forChar,...was]){ if(!id) continue; const c=ch(id); c.voice=v.id; c.lost=false; c.sit=false; } }
+    else if(m.t==='cast'){ const c=ch(m.charId); c.voice=m.voiceId; c.lost=false; c.sit=false; }
+    else if(m.t==='sitout'){ const c=ch(m.charId); c.sit=true; c.lost=false; }
+    else if(m.t==='remove'){ const c=ch(m.charId); c.removed=true; c.lost=false; }
+    else if(m.t==='face'){ const f=faces.find(f=>f.id===m.faceId); f.done=true; f.to=m.charId; if(m.charId){ const c=ch(m.charId); c.faces+=1; } }
+  }
+  // queued voices: ready clones, accepted designs, bench rows; "placed" when a move already uses them
+  const placed = new Set(moves.filter(m=>m.t==='add').map(m=>m.q.key));
+  const restored = new Set(moves.filter(m=>m.t==='restore').map(m=>m.voiceId));
+  const queued = [];
+  for(const c of chars){
+    if(c.ready) queued.push({...c.ready,forChar:c.id,placed:placed.has(c.ready.key)});
+    const d = designs[c.id]; if(d) queued.push({key:'design:'+c.id,name:c.name+' (designed, take '+d.take+')',origin:'design',backup:'prompt',forChar:c.id,placed:placed.has('design:'+c.id),mode:d.mode});
+  }
+  const used = voices.filter(v=>v.slot).length;
+  return {chars,voices,faces,queued,used,free:SLOTS-used,restored,
+    speakers:(vid)=>chars.filter(c=>c.voice===vid&&!c.removed)};
+}
+
+/* ======================================================================
+   RENDER
+   ====================================================================== */
+const $ = s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc = s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const SVG = {
+  lock:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2"/></svg>',
+  play:'<svg class="ic" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg>',
+  wand:'<svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 14l8-8"/><path d="M11 2v2M11 7v2M9 4.5h2M12.5 4.5h2"/><path d="M12 2l-1 1 1 1 1-1z"/></svg>',
+  grip:'<svg class="ic" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="4" r="1.3"/><circle cx="11" cy="4" r="1.3"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/><circle cx="5" cy="12" r="1.3"/><circle cx="11" cy="12" r="1.3"/></svg>',
+};
+function avatar(c,sm){ return `<span class="av${sm?' sm':''}" style="background:${c.col}" aria-hidden="true">${c.band?`<span class="band" style="background:${c.band}"></span>`:''}<span style="position:relative">${c.ini}</span></span>`; }
+function faceSvg(f,i=0){ // a fake panel crop
+  return `<svg viewBox="0 0 52 52"><rect width="52" height="52" fill="${f.hue}"/><path d="M0 ${30+i*4} Q 20 ${8+i*6} 52 ${26-i*3}" stroke="rgba(0,0,0,.35)" stroke-width="6" fill="none"/><circle cx="${22+i*3}" cy="${24+i*2}" r="9" fill="rgba(255,255,255,.22)"/><rect x="${14+i*2}" y="34" width="26" height="4" fill="rgba(0,0,0,.4)"/></svg>`;
+}
+const originWord = v => v.origin==='clone'?'clone':v.origin==='design'?'designed':'library';
+const backupWord = v => v.backup==='clip'?'clip copy, exact restore':v.backup==='snap'?'samples copied at save, exact restore':v.backup==='prompt'?'prompt kept, re-designed on restore (close, not identical)':v.backup==='library'?'':'no backup';
+const locked = v => v.prot || v.pinned;
+const lockWhy = v => v.prot?'v2 voice, locked':`pinned by ${v.owner}`;
+
+let VW; // current view
+function render(){
+  VW = view();
+  renderMeter(); renderCast(); renderRoster(); renderBench(); renderMoves(); renderStatus();
+  if(carry) markTargets();
+}
+
+function renderMeter(){
+  const {voices} = VW;
+  const segs=[]; for(let n=1;n<=SLOTS;n++){ const v=voices.find(v=>v.slot===n); let k='free';
+    if(v){ k = v.pend==='in'?'plan': locked(v)?'lock': v.owner!=='comic'?'other':'ours'; }
+    segs.push(`<span class="seg ${k}" title="slot ${n}${v?': '+esc(v.name):' (free)'}"></span>`); }
+  const outs = voices.filter(v=>v.pend==='out').length;
+  $('#meter').innerHTML = `<div class="segs">${segs.join('')}</div><span class="lbl"><b>${VW.used}</b> of 30 after save · <b>${VW.free}</b> free${outs?` · <b>${outs}</b> moving out`:''}</span>
+    <span class="lbl">changes this month <b>${MONTHLY_USED+countChanges()}</b> of ${MONTHLY_MAX}</span>`;
+  $('#rosterN').textContent = `${VW.used} of 30`;
+}
+function countChanges(){ return moves.filter(m=>m.t==='add'||m.t==='archive'||m.t==='restore').reduce((n,m)=>n+1+(m.replace?1:0),0); }
+
+const GROUPS=[['lead','Leads','10+ lines'],['sup','Supporting','3–9 lines'],['one','One-offs','1–2 lines. A stand-in, or a slot borrowed for the run'],['silent','No lines here','in the cast, nothing to say this issue. No voice needed'],['role','Roles','narrator, off-panel, crowd']];
+function renderCast(){
+  const {chars,voices,queued,faces} = VW;
+  // faces tray
+  const open = faces.filter(f=>!f.done);
+  $('#facetray').innerHTML = `<div class="tl"><b>Needs a name</b><span class="mono dim">${open.length}</span><span class="mute">drag a face onto who it is</span><button id="facebin" data-target="facebin">not a character</button></div>` +
+    open.map((f,i)=>`<button class="face dr" draggable="true" data-carry="face" data-id="${f.id}" aria-label="Face on page ${f.page}, ${f.hint}. Press Space to pick up." title="p.${f.page}: ${f.hint}">${faceSvg(f,i)}<span class="pg">p.${f.page}</span></button>`).join('');
+  $('#facetray').style.display = open.length?'':'none';
+  $('#btnFaces').style.display = open.length?'':'none'; $('#btnFaces').textContent = `Faces · ${open.length} unnamed`;
+
+  let html='';
+  for(const [k,label,hint] of GROUPS){
+    const list = chars.filter(c=>c.kind===k && !c.removed && !c.sit);
+    if(!list.length) continue;
+    html += `<div class="grp">${label}<span class="mono">${list.length}</span><span class="hint">${hint}</span></div>`;
+    html += list.map(c=>rowHtml(c)).join('');
+  }
+  $('#castList').innerHTML = html;
+  const sits = chars.filter(c=>c.sit);
+  $('#sitout').innerHTML = `<div class="tl"><b>Sitting out this run</b><span class="mono dim">${sits.length}</span><span class="mute">drop a character here. Its lines stay silent; the castlist row is kept.</span></div>` + sits.map(c=>rowHtml(c)).join('');
+  const rem = chars.filter(c=>c.removed);
+  $('#removedList').innerHTML = rem.length?`<div class="grp">Not in this issue<span class="mono">${rem.length}</span></div>`+rem.map(c=>rowHtml(c)).join(''):'';
+  $('#castN').textContent = chars.filter(c=>!c.removed).length;
+}
+function rowHtml(c){
+  const {voices,queued} = VW;
+  const v = voices.find(x=>x.id===c.voice);
+  let chips='';
+  if(c.removed){ chips=`<span class="chip sit"><span class="dot"></span><span class="x">not in this issue</span></span>`; }
+  else if(c.sit){ chips=`<span class="chip sit"><span class="dot"></span><span class="x">sitting out</span></span>`; }
+  else if(v && v.lib){ chips=`<span class="chip lib" title="library voice, no slot"><span class="dot"></span><span class="x">${esc(v.name)} · library</span>${playBtn('voice:'+v.id)}</span>`; }
+  else if(v){ const own = v.forChar===c.id || v.name.startsWith(c.name); const slotTxt = v.slot?`slot ${v.slot}`:'';
+    chips=`<span class="chip on${own?'':' standin'}" title="${own?'its own voice':'speaks in another character\'s voice'}"><span class="dot"></span><span class="x">${own?'':'as '}${esc(v.name)}${v.pend==='in'?' · new':''}${slotTxt?' · '+slotTxt:''}</span>${playBtn('voice:'+v.id)}</span>`; }
+  else if(c.lines===0){ chips=`<span class="chip sit" title="no lines in this issue, so no voice is needed this run"><span class="dot"></span><span class="x">none needed</span></span>`; }
+  else { chips=`<span class="chip none"><span class="dot"></span><span class="x">${c.lost?'lost its voice':'no voice'}</span></span>`; }
+  const qs = queued.filter(q=>q.forChar===c.id && !c.removed && !q.placed);
+  chips += qs.map(q=>`<button class="chip q dr${q.placed?' placed':''}" ${q.placed?'disabled':'draggable="true"'} data-carry="queued" data-id="${q.key}" title="${q.placed?'already on a slot':esc(q.note||'needs a slot: drag it onto one')}"><span class="dot"></span><span class="x">${esc(q.name)}${q.placed?'':' · needs a slot'}</span></button>`).join('');
+  const needs = !c.removed && !c.sit && !v && c.lines>0;
+  const acts = needs?`<span class="rowacts"><button class="btn small" data-act="design" data-id="${c.id}">Design</button><button class="btn small ghost" data-act="sit" data-id="${c.id}">Sit out</button></span>`:'';
+  return `<div class="row dropc${c.lost?' lost':''}${c.sit?' sit':''}${c.removed?' removed':''}" data-target="char" data-id="${c.id}">
+    <button class="av dr" draggable="${!c.removed}" data-carry="char" data-id="${c.id}" style="background:${c.col}" aria-label="${esc(c.name)}. Press Space to pick up, then choose a voice or a slot.">${c.band?`<span class="band" style="background:${c.band}"></span>`:''}<span style="position:relative">${c.ini}</span></button>
+    <div class="nm"><button class="name" data-act="open" data-id="${c.id}">${esc(c.name)}</button><span class="meta">${c.lines} line${c.lines===1?'':'s'} · ${c.faces?c.faces+' faces · p.'+c.pages:c.pages}</span></div>
+    <div class="vc">${chips}${acts}</div></div>`;
+}
+function playBtn(key){ return `<button class="pl" data-play="${key}" aria-label="Hear it" title="Hear a sample (never changes a move)">${SVG.play}</button>`; }
+
+function renderRoster(){
+  const {voices,speakers} = VW;
+  let html='';
+  for(let n=1;n<=SLOTS;n++){
+    const v = voices.find(v=>v.slot===n);
+    if(!v){ html+=`<div class="tile free dropt" data-target="slot" data-slot="${n}" tabindex="-1"><div class="top">${String(n).padStart(2,'0')}</div>free</div>`; continue; }
+    const lk = locked(v);
+    const sp = speakers(v.id);
+    const top = `<div class="top">${String(n).padStart(2,'0')}${v.pend==='in'?' <span style="color:var(--amber);font-family:var(--sans)">new</span>':''}${v.runOnly?' <span style="color:var(--amber);font-family:var(--sans)">this run</span>':''}${lk?`<span class="lk" title="${lockWhy(v)}">${SVG.lock}${v.prot?'v2':esc(v.owner)}</span>`:v.owner!=='comic'?`<span class="own" title="held by ${esc(v.owner)}">${esc(v.owner)}</span>`:''}</div>`;
+    const bk = `<span class="bk${v.backup?'':' no'}" title="${v.backup?backupWord(v):'no backup: '+(v.why||'')}"></span>`;
+    html+=`<div class="tile dropt${lk?' locked':''}${v.owner!=='comic'?' other':''}${v.pend==='in'?' plan':''}" data-target="slot" data-slot="${n}" data-voice="${v.id}" tabindex="-1">
+      ${top}
+      <div class="vn dr" ${lk?'':'draggable="true"'} data-carry="voice" data-id="${v.id}" tabindex="0" role="button" aria-label="${esc(v.name)}, slot ${n}, ${originWord(v)}, ${v.backup?backupWord(v):'no backup'}${lk?', '+lockWhy(v):'. Press Space to pick up.'}">${esc(v.name)}</div>
+      <button class="hear" data-play="voice:${v.id}" aria-label="Hear ${esc(v.name)}" title="Hear it (never changes a move)">${SVG.play}</button>
+      <div class="bot">${bk}<span class="sp">${sp.map(c=>avatar(c,true)).join('')}${!sp.length&&v.owner==='comic'?'<span class="mute" style="font-size:10.5px">no speaker here</span>':''}</span><span class="orig">${originWord(v)}</span></div>
+    </div>`;
+  }
+  $('#grid').innerHTML = html;
+}
+function renderBench(){
+  const {voices,restored} = VW;
+  const bench = voices.filter(v=>v.status==='archived' && !v.lib);
+  $('#benchN').textContent = bench.length;
+  $('#benchItems').innerHTML = bench.length? bench.map(v=>`<button class="bchip dr${v.pend==='out'?' pend':''}${restored.has(v.id)?' placed':''}" draggable="${!restored.has(v.id)}" data-carry="bench" data-id="${v.id}" aria-label="${esc(v.name)}, archived, ${v.backup?backupWord(v):'no backup'}. Press Space to pick up." title="${v.pend==='out'?'moving out this save':'archived'} · ${v.backup?backupWord(v):'no backup'}"><span class="dot"></span>${esc(v.name)}<span class="sm">${v.pend==='out'?'moving out':originWord(v)}${v.note?' · '+esc(v.note):''}</span></button>`).join('') : `<span class="mute">nothing archived</span>`;
+  const lib = voices.filter(v=>v.lib);
+  $('#libN').textContent = lib.length;
+  $('#libItems').innerHTML = lib.map(v=>`<span class="bchip lchip dropl" data-target="lib" data-id="${v.id}" tabindex="-1"><span class="dot" style="background:#b0b8c0"></span>${esc(v.name)}${playBtn('voice:'+v.id)}</span>`).join('');
+}
+
+function moveText(m){
+  const vn = id => { const v=VOICES.find(v=>v.id===id); return v?v.name:id; };
+  const cn = id => { const c=CHARS.find(c=>c.id===id); return c?c.name:id; };
+  const vobj = id => VOICES.find(v=>v.id===id);
+  if(m.t==='add'){ const d=designs[m.q.forChar];
+    return {t:`Add <b>${esc(m.q.name)}</b> to slot ${m.slot} for <b>${esc(cn(m.q.forChar))}</b>`, sub:`${m.q.origin==='clone'?'cloned from the lab clip (IVC), 0 credits':`saved from design take ${d?d.take:'?'}; prompt kept`}${m.runOnly?' · this run only: archived after its lines render':''}`, repl:m.replace?vobj(m.replace):null}; }
+  if(m.t==='restore'){ return {t:`Bring back <b>${esc(vn(m.voiceId))}</b> to slot ${m.slot}${m.forChar?` for <b>${esc(cn(m.forChar))}</b>`:''}`, sub:`re-created from its ${vobj(m.voiceId).backup}, 0 credits`, repl:m.replace?vobj(m.replace):null}; }
+  if(m.t==='archive'){ const v=vobj(m.voiceId); return {t:`Move out <b>${esc(v.name)}</b>${v.owner!=='comic'?` <span class="dim">(${esc(v.owner)})</span>`:''}`, sub:`frees slot ${v.slot}`, repl:v, self:true}; }
+  if(m.t==='cast'){ const v=VOICES.find(v=>v.id===m.voiceId); return {t:`<b>${esc(cn(m.charId))}</b> speaks as <b>${esc(v?v.name:m.voiceId)}</b>`, sub:v&&v.lib?'library voice, no slot':'shares the voice, no slot'}; }
+  if(m.t==='sitout'){ return {t:`<b>${esc(cn(m.charId))}</b> sits out`, sub:'lines stay silent this run'}; }
+  if(m.t==='remove'){ return {t:`<b>${esc(cn(m.charId))}</b> is not in this issue`, sub:'castlist row marked in_issue = false'}; }
+  if(m.t==='face'){ const f=FACES.find(f=>f.id===m.faceId); return {t:`Face p.${f.page} → <b>${m.charId?esc(cn(m.charId)):'not a character'}</b>`, sub:m.charId?'becomes an exemplar':'dismissed'}; }
+  return {t:'?'};
+}
+function renderMoves(){
+  $('#movesN').textContent = moves.length;
+  if(!moves.length){ $('#moves').innerHTML = `<div class="empty">No moves yet. Every drag becomes a line here, in the order it will run. Nothing on this list touches ElevenLabs or the database until you save.</div>`; }
+  else $('#moves').innerHTML = moves.map((m,i)=>{
+    const x = moveText(m);
+    let extra='';
+    if(x.repl){ const v=x.repl; const lossy = !v.backup;
+      if(x.self||m.replace){
+        extra += lossy
+          ? `<label><input type="checkbox" data-lossy="${i}" ${m.lossyOk?'checked':''}> no backup possible (${esc(v.why||'nothing on file')}). Archive anyway and lose it</label>`
+          : `<label><input type="checkbox" data-backup="${i}" ${m.backup!==false?'checked':''}> back up first (${backupWord(v)})</label>`;
+        if(!x.self) x.sub = `replaces <b>${esc(v.name)}</b>, which moves to the bench · `+x.sub;
+        if(v.owner!=='comic' && !x.self) x.sub += ` · ${esc(v.owner)} gets it back from the bench when it needs it`;
+      } }
+    return `<div class="mv${x.repl&&!x.repl.backup&&!m.lossyOk?' lossy':''}"><div class="t"><span class="n">${i+1}</span>${x.t}</div><div class="sub">${x.sub}</div>${extra}<button class="x" data-undo="${i}" aria-label="Remove this move" title="Remove">✕</button></div>`;
+  }).join('');
+  // tally
+  const adds = moves.filter(m=>m.t==='add').length, restores = moves.filter(m=>m.t==='restore').length;
+  const outs = moves.filter(m=>m.t==='archive').length + moves.filter(m=>m.replace).length;
+  const lossy = moves.filter(m=>{ const r=m.t==='archive'?m.voiceId:m.replace; if(!r) return false; const v=VOICES.find(v=>v.id===r); return !v.backup; });
+  const credits = Object.values(designs).reduce((n,d)=>n+d.credits,0);
+  $('#tally').innerHTML = `<span>Slots after save</span><b>${VW.used} / 30</b><span>Voices created</span><b>${adds}</b><span>Brought back</span><b>${restores}</b><span>Moved out</span><b>${outs}</b><span class="${lossy.length?'warn':''}">…without backup</span><b class="${lossy.length?'warn':''}">${lossy.length}</b><span>Credits so far</span><b>~${credits}</b>`;
+  const bl = blockers();
+  $('#blockers').innerHTML = bl.map(b=>`· ${b}`).join('<br>');
+  $('#btnReview2').disabled = $('#btnReview').disabled = bl.length>0;
+}
+function blockers(){
+  const out=[];
+  const need = VW.chars.filter(c=>!c.removed && !c.sit && !c.voice && c.lines>0);
+  if(need.length) out.push(`${need.length} ${need.length===1?'character needs':'characters need'} a voice or a seat out: ${need.slice(0,3).map(c=>c.name).join(', ')}${need.length>3?'…':''}`);
+  const lossy = moves.filter(m=>{ const r=m.t==='archive'?m.voiceId:m.replace; if(!r) return false; const v=VOICES.find(v=>v.id===r); return !v.backup && !m.lossyOk; });
+  if(lossy.length) out.push(`${lossy.length} move${lossy.length===1?'':'s'} would lose a voice. Tick "archive anyway" or remove the move.`);
+  if(VW.used>SLOTS) out.push('More voices than slots.');
+  return out;
+}
+function renderStatus(){
+  const s=$('#status');
+  if(carry) s.innerHTML = `<span class="carry">Carrying ${esc(carry.label)}.</span> ${carryHint()} <kbd>Esc</kbd> to put it down.`;
+  else s.textContent = 'Drag a character onto a voice, or a voice onto a slot. Nothing saves until you review.';
+}
+function carryHint(){
+  switch(carry.type){
+    case 'char': return 'Drop on a roster voice to speak in it, on a free slot to give it a voice, on the library, or on "Sitting out".';
+    case 'queued': return 'Drop on a free slot, or on any unlocked voice to take its slot (that voice moves to the bench, backed up).';
+    case 'bench': return 'Drop on a free slot to bring it back, or on an unlocked voice to take its slot.';
+    case 'voice': return 'Drop on the bench to move it out (backed up), or on a character to have them speak in it.';
+    case 'face': return 'Drop on the character this face belongs to, or on "not a character".';
+  } return '';
+}
+
+/* ======================================================================
+   DRAG + PICK/PLACE (one model; HTML5 drag is sugar over pick/place)
+   ====================================================================== */
+function labelFor(type,id){
+  if(type==='char') return CHARS.find(c=>c.id===id).name;
+  if(type==='queued') return VW.queued.find(q=>q.key===id).name;
+  if(type==='voice'||type==='bench') return VW.voices.find(v=>v.id===id).name;
+  if(type==='face'){ const f=FACES.find(f=>f.id===id); return `face p.${f.page}`; }
+}
+function pick(type,id,el){
+  carry = {type,id,label:labelFor(type,id)};
+  $$('.carrying').forEach(e=>e.classList.remove('carrying')); if(el) el.classList.add('carrying');
+  markTargets(); renderStatus();
+}
+function drop(){ carry=null; $$('.carrying,.can-drop,.over,.nodrop').forEach(e=>e.classList.remove('carrying','can-drop','over','nodrop')); $$('[data-target]').forEach(e=>{ if(e.dataset.target!=='char') e.tabIndex=-1; }); renderStatus(); }
+function targetOf(el){ return el.closest('[data-target]'); }
+function canDrop(t){
+  if(!carry||!t) return {ok:false};
+  const k=t.dataset.target;
+  const vid=t.dataset.voice, v = vid?VW.voices.find(v=>v.id===vid):null;
+  switch(carry.type){
+    case 'char':
+      if(k==='slot') return v? {ok:true,act:'cast'} : {ok:true,act:'fill'};
+      if(k==='sitout') return {ok:true,act:'sit'};
+      if(k==='lib') return {ok:true,act:'castlib'};
+      return {ok:false};
+    case 'queued': case 'bench':
+      if(k!=='slot') return {ok:false};
+      if(!v) return {ok:true,act:'add'};
+      if(locked(v)) return {ok:false,why:`${v.name}: ${lockWhy(v)}. It stays.`};
+      if(v.pend==='in') return {ok:false,why:`${v.name} is being added this save. Pick another slot.`};
+      return {ok:true,act:'replace'};
+    case 'voice':
+      if(k==='bench') return {ok:true,act:'archive'};
+      if(k==='char') return {ok:true,act:'castv'};
+      return {ok:false};
+    case 'face':
+      if(k==='char') return {ok:true,act:'name'};
+      if(k==='facebin') return {ok:true,act:'dismiss'};
+      return {ok:false};
+  }
+  return {ok:false};
+}
+function markTargets(){
+  $$('[data-target]').forEach(t=>{ const r=canDrop(t); t.classList.toggle('can-drop',r.ok); t.classList.toggle('nodrop',!r.ok && t.classList.contains('tile') && (carry.type==='queued'||carry.type==='bench')); t.tabIndex = r.ok?0:(t.dataset.target==='char'?-1:-1); });
+}
+function place(t,ev){
+  const r = canDrop(t);
+  if(!r.ok){ if(r.why){ toast(r.why,true); t.classList.add('shake'); setTimeout(()=>t.classList.remove('shake'),400);} return; }
+  const slot = +t.dataset.slot, vid=t.dataset.voice, c=carry; 
+  switch(r.act){
+    case 'cast': { const ch=CHARS.find(x=>x.id===c.id); const v=VW.voices.find(v=>v.id===vid);
+      if(VW.chars.find(x=>x.id===c.id).voice===vid){ toast(`${ch.name} already speaks as ${v.name}.`); break; }
+      pushMove({t:'cast',charId:c.id,voiceId:vid}); toast(`${ch.name} speaks as ${v.name}. No slot used.`); break; }
+    case 'castlib': { const ch=CHARS.find(x=>x.id===c.id); const lv=VW.voices.find(v=>v.id===t.dataset.id); pushMove({t:'cast',charId:c.id,voiceId:lv.id}); toast(`${ch.name} speaks as ${lv.name} (library, no slot).`); break; }
+    case 'fill': { drop(); fillMenu(c.id,slot,ev); return; }
+    case 'sit': pushMove({t:'sitout',charId:c.id}); break;
+    case 'add': {
+      if(c.type==='bench'){ pushMove({t:'restore',voiceId:c.id,slot,forChar:guessChar(c.id)}); }
+      else { const q=VW.queued.find(q=>q.key===c.id); pushMove({t:'add',q:{key:q.key,name:q.name,origin:q.origin,backup:q.backup,forChar:q.forChar},slot,replace:null,runOnly:q.mode==='run'}); }
+      flash(slot); break; }
+    case 'replace': {
+      const old=VW.voices.find(v=>v.id===vid);
+      if(c.type==='bench'){ pushMove({t:'restore',voiceId:c.id,slot,replace:vid,backup:true,forChar:guessChar(c.id)}); }
+      else { const q=VW.queued.find(q=>q.key===c.id); pushMove({t:'add',q:{key:q.key,name:q.name,origin:q.origin,backup:q.backup,forChar:q.forChar},slot,replace:vid,backup:true,runOnly:q.mode==='run'}); }
+      toast(old.backup?`${old.name} moves to the bench, backed up (${backupWord(old)}).`:`${old.name} has no backup. The move needs "archive anyway" before you can save.`,!old.backup); flash(slot); break; }
+    case 'archive': { const v=VW.voices.find(v=>v.id===c.id); pushMove({t:'archive',voiceId:c.id,backup:true}); toast(v.backup?`${v.name} moves out, backed up (${backupWord(v)}). Slot ${v.slot} frees.`:`${v.name} has no backup. Tick "archive anyway" or remove the move.`,!v.backup); break; }
+    case 'castv': { const ch=CHARS.find(x=>x.id===t.dataset.id); const v=VW.voices.find(v=>v.id===c.id); if(VW.chars.find(x=>x.id===ch.id).voice===c.id){ toast(`${ch.name} already speaks as ${v.name}.`); break; } pushMove({t:'cast',charId:ch.id,voiceId:c.id}); toast(`${ch.name} speaks as ${v.name}.`); break; }
+    case 'name': pushMove({t:'face',faceId:c.id,charId:t.dataset.id}); break;
+    case 'dismiss': pushMove({t:'face',faceId:c.id,charId:null}); break;
+  }
+  drop(); render();
+}
+function guessChar(benchId){ const v=VOICES.find(v=>v.id===benchId); const c=CHARS.find(c=>v.name.startsWith(c.name)); if(!c) return null; const cv=VW.chars.find(x=>x.id===c.id); return cv.voice?null:c.id; }
+function pushMove(m){
+  // collapse: a new cast/sitout for the same character replaces the old one
+  if(m.t==='cast'||m.t==='sitout'||m.t==='remove') moves = moves.filter(x=>!((x.t==='cast'||x.t==='sitout'||x.t==='remove') && x.charId===m.charId));
+  moves.push(m);
+}
+function flash(slot){ requestAnimationFrame(()=>{ const t=document.querySelector(`.tile[data-slot="${slot}"]`); if(t){ t.classList.add('flash'); setTimeout(()=>t.classList.remove('flash'),700);} }); }
+
+// events (delegated)
+document.addEventListener('dragstart',e=>{ const d=e.target.closest('.dr'); if(!d||d.disabled) return; pick(d.dataset.carry,d.dataset.id,d); d.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',d.dataset.id); });
+document.addEventListener('dragend',e=>{ $$('.dragging').forEach(x=>x.classList.remove('dragging')); if(carry) drop(); });
+document.addEventListener('dragover',e=>{ const t=targetOf(e.target); if(t&&canDrop(t).ok){ e.preventDefault(); e.dataTransfer.dropEffect='move'; t.classList.add('over'); } });
+document.addEventListener('dragleave',e=>{ const t=targetOf(e.target); if(t) t.classList.remove('over'); });
+document.addEventListener('drop',e=>{ const t=targetOf(e.target); if(!t) return; e.preventDefault(); place(t,e); });
+document.addEventListener('click',e=>{
+  const pl=e.target.closest('[data-play]'); if(pl){ e.stopPropagation(); playFake(pl); return; }
+  const act=e.target.closest('[data-act]'); if(act){ onAct(act.dataset.act,act.dataset.id,act); return; }
+  const undo=e.target.closest('[data-undo]'); if(undo){ moves.splice(+undo.dataset.undo,1); render(); return; }
+  if(carry){ const t=targetOf(e.target); if(t && canDrop(t).ok){ place(t,e); return; }
+    const d=e.target.closest('.dr'); if(d && d.dataset.id===carry.id){ drop(); return; }
+    if(!e.target.closest('.pop')){ const bad=t&&canDrop(t); if(bad&&bad.why) { toast(bad.why,true); } else drop(); } return; }
+  const d=e.target.closest('.dr'); if(d && !d.disabled && d.getAttribute('draggable')!=='false'){ pick(d.dataset.carry,d.dataset.id,d); return; }
+  if(d && d.classList.contains('vn')){ const v=VW.voices.find(v=>v.id===d.dataset.id); toast(`${v.name}: ${lockWhy(v)}.`,true); }
+});
+document.addEventListener('change',e=>{
+  if(e.target.dataset.backup!==undefined){ moves[+e.target.dataset.backup].backup=e.target.checked; render(); }
+  if(e.target.dataset.lossy!==undefined){ moves[+e.target.dataset.lossy].lossyOk=e.target.checked; render(); }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ if($('#pop').classList.contains('open')) closePop(); else if(carry) drop(); else closeAll(); return; }
+  const d=e.target.closest&&e.target.closest('.dr');
+  if((e.key===' '||e.key==='Enter') && d && !carry && d.getAttribute('draggable')!=='false' && !d.disabled){ e.preventDefault(); pick(d.dataset.carry,d.dataset.id,d); return; }
+  if(e.key==='Enter' && carry){ const t=targetOf(e.target); if(t&&canDrop(t).ok){ e.preventDefault(); place(t,e); } }
+});
+
+/* ======================================================================
+   FILL MENU (character dropped on a free slot): what could take the slot
+   ====================================================================== */
+function fillMenu(charId,slot,ev){
+  const c=CHARS.find(c=>c.id===charId); const cv=VW.chars.find(x=>x.id===charId);
+  const q = VW.queued.filter(q=>q.forChar===charId && !q.placed);
+  const bench = VW.voices.filter(v=>v.status==='archived' && !v.lib && v.name.startsWith(c.name) && !VW.restored.has(v.id));
+  const one = c.kind==='one' || c.lines<=2;
+  let html=`<div class="ph">Fill slot ${slot} for ${esc(c.name)}</div>`;
+  for(const x of q) html+=`<button data-fill="q" data-key="${x.key}">${esc(x.name)}<span class="s">${x.origin==='clone'?'clone from the lab clip, 0 credits':'save the accepted design'} · takes the slot</span></button>`;
+  for(const b of bench) html+=`<button data-fill="bench" data-key="${b.id}">Bring back ${esc(b.name)}<span class="s">archived, ${backupWord(b)} · 0 credits</span></button>`;
+  html+=`<button data-fill="design">Design a new voice<span class="s">${c.desc?'drafts a prompt from the voice description on file':'nothing on file; you write the prompt'} · preview first, saved here at Save</span></button>`;
+  if(one) html+=`<button data-fill="designrun">Design for this run only<span class="s">holds slot ${slot} until the ${c.lines===1?'line renders':'lines render'}, then archives itself (prompt kept)</span></button>`;
+  html+=`<button data-fill="standin">Speak in a voice already here<span class="s">no slot: drop ${esc(c.name)} on a roster voice instead</span></button>`;
+  openPop(html,ev);
+  $('#pop').onclick = e=>{ const b=e.target.closest('[data-fill]'); if(!b) return; closePop();
+    const k=b.dataset.fill;
+    if(k==='q'){ const x=VW.queued.find(q=>q.key===b.dataset.key); pushMove({t:'add',q:{key:x.key,name:x.name,origin:x.origin,backup:x.backup,forChar:charId},slot,replace:null,runOnly:x.mode==='run'}); render(); flash(slot); }
+    else if(k==='bench'){ pushMove({t:'restore',voiceId:b.dataset.key,slot,forChar:charId}); render(); flash(slot); }
+    else if(k==='design'||k==='designrun'){ openDesign(charId,{slot,mode:k==='designrun'?'run':'keep'}); }
+    else if(k==='standin'){ toast(`Pick ${c.name} up and drop it on any voice in the roster.`); }
+  };
+}
+function openPop(html,ev){ const p=$('#pop'); p.innerHTML=html; p.classList.add('open');
+  const x = ev&&ev.clientX?Math.min(ev.clientX,window.innerWidth-300):window.innerWidth/2-140, y = ev&&ev.clientY?Math.min(ev.clientY,window.innerHeight-260):200;
+  p.style.left=x+'px'; p.style.top=y+'px'; const f=p.querySelector('button'); if(f) f.focus(); }
+function closePop(){ $('#pop').classList.remove('open'); $('#pop').onclick=null; }
+document.addEventListener('mousedown',e=>{ if($('#pop').classList.contains('open') && !e.target.closest('.pop')) closePop(); });
+
+/* ======================================================================
+   FAKE AUDIO: a visible playing state, never a move
+   ====================================================================== */
+let playT=null;
+function playFake(btn){
+  $$('.playing').forEach(b=>{ b.classList.remove('playing'); const bars=b.querySelector('.bars'); if(bars) bars.remove(); });
+  clearTimeout(playT);
+  btn.classList.add('playing');
+  if(!btn.classList.contains('pl')&&!btn.classList.contains('hear')){ btn.insertAdjacentHTML('beforeend','<span class="bars"><i></i><i></i><i></i><i></i><i></i></span>'); }
+  const key=btn.dataset.play||''; const nm = key.startsWith('voice:')?(VW.voices.find(v=>v.id===key.slice(6))||{}).name:key;
+  if(nm) toast(`Playing ${nm} (mock audio) · your pick is unchanged`);
+  playT=setTimeout(()=>{ btn.classList.remove('playing'); const bars=btn.querySelector('.bars'); if(bars) bars.remove(); },2600);
+}
+
+/* ======================================================================
+   CHARACTER DRAWER: lines, faces, voice history; the old Characters panel
+   ====================================================================== */
+function onAct(act,id,el){
+  if(act==='open') openChar(id);
+  else if(act==='design') openDesign(id,{});
+  else if(act==='sit'){ pushMove({t:'sitout',charId:id}); render(); }
+  else if(act==='unsit'){ moves=moves.filter(m=>!(m.t==='sitout'&&m.charId===id)); render(); closeAll(); }
+  else if(act==='remove'){ pushMove({t:'remove',charId:id}); render(); closeAll(); }
+  else if(act==='unremove'){ moves=moves.filter(m=>!(m.t==='remove'&&m.charId===id)); render(); closeAll(); }
+  else if(act==='rename'){ toast('Rename: an inline field in the drawer header (not mocked).'); }
+  else if(act==='exok'){ faceOk[id]=!faceOk[id]; el.closest('.ex').classList.toggle('ok',!!faceOk[id]); const c=el.closest('.ex').dataset.c; const n=$$('#cdBody .ex.ok').length; $('#exN').textContent=`${n} of 6 confirmed`; }
+}
+function openChar(id){
+  const c=VW.chars.find(x=>x.id===id); const v=VW.voices.find(v=>v.id===c.voice);
+  $('#cdAv').innerHTML=avatar(c); $('#cdTitle').textContent=c.name; $('#cdSub').textContent=`${c.id} · ${c.lines} lines · ${c.faces?c.faces+' faces on p.'+c.pages:c.pages}`;
+  const hist = VOICES.filter(x=>x.name.startsWith(c.name)).map(x=>`<div class="line"><span class="pg">${x.slot?'slot '+x.slot:x.status==='library'?'lib':'bench'}</span><span class="tx">${esc(x.name)} <span class="dim">· ${originWord(x)} · ${backupWord(x)||'no slot'}</span></span>${playBtn('voice:'+x.id)}</div>`).join('') || `<div class="line"><span class="tx dim">no voice of its own yet</span></div>`;
+  for(let i=0;i<6;i++) if(faceOk[c.id+i]===undefined) faceOk[c.id+i]=i<4;
+  const faces = c.faces? `<div class="sec"><h4>Faces <span class="r" id="exN">${[0,1,2,3,4,5].filter(i=>faceOk[c.id+i]).length} of 6 confirmed</span></h4><div class="exg">${[0,1,2,3,4,5].map(i=>`<div class="ex${faceOk[c.id+i]?' ok':''}" data-c="${c.id}">${faceSvg({hue:c.col},i)}<div class="ef">p.${c.pages.split('–')[0]}<button class="ck" data-act="exok" data-id="${c.id}${i}" aria-label="Confirm exemplar ${i+1}">✓</button></div></div>`).join('')}</div><div class="note">Confirm the crops that are clearly ${esc(c.name)}. Unnamed faces are in the tray at the top of the cast.</div></div>`:'';
+  $('#cdBody').innerHTML = `
+    <div class="sec"><h4>Speaks as</h4>${v?`<span class="chip on${v.lib?' lib':''}"><span class="dot"></span><span class="x">${esc(v.name)}${v.slot?' · slot '+v.slot:' · library'}</span>${playBtn('voice:'+v.id)}</span>`:c.sit?`<span class="chip sit"><span class="dot"></span><span class="x">sitting out</span></span>`:`<span class="chip none"><span class="dot"></span><span class="x">no voice</span></span>`}
+      <div class="note">${c.desc?esc(c.desc):'<i>No description on file.</i>'}</div></div>
+    <div class="sec"><h4>Lines in this issue <span class="r">${c.lines} · first three</span></h4>${c.samples.map(([p,t])=>`<div class="line"><span class="pg">p.${p}</span><span class="tx">${esc(t).replace(/\[(.*?)\]/g,'<span class="cue">[$1]</span>')}</span>${playBtn('line:'+c.id)}</div>`).join('')}
+      <div class="note">Play renders a test line in the current voice (mock here). It never changes a move.</div></div>
+    <div class="sec"><h4>Its voices</h4>${hist}</div>
+    ${faces}`;
+  $('#cdFoot').innerHTML = `<button class="btn" data-act="design" data-id="${c.id}">${SVG.wand} Design a voice</button>
+    ${c.sit?`<button class="btn" data-act="unsit" data-id="${c.id}">Back in</button>`:`<button class="btn ghost" data-act="sit" data-id="${c.id}">Sit out this run</button>`}
+    <span style="flex:1"></span><button class="btn ghost" data-act="rename" data-id="${c.id}">Rename</button>
+    ${c.removed?`<button class="btn" data-act="unremove" data-id="${c.id}">Put back in the issue</button>`:`<button class="btn ghost danger" data-act="remove" data-id="${c.id}">Not in this issue</button>`}`;
+  openDrawer('#charDrawer');
+}
+function openDrawer(sel){ $('#scrim').classList.add('open'); $(sel).classList.add('open'); const f=$(sel).querySelector('textarea,button.close'); if(f) f.focus(); }
+function closeAll(){ $('#scrim').classList.remove('open'); $$('.drawer.open').forEach(d=>d.classList.remove('open')); $('#sheet').classList.remove('open'); }
+$('#scrim').onclick=closeAll; $('#cdClose').onclick=closeAll; $('#ddClose').onclick=closeAll; $('#shClose').onclick=closeAll;
+
+/* ======================================================================
+   DESIGN SHEET: magic write → edit → generate → listen → accept
+   ====================================================================== */
+let D=null; // in-flight design
+function openDesign(charId,opts){
+  const c=CHARS.find(x=>x.id===charId);
+  closeAll();
+  const prev = designs[charId];
+  D={charId,slot:opts.slot||null,mode:opts.mode||(prev?prev.mode:'keep'),prompt:prev?prev.prompt:'',text:prev?prev.text:defaultPreview(c),takes:null,take:prev?prev.take:0,busy:false,credits:prev?prev.credits:0};
+  $('#ddTitle').textContent=`Design a voice for ${c.name}`;
+  $('#ddSub').textContent = c.kind==='one'||c.lines<=2 ? `${c.lines} line${c.lines===1?'':'s'} · one-off` : `${c.lines} lines`;
+  renderDesign(); openDrawer('#designDrawer');
+}
+function defaultPreview(c){ let t=c.samples.map(s=>s[1]).join(' '); const pad=' Hold on, let me say that again, slower, so you can hear the whole voice. And once more with some feeling in it!'; while(t.length<100) t+=pad; return t.trim(); }
+function renderDesign(){
+  const c=CHARS.find(x=>x.id===D.charId);
+  const n=D.prompt.length, pn=D.text.length;
+  $('#ddBody').innerHTML = `
+    <div class="sec">
+      <div class="fieldhead"><label for="dprompt">Voice prompt</label><div class="r"><span>${n} chars</span><button class="btn small" id="magic" ${D.busy?'disabled':''}>${SVG.wand} ${D.prompt?'Draft again':'Draft from the description'}</button></div></div>
+      <textarea id="dprompt" class="magic" rows="5" placeholder="${c.desc?'Click Draft, or write how the voice sounds: age, pitch, accent, energy.':'Write how the voice sounds: age, pitch, accent, energy.'}">${esc(D.prompt)}</textarea>
+      ${c.desc?`<div class="note">Draft starts from the voice description on file (voices.description): “${esc(c.desc)}”</div>`:'<div class="note">Nothing on file for this character: no voice yet, no voice-lab note.</div>'}
+    </div>
+    <div class="sec">
+      <div class="fieldhead"><label for="dtext">Preview text</label><div class="r"><span style="color:${pn<100||pn>1000?'var(--red)':'inherit'}">${pn} chars · 100–1000</span></div></div>
+      <textarea id="dtext" rows="3">${esc(D.text)}</textarea>
+      <div class="note">${c.name}'s own lines, so the preview sounds like the part. ElevenLabs charges the preview text once for all three takes: ~${pn} credits.</div>
+    </div>
+    <div class="sec">
+      <button class="btn primary" id="gen" ${(!D.prompt.trim()||pn<100||pn>1000||D.busy)?'disabled':''}>${D.busy?'<span class="spin"></span> Generating three takes':D.takes?'Generate three more (~'+pn+' credits)':'Generate three takes (~'+pn+' credits)'}</button>
+      ${D.takes?`<div class="takes" style="margin-top:10px">${D.takes.map((t,i)=>`<label class="take${D.take===i+1?' sel':''}"><input type="radio" name="take" value="${i+1}" ${D.take===i+1?'checked':''}><span class="tn">Take ${i+1}</span><span class="td">${t}</span><button class="play" data-play="take ${i+1}" aria-label="Play take ${i+1}">${SVG.play}</button></label>`).join('')}</div>`:''}
+    </div>
+    <div class="sec"><h4>At Save</h4>
+      <label class="opt${D.mode==='keep'?' sel':''}"><input type="radio" name="mode" value="keep" ${D.mode==='keep'?'checked':''}><span><div class="ot">Save it as ${esc(c.name)}'s voice</div><div class="od">Takes one slot${D.slot?` (slot ${D.slot})`:''}. Prompt kept, so it can be archived and brought back for free.</div></span></label>
+      <label class="opt${D.mode==='run'?' sel':''}"><input type="radio" name="mode" value="run" ${D.mode==='run'?'checked':''}><span><div class="ot">This run only</div><div class="od">Takes a slot until ${esc(c.name)}'s ${c.lines===1?'line renders':c.lines+' lines render'}, then archives itself. The audio files stay. Prompt kept.</div></span></label>
+      <div class="note red">An unsaved take can only say its preview text. To read lines, a designed voice has to be saved, so it holds a slot, even for one line. There is no slot-free way to voice a part.</div>
+    </div>`;
+  $('#ddFoot').innerHTML = `<button class="btn primary" id="accept" ${D.take?'':'disabled'}>Accept take ${D.take||'…'}${D.slot?' → slot '+D.slot:''}</button><span class="dim" style="font-size:12px">Nothing is saved to ElevenLabs until Review &amp; save.</span><span style="flex:1"></span><button class="btn ghost" id="ddCancel">Cancel</button>`;
+  $('#dprompt').oninput=e=>{ D.prompt=e.target.value; $('#gen').disabled=!D.prompt.trim()||D.text.length<100||D.text.length>1000; };
+  $('#dtext').oninput=e=>{ D.text=e.target.value; renderDesign(); $('#dtext').focus(); $('#dtext').setSelectionRange(D.text.length,D.text.length); };
+  $('#magic').onclick=magicWrite;
+  $('#gen').onclick=generate;
+  $$('input[name=take]').forEach(r=>r.onchange=()=>{ D.take=+r.value; renderDesign(); });
+  $$('input[name=mode]').forEach(r=>r.onchange=()=>{ D.mode=r.value; renderDesign(); });
+  $('#accept').onclick=acceptDesign; $('#ddCancel').onclick=closeAll;
+}
+function magicWrite(){
+  const c=CHARS.find(x=>x.id===D.charId);
+  const draft = draftPrompt(c);
+  D.busy=true; renderDesign();
+  const ta=$('#dprompt'); ta.value=''; let i=0;
+  const tick=()=>{ i+=3; ta.value=draft.slice(0,i); if(i<draft.length) setTimeout(tick,12); else { D.prompt=draft; D.busy=false; renderDesign(); $('#dprompt').focus(); } };
+  tick();
+}
+function draftPrompt(c){
+  const d=c.desc||`${c.name}.`;
+  const age = /old|elder|sensei|grandma/i.test(d)?'older':/teen|young|kid/i.test(d)?'late teens':'adult';
+  const sex = /she|her|kimberly|trini|karai|rita|grace|june|rosa/i.test(d+c.name)?'female':'male';
+  const pace = /slow|patient|unhurried|measured/i.test(d)?'slow':/fast|quick|fretful|excited/i.test(d)?'fast':'medium';
+  const tone = /menace|cold|evil|rasp|imperial/i.test(d)?'low, menacing':/warm|kind|gentle|calm/i.test(d)?'warm':/loud|boom|shout|roar/i.test(d)?'loud, booming':'clear';
+  return `${age} ${sex} voice, ${tone}, ${pace} pace. ${d} American English unless the description says otherwise. Comic-book delivery: performs the bracketed cues, lands the exclamation points, no narration voice.`;
+}
+function generate(){
+  D.busy=true; D.takes=null; D.take=0; renderDesign();
+  setTimeout(()=>{ D.busy=false; D.credits += D.text.length; D.takes=['closest to the prompt','a touch deeper, slower','brighter, more energy']; renderDesign(); toast(`Three takes ready (mock). ~${D.text.length} credits.`); },1800);
+}
+function acceptDesign(){
+  const c=CHARS.find(x=>x.id===D.charId);
+  designs[D.charId]={take:D.take,prompt:D.prompt,text:D.text,mode:D.mode,credits:D.credits};
+  // an accepted design that was already placed keeps its slot; otherwise it waits as a chip, or lands on the slot it was opened from
+  const key='design:'+D.charId;
+  moves = moves.filter(m=>!(m.t==='add'&&m.q.key===key));
+  if(D.slot){ pushMove({t:'add',q:{key,name:`${c.name} (designed, take ${D.take})`,origin:'design',backup:'prompt',forChar:c.id},slot:D.slot,replace:null,runOnly:D.mode==='run'}); flash(D.slot); toast(`Take ${D.take} accepted. It is saved to slot ${D.slot} when you save.`); }
+  else toast(`Take ${D.take} accepted. Drag the new chip on ${c.name}'s row onto a slot.`);
+  closeAll(); render();
+}
+
+/* ======================================================================
+   REVIEW & SAVE
+   ====================================================================== */
+function openReview(){
+  if(blockers().length){ toast(blockers()[0],true); return; }
+  const v=VW; const adds=moves.filter(m=>m.t==='add'), rest=moves.filter(m=>m.t==='restore');
+  const outs=[...moves.filter(m=>m.t==='archive').map(m=>({v:VOICES.find(x=>x.id===m.voiceId),m})), ...moves.filter(m=>m.replace).map(m=>({v:VOICES.find(x=>x.id===m.replace),m}))];
+  const lossy=outs.filter(o=>!o.v.backup);
+  const credits=Object.values(designs).reduce((n,d)=>n+d.credits,0);
+  const sits=moves.filter(m=>m.t==='sitout').length, stand=moves.filter(m=>m.t==='cast').length;
+  const changes=countChanges();
+  // run order: moves that free a slot first when the roster is full, else as listed
+  const order = orderMoves();
+  $('#shSub').textContent = `${BOOK} / ${ISSUE}`;
+  $('#shBody').innerHTML = `
+    <div class="sum">
+      <div><div class="k">Slots after</div><div class="v">${v.used}<small>of 30</small></div></div>
+      <div><div class="k">Created</div><div class="v">${adds.length}<small>${rest.length?'+ '+rest.length+' back':''}</small></div></div>
+      <div class="${lossy.length?'red':''}"><div class="k">Moved out</div><div class="v">${outs.length}<small>${outs.length-lossy.length} backed up${lossy.length?', '+lossy.length+' lost':''}</small></div></div>
+      <div><div class="k">Credits</div><div class="v">~${credits}<small>previews; lines render at the audio step</small></div></div>
+    </div>
+    <div class="sec"><h4>Runs in this order <span class="r">frees slots before it fills them · ${changes} of the month's ${MONTHLY_MAX} changes</span></h4>
+      <ol class="steps" id="steps">${order.map(m=>{ const x=moveText(m); const r=m.t==='archive'?VOICES.find(v=>v.id===m.voiceId):m.replace?VOICES.find(v=>v.id===m.replace):null;
+        let s=x.sub; if(r&&m.t!=='archive') s=`first: ${esc(r.name)} ${r.backup?'backed up ('+backupWord(r)+') and archived':'archived with no backup, lost'} · then `+s; if(m.t==='archive') s=`${r.backup?'backed up ('+backupWord(r)+'), then archived':'archived with no backup, lost'} · ${s}`;
+        const cost = m.t==='add'&&m.q.origin==='design'?'~0 (preview paid)':m.t==='add'?'0 credits':m.t==='restore'?'0 credits':'';
+        return `<li><span class="st">${x.t}<div class="s">${s}</div></span><span class="cost">${cost}</span></li>`; }).join('')}</ol>
+      ${sits||stand?`<div class="note">${sits?sits+' sitting out. ':''}${stand?stand+' stand-in'+(stand===1?'':'s')+'. ':''}Castlist rows only; no ElevenLabs call.</div>`:''}
+    </div>
+    <div class="note">What changes: ${adds.length+rest.length} voice${adds.length+rest.length===1?'':'s'} added to ElevenLabs, ${outs.length} archived, castlist rows for ${v.chars.filter(c=>!c.removed).length} characters written. The audio step renders the lines afterwards.</div>`;
+  $('#shFoot').innerHTML = `<button class="btn primary" id="go">Save and run ${order.length} move${order.length===1?'':'s'}</button><span class="dim" style="font-size:12px">${lossy.length?`<span style="color:var(--red)">${lossy.length} voice${lossy.length===1?'':'s'} cannot be brought back after this.</span>`:'Everything moved out can be brought back from the bench.'}</span><span style="flex:1"></span><button class="btn ghost" id="shBack">Back</button>`;
+  $('#go').onclick=runSave; $('#shBack').onclick=closeAll;
+  $('#scrim').classList.add('open'); $('#sheet').classList.add('open'); $('#go').focus();
+}
+function orderMoves(){
+  const frees = moves.filter(m=>m.t==='archive'||m.t==='remove'||m.t==='sitout'||m.t==='face'||m.t==='cast');
+  const fills = moves.filter(m=>m.t==='add'||m.t==='restore');
+  return [...frees.filter(m=>m.t==='archive'), ...fills, ...frees.filter(m=>m.t!=='archive')];
+}
+function runSave(){
+  const lis=$$('#steps li'); $('#go').disabled=true; $('#go').innerHTML='<span class="spin"></span> Running';
+  let i=0; const step=()=>{ if(i>0) lis[i-1].classList.replace('run','done'); if(i<lis.length){ lis[i].classList.add('run'); i++; setTimeout(step,500); } else done(); };
+  step();
+}
+function done(){
+  $('#shFoot').innerHTML = `<span style="color:var(--green);font-weight:600">Saved.</span><span class="dim" style="font-size:12px">The roster below is the account now. Next: the audio step renders ${VW.chars.filter(c=>!c.removed&&!c.sit).reduce((n,c)=>n+c.lines,0)} lines.</span><span style="flex:1"></span><button class="btn" id="shDone">Close</button>`;
+  $('#shDone').onclick=()=>{ // bake moves into base (mock), clear the list
+    closeAll(); bake(); };
+}
+function bake(){
+  const v=VW; VOICES.length=0; v.voices.forEach(x=>{ delete x.pend; delete x.outMove; VOICES.push(x); });
+  CHARS.forEach(c=>{ const cv=v.chars.find(x=>x.id===c.id); c.voice=cv.voice; if(cv.sit) c.sitBase=true; if(cv.removed) c.removedBase=true; delete c.ready; });
+  FACES.splice(0, FACES.length, ...v.faces.filter(f=>!f.done));
+  moves=[]; designs={}; render(); toast('Saved (mock). Moves list cleared; the roster shows the result.');
+}
+$('#btnReview').onclick=openReview; $('#btnReview2').onclick=openReview;
+$('#btnClear').onclick=()=>{ moves=[]; render(); };
+$('#btnAddChar').onclick=()=>toast('Add a character: a search over the book\'s cast and wiki (not mocked).');
+$('#btnFaces').onclick=()=>{ $('#castScroll').scrollTop=0; $('#facetray').classList.add('flash'); setTimeout(()=>$('#facetray').classList.remove('flash'),700); };
+
+let toastT; function toast(msg,bad){ const t=$('#toast'); t.textContent=msg; t.classList.toggle('bad',!!bad); t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),bad?4200:2600); }
+
+render();
+</script>
+</body>
+</html>
