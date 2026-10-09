@@ -22,6 +22,7 @@ import {
   bubbleInsert,
   bubbleUpdate,
   boxRowsByPage,
+  CastConflict,
   groupGained,
   groupLeft,
   leavesGroupClip,
@@ -32,7 +33,10 @@ import {
   newPanelLabels,
   panelInsert,
   panelUpdate,
+  planCastAdds,
   saveRequestSchema,
+  type CastOp,
+  type CastPlan,
   type SaveResult,
   type WriteContext,
 } from "../write-rules";
@@ -49,7 +53,8 @@ type Op =
       id: string;
       row: Record<string, unknown>;
     }
-  | { op: "delete"; table: "bubbles" | "panels"; id: string };
+  | { op: "delete"; table: "bubbles" | "panels"; id: string }
+  | CastOp;
 
 function fail(error: string, status: number) {
   return Response.json({ error }, { status });
@@ -183,6 +188,19 @@ export async function POST(req: NextRequest) {
   }
   const { bookId, issueId, bubbles, panels } = parsed.data;
 
+  // Characters added in the editor (#416): which are new and who joins the
+  // cast is decided here. Each added id is an existing row's or the new
+  // row's, so the bubbles that name it are written as they are.
+  let cast: CastPlan;
+  try {
+    cast = await planCastAdds(bookId, issueId, parsed.data.cast?.add ?? []);
+  } catch (e) {
+    return fail(
+      `Nothing was saved: ${(e as Error).message}`,
+      e instanceof CastConflict ? 409 : 500,
+    );
+  }
+
   let ctx: WriteContext;
   try {
     ctx = await loadWriteContext(bookId, issueId, {
@@ -199,6 +217,9 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     return fail(`Nothing was saved: ${(e as Error).message}`, 500);
   }
+  // A character this Save creates has no row to read yet; its bubbles write
+  // its id and the typed name.
+  for (const [id, name] of cast.created) ctx.displayNames.set(id, name);
   // An existing bubble is on the page its row says, whatever the request
   // says. One the read did not find is left to save_review_edits, which
   // fails the whole Save on it.
@@ -317,9 +338,11 @@ export async function POST(req: NextRequest) {
       existingPanels.map((p) => p.panel_id),
       panels.add.map((p) => p.page),
     );
+    // Characters go in before the castlist rows and bubbles that name them.
     // Panels go in before the bubbles that name them, and out after the
     // bubbles that left them.
     ops = [
+      ...cast.ops,
       ...panels.add.map(
         (p, i): Op => ({
           op: "insert",
@@ -429,6 +452,8 @@ export async function POST(req: NextRequest) {
   ].map((r) => r.page);
   await revalidateReaderPages(bookId, issueId, pages);
   revalidatePath(`/admin/${bookId}/${issueId}/review/editor`, "page");
+  if (cast.ops.length > 0)
+    revalidatePath(`/admin/${bookId}/${issueId}/review/characters`, "page");
   revalidatePath(`/book/${bookId}`);
   revalidatePath("/");
 
@@ -436,7 +461,9 @@ export async function POST(req: NextRequest) {
     written: ops.length,
     needsAudio: ops.filter(
       (op) =>
-        op.table === "bubbles" && op.op !== "delete" && op.row.needs_audio,
+        (op.op === "insert" || op.op === "update") &&
+        op.table === "bubbles" &&
+        op.row.needs_audio,
     ).length,
     wordBoxesFailed,
     audioCleared: [...leavers, ...staleRows.map((r) => r.id)],

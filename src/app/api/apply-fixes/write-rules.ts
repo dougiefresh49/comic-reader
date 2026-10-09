@@ -1,10 +1,18 @@
-// The one home for what a review edit writes: which columns a bubble or panel edit sets, and what an added row starts with.
+// The one home for what a review edit writes: which columns a bubble or panel edit sets, what an added row starts with, and what a character added to the cast writes.
 // The v2 editor's Save (/api/apply-fixes/save) is the one writer that uses it.
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { BUBBLE_TYPES } from "~/lib/bubble-types";
 import { bubbleSpeaker, type BubbleSpeaker } from "~/lib/bubble-speaker";
+import {
+  castRow,
+  loadBookCast,
+  proposeCast,
+  readBookFranchises,
+  startingVoice,
+} from "~/lib/cast";
+import { slugify } from "~/lib/character-id";
 import { chunk } from "~/lib/chunk";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { normalizePanelAudioTags } from "~/workflows/steps/vision-rows";
@@ -572,6 +580,108 @@ export function newPanelLabels(
   });
 }
 
+// ------------------------------------------------------- added to the cast
+
+/** A character the editor added to the cast (#416), under the id its bubbles name. */
+export interface CastAdd {
+  id: string;
+  /** The name the owner typed. */
+  name: string;
+}
+
+/** The two `save_review_edits` writes that add a character to the cast. */
+export type CastOp =
+  | {
+      op: "add_character";
+      id: string;
+      display_name: string;
+      franchise_id: string | null;
+    }
+  | { op: "add_to_cast"; character_id: string; voice_uuid: string | null };
+
+export interface CastPlan {
+  /** `add_character` writes first, then `add_to_cast`. */
+  ops: CastOp[];
+  /** The display name of each character this Save creates, by id. */
+  created: Map<string, string>;
+}
+
+/** The editor and the database disagree on who an added name is; the Save is refused. */
+export class CastConflict extends Error {}
+
+/**
+ * What adding these characters writes, decided at Save time with the
+ * Characters screen's rule (`resolveTarget`): a typed name that already names
+ * a character (its id, display name or an alias) is that character, never a
+ * second row. A `characters` row whose id is the added id is that character.
+ * Otherwise the name decides: a name that resolves to a row the editor did
+ * not pick, or a new name whose slug is not the added id, is a
+ * `CastConflict`, so the bubbles that name the added id never point
+ * elsewhere. A new one gets `slugify(name)` as its id, the typed name as its
+ * display name and the book's first franchise. Each joins the issue's cast
+ * unless it is in it already; a castlist row it does not have yet starts with
+ * the voice `addToCast` would give it (`startingVoice`), none for a new
+ * character. An issue with no castlist rows yet shows the proposed cast in
+ * the editor, and a single row would replace that list with itself, so the
+ * proposed cast joins in the same Save, as `seedCast` would write it.
+ */
+export async function planCastAdds(
+  bookId: string,
+  issueId: string,
+  adds: CastAdd[],
+): Promise<CastPlan> {
+  const plan: CastPlan = { ops: [], created: new Map() };
+  if (adds.length === 0) return plan;
+  const [book, franchises] = await Promise.all([
+    loadBookCast(supabaseAdmin, bookId),
+    readBookFranchises(supabaseAdmin, bookId),
+  ]);
+  const franchiseId = franchises[0]?.id ?? null;
+  const joining = new Set<string>();
+  for (const add of adds) {
+    const name = add.name.trim();
+    // `formOf` holds every `characters` id: an exact lookup, not the name rule.
+    const found = book.formOf.has(add.id)
+      ? { id: add.id, display_name: null }
+      : book.resolve(name);
+    const id = found?.id ?? slugify(name);
+    if (!id)
+      throw new Error(`"${add.name}" is not a name a character can have.`);
+    if (id !== add.id)
+      throw new CastConflict(
+        found
+          ? `"${name}" is the character ${found.display_name ?? found.id}, which the editor did not know about. Reload the editor and pick it from the cast.`
+          : `"${name}" does not match the character the editor added (${add.id}). Reload the editor and add it again.`,
+      );
+    if (!found && !plan.created.has(id)) {
+      plan.created.set(id, name);
+      plan.ops.push({
+        op: "add_character",
+        id,
+        display_name: name,
+        franchise_id: franchiseId,
+      });
+    }
+    if (!castRow(book, id, issueId)?.in_issue) joining.add(id);
+  }
+  if (joining.size === 0) return plan;
+  if (!book.rows.some((r) => r.issue_id === issueId)) {
+    const proposed = await proposeCast(supabaseAdmin, bookId, issueId);
+    for (const m of proposed.members) joining.add(m.id);
+  }
+  for (const id of joining) {
+    plan.ops.push({
+      op: "add_to_cast",
+      character_id: id,
+      // Used only when the row is inserted; an existing row keeps its voice.
+      voice_uuid: castRow(book, id, issueId)
+        ? null
+        : await startingVoice(supabaseAdmin, book, id),
+    });
+  }
+  return plan;
+}
+
 // ------------------------------------------------------------ the v2 Save
 
 const uuid = z.string().uuid();
@@ -625,6 +735,14 @@ export const saveRequestSchema = z.object({
     update: z.array(z.object({ id: uuid, page, set: bubbleEdit })),
     remove: z.array(z.object({ id: uuid, page })),
   }),
+  /** Left out by an editor from before #416. */
+  cast: z
+    .object({
+      add: z.array(
+        z.object({ id: z.string().min(1), name: z.string().min(1) }).strict(),
+      ),
+    })
+    .optional(),
   panels: z.object({
     add: z.array(z.object({ id: uuid, page, box, sortOrder: order })),
     update: z.array(

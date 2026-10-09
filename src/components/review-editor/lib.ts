@@ -1,4 +1,5 @@
 // Small pure helpers shared by the review editor's loader and its client components.
+import { nameResolver } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import type { RoleId } from "~/lib/cast";
 import type { CastMember, KnownCharacter, VoiceOption } from "./types";
@@ -63,7 +64,7 @@ export function findCast(name: string, cast: CastMember[]): CastMember | null {
 
 /** What to show for a cast member's voice, or null when it has none. */
 export function voiceLabel(member: CastMember): string | null {
-  return member.voice?.name ?? (member.newVoice ? "New voice" : null);
+  return member.voice?.name ?? null;
 }
 
 /**
@@ -80,18 +81,20 @@ export function ownVoice(
   return id ? (voices.find((v) => v.id === id) ?? null) : null;
 }
 
-/** The `characters` row a typed name means: its id, display name or a full alias. */
+/**
+ * The `characters` row a typed name means, by the server's name rule
+ * (`nameResolver`): ids across every row first, then display names, then
+ * aliases. The Save resolves the name the same way (#416).
+ */
 export function matchKnown(
   name: string,
   known: KnownCharacter[],
 ): KnownCharacter | null {
-  const key = slug(name);
-  if (!key) return null;
-  return (
-    known.find((k) => k.id === key || slug(k.name) === key) ??
-    known.find((k) => k.aliases.some((a) => slug(a) === key)) ??
-    null
+  const resolve = nameResolver(
+    known.map((k) => ({ ...k, display_name: k.name })),
   );
+  const row = resolve(name);
+  return row ? (known.find((k) => k.id === row.id) ?? null) : null;
 }
 
 /** Outline, text and dot classes per speaker. Amber and red stay free for flags. */
