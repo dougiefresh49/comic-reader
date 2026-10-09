@@ -1318,7 +1318,7 @@ export type Database = {
           p_bubble_id: string;
           p_issue_id: string;
           p_normalized_alignment: Json;
-          p_voice_id: string;
+          p_voice_id?: string;
         };
         Returns: string;
       };
@@ -1332,7 +1332,7 @@ export type Database = {
           p_lead_id: string;
           p_member_ids: string[];
           p_normalized_alignment: Json;
-          p_voice_id: string;
+          p_voice_id?: string;
         };
         Returns: string;
       };

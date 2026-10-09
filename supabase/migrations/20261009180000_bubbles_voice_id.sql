@@ -7,9 +7,12 @@
 -- or audio a script pointed the row at without knowing its voice. No
 -- backfill.
 --
--- Both audio-take switches gain a required p_voice_id, written wherever they
--- write audio_storage_path. Adding an argument changes each signature, so
--- the old signature is dropped first and no stale overload remains. The
+-- Both audio-take switches gain p_voice_id, written wherever they write
+-- audio_storage_path. It comes last and defaults to null, so a caller still
+-- on the old signature (a deploy not yet live, a workflow run in flight, a
+-- rollback) resolves to the new function and clears voice_id rather than
+-- failing after its ElevenLabs call. Adding an argument changes each
+-- signature, so the old one is dropped first and no stale overload remains. The
 -- bodies, security settings and grants are otherwise those of
 -- 20260929024423_switch_bubble_audio_take.sql and
 -- 20261008043819_bubbles_group_id.sql.
@@ -38,9 +41,9 @@ CREATE OR REPLACE FUNCTION switch_bubble_audio_take(
   p_book_id text,
   p_issue_id text,
   p_audio_storage_path text,
-  p_voice_id uuid,
   p_alignment jsonb,
-  p_normalized_alignment jsonb
+  p_normalized_alignment jsonb,
+  p_voice_id uuid DEFAULT NULL
 )
 RETURNS text
 LANGUAGE plpgsql
@@ -81,8 +84,8 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION switch_bubble_audio_take(uuid, text, text, text, uuid, jsonb, jsonb) FROM public, anon, authenticated;
-GRANT EXECUTE ON FUNCTION switch_bubble_audio_take(uuid, text, text, text, uuid, jsonb, jsonb) TO service_role;
+REVOKE EXECUTE ON FUNCTION switch_bubble_audio_take(uuid, text, text, text, jsonb, jsonb, uuid) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION switch_bubble_audio_take(uuid, text, text, text, jsonb, jsonb, uuid) TO service_role;
 
 DROP FUNCTION switch_group_audio_take(text, text, uuid, uuid[], uuid, text, jsonb, jsonb);
 
@@ -99,9 +102,9 @@ CREATE OR REPLACE FUNCTION switch_group_audio_take(
   p_member_ids uuid[],
   p_lead_id uuid,
   p_audio_storage_path text,
-  p_voice_id uuid,
   p_alignment jsonb,
-  p_normalized_alignment jsonb
+  p_normalized_alignment jsonb,
+  p_voice_id uuid DEFAULT NULL
 )
 RETURNS text
 LANGUAGE plpgsql
@@ -199,5 +202,5 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION switch_group_audio_take(text, text, uuid, uuid[], uuid, text, uuid, jsonb, jsonb) FROM public, anon, authenticated;
-GRANT EXECUTE ON FUNCTION switch_group_audio_take(text, text, uuid, uuid[], uuid, text, uuid, jsonb, jsonb) TO service_role;
+REVOKE EXECUTE ON FUNCTION switch_group_audio_take(text, text, uuid, uuid[], uuid, text, jsonb, jsonb, uuid) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION switch_group_audio_take(text, text, uuid, uuid[], uuid, text, jsonb, jsonb, uuid) TO service_role;
