@@ -249,6 +249,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const [moving, setMoving] = useState<FaceView[] | null>(null);
   const moveOpener = useRef<HTMLElement | null>(null);
   const pencilRef = useRef<HTMLButtonElement>(null);
+  const asideRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const wasRenaming = useRef(renameOnOpen);
   const idBase = useId();
   const shown = card.faces.find((f) => f.id === shownId) ?? null;
@@ -263,6 +265,17 @@ export function CharacterPanel(props: CharacterPanelProps) {
     setRenaming(false);
     setDraft(state.name);
   }, [state.name]);
+  // Opening moves focus into the panel: the checked voice, else the name.
+  // Rename's field takes it itself. Closing hands it back to the card.
+  useEffect(() => {
+    if (renameOnOpen) return;
+    const checked = asideRef.current?.querySelector<HTMLElement>(
+      '[role="radio"][aria-checked="true"]',
+    );
+    (checked ?? headingRef.current)?.focus();
+    // Once, when the panel opens for this card.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (wasRenaming.current && !renaming) pencilRef.current?.focus();
     wasRenaming.current = renaming;
@@ -296,6 +309,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
   return (
     <>
       <aside
+        ref={asideRef}
         aria-label={state.name}
         className="flex w-[440px] max-w-full shrink-0 flex-col overflow-hidden border-l border-neutral-800 bg-neutral-900"
       >
@@ -341,7 +355,11 @@ export function CharacterPanel(props: CharacterPanelProps) {
                 </button>
               </form>
             ) : (
-              <h3 className="flex min-w-0 items-center gap-1.5 text-[16px] leading-tight font-semibold text-neutral-100">
+              <h3
+                ref={headingRef}
+                tabIndex={-1}
+                className={`flex min-w-0 items-center gap-1.5 text-[16px] leading-tight font-semibold text-neutral-100 ${FOCUS}`}
+              >
                 <span className="truncate">{state.name}</span>
                 <button
                   ref={pencilRef}

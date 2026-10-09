@@ -94,6 +94,43 @@ export function cardState(card: CharacterCard, staged: Staged[]): CardState {
   return state;
 }
 
+/**
+ * The staged list with no move doubled: one archive per voice, one pick per
+ * character, and one each of `sit_out`, `back_in`, `add_character`,
+ * `remove_character` and `rename` per character (the last rename, else the
+ * first; a `back_in` the owner pressed wins over one a pick tied on). Every
+ * change to the list goes through it.
+ */
+export function oneEach(staged: Staged[]): Staged[] {
+  const keep = staged.map(() => true);
+  const seen = new Map<string, number>();
+  staged.forEach(({ move: m, pickFor }, i) => {
+    const who = characterOf(m);
+    const key =
+      m.kind === "archive"
+        ? `archive:${m.voice_uuid ?? m.elevenlabs_id ?? ""}`
+        : isPick(m)
+          ? `pick:${who}`
+          : `${m.kind}:${who}`;
+    const first = seen.get(key);
+    if (first === undefined) {
+      seen.set(key, i);
+      return;
+    }
+    const lastWins =
+      m.kind === "rename" ||
+      isPick(m) ||
+      (m.kind === "back_in" &&
+        pickFor === undefined &&
+        staged[first]!.pickFor !== undefined);
+    if (lastWins) {
+      keep[first] = false;
+      seen.set(key, i);
+    } else keep[i] = false;
+  });
+  return staged.filter((_, i) => keep[i]);
+}
+
 /** Drops a character's pick and every move tied to it. */
 export function withoutPick(staged: Staged[], characterId: string): Staged[] {
   return staged.filter(

@@ -49,6 +49,7 @@ import {
   characterOf,
   freeFor,
   isPick,
+  oneEach,
   lockReason,
   pickMove,
   pickVoiceId,
@@ -605,7 +606,13 @@ function FacesDialog({
 export function CastingScreen({ data }: { data: CharactersData }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
-  const [staged, setStaged] = useState<Staged[]>([]);
+  const [staged, setStagedRaw] = useState<Staged[]>([]);
+  /** Every change to the staged list, with no move doubled (`oneEach`). */
+  const setStaged = useCallback(
+    (u: Staged[] | ((s: Staged[]) => Staged[])) =>
+      setStagedRaw((s) => oneEach(typeof u === "function" ? u(s) : u)),
+    [],
+  );
   const [roster, setRoster] = useState<Roster | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -769,12 +776,15 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     if (!isBase) {
       const m = pickMove(card, voice);
       if (takesSlot(m)) {
-        const free = model ? freeFor(slotModel(roster!, next), null) : 1;
+        // Read the slots from the list without the old pick, whose archive
+        // it just dropped, so that slot can be swapped out again.
+        const after = roster ? slotModel(roster, next) : null;
+        const free = after ? freeFor(after, null) : 1;
         const target =
           slot ??
           (free > 0
             ? undefined
-            : model?.slots.find(
+            : after?.slots.find(
                 (v) =>
                   v.slot.holder.kind === "repo" &&
                   v.slot.holder.characterId === card.id &&
@@ -800,7 +810,11 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           : { move: m },
       ];
     }
-    if (card.noAudio)
+    // One back_in: the one Back in staged, else one tied to this pick.
+    if (
+      card.noAudio &&
+      !next.some((s) => forChar(card.id)(s) && s.move.kind === "back_in")
+    )
       next = [
         ...next,
         { move: { kind: "back_in", character_id: card.id }, pickFor: card.id },

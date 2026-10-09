@@ -24,11 +24,41 @@ const TAG_NOW = `${TAG} bg-emerald-400/15 text-emerald-300`;
 const TAG_NEW = `${TAG} bg-amber-400/15 text-amber-300`;
 const TAG_LAB = `${TAG} bg-sky-400/15 text-sky-300`;
 
-/** One radio row: the dot, the name, a grey line of facts, and Play. */
+const ARROWS: Record<string, number> = {
+  ArrowDown: 1,
+  ArrowRight: 1,
+  ArrowUp: -1,
+  ArrowLeft: -1,
+};
+
+/**
+ * A radio group's arrow keys (#754's behavior): from a row, Up/Left and
+ * Down/Right move focus to the previous or next row that is not locked,
+ * wrapping, and select it. A key pressed on a row's Play never gets here.
+ */
+function onRadioArrows(e: React.KeyboardEvent<HTMLElement>) {
+  const step = ARROWS[e.key];
+  const from = e.target as HTMLElement;
+  if (!step || from.getAttribute("role") !== "radio") return;
+  const rows = [
+    ...e.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="radio"]:not([aria-disabled="true"])',
+    ),
+  ];
+  const i = rows.indexOf(from);
+  if (i < 0) return;
+  e.preventDefault();
+  const to = rows[(i + step + rows.length) % rows.length]!;
+  to.focus();
+  if (to.getAttribute("aria-checked") !== "true") to.click();
+}
+
+/** One radio row: the dot, the name, a grey line of facts, and Play. Only the group's tab stop is in the Tab order. */
 function VoiceRow({
   name,
   sub,
   on,
+  tabStop,
   locked,
   lockTitle,
   compact,
@@ -38,6 +68,8 @@ function VoiceRow({
   name: string;
   sub: React.ReactNode;
   on: boolean;
+  /** The group's one Tab stop: the checked row, else the first. */
+  tabStop: boolean;
   locked?: boolean;
   lockTitle?: string;
   compact?: boolean;
@@ -49,7 +81,7 @@ function VoiceRow({
       role="radio"
       aria-checked={on}
       aria-disabled={locked ? true : undefined}
-      tabIndex={locked ? -1 : 0}
+      tabIndex={tabStop && !locked ? 0 : -1}
       title={locked ? lockTitle : undefined}
       onClick={() => {
         if (!locked) onPick();
@@ -304,6 +336,14 @@ export function VoiceTab({
         a.index - b.index
       );
     });
+  // Each radio group's one Tab stop: its checked row, else its first.
+  const shownVoices = [...own, ...(expanded ? [...library, ...others] : [])];
+  const voiceStop =
+    shownVoices.find((v) => !silenced && v.id === state.voiceId)?.id ??
+    shownVoices[0]?.id;
+  const swapStop =
+    candidates.find((s) => s.index === tiedSlot?.index)?.index ??
+    candidates.find((s) => s.lock === "movable")?.index;
   const silentIfSwapped =
     tiedSlot && tiedSlot.holder.kind !== "free" && tiedSlot.holder.voiceUuid
       ? (speakers.get(tiedSlot.holder.voiceUuid) ?? []).filter(
@@ -313,7 +353,7 @@ export function VoiceTab({
 
   return (
     <div>
-      <section role="radiogroup" aria-label="Voices">
+      <section role="radiogroup" aria-label="Voices" onKeyDown={onRadioArrows}>
         <h4 className={`mb-1.5 flex items-baseline ${LABEL}`}>
           Voices
           {silenced && (
@@ -328,6 +368,7 @@ export function VoiceTab({
             name={v.name}
             sub={sub(v)}
             on={!silenced && state.voiceId === v.id}
+            tabStop={v.id === voiceStop}
             playVoiceId={v.id}
             onPick={() => onPick(v)}
           />
@@ -391,6 +432,7 @@ export function VoiceTab({
                     </>
                   }
                   on={!silenced && state.voiceId === v.id}
+                  tabStop={v.id === voiceStop}
                   playVoiceId={v.id}
                   onPick={() => onPick(v)}
                 />
@@ -461,6 +503,7 @@ export function VoiceTab({
               <div
                 role="radiogroup"
                 aria-label="Voice to swap out"
+                onKeyDown={onRadioArrows}
                 className="max-h-[230px] overflow-y-auto"
               >
                 {candidates.map((s) => {
@@ -477,6 +520,7 @@ export function VoiceTab({
                       compact
                       name={h.name}
                       on={tiedSlot?.index === s.index}
+                      tabStop={s.index === swapStop}
                       locked={why !== null}
                       lockTitle={why ?? undefined}
                       sub={
