@@ -90,6 +90,12 @@ export interface SlotsView {
   headroom: number;
   adds: number;
   archives: number;
+  /**
+   * Free slots the plan gave no item (`free` less the items planned onto a
+   * free slot). A card offers "use a free slot" only out of these, so an item
+   * the plan found no slot for does not take the slot another item holds (#778).
+   */
+  freeAfterPlan: number;
 }
 
 export interface Portrait {

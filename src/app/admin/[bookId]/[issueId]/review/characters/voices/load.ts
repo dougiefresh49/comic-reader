@@ -337,6 +337,11 @@ export async function loadVoices(
           headroom: plan.addEditHeadroom,
           adds: plan.adds,
           archives: plan.archives,
+          freeAfterPlan: Math.max(
+            0,
+            plan.freeNow -
+              plan.items.filter((i) => i.outgoing?.kind === "free slot").length,
+          ),
         }
       : null,
     planError,
