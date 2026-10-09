@@ -1,20 +1,27 @@
 // The character panel: the open card in a right column, its actions grouped by job (#743).
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { VoiceRequest } from "~/lib/cast";
 import type { NameTarget } from "./actions";
+import { FacesTab } from "./FacesTab";
+import { MoveDialog } from "./MoveDialog";
 import {
-  BUTTON,
   ConfirmDialog,
   FaceCrop,
-  FaceTiles,
+  ICON_BUTTON,
   INPUT,
   PRIMARY,
   PageWithBox,
   QUIET,
   QUIET_DANGER,
-  VoiceLine,
   bestFace,
   facesLine,
 } from "./shared";
@@ -24,306 +31,8 @@ import type {
   FaceView,
   KnownCharacter,
   PageView,
-  VoicePick,
 } from "./types";
-
-type VoiceOption = "active" | "clone" | "design";
-
-const VOICE_OPTIONS: { key: VoiceOption | "keep"; label: string }[] = [
-  { key: "keep", label: "Keep" },
-  { key: "active", label: "Another active voice" },
-  { key: "clone", label: "Its voices" },
-  { key: "design", label: "A new designed voice" },
-];
-
-/** What the primary button under "Its voices" does for the chosen entry. */
-function pickAction(pick: VoicePick): {
-  label: string;
-  kind: "use" | "cast" | "clone" | "clip" | "design";
-} {
-  if (pick.kind === "appearance")
-    return { label: "Ask voice-lab for a clip", kind: "clip" };
-  if (pick.status === "active") return { label: "Use this voice", kind: "use" };
-  // Already a voice of this book: cast here, and the voices stop restores it.
-  if (pick.status === "archived" && pick.inBook)
-    return { label: "Use in this issue", kind: "cast" };
-  if (pick.status === "archived")
-    return { label: "Request this clone", kind: "clone" };
-  return pick.appearanceId
-    ? { label: "Ask voice-lab for a clip", kind: "clip" }
-    : { label: "Request this design", kind: "design" };
-}
-
-const PICK_STATUS: Record<string, string> = {
-  archived: "archived",
-  needs_clip: "needs a clip",
-};
-
-/** The opened card's Change control: keep, another active voice (applied at once), one of its own voices or appearances, or a request for a design. */
-function VoiceChoices({
-  card,
-  activeVoices,
-  pullNote,
-  busy,
-  onKeep,
-  onSetVoice,
-  onRequest,
-  onPickAppearance,
-  onCastArchived,
-}: {
-  card: CharacterCard;
-  activeVoices: ActiveVoice[];
-  pullNote: string;
-  busy: boolean;
-  onKeep: () => void;
-  onSetVoice: (voice: ActiveVoice) => void;
-  onRequest: (request: VoiceRequest) => void;
-  onPickAppearance: (appearanceId: string) => void;
-  onCastArchived: (voiceId: string) => void;
-}) {
-  const [option, setOption] = useState<VoiceOption | null>(null);
-  const others = activeVoices.filter((v) => v.id !== card.voice?.uuid);
-  const [voiceId, setVoiceId] = useState("");
-  const [pickId, setPickId] = useState(
-    card.voicePicks.find((p) => p.kind === "voice" && p.startingPick)?.id ?? "",
-  );
-  const [pull, setPull] = useState<"copied" | "failed" | null>(null);
-  const [playError, setPlayError] = useState<string | null>(null);
-  const audio = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => audio.current?.pause(), []);
-
-  const play = (name: string, clipUrl: string) => {
-    audio.current?.pause();
-    setPlayError(null);
-    const a = new Audio(clipUrl);
-    audio.current = a;
-    a.play().catch(() => setPlayError(`Could not play ${name}.`));
-  };
-  const chosen = others.find((v) => v.id === voiceId);
-  const picked = card.voicePicks.find((p) => p.id === pickId);
-  const pickedAction = picked ? pickAction(picked) : null;
-  const usePick = () => {
-    if (!picked || !pickedAction) return;
-    if (picked.kind === "appearance") return onPickAppearance(picked.id);
-    switch (pickedAction.kind) {
-      case "use":
-        return onSetVoice({ id: picked.id, name: picked.name });
-      case "cast":
-        return onCastArchived(picked.id);
-      case "clone":
-        return onRequest({ action: "clone", targetVoiceUuid: picked.id });
-      case "clip":
-        return picked.appearanceId && onPickAppearance(picked.appearanceId);
-      case "design":
-        return onRequest({ action: "design" });
-    }
-  };
-
-  return (
-    <div className="mt-3 max-w-2xl rounded-md border border-neutral-700 bg-neutral-950/60 p-3">
-      <div
-        role="radiogroup"
-        aria-label={`Voice for ${card.name}`}
-        className="flex flex-wrap gap-2"
-      >
-        {VOICE_OPTIONS.map((o) => (
-          <button
-            key={o.key}
-            type="button"
-            role="radio"
-            aria-checked={option === o.key}
-            onClick={() => (o.key === "keep" ? onKeep() : setOption(o.key))}
-            className={
-              option === o.key
-                ? `${BUTTON} border-neutral-300 bg-neutral-800 text-white`
-                : BUTTON
-            }
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-
-      {option === "active" && (
-        <div className="mt-3">
-          {others.length === 0 ? (
-            <p className="text-neutral-400">No other active voice.</p>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={voiceId}
-                onChange={(e) => setVoiceId(e.target.value)}
-                aria-label="Active voice"
-                className={`${INPUT} w-auto max-w-xs`}
-              >
-                <option value="">Pick a voice…</option>
-                {others.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={busy || !chosen}
-                onClick={() => chosen && onSetVoice(chosen)}
-                className={PRIMARY}
-              >
-                Use this voice
-              </button>
-            </div>
-          )}
-          <p className="mt-2 text-neutral-500">
-            Applied at once, in every issue of the book.
-          </p>
-        </div>
-      )}
-
-      {option === "clone" && (
-        <div className="mt-3">
-          {card.voicePicks.length === 0 ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-neutral-300">No voice-lab clone on file.</p>
-              <button
-                type="button"
-                onClick={() =>
-                  navigator.clipboard.writeText(pullNote).then(
-                    () => setPull("copied"),
-                    () => setPull("failed"),
-                  )
-                }
-                className={BUTTON}
-              >
-                Request a pull
-              </button>
-              {pull === "copied" && (
-                <span className="text-emerald-300">
-                  Copied a note for voice-lab.
-                </span>
-              )}
-              {pull === "failed" && (
-                <p className="w-full text-amber-300">
-                  Could not copy. The note: {pullNote}
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              <ul className="space-y-1">
-                {card.voicePicks.map((p) => {
-                  const name = p.kind === "voice" ? p.name : card.name;
-                  return (
-                    <li key={p.id} className="flex items-center gap-3">
-                      <label className="flex min-w-0 flex-1 cursor-pointer flex-wrap items-center gap-x-2">
-                        <input
-                          type="radio"
-                          name={`pick-${card.id}`}
-                          value={p.id}
-                          checked={pickId === p.id}
-                          onChange={() => setPickId(p.id)}
-                        />
-                        <span className="truncate text-neutral-100">
-                          {name}
-                        </span>
-                        {p.work && (
-                          <span className="truncate text-neutral-400">
-                            {p.work}
-                            {p.kind === "appearance" &&
-                              p.voiceActor &&
-                              `, ${p.voiceActor}`}
-                          </span>
-                        )}
-                        {p.kind === "voice" && p.startingPick && (
-                          <span className="text-neutral-500">lab default</span>
-                        )}
-                        {p.kind === "voice" && PICK_STATUS[p.status] && (
-                          <span className="text-neutral-500">
-                            {PICK_STATUS[p.status]}
-                          </span>
-                        )}
-                      </label>
-                      {p.kind === "voice" &&
-                        p.status === "archived" &&
-                        (p.clipUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => play(p.name, p.clipUrl!)}
-                            className={QUIET}
-                            aria-label={`Play ${p.name}`}
-                          >
-                            Play
-                          </button>
-                        ) : (
-                          <span className="text-neutral-600">No clip link</span>
-                        ))}
-                    </li>
-                  );
-                })}
-              </ul>
-              {playError && <p className="mt-1 text-amber-300">{playError}</p>}
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  disabled={busy || !pickedAction}
-                  onClick={usePick}
-                  className={PRIMARY}
-                >
-                  {pickedAction?.label ?? "Request this clone"}
-                </button>
-                <span className="text-neutral-500">
-                  {pickedAction?.kind === "use"
-                    ? "Applied at once, in every issue of the book."
-                    : "Made at the voices stop."}
-                </span>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {option === "design" && (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onRequest({ action: "design" })}
-            className={PRIMARY}
-          >
-            Request a new designed voice
-          </button>
-          <span className="text-neutral-500">Made at the voices stop.</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** A pending voice request on the card, with Undo. */
-function VoiceRequestNote({
-  card,
-  busy,
-  onUndo,
-}: {
-  card: CharacterCard;
-  busy: boolean;
-  onUndo: () => void;
-}) {
-  const request = card.voiceRequest;
-  if (!request) return null;
-  const keeps = `It is made at the voices stop; ${card.name} keeps ${card.voice?.name ?? "no voice"} until then.`;
-  return (
-    <div className="mt-3 flex max-w-2xl flex-wrap items-center gap-3 rounded-md border border-sky-400/40 bg-sky-400/5 px-3 py-2">
-      <p className="min-w-0 flex-1 text-sky-100">
-        {request.action === "clone"
-          ? `Wants a voice-lab clone: ${request.targetName ?? "unknown voice"}. ${keeps}`
-          : `Wants a new designed voice. ${keeps}`}
-      </p>
-      <button type="button" disabled={busy} onClick={onUndo} className={BUTTON}>
-        Undo request
-      </button>
-    </div>
-  );
-}
+import { VoiceTab } from "./VoiceTab";
 
 const GROUP_LABEL: Record<CharacterCard["group"], string> = {
   here: "In this issue",
@@ -504,6 +213,8 @@ function PagePreview({
 export interface CharacterPanelProps {
   card: CharacterCard;
   pages: Map<number, PageView>;
+  /** Every card of the issue: the move dialog's grid. */
+  cards: CharacterCard[];
   known: KnownCharacter[];
   activeVoices: ActiveVoice[];
   /** A `characters` row, not removed: the Voice tab gets the Change control. */
@@ -519,6 +230,8 @@ export interface CharacterPanelProps {
   onAddBack: () => void;
   onConfirm: () => void;
   onMove: (face: FaceView, target: NameTarget, name: string) => void;
+  /** A selection from select mode, moved in one action. */
+  onMoveMany: (faces: FaceView[], target: NameTarget, name: string) => void;
   onReject: (face: FaceView) => void;
   onSetVoice: (voice: ActiveVoice) => void;
   onRequestVoice: (request: VoiceRequest) => void;
@@ -529,13 +242,15 @@ export interface CharacterPanelProps {
 
 /**
  * The open card, in a column to the right of the grid: the identity header
- * (with Rename and Remove from this issue), then Faces and Voice as tabs.
- * Mounted per card (the screen keys it by card id), so a swap starts the
- * local state over; the chosen tab lives in the screen and survives.
+ * (with Rename and Remove from this issue), then Faces and Voice as tabs
+ * (FacesTab, VoiceTab). Mounted per card (the screen keys it by card id), so
+ * a swap starts the local state over, select mode included; the chosen tab
+ * lives in the screen and survives.
  */
 export function CharacterPanel({
   card,
   pages,
+  cards,
   known,
   activeVoices,
   canChangeVoice,
@@ -549,6 +264,7 @@ export function CharacterPanel({
   onAddBack,
   onConfirm,
   onMove,
+  onMoveMany,
   onReject,
   onSetVoice,
   onRequestVoice,
@@ -557,10 +273,14 @@ export function CharacterPanel({
   onUndoVoiceRequest,
 }: CharacterPanelProps) {
   const [renaming, setRenaming] = useState(false);
-  const [changing, setChanging] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [draft, setDraft] = useState(card.name);
   const [shownId, setShownId] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  /** The faces the move dialog is open for; null when it is closed. */
+  const [moving, setMoving] = useState<FaceView[] | null>(null);
+  /** The control that opened the move dialog, for focus when it closes. */
+  const moveOpener = useRef<HTMLElement | null>(null);
   const removeRef = useRef<HTMLButtonElement>(null);
   const idBase = useId();
   const shown = card.faces.find((f) => f.id === shownId) ?? null;
@@ -568,23 +288,26 @@ export function CharacterPanel({
     () => bestFace(card.faces, pages),
     [card.faces, pages],
   );
-  const unconfirmed =
-    card.faces.filter((f) => f.exemplar && !f.exemplar.confirmed).length +
-    card.looseExemplars.filter((e) => !e.confirmed).length;
-  const exemplars =
-    card.faces.filter((f) => f.exemplar).length + card.looseExemplars.length;
   // A role has no faces, so it shows Voice whatever the screen's tab says, and leaves it alone.
   const isRole = card.group === "role";
   const shownTab: PanelTab = isRole ? "voice" : tab;
 
-  // The open panel owns Escape, innermost first: the Remove confirm, the page
-  // preview, an open Rename, then the panel. A focused Rename or Move field
-  // stops the key itself before it reaches the window.
+  const closeMove = useCallback(() => {
+    setMoving(null);
+    moveOpener.current?.focus();
+  }, []);
+
+  // The open panel owns Escape, innermost first: the move dialog, select
+  // mode, the Remove confirm, the page preview, an open Rename, then the
+  // panel. A focused Rename field stops the key itself before it reaches
+  // the window.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
-      if (confirming) {
+      if (moving) closeMove();
+      else if (selecting) setSelecting(false);
+      else if (confirming) {
         setConfirming(false);
         removeRef.current?.focus();
       } else if (shown) setShownId(null);
@@ -595,63 +318,30 @@ export function CharacterPanel({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [confirming, shown, renaming, card.name, onClose]);
+  }, [
+    moving,
+    selecting,
+    confirming,
+    shown,
+    renaming,
+    card.name,
+    onClose,
+    closeMove,
+  ]);
 
   const voiceContent = (
-    <>
-      <div className="flex min-h-7 items-center justify-between gap-3">
-        <span className="min-w-0 truncate">
-          <VoiceLine card={card} />
-        </span>
-        {canChangeVoice && !card.voiceRequest && !changing && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setChanging(true)}
-            className={`${QUIET} h-7`}
-          >
-            Change
-          </button>
-        )}
-      </div>
-      {card.voiceRequest ? (
-        <VoiceRequestNote
-          card={card}
-          busy={busy}
-          onUndo={() => {
-            setChanging(canChangeVoice);
-            onUndoVoiceRequest();
-          }}
-        />
-      ) : (
-        canChangeVoice &&
-        changing && (
-          <VoiceChoices
-            card={card}
-            activeVoices={activeVoices}
-            pullNote={pullNote}
-            busy={busy}
-            onKeep={() => setChanging(false)}
-            onSetVoice={(v) => {
-              setChanging(false);
-              onSetVoice(v);
-            }}
-            onRequest={(request) => {
-              setChanging(false);
-              onRequestVoice(request);
-            }}
-            onPickAppearance={(appearanceId) => {
-              setChanging(false);
-              onPickAppearance(appearanceId);
-            }}
-            onCastArchived={(voiceId) => {
-              setChanging(false);
-              onCastArchived(voiceId);
-            }}
-          />
-        )
-      )}
-    </>
+    <VoiceTab
+      card={card}
+      activeVoices={activeVoices}
+      canChangeVoice={canChangeVoice}
+      pullNote={pullNote}
+      busy={busy}
+      onSetVoice={onSetVoice}
+      onRequestVoice={onRequestVoice}
+      onPickAppearance={onPickAppearance}
+      onCastArchived={onCastArchived}
+      onUndoVoiceRequest={onUndoVoiceRequest}
+    />
   );
 
   return (
@@ -741,7 +431,7 @@ export function CharacterPanel({
                     }}
                     aria-label="Rename"
                     title="Rename"
-                    className="inline-flex size-7 items-center justify-center rounded-sm text-neutral-400 hover:bg-neutral-800 hover:text-white"
+                    className={ICON_BUTTON}
                   >
                     <PencilIcon />
                   </button>
@@ -801,38 +491,19 @@ export function CharacterPanel({
               aria-labelledby={`${idBase}-tab-faces`}
               className="px-4 py-4"
             >
-              <div className="mb-3 flex min-h-8 items-center justify-between gap-3">
-                <span className="text-[14px] text-neutral-500">
-                  {exemplars === 0
-                    ? "No exemplars yet"
-                    : `${exemplars} ${exemplars === 1 ? "exemplar" : "exemplars"}${
-                        unconfirmed > 0
-                          ? `, ${unconfirmed} unconfirmed`
-                          : ", all confirmed"
-                      }`}
-                </span>
-                {card.faces.length > 0 && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={onConfirm}
-                    className={PRIMARY}
-                    title="Confirm this character's exemplars from this issue, so the matcher uses them on later issues"
-                  >
-                    Faces are right
-                  </button>
-                )}
-              </div>
-              <FaceTiles
-                faces={card.faces}
-                loose={card.looseExemplars}
+              <FacesTab
+                card={card}
                 pages={pages}
-                label={card.name}
-                known={known}
                 busy={busy}
+                selecting={selecting}
+                onSelectingChange={setSelecting}
                 shownId={shownId}
                 onShow={(id) => setShownId((cur) => (cur === id ? null : id))}
-                onMove={onMove}
+                onConfirm={onConfirm}
+                onMoveRequest={(faces, opener) => {
+                  moveOpener.current = opener;
+                  setMoving(faces);
+                }}
                 onReject={onReject}
               />
             </div>
@@ -841,9 +512,6 @@ export function CharacterPanel({
               aria-label="Voice"
               className="border-t border-neutral-800 px-4 py-4"
             >
-              <h3 className="mb-3 text-[12px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-                Voice
-              </h3>
               {voiceContent}
             </section>
           ) : (
@@ -882,6 +550,24 @@ export function CharacterPanel({
             setConfirming(false);
             removeRef.current?.focus();
           }}
+        />
+      )}
+
+      {moving && (
+        <MoveDialog
+          card={card}
+          faces={moving}
+          cards={cards}
+          known={known}
+          pages={pages}
+          busy={busy}
+          onConfirm={(target, name) => {
+            const faces = moving;
+            closeMove();
+            if (faces.length === 1) onMove(faces[0]!, target, name);
+            else onMoveMany(faces, target, name);
+          }}
+          onCancel={closeMove}
         />
       )}
     </>

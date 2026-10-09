@@ -352,6 +352,42 @@ export async function rejectGroup(args: {
  * character's only face on the page; either way it is confirmed for the new
  * character. Any other loose exemplar on that page stays, unconfirmed.
  */
+/**
+ * The writes of one face move: the detection goes to `to`, verified; its
+ * exemplar follows, confirmed; the page's loose exemplars settle. Both move
+ * actions call this, so a batch writes exactly what a single move does.
+ */
+async function moveDetection(
+  scope: Scope,
+  face: { id: string; characterId: string | null; page: number },
+  to: string,
+): Promise<void> {
+  const moved = await supabaseAdmin
+    .from("panel_character_detections")
+    .update({
+      character_id: to,
+      suggested_name: null,
+      human_verified: true,
+    })
+    .eq("id", face.id);
+  must("moving the face", moved.error);
+  const exemplar = await supabaseAdmin
+    .from("character_face_exemplars")
+    .update({
+      character_id: to,
+      suggested_name: null,
+      is_confirmed: true,
+    })
+    .eq("book_id", scope.bookId)
+    .eq("source_issue", scope.issueId)
+    .eq("detection_id", face.id);
+  must("moving the face's exemplar", exemplar.error);
+  await settleLooseExemplars(scope, face.characterId, face.page, {
+    kind: "move",
+    to,
+  });
+}
+
 export async function moveFace(args: {
   scope: Scope;
   detectionId: string;
@@ -369,30 +405,7 @@ export async function moveFace(args: {
     );
     if (face.characterId === who.id)
       return { ok: true, message: `That face is already ${who.name}.` };
-    const moved = await supabaseAdmin
-      .from("panel_character_detections")
-      .update({
-        character_id: who.id,
-        suggested_name: null,
-        human_verified: true,
-      })
-      .eq("id", detectionId);
-    must("moving the face", moved.error);
-    const exemplar = await supabaseAdmin
-      .from("character_face_exemplars")
-      .update({
-        character_id: who.id,
-        suggested_name: null,
-        is_confirmed: true,
-      })
-      .eq("book_id", scope.bookId)
-      .eq("source_issue", scope.issueId)
-      .eq("detection_id", detectionId);
-    must("moving the face's exemplar", exemplar.error);
-    await settleLooseExemplars(scope, face.characterId, face.page, {
-      kind: "move",
-      to: who.id,
-    });
+    await moveDetection(scope, face, who.id);
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
     return {
@@ -401,6 +414,53 @@ export async function moveFace(args: {
     };
   } catch (err) {
     return fail("moving a face", err);
+  }
+}
+
+/**
+ * Moves a selection of faces to one character (#745): the target is resolved
+ * once, each face is written as `moveFace` writes it, and the cast and the
+ * page refresh once. A face already on the target is skipped and counted.
+ */
+export async function moveFaces(args: {
+  scope: Scope;
+  detectionIds: string[];
+  target: NameTarget;
+  franchiseId: string | null;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { scope, detectionIds } = args;
+    if (detectionIds.length === 0) throw new Error("no faces were picked");
+    const who = await resolveTarget(
+      scope.bookId,
+      args.target,
+      args.franchiseId,
+    );
+    let moved = 0;
+    let skipped = 0;
+    for (const detectionId of detectionIds) {
+      const face = await readDetection(scope, detectionId);
+      if (face.characterId === who.id) {
+        skipped += 1;
+        continue;
+      }
+      await moveDetection(scope, face, who.id);
+      moved += 1;
+    }
+    await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
+    revalidate(scope);
+    const faces = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
+    return {
+      ok: true,
+      message:
+        `Moved ${faces(moved)} to ${who.name}${who.created ? ", a new character" : ""}.` +
+        (skipped > 0
+          ? ` ${faces(skipped)} already ${who.name}, left alone.`
+          : ""),
+    };
+  } catch (err) {
+    return fail("moving faces", err);
   }
 }
 

@@ -17,6 +17,7 @@ import {
   approveCharacters,
   confirmFaces,
   moveFace,
+  moveFaces,
   nameGroup,
   nameSuggestion,
   castArchivedVoice,
@@ -452,6 +453,7 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
   const panelProps = (card: CharacterCard) => ({
     card,
     pages,
+    cards: data.cards,
     known: data.known,
     activeVoices: data.activeVoices,
     canChangeVoice: !card.removed && characterIds.has(card.id),
@@ -485,6 +487,15 @@ export function CharactersScreen({ data }: { data: CharactersData }) {
         moveFace({
           scope,
           detectionId: face.id,
+          target,
+          franchiseId: data.franchiseId,
+        }),
+      ),
+    onMoveMany: (faces: FaceView[], target: NameTarget, name: string) =>
+      run(`Moving ${faces.length} faces to ${name}`, () =>
+        moveFaces({
+          scope,
+          detectionIds: faces.map((f) => f.id),
           target,
           franchiseId: data.franchiseId,
         }),

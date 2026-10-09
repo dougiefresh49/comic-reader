@@ -40,6 +40,8 @@ export interface VoiceView {
   borrowedFrom: string | null;
   /** The `voices` row id, when the castlist or the starting voice names one. */
   uuid: string | null;
+  /** A playable preview of the voice; unset until the loader ships one (#745, owner call O1). */
+  previewUrl?: string | null;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface PendingVoiceRequest {
 export interface ActiveVoice {
   id: string;
   name: string;
+  /** A playable preview of the voice; unset until the loader ships one (#745, owner call O1). */
+  previewUrl?: string | null;
 }
 
 export type CardGroup = "here" | "before" | "role";
