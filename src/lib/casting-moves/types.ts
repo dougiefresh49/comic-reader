@@ -280,3 +280,13 @@ export type RunResult =
       plan: MovesPlan;
       moves: MoveOutcome[];
     };
+
+/** Opt-ins for `planMoves`/`runMoves`; the casting page passes none. */
+export interface PlanOptions {
+  /**
+   * The audio step's run_only archive (#790): a speaker this plan's archive
+   * leaves with no slot is not unvoiced when every line of theirs here that
+   * has text already has audio rendered by that voice (`bubbles.voice_id`).
+   */
+  renderedLinesVoiced?: boolean;
+}
