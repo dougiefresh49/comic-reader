@@ -1,6 +1,7 @@
 import { createPartFromText } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { slugify } from "~/lib/character-id";
+import { voiceDescriptionPrompt } from "~/lib/gemini-prompts";
 import type { generateContentLogged as GenerateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import type { Database } from "~/types/database";
@@ -437,16 +438,7 @@ export async function describeVoices(
     for (const r of nameRows ?? []) names.set(r.id, r.display_name ?? r.id);
   }
   for (const d of toDescribe) {
-    const list = d.snippets.map((s, idx) => `${idx + 1}. ${s}`).join("\n");
-
-    const prompt = `Consolidate these voice description snippets into a single, concise voice description suitable for ElevenLabs voice design. Focus on tone, pitch, accent, and speaking style. Keep it under 100 words.
-
-Character: "${d.resolvedName}"
-
-Snippets:
-${list}
-
-Return ONLY the consolidated description as plain text — no JSON, no markdown.`;
+    const prompt = voiceDescriptionPrompt(d.resolvedName, d.snippets);
 
     const textPart = createPartFromText(prompt);
     const response = await opts.generate(
