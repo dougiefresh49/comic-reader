@@ -139,6 +139,8 @@ export type BlockerCode =
   | "headroom"
   /** A restore whose voice cannot come back (no snapshot, bucket copy, description or labels). */
   | "not_restorable"
+  /** A move on a voice an earlier run left unresolved; `reconcileRun` settles it first. */
+  | "unresolved"
   /** A move that names no such voice or character, or one in the wrong state. */
   | "invalid";
 

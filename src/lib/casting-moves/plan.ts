@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { slugify } from "~/lib/character-id";
 import {
   loadBookCast,
@@ -107,13 +108,105 @@ export interface PlanDetail {
   plan: MovesPlan;
   /** Move indexes in run order. */
   order: number[];
-  /** `voices.id` the issue's speakers render with once every move ran. */
+  /**
+   * `voices.id` the issue's speakers render with once every move ran, the
+   * archive guard's "needed by issue" set. A voice this plan restores is left
+   * out, so an archive and a restore of the same voice can both run.
+   */
   needsAfter: Set<string>;
   /** Add move index to the archive move whose slot it takes. */
   slotFrom: Map<number, number>;
   /** Archive move index to the account voice it names by ElevenLabs id (no `voices` row). */
   outside: Map<number, AccountVoice>;
   owners: Map<string, AccountVoiceOwner>;
+}
+
+/** Which castlist rows a cast writes: this issue's, or this issue's and the book's later issues' (`castVoiceInBook`). */
+export type CastScope = "issue" | "later";
+
+/**
+ * Why casting `to` for the character would replace one of the owner's v2
+ * voices, or null. It reads every castlist row of the character the cast
+ * writes (this issue's, and for `later` the book's later issues'), whatever
+ * their `no_audio` or `in_issue`, and the voice the render chain lends the
+ * issue when its own row holds none.
+ */
+export function castAwayReason(
+  book: BookCast,
+  protectedName: (voiceUuid: string) => string | null,
+  characterId: string,
+  issueId: string,
+  scope: CastScope,
+  to: string | null,
+): string | null {
+  const here = book.issueNumber.get(issueId) ?? 0;
+  const held = book.rows
+    .filter(
+      (r) =>
+        r.character_id === characterId &&
+        (r.issue_id === issueId ||
+          (scope === "later" &&
+            (book.issueNumber.get(r.issue_id) ?? 0) > here)),
+    )
+    .flatMap((r) => (r.voice_uuid ? [r.voice_uuid] : []));
+  const lent = voiceFor(book, characterId, issueId);
+  if (lent?.from === characterId) held.push(lent.voiceUuid);
+  for (const uuid of held) {
+    if (uuid === to) continue;
+    const name = protectedName(uuid);
+    if (name)
+      return `${name} is a protected v2 voice; ${characterId}'s cast in it is never replaced`;
+  }
+  return null;
+}
+
+/**
+ * The voices (by `voices.id`, by ElevenLabs id, and `design:<character>`
+ * for a design) that an earlier run's move left unresolved: `needs_attention`,
+ * or `pending` with an operation record (a run in flight, or one that
+ * crashed). A new move on any of them is refused until `reconcileRun`
+ * settles it, so a lost add is never made twice.
+ */
+export async function readUnresolvedMoves(
+  supabase: SupabaseClient,
+): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from("casting_moves")
+    .select("run_id, seq, kind, character_id, voice_uuid, status, operation")
+    .or(
+      "status.eq.needs_attention,and(status.eq.pending,operation.not.is.null)",
+    );
+  if (error)
+    throw new Error(
+      `casting moves: reading unresolved moves: ${error.message}`,
+    );
+  const out = new Map<string, string>();
+  for (const r of (data ?? []) as {
+    run_id: string;
+    seq: number;
+    kind: string;
+    character_id: string | null;
+    voice_uuid: string | null;
+    status: string;
+    operation: {
+      phase?: string;
+      archived?: string;
+      archivedElevenLabsId?: string;
+    } | null;
+  }[]) {
+    const op = r.operation;
+    const why = `an earlier ${r.kind} (run ${r.run_id}, move ${r.seq + 1}) ${r.status === "pending" ? "is still open" : "needs attention"}${op?.phase ? ` at ${op.phase}` : ""}; settle it with reconcileRun("${r.run_id}") first`;
+    for (const key of [
+      r.voice_uuid,
+      op?.archived,
+      op?.archivedElevenLabsId,
+      r.kind === "create_design" && r.character_id
+        ? `design:${r.character_id}`
+        : null,
+    ])
+      if (key && !out.has(key)) out.set(key, why);
+  }
+  return out;
 }
 
 /** True when the row's bucket copy is there and matches; any manifest problem reads as no snapshot. */
@@ -161,7 +254,7 @@ export async function planMovesDetail(
   const needAccount = moves.some(
     (m) => m?.kind === "archive" && !m.voice_uuid && m.elevenlabs_id,
   );
-  const [status, voices, book, lines, owners, castlist, account] =
+  const [status, voices, book, lines, owners, castlist, account, unresolved] =
     await Promise.all([
       getSlotStatus(deps),
       readVoices(sb),
@@ -170,6 +263,7 @@ export async function planMovesDetail(
       readAccountOwners(sb),
       readCastlist(sb),
       needAccount ? readAccountVoices(deps) : Promise.resolve(null),
+      readUnresolvedMoves(sb),
     ]);
   if (!book.issueNumber.has(issueId))
     throw new Error(`casting moves: no issue ${bookId}/${issueId}`);
@@ -181,8 +275,12 @@ export async function planMovesDetail(
       .map((v) => [v.current_elevenlabs_id!, v]),
   );
   const accountById = new Map((account ?? []).map((a) => [a.voice_id, a]));
-  const charName = (id: string) => book.resolve(id)?.display_name ?? id;
-  const isCharacter = (id: string) => book.resolve(id)?.id === id;
+  /** Characters an `add_character` earlier in this plan creates, by id. */
+  const newCharacters = new Map<string, string>();
+  const charName = (id: string) =>
+    newCharacters.get(id) ?? book.resolve(id)?.display_name ?? id;
+  const isCharacter = (id: string) =>
+    newCharacters.has(id) || book.resolve(id)?.id === id;
 
   // The cast as it will be: a copy of the book's rows and voice states that
   // each placed move changes, read by the render chain at the end.
@@ -246,17 +344,36 @@ export async function planMovesDetail(
   const block = (moveIndex: number | null, code: BlockerCode, reason: string) =>
     blockers.push({ moveIndex, code, reason });
 
-  /** Cast-away (#786 decision 5): the move changes a character's own voice in this issue, and that voice is a v2 voice. */
-  const castAway = (i: number, characterId: string, to: string | null) => {
-    const own = voiceFor(sim, characterId, issueId);
-    const ownRow =
-      own?.from === characterId ? rowById.get(own.voiceUuid) : null;
-    if (ownRow && isProtectedVoice(ownRow) && ownRow.id !== to)
-      block(
-        i,
-        "protected",
-        `${charName(characterId)} speaks with ${ownRow.display_name}, a protected v2 voice; it is never cast away`,
-      );
+  const protectedName = (uuid: string) => {
+    const row = rowById.get(uuid);
+    return row && isProtectedVoice(row) ? row.display_name : null;
+  };
+  /** Cast-away (#786 decision 5): see `castAwayReason`. */
+  const castAway = (
+    i: number,
+    characterId: string,
+    to: string | null,
+    scope: CastScope,
+  ) => {
+    const why = castAwayReason(
+      sim,
+      protectedName,
+      characterId,
+      issueId,
+      scope,
+      to,
+    );
+    if (why) block(i, "protected", why);
+  };
+  /** A move on a voice an earlier run left unresolved. */
+  const unsettled = (i: number, ...keys: (string | null | undefined)[]) => {
+    for (const key of keys) {
+      const why = key ? unresolved.get(key) : undefined;
+      if (why) {
+        block(i, "unresolved", why);
+        return;
+      }
+    }
   };
   const replacesProtected = (
     i: number,
@@ -280,6 +397,10 @@ export async function planMovesDetail(
   const outside = new Map<number, AccountVoice>();
   /** Voices archived by this plan, with whether they can come back. */
   const archivedHere = new Map<string, { moveIndex: number; lossy: boolean }>();
+  /** Other projects' ElevenLabs ids archived by this plan, to the archive move. */
+  const archivedOutside = new Map<string, number>();
+  /** Voices this plan restores: the archive guard's "needed" set leaves them out. */
+  const restoredHere = new Set<string>();
   let pristineFree = Math.max(0, status.voice_limit - status.voice_slots_used);
   const freed: number[] = [];
   let adds = 0;
@@ -330,11 +451,22 @@ export async function planMovesDetail(
       step(i, "archive", `Archive ${name}`);
       return;
     }
-    if (row && states.get(row.id)?.status !== "active") {
-      block(i, "invalid", `${name} is not active, so there is no slot to free`);
-      step(i, "archive", `Archive ${name}`, { voiceUuid: row.id });
+    const earlier = acct ? archivedOutside.get(acct.voice_id) : undefined;
+    if (
+      (row && states.get(row.id)?.status !== "active") ||
+      earlier !== undefined
+    ) {
+      block(
+        i,
+        "invalid",
+        earlier !== undefined
+          ? `${name} is already archived by move ${earlier + 1}`
+          : `${name} is not active, so there is no slot to free`,
+      );
+      step(i, "archive", `Archive ${name}`, { voiceUuid: row?.id ?? null });
       return;
     }
+    unsettled(i, row?.id, elevenLabsId);
     const hardBefore = blockers.length;
     if (row && isProtectedVoice(row))
       block(
@@ -400,6 +532,7 @@ export async function planMovesDetail(
       setState(row.id, "archived", null);
       archivedHere.set(row.id, { moveIndex: i, lossy });
     }
+    if (acct) archivedOutside.set(acct.voice_id, i);
     if (frees) {
       freed.push(i);
       archives++;
@@ -426,20 +559,8 @@ export async function planMovesDetail(
     return { slot: "freed", slotFromMove: from };
   };
 
-  for (let i = 0; i < moves.length; i++) {
-    if (placed.has(i)) continue;
-    const m = moves[i]!;
-    const bad = moveShapeError(m);
-    if (bad) {
-      placed.add(i);
-      order.push(i);
-      block(i, "invalid", bad);
-      continue;
-    }
-    if (m.kind === "archive") {
-      await placeArchive(i, m);
-      continue;
-    }
+  /** Places a move that is not an archive. */
+  const placeOther = async (i: number, m: Exclude<Move, ArchiveMove>) => {
     placed.add(i);
     const characterId = "character_id" in m ? m.character_id : null;
     if (
@@ -450,7 +571,7 @@ export async function planMovesDetail(
       order.push(i);
       block(i, "invalid", `no character ${characterId}`);
       step(i, m.kind, `${m.kind} ${characterId}`, { characterId });
-      continue;
+      return;
     }
 
     switch (m.kind) {
@@ -489,9 +610,11 @@ export async function planMovesDetail(
             "no_slot",
             `no free slot for ${name}; archive a voice to make room`,
           );
+        unsettled(i, m.voice_uuid);
+        restoredHere.add(m.voice_uuid);
         if (m.character_id) {
           replacesProtected(i, m);
-          castAway(i, m.character_id, m.voice_uuid);
+          castAway(i, m.character_id, m.voice_uuid, "later");
         }
         if (row)
           setState(row.id, "active", row.current_elevenlabs_id ?? "restored");
@@ -516,8 +639,9 @@ export async function planMovesDetail(
             "no_slot",
             `no free slot for ${name}'s new voice; archive a voice to make room`,
           );
+        unsettled(i, `design:${m.character_id}`);
         replacesProtected(i, m);
-        castAway(i, m.character_id, null);
+        castAway(i, m.character_id, null, m.run_only ? "issue" : "later");
         const key = `design:${i}`;
         setState(key, "active", key);
         setVoiceIn(m.character_id, key, m.run_only ? "issue" : "later");
@@ -542,8 +666,14 @@ export async function planMovesDetail(
             "protected",
             `${row.display_name} is a protected v2 voice; it speaks only for its own character`,
           );
+        unsettled(i, m.voice_uuid);
         replacesProtected(i, m);
-        castAway(i, m.character_id, m.voice_uuid);
+        castAway(
+          i,
+          m.character_id,
+          m.voice_uuid,
+          m.kind === "cast" ? "later" : "issue",
+        );
         setVoiceIn(
           m.character_id,
           m.voice_uuid,
@@ -595,6 +725,8 @@ export async function planMovesDetail(
           block(i, "invalid", `no character ${m.character_id}`);
         else if (!id && !slugify(m.name))
           block(i, "invalid", `"${m.name}" makes no character id`);
+        if (!id && slugify(m.name))
+          newCharacters.set(slugify(m.name), m.name.trim());
         if (id && isCharacter(id)) patchRow(id, { in_issue: true });
         step(
           i,
@@ -617,6 +749,43 @@ export async function planMovesDetail(
         );
         break;
     }
+  };
+
+  /** An add that may run before an archive: not a restore of a voice an archive still to be placed frees. */
+  const canGoFirst = (j: number) => {
+    const mj = moves[j];
+    if (!mj || moveShapeError(mj) || !isAddMove(mj)) return false;
+    return !(
+      mj.kind === "restore" &&
+      moves.some(
+        (mk, k) =>
+          !placed.has(k) &&
+          mk?.kind === "archive" &&
+          mk.voice_uuid === mj.voice_uuid,
+      )
+    );
+  };
+
+  for (let i = 0; i < moves.length; i++) {
+    if (placed.has(i)) continue;
+    const m = moves[i]!;
+    const bad = moveShapeError(m);
+    if (bad) {
+      placed.add(i);
+      order.push(i);
+      block(i, "invalid", bad);
+      continue;
+    }
+    if (m.kind === "archive") {
+      // Add first while a slot is free, as `carryOut` does: a refused add
+      // stops the run before this archive deletes anything.
+      for (let j = i + 1; pristineFree > 0 && j < moves.length; j++)
+        if (!placed.has(j) && canGoFirst(j))
+          await placeOther(j, moves[j] as Exclude<Move, ArchiveMove>);
+      await placeArchive(i, m);
+      continue;
+    }
+    await placeOther(i, m);
   }
 
   // Speakers after every move: each must render, sit out, or be removed.
@@ -681,7 +850,7 @@ export async function planMovesDetail(
       blockers,
     },
     order,
-    needsAfter,
+    needsAfter: new Set([...needsAfter].filter((v) => !restoredHere.has(v))),
     slotFrom,
     outside,
     owners,

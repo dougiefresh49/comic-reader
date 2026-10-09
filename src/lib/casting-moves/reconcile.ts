@@ -123,6 +123,14 @@ async function reconcileMove(
         return await settle("failed", "nothing was deleted or added");
       case "archiving":
       case "archived": {
+        // An add's record at `archived`: its own add and the bring-back of
+        // the voice archived to make room were both refused.
+        if (row.payload.kind !== "archive")
+          return await settle(
+            "failed",
+            "the move's own add was refused",
+            `${archivedRow?.display_name ?? op.archived} stays archived; restore it from /admin/voices`,
+          );
         if (!archivedRow || !op.archivedElevenLabsId)
           return {
             status: "needs_attention",
@@ -144,8 +152,19 @@ async function reconcileMove(
       case "adding": {
         const found = await matchLostAdd(deps, op);
         if (op.back) {
-          if (found.ok && archivedRow?.status === "archived")
-            await markRestored(sb, archivedRow, found.id);
+          // The id goes only onto the state the bring-back found: archived, no id.
+          if (
+            found.ok &&
+            !(
+              archivedRow?.status === "archived" &&
+              archivedRow.current_elevenlabs_id === null
+            )
+          )
+            return await settle(
+              "needs_attention",
+              `${found.id} is a restore of ${archivedRow?.display_name ?? op.archived}, but that row is ${archivedRow?.status ?? "gone"} with ${archivedRow?.current_elevenlabs_id ?? "no id"} now; nothing was written (delete ${found.id} on ElevenLabs by hand if it is a duplicate)`,
+            );
+          if (found.ok) await markRestored(sb, archivedRow!, found.id);
           if (found.ok || opts.notAdded)
             return await settle(
               "failed",
@@ -172,9 +191,12 @@ async function reconcileMove(
         };
     }
   } catch (err) {
-    return {
-      status: "needs_attention",
-      reasons: [`reconcile stopped: ${errorMessage(err)}`],
-    };
+    // Kept on the row, so the next look at the run says why.
+    const why = `reconcile stopped: ${errorMessage(err)}`;
+    try {
+      return await settle("needs_attention", why);
+    } catch {
+      return { status: "needs_attention", reasons: [why] };
+    }
   }
 }

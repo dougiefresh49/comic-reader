@@ -39,6 +39,7 @@ import {
   markRestored,
   readStoredDesign,
   readVoice,
+  readVoices,
 } from "~/lib/voice-slots/registry";
 import { readVoicesByElevenLabsIds } from "~/lib/voice-slots/lookup";
 import {
@@ -56,7 +57,13 @@ import {
 } from "~/lib/voice-slots/types";
 import { readAccountOwners } from "./account";
 import { blank, labelsMissing, minimalLabels } from "./labels";
-import { planMovesDetail, snapshotValid, type PlanDetail } from "./plan";
+import {
+  castAwayReason,
+  planMovesDetail,
+  snapshotValid,
+  type CastScope,
+  type PlanDetail,
+} from "./plan";
 import type {
   AddMove,
   ArchiveMove,
@@ -355,19 +362,30 @@ async function runClaimed(
   }
 }
 
-/** The character's own voice in this issue when it is a v2 voice, which no move may change. */
+/** `castAwayReason` on the cast and voices as they are now: the re-check before a cast write or an add. */
 async function protectedOwnVoice(
   ctx: Ctx,
   characterId: string,
   to: string | null,
+  scope: CastScope,
 ): Promise<string | null> {
-  const book = await loadBookCast(ctx.deps.supabase, ctx.bookId);
-  const own = voiceFor(book, characterId, ctx.issueId);
-  if (own?.from !== characterId || own.voiceUuid === to) return null;
-  const row = await readVoice(ctx.deps.supabase, own.voiceUuid);
-  return row && isProtectedVoice(row)
-    ? `${row.display_name} is a protected v2 voice; it is never cast away`
-    : null;
+  const sb = ctx.deps.supabase;
+  const [book, voices] = await Promise.all([
+    loadBookCast(sb, ctx.bookId),
+    readVoices(sb),
+  ]);
+  const byId = new Map(voices.map((v) => [v.id, v]));
+  return castAwayReason(
+    book,
+    (uuid) => {
+      const row = byId.get(uuid);
+      return row && isProtectedVoice(row) ? row.display_name : null;
+    },
+    characterId,
+    ctx.issueId,
+    scope,
+    to,
+  );
 }
 
 /**
@@ -538,8 +556,15 @@ export async function finishAdd(
     if (!recorded) {
       const row = await readVoice(sb, voiceUuid);
       if (!row) throw new Error(`no voice ${voiceUuid}`);
-      if (row.current_elevenlabs_id !== elevenLabsId)
+      if (row.current_elevenlabs_id !== elevenLabsId) {
+        // Write the id only onto the state the add left: archived, no id.
+        // A row restored or re-archived since then is left as it is.
+        if (row.status !== "archived" || row.current_elevenlabs_id !== null)
+          throw new Error(
+            `${row.display_name} is ${row.status} with ${row.current_elevenlabs_id ?? "no ElevenLabs id"}, not archived as the add found it; ${elevenLabsId} was not written to it (delete it on ElevenLabs by hand if it is a duplicate)`,
+          );
         await markRestored(sb, row, elevenLabsId);
+      }
     }
     if (m.character_id) await fileVoiceUnder(sb, voiceUuid, m.character_id);
   } else {
@@ -620,6 +645,7 @@ async function runAdd(
           ctx,
           m.character_id,
           m.kind === "restore" ? m.voice_uuid : null,
+          m.kind === "create_design" && m.run_only ? "issue" : "later",
         );
         if (why) return failed(why, "nothing was spent");
       }
@@ -667,12 +693,28 @@ async function runAdd(
         const freedBy = from !== undefined ? ctx.archived.get(from) : undefined;
         if (!freedBy)
           return failed(`adding ${name} was refused: ${added.reason}`);
-        const back = await bringBack(
-          deps,
-          rec,
-          freedBy.row,
-          freedBy.deleteConfirmed,
-        );
+        // The record names the archived voice and the id its DELETE took,
+        // so a reconcile can finish it; the bring-back takes that voice's
+        // claim again, fresh, so no other run restores it meanwhile.
+        await rec.record({
+          archived: freedBy.row.id,
+          archivedElevenLabsId: freedBy.row.current_elevenlabs_id ?? undefined,
+        });
+        const now = await readVoice(sb, freedBy.row.id);
+        let back: { ok: true } | { ok: false; why: string };
+        try {
+          back = now
+            ? await withVoiceClaims(sb, [{ row: now, op: "restore" }], () =>
+                bringBack(deps, rec, now, freedBy.deleteConfirmed),
+              )
+            : { ok: false, why: `${freedBy.row.display_name}: row not found` };
+        } catch (err) {
+          if (!(err instanceof VoiceHeldError)) throw err;
+          back = {
+            ok: false,
+            why: `${freedBy.row.display_name} is held by another run, so it was not brought back; restore it from /admin/voices`,
+          };
+        }
         return back.ok
           ? failed(
               `adding ${name} was refused: ${added.reason}`,
@@ -733,7 +775,12 @@ async function runCastMove(
         return failed(
           `${voice.display_name} is a protected v2 voice; it speaks only for its own character`,
         );
-      const why = await protectedOwnVoice(ctx, m.character_id, m.voice_uuid);
+      const why = await protectedOwnVoice(
+        ctx,
+        m.character_id,
+        m.voice_uuid,
+        m.kind === "cast" ? "later" : "issue",
+      );
       if (why) return failed(why);
       if (m.kind === "cast")
         await castVoiceInBook(
