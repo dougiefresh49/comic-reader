@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import type React from "react";
+import { useEffect, type RefObject } from "react";
 
 const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
 
@@ -11,7 +10,7 @@ const FOCUSABLE = "a[href], button, input, select, textarea, [tabindex]";
  * box they land on the first or the last. The list is read at each keypress,
  * so a button that `busy` disables drops out of it.
  */
-export function useTabTrap(ref: React.RefObject<HTMLElement | null>) {
+export function useTabTrap(ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const box = ref.current;
