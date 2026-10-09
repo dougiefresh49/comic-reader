@@ -342,6 +342,7 @@ export async function regenerateAudio(args: Args) {
         p_book_id: args.bookId,
         p_issue_id: args.issueId,
         p_audio_storage_path: storagePath,
+        p_voice_id: resolved.voiceUuid,
         p_alignment: alignment,
         p_normalized_alignment: normalizedAlignment,
       },

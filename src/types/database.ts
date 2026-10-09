@@ -245,6 +245,7 @@ export type Database = {
           type: string;
           updated_at: string | null;
           voice_description: string | null;
+          voice_id: string | null;
         };
         Insert: {
           ai_reasoning?: string | null;
@@ -278,6 +279,7 @@ export type Database = {
           type?: string;
           updated_at?: string | null;
           voice_description?: string | null;
+          voice_id?: string | null;
         };
         Update: {
           ai_reasoning?: string | null;
@@ -311,6 +313,7 @@ export type Database = {
           type?: string;
           updated_at?: string | null;
           voice_description?: string | null;
+          voice_id?: string | null;
         };
         Relationships: [
           {
@@ -332,6 +335,13 @@ export type Database = {
             columns: ["panel_id"];
             isOneToOne: false;
             referencedRelation: "panels";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bubbles_voice_id_fkey";
+            columns: ["voice_id"];
+            isOneToOne: false;
+            referencedRelation: "voices";
             referencedColumns: ["id"];
           },
         ];
@@ -1308,6 +1318,7 @@ export type Database = {
           p_bubble_id: string;
           p_issue_id: string;
           p_normalized_alignment: Json;
+          p_voice_id?: string;
         };
         Returns: string;
       };
@@ -1321,6 +1332,7 @@ export type Database = {
           p_lead_id: string;
           p_member_ids: string[];
           p_normalized_alignment: Json;
+          p_voice_id?: string;
         };
         Returns: string;
       };
