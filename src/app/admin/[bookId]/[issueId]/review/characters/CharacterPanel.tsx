@@ -24,6 +24,7 @@ import {
   QUIET_DANGER,
   bestFace,
   facesLine,
+  useTabTrap,
 } from "./shared";
 import type {
   ActiveVoice,
@@ -165,7 +166,12 @@ function PencilIcon() {
   );
 }
 
-/** Show: the page with the face boxed, large over the screen. Click outside, the X or Escape closes it. */
+/**
+ * Show: the page with the face boxed, large over the screen. Click outside,
+ * the X or Escape closes it. It opens with focus on the X, keeps Tab inside,
+ * and hands focus back to whatever had it before (the Show button or the
+ * face crop) when it closes.
+ */
 function PagePreview({
   face,
   pages,
@@ -177,10 +183,24 @@ function PagePreview({
   label: string;
   onClose: () => void;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useTabTrap(rootRef);
+  useEffect(() => {
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    closeRef.current?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
   const page = pages.get(face.page);
   if (!page) return null;
   return (
     <div
+      ref={rootRef}
       role="dialog"
       aria-label={`Page ${face.page}, ${label}`}
       onClick={onClose}
@@ -199,6 +219,7 @@ function PagePreview({
         />
       </div>
       <button
+        ref={closeRef}
         type="button"
         onClick={onClose}
         aria-label="Close the page"
@@ -291,6 +312,8 @@ export function CharacterPanel({
   /** The control that opened the move dialog, for focus when it closes. */
   const moveOpener = useRef<HTMLElement | null>(null);
   const removeRef = useRef<HTMLButtonElement>(null);
+  const pencilRef = useRef<HTMLButtonElement>(null);
+  const wasRenaming = useRef(false);
   const idBase = useId();
   const shown = card.faces.find((f) => f.id === shownId) ?? null;
   const portrait = useMemo(
@@ -305,6 +328,17 @@ export function CharacterPanel({
     setMoving(null);
     moveOpener.current?.focus();
   }, []);
+
+  // Every way Rename closes (Save, Cancel, Escape in the field or on the
+  // window) lands focus on the pencil, once it is mounted again.
+  const closeRename = useCallback(() => {
+    setRenaming(false);
+    setDraft(card.name);
+  }, [card.name]);
+  useEffect(() => {
+    if (wasRenaming.current && !renaming) pencilRef.current?.focus();
+    wasRenaming.current = renaming;
+  }, [renaming]);
 
   // The open panel owns Escape, innermost first: the move dialog, then the
   // Remove confirm and the page preview (overlays, which can sit over select
@@ -321,10 +355,8 @@ export function CharacterPanel({
         removeRef.current?.focus();
       } else if (shown) setShownId(null);
       else if (selecting) setSelecting(false);
-      else if (renaming) {
-        setRenaming(false);
-        setDraft(card.name);
-      } else onClose();
+      else if (renaming) closeRename();
+      else onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -334,9 +366,9 @@ export function CharacterPanel({
     confirming,
     shown,
     renaming,
-    card.name,
     onClose,
     closeMove,
+    closeRename,
   ]);
 
   const voiceContent = (
@@ -397,7 +429,7 @@ export function CharacterPanel({
                   className="flex flex-wrap items-center gap-2"
                   onSubmit={(e) => {
                     e.preventDefault();
-                    setRenaming(false);
+                    closeRename();
                     if (draft.trim() && draft.trim() !== card.name)
                       onRename(draft);
                   }}
@@ -410,8 +442,7 @@ export function CharacterPanel({
                     onKeyDown={(e) => {
                       if (e.key === "Escape") {
                         e.stopPropagation();
-                        setRenaming(false);
-                        setDraft(card.name);
+                        closeRename();
                       }
                     }}
                     className={`${INPUT} min-w-[160px] flex-1 text-[16px]`}
@@ -419,14 +450,7 @@ export function CharacterPanel({
                   <button type="submit" className={PRIMARY} disabled={busy}>
                     Save
                   </button>
-                  <button
-                    type="button"
-                    className={QUIET}
-                    onClick={() => {
-                      setRenaming(false);
-                      setDraft(card.name);
-                    }}
-                  >
+                  <button type="button" className={QUIET} onClick={closeRename}>
                     Cancel
                   </button>
                 </form>
@@ -436,6 +460,7 @@ export function CharacterPanel({
                     {card.name}
                   </h2>
                   <button
+                    ref={pencilRef}
                     type="button"
                     onClick={() => {
                       setDraft(card.name);
