@@ -246,11 +246,22 @@ function Samples({
       text: `Playing page ${line.page} in ${item.voice?.name}…`,
       tone: "plain",
     });
-    const result = await playSample({
-      scope,
-      characterId: item.characterId,
-      bubbleId: line.bubbleId,
-    });
+    let result;
+    try {
+      result = await playSample({
+        scope,
+        characterId: item.characterId,
+        bubbleId: line.bubbleId,
+      });
+    } catch (err) {
+      // The call can throw before the action runs (fetch refused, network down).
+      setPlaying(null);
+      setNote({
+        text: err instanceof Error ? err.message : String(err),
+        tone: "warn",
+      });
+      return;
+    }
     if (!result.ok) {
       setPlaying(null);
       setNote({ text: result.error, tone: "warn" });
