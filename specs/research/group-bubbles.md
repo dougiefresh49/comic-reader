@@ -51,7 +51,7 @@ A `characters` row such as `turtles` with a castlist row and a voice. `createCha
 ### C. A speaker list per bubble
 
 - **Data.** A `bubbles.speakers` jsonb column beside `character_id`. `save_review_edits` already writes any `bubbles` column, and `switch_bubble_audio_take` already stores one clip and one alignment, so neither changes. A join table instead would need `save_review_edits` extended.
-- **Speaker step.** The get-context reply becomes a list: the speaker rule (`src/lib/gemini-prompts.ts:61-68`), the reply's `speaker` field (`:134`), the parsed type (`src/workflows/steps/vision-rows.ts:33`), the row writer (`vision-rows.ts:484-545`) and the editor's analyze path (`src/server/actions/review/analyze-bubble.ts:186`). That is a prompt edit, so it is kid-facing taste work.
+- **Speaker step.** The get-context reply becomes a list: the speaker rule (`src/lib/gemini-prompts.ts:61-62`), the reply's `speaker` field (`:134`), the parsed type (`src/workflows/steps/vision-rows.ts:33`), the row writer (`vision-rows.ts:484-545`) and the editor's analyze path (`src/server/actions/review/analyze-bubble.ts:186`). That is a prompt edit, so it is kid-facing taste work.
 - **Editor.** Multi-select in `SpeakerPicker.tsx`, `model.ts` and the inspector, plus the save shape.
 - **Render.** `renderVoice` for N characters, N renders in `generation.ts` and `regenerate-audio.ts`, and a new mixer.
 
@@ -77,7 +77,7 @@ All takes say the same words, so one lead take drives the marker, and the other 
 - **Lead.** The bubble's first-listed member, or the group's first member in D. Its `alignment` is stored in `audio_timestamps` as now, and `useWordHighlight.ts` lights words off it unchanged.
 - **Offset.** Shift each other take so its first character starts when the lead's does, from each take's `character_start_times_seconds[0]`.
 - **Length drift.** A short shout drifts by tens of milliseconds, which nobody sees. For a longer line, stretch each take to the lead's speech span with ffmpeg `atempo` when the gap passes about 80 ms, then pad to the longest.
-- **Gain.** Four takes of the same shout sum to about +12 dB over one. `amix` normalizes by default, dividing by the input count (about -12 dB for four), which brings the mix back to about one take's loudness.
+- **Gain.** Four different voices on the same shout sum to about +6 dB over one take. `amix`'s default divides each input by the input count (about -12 dB for four), so the mix lands about 6 dB under one take. Set `normalize=0` with each input at about -6 dB, or add about +6 dB after the mix, and check by ear.
 - **Tooling.** `ffmpeg-static` and `fluent-ffmpeg` are in `devDependencies` (`package.json:97-98`), imported today only by `scripts/export-episode-mp4.ts` and `scripts/clip-audio-segments.ts`. A mixer in the app's render path moves them to `dependencies` and needs a check that the ffmpeg binary ships in the Vercel build.
 - **Merged alignment.** Averaging the takes' timings buys nothing when the words are identical and adds code, so skip it.
 
