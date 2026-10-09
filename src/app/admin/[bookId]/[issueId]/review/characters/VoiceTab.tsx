@@ -1,4 +1,4 @@
-// The panel's Voice tab (#745): the current voice as a field-like row, and under it a browser of the choices with a preview on each row that has one.
+// The panel's Voice tab (#745, #750): the choices listed from the start as radio-style rows (its voices, a new designed voice, then the other active voices), the current voice marked among them, a preview on each row that has one, and a footer once another row is picked.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -22,16 +22,11 @@ function PlayIcon() {
   );
 }
 
-function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg {...SVG_ICON} className={open ? "rotate-180" : ""}>
-      <path d="m6 9 6 6 6-6" />
-    </svg>
-  );
-}
-
 const PILL =
   "shrink-0 rounded-full border border-neutral-700 px-1.5 text-[11px] leading-4 tracking-[0.04em] text-neutral-400 uppercase";
+/** The one pill that stays on the current voice's row when the dot moves to a pick. */
+const CURRENT_PILL =
+  "shrink-0 rounded-full border border-neutral-400 px-1.5 text-[11px] leading-4 tracking-[0.04em] text-neutral-200 uppercase";
 
 /** What the primary button does for the chosen entry of "Its voices". */
 function pickAction(pick: VoicePick): {
@@ -137,9 +132,11 @@ function PreviewPlay({
 }
 
 /**
- * One radio-style row of the browser: name in bold, the source in grey, the
+ * One radio-style row of the list: name in bold, the source in grey, the
  * status pills, and Play when the row has a preview. A click anywhere on the
- * row picks it; the radio button inside carries the keyboard.
+ * row picks it; the radio button inside carries the keyboard. The current
+ * voice is a row like the others: the dot rests on it, a pick moves the dot,
+ * and its "current" pill stays.
  */
 function ChoiceRow({
   name,
@@ -149,7 +146,6 @@ function ChoiceRow({
   cache,
   loadingIds,
   checked,
-  disabled = false,
   group,
   onPick,
   onPlay,
@@ -163,8 +159,6 @@ function ChoiceRow({
   cache: PreviewCache;
   loadingIds: ReadonlySet<string>;
   checked: boolean;
-  /** The current voice: shown for the record, not a choice. */
-  disabled?: boolean;
   /** The radio group's `name`. */
   group: string;
   onPick: () => void;
@@ -173,13 +167,11 @@ function ChoiceRow({
 }) {
   return (
     <li
-      onClick={disabled ? undefined : onPick}
+      onClick={onPick}
       className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
         checked
           ? "border-neutral-300 bg-neutral-800"
-          : disabled
-            ? "border-neutral-800 bg-neutral-900/40"
-            : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/60"
+          : "border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800/60"
       }`}
     >
       <button
@@ -187,32 +179,22 @@ function ChoiceRow({
         role="radio"
         name={group}
         aria-checked={checked}
-        aria-disabled={disabled || undefined}
-        disabled={disabled}
         onClick={(e) => {
           e.stopPropagation();
           onPick();
         }}
-        className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
       >
         <span
           aria-hidden
           className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-            checked
-              ? "border-white"
-              : disabled
-                ? "border-neutral-700"
-                : "border-neutral-500"
+            checked ? "border-white" : "border-neutral-500"
           }`}
         >
           {checked && <span className="block size-2 rounded-full bg-white" />}
         </span>
         <span className="min-w-0 flex-1 leading-5">
-          <span
-            className={`block truncate font-medium ${
-              disabled ? "text-neutral-400" : "text-neutral-100"
-            }`}
-          >
+          <span className="block truncate font-medium text-neutral-100">
             {name}
           </span>
           {source && (
@@ -220,7 +202,7 @@ function ChoiceRow({
           )}
         </span>
         {pills.map((p) => (
-          <span key={p} className={PILL}>
+          <span key={p} className={p === "current" ? CURRENT_PILL : PILL}>
             {p}
           </span>
         ))}
@@ -277,7 +259,7 @@ function VoiceRequestNote({
 export interface VoiceTabProps {
   card: CharacterCard;
   activeVoices: ActiveVoice[];
-  /** A `characters` row, not removed: the row gets Change. */
+  /** A `characters` row, not removed: the tab lists the choices. */
   canChangeVoice: boolean;
   pullNote: string;
   busy: boolean;
@@ -290,17 +272,23 @@ export interface VoiceTabProps {
 }
 
 /**
- * The Voice tab: a "Voice" field whose boxed row names the current voice,
- * its source in grey, Play when a preview exists, and Change on the right.
- * Change opens the browser in place: "Its voices", "Other active voices" and
- * "A new designed voice" as radio-style rows, and a footer whose one primary
- * button is named for the picked row. Play on the current voice and on every
- * `voices` row: a row with a URL of its own (an archived clone's signed clip
- * from the loader, or a `previewUrl` override) plays it at once; otherwise
- * the first click asks `voicePreview` (the source clip signed, else a bubble
- * of this book rendered in that voice), the answer is kept per voice id, and
- * null leaves a "no stored audio" mark. Appearances and the designed-voice
- * row have no Play.
+ * The Voice tab: the choices listed from the start, "Its voices", "A new
+ * designed voice" and "Other active voices" as radio-style rows (the designed
+ * voice sits above the long active list so it is not buried), with the
+ * current voice marked among them (the dot rests on it, and it keeps a
+ * "current" pill once the dot moves). Picking another row shows a footer:
+ * Cancel on the left, one primary button named for the pick on the right,
+ * and under them a line on when the pick takes effect. A voice with no row
+ * of its own (none yet, no audio this run, a borrowed voice that is not
+ * active) gets one plain line above the list, and a card that cannot change
+ * (removed, or a request pending) gets that line in place of the list; the
+ * line has Play when the voice has an id. Play on every `voices` row: a row
+ * with a URL of its own (an archived clone's signed clip from the loader, or
+ * a `previewUrl` override) plays it at once; otherwise the first click asks
+ * `voicePreview` (the source clip signed, else a bubble of this book
+ * rendered in that voice), the answer is kept per voice id, and null leaves
+ * a "no stored audio" mark. Appearances and the designed-voice row have no
+ * Play.
  */
 export function VoiceTab({
   card,
@@ -315,16 +303,11 @@ export function VoiceTab({
   onUndoVoiceRequest,
   onPreviewVoice,
 }: VoiceTabProps) {
-  const [changing, setChanging] = useState(false);
   const currentId = card.voice?.uuid ?? null;
-  /** The current voice's own entry: shown under "Its voices" for the record, never a choice. */
+  /** The current voice's own entry: marked under "Its voices"; picking it clears the pick. */
   const isCurrent = (p: VoicePick) => p.kind === "voice" && p.id === currentId;
-  const [pickedKey, setPickedKey] = useState<string | null>(() => {
-    const start = card.voicePicks.find(
-      (p) => p.kind === "voice" && p.startingPick && !isCurrent(p),
-    );
-    return start ? `pick:${start.id}` : null;
-  });
+  /** The row picked instead of the current voice; null keeps the dot on the current voice and hides the footer. Nothing is picked on open: the "lab default" pill marks the suggestion. */
+  const [pickedKey, setPickedKey] = useState<string | null>(null);
   const [pull, setPull] = useState<"copied" | "failed" | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const [cache, setCache] = useState<PreviewCache>({});
@@ -396,12 +379,28 @@ export function VoiceTab({
   ): PreviewSource =>
     typeof previewUrl === "string" ? { url: previewUrl } : { voiceId };
 
-  const others = activeVoices.filter((v) => v.id !== currentId);
+  const current = card.voice;
+  const currentPick = currentId
+    ? card.voicePicks.find(
+        (p): p is Extract<VoicePick, { kind: "voice" }> =>
+          p.kind === "voice" && p.id === currentId,
+      )
+    : undefined;
+  // The current voice is marked where it lives: under "Its voices" when it is
+  // one of them, else among the active voices (a borrowed one).
+  const others = currentPick
+    ? activeVoices.filter((v) => v.id !== currentId)
+    : activeVoices;
+  const currentInList = !!currentPick || others.some((v) => v.id === currentId);
+  /** The list shows for a card that can change and has no request pending. */
+  const listed = canChangeVoice && !card.voiceRequest;
   const choices: Choice[] = [
     ...card.voicePicks
       .filter((p) => !isCurrent(p))
       .map((pick): Choice => ({ section: "pick", pick })),
-    ...others.map((voice): Choice => ({ section: "active", voice })),
+    ...others
+      .filter((v) => v.id !== currentId)
+      .map((voice): Choice => ({ section: "active", voice })),
     { section: "design" },
   ];
   const picked = choices.find((c) => choiceKey(c) === pickedKey) ?? null;
@@ -413,10 +412,33 @@ export function VoiceTab({
         : { label: "Request this design", kind: "design" as const }
     : null;
   const group = `voice-${card.id}`;
-  const close = () => setChanging(false);
+  const cancel = () => setPickedKey(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  // The footer is sticky at the panel's bottom, so a pick near the end of the
+  // list would sit under it: scroll the panel by the overlap, and only then.
+  useEffect(() => {
+    if (!pickedKey) return;
+    const row = listRef.current
+      ?.querySelector('[role="radio"][aria-checked="true"]')
+      ?.closest("li");
+    const footer = footerRef.current;
+    if (!row || !footer) return;
+    const overlap =
+      row.getBoundingClientRect().bottom - footer.getBoundingClientRect().top;
+    if (overlap <= 0) return;
+    let scroller: HTMLElement | null = row.parentElement;
+    while (
+      scroller &&
+      !/auto|scroll/.test(getComputedStyle(scroller).overflowY)
+    )
+      scroller = scroller.parentElement;
+    scroller?.scrollBy({ top: overlap + 8, behavior: "smooth" });
+  }, [pickedKey]);
   const apply = () => {
     if (!picked || !action) return;
-    close();
+    // The dot goes back to the current voice, which the callback is about to change or keep.
+    setPickedKey(null);
     if (picked.section === "active") return onSetVoice(picked.voice);
     if (picked.section === "design")
       return onRequestVoice({ action: "design" });
@@ -436,15 +458,8 @@ export function VoiceTab({
     }
   };
 
-  // The current voice's source: VoiceLine names whose it is when borrowed;
+  // The plain line: VoiceLine names whose the voice is when borrowed;
   // otherwise its own entry says the work it was cloned from, or that it is designed.
-  const current = card.voice;
-  const currentPick = current?.uuid
-    ? card.voicePicks.find(
-        (p): p is Extract<VoicePick, { kind: "voice" }> =>
-          p.kind === "voice" && p.id === current.uuid,
-      )
-    : undefined;
   const currentSource =
     current && !current.borrowedFrom && currentPick
       ? (currentPick.work ?? "Designed voice")
@@ -452,219 +467,206 @@ export function VoiceTab({
   const currentPreview = current?.uuid
     ? sourceOf(current.uuid, current.previewUrl)
     : null;
+  const line = !listed || !currentInList;
 
   return (
     <div className="text-[14px]">
-      <div className="mb-1.5 text-[12px] font-semibold tracking-[0.08em] text-neutral-500 uppercase">
-        Voice
-      </div>
-      <div className="flex min-h-10 items-center gap-2 rounded-md border border-neutral-700 bg-neutral-950/60 py-1 pr-1 pl-3">
-        <span className="min-w-0 flex-1 truncate">
-          <VoiceLine card={card} />
-          {currentSource && (
-            <span className="text-neutral-500">, {currentSource}</span>
+      {line && (
+        <div className="flex min-h-8 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate">
+            <VoiceLine card={card} />
+            {currentSource && (
+              <span className="text-neutral-500">, {currentSource}</span>
+            )}
+          </span>
+          {current && currentPreview && (
+            <PreviewPlay
+              name={current.name}
+              source={currentPreview}
+              cache={cache}
+              loadingIds={loadingIds}
+              onPlay={playRow}
+              onLookup={lookup}
+            />
           )}
-        </span>
-        {current && currentPreview && (
-          <PreviewPlay
-            name={current.name}
-            source={currentPreview}
-            cache={cache}
-            loadingIds={loadingIds}
-            onPlay={playRow}
-            onLookup={lookup}
-          />
-        )}
-        {canChangeVoice && !card.voiceRequest && (
-          <button
-            type="button"
-            disabled={busy}
-            aria-expanded={changing}
-            onClick={() => setChanging((c) => !c)}
-            className={`${QUIET} h-8 gap-1 pr-1.5`}
-          >
-            Change
-            <ChevronIcon open={changing} />
-          </button>
-        )}
-      </div>
-      {playError && !changing && (
-        <p className="mt-2 text-amber-300">{playError}</p>
+        </div>
       )}
 
       {card.voiceRequest && (
-        <VoiceRequestNote
-          card={card}
-          busy={busy}
-          onUndo={() => {
-            setChanging(canChangeVoice);
-            onUndoVoiceRequest();
-          }}
-        />
+        <VoiceRequestNote card={card} busy={busy} onUndo={onUndoVoiceRequest} />
       )}
 
-      {canChangeVoice && !card.voiceRequest && changing && (
-        <div className="mt-2 rounded-md border border-neutral-800 bg-neutral-900/40">
-          <div
-            role="radiogroup"
-            aria-label={`Voice for ${card.name}`}
-            className="space-y-4 p-3"
-          >
-            <section>
-              <SectionHeading>Its voices</SectionHeading>
-              {card.voicePicks.length === 0 ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="text-neutral-300">
-                    No voice-lab clone on file.
+      {listed && (
+        <div
+          ref={listRef}
+          role="radiogroup"
+          aria-label={`Voice for ${card.name}`}
+          className={`space-y-4 ${line ? "mt-4" : ""}`}
+        >
+          <section>
+            <SectionHeading>Its voices</SectionHeading>
+            {card.voicePicks.length === 0 ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-neutral-300">No voice-lab clone on file.</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigator.clipboard.writeText(pullNote).then(
+                      () => setPull("copied"),
+                      () => setPull("failed"),
+                    )
+                  }
+                  className={BUTTON}
+                >
+                  Request a pull
+                </button>
+                {pull === "copied" && (
+                  <span className="text-emerald-300">
+                    Copied a note for voice-lab.
+                  </span>
+                )}
+                {pull === "failed" && (
+                  <p className="w-full text-amber-300">
+                    Could not copy. The note: {pullNote}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigator.clipboard.writeText(pullNote).then(
-                        () => setPull("copied"),
-                        () => setPull("failed"),
-                      )
-                    }
-                    className={BUTTON}
-                  >
-                    Request a pull
-                  </button>
-                  {pull === "copied" && (
-                    <span className="text-emerald-300">
-                      Copied a note for voice-lab.
-                    </span>
-                  )}
-                  {pull === "failed" && (
-                    <p className="w-full text-amber-300">
-                      Could not copy. The note: {pullNote}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <ul className="space-y-1">
-                  {card.voicePicks.map((p) => {
-                    const key = `pick:${p.id}`;
-                    const name = p.kind === "voice" ? p.name : card.name;
-                    const source =
-                      p.kind === "appearance"
-                        ? [p.work, p.voiceActor].filter(Boolean).join(", ")
-                        : (p.work ?? "Designed voice");
-                    const current = isCurrent(p);
-                    const pills =
-                      p.kind === "voice"
-                        ? current
-                          ? // The one pill that says it all: a current voice is active and in this book.
-                            ["current"]
-                          : [
-                              PICK_STATUS[p.status],
-                              ...(p.inBook ? ["in this book"] : []),
-                              ...(p.startingPick ? ["lab default"] : []),
-                              // Signing its source clip failed, or it has none: no Play.
-                              ...(p.status === "archived" && !p.clipUrl
-                                ? ["no clip link"]
-                                : []),
-                            ]
-                        : ["needs a clip"];
-                    return (
-                      <ChoiceRow
-                        key={key}
-                        name={name}
-                        source={source || null}
-                        pills={pills}
-                        preview={
-                          p.kind !== "voice"
-                            ? null
-                            : p.status === "archived"
-                              ? // An archived clone plays its signed clip or nothing: the "no clip link" pill says which.
-                                p.clipUrl
-                                ? { url: p.clipUrl }
-                                : null
-                              : sourceOf(p.id, p.clipUrl)
-                        }
-                        cache={cache}
-                        loadingIds={loadingIds}
-                        checked={pickedKey === key}
-                        disabled={current}
-                        group={group}
-                        onPick={() => setPickedKey(key)}
-                        onPlay={playRow}
-                        onLookup={lookup}
-                      />
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-
-            <section>
-              <SectionHeading>Other active voices</SectionHeading>
-              {others.length === 0 ? (
-                <p className="text-neutral-400">No other active voice.</p>
-              ) : (
-                <ul className="space-y-1">
-                  {others.map((v) => {
-                    const key = `active:${v.id}`;
-                    return (
-                      <ChoiceRow
-                        key={key}
-                        name={v.name}
-                        source={null}
-                        pills={["active"]}
-                        preview={sourceOf(v.id, v.previewUrl)}
-                        cache={cache}
-                        loadingIds={loadingIds}
-                        checked={pickedKey === key}
-                        group={group}
-                        onPick={() => setPickedKey(key)}
-                        onPlay={playRow}
-                        onLookup={lookup}
-                      />
-                    );
-                  })}
-                </ul>
-              )}
-            </section>
-
-            <section>
-              <SectionHeading>A new designed voice</SectionHeading>
-              <ul>
-                <ChoiceRow
-                  name="New designed voice"
-                  source="From the character's description"
-                  pills={[]}
-                  preview={null}
-                  cache={cache}
-                  loadingIds={loadingIds}
-                  checked={pickedKey === "design"}
-                  group={group}
-                  onPick={() => setPickedKey("design")}
-                  onPlay={playRow}
-                  onLookup={lookup}
-                />
+                )}
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {card.voicePicks.map((p) => {
+                  const key = `pick:${p.id}`;
+                  const name = p.kind === "voice" ? p.name : card.name;
+                  const source =
+                    p.kind === "appearance"
+                      ? [p.work, p.voiceActor].filter(Boolean).join(", ")
+                      : (p.work ?? "Designed voice");
+                  const isThis = isCurrent(p);
+                  const pills =
+                    p.kind === "voice"
+                      ? isThis
+                        ? // The one pill that says it all: a current voice is active and in this book.
+                          ["current"]
+                        : [
+                            PICK_STATUS[p.status],
+                            ...(p.inBook ? ["in this book"] : []),
+                            ...(p.startingPick ? ["lab default"] : []),
+                            // Signing its source clip failed, or it has none: no Play.
+                            ...(p.status === "archived" && !p.clipUrl
+                              ? ["no clip link"]
+                              : []),
+                          ]
+                      : ["needs a clip"];
+                  return (
+                    <ChoiceRow
+                      key={key}
+                      name={name}
+                      source={source || null}
+                      pills={pills}
+                      preview={
+                        p.kind !== "voice"
+                          ? null
+                          : p.status === "archived" && !isThis
+                            ? // An archived clone plays its signed clip or nothing: the "no clip link" pill says which.
+                              p.clipUrl
+                              ? { url: p.clipUrl }
+                              : null
+                            : // The current voice, whatever its status, asks `voicePreview` when it has no clip: a bubble of this book is rendered in it.
+                              sourceOf(p.id, p.clipUrl)
+                      }
+                      cache={cache}
+                      loadingIds={loadingIds}
+                      checked={isThis ? !picked : pickedKey === key}
+                      group={group}
+                      onPick={() => setPickedKey(isThis ? null : key)}
+                      onPlay={playRow}
+                      onLookup={lookup}
+                    />
+                  );
+                })}
               </ul>
-            </section>
-            {playError && <p className="text-amber-300">{playError}</p>}
-          </div>
+            )}
+          </section>
 
-          <div className="sticky bottom-0 flex flex-wrap items-center gap-2 rounded-b-md border-t border-neutral-800 bg-neutral-950 px-3 py-2">
+          <section>
+            <SectionHeading>A new designed voice</SectionHeading>
+            <ul>
+              <ChoiceRow
+                name="New designed voice"
+                source="From the character's description"
+                pills={[]}
+                preview={null}
+                cache={cache}
+                loadingIds={loadingIds}
+                checked={pickedKey === "design"}
+                group={group}
+                onPick={() => setPickedKey("design")}
+                onPlay={playRow}
+                onLookup={lookup}
+              />
+            </ul>
+          </section>
+
+          <section>
+            <SectionHeading>Other active voices</SectionHeading>
+            {others.length === 0 ? (
+              <p className="text-neutral-400">No other active voice.</p>
+            ) : (
+              <ul className="space-y-1">
+                {others.map((v) => {
+                  const key = `active:${v.id}`;
+                  const isThis = v.id === currentId;
+                  return (
+                    <ChoiceRow
+                      key={key}
+                      name={v.name}
+                      source={
+                        isThis && current?.borrowedFrom
+                          ? `${current.borrowedFrom}'s voice`
+                          : null
+                      }
+                      pills={isThis ? ["current"] : ["active"]}
+                      preview={sourceOf(v.id, v.previewUrl)}
+                      cache={cache}
+                      loadingIds={loadingIds}
+                      checked={isThis ? !picked : pickedKey === key}
+                      group={group}
+                      onPick={() => setPickedKey(isThis ? null : key)}
+                      onPlay={playRow}
+                      onLookup={lookup}
+                    />
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+      )}
+
+      {playError && <p className="mt-3 text-amber-300">{playError}</p>}
+
+      {listed && picked && action && (
+        <div
+          ref={footerRef}
+          className="sticky bottom-0 -mx-4 mt-3 -mb-4 border-t border-neutral-800 bg-neutral-950 px-4 py-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={cancel} className={QUIET}>
+              Cancel
+            </button>
             <button
               type="button"
-              disabled={busy || !action}
+              disabled={busy}
               onClick={apply}
               className={PRIMARY}
             >
-              {action?.label ?? "Pick a voice"}
-            </button>
-            <span className="min-w-0 flex-1 text-neutral-500">
-              {action &&
-                (action.kind === "use"
-                  ? "Applied at once, in every issue of the book."
-                  : "Made at the voices stop.")}
-            </span>
-            <button type="button" onClick={close} className={QUIET}>
-              Cancel
+              {action.label}
             </button>
           </div>
+          <p className="mt-1.5 text-neutral-500">
+            {action.kind === "use"
+              ? "Applied at once, in every issue of the book."
+              : "Made at the voices stop."}
+          </p>
         </div>
       )}
     </div>
