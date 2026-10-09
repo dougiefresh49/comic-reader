@@ -86,8 +86,8 @@ export interface CastVoiceRow {
   id: string;
   current_elevenlabs_id: string | null;
   status: string;
-  /** A "this run only" voice: its own issue renders with it, no other issue inherits it (#806). Absent counts as false. */
-  run_only?: boolean;
+  /** A "this run only" voice: its own issue renders with it, no other issue inherits it (#806). */
+  run_only: boolean;
 }
 
 export interface CharacterRow {

@@ -54,7 +54,12 @@ function syntheticBook(rows: Partial<CastRow>[]): BookCast {
     voices: new Map([
       [
         "v-active",
-        { id: "v-active", current_elevenlabs_id: "el-a", status: "active" },
+        {
+          id: "v-active",
+          current_elevenlabs_id: "el-a",
+          status: "active",
+          run_only: false,
+        },
       ],
     ]),
     formOf: new Map(),
