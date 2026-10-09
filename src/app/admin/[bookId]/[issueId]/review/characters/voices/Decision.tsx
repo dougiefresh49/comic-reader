@@ -3,11 +3,11 @@
 
 import { useId, useState } from "react";
 import { chooseVoice, noAudio, pickActiveVoice, runItem } from "./actions";
-import { Leaves, Samples } from "./bits";
+import { Leaves, Reasons, Samples } from "./bits";
 import {
   PRIMARY,
   SELECT,
-  plain,
+  archiveWhy,
   plainList,
   refOf,
   type Note,
@@ -38,6 +38,8 @@ function presetOf(item: ItemView, slots: SlotsView | null): string {
 
 /** The option the plan holds for the item: what Add would make. Null when nothing is chosen yet. */
 function chosenKeyOf(item: ItemView): string | null {
+  // The plan's default clone is withheld (the card says why): nothing is chosen yet.
+  if (item.noDefault) return null;
   // Not a request and not planned: the plan's default is not on offer.
   const planned =
     item.source === "request" || item.needsSlot || item.refusals.length > 0;
@@ -49,6 +51,25 @@ function chosenKeyOf(item: ItemView): string | null {
 /** The card's key: a refresh that changes the plan's pick or the preset starts the decision over. */
 export const decisionKey = (item: ItemView, slots: SlotsView | null): string =>
   `${chosenKeyOf(item)}|${presetOf(item, slots)}`;
+
+/**
+ * What the pending cards' presets would add and archive, for the page
+ * header: an archive counts only where the card starts on one, so the
+ * header agrees with the cards (#779).
+ */
+export function presetCounts(
+  items: ItemView[],
+  slots: SlotsView | null,
+): { adds: number; archives: number } {
+  const adding = items.filter(
+    (i) => i.state === "pending" && i.needsSlot && chosenKeyOf(i) !== null,
+  );
+  const archives = adding.filter((i) => {
+    const p = presetOf(i, slots);
+    return p !== FREE && p !== PICK;
+  }).length;
+  return { adds: adding.length, archives };
+}
 
 type Option =
   | {
@@ -156,23 +177,30 @@ export function Decision({
   const group = useId();
   const archiveId = useId();
   const sel = options.find((o) => o.key === selected) ?? null;
-  const activeVoice = active.find((v) => v.id === activeId) ?? null;
+  // The voice offered as "Keep" is not listed again under "Another active voice".
+  const others = active.filter((v) => v.id !== item.replaces?.id);
+  const activeVoice = others.find((v) => v.id === activeId) ?? null;
+  // Leaving "Another active voice" clears its list, so a later pick from it always changes the select and selects the option.
+  const choose = (key: string) => {
+    setSelected(key);
+    if (key !== "active") setActiveId("");
+  };
 
   // The slot plan, shown only under the plan's own pick: another option is a choice to record, or takes no slot.
   const preset = presetOf(item, slots);
   const freeOffered = slots !== null && freeOfferedFor(item, slots);
   const choice = item.choices.find((c) => c.id === picked) ?? null;
   const refused = (choice?.refusals.length ?? 0) > 0;
+  // Add decides this when clicked, by whether a slot is free then (`carryOutClaimed`), not by the plan's order.
   const order =
-    choice && !refused
-      ? item.outgoing?.kind === "archive" && item.outgoing.id === choice.id
-        ? item.outgoing.order
-        : slots && slots.free > 0
-          ? "add first"
-          : "archive first"
+    choice && !refused && slots
+      ? slots.free > 0
+        ? "add first"
+        : "archive first"
       : null;
   const replacesRefusals =
     item.choices.find((c) => c.id === item.replaces?.id)?.refusals ?? [];
+  const archivable = item.choices.some((c) => c.refusals.length === 0);
   const costs = sel !== null && sel.key === chosenKey && item.needsSlot;
 
   // Why Add is off, first match wins; null means it may go.
@@ -184,12 +212,16 @@ export function Decision({
         ? "The slot plan could not be read."
         : picked === FREE
           ? slots.free === 0
-            ? "No free slot: pick a voice to archive"
+            ? archivable
+              ? "No free slot: pick a voice to archive"
+              : "No free slot, and nothing here can be archived"
             : null
           : !choice
-            ? "Pick a voice to archive"
+            ? archivable
+              ? "Pick a voice to archive"
+              : "No slot, and nothing here can be archived"
             : refused
-              ? `${choice.name} cannot be archived: ${plainList(choice.refusals)}`
+              ? `${choice.name} cannot be archived: ${archiveWhy(choice.refusals)}`
               : null;
 
   const addLabel = (o: Option) =>
@@ -243,7 +275,7 @@ export function Decision({
       action = {
         label: `Choose ${name}`,
         consequence:
-          "Records the choice and plans a slot for it. Nothing is added until you click Add.",
+          "Records the choice; nothing is added yet. The card then shows the slot it takes and an Add button.",
         why: null,
         go: () =>
           run(`Choosing ${name}`, () =>
@@ -305,12 +337,14 @@ export function Decision({
     ].filter((t): t is string => t !== null);
     const base = `archive ${c.name}${tags.length ? ` (${tags.join(", ")})` : ""}`;
     return c.refusals.length
-      ? `${base}, cannot be archived: ${plainList(c.refusals)}`
+      ? `${base}, cannot be archived: ${archiveWhy(c.refusals)}`
       : base;
   };
 
   return (
     <div className="mt-3 space-y-3">
+      {/* With no plan pick, why the plan has none (a clone target that is gone, a voice already active). */}
+      {chosenKey === null && <Reasons items={item.refusals} tone="warn" />}
       <fieldset className="min-w-0">
         <legend className="mb-1.5 text-neutral-400">
           Voice<span className="sr-only"> for {item.name}</span>
@@ -354,7 +388,7 @@ export function Decision({
                   }}
                 >
                   <option value="">Pick an active voice…</option>
-                  {active.map((v) => (
+                  {others.map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.name}
                     </option>
@@ -364,7 +398,7 @@ export function Decision({
             return (
               <li
                 key={o.key}
-                onClick={() => !busy && setSelected(o.key)}
+                onClick={() => !busy && choose(o.key)}
                 className={`rounded-sm border px-3 py-2 ${
                   checked
                     ? "border-neutral-300 bg-neutral-800"
@@ -379,7 +413,7 @@ export function Decision({
                     value={o.key}
                     checked={checked}
                     disabled={busy}
-                    onChange={() => setSelected(o.key)}
+                    onChange={() => choose(o.key)}
                   />
                   <span
                     aria-hidden
@@ -412,8 +446,19 @@ export function Decision({
           <p className="text-neutral-300">Takes a slot.</p>
           {item.outgoing === null && (
             <p className="text-amber-200">
-              The plan found no slot for it: every free slot is planned for
-              another item. Pick a voice to archive.
+              The plan found no slot for it:{" "}
+              {!slots
+                ? "the slot plan could not be read."
+                : slots.free === 0
+                  ? "no slot is free."
+                  : slots.freeAfterPlan === 0
+                    ? slots.free === 1
+                      ? "the free slot is planned for another item."
+                      : "the free slots are planned for other items."
+                    : "it needs a voice to archive."}{" "}
+              {archivable
+                ? "Pick a voice to archive."
+                : "There is nothing here to archive."}
             </p>
           )}
           <label
@@ -450,7 +495,7 @@ export function Decision({
           </label>
           {picked === FREE && item.replaces && replacesRefusals.length > 0 && (
             <p className="text-neutral-400">
-              {item.replaces.name} stays active: {plainList(replacesRefusals)}.
+              {item.replaces.name} stays active: {archiveWhy(replacesRefusals)}.
             </p>
           )}
           {choice && !refused && <Leaves leaves={choice.leaves} />}
@@ -468,9 +513,7 @@ export function Decision({
           >
             {action.label}
           </button>
-          {action.why && (
-            <span className="text-amber-200">{plain(action.why)}</span>
-          )}
+          {action.why && <span className="text-amber-200">{action.why}</span>}
         </div>
         {action.why === null && action.consequence && (
           <p className="mt-1 text-neutral-500">{action.consequence}</p>

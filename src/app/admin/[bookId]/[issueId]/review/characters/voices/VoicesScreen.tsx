@@ -22,7 +22,7 @@ import {
   runAgain,
 } from "./actions";
 import { Reasons, Samples } from "./bits";
-import { Decision, decisionKey } from "./Decision";
+import { Decision, decisionKey, presetCounts } from "./Decision";
 import {
   BUTTON,
   PRIMARY,
@@ -360,6 +360,8 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
     />
   );
   const s = data.slots;
+  // What the cards start on, not the plan's own archives: a card whose planned archive is refused starts on the free slot.
+  const counts = presetCounts(data.items, s);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-[14px] text-neutral-200">
@@ -440,8 +442,9 @@ export function VoicesScreen({ data }: { data: VoicesData }) {
           <p className="mb-2 text-neutral-300">
             Voice slots: {s.used} of {s.limit} used, {s.free} free. Voice
             changes this month: {s.addEditUsed} of {s.addEditMax}. This list
-            needs {s.adds} {s.adds === 1 ? "voice" : "voices"} added and{" "}
-            {s.archives} {s.archives === 1 ? "voice" : "voices"} archived.
+            needs {counts.adds} {counts.adds === 1 ? "voice" : "voices"} added
+            and {counts.archives} {counts.archives === 1 ? "voice" : "voices"}{" "}
+            archived.
           </p>
         )}
         {data.planError && (

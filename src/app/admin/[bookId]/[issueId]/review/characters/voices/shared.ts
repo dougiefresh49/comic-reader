@@ -31,7 +31,7 @@ export const refOf = (item: ItemView): ItemRef => ({
  * way to the screen.
  */
 const PLAIN: [RegExp, string][] = [
-  [/\bno snapshot\b/g, "no backup copy, so archiving it would lose it"],
+  [/\bno snapshot\b/g, "no backup copy"],
   [/\bbucket copy missing\b/g, "its backup copy is missing"],
   [/\bmd5 mismatch\b/g, "its backup copy does not match the voice"],
   [
@@ -49,12 +49,63 @@ const PLAIN: [RegExp, string][] = [
   [/\bcarryOut\b/g, "Add"],
   [/\bone GEMINI_MEDIUM call\b/g, "one Gemini call"],
   [/\boutgoing voice\b/g, "voice to archive"],
+  [/\bitem\(s\)/g, "items"],
+  [/\bvoice\(s\)/g, "voices"],
+  [/\badd\(s\)/g, "adds"],
+  [/\bthe policy can archive\b/g, "that can be archived"],
+];
+
+/** "1 voice", "2 voices". */
+const count = (n: string, word: string): string =>
+  `${n} ${n === "1" ? word : `${word}s`}`;
+
+/**
+ * The plan's page-level refusals (`planVoiceWork` in `~/lib/voice-requests`)
+ * as sentences. Matched before `PLAIN`, which would otherwise swap words
+ * inside them.
+ */
+const SENTENCES: [RegExp, (...m: string[]) => string][] = [
+  [
+    /^(\d+) item\(s\) have no slot: (\d+) free and only (\d+) voice\(s\) the policy can archive$/,
+    (_, n, free, can) =>
+      `${count(n, "voice")} to add ${n === "1" ? "has" : "have"} no slot: ${count(free, "slot")} free, and ${can === "0" ? "no voice" : `only ${count(can, "voice")}`} can be archived.`,
+  ],
+  [
+    /^(\d+) replacement\(s\) need their old voice archived first and it is refused; pick another voice for each$/,
+    (_, n) =>
+      n === "1"
+        ? "1 new voice needs its old voice archived first, and that voice cannot be archived. Pick another voice to archive for it."
+        : `${n} new voices need their old voice archived first, and those voices cannot be archived. Pick another voice to archive for each.`,
+  ],
+  [
+    /^add\/edit headroom (\d+) is below the (\d+) add\(s\) planned$/,
+    (_, left, adds) =>
+      `${left === "0" ? "No voice changes" : `Only ${count(left, "voice change")}`} left this month, and this list adds ${count(adds, "voice")}.`,
+  ],
 ];
 
 /** A plan string in the owner's words. */
-export const plain = (s: string): string =>
-  PLAIN.reduce((out, [re, words]) => out.replace(re, words), s);
+export const plain = (s: string): string => {
+  for (const [re, say] of SENTENCES) {
+    const m = re.exec(s);
+    if (m) return say(...m);
+  }
+  return PLAIN.reduce((out, [re, words]) => out.replace(re, words), s);
+};
 
 /** A refusal list ("no snapshot, no labels") as one clause. */
 export const plainList = (reasons: string[]): string =>
   reasons.map(plain).join("; ");
+
+/**
+ * Why a voice cannot be archived, as one clause. With no backup copy the
+ * clause says what archiving would do to it.
+ */
+export const archiveWhy = (reasons: string[]): string =>
+  reasons
+    .map((r) =>
+      r === "no snapshot"
+        ? "no backup copy, so archiving it would lose it"
+        : plain(r),
+    )
+    .join("; ");
