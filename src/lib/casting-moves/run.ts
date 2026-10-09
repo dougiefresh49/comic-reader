@@ -69,6 +69,7 @@ import type {
   Move,
   MoveOutcome,
   MoveStatus,
+  PlanOptions,
   RunResult,
 } from "./types";
 
@@ -232,9 +233,10 @@ export async function runMoves(
   bookId: string,
   issueId: string,
   moves: Move[],
+  opts: PlanOptions = {},
 ): Promise<RunResult> {
   const sb = deps.supabase;
-  const detail = await planMovesDetail(deps, bookId, issueId, moves);
+  const detail = await planMovesDetail(deps, bookId, issueId, moves, opts);
   if (detail.plan.blockers.length > 0)
     return { status: "refused", runId: null, blockers: detail.plan.blockers };
 

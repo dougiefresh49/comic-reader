@@ -34,6 +34,7 @@ import type {
   Move,
   MoveKind,
   MovesPlan,
+  PlanOptions,
   PlanStep,
 } from "./types";
 
@@ -254,8 +255,9 @@ export async function planMoves(
   bookId: string,
   issueId: string,
   moves: Move[],
+  opts: PlanOptions = {},
 ): Promise<MovesPlan> {
-  return (await planMovesDetail(deps, bookId, issueId, moves)).plan;
+  return (await planMovesDetail(deps, bookId, issueId, moves, opts)).plan;
 }
 
 export async function planMovesDetail(
@@ -263,6 +265,7 @@ export async function planMovesDetail(
   bookId: string,
   issueId: string,
   moves: Move[],
+  opts: PlanOptions = {},
 ): Promise<PlanDetail> {
   const sb = deps.supabase;
   const needAccount = moves.some(
@@ -826,6 +829,25 @@ export async function planMovesDetail(
     await placeOther(i, m);
   }
 
+  // With `renderedLinesVoiced`: this issue's bubbles with audio rendered by a
+  // voice this plan archives, as bubble id to `voices.id`.
+  const renderedBy = new Map<string, string>();
+  if (opts.renderedLinesVoiced && archivedHere.size > 0) {
+    const { data, error } = await sb
+      .from("bubbles")
+      .select("id, voice_id")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .not("audio_storage_path", "is", null)
+      .in("voice_id", [...archivedHere.keys()]);
+    if (error)
+      throw new Error(
+        `casting moves: reading rendered bubbles: ${error.message}`,
+      );
+    for (const b of (data ?? []) as { id: string; voice_id: string }[])
+      renderedBy.set(b.id, b.voice_id);
+  }
+
   // Speakers after every move: each must render, sit out, or be removed.
   const needsAfter = new Set<string>();
   for (const [id, list] of lines) {
@@ -835,6 +857,15 @@ export async function planMovesDetail(
       continue;
     }
     if (r.reason !== "no voice" && r.reason !== "not in a slot") continue;
+    // A line with no text never gets audio (`bubbleNeedsAudio`).
+    const gone = r.reason === "not in a slot" ? r.voice?.voiceUuid : undefined;
+    if (
+      gone &&
+      archivedHere.has(gone) &&
+      opts.renderedLinesVoiced &&
+      list.every((l) => !l.text || renderedBy.get(l.bubbleId) === gone)
+    )
+      continue;
     const culprit =
       (r.voice ? archivedHere.get(r.voice.voiceUuid)?.moveIndex : undefined) ??
       [...moves.keys()].reverse().find((j) => {

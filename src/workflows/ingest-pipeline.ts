@@ -31,6 +31,7 @@ import { fetchWikiContextStep } from "./steps/wiki";
 import { generateVoiceDescriptions } from "./steps/voice";
 import { wordGeometryPage } from "./steps/word-geometry";
 import { getAudioJobs, generateAudioBatch } from "./steps/generation";
+import { archiveRunOnlyVoices } from "./steps/run-only-archive";
 import { generateManifest } from "./steps/publishing";
 import { createCastingTasks } from "./steps/casting-tasks";
 import { recordGateSkip, recordGateWait } from "./steps/gate-checks";
@@ -289,6 +290,7 @@ export async function ingestPipeline(input: IngestInput) {
       for (const batch of audioBatches) {
         await generateAudioBatch(bookId, issueId, batch);
       }
+      await archiveRunOnlyVoices(bookId, issueId);
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 
