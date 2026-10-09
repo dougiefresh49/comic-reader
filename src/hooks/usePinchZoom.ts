@@ -61,7 +61,12 @@ export function usePinchZoom({
     setOffset({ x: 0, y: 0 });
   }, []);
 
+  // Panel view swaps these handlers out and back (#734, #737), so a gesture
+  // that spans the swap must not leave pointer or swipe state behind.
   useEffect(() => {
+    pointerMapRef.current.clear();
+    pinchRef.current = null;
+    swipeStartRef.current = null;
     if (disabled) {
       setScale(1);
       setOffset({ x: 0, y: 0 });
@@ -98,6 +103,9 @@ export function usePinchZoom({
       if (disabled) return;
       const pointers = pointerMapRef.current;
       const prev = pointers.get(e.pointerId);
+      // Only track pointers this hook saw go down; a hovering mouse or pen
+      // must not count toward a pinch or pass onPointerUp's check.
+      if (!prev) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
       if (pointers.size === 2 && pinchRef.current) {
@@ -126,6 +134,10 @@ export function usePinchZoom({
     (e: React.PointerEvent) => {
       if (disabled) return;
       const pointers = pointerMapRef.current;
+      if (!pointers.has(e.pointerId)) {
+        swipeStartRef.current = null;
+        return;
+      }
       const wasPinch = pointers.size === 2;
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinchRef.current = null;
