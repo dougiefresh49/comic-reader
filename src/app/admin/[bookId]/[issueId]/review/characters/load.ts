@@ -299,9 +299,20 @@ export async function loadCharacters(
   const voiceView = (id: string): VoiceView | null => {
     // A "no audio" row is silent: no voice of its own, and no fallback (#410).
     if (isNoAudio(book, id, issueId)) return null;
-    // A removed member's card still shows the voice it would come back with.
-    const removed = castRow(book, id, issueId)?.in_issue === false;
-    const v = voiceFor(book, id, removed ? undefined : issueId);
+    // A removed member's card still shows the voice it would come back with:
+    // its own row's voice (a "this run only" one included, #806), else the
+    // one it inherits.
+    const own = castRow(book, id, issueId);
+    const removed = own?.in_issue === false;
+    const v =
+      removed && own.voice_uuid
+        ? {
+            voiceUuid: own.voice_uuid,
+            elevenLabsId:
+              book.voices.get(own.voice_uuid)?.current_elevenlabs_id ?? null,
+            from: id,
+          }
+        : voiceFor(book, id, removed ? undefined : issueId);
     if (!v) {
       const starting = startingVoice.get(id);
       return starting
