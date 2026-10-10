@@ -9,6 +9,7 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { requireAdmin } from "~/server/admin/require-admin";
 import {
   bookIdFromTitle,
+  bookSearchReply,
   matchSeries,
   volumeOrNull,
   type SeriesMatch,
@@ -20,9 +21,9 @@ type Result<T> = Ok<T> | Err;
 
 export interface BookSearchResult {
   title: string;
-  wikiUrl: string;
-  wikiHost: string;
-  publisher: string;
+  wikiUrl: string | null;
+  wikiHost: string | null;
+  publisher: string | null;
   franchises: string[];
   /** The multi-volume series this book belongs to; null when standalone. */
   seriesName: string | null;
@@ -32,8 +33,8 @@ export interface BookSearchResult {
   seriesId: string | null;
   seriesIsNew: boolean;
   /** This volume's issue count only. */
-  totalIssues: number;
-  wikiTitleTemplate: string;
+  totalIssues: number | null;
+  wikiTitleTemplate: string | null;
   suggestedSlug: string;
 }
 
@@ -105,11 +106,9 @@ Return JSON only, no markdown.`;
     const text = response.text?.trim();
     if (!text) return { ok: false, error: "Empty response from Gemini" };
 
-    const cleaned = text.replace(/^```json?\s*/, "").replace(/\s*```$/, "");
-    const parsed = JSON.parse(cleaned) as Omit<
-      BookSearchResult,
-      "suggestedSlug" | "seriesId" | "seriesIsNew"
-    >;
+    const reply = bookSearchReply(text);
+    if (!reply.ok) return reply;
+    const parsed = reply.data;
     const series = await resolveSeries(parsed.seriesName);
     if (!series.ok) return series;
 
@@ -135,11 +134,11 @@ Return JSON only, no markdown.`;
 interface CreateBookArgs {
   slug: string;
   title: string;
-  wikiHost: string;
-  wikiTitleTemplate: string;
-  publisher: string;
+  wikiHost: string | null;
+  wikiTitleTemplate: string | null;
+  publisher: string | null;
   franchises: string[];
-  totalIssues: number;
+  totalIssues: number | null;
   seriesName: string | null;
   volumeNumber: number | null;
   /** Standalone books to put in the book's series, each at its volume. */

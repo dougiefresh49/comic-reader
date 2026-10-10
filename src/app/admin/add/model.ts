@@ -139,6 +139,66 @@ export function volumeOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : null;
 }
 
+/** Gemini's book search answer, each field checked; `volumeNumber` is raw. */
+export interface BookSearchReply {
+  title: string;
+  wikiUrl: string | null;
+  wikiHost: string | null;
+  wikiTitleTemplate: string | null;
+  publisher: string | null;
+  seriesName: string | null;
+  franchises: string[];
+  totalIssues: number | null;
+  volumeNumber: unknown;
+}
+
+/**
+ * Gemini's book search text as a `BookSearchReply`, or the error the Book
+ * step shows. A missing or wrong-typed field becomes null (or `[]`), so a
+ * one-volume book with no issue wiki pages still gets a card.
+ */
+export function bookSearchReply(
+  text: string,
+): { ok: true; data: BookSearchReply } | { ok: false; error: string } {
+  const cleaned = text.replace(/^```json?\s*/, "").replace(/\s*```$/, "");
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // Not JSON: falls through to the "wasn't a book" error below.
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+    return {
+      ok: false,
+      error: "Gemini's answer wasn't a book. Try the search again.",
+    };
+  const reply = parsed as Record<string, unknown>;
+  const str = (v: unknown) =>
+    typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+  const title = str(reply.title);
+  if (!title)
+    return {
+      ok: false,
+      error: "Gemini's answer had no title. Try the search again or reword it.",
+    };
+  return {
+    ok: true,
+    data: {
+      title,
+      wikiUrl: str(reply.wikiUrl),
+      wikiHost: str(reply.wikiHost),
+      wikiTitleTemplate: str(reply.wikiTitleTemplate),
+      publisher: str(reply.publisher),
+      seriesName: str(reply.seriesName),
+      franchises: Array.isArray(reply.franchises)
+        ? reply.franchises.flatMap((f: unknown) => str(f) ?? [])
+        : [],
+      totalIssues: volumeOrNull(reply.totalIssues),
+      volumeNumber: reply.volumeNumber,
+    },
+  };
+}
+
 /** The Book step's series fields, as typed. */
 export interface SeriesFields {
   seriesName: string;
