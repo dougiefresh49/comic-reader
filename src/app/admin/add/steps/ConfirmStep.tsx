@@ -81,10 +81,10 @@ export function confirmStep(f: Flow): StepView | null {
   if (!book || !pages) return null;
   const fresh = (isNew: boolean) =>
     isNew ? <Chip tone="ok">new</Chip> : <Chip tone="none">saved</Chip>;
-  const seriesPart =
-    f.draft?.result.seriesIsNew && f.bookChoice === "new"
-      ? "+ series, franchises"
-      : "+ franchises";
+  // The series fields as edited in the Book step, for a new book only.
+  const plan = book.isNew && f.bookChoice === "new" ? f.seriesPlan : null;
+  const series = plan?.series ?? null;
+  const seriesPart = series?.isNew ? "+ series, franchises" : "+ franchises";
   const body = (
     <>
       {f.issueContext}
@@ -114,6 +114,26 @@ export function confirmStep(f: Flow): StepView | null {
             <span className={`${MONO} text-neutral-500`}>{seriesPart}</span>
           )}
         </WriteRow>
+        {plan && series && (
+          <WriteRow
+            k="Series"
+            title={
+              plan.volume !== null
+                ? `${series.name} · Vol. ${plan.volume}`
+                : series.name
+            }
+          >
+            {fresh(series.isNew)}
+            <span className={`${MONO} text-neutral-500`}>
+              series · {series.id}
+            </span>
+            {plan.attach.map((a) => (
+              <span key={a.bookId} className="basis-full">
+                {a.name} → Vol. {a.position}
+              </span>
+            ))}
+          </WriteRow>
+        )}
         <WriteRow k="Issue" title={`Issue ${f.number}`}>
           {fresh(f.issueIsNew)}
           <span className={`${MONO} text-neutral-500`}>
@@ -140,7 +160,9 @@ export function confirmStep(f: Flow): StepView | null {
           : pages.kind === "disk"
             ? "Uploads these files, in this order."
             : book.isNew
-              ? "Writes the book and issue rows only."
+              ? plan?.series
+                ? "Writes the book, series and issue rows only."
+                : "Writes the book and issue rows only."
               : "Writes the issue row only."}
       </Note>
       <Spacer />

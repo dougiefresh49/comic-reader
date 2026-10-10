@@ -40,8 +40,11 @@ export function savingStep(f: Flow): StepView | null {
       return <span className={`${MONO} text-red-300`}>{save.error}</span>;
     return null;
   };
-  const franchiseNote = save.warnings.find((w) =>
-    w.startsWith("Franchise links not saved"),
+  // createBook's warning once the book row is in (series books, franchises).
+  const bookNote = save.warnings.find(
+    (w) =>
+      w.startsWith("Series books not saved") ||
+      w.startsWith("Franchise links not saved"),
   );
   const progress = save.progress;
   const total = pages.kind === "online" ? pages.source.pageCount : files.length;
@@ -88,8 +91,8 @@ export function savingStep(f: Flow): StepView | null {
       <WriteList>
         <WriteRow k="Book" title={book.name}>
           {status(save.book)}
-          {franchiseNote && (
-            <span className={`${MONO} text-amber-400`}>{franchiseNote}</span>
+          {bookNote && (
+            <span className={`${MONO} text-amber-400`}>{bookNote}</span>
           )}
         </WriteRow>
         <WriteRow k="Issue" title={`Issue ${f.number}`}>

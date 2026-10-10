@@ -1,6 +1,7 @@
 /**
  * Shared shapes and rules for the Add content flow (#793). Client-safe.
  */
+import { franchiseSlug } from "~/lib/character-id";
 import { isUnstartedStep } from "~/lib/pipeline-steps";
 
 /** A saved book, as the Book step's cards show it. */
@@ -14,6 +15,15 @@ export interface FlowBook {
   wikiTitleTemplate: string | null;
   /** Page 1 of the first issue that has pages, or null. */
   cover: string | null;
+  /** `books.series_id` and `books.series_position`; null when standalone. */
+  seriesId: string | null;
+  seriesPosition: number | null;
+}
+
+/** A `series` row. */
+export interface FlowSeries {
+  id: string;
+  name: string;
 }
 
 /** A saved issue, as the Issue step's cards show it. */
@@ -92,3 +102,136 @@ export function naturalCompare(a: string, b: string): number {
 
 /** The image types the Pages step accepts from disk. */
 export const DISK_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+// ─── Series (#822) ───────────────────────────────────────────────────────────
+
+/** The series a name resolves to: an existing row, or the row a save adds. */
+export interface SeriesMatch {
+  id: string;
+  name: string;
+  isNew: boolean;
+}
+
+/**
+ * The series a book joins: an existing row whose id is the name's slug, or
+ * whose name matches ignoring case, spacing and punctuation, keeps its id, so
+ * a later volume lands in the same series; otherwise the id a new row would
+ * get. Null when there is no name. `createBook` and the Book step both use it.
+ */
+export function matchSeries(
+  rows: FlowSeries[],
+  name: string | null | undefined,
+): SeriesMatch | null {
+  const series = name?.trim();
+  const slug = series ? franchiseSlug(series) : "";
+  if (!series || !slug) return null;
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const existing = rows.find(
+    (r) => r.id === slug || key(r.name) === key(series),
+  );
+  return existing
+    ? { id: existing.id, name: existing.name, isNew: false }
+    : { id: slug, name: series, isNew: true };
+}
+
+/** A volume number, kept only when it is a positive integer. */
+export function volumeOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : null;
+}
+
+/** The Book step's series fields, as typed. */
+export interface SeriesFields {
+  seriesName: string;
+  /** The new book's volume field; empty for none. */
+  volume: string;
+  /** Standalone books ticked to join the series: book id → volume field. */
+  attach: Record<string, string>;
+}
+
+/**
+ * A ticked book's volume field, or null when it is not ticked. Own keys only:
+ * a book id such as `constructor` is not ticked by inheritance.
+ */
+export function attachField(
+  attach: Record<string, string>,
+  id: string,
+): string | null {
+  return Object.hasOwn(attach, id) ? (attach[id] ?? "") : null;
+}
+
+/** What the series fields will write, and the one problem that blocks them. */
+export interface SeriesPlan {
+  series: SeriesMatch | null;
+  /** The new book's volume; null when empty or standalone. */
+  volume: number | null;
+  /** The matched series' saved books, by volume. Empty for a new series. */
+  members: FlowBook[];
+  /** Saved books with no series, the ones that can be ticked. */
+  standalone: FlowBook[];
+  /** Ticked books; `position` is 0 while the volume is missing or bad. */
+  attach: { bookId: string; name: string; position: number }[];
+  problem: string | null;
+}
+
+export function planSeries(
+  rows: FlowSeries[],
+  books: FlowBook[],
+  fields: SeriesFields,
+): SeriesPlan {
+  const series = matchSeries(rows, fields.seriesName);
+  const standalone = books.filter((b) => b.seriesId === null);
+  if (!series) {
+    return {
+      series,
+      volume: null,
+      members: [],
+      standalone,
+      attach: [],
+      problem: null,
+    };
+  }
+  const read = (text: string) =>
+    text.trim() === "" ? null : volumeOrNull(Number(text));
+  const members = series.isNew
+    ? []
+    : books
+        .filter((b) => b.seriesId === series.id)
+        .sort(
+          (a, b) =>
+            (a.seriesPosition ?? Infinity) - (b.seriesPosition ?? Infinity),
+        );
+  const volume = read(fields.volume);
+  const attach = standalone
+    .filter((b) => attachField(fields.attach, b.id) !== null)
+    .map((b) => ({
+      bookId: b.id,
+      name: b.name,
+      position: read(attachField(fields.attach, b.id) ?? "") ?? 0,
+    }));
+
+  const problem = ((): string | null => {
+    if (fields.volume.trim() !== "" && volume === null)
+      return "Volume must be a whole number above 0.";
+    const missing = attach.find((a) => a.position === 0);
+    if (missing) return `${missing.name} needs a volume.`;
+    // Each volume once: the series' saved books (by name), then this save's.
+    const taken = new Map<number, string | null>();
+    for (const b of members)
+      if (b.seriesPosition !== null) taken.set(b.seriesPosition, b.name);
+    const planned = [
+      ...(volume !== null ? [volume] : []),
+      ...attach.map((a) => a.position),
+    ];
+    for (const n of planned) {
+      if (taken.has(n)) {
+        const holder = taken.get(n);
+        return holder
+          ? `Vol. ${n} is already ${holder}.`
+          : `Vol. ${n} is used twice.`;
+      }
+      taken.set(n, null);
+    }
+    return null;
+  })();
+  return { series, volume, members, standalone, attach, problem };
+}
