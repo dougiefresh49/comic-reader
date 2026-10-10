@@ -419,13 +419,11 @@ export function CharacterPanel(props: CharacterPanelProps) {
         >
           {shownTab === "voice" ? (
             <>
-              {revoice && (
-                <Revoice
-                  bookId={bookId}
-                  plan={revoice}
-                  voiceName={card.voice?.name ?? null}
-                />
-              )}
+              <Revoice
+                bookId={bookId}
+                plan={revoice}
+                voiceName={card.voice?.name ?? null}
+              />
               <VoiceTab card={card} state={state} {...voiceProps} />
             </>
           ) : (

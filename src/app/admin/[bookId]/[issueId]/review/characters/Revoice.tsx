@@ -21,20 +21,28 @@ const credits = (n: number) => `≈${n.toLocaleString()} credits`;
 
 export function Revoice({
   bookId,
-  plan,
+  plan: current,
   voiceName,
 }: {
   bookId: string;
-  plan: RevoicePlan;
+  /** The page's plan; null when the character has no old-voice audio. */
+  plan: RevoicePlan | null;
   /** The voice the lines will be rendered in now. */
   voiceName: string | null;
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  // Each render revalidates the reader page, and the action's answer brings
+  // a fresh casting page, so the page's plan shrinks as the run goes. The
+  // box shows the plan it confirmed until the run ends, and stays to say so.
+  const [confirmed, setConfirmed] = useState<RevoicePlan | null>(null);
   const stop = useRef(false);
+  const plan = confirmed ?? current;
+  if (!plan) return null;
 
-  async function run() {
+  async function run(plan: RevoicePlan) {
     stop.current = false;
+    setConfirmed(plan);
     let done = 0;
     let rendered = 0;
     setPhase({ kind: "running", done, lines: rendered });
@@ -53,6 +61,7 @@ export function Revoice({
           lines: rendered,
           error: r.error,
         });
+        setConfirmed(null);
         router.refresh();
         return;
       }
@@ -62,9 +71,12 @@ export function Revoice({
     }
     const finished = done === plan.units.length;
     setPhase({ kind: "stopped", finished, lines: rendered, error: null });
-    // A stop part way reads the plan again for the next Re-voice. A finished
-    // run leaves the page as it is, so its Done line stays in view.
-    if (!finished) router.refresh();
+    // A stop part way shows the page's plan again for the next Re-voice. A
+    // finished run keeps the one it ran, so its Done line stays in view.
+    if (!finished) {
+      setConfirmed(null);
+      router.refresh();
+    }
   }
 
   const total = plan.units.length;
@@ -109,7 +121,11 @@ export function Revoice({
             <span className="text-[12.5px] text-amber-200">
               Spend {credits(plan.credits)} on {lines(plan.bubbles)}?
             </span>
-            <button type="button" className={BTN_PRIMARY} onClick={run}>
+            <button
+              type="button"
+              className={BTN_PRIMARY}
+              onClick={() => run(plan)}
+            >
               Confirm
             </button>
             <button
