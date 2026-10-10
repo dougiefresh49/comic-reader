@@ -371,8 +371,9 @@ function issueLinkLabel(issue: IssueManifest): string {
  * Where the end-of-issue screen leads (#830). `manifest` is the one the route
  * loaded, so its books are the ones this route may link to. `everyIssue` is
  * the unfiltered manifest, so a book's issue list includes the pending
- * issues the public filter drops: those still make this issue not the
- * book's last, and still count as a book's first issue.
+ * issues the public filter drops (those still make this issue not the
+ * book's last, and still count as a book's first issue), and a series
+ * lists its unpublished volumes in position order.
  * Next issue: the first later issue of this book that is finished and has
  * pages. Next book, only from the book's last issue: the next book in the
  * series, when its first issue is finished and has pages. Finished means
@@ -412,18 +413,26 @@ function endOfIssueLinks(
   }
 
   // A later issue that is not finished yet means this is not the book's
-  // last issue, so there is no next book either.
+  // last issue, so there is no next book either. The next book comes from
+  // the unfiltered series, so an unpublished next volume means none here
+  // rather than a skip to the volume after it.
   const series =
     at === issues.length - 1 && book.series
-      ? manifest.series.find((s) => s.id === book.series?.id)
+      ? everyIssue.series.find((s) => s.id === book.series?.id)
       : undefined;
   const books = series?.books ?? [];
   const nextBook = books[books.findIndex((b) => b.id === book.id) + 1];
-  const firstIssue = nextBook ? issuesOf(nextBook)[0] : undefined;
+  const linkable =
+    !!nextBook && manifest.books.some((b) => b.id === nextBook.id);
+  const firstIssue = nextBook?.issues[0];
   return {
     nextIssue: null,
     nextBook:
-      nextBook && firstIssue && finished(firstIssue) && firstIssue.pageCount > 0
+      nextBook &&
+      linkable &&
+      firstIssue &&
+      finished(firstIssue) &&
+      firstIssue.pageCount > 0
         ? {
             href: `${basePath}/${nextBook.id}/${firstIssue.id}/1`,
             label: nextBook.name,
