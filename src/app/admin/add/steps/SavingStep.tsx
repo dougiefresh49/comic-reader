@@ -72,7 +72,7 @@ export function savingStep(f: Flow): StepView | null {
         )}
         <span className="mt-1.5 block h-1.5 w-full max-w-[420px] overflow-hidden rounded-[3px] bg-[#303030]">
           <i
-            className={`block h-full transition-all ${progress?.finalizing ? "animate-pulse bg-sky-400" : "bg-emerald-400"}`}
+            className={`block h-full transition-all ${progress?.finalizing && save.pages === "saving" ? "animate-pulse bg-sky-400" : "bg-emerald-400"}`}
             style={{
               width: `${progress && progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
             }}
