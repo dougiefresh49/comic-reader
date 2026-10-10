@@ -5,12 +5,17 @@
  * finalize). Both report progress and stop on `signal`.
  */
 
+import { storedPages } from "./actions";
+
 export interface PageProgress {
   current: number;
   total: number;
   /** The latest event message, or the file being sent. */
   detail: string;
-  /** Set once the upload's finalize runs, which cannot be stopped. */
+  /**
+   * Set once the upload's finalize runs, which cannot be stopped. `current`
+   * then counts the pages stored as WebP so far, from 0.
+   */
   finalizing?: boolean;
 }
 
@@ -159,17 +164,43 @@ export async function uploadPages(args: {
   );
   if (failure !== null) return { ok: false, error: failure };
 
-  args.onProgress({
-    current: files.length,
-    total: files.length,
-    detail: "storing as WebP…",
-    finalizing: true,
-  });
-  const fin = await post(
-    { mode: "finalize", bookId, issueId, count: files.length },
-    signal,
-  );
-  if (!fin.ok) return { ok: false, error: await errorOf(fin) };
-  const body = (await fin.json()) as { stored: number; warnings?: string[] };
-  return { ok: true, stored: body.stored, warnings: body.warnings ?? [] };
+  // Finalize is one long request. Poll the stored rows so the count moves:
+  // one poll at a time, none reported once finalize ends.
+  const total = files.length;
+  let shown = 0;
+  let ended = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const report = () =>
+    args.onProgress({
+      current: shown,
+      total,
+      detail: "uploaded · storing as WebP",
+      finalizing: true,
+    });
+  const poll = async () => {
+    try {
+      const rows = await storedPages(bookId, issueId);
+      if (ended || signal.aborted) return;
+      shown = Math.max(shown, Math.min(rows, total));
+      report();
+    } catch {
+      // the next poll tries again
+    }
+    if (!ended && !signal.aborted) timer = setTimeout(() => void poll(), 2000);
+  };
+  report();
+  timer = setTimeout(() => void poll(), 2000);
+  try {
+    const fin = await post(
+      { mode: "finalize", bookId, issueId, count: total },
+      signal,
+    );
+    ended = true;
+    if (!fin.ok) return { ok: false, error: await errorOf(fin) };
+    const body = (await fin.json()) as { stored: number; warnings?: string[] };
+    return { ok: true, stored: body.stored, warnings: body.warnings ?? [] };
+  } finally {
+    ended = true;
+    clearTimeout(timer);
+  }
 }
