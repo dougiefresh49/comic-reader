@@ -244,6 +244,10 @@ function seriesFields(f: Flow, draft: NewBook) {
 export function newBookStep(f: Flow): StepView {
   const { draft } = f;
   const r = draft?.result;
+  const wiki =
+    r?.wikiHost && r.wikiTitleTemplate
+      ? `${r.wikiHost}/wiki/${r.wikiTitleTemplate.replace(/^\/?(wiki\/)?/i, "")}`
+      : (r?.wikiUrl?.replace(/^https:\/\//, "") ?? null);
   const idProblem = draft ? f.bookIdProblem(draft.id) : null;
   const seriesProblem = f.seriesPlan?.problem ?? null;
   const body = (
@@ -286,19 +290,28 @@ export function newBookStep(f: Flow): StepView {
           <div>
             <h3 className="mb-1 text-[17px] font-semibold">{r.title}</h3>
             <div className="flex flex-wrap gap-1.5">
-              <Chip tone="site">{r.wikiHost}</Chip>
-              <Chip tone="none">{r.totalIssues} issues</Chip>
+              {r.wikiHost && <Chip tone="site">{r.wikiHost}</Chip>}
+              {r.totalIssues !== null && (
+                <Chip tone="none">{r.totalIssues} issues</Chip>
+              )}
             </div>
             <div className="mt-2 grid grid-cols-[90px_1fr] gap-x-3 gap-y-[3px] text-[13px]">
-              <span className="text-neutral-500">Publisher</span>
-              <span>{r.publisher}</span>
+              {r.publisher && (
+                <>
+                  <span className="text-neutral-500">Publisher</span>
+                  <span>{r.publisher}</span>
+                </>
+              )}
               <span className="text-neutral-500">Franchises</span>
               <span>{r.franchises.join(", ")}</span>
-              <span className="text-neutral-500">Wiki</span>
-              <span className={`${MONO} break-all text-neutral-400`}>
-                {r.wikiHost}/wiki/
-                {r.wikiTitleTemplate.replace(/^\/?(wiki\/)?/i, "")}
-              </span>
+              {wiki && (
+                <>
+                  <span className="text-neutral-500">Wiki</span>
+                  <span className={`${MONO} break-all text-neutral-400`}>
+                    {wiki}
+                  </span>
+                </>
+              )}
             </div>
             {seriesFields(f, draft)}
             <IdLine
