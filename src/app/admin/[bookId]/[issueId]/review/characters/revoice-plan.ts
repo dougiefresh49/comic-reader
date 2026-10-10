@@ -4,6 +4,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { joinGroupText } from "~/lib/balloon-groups";
+import { chunk } from "~/lib/chunk";
 import { loadBookCast, renderVoice, type BookCast } from "~/lib/cast";
 import { buildTtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
@@ -51,26 +52,83 @@ async function readAudioRows(
   }
 }
 
-/** `character:voice` for every done casting move that put a voice on a character. */
-async function readSwappedIn(
+/**
+ * For each `character:voice` a done casting move swapped in (a voice that
+ * replaced a different one), the first issue the swap covers: a swap writes
+ * its own issue's castlist row and the later ones' (`castVoiceInBook`).
+ */
+async function readSwaps(
+  client: SupabaseClient,
+  book: BookCast,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await client
+      .from("casting_moves")
+      .select("issue_id, character_id, voice_uuid, replaces_voice_uuid")
+      .eq("book_id", book.bookId)
+      .eq("status", "done")
+      .not("character_id", "is", null)
+      .not("voice_uuid", "is", null)
+      .not("replaces_voice_uuid", "is", null)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error)
+      throw new Error(`re-voice: reading casting moves: ${error.message}`);
+    const rows = (data ?? []) as {
+      issue_id: string;
+      character_id: string;
+      voice_uuid: string;
+      replaces_voice_uuid: string;
+    }[];
+    for (const m of rows) {
+      if (m.replaces_voice_uuid === m.voice_uuid) continue;
+      const key = `${m.character_id}:${m.voice_uuid}`;
+      const n = book.issueNumber.get(m.issue_id) ?? 0;
+      out.set(key, Math.min(n, out.get(key) ?? n));
+    }
+    if (rows.length < PAGE) return out;
+  }
+}
+
+/** The active (not ignored, not silent) members of joined groups, by `issue:group`, in sort order. */
+async function readGroupMembers(
   client: SupabaseClient,
   bookId: string,
-): Promise<Set<string>> {
-  const { data, error } = await client
-    .from("casting_moves")
-    .select("character_id, voice_uuid")
-    .eq("book_id", bookId)
-    .eq("status", "done")
-    .not("character_id", "is", null)
-    .not("voice_uuid", "is", null);
-  if (error)
-    throw new Error(`re-voice: reading casting moves: ${error.message}`);
-  return new Set(
-    ((data ?? []) as { character_id: string; voice_uuid: string }[]).map(
-      (m) => `${m.character_id}:${m.voice_uuid}`,
-    ),
-  );
+  groups: { issueId: string; groupId: string }[],
+): Promise<Map<string, GroupMember[]>> {
+  const out = new Map<string, GroupMember[]>();
+  for (const issueId of new Set(groups.map((g) => g.issueId))) {
+    const ids = groups
+      .filter((g) => g.issueId === issueId)
+      .map((g) => g.groupId);
+    for (const part of chunk(ids, 100)) {
+      const { data, error } = await client
+        .from("bubbles")
+        .select(
+          "id, group_id, page_number, sort_order, text_with_cues, ocr_text",
+        )
+        .eq("book_id", bookId)
+        .eq("issue_id", issueId)
+        .in("group_id", part)
+        .eq("ignored", false)
+        .eq("silent", false)
+        .order("sort_order")
+        .order("id");
+      if (error) throw new Error(`re-voice: reading groups: ${error.message}`);
+      for (const m of (data ?? []) as (GroupMember & { group_id: string })[]) {
+        const key = `${issueId}:${m.group_id}`;
+        out.set(key, [...(out.get(key) ?? []), m]);
+      }
+    }
+  }
+  return out;
 }
+
+type GroupMember = Pick<
+  AudioRow,
+  "id" | "page_number" | "sort_order" | "text_with_cues" | "ocr_text"
+>;
 
 /**
  * Every character in the book with old-voice audio, and the renders that
@@ -79,66 +137,85 @@ async function readSwappedIn(
  * - `bubbles.voice_id` names a voice other than the one `renderVoice` finds
  *   for its character in its issue now; or
  * - `voice_id` is null (audio from before #748 recorded it) and a done
- *   `casting_moves` row put the character's current voice in. Moves started
- *   after `voice_id` did, and every render since writes `voice_id`, so audio
- *   with no `voice_id` predates every recorded swap.
+ *   `casting_moves` row swapped the character's current voice in, on this
+ *   issue or an earlier one. Moves started after `voice_id` did, and every
+ *   render since writes `voice_id`, so audio with no `voice_id` predates
+ *   every recorded swap.
  *
  * A bubble whose character has no playable voice now is left out: Regenerate
- * could not render it either. Credits are the request text `buildTtsRequest`
- * makes, voice prefix included, one per render: a joined group (#451) is one.
+ * could not render it either. A render is what Regenerate makes for the
+ * bubble: a joined group (#451) with two or more active members is one
+ * render of every active member, priced on their joined text; anything else
+ * is the bubble alone. Credits are the request text `buildTtsRequest` makes,
+ * voice prefix included.
  */
 export async function planRevoice(
   client: SupabaseClient,
   bookId: string,
   opts: { characterIds?: string[]; book?: BookCast } = {},
 ): Promise<RevoicePlan[]> {
-  const [book, rows, swappedIn] = await Promise.all([
+  const [book, rows] = await Promise.all([
     opts.book ?? loadBookCast(client, bookId),
     readAudioRows(client, bookId, opts.characterIds),
-    readSwappedIn(client, bookId),
   ]);
+  const swaps = await readSwaps(client, book);
+  const issueNumber = (id: string) => book.issueNumber.get(id) ?? 0;
 
   const stale: { row: AudioRow; elevenLabsId: string }[] = [];
   for (const row of rows) {
     const now = renderVoice(book, row.character_id, row.issue_id);
     if (!now.ok) continue;
+    const swappedAt = swaps.get(`${now.from}:${now.voiceUuid}`);
     const old = row.voice_id
       ? row.voice_id !== now.voiceUuid
-      : swappedIn.has(`${now.from}:${now.voiceUuid}`);
+      : swappedAt !== undefined && swappedAt <= issueNumber(row.issue_id);
     if (old) stale.push({ row, elevenLabsId: now.elevenLabsId });
   }
-  const overrides = await loadVoiceOverrides(
-    client,
-    stale.map((s) => s.elevenLabsId),
-  );
+  const [overrides, groups] = await Promise.all([
+    loadVoiceOverrides(
+      client,
+      stale.map((s) => s.elevenLabsId),
+    ),
+    readGroupMembers(
+      client,
+      bookId,
+      stale.flatMap(({ row }) =>
+        row.group_id ? [{ issueId: row.issue_id, groupId: row.group_id }] : [],
+      ),
+    ),
+  ]);
 
   // One render per bubble, or per joined group: the members share one clip.
   const units = new Map<
     string,
-    { rows: AudioRow[]; elevenLabsId: string; characterId: string }
+    { members: GroupMember[]; elevenLabsId: string; characterId: string }
   >();
   for (const { row, elevenLabsId } of stale) {
-    const key = row.group_id
+    const members = row.group_id
+      ? groups.get(`${row.issue_id}:${row.group_id}`)
+      : undefined;
+    const joined = members && members.length >= 2;
+    const key = joined
       ? `${row.issue_id}:group:${row.group_id}`
       : `${row.issue_id}:${row.id}`;
-    const unit = units.get(key);
-    if (unit) unit.rows.push(row);
-    else
-      units.set(key, {
-        rows: [row],
-        elevenLabsId,
-        characterId: row.character_id,
-      });
+    if (units.has(key)) continue;
+    units.set(key, {
+      members: joined ? members : [row],
+      elevenLabsId,
+      characterId: row.character_id,
+    });
   }
 
   const plans = new Map<string, RevoicePlan>();
-  for (const unit of units.values()) {
-    unit.rows.sort((a, b) => a.sort_order - b.sort_order);
-    const first = unit.rows[0]!;
+  for (const [key, unit] of units) {
+    const first = unit.members[0]!;
+    const issueId = key.slice(0, key.indexOf(":"));
     const text =
-      unit.rows.length > 1
+      unit.members.length > 1
         ? joinGroupText(
-            unit.rows.map((r) => (r.text_with_cues ?? r.ocr_text ?? "").trim()),
+            unit.members.map((r) =>
+              (r.text_with_cues ?? r.ocr_text ?? "").trim(),
+            ),
           )
         : (first.text_with_cues ?? first.ocr_text ?? "");
     const credits = buildTtsRequest({
@@ -155,11 +232,11 @@ export async function planRevoice(
     };
     plans.set(unit.characterId, plan);
     const u: RevoiceUnit = {
-      issueId: first.issue_id,
+      issueId,
       bubbleId: first.id,
       page: first.page_number,
       sortOrder: first.sort_order,
-      bubbles: unit.rows.length,
+      bubbles: unit.members.length,
       credits,
     };
     plan.units.push(u);
@@ -167,7 +244,6 @@ export async function planRevoice(
     plan.credits += u.credits;
   }
 
-  const issueNumber = (id: string) => book.issueNumber.get(id) ?? 0;
   for (const plan of plans.values()) {
     plan.units.sort(
       (a, b) =>

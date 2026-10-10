@@ -14,15 +14,18 @@ import { planRevoice } from "./revoice-plan";
 
 /**
  * Renders one unit of the character's plan, after reading the plan again: a
- * bubble that already plays its current voice (a rerun, another tab) is
- * skipped and spends nothing.
+ * bubble that already plays its current voice (a rerun, or another tab that
+ * finished it first) is skipped and spends nothing. Two calls for one bubble
+ * at the same moment can both pay; the box runs one call at a time.
  */
 export async function revoiceUnit(args: {
   bookId: string;
   issueId: string;
   bubbleId: string;
   characterId: string;
-}): Promise<{ ok: true; skipped: boolean } | { ok: false; error: string }> {
+}): Promise<
+  { ok: true; skipped: boolean } | { ok: false; error: string; spent: boolean }
+> {
   try {
     await requireAdmin();
     const [plan] = await planRevoice(supabaseAdmin, args.bookId, {
@@ -36,6 +39,7 @@ export async function revoiceUnit(args: {
     return {
       ok: false,
       error: err instanceof Error ? err.message : String(err),
+      spent: false,
     };
   }
   const result = await regenerateAudio({
@@ -43,8 +47,12 @@ export async function revoiceUnit(args: {
     issueId: args.issueId,
     bubbleId: args.bubbleId,
   });
-  // Its error says what the reader plays now and whether it was paid for.
-  if (!result.ok)
-    return { ok: false, error: result.error ?? "Regenerate failed" };
+  // Its error says what the reader plays now. Every failure at or after the
+  // paid call ends with "Regenerating will spend ElevenLabs credits again";
+  // the ones before it (no text, a group to fix first) cost nothing.
+  if (!result.ok) {
+    const error = result.error ?? "Regenerate failed";
+    return { ok: false, error, spent: error.includes("credits again") };
+  }
   return { ok: true, skipped: false };
 }

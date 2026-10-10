@@ -13,8 +13,15 @@ import { BTN, BTN_GHOST, BTN_PRIMARY, LABEL } from "./ui";
 type Phase =
   | { kind: "idle" }
   | { kind: "confirm" }
-  | { kind: "running"; done: number; lines: number }
-  | { kind: "stopped"; finished: boolean; lines: number; error: string | null };
+  | { kind: "running"; done: number; tally: Tally }
+  | { kind: "stopped"; finished: boolean; tally: Tally; error: string | null };
+
+/** Lines re-voiced, lines already in the current voice, and renders refused at no cost. */
+interface Tally {
+  lines: number;
+  current: number;
+  refused: string[];
+}
 
 const lines = (n: number) => `${n} ${n === 1 ? "line" : "lines"}`;
 const credits = (n: number) => `≈${n.toLocaleString()} credits`;
@@ -37,15 +44,19 @@ export function Revoice({
   // box shows the plan it confirmed until the run ends, and stays to say so.
   const [confirmed, setConfirmed] = useState<RevoicePlan | null>(null);
   const stop = useRef(false);
+  /** Held from Confirm to the end of the run, so a second click starts nothing. */
+  const running = useRef(false);
   const plan = confirmed ?? current;
   if (!plan) return null;
 
   async function run(plan: RevoicePlan) {
+    if (running.current) return;
+    running.current = true;
     stop.current = false;
     setConfirmed(plan);
     let done = 0;
-    let rendered = 0;
-    setPhase({ kind: "running", done, lines: rendered });
+    const tally: Tally = { lines: 0, current: 0, refused: [] };
+    setPhase({ kind: "running", done, tally: { ...tally } });
     for (const u of plan.units) {
       if (stop.current) break;
       const r = await revoiceUnit({
@@ -53,12 +64,21 @@ export function Revoice({
         issueId: u.issueId,
         bubbleId: u.bubbleId,
         characterId: plan.characterId,
-      }).catch((e: Error) => ({ ok: false as const, error: e.message }));
-      if (!r.ok) {
+      }).catch((e: Error) => ({
+        ok: false as const,
+        error: e.message,
+        // No answer: the call may have reached ElevenLabs.
+        spent: true,
+      }));
+      // A failure that may have been paid for stops the run; one refused
+      // before the paid call (no text, a group to fix first) is noted and
+      // the run goes on, since a retry would only be refused again.
+      if (!r.ok && r.spent) {
+        running.current = false;
         setPhase({
           kind: "stopped",
           finished: false,
-          lines: rendered,
+          tally: { ...tally },
           error: r.error,
         });
         setConfirmed(null);
@@ -66,11 +86,14 @@ export function Revoice({
         return;
       }
       done += 1;
-      rendered += u.bubbles;
-      setPhase({ kind: "running", done, lines: rendered });
+      if (!r.ok) tally.refused.push(`p.${u.page}: ${r.error}`);
+      else if (r.skipped) tally.current += u.bubbles;
+      else tally.lines += u.bubbles;
+      setPhase({ kind: "running", done, tally: { ...tally } });
     }
-    const finished = done === plan.units.length;
-    setPhase({ kind: "stopped", finished, lines: rendered, error: null });
+    running.current = false;
+    const finished = done === plan.units.length && tally.refused.length === 0;
+    setPhase({ kind: "stopped", finished, tally: { ...tally }, error: null });
     // A stop part way shows the page's plan again for the next Re-voice. A
     // finished run keeps the one it ran, so its Done line stays in view.
     if (!finished) {
@@ -140,7 +163,8 @@ export function Revoice({
         {phase.kind === "running" && (
           <>
             <span role="status" className="text-[12.5px] text-neutral-200">
-              Rendering {phase.done + 1} of {total} · {lines(phase.lines)} done
+              Rendering {phase.done + 1} of {total} · {lines(phase.tally.lines)}{" "}
+              done
             </span>
             <button
               type="button"
@@ -154,16 +178,31 @@ export function Revoice({
           </>
         )}
         {phase.kind === "stopped" && (
-          <span
-            role="status"
-            className={`text-[12.5px] ${phase.error ? "text-red-300" : "text-emerald-300"}`}
-          >
-            {phase.error
-              ? `Stopped after ${lines(phase.lines)}: ${phase.error} Re-voice again to carry on.`
-              : phase.finished
-                ? `Done: ${lines(phase.lines)} re-voiced.`
-                : `Stopped after ${lines(phase.lines)}. Re-voice again to carry on.`}
-          </span>
+          <div role="status" className="text-[12.5px]">
+            <p
+              className={
+                phase.error || !phase.finished
+                  ? "text-red-300"
+                  : "text-emerald-300"
+              }
+            >
+              {phase.error
+                ? `Stopped after ${lines(phase.tally.lines)}: ${phase.error}`
+                : phase.finished
+                  ? `Done: ${lines(phase.tally.lines)} re-voiced.`
+                  : `Stopped after ${lines(phase.tally.lines)}.`}
+              {phase.tally.current > 0 &&
+                ` ${lines(phase.tally.current)} already played the current voice.`}
+              {!phase.finished && " Re-voice again to carry on."}
+            </p>
+            {phase.tally.refused.length > 0 && (
+              <ul className="mt-1 text-neutral-300">
+                {phase.tally.refused.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </div>
     </section>
