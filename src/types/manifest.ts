@@ -1,5 +1,7 @@
 export interface IssueManifest {
   id: string;
+  /** `issues.number`, the issue's number within its book. */
+  number: number;
   name: string;
   pageCount: number;
   bubbleCount: number;

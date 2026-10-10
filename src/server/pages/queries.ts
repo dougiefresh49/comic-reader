@@ -205,6 +205,7 @@ export async function getManifest({
         : null,
       issues: (book.issues ?? []).map((issue) => ({
         id: issue.id,
+        number: issue.number,
         name: issue.name,
         pageCount: issue.page_count,
         bubbleCount: issue.bubble_count,
@@ -407,10 +408,9 @@ export async function getReaderPage({
   basePath: "/book" | "/admin/preview";
 }): Promise<ReaderPageProps | null> {
   const manifest = await getManifest({ publishedOnly });
-  const issue = manifest.books
-    .find((b) => b.id === bookId)
-    ?.issues.find((i) => i.id === issueId);
-  if (!issue) return null;
+  const book = manifest.books.find((b) => b.id === bookId);
+  const issue = book?.issues.find((i) => i.id === issueId);
+  if (!book || !issue) return null;
 
   const pageNum = parseInt(pageNumber, 10);
   if (isNaN(pageNum) || pageNum < 1) return null;
@@ -438,6 +438,8 @@ export async function getReaderPage({
     pageImage: pageImageUrl(bookId, issueId, pageNum),
     bookId,
     issueId,
+    bookName: book.name,
+    issueNumber: issue.number,
     pageNumber: pageNum,
     pageCount,
     prevPageLink: turns.prev !== null ? pageLink(turns.prev) : null,
