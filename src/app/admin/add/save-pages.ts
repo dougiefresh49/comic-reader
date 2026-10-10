@@ -101,6 +101,14 @@ function extOf(file: File): string {
 // At #818's ~3.1 s a page, 50 pages take ~155 s, half the 300 s maxDuration.
 const FINALIZE_BATCH = 50;
 
+/**
+ * The files each issue was last sent with in this tab. A resume skips only
+ * the stored pages whose file is still at the same place in the pick: Back
+ * lets the pick change, and a removed or replaced file shifts what follows.
+ */
+const lastPicks = new Map<string, string[]>();
+const fileKey = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+
 async function post(body: object, signal: AbortSignal): Promise<Response> {
   return fetch("/api/admin/upload-source-page", {
     method: "POST",
@@ -141,9 +149,16 @@ export async function uploadPages(args: {
       error: `${issueId} already holds pages up to ${lastStored}, but ${total} files were picked.`,
     };
   }
+  // Stored pages count as done only up to the first file that differs from
+  // the last pick; with no record of one, everything is sent again.
+  const picked = files.map(fileKey);
+  const prior = lastPicks.get(`${bookId}/${issueId}`) ?? [];
+  let same = 0;
+  while (same < picked.length && picked[same] === prior[same]) same++;
+  lastPicks.set(`${bookId}/${issueId}`, picked);
   // Every page stored but the issue row unwritten: redo the last page alone,
   // whose finalize writes it.
-  const start = Math.max(1, Math.min(resumeFrom, total));
+  const start = Math.max(1, Math.min(resumeFrom, same + 1, total));
   if (start > 1) {
     args.onProgress({ current: start - 1, total, detail: "" });
   }
