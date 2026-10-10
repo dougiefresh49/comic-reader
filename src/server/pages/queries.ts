@@ -368,25 +368,32 @@ function issueLinkLabel(issue: IssueManifest): string {
 }
 
 /**
- * Where the end-of-issue screen leads (#830), from the manifest already
- * loaded. Next issue: the first later issue of this book that has pages.
- * Next book, only from the book's last issue: the first later book in the
- * series whose first issue has pages. On the public route the issue must also be
- * `ready`: the manifest's `publishedOnly` filter drops draft books and
- * pending issues but keeps `processing` ones.
+ * Where the end-of-issue screen leads (#830). `manifest` is the one the route
+ * loaded, so its books are the ones this route may link to. `everyIssue` is
+ * the unfiltered manifest, so a book's issue list includes the pending
+ * issues the public filter drops: those still make this issue not the
+ * book's last, and still count as a book's first issue.
+ * Next issue: the first later issue of this book that is finished and has
+ * pages. Next book, only from the book's last issue: the next book in the
+ * series, when its first issue is finished and has pages. Finished means
+ * `ready` on the public route and anything in preview.
  */
 function endOfIssueLinks(
   manifest: Manifest,
+  everyIssue: Manifest,
   book: BookManifest,
   issueId: string,
   storedCounts: Record<string, Record<string, number>>,
   basePath: "/book" | "/admin/preview",
 ): EndOfIssue {
-  // The public reader offers only finished issues; preview offers any.
   const finished = (i: IssueManifest) =>
     basePath === "/admin/preview" || i.status === "ready";
-  const at = book.issues.findIndex((i) => i.id === issueId);
-  const nextIssue = book.issues
+  const issuesOf = (b: BookManifest) =>
+    everyIssue.books.find((x) => x.id === b.id)?.issues ?? b.issues;
+
+  const issues = issuesOf(book);
+  const at = issues.findIndex((i) => i.id === issueId);
+  const nextIssue = issues
     .slice(at + 1)
     .find(
       (i) =>
@@ -404,25 +411,19 @@ function endOfIssueLinks(
     };
   }
 
-  // A later issue that is not ready yet means this is not the book's last
-  // issue, so there is no next book either.
-  const lastIssue = at === book.issues.length - 1;
+  // A later issue that is not finished yet means this is not the book's
+  // last issue, so there is no next book either.
   const series =
-    lastIssue && book.series
+    at === issues.length - 1 && book.series
       ? manifest.series.find((s) => s.id === book.series?.id)
       : undefined;
   const books = series?.books ?? [];
-  const nextBook = books
-    .slice(books.findIndex((b) => b.id === book.id) + 1)
-    .find((b) => {
-      const first = b.issues[0];
-      return !!first && finished(first) && first.pageCount > 0;
-    });
-  const firstIssue = nextBook?.issues[0];
+  const nextBook = books[books.findIndex((b) => b.id === book.id) + 1];
+  const firstIssue = nextBook ? issuesOf(nextBook)[0] : undefined;
   return {
     nextIssue: null,
     nextBook:
-      nextBook && firstIssue
+      nextBook && firstIssue && finished(firstIssue) && firstIssue.pageCount > 0
         ? {
             href: `${basePath}/${nextBook.id}/${firstIssue.id}/1`,
             label: nextBook.name,
@@ -529,7 +530,15 @@ export async function getReaderPage({
     // Only on the issue's last stop, where a forward turn opens the screen.
     endOfIssue:
       turns.next === null
-        ? endOfIssueLinks(manifest, book, issueId, storedCounts, basePath)
+        ? endOfIssueLinks(
+            manifest,
+            // The public manifest drops pending issues; the end stop needs them.
+            publishedOnly ? await getManifest() : manifest,
+            book,
+            issueId,
+            storedCounts,
+            basePath,
+          )
         : null,
     spreadStarts,
   };
