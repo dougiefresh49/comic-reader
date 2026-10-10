@@ -27,6 +27,10 @@ import {
 } from "./zen-comic-reader/OnboardingOverlay";
 import { SettingsSheet } from "./zen-comic-reader/SettingsSheet";
 import {
+  EndOfIssueScreen,
+  type EndOfIssue,
+} from "./zen-comic-reader/EndOfIssueScreen";
+import {
   bubbleAccessibleName,
   bubbleSpeaker,
   buildSpeechContent,
@@ -81,6 +85,11 @@ interface ZenComicReaderProps {
   issueNumber: number;
   prevPageLink?: string | null;
   nextPageLink?: string | null;
+  /**
+   * Set on the issue's last stop (#830): a forward turn there opens the
+   * end-of-issue screen with these links.
+   */
+  endOfIssue?: EndOfIssue | null;
   pageNumber: number;
   pageCount: number;
   panels?: PageDirectedPanel[];
@@ -103,6 +112,7 @@ export default function ZenComicReader({
   issueNumber,
   prevPageLink,
   nextPageLink,
+  endOfIssue = null,
   pageNumber,
   pageCount,
   panels: rawPanels = [],
@@ -153,6 +163,13 @@ export default function ZenComicReader({
   const panelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { isOnboardingOpen, dismissOnboarding } = useOnboarding();
+
+  // The end-of-issue screen (#830). Only a page with `endOfIssue` can show it.
+  const [endScreenRequested, setEndScreenRequested] = useState(false);
+  const isEndScreenOpen = endScreenRequested && endOfIssue !== null;
+  const focusBeforeEndScreenRef = useRef<Element | null>(null);
+  // Forward turns go on when there is a next page or the end screen to open.
+  const hasForwardTurn = !!nextPageLink || endOfIssue !== null;
 
   const anySheetOpen = isPageSheetOpen || isSettingsOpen;
   const { chromeVisible, showChrome, toggleChrome, lockChrome } =
@@ -291,7 +308,7 @@ export default function ZenComicReader({
   } = usePanelNavigation({
     panelCount: panels.length,
     enabled: panelViewMode && panels.length > 0,
-    keyboardEnabled: !anySheetOpen && !isOnboardingOpen,
+    keyboardEnabled: !anySheetOpen && !isOnboardingOpen && !isEndScreenOpen,
     onExit: exitPanelView,
     onTogglePanelAutoPlay: onTogglePanelAutoPlayKey,
     onPastEnd: () => navigateNextRef.current?.(),
@@ -380,13 +397,37 @@ export default function ZenComicReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // On the issue's last stop a forward turn opens the end-of-issue screen
+  // instead (#830), and everything sounding stops, read-aloud's ambience too.
+  const openEndScreen = useCallback(() => {
+    clearPanelTimer();
+    stopAllRef.current();
+    cancelPendingRef.current();
+    readAloudCarryTo = null;
+    setPanelAutoPlay(false);
+    focusBeforeEndScreenRef.current = document.activeElement;
+    setEndScreenRequested(true);
+  }, [clearPanelTimer]);
+  // Back to the last page as it was: same page, same panel, same view.
+  const closeEndScreen = useCallback(() => {
+    setEndScreenRequested(false);
+    const el = focusBeforeEndScreenRef.current;
+    focusBeforeEndScreenRef.current = null;
+    if (el instanceof HTMLElement) queueMicrotask(() => el.focus());
+  }, []);
+
   const { navigatePrev: rawNavigatePrev, navigateNext: rawNavigateNext } =
     usePageNavigation({
       prevPageLink,
       nextPageLink,
-      // Panel mode has its own arrow-key handler; sheets and the onboarding
-      // overlay own the keyboard while open.
-      keyboardEnabled: !panelViewMode && !anySheetOpen && !isOnboardingOpen,
+      onPastLastPage: endOfIssue ? openEndScreen : undefined,
+      // Panel mode has its own arrow-key handler; sheets, the onboarding
+      // overlay and the end-of-issue screen own the keyboard while open.
+      keyboardEnabled:
+        !panelViewMode &&
+        !anySheetOpen &&
+        !isOnboardingOpen &&
+        !isEndScreenOpen,
     });
   // Every page turn in this file goes through these, so an autoplay turn and a
   // manual one (HUD arrow, key, swipe) both carry read-aloud on (#530).
@@ -839,7 +880,7 @@ export default function ZenComicReader({
     <>
       <div
         className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black"
-        inert={isOnboardingOpen}
+        inert={isOnboardingOpen || isEndScreenOpen}
       >
         <TopBar
           visible={chromeVisible}
@@ -995,7 +1036,7 @@ export default function ZenComicReader({
               <EdgePageNav
                 side="right"
                 onNavigate={navigateNext}
-                disabled={!nextPageLink}
+                disabled={!hasForwardTurn}
               />
             </>
           ) : null}
@@ -1019,7 +1060,7 @@ export default function ZenComicReader({
                 onClose={exitPanelView}
                 onPrev={goPrevPanel}
                 onNext={goNextPanel}
-                hasNextPage={!!nextPageLink}
+                hasNextPage={hasForwardTurn}
                 hasPrevPage={!!prevPageLink}
                 // Pause while any clip sounds, read-aloud's or not (#728).
                 panelAutoPlay={panelAutoPlay || isPlaying}
@@ -1161,6 +1202,15 @@ export default function ZenComicReader({
 
       {isOnboardingOpen ? (
         <OnboardingOverlay onDismiss={dismissOnboarding} />
+      ) : null}
+
+      {isEndScreenOpen && endOfIssue ? (
+        <EndOfIssueScreen
+          endOfIssue={endOfIssue}
+          bookName={bookName}
+          issueNumber={issueNumber}
+          onBack={closeEndScreen}
+        />
       ) : null}
     </>
   );
