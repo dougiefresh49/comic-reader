@@ -5,7 +5,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { revoiceUnit } from "./revoice-actions";
 import type { RevoicePlan } from "./types";
 import { BTN, BTN_GHOST, BTN_PRIMARY, LABEL } from "./ui";
@@ -46,6 +46,14 @@ export function Revoice({
   const stop = useRef(false);
   /** Held from Confirm to the end of the run, so a second click starts nothing. */
   const running = useRef(false);
+  // Closing the panel or switching cards unmounts the box: the run stops
+  // after the call in flight, so a box mounted again cannot pay twice.
+  useEffect(
+    () => () => {
+      stop.current = true;
+    },
+    [],
+  );
   const plan = confirmed ?? current;
   if (!plan) return null;
 

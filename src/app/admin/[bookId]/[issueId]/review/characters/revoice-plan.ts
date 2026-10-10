@@ -53,19 +53,26 @@ async function readAudioRows(
 }
 
 /**
- * For each `character:voice` a done casting move swapped in (a voice that
- * replaced a different one), the first issue the swap covers: a swap writes
- * its own issue's castlist row and the later ones' (`castVoiceInBook`).
+ * The done casting moves that swapped a voice in for a different one, by
+ * `character:voice`. A swap writes its own issue's castlist row and the later
+ * ones' (`castVoiceInBook`), so `from` holds the first issue it covers. A
+ * `stand_in` writes only its own issue's row (`setIssueVoice`), so `only`
+ * holds `character:voice@issue`.
  */
+interface Swaps {
+  from: Map<string, number>;
+  only: Set<string>;
+}
+
 async function readSwaps(
   client: SupabaseClient,
   book: BookCast,
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+): Promise<Swaps> {
+  const out: Swaps = { from: new Map(), only: new Set() };
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await client
       .from("casting_moves")
-      .select("issue_id, character_id, voice_uuid, replaces_voice_uuid")
+      .select("kind, issue_id, character_id, voice_uuid, replaces_voice_uuid")
       .eq("book_id", book.bookId)
       .eq("status", "done")
       .not("character_id", "is", null)
@@ -76,6 +83,7 @@ async function readSwaps(
     if (error)
       throw new Error(`re-voice: reading casting moves: ${error.message}`);
     const rows = (data ?? []) as {
+      kind: string;
       issue_id: string;
       character_id: string;
       voice_uuid: string;
@@ -84,8 +92,12 @@ async function readSwaps(
     for (const m of rows) {
       if (m.replaces_voice_uuid === m.voice_uuid) continue;
       const key = `${m.character_id}:${m.voice_uuid}`;
+      if (m.kind === "stand_in") {
+        out.only.add(`${key}@${m.issue_id}`);
+        continue;
+      }
       const n = book.issueNumber.get(m.issue_id) ?? 0;
-      out.set(key, Math.min(n, out.get(key) ?? n));
+      out.from.set(key, Math.min(n, out.from.get(key) ?? n));
     }
     if (rows.length < PAGE) return out;
   }
@@ -138,9 +150,9 @@ type GroupMember = Pick<
  *   for its character in its issue now; or
  * - `voice_id` is null (audio from before #748 recorded it) and a done
  *   `casting_moves` row swapped the character's current voice in, on this
- *   issue or an earlier one. Moves started after `voice_id` did, and every
- *   render since writes `voice_id`, so audio with no `voice_id` predates
- *   every recorded swap.
+ *   issue or an earlier one (a stand-in: this issue only). Moves started
+ *   after `voice_id` did, and every render since writes `voice_id`, so audio
+ *   with no `voice_id` predates every recorded swap.
  *
  * A bubble whose character has no playable voice now is left out: Regenerate
  * could not render it either. A render is what Regenerate makes for the
@@ -165,10 +177,12 @@ export async function planRevoice(
   for (const row of rows) {
     const now = renderVoice(book, row.character_id, row.issue_id);
     if (!now.ok) continue;
-    const swappedAt = swaps.get(`${now.from}:${now.voiceUuid}`);
+    const key = `${now.from}:${now.voiceUuid}`;
+    const swappedAt = swaps.from.get(key);
     const old = row.voice_id
       ? row.voice_id !== now.voiceUuid
-      : swappedAt !== undefined && swappedAt <= issueNumber(row.issue_id);
+      : (swappedAt !== undefined && swappedAt <= issueNumber(row.issue_id)) ||
+        swaps.only.has(`${key}@${row.issue_id}`);
     if (old) stale.push({ row, elevenLabsId: now.elevenLabsId });
   }
   const [overrides, groups] = await Promise.all([
