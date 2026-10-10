@@ -98,6 +98,18 @@ function extOf(file: File): string {
   return "jpg";
 }
 
+// At #818's ~3.1 s a page, 50 pages take ~155 s, half the 300 s maxDuration.
+const FINALIZE_BATCH = 50;
+
+/**
+ * Per issue, in this tab: the file each page was stored from, set only once
+ * its finalize batch is answered OK and cleared before a batch is sent. A
+ * resume skips the stored pages whose file is still at the same place in the
+ * pick, since Back lets the pick change and a removed file shifts the rest.
+ */
+const confirmedPages = new Map<string, (string | undefined)[]>();
+const fileKey = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
+
 async function post(body: object, signal: AbortSignal): Promise<Response> {
   return fetch("/api/admin/upload-source-page", {
     method: "POST",
@@ -108,9 +120,10 @@ async function post(body: object, signal: AbortSignal): Promise<Response> {
 }
 
 /**
- * Sends the files as pages 1..N of a saved issue that has none. Each file is
- * stored raw as `page-NN.<ext>`; finalize turns pages 1..N into WebP and the
- * `pages` rows.
+ * Sends the files as pages 1..N of a saved issue that has none, or resumes an
+ * unfinished one from the page init names. Each file is stored raw as
+ * `page-NN.<ext>`; finalize turns them into WebP and the `pages` rows, in
+ * batches of `FINALIZE_BATCH`.
  */
 export async function uploadPages(args: {
   bookId: string;
@@ -126,10 +139,34 @@ export async function uploadPages(args: {
     signal,
   );
   if (!init.ok) return { ok: false, error: await errorOf(init) };
+  const { resumeFrom = 1, lastStored = 0 } = (await init.json()) as {
+    resumeFrom?: number;
+    lastStored?: number;
+  };
+  const total = files.length;
+  if (lastStored > total) {
+    return {
+      ok: false,
+      error: `${issueId} already holds pages up to ${lastStored}, but ${total} files were picked. Pick at least ${lastStored} to finish it.`,
+    };
+  }
+  // Stored pages count as done only up to the first page whose confirmed
+  // file differs from the pick; with no record, everything is sent again.
+  const picked = files.map(fileKey);
+  const confirmed = confirmedPages.get(`${bookId}/${issueId}`) ?? [];
+  confirmedPages.set(`${bookId}/${issueId}`, confirmed);
+  let same = 0;
+  while (same < total && picked[same] === confirmed[same]) same++;
+  // Every page stored but the issue row unwritten: redo the last page alone,
+  // whose finalize writes it.
+  const start = Math.max(1, Math.min(resumeFrom, same + 1, total));
+  if (start > 1) {
+    args.onProgress({ current: start - 1, total, detail: "" });
+  }
 
-  let sent = 0;
+  let sent = start - 1;
   let failure: string | null = null;
-  let next = 0;
+  let next = start - 1;
   const sendOne = async (index: number) => {
     const file = files[index]!;
     const filename = `page-${String(index + 1).padStart(2, "0")}.${extOf(file)}`;
@@ -151,7 +188,7 @@ export async function uploadPages(args: {
   };
   // Five at a time; the first failure stops the rest.
   await Promise.all(
-    Array.from({ length: Math.min(5, files.length) }, async () => {
+    Array.from({ length: Math.min(5, total - next) }, async () => {
       while (failure === null && next < files.length) {
         const index = next++;
         try {
@@ -164,10 +201,10 @@ export async function uploadPages(args: {
   );
   if (failure !== null) return { ok: false, error: failure };
 
-  // Finalize is one long request. Poll the stored rows so the count moves:
-  // one poll at a time, none reported once finalize ends.
-  const total = files.length;
-  let shown = 0;
+  // Finalize is one long request per batch. Poll the stored rows across all
+  // of them so the count moves: one poll at a time, none reported once the
+  // last batch ends or one fails.
+  let shown = start - 1;
   let ended = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const report = () =>
@@ -191,14 +228,37 @@ export async function uploadPages(args: {
   report();
   timer = setTimeout(() => void poll(), 2000);
   try {
-    const fin = await post(
-      { mode: "finalize", bookId, issueId, count: total },
-      signal,
-    );
-    ended = true;
-    if (!fin.ok) return { ok: false, error: await errorOf(fin) };
-    const body = (await fin.json()) as { stored: number; warnings?: string[] };
-    return { ok: true, stored: body.stored, warnings: body.warnings ?? [] };
+    let stored = start - 1;
+    const warnings: string[] = [];
+    for (let from = start; from <= total; from += FINALIZE_BATCH) {
+      const to = Math.min(from + FINALIZE_BATCH - 1, total);
+      confirmed.fill(undefined, from - 1, to);
+      const fin = await post(
+        { mode: "finalize", bookId, issueId, count: total, from, to },
+        signal,
+      );
+      if (!fin.ok) {
+        ended = true;
+        const range =
+          from === to
+            ? `Page ${from} did not store`
+            : `Pages ${from}–${to} did not all store`;
+        return {
+          ok: false,
+          error: `${range} (${await errorOf(fin)}). Back, then Confirm and save picks up at page ${from}.`,
+        };
+      }
+      for (let page = from; page <= to; page++) {
+        confirmed[page - 1] = picked[page - 1];
+      }
+      const body = (await fin.json()) as {
+        stored: number;
+        warnings?: string[];
+      };
+      stored += body.stored;
+      warnings.push(...(body.warnings ?? []));
+    }
+    return { ok: true, stored, warnings };
   } finally {
     ended = true;
     clearTimeout(timer);
