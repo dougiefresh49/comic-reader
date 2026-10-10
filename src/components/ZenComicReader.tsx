@@ -75,6 +75,10 @@ interface ZenComicReaderProps {
   timestamps: Record<string, AudioTimestamps>;
   bookId: string;
   issueId: string;
+  /** The book's display name (`books.name`), shown in the top bar (#831). */
+  bookName: string;
+  /** `issues.number`, shown in the top bar beside the book name. */
+  issueNumber: number;
   prevPageLink?: string | null;
   nextPageLink?: string | null;
   pageNumber: number;
@@ -95,6 +99,8 @@ export default function ZenComicReader({
   timestamps,
   bookId,
   issueId,
+  bookName,
+  issueNumber,
   prevPageLink,
   nextPageLink,
   pageNumber,
@@ -837,6 +843,8 @@ export default function ZenComicReader({
       >
         <TopBar
           visible={chromeVisible}
+          bookName={bookName}
+          issueNumber={issueNumber}
           onOpenPages={() => setIsPageSheetOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           panelViewMode={panelViewMode}

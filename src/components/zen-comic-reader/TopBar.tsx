@@ -4,6 +4,9 @@ import Link from "next/link";
 
 interface TopBarProps {
   visible: boolean;
+  /** Shown as "<bookName> · Issue <issueNumber>" between the button groups. */
+  bookName: string;
+  issueNumber: number;
   onOpenPages: () => void;
   onOpenSettings: () => void;
   /** Whole page or panel by panel; the toggle sits beside the Pages button (#607). */
@@ -14,19 +17,22 @@ interface TopBarProps {
 
 export function TopBar({
   visible,
+  bookName,
+  issueNumber,
   onOpenPages,
   onOpenSettings,
   panelViewMode,
   hasPanels,
   onTogglePanelView,
 }: TopBarProps) {
+  const issueLabel = `Issue ${issueNumber}`;
   return (
     <div
-      className={`absolute top-0 right-0 left-0 z-50 flex h-14 items-center justify-between border-b border-white/5 bg-neutral-950/90 px-3 backdrop-blur transition-transform duration-300 ${
+      className={`absolute top-0 right-0 left-0 z-50 flex h-14 items-center gap-2 border-b border-white/5 bg-neutral-950/90 px-3 backdrop-blur transition-transform duration-300 ${
         visible ? "translate-y-0" : "-translate-y-full"
       }`}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <Link
           href="/"
           className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
@@ -104,7 +110,15 @@ export function TopBar({
         </button>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div
+        className="flex min-w-0 flex-1 text-sm whitespace-nowrap text-neutral-300"
+        title={`${bookName} · ${issueLabel}`}
+      >
+        <span className="min-w-0 truncate">{bookName}</span>
+        <span className="shrink-0">&nbsp;· {issueLabel}</span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={onOpenSettings}
           className="rounded-full p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white"
