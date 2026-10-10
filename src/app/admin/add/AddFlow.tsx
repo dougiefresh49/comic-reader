@@ -120,7 +120,7 @@ export function AddFlow({
    * A written book's warning (series books or franchise links not saved), so
    * a retry that skips the book still shows it.
    */
-  const bookWarnings = useRef<Record<string, string>>({});
+  const bookWarnings = useRef(new Map<string, string>());
   const [issueNumber, setIssueNumber] = useState<number | null>(
     startIssue?.number ?? null,
   );
@@ -334,7 +334,7 @@ export function AddFlow({
   async function runSave(book: BookView, pages: PagesChoice) {
     const controller = new AbortController();
     abortRef.current = controller;
-    const carried = book.isNew ? "" : (bookWarnings.current[book.id] ?? "");
+    const carried = book.isNew ? "" : (bookWarnings.current.get(book.id) ?? "");
     setSave({
       ...IDLE_SAVE,
       warnings: carried ? [carried] : [],
@@ -371,7 +371,7 @@ export function AddFlow({
       // createBook's error names the part that failed.
       const warning =
         res.ok || res.error.includes("books_pkey") ? "" : res.error;
-      bookWarnings.current[book.id] = warning;
+      bookWarnings.current.set(book.id, warning);
       setSave((s) => ({
         ...s,
         book: "saved",
