@@ -5,6 +5,7 @@ import { supabaseAdmin } from "~/lib/supabase-admin";
 import { storePageImage } from "~/lib/page-images";
 import { insertIssue, selectIssue, updateIssue } from "~/lib/issue-queries";
 import { countIssuePages } from "~/lib/add-content/issue-pages";
+import { isUnstartedStep } from "~/lib/pipeline-steps";
 
 export const maxDuration = 300;
 
@@ -14,10 +15,11 @@ const RAW_BUCKET = "comic-pages-raw";
  * Whether an issue may take pages from disk, and the `pages` rows it holds.
  * It may when it holds none (by `page_count` and by rows), or when it is an
  * unfinished disk store: rows stored, but the last finalize batch never wrote
- * `page_count` or `pipeline_step`. Disk `init` sets `source_pages_path`; an
- * online download sets it only when it ends, with `pipeline_step`, so a
- * download that stopped part way is never taken for one. Null when the issue
- * row is gone.
+ * `page_count`. Disk `init` sets `source_pages_path`; an online download sets
+ * it only when it ends, with `pipeline_step` and a `page_count` of the pages
+ * it stored, so a download that stopped part way is never taken for one, and
+ * one that stored none leaves an issue that is still empty. Null when the
+ * issue row is gone.
  */
 async function pagesHeld(
   bookId: string,
@@ -35,28 +37,38 @@ async function pagesHeld(
   const empty = !row.page_count && rows === 0;
   const unfinishedDiskStore =
     !row.page_count &&
-    row.pipeline_step === null &&
+    isUnstartedStep(row.pipeline_step) &&
     !!row.source_pages_path &&
     rows > 0;
   return { rows, takesPages: empty || unfinishedDiskStore };
 }
 
-/** The first page number from 1 up with no `pages` row. */
-async function firstMissingPage(
+/**
+ * The first page number from 1 up with no `pages` row, and the highest stored.
+ * Read in pages of 1000, the API's row cap.
+ */
+async function storedSpan(
   bookId: string,
   issueId: string,
-): Promise<number> {
-  const { data, error } = await supabaseAdmin
-    .from("pages")
-    .select("number")
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId);
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as { number: number }[];
-  const numbers = new Set(rows.map((p) => p.number));
-  let page = 1;
-  while (numbers.has(page)) page++;
-  return page;
+): Promise<{ firstMissing: number; last: number }> {
+  const numbers = new Set<number>();
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from("pages")
+      .select("number")
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .order("number")
+      .range(offset, offset + pageSize - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as { number: number }[];
+    for (const p of rows) numbers.add(p.number);
+    if (rows.length < pageSize) break;
+  }
+  let firstMissing = 1;
+  while (numbers.has(firstMissing)) firstMissing++;
+  return { firstMissing, last: Math.max(0, ...numbers) };
 }
 
 const hasPagesError = (bookId: string, issueId: string) =>
@@ -135,15 +147,16 @@ export async function POST(req: NextRequest) {
     if (existing) {
       // An issue saved with no pages yet takes them here (#793), and so does
       // an unfinished disk store (#821), from its first missing page. One
-      // that has pages any other way is refused.
-      let resumeFrom = 1;
+      // that has pages any other way is refused. `lastStored` lets the client
+      // refuse a pick with fewer files than the pages already stored.
+      let span = { firstMissing: 1, last: 0 };
       try {
         const held = await pagesHeld(body.bookId, body.issueId);
         if (held && !held.takesPages) {
           return hasPagesError(body.bookId, body.issueId);
         }
         if (held && held.rows > 0) {
-          resumeFrom = await firstMissingPage(body.bookId, body.issueId);
+          span = await storedSpan(body.bookId, body.issueId);
         }
       } catch (e) {
         return Response.json(
@@ -160,7 +173,12 @@ export async function POST(req: NextRequest) {
       if (updateErr) {
         return Response.json({ error: updateErr.message }, { status: 500 });
       }
-      return Response.json({ ok: true, sourcePath, resumeFrom });
+      return Response.json({
+        ok: true,
+        sourcePath,
+        resumeFrom: span.firstMissing,
+        lastStored: span.last,
+      });
     }
     // insert, not upsert: a racing init that lost the check above hits the
     // primary key (23505) instead of overwriting the row.
@@ -183,7 +201,12 @@ export async function POST(req: NextRequest) {
       }
       return Response.json({ error: issueErr.message }, { status: 500 });
     }
-    return Response.json({ ok: true, sourcePath, resumeFrom: 1 });
+    return Response.json({
+      ok: true,
+      sourcePath,
+      resumeFrom: 1,
+      lastStored: 0,
+    });
   }
 
   if (body.mode === "url") {
@@ -233,7 +256,7 @@ export async function POST(req: NextRequest) {
     try {
       held = await pagesHeld(body.bookId, body.issueId);
       if (held?.takesPages && body.from > 1) {
-        firstMissing = await firstMissingPage(body.bookId, body.issueId);
+        ({ firstMissing } = await storedSpan(body.bookId, body.issueId));
       }
     } catch (e) {
       return Response.json(
@@ -343,10 +366,10 @@ export async function POST(req: NextRequest) {
       // this store into "already has pages" and lock out the resume (#821).
       // The stored rows alone make the issue read unfinished in the Issue
       // step, and every other guard counts them (`countIssuePages`).
-      const resumeFrom = await firstMissingPage(
-        body.bookId,
-        body.issueId,
-      ).catch(() => undefined);
+      const resumeFrom = await storedSpan(body.bookId, body.issueId).then(
+        (span) => span.firstMissing,
+        () => undefined,
+      );
       return Response.json(
         {
           error: `finalize failed for ${errors.length} page(s)`,
@@ -360,8 +383,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Only the batch that ends the issue writes its row, counting every
-    // batch's pages.
+    // Only the batch that ends the issue writes its row, once pages 1..count
+    // are all stored and none past count are: an earlier, longer pick may
+    // have left some, and they would join the issue.
     if (body.to === body.count) {
       let rows: number;
       try {
@@ -370,6 +394,14 @@ export async function POST(req: NextRequest) {
         return Response.json(
           { error: e instanceof Error ? e.message : String(e) },
           { status: 500 },
+        );
+      }
+      if (rows !== body.count) {
+        return Response.json(
+          {
+            error: `${body.issueId} holds ${rows} pages, not the ${body.count} picked. The issue row was left unwritten.`,
+          },
+          { status: 409 },
         );
       }
       const { error: issueErr } = await updateIssue(

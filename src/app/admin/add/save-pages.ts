@@ -130,17 +130,23 @@ export async function uploadPages(args: {
     signal,
   );
   if (!init.ok) return { ok: false, error: await errorOf(init) };
-  const { resumeFrom = 1 } = (await init.json()) as { resumeFrom?: number };
+  const { resumeFrom = 1, lastStored = 0 } = (await init.json()) as {
+    resumeFrom?: number;
+    lastStored?: number;
+  };
   const total = files.length;
-  if (resumeFrom > total + 1) {
+  if (lastStored > total) {
     return {
       ok: false,
-      error: `${issueId} already holds pages 1–${resumeFrom - 1}, but ${total} files were picked.`,
+      error: `${issueId} already holds pages up to ${lastStored}, but ${total} files were picked.`,
     };
   }
   // Every page stored but the issue row unwritten: redo the last page alone,
   // whose finalize writes it.
   const start = Math.max(1, Math.min(resumeFrom, total));
+  if (start > 1) {
+    args.onProgress({ current: start - 1, total, detail: "" });
+  }
 
   let sent = start - 1;
   let failure: string | null = null;
