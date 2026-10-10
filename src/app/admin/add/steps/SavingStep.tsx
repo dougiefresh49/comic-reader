@@ -19,6 +19,7 @@ import { plannedPagesRow } from "./ConfirmStep";
 import {
   Note,
   Spacer,
+  type BookView,
   type Flow,
   type RowState,
   type StepView,
@@ -100,10 +101,19 @@ export function savingStep(f: Flow): StepView | null {
         </WriteRow>
         {pagesRow}
       </WriteList>
+      {pages.kind === "online" &&
+        save.book === "saved" &&
+        save.issue === "saved" &&
+        !save.error && (
+          <div className="mt-[22px]">
+            {whatNext(f, book, { pipeline: false })}
+          </div>
+        )}
     </>
   );
   // Online: the server finishes the download whatever the browser does, so
-  // the button only leaves. Disk: Stop holds until finalize, which runs on.
+  // the footer only says so; the What next cards are the exits. Disk: Stop
+  // holds until finalize, which runs on.
   const footer = save.error ? (
     <>
       <button
@@ -124,9 +134,6 @@ export function savingStep(f: Flow): StepView | null {
         The download keeps going after you leave. It finishes on its own.
       </Note>
       <Spacer />
-      <button type="button" onClick={f.stop} className={btn("ghost")}>
-        Leave
-      </button>
     </>
   ) : progress?.finalizing ? (
     <Spacer />
@@ -148,7 +155,6 @@ export function savingStep(f: Flow): StepView | null {
 export function doneStep(f: Flow): StepView | null {
   const { book, pages, save, files, number } = f;
   if (!book || !pages) return null;
-  const after = Math.max(f.next, number + 1);
   const expected =
     pages.kind === "online"
       ? pages.source.pageCount
@@ -189,6 +195,21 @@ export function doneStep(f: Flow): StepView | null {
           ))}
         </div>
       </div>
+      {whatNext(f, book, { pipeline: true })}
+    </>
+  );
+  return { body, footer: <Spacer /> };
+}
+
+/** The "What next?" cards. Saving leaves out Start Pipeline: pages still download. */
+function whatNext(
+  f: Flow,
+  book: BookView,
+  { pipeline }: { pipeline: boolean },
+) {
+  const after = Math.max(f.next, f.number + 1);
+  return (
+    <>
       <Heading title="What next?" />
       <div className="grid max-w-[860px] grid-cols-1 gap-3.5 sm:grid-cols-3">
         <Choice
@@ -197,13 +218,15 @@ export function doneStep(f: Flow): StepView | null {
           sub="same book, same flow"
           href={`/admin/add?book=${encodeURIComponent(book.id)}`}
         />
-        <Choice
-          warn
-          icon={<PlayIcon className="mb-1.5 h-[26px] w-[26px]" />}
-          title="Start Pipeline ↗"
-          sub="the button on the admin page. This flow never starts it."
-          href="/admin"
-        />
+        {pipeline && (
+          <Choice
+            warn
+            icon={<PlayIcon className="mb-1.5 h-[26px] w-[26px]" />}
+            title="Start Pipeline ↗"
+            sub="the button on the admin page. This flow never starts it."
+            href="/admin"
+          />
+        )}
         <Choice
           icon={<HomeIcon className="mb-1.5 h-[26px] w-[26px]" />}
           title="Done"
@@ -213,5 +236,4 @@ export function doneStep(f: Flow): StepView | null {
       </div>
     </>
   );
-  return { body, footer: <Spacer /> };
 }
