@@ -3,7 +3,12 @@ import { listAllIssues } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
 import { getStoredPageCounts } from "~/server";
 import { AddFlow } from "./AddFlow";
-import { isPickable, type FlowBook, type FlowIssue } from "./model";
+import {
+  isPickable,
+  type FlowBook,
+  type FlowIssue,
+  type FlowSeries,
+} from "./model";
 
 export const dynamic = "force-dynamic";
 // Check pages may run a browser session (previewSource).
@@ -27,11 +32,11 @@ export default async function AddContentPage({
   // `<bookId>/<issueId>` of an online download stopped from Saving.
   const [stoppedBook, stoppedIssue] = stoppedParam?.split("/") ?? [];
 
-  const [booksRes, issuesRes, stored] = await Promise.all([
+  const [booksRes, seriesRes, issuesRes, stored] = await Promise.all([
     supabaseAdmin
       .from("books")
       .select(
-        "id, name, publisher, total_issues, published, wiki_host, wiki_title_template",
+        "id, name, publisher, total_issues, published, wiki_host, wiki_title_template, series_id, series_position",
       )
       .order("name") as unknown as Promise<{
       data: Array<{
@@ -42,7 +47,13 @@ export default async function AddContentPage({
         published: boolean;
         wiki_host: string | null;
         wiki_title_template: string | null;
+        series_id: string | null;
+        series_position: number | null;
       }> | null;
+      error: { message: string } | null;
+    }>,
+    supabaseAdmin.from("series").select("id, name") as unknown as Promise<{
+      data: FlowSeries[] | null;
       error: { message: string } | null;
     }>,
     listAllIssues(
@@ -54,6 +65,7 @@ export default async function AddContentPage({
     getStoredPageCounts(),
   ]);
   if (booksRes.error) throw new Error(`books: ${booksRes.error.message}`);
+  if (seriesRes.error) throw new Error(`series: ${seriesRes.error.message}`);
   if (issuesRes.error) throw new Error(`issues: ${issuesRes.error.message}`);
 
   const issues: FlowIssue[] = (issuesRes.data ?? []).map((row) => ({
@@ -78,6 +90,8 @@ export default async function AddContentPage({
     wikiTitleTemplate: b.wiki_title_template,
     cover:
       issues.find((i) => i.bookId === b.id && i.cover !== null)?.cover ?? null,
+    seriesId: b.series_id,
+    seriesPosition: b.series_position,
   }));
 
   // Resume: the newest issue of an unpublished book that is saved with no
@@ -101,6 +115,7 @@ export default async function AddContentPage({
   return (
     <AddFlow
       books={books}
+      series={seriesRes.data ?? []}
       issues={issues}
       resume={resume ? { bookId: resume.bookId, issueId: resume.id } : null}
       stopped={

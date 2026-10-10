@@ -10,7 +10,7 @@ import type { ReactNode, RefObject } from "react";
 import type { BookSearchResult } from "../../add-book/actions";
 import type { CheckedSource } from "../../add-issue/SourceConfirm";
 import type { DiskFile } from "../DiskPages";
-import type { FlowBook, FlowIssue } from "../model";
+import type { FlowBook, FlowIssue, SeriesFields, SeriesPlan } from "../model";
 import type { PageProgress } from "../save-pages";
 import { btn } from "../ui";
 
@@ -25,7 +25,8 @@ export type Step =
   | "saving"
   | "done";
 
-export interface NewBook {
+/** The searched book, with the series fields as edited (from the search). */
+export interface NewBook extends SeriesFields {
   result: BookSearchResult;
   id: string;
   cover: string | null;
@@ -75,6 +76,8 @@ export interface Flow {
   bookChoice: string | null;
   draft: NewBook | null;
   setDraft: (update: (d: NewBook | null) => NewBook | null) => void;
+  /** What the draft's series fields write; null with no draft. */
+  seriesPlan: SeriesPlan | null;
   book: BookView | null;
   bookIssues: FlowIssue[];
   next: number;

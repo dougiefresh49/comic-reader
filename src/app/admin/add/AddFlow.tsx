@@ -16,8 +16,10 @@ import {
   issueState,
   naturalCompare,
   nextIssueNumber,
+  planSeries,
   type FlowBook,
   type FlowIssue,
+  type FlowSeries,
 } from "./model";
 import { downloadPages, uploadPages, type PageProgress } from "./save-pages";
 import { bookStep, newBookStep } from "./steps/BookStep";
@@ -78,6 +80,7 @@ const STEPS: Record<Step, (f: Flow) => StepView | null> = {
  */
 export function AddFlow({
   books,
+  series,
   issues,
   resume,
   stopped,
@@ -85,6 +88,7 @@ export function AddFlow({
   initialIssueId,
 }: {
   books: FlowBook[];
+  series: FlowSeries[];
   issues: FlowIssue[];
   resume: { bookId: string; issueId: string } | null;
   stopped: { bookId: string; issueId: string } | null;
@@ -143,6 +147,7 @@ export function AddFlow({
 
   // ─── Derived ───────────────────────────────────────────────────────────────
 
+  const seriesPlan = draft ? planSeries(series, books, draft) : null;
   const saved = books.find((b) => b.id === bookChoice) ?? null;
   const book: BookView | null =
     bookChoice === "new" && draft
@@ -186,12 +191,18 @@ export function AddFlow({
     setOnlineRun(null);
   }
 
-  /** The draft the Issue step was opened with, so a new draft resets it. */
+  /**
+   * The draft the Issue step was opened with, so a new search or book id
+   * resets it. A series edit does not: the issue and pages stay.
+   */
   const usedDraft = useRef<NewBook | null>(null);
 
   function pickBook(id: string) {
     const changed =
-      id !== bookChoice || (id === "new" && usedDraft.current !== draft);
+      id !== bookChoice ||
+      (id === "new" &&
+        (usedDraft.current?.result !== draft?.result ||
+          usedDraft.current?.id !== draft?.id));
     if (id === "new") usedDraft.current = draft;
     if (changed) {
       setIssueNumber(null);
@@ -231,7 +242,14 @@ export function AddFlow({
       return;
     }
     const r = res.data;
-    setDraft({ result: r, id: r.suggestedSlug, cover: null });
+    setDraft({
+      result: r,
+      id: r.suggestedSlug,
+      cover: null,
+      seriesName: r.seriesName ?? "",
+      volume: r.volumeNumber != null ? String(r.volumeNumber) : "",
+      attach: {},
+    });
     if (r.wikiHost && r.wikiTitleTemplate) {
       const cover = await wikiCover({
         wikiHost: r.wikiHost,
@@ -330,11 +348,15 @@ export function AddFlow({
         publisher: r.publisher,
         franchises: r.franchises,
         totalIssues: r.totalIssues,
-        seriesName: r.seriesName,
-        volumeNumber: r.volumeNumber,
+        seriesName: seriesPlan?.series?.name ?? null,
+        volumeNumber: seriesPlan?.volume ?? null,
+        attach: (seriesPlan?.attach ?? []).map(({ bookId, position }) => ({
+          bookId,
+          position,
+        })),
       });
-      // The books row goes in before the franchise links; when only the links
-      // failed, the book is saved and the save carries on.
+      // The books row goes in before the series books and franchise links;
+      // when only those failed, the book is saved and the save carries on.
       const exists = res.ok || (await bookExists(book.id).catch(() => false));
       if (!exists) return fail("book", res.ok ? "" : res.error);
       setWrittenBooks((w) => [...w, book.id]);
@@ -343,10 +365,8 @@ export function AddFlow({
         book: "saved",
         issue: "saving",
         // A retry finds the row this page wrote before: no warning for that.
-        warnings:
-          res.ok || res.error.includes("books_pkey")
-            ? []
-            : [`Franchise links not saved: ${res.error}`],
+        // createBook's error names the part that failed.
+        warnings: res.ok || res.error.includes("books_pkey") ? [] : [res.error],
       }));
     }
 
@@ -499,6 +519,7 @@ export function AddFlow({
     bookChoice,
     draft,
     setDraft,
+    seriesPlan,
     book,
     bookIssues,
     next,

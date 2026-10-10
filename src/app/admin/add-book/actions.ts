@@ -7,7 +7,12 @@ import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { requireAdmin } from "~/server/admin/require-admin";
-import { bookIdFromTitle } from "../add/model";
+import {
+  bookIdFromTitle,
+  matchSeries,
+  volumeOrNull,
+  type SeriesMatch,
+} from "../add/model";
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: string };
@@ -33,19 +38,14 @@ export interface BookSearchResult {
 }
 
 /**
- * The series a book joins: an existing row whose id is the name's slug, or
- * whose name matches ignoring case, spacing and punctuation, keeps its id, so
- * a later volume lands in the same series; otherwise the id a new row would
- * get. Null when there is no name.
+ * The series a book joins, by `matchSeries` against every `series` row.
  * The match runs here, not as an ilike filter, because PostgREST reads `*`
  * in an ilike value as a wildcard; the table holds one row per series.
  */
 async function resolveSeries(
   name: string | null | undefined,
-): Promise<Result<{ id: string; name: string; isNew: boolean } | null>> {
-  const series = name?.trim();
-  const slug = series ? franchiseSlug(series) : "";
-  if (!series || !slug) return { ok: true, data: null };
+): Promise<Result<SeriesMatch | null>> {
+  if (!matchSeries([], name)) return { ok: true, data: null };
   const { data: rows, error } = (await supabaseAdmin
     .from("series")
     .select("id, name")) as {
@@ -53,21 +53,19 @@ async function resolveSeries(
     error: { message: string } | null;
   };
   if (error) return { ok: false, error: error.message };
-  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const existing = (rows ?? []).find(
-    (r) => r.id === slug || key(r.name) === key(series),
-  );
-  return {
-    ok: true,
-    data: existing
-      ? { id: existing.id, name: existing.name, isNew: false }
-      : { id: slug, name: series, isNew: true },
-  };
+  return { ok: true, data: matchSeries(rows ?? [], name) };
 }
 
-/** Gemini's volume number, kept only when it is a positive integer. */
-function volumeOrNull(v: unknown): number | null {
-  return typeof v === "number" && Number.isInteger(v) && v > 0 ? v : null;
+/** The unique (series_id, series_position) violation, as a person reads it. */
+function takenVolume(
+  error: { code?: string; message: string },
+  position: number | null,
+  series: SeriesMatch | null,
+): string | null {
+  return error.code === "23505" &&
+    error.message.includes("books_series_id_series_position_key")
+    ? `Another book is already volume ${position} of the ${series?.name} series.`
+    : null;
 }
 
 export async function searchForBook(
@@ -144,8 +142,16 @@ interface CreateBookArgs {
   totalIssues: number;
   seriesName: string | null;
   volumeNumber: number | null;
+  /** Standalone books to put in the book's series, each at its volume. */
+  attach?: { bookId: string; position: number }[];
 }
 
+/**
+ * Writes the series row, the book, the attached books, then the franchise
+ * links. Once the book is in, a later failure returns its error prefixed
+ * with the part that failed (`Series books not saved:`, `Franchise links not
+ * saved:`), so the flow keeps the book and warns.
+ */
 export async function createBook(
   args: CreateBookArgs,
 ): Promise<Result<{ id: string }>> {
@@ -164,6 +170,7 @@ export async function createBook(
     totalIssues,
     seriesName,
     volumeNumber,
+    attach = [],
   } = args;
 
   if (!slug || !title)
@@ -216,16 +223,34 @@ export async function createBook(
       if (count === 0)
         await supabaseAdmin.from("series").delete().eq("id", series.id);
     }
-    if (
-      bookError.code === "23505" &&
-      bookError.message.includes("books_series_id_series_position_key")
-    ) {
-      return {
-        ok: false,
-        error: `Another book is already volume ${position} of the ${series?.name} series.`,
-      };
+    return {
+      ok: false,
+      error: takenVolume(bookError, position, series) ?? bookError.message,
+    };
+  }
+
+  // Earlier books join the series. Only a book with no series is moved, so a
+  // stale list never takes a book out of another series.
+  const problems: string[] = [];
+  for (const a of series ? attach : []) {
+    const at = volumeOrNull(a.position);
+    const { data: moved, error: attachError } = at
+      ? await supabaseAdmin
+          .from("books")
+          .update({ series_id: seriesId, series_position: at })
+          .eq("id", a.bookId)
+          .is("series_id", null)
+          .select("id")
+      : { data: null, error: { message: `${a.bookId} needs a volume.` } };
+    const failed = attachError
+      ? (takenVolume(attachError, at, series) ?? attachError.message)
+      : (moved ?? []).length === 0
+        ? `${a.bookId} is already in a series.`
+        : null;
+    if (failed) {
+      problems.push(`Series books not saved: ${failed}`);
+      break;
     }
-    return { ok: false, error: bookError.message };
   }
 
   // One `franchises` row per name (an existing id is left as it is) and one
@@ -243,18 +268,20 @@ export async function createBook(
         [...named].map(([id, f]) => ({ id, name: f.name })),
         { onConflict: "id", ignoreDuplicates: true },
       );
-    if (franchiseError) return { ok: false, error: franchiseError.message };
-    const { error: linkError } = await supabaseAdmin
-      .from("book_franchises")
-      .insert(
-        [...named].map(([id, f]) => ({
-          book_id: slug,
-          franchise_id: id,
-          position: f.position,
-        })),
-      );
-    if (linkError) return { ok: false, error: linkError.message };
+    const { error: linkError } = franchiseError
+      ? { error: franchiseError }
+      : await supabaseAdmin.from("book_franchises").insert(
+          [...named].map(([id, f]) => ({
+            book_id: slug,
+            franchise_id: id,
+            position: f.position,
+          })),
+        );
+    if (linkError)
+      problems.push(`Franchise links not saved: ${linkError.message}`);
   }
 
-  return { ok: true, data: { id: slug } };
+  return problems.length > 0
+    ? { ok: false, error: problems.join(" ") }
+    : { ok: true, data: { id: slug } };
 }
