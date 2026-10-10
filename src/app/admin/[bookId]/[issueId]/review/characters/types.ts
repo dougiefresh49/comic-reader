@@ -109,6 +109,33 @@ export type PauseView =
   | { step: "review-clusters"; blocker: string | null }
   | { step: "casting"; blocker: string | null };
 
+/** One render Re-voice makes (#836): a bubble, or a joined group's first member. */
+export interface RevoiceUnit {
+  issueId: string;
+  bubbleId: string;
+  page: number;
+  sortOrder: number;
+  /** Bubbles the render replaces: 1, or the group's members. */
+  bubbles: number;
+  /** ElevenLabs characters the request bills. */
+  credits: number;
+}
+
+/** A character's old-voice audio across the book, per issue and in total. */
+export interface RevoicePlan {
+  characterId: string;
+  issues: {
+    issueId: string;
+    number: number;
+    bubbles: number;
+    credits: number;
+  }[];
+  /** In play order: issue, page, then sort order. */
+  units: RevoiceUnit[];
+  bubbles: number;
+  credits: number;
+}
+
 export interface CharactersData {
   bookId: string;
   issueId: string;
@@ -128,4 +155,6 @@ export interface CharactersData {
   voices: VoiceOption[];
   /** The paused run's step, or null when no run is paused here. */
   pause: PauseView | null;
+  /** Characters whose audio in the book is from a voice they no longer have (#836). */
+  revoice: RevoicePlan[];
 }

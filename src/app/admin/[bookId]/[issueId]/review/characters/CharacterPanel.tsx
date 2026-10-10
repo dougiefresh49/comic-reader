@@ -10,6 +10,7 @@ import type { NameTarget } from "./actions";
 import { WandIcon } from "./design-sheet/DesignSheet";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
+import { Revoice } from "./Revoice";
 import { PageWithBox } from "./shared";
 import type { CardState } from "./staging";
 import type {
@@ -17,6 +18,7 @@ import type {
   FaceView,
   KnownCharacter,
   PageView,
+  RevoicePlan,
 } from "./types";
 import { BTN, BTN_GHOST, BTN_SMALL, FOCUS, Icon, Portrait } from "./ui";
 import { VoiceTab, type VoiceTabProps } from "./VoiceTab";
@@ -199,6 +201,9 @@ export interface CharacterPanelProps
   /** Every card of the issue: the move dialog's grid. */
   cards: CharacterCard[];
   known: KnownCharacter[];
+  bookId: string;
+  /** The card's old-voice audio (#836), or null when it has none. */
+  revoice: RevoicePlan | null;
   /** A Faces save is running. */
   busy: boolean;
   /** The open tab, held by the screen so it survives a swap to another card. A role shows Voice whatever it says. */
@@ -226,6 +231,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
     pages,
     cards,
     known,
+    bookId,
+    revoice,
     busy,
     tab,
     onTabChange,
@@ -411,7 +418,16 @@ export function CharacterPanel(props: CharacterPanelProps) {
           className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-5"
         >
           {shownTab === "voice" ? (
-            <VoiceTab card={card} state={state} {...voiceProps} />
+            <>
+              {revoice && (
+                <Revoice
+                  bookId={bookId}
+                  plan={revoice}
+                  voiceName={card.voice?.name ?? null}
+                />
+              )}
+              <VoiceTab card={card} state={state} {...voiceProps} />
+            </>
           ) : (
             <FacesTab
               card={card}

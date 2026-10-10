@@ -22,6 +22,7 @@ import { readVoices, type VoiceRow } from "~/lib/voice-slots";
 import { isProtectedVoice } from "~/lib/voice-slots/types";
 import { audioUrl } from "~/lib/storage";
 import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
+import { planRevoice } from "./revoice-plan";
 import { readVoicesGate } from "~/server/admin/voices-gate";
 import {
   unknownFaceGroups,
@@ -495,6 +496,8 @@ export async function loadCharacters(
     };
   }
 
+  const revoice = await planRevoice(supabaseAdmin, bookId, { book });
+
   return {
     bookId,
     issueId,
@@ -510,5 +513,6 @@ export async function loadCharacters(
     known,
     voices,
     pause,
+    revoice,
   };
 }

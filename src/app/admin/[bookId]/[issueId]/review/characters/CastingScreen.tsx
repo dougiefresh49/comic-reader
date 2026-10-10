@@ -1286,6 +1286,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
               pages={pages}
               cards={cards}
               known={data.known}
+              bookId={data.bookId}
+              revoice={
+                data.revoice.find((r) => r.characterId === openCard.id) ?? null
+              }
               busy={busy}
               tab={tab}
               onTabChange={setTab}
