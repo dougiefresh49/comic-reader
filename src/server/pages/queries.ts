@@ -370,8 +370,8 @@ function issueLinkLabel(issue: IssueManifest): string {
 /**
  * Where the end-of-issue screen leads (#830), from the manifest already
  * loaded. Next issue: the first later issue of this book that has pages.
- * Next book, only without a next issue: the first later book in the series
- * whose first issue has pages. On the public route the issue must also be
+ * Next book, only from the book's last issue: the first later book in the
+ * series whose first issue has pages. On the public route the issue must also be
  * `ready`: the manifest's `publishedOnly` filter drops draft books and
  * pending issues but keeps `processing` ones.
  */
@@ -404,9 +404,13 @@ function endOfIssueLinks(
     };
   }
 
-  const series = book.series
-    ? manifest.series.find((s) => s.id === book.series?.id)
-    : undefined;
+  // A later issue that is not ready yet means this is not the book's last
+  // issue, so there is no next book either.
+  const lastIssue = at === book.issues.length - 1;
+  const series =
+    lastIssue && book.series
+      ? manifest.series.find((s) => s.id === book.series?.id)
+      : undefined;
   const books = series?.books ?? [];
   const nextBook = books
     .slice(books.findIndex((b) => b.id === book.id) + 1)
