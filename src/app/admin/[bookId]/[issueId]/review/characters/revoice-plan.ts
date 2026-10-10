@@ -5,7 +5,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { joinGroupText } from "~/lib/balloon-groups";
 import { chunk } from "~/lib/chunk";
-import { loadBookCast, renderVoice, type BookCast } from "~/lib/cast";
+import { castRow, loadBookCast, renderVoice, type BookCast } from "~/lib/cast";
 import { buildTtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import type { RevoicePlan, RevoiceUnit } from "./types";
@@ -56,19 +56,21 @@ async function readAudioRows(
  * The done casting moves that swapped a voice in for a different one, by
  * `character:voice`. A swap writes its own issue's castlist row and the later
  * ones' (`castVoiceInBook`), so `from` holds the first issue it covers. A
- * `stand_in` writes only its own issue's row (`setIssueVoice`), so `only`
- * holds `character:voice@issue`.
+ * `stand_in` writes only its own issue's row (`setIssueVoice`): `only` holds
+ * `character:voice@issue`, and `standIns` the `character:voice`, since an
+ * issue with no voice of its own inherits the book's latest one.
  */
 interface Swaps {
   from: Map<string, number>;
   only: Set<string>;
+  standIns: Set<string>;
 }
 
 async function readSwaps(
   client: SupabaseClient,
   book: BookCast,
 ): Promise<Swaps> {
-  const out: Swaps = { from: new Map(), only: new Set() };
+  const out: Swaps = { from: new Map(), only: new Set(), standIns: new Set() };
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await client
       .from("casting_moves")
@@ -94,6 +96,7 @@ async function readSwaps(
       const key = `${m.character_id}:${m.voice_uuid}`;
       if (m.kind === "stand_in") {
         out.only.add(`${key}@${m.issue_id}`);
+        out.standIns.add(key);
         continue;
       }
       const n = book.issueNumber.get(m.issue_id) ?? 0;
@@ -182,7 +185,10 @@ export async function planRevoice(
     const old = row.voice_id
       ? row.voice_id !== now.voiceUuid
       : (swappedAt !== undefined && swappedAt <= issueNumber(row.issue_id)) ||
-        swaps.only.has(`${key}@${row.issue_id}`);
+        swaps.only.has(`${key}@${row.issue_id}`) ||
+        // An issue with no voice of its own speaks the stand-in it inherits.
+        (swaps.standIns.has(key) &&
+          !castRow(book, now.from, row.issue_id)?.voice_uuid);
     if (old) stale.push({ row, elevenLabsId: now.elevenLabsId });
   }
   const [overrides, groups] = await Promise.all([

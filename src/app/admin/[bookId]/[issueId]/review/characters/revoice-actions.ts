@@ -13,12 +13,41 @@ import { regenerateAudio } from "~/server/actions/review/regenerate-audio";
 import { planRevoice } from "./revoice-plan";
 
 /**
+ * The bubbles a call on this server is checking or rendering now. A second
+ * call for one of them (a box mounted again while the first box's call is in
+ * flight) is refused before it reads the plan, so the two cannot both pay.
+ */
+const inFlight = new Set<string>();
+
+/**
  * Renders one unit of the character's plan, after reading the plan again: a
  * bubble that already plays its current voice (a rerun, or another tab that
- * finished it first) is skipped and spends nothing. Two calls for one bubble
- * at the same moment can both pay; the box runs one call at a time.
+ * finished it first) is skipped and spends nothing.
  */
 export async function revoiceUnit(args: {
+  bookId: string;
+  issueId: string;
+  bubbleId: string;
+  characterId: string;
+}): Promise<
+  { ok: true; skipped: boolean } | { ok: false; error: string; spent: boolean }
+> {
+  const claim = `${args.bookId}/${args.issueId}/${args.bubbleId}`;
+  if (inFlight.has(claim))
+    return {
+      ok: false,
+      error: "This line is already rendering in another Re-voice run.",
+      spent: false,
+    };
+  inFlight.add(claim);
+  try {
+    return await checkAndRender(args);
+  } finally {
+    inFlight.delete(claim);
+  }
+}
+
+async function checkAndRender(args: {
   bookId: string;
   issueId: string;
   bubbleId: string;

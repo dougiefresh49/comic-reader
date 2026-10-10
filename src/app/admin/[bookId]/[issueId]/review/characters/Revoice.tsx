@@ -47,7 +47,8 @@ export function Revoice({
   /** Held from Confirm to the end of the run, so a second click starts nothing. */
   const running = useRef(false);
   // Closing the panel or switching cards unmounts the box: the run stops
-  // after the call in flight, so a box mounted again cannot pay twice.
+  // after the call in flight, and the action refuses that call's bubble to a
+  // box mounted again until it lands.
   useEffect(
     () => () => {
       stop.current = true;
