@@ -104,8 +104,11 @@ export function savingStep(f: Flow): StepView | null {
       {pages.kind === "online" &&
         save.book === "saved" &&
         save.issue === "saved" &&
-        !save.error &&
-        whatNext(f, book, { pipeline: false })}
+        !save.error && (
+          <div className="mt-[22px]">
+            {whatNext(f, book, { pipeline: false })}
+          </div>
+        )}
     </>
   );
   // Online: the server finishes the download whatever the browser does, so
