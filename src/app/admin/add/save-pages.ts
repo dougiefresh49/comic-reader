@@ -102,11 +102,12 @@ function extOf(file: File): string {
 const FINALIZE_BATCH = 50;
 
 /**
- * The files each issue was last sent with in this tab. A resume skips only
- * the stored pages whose file is still at the same place in the pick: Back
- * lets the pick change, and a removed or replaced file shifts what follows.
+ * Per issue, in this tab: the file each page was stored from, set only once
+ * its finalize batch is answered OK and cleared before a batch is sent. A
+ * resume skips the stored pages whose file is still at the same place in the
+ * pick, since Back lets the pick change and a removed file shifts the rest.
  */
-const lastPicks = new Map<string, string[]>();
+const confirmedPages = new Map<string, (string | undefined)[]>();
 const fileKey = (f: File) => `${f.name}:${f.size}:${f.lastModified}`;
 
 async function post(body: object, signal: AbortSignal): Promise<Response> {
@@ -146,16 +147,16 @@ export async function uploadPages(args: {
   if (lastStored > total) {
     return {
       ok: false,
-      error: `${issueId} already holds pages up to ${lastStored}, but ${total} files were picked.`,
+      error: `${issueId} already holds pages up to ${lastStored}, but ${total} files were picked. Pick at least ${lastStored} to finish it.`,
     };
   }
-  // Stored pages count as done only up to the first file that differs from
-  // the last pick; with no record of one, everything is sent again.
+  // Stored pages count as done only up to the first page whose confirmed
+  // file differs from the pick; with no record, everything is sent again.
   const picked = files.map(fileKey);
-  const prior = lastPicks.get(`${bookId}/${issueId}`) ?? [];
+  const confirmed = confirmedPages.get(`${bookId}/${issueId}`) ?? [];
+  confirmedPages.set(`${bookId}/${issueId}`, confirmed);
   let same = 0;
-  while (same < picked.length && picked[same] === prior[same]) same++;
-  lastPicks.set(`${bookId}/${issueId}`, picked);
+  while (same < total && picked[same] === confirmed[same]) same++;
   // Every page stored but the issue row unwritten: redo the last page alone,
   // whose finalize writes it.
   const start = Math.max(1, Math.min(resumeFrom, same + 1, total));
@@ -231,27 +232,24 @@ export async function uploadPages(args: {
     const warnings: string[] = [];
     for (let from = start; from <= total; from += FINALIZE_BATCH) {
       const to = Math.min(from + FINALIZE_BATCH - 1, total);
+      confirmed.fill(undefined, from - 1, to);
       const fin = await post(
         { mode: "finalize", bookId, issueId, count: total, from, to },
         signal,
       );
       if (!fin.ok) {
         ended = true;
-        const { resumeFrom: at } = (await fin
-          .clone()
-          .json()
-          .catch(() => ({}))) as { resumeFrom?: number };
         const range =
           from === to
             ? `Page ${from} did not store`
             : `Pages ${from}–${to} did not all store`;
-        const back = at
-          ? `picks up at page ${at}`
-          : "picks up where it stopped";
         return {
           ok: false,
-          error: `${range} (${await errorOf(fin)}). Back, then Confirm and save ${back}.`,
+          error: `${range} (${await errorOf(fin)}). Back, then Confirm and save picks up at page ${from}.`,
         };
+      }
+      for (let page = from; page <= to; page++) {
+        confirmed[page - 1] = picked[page - 1];
       }
       const body = (await fin.json()) as {
         stored: number;

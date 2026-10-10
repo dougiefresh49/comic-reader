@@ -366,17 +366,12 @@ export async function POST(req: NextRequest) {
       // this store into "already has pages" and lock out the resume (#821).
       // The stored rows alone make the issue read unfinished in the Issue
       // step, and every other guard counts them (`countIssuePages`).
-      const resumeFrom = await storedSpan(body.bookId, body.issueId).then(
-        (span) => span.firstMissing,
-        () => undefined,
-      );
       return Response.json(
         {
           error: `finalize failed for ${errors.length} page(s)`,
           stored,
           total: pageFiles.length,
           errors,
-          ...(resumeFrom ? { resumeFrom } : {}),
           ...(warnings.length > 0 ? { warnings } : {}),
         },
         { status: 500 },
