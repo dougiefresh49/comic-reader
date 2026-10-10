@@ -11,7 +11,7 @@ import {
   Spinner,
   btn,
 } from "../ui";
-import type { SeriesFields } from "../model";
+import { attachField, type SeriesFields } from "../model";
 import {
   Back,
   CARD_META,
@@ -208,7 +208,8 @@ function seriesFields(f: Flow, draft: NewBook) {
           </div>
           <ul className="flex flex-col gap-1.5">
             {plan.standalone.map((b) => {
-              const on = b.id in draft.attach;
+              const field = attachField(draft.attach, b.id);
+              const on = field !== null;
               return (
                 <li key={b.id} className="flex items-center gap-2 text-[13px]">
                   <label className="flex min-w-0 flex-1 items-center gap-2">
@@ -221,7 +222,7 @@ function seriesFields(f: Flow, draft: NewBook) {
                     <span className="truncate">{b.name}</span>
                   </label>
                   <input
-                    value={draft.attach[b.id] ?? ""}
+                    value={field ?? ""}
                     onChange={(e) => setAttach(b.id, e.target.value)}
                     disabled={!on}
                     inputMode="numeric"

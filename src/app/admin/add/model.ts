@@ -148,6 +148,17 @@ export interface SeriesFields {
   attach: Record<string, string>;
 }
 
+/**
+ * A ticked book's volume field, or null when it is not ticked. Own keys only:
+ * a book id such as `constructor` is not ticked by inheritance.
+ */
+export function attachField(
+  attach: Record<string, string>,
+  id: string,
+): string | null {
+  return Object.hasOwn(attach, id) ? (attach[id] ?? "") : null;
+}
+
 /** What the series fields will write, and the one problem that blocks them. */
 export interface SeriesPlan {
   series: SeriesMatch | null;
@@ -191,11 +202,11 @@ export function planSeries(
         );
   const volume = read(fields.volume);
   const attach = standalone
-    .filter((b) => b.id in fields.attach)
+    .filter((b) => attachField(fields.attach, b.id) !== null)
     .map((b) => ({
       bookId: b.id,
       name: b.name,
-      position: read(fields.attach[b.id] ?? "") ?? 0,
+      position: read(attachField(fields.attach, b.id) ?? "") ?? 0,
     }));
 
   const problem = ((): string | null => {
