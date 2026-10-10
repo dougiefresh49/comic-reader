@@ -63,13 +63,16 @@ export function savingStep(f: Flow): StepView | null {
         {save.pages === "error" ? (
           <span className={`${MONO} text-red-300`}>{save.error}</span>
         ) : (
-          <span className={`${MONO} truncate text-neutral-500`}>
-            {progress?.detail ?? ""}
-          </span>
+          <>
+            <span className={`${MONO} truncate text-neutral-500`}>
+              {progress?.detail ?? ""}
+            </span>
+            {progress?.finalizing && <Spinner />}
+          </>
         )}
         <span className="mt-1.5 block h-1.5 w-full max-w-[420px] overflow-hidden rounded-[3px] bg-[#303030]">
           <i
-            className="block h-full bg-emerald-400 transition-all"
+            className={`block h-full transition-all ${progress?.finalizing ? "animate-pulse bg-sky-400" : "bg-emerald-400"}`}
             style={{
               width: `${progress && progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`,
             }}

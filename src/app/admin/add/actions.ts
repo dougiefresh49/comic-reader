@@ -1,5 +1,6 @@
 "use server";
 
+import { countIssuePages } from "~/lib/add-content/issue-pages";
 import { fetchWikiCoverUrl, wikiPageTitle } from "~/lib/add-content/wiki";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { requireAdmin } from "~/server/admin/require-admin";
@@ -33,4 +34,16 @@ export async function bookExists(id: string): Promise<boolean> {
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data !== null;
+}
+
+/**
+ * How many `pages` rows an issue has. The upload's finalize writes one per
+ * page as it stores it, so the Pages row polls this while it runs (#818).
+ */
+export async function storedPages(
+  bookId: string,
+  issueId: string,
+): Promise<number> {
+  await requireAdmin();
+  return countIssuePages(bookId, issueId);
 }
