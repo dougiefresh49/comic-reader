@@ -75,10 +75,21 @@ export async function POST(req: NextRequest) {
   }
   const sourceUrl = issue.source_url;
 
+  // Leaving the Saving screen cancels the stream, and the store must still
+  // finish and write the issue row (#827), so progress after that is dropped.
+  let open = true;
   const stream = new ReadableStream({
+    cancel() {
+      open = false;
+    },
     async start(controller) {
       const send = (event: ProgressEvent) => {
-        controller.enqueue(new TextEncoder().encode(encodeEvent(event)));
+        if (!open) return;
+        try {
+          controller.enqueue(new TextEncoder().encode(encodeEvent(event)));
+        } catch {
+          open = false;
+        }
       };
 
       try {
@@ -255,7 +266,7 @@ export async function POST(req: NextRequest) {
           message: err instanceof Error ? err.message : "Unknown error",
         });
       } finally {
-        controller.close();
+        if (open) controller.close();
       }
     },
   });
