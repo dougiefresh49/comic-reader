@@ -160,7 +160,9 @@ export function confirmStep(f: Flow): StepView | null {
           : pages.kind === "disk"
             ? "Uploads these files, in this order."
             : book.isNew
-              ? "Writes the book and issue rows only."
+              ? plan?.series
+                ? "Writes the book, series and issue rows only."
+                : "Writes the book and issue rows only."
               : "Writes the issue row only."}
       </Note>
       <Spacer />

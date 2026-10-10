@@ -116,6 +116,11 @@ export function AddFlow({
    * skips exactly those rows and an edited id is never taken for saved.
    */
   const [writtenBooks, setWrittenBooks] = useState<string[]>([]);
+  /**
+   * A written book's warning (series books or franchise links not saved), so
+   * a retry that skips the book still shows it.
+   */
+  const bookWarnings = useRef<Record<string, string>>({});
   const [issueNumber, setIssueNumber] = useState<number | null>(
     startIssue?.number ?? null,
   );
@@ -329,8 +334,10 @@ export function AddFlow({
   async function runSave(book: BookView, pages: PagesChoice) {
     const controller = new AbortController();
     abortRef.current = controller;
+    const carried = book.isNew ? "" : (bookWarnings.current[book.id] ?? "");
     setSave({
       ...IDLE_SAVE,
+      warnings: carried ? [carried] : [],
       book: book.isNew ? "saving" : "saved",
       issue: book.isNew ? "waiting" : "saving",
     });
@@ -360,13 +367,16 @@ export function AddFlow({
       const exists = res.ok || (await bookExists(book.id).catch(() => false));
       if (!exists) return fail("book", res.ok ? "" : res.error);
       setWrittenBooks((w) => [...w, book.id]);
+      // A retry finds the row this page wrote before: no warning for that.
+      // createBook's error names the part that failed.
+      const warning =
+        res.ok || res.error.includes("books_pkey") ? "" : res.error;
+      bookWarnings.current[book.id] = warning;
       setSave((s) => ({
         ...s,
         book: "saved",
         issue: "saving",
-        // A retry finds the row this page wrote before: no warning for that.
-        // createBook's error names the part that failed.
-        warnings: res.ok || res.error.includes("books_pkey") ? [] : [res.error],
+        warnings: warning ? [warning] : [],
       }));
     }
 
