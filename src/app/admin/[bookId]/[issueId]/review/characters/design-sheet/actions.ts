@@ -145,8 +145,9 @@ export async function startDesign(
 /**
  * Draft: the prompt on file, free, unless `again`; else one GEMINI_MEDIUM
  * call with the pipeline's voice-description prompt over the character's
- * voice snippets from this issue, named as `describeVoices` names it.
- * Writes nothing.
+ * voice snippets from this issue, named as `describeVoices` names it. A
+ * character with no snippets (#811: main cast never gets them) drafts from
+ * its own lines. Writes nothing.
  */
 export async function draftVoicePrompt(args: Who & { again: boolean }): Promise<
   DesignResult<{
@@ -167,8 +168,26 @@ export async function draftVoicePrompt(args: Who & { again: boolean }): Promise<
       issueId,
     );
     const group = input.groups.find((g) => g.characterId === characterId);
-    const snippets = group?.snippets ?? [];
-    if (!group || snippets.length === 0)
+    let name: string;
+    let snippets: string[];
+    if (group && group.snippets.length > 0) {
+      name = group.resolvedName;
+      snippets = group.snippets;
+    } else {
+      const lines = await readSpeakerLines(supabaseAdmin, bookId, issueId);
+      snippets = (lines.get(characterId) ?? [])
+        .map((l) => l.text)
+        .filter((t) => t !== "");
+      const { data, error } = await (supabaseAdmin as SupabaseClient<Database>)
+        .from("characters")
+        .select("display_name")
+        .eq("id", characterId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      const displayName = data?.display_name?.trim() ?? "";
+      name = displayName.length > 0 ? displayName : characterId;
+    }
+    if (snippets.length === 0)
       return {
         ok: false,
         error: again
@@ -180,12 +199,7 @@ export async function draftVoicePrompt(args: Who & { again: boolean }): Promise<
       getGeminiClient(),
       {
         model: GEMINI_MEDIUM,
-        contents: [
-          // The name `describeVoices` passes: the group's first raw speaker string.
-          createPartFromText(
-            voiceDescriptionPrompt(group.resolvedName, snippets),
-          ),
-        ],
+        contents: [createPartFromText(voiceDescriptionPrompt(name, snippets))],
       },
       { step: "draft-voice-prompt", bookId, issueId },
     );
