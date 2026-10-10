@@ -7,6 +7,11 @@ interface UsePageNavigationOptions {
   prevPageLink?: string | null;
   nextPageLink?: string | null;
   /**
+   * A forward turn with no next page calls this instead, ArrowRight
+   * included: the issue's last page opens the end-of-issue screen (#830).
+   */
+  onPastLastPage?: () => void;
+  /**
    * When true, ArrowLeft/ArrowRight turn the page (desktop affordance).
    * Keep false while panel-focus mode, sheets, or overlays own the keyboard.
    */
@@ -16,6 +21,7 @@ interface UsePageNavigationOptions {
 export function usePageNavigation({
   prevPageLink,
   nextPageLink,
+  onPastLastPage,
   keyboardEnabled = false,
 }: UsePageNavigationOptions) {
   const router = useRouter();
@@ -26,7 +32,8 @@ export function usePageNavigation({
 
   const navigateNext = useCallback(() => {
     if (nextPageLink) router.push(nextPageLink);
-  }, [nextPageLink, router]);
+    else onPastLastPage?.();
+  }, [nextPageLink, onPastLastPage, router]);
 
   useEffect(() => {
     if (!keyboardEnabled) return;

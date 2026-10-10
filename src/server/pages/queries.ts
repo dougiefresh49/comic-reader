@@ -4,9 +4,15 @@ import { supabase } from "~/lib/supabase";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { pageImageUrl } from "~/lib/storage";
 import type ZenComicReader from "~/components/ZenComicReader";
+import type { EndOfIssue } from "~/components/zen-comic-reader/EndOfIssueScreen";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { TextGeometry } from "~/types/text-geometry";
-import type { BookManifest, Manifest, SeriesManifest } from "~/types/manifest";
+import type {
+  BookManifest,
+  IssueManifest,
+  Manifest,
+  SeriesManifest,
+} from "~/types/manifest";
 import {
   normalizeSpreadStarts,
   spreadPageTurns,
@@ -350,6 +356,65 @@ function pageCountFor(
 
 export type ReaderPageProps = ComponentProps<typeof ZenComicReader>;
 
+/** "Issue 2", plus the issue's name when it says more than that. */
+function issueLinkLabel(issue: IssueManifest): string {
+  const base = `Issue ${issue.number}`;
+  const name = issue.name.trim();
+  return name && name.toLowerCase() !== base.toLowerCase()
+    ? `${base} · ${name}`
+    : base;
+}
+
+/**
+ * Where the end-of-issue screen leads (#830), from the manifest already
+ * loaded. Next issue: the first later issue of this book that has pages.
+ * Next book, only without a next issue: the first later book in the series
+ * whose first issue has pages. The manifest's `publishedOnly` filter has
+ * already dropped draft books and pending issues on the public route.
+ */
+function endOfIssueLinks(
+  manifest: Manifest,
+  book: BookManifest,
+  issueId: string,
+  storedCounts: Record<string, Record<string, number>>,
+  basePath: "/book" | "/admin/preview",
+): EndOfIssue {
+  const at = book.issues.findIndex((i) => i.id === issueId);
+  const nextIssue = book.issues
+    .slice(at + 1)
+    .find((i) => pageCountFor(book.id, i.id, i.pageCount, storedCounts) > 0);
+  if (nextIssue) {
+    return {
+      nextIssue: {
+        href: `${basePath}/${book.id}/${nextIssue.id}/1`,
+        label: issueLinkLabel(nextIssue),
+      },
+      nextBook: null,
+      libraryHref: "/",
+    };
+  }
+
+  const series = book.series
+    ? manifest.series.find((s) => s.id === book.series?.id)
+    : undefined;
+  const books = series?.books ?? [];
+  const nextBook = books
+    .slice(books.findIndex((b) => b.id === book.id) + 1)
+    .find((b) => (b.issues[0]?.pageCount ?? 0) > 0);
+  const firstIssue = nextBook?.issues[0];
+  return {
+    nextIssue: null,
+    nextBook:
+      nextBook && firstIssue
+        ? {
+            href: `${basePath}/${nextBook.id}/${firstIssue.id}/1`,
+            label: nextBook.name,
+          }
+        : null,
+    libraryHref: "/",
+  };
+}
+
 interface SpreadPageRow {
   number: number;
   width: number;
@@ -444,6 +509,11 @@ export async function getReaderPage({
     pageCount,
     prevPageLink: turns.prev !== null ? pageLink(turns.prev) : null,
     nextPageLink: turns.next !== null ? pageLink(turns.next) : null,
+    // Only on the issue's last stop, where a forward turn opens the screen.
+    endOfIssue:
+      turns.next === null
+        ? endOfIssueLinks(manifest, book, issueId, storedCounts, basePath)
+        : null,
     spreadStarts,
   };
 
