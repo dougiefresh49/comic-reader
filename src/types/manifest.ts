@@ -9,6 +9,8 @@ export interface IssueManifest {
   hasWebP: boolean;
   hasAudio: boolean;
   hasTimestamps: boolean;
+  /** `issues.status`: `pending`, `processing` or `ready`. */
+  status: string;
 }
 
 export interface BookManifest {

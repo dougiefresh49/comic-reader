@@ -80,6 +80,7 @@ interface IssueRow {
   has_webp: boolean;
   has_audio: boolean;
   has_timestamps: boolean;
+  status: string;
 }
 
 interface BookRow {
@@ -184,7 +185,7 @@ export async function getManifest({
   let query = supabase
     .from("books")
     .select(
-      "id, name, series_id, series_position, series(id, name), issues(id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps)",
+      "id, name, series_id, series_position, series(id, name), issues(id, number, name, page_count, bubble_count, audio_count, has_webp, has_audio, has_timestamps, status)",
     )
     .order("number", { ascending: true, foreignTable: "issues" });
   if (publishedOnly) {
@@ -219,6 +220,7 @@ export async function getManifest({
         hasWebP: issue.has_webp,
         hasAudio: issue.has_audio,
         hasTimestamps: issue.has_timestamps,
+        status: issue.status,
       })),
     }),
   );
@@ -369,8 +371,9 @@ function issueLinkLabel(issue: IssueManifest): string {
  * Where the end-of-issue screen leads (#830), from the manifest already
  * loaded. Next issue: the first later issue of this book that has pages.
  * Next book, only without a next issue: the first later book in the series
- * whose first issue has pages. The manifest's `publishedOnly` filter has
- * already dropped draft books and pending issues on the public route.
+ * whose first issue has pages. On the public route the issue must also be
+ * `ready`: the manifest's `publishedOnly` filter drops draft books and
+ * pending issues but keeps `processing` ones.
  */
 function endOfIssueLinks(
   manifest: Manifest,
@@ -379,10 +382,17 @@ function endOfIssueLinks(
   storedCounts: Record<string, Record<string, number>>,
   basePath: "/book" | "/admin/preview",
 ): EndOfIssue {
+  // The public reader offers only finished issues; preview offers any.
+  const finished = (i: IssueManifest) =>
+    basePath === "/admin/preview" || i.status === "ready";
   const at = book.issues.findIndex((i) => i.id === issueId);
   const nextIssue = book.issues
     .slice(at + 1)
-    .find((i) => pageCountFor(book.id, i.id, i.pageCount, storedCounts) > 0);
+    .find(
+      (i) =>
+        finished(i) &&
+        pageCountFor(book.id, i.id, i.pageCount, storedCounts) > 0,
+    );
   if (nextIssue) {
     return {
       nextIssue: {
@@ -400,7 +410,10 @@ function endOfIssueLinks(
   const books = series?.books ?? [];
   const nextBook = books
     .slice(books.findIndex((b) => b.id === book.id) + 1)
-    .find((b) => (b.issues[0]?.pageCount ?? 0) > 0);
+    .find((b) => {
+      const first = b.issues[0];
+      return !!first && finished(first) && first.pageCount > 0;
+    });
   const firstIssue = nextBook?.issues[0];
   return {
     nextIssue: null,
