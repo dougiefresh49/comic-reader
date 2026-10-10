@@ -156,9 +156,11 @@ type GroupMember = Pick<
  *   for its character in its issue now; or
  * - `voice_id` is null (audio from before #748 recorded it) and a done
  *   `casting_moves` row swapped the character's current voice in, on this
- *   issue or an earlier one (a stand-in: this issue only). Moves started
- *   after `voice_id` did, and every render since writes `voice_id`, so audio
- *   with no `voice_id` predates every recorded swap.
+ *   issue or an earlier one. A stand-in covers its own issue, and an issue
+ *   with no voice of its own when the stand-in is the latest voiced row it
+ *   inherits. Moves started after `voice_id` did, and every render since
+ *   writes `voice_id`, so audio with no `voice_id` predates every recorded
+ *   swap.
  *
  * A bubble whose character has no playable voice now is left out: Regenerate
  * could not render it either. A render is what Regenerate makes for the
