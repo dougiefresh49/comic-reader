@@ -215,7 +215,7 @@ ${facts.join("\n")}${heard}
 
 ${lead}
 
-"prompt": describe the voice itself, in plain sentences: how old it sounds and its gender, pitch, accent, energy and pace, and its texture (for example raspy, nasal, smooth, booming). Keep it under 100 words. Never name an actor, a show, a film, or the character; describe the sound, not who it sounds like. Keep the register of a children's cartoon: a villain can sound sly or sinister, but not truly frightening.
+"prompt": describe the voice itself, in plain sentences: how old it sounds and its gender, pitch, accent (always name one, such as "a general American accent" when nothing else fits), energy and pace, and its texture (for example raspy, nasal, smooth, booming). Keep it under 100 words. Never name an actor, a show, a film, or the character; describe the sound, not who it sounds like. Keep the register of a children's cartoon: a villain can sound sly or sinister, but not truly frightening.
 
 ${
   wantPreviewText
