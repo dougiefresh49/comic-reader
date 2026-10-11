@@ -46,6 +46,7 @@ function blockerCharacter(
 export function ReviewSheet({
   scope,
   staged,
+  voiceMode,
   names,
   onUndo,
   onArchiveFlags,
@@ -55,6 +56,8 @@ export function ReviewSheet({
 }: {
   scope: Scope;
   staged: Staged[];
+  /** Voices mode (#854); faces mode shows no slot, credit or adds totals. */
+  voiceMode: boolean;
   /** The board's characters, for a blocker's Sit out fix. */
   names: { id: string; name: string }[];
   onUndo: (index: number) => void;
@@ -251,31 +254,33 @@ export function ReviewSheet({
             </ol>
           ) : plan ? (
             <>
-              <div className="mb-3.5 grid grid-cols-4 gap-2">
-                <Total
-                  k="Slots after"
-                  v={plan.slots.after}
-                  small={`of ${plan.slots.limit}`}
-                />
-                <Total k="Created" v={plan.headroom.adds} />
-                <Total
-                  k="Archived"
-                  v={archivesIn.length}
-                  small={
-                    archivesIn.length
-                      ? lost
-                        ? `${lost} lost`
-                        : "backed up"
-                      : undefined
-                  }
-                  red={lost > 0}
-                />
-                <Total
-                  k="Credits"
-                  v={`~${plan.credits.previews + plan.credits.run}`}
-                  small="previews"
-                />
-              </div>
+              {voiceMode && (
+                <div className="mb-3.5 grid grid-cols-4 gap-2">
+                  <Total
+                    k="Slots after"
+                    v={plan.slots.after}
+                    small={`of ${plan.slots.limit}`}
+                  />
+                  <Total k="Created" v={plan.headroom.adds} />
+                  <Total
+                    k="Archived"
+                    v={archivesIn.length}
+                    small={
+                      archivesIn.length
+                        ? lost
+                          ? `${lost} lost`
+                          : "backed up"
+                        : undefined
+                    }
+                    red={lost > 0}
+                  />
+                  <Total
+                    k="Credits"
+                    v={`~${plan.credits.previews + plan.credits.run}`}
+                    small="previews"
+                  />
+                </div>
+              )}
               <ol className="overflow-hidden rounded-lg border border-neutral-800">
                 {steps.map((s, n) => {
                   const st = staged[s.moveIndex];
@@ -371,10 +376,12 @@ export function ReviewSheet({
                   );
                 })}
               </ol>
-              <p className="mt-1.5 text-[12px] text-neutral-400">
-                uses {plan.headroom.adds} of the {plan.headroom.left} adds left
-                this month · lines render at the audio step
-              </p>
+              {voiceMode && (
+                <p className="mt-1.5 text-[12px] text-neutral-400">
+                  uses {plan.headroom.adds} of the {plan.headroom.left} adds
+                  left this month · lines render at the audio step
+                </p>
+              )}
               {plan.blockers.map((b, i) => {
                 const who =
                   b.code === "unvoiced_speaker"

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -142,6 +143,7 @@ function Chip({
   slotOf,
   landing,
   outIds,
+  noSlot,
 }: {
   card: CharacterCard;
   state: CardState;
@@ -150,11 +152,14 @@ function Chip({
   landing: number | null;
   /** Voices a staged archive takes out. */
   outIds: Set<string>;
+  /** Voiced, but under Needs a voice: say "no slot" (#854). */
+  noSlot: boolean;
 }) {
   const dot = (cls: string, title?: string) => (
     <span title={title} className={`size-[7px] shrink-0 rounded-full ${cls}`} />
   );
   const dim = "truncate text-neutral-400";
+  const noSlotTag = <span className="text-[11px] text-red-400">no slot</span>;
   if (state.removed)
     return (
       <>
@@ -180,6 +185,7 @@ function Chip({
         <>
           {dot("bg-red-400")}
           <span className="truncate text-neutral-100">lost its voice</span>
+          {noSlot && noSlotTag}
         </>
       );
     return (
@@ -203,8 +209,8 @@ function Chip({
         </span>
         {slot ? (
           <span className="font-mono text-[11px] text-neutral-500">{slot}</span>
-        ) : v.status === "archived" ? (
-          <span className="text-[11px] text-red-400">no slot</span>
+        ) : v.status === "archived" || noSlot ? (
+          noSlotTag
         ) : null}
         <span className="ml-auto">
           <PlayButton voiceId={v.id} name={v.name} size="sm" />
@@ -231,6 +237,8 @@ function Chip({
           <span className="font-mono text-[11px] text-neutral-500">
             {landing}
           </span>
+        ) : noSlot ? (
+          noSlotTag
         ) : null}
         {take?.url ? (
           <span className="ml-auto">
@@ -679,6 +687,9 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [resumed, setResumed] = useState(false);
   /** Silent here is folded until opened. */
   const [silentOpen, setSilentOpen] = useState(false);
+  const silentGridId = useId();
+  /** The open card Silent here last unfolded for. */
+  const [silentPull, setSilentPull] = useState<string | null>(null);
   /** Speakers exist (#854); before that the page is faces only. */
   const voiceMode = data.hasSpeakers;
   const scope = useMemo(
@@ -1100,11 +1111,13 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     setStaged((s) => s.filter((_, i) => !done.has(i)));
     say(
       result.status === "done"
-        ? "Confirmed · the account matches the strip"
+        ? voiceMode
+          ? "Confirmed · the account matches the strip"
+          : "Confirmed"
         : "Stopped · what did not run is still staged",
       result.status !== "done",
     );
-    readRoster();
+    if (voiceMode) readRoster();
     router.refresh();
   };
 
@@ -1134,8 +1147,22 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     const k = groupOf(c);
     grouped.set(k, [...(grouped.get(k) ?? []), c]);
   }
-  for (const list of grouped.values())
-    list.sort((a, b) => b.lines - a.lines || a.name.localeCompare(b.name));
+  // Roles keep load.ts's `ROLE_IDS` order.
+  for (const [k, list] of grouped)
+    if (k !== "role")
+      list.sort((a, b) => b.lines - a.lines || a.name.localeCompare(b.name));
+  const groupById = new Map(
+    [...grouped].flatMap(([k, list]) => list.map((c) => [c.id, k] as const)),
+  );
+  // The open card (a card just added opens) landing in Silent here unfolds
+  // it, and it stays unfolded, so closing the panel can focus the card. Only
+  // on arrival: the toggle can still fold it after.
+  const pull =
+    openId !== null && groupById.get(openId) === "silent" ? openId : null;
+  if (pull !== silentPull) {
+    setSilentPull(pull);
+    if (pull !== null) setSilentOpen(true);
+  }
 
   const pause = data.pause;
   const pauseLabel =
@@ -1279,6 +1306,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                       <button
                         type="button"
                         aria-expanded={silentOpen}
+                        aria-controls={silentGridId}
                         onClick={() => setSilentOpen((o) => !o)}
                         className={`flex items-baseline gap-2.5 uppercase hover:text-neutral-300 ${FOCUS}`}
                       >
@@ -1294,7 +1322,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                     )}
                   </h2>
                   {(!folds || silentOpen) && (
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5">
+                    <div
+                      id={folds ? silentGridId : undefined}
+                      className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5"
+                    >
                       {list.map((c) => {
                         const st = stateOf(c);
                         return (
@@ -1315,8 +1346,12 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                                   slotOf={slotOf}
                                   landing={landingOf(st)}
                                   outIds={outIds}
+                                  noSlot={
+                                    isVoiced(st) &&
+                                    groupById.get(c.id) === "needs"
+                                  }
                                 />
-                              ) : (
+                              ) : c.group === "role" ? null : (
                                 <span className="truncate text-neutral-400">
                                   {c.faces.length === 0
                                     ? "no faces"
@@ -1595,6 +1630,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         <ReviewSheet
           scope={scope}
           staged={staged}
+          voiceMode={voiceMode}
           names={cards.map((c) => ({ id: c.id, name: nameOf(c.id) }))}
           onUndo={undo}
           onArchiveFlags={setArchiveFlags}
