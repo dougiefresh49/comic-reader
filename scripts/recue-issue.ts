@@ -14,7 +14,7 @@ import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { supabase } from "./lib/supabase.js";
 import { groupLeadId, joinGroupText } from "~/lib/balloon-groups";
-import { loadBookCast, renderVoice } from "~/lib/cast";
+import { issueCast, loadBookCast, renderVoice } from "~/lib/cast";
 import { cueRequest, type CuePromptInput } from "~/lib/cue-rules";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { selectIssue } from "~/lib/issue-queries";
@@ -100,17 +100,21 @@ async function cue(input: CuePromptInput): Promise<string> {
 }
 
 /**
- * The editor sends `ocr_text` as the text, the cast id (else the raw speaker
- * label) and the emotion, as saved (Workbench `saveFirst`).
+ * The editor sends `ocr_text` as the text, the cast id when the issue's cast
+ * holds it (else the raw speaker label, as `toBubble` does) and the emotion,
+ * as saved (Workbench `saveFirst`).
  */
-async function check(row: Row): Promise<Result> {
+async function check(row: Row, inCast: Set<string>): Promise<Result> {
   if (!row.ocr_text?.trim())
     return { row, proposal: null, error: "Empty text" };
   try {
     const proposal = await cue({
       text: row.ocr_text,
       emotion: row.emotion ?? "",
-      speaker: row.character_id ?? row.speaker,
+      speaker:
+        row.character_id && inCast.has(row.character_id)
+          ? row.character_id
+          : row.speaker,
     });
     return { row, proposal };
   } catch (e) {
@@ -135,6 +139,8 @@ type Sibling = {
  * active members in sort order, changed ones with their new cues, joined by
  * `joinGroupText`, in the lead's voice. That render refuses a group holding
  * an ignored or silent row, so such a group costs nothing and is counted.
+ * Its other refusals (members split across panels or speakers, a member
+ * with no text) are not checked here, so the total is an upper bound.
  */
 async function price(bookId: string, issueId: string, changed: Changed[]) {
   const fresh = new Map(changed.map((r) => [r.row.id, r.proposal]));
@@ -254,9 +260,18 @@ async function main(): Promise<void> {
   if (count !== null && count > rows.length)
     throw new Error(`bubbles read: got ${rows.length} of ${count} rows`);
 
+  const inCast = new Set(
+    issueCast(await loadBookCast(supabase, bookId), issueId).map(
+      (r) => r.character_id,
+    ),
+  );
   const results: Result[] = [];
   for (let i = 0; i < rows.length; i += POOL)
-    results.push(...(await Promise.all(rows.slice(i, i + POOL).map(check))));
+    results.push(
+      ...(await Promise.all(
+        rows.slice(i, i + POOL).map((r) => check(r, inCast)),
+      )),
+    );
 
   const failed = results.filter((r) => r.proposal === null);
   const ok = results.filter((r): r is Changed => r.proposal !== null);
@@ -297,7 +312,7 @@ async function main(): Promise<void> {
     `- Unchanged: ${kept.length - changed.length}`,
     `- Flagged, words differ, left out: ${flagged.length}`,
     `- Empty or failed replies: ${failed.length}`,
-    `- ElevenLabs characters to re-render the changed rows: ${cost.characters} over ${cost.renders} renders` +
+    `- ElevenLabs characters to re-render the changed rows: at most ${cost.characters} over ${cost.renders} renders` +
       ` (${cost.grouped} changed rows in joined groups, each group priced once` +
       (cost.refused
         ? `; ${cost.refused} groups left out, the render refuses a group with an ignored or silent row`
