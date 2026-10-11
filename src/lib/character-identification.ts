@@ -280,59 +280,62 @@ Example for four crops (a named character, a minion or generic enemy, a face you
 }
 
 /**
- * One reply entry per crop, keyed by its 1-based `face` index. An entry with
- * an out-of-range or duplicated index, or a missing or non-numeric
- * confidence, leaves its crop null; so does a reply with no parseable array.
+ * One reply entry per crop, keyed by its 1-based `face` index. A reply with
+ * any entry whose index is missing, out of range or repeated is misnumbered,
+ * so none of its names can be trusted to sit on the right crop: every crop
+ * comes back null, as for a reply with no parseable array. Otherwise an entry
+ * without a boolean `is_face`, a string-or-null `character_name` and a numeric
+ * `confidence` leaves its crop null, and so does a crop with no entry.
  */
 function parsePanelReply(
   text: string,
   faceCount: number,
 ): (FaceIdentification | null)[] {
-  const results: (FaceIdentification | null)[] = Array.from(
-    { length: faceCount },
-    () => null,
-  );
+  const none = () =>
+    Array.from({ length: faceCount }, (): FaceIdentification | null => null);
   const arrayMatch = /\[[\s\S]*\]/.exec(stripJsonFences(text));
-  if (!arrayMatch) return results;
+  if (!arrayMatch) return none();
   let parsed: unknown;
   try {
     parsed = JSON.parse(arrayMatch[0]);
   } catch {
-    return results;
+    return none();
   }
-  if (!Array.isArray(parsed)) return results;
+  if (!Array.isArray(parsed)) return none();
 
+  const results = none();
   const seen = new Set<number>();
-  const duplicated = new Set<number>();
   for (const entry of parsed as unknown[]) {
-    if (typeof entry !== "object" || entry === null) continue;
+    if (typeof entry !== "object" || entry === null) return none();
     const e = entry as Record<string, unknown>;
     const face = e.face;
     if (
       typeof face !== "number" ||
       !Number.isInteger(face) ||
       face < 1 ||
-      face > faceCount
+      face > faceCount ||
+      seen.has(face)
+    ) {
+      return none();
+    }
+    seen.add(face);
+    const isFace = parseIsFace(e.is_face);
+    const name = e.character_name;
+    if (
+      isFace === undefined ||
+      (name !== null && typeof name !== "string") ||
+      typeof e.confidence !== "number" ||
+      !Number.isFinite(e.confidence)
     ) {
       continue;
     }
-    if (seen.has(face)) {
-      duplicated.add(face);
-      continue;
-    }
-    seen.add(face);
-    if (typeof e.confidence !== "number" || !Number.isFinite(e.confidence)) {
-      continue;
-    }
     results[face - 1] = {
-      characterName:
-        typeof e.character_name === "string" ? e.character_name : null,
+      characterName: name,
       confidence: e.confidence,
-      isFace: parseIsFace(e.is_face),
+      isFace,
       reasoning: typeof e.reasoning === "string" ? e.reasoning : undefined,
     };
   }
-  for (const face of duplicated) results[face - 1] = null;
   return results;
 }
 

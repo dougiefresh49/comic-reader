@@ -245,6 +245,8 @@ const { data: calls, error: callsErr } = await supabase
   .from("llm_calls")
   .select("model, usd_est")
   .eq("step", STEP)
+  .eq("book_id", BOOK_ID)
+  .eq("issue_id", ISSUE_ID)
   .gte("created_at", startedAt);
 if (callsErr) {
   console.error(`llm_calls read failed: ${callsErr.message}`);
