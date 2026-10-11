@@ -525,35 +525,23 @@ async function proposeFrom(
     if (row) member(row, "wiki").wikiNames.push(label);
     else suggest({ name, qualifier, source: "wiki" });
   }
-  // Comic Vine's credits (#851) take the wiki's path: a credit that is a
-  // `characters` row joins it as a wiki member, one the wiki already lists
-  // only lends the wiki's suggestion its deck when the wiki gave no
-  // qualifier, and the rest join the same suggestion list, dismissed the same
-  // way. `matchCredit` is the lookahead's matching, so both agree.
-  type Known = { row: CharacterRow } | { wikiName: string };
-  const known: { name: string; value: Known }[] = [];
-  for (const id of book.formOf.keys()) {
-    const row = resolve(id);
-    if (!row) continue;
-    for (const name of [row.id, row.display_name ?? "", ...row.aliases]) {
-      if (name) known.push({ name, value: { row } });
-    }
-  }
-  for (const w of wiki)
-    known.push({ name: w.name, value: { wikiName: w.name } });
-
+  // Comic Vine's credits (#851) take the wiki's path, on exact matches only:
+  // a credit whose name or an alias resolves to a `characters` row joins it
+  // as a wiki member; one whose name or an alias is a wiki name (normalized)
+  // only lends that wiki suggestion its deck when the wiki gave no qualifier;
+  // the rest join the same suggestion list, dismissed the same way.
+  const wikiKnown = wiki.map((w) => ({ name: w.name, value: w.name }));
   const comicvine =
     parseComicVineCharacters(issue.data.comicvine_characters) ?? [];
   for (const c of comicvine) {
     const deck = deckSentence(c.deck, 80) ?? "";
-    const match = matchCredit(c, known);
-    if (match && "row" in match) {
-      const m = member(match.row, "wiki");
+    const row = [c.name, ...c.aliases].map(resolve).find(Boolean);
+    const wikiName = row ? undefined : matchCredit(c, wikiKnown, true);
+    if (row) {
+      const m = member(row, "wiki");
       if (!m.wikiNames.includes(c.name)) m.wikiNames.push(c.name);
-    } else if (match) {
-      const s = suggestions.find(
-        (x) => slugify(x.name) === slugify(match.wikiName),
-      );
+    } else if (wikiName) {
+      const s = suggestions.find((x) => slugify(x.name) === slugify(wikiName));
       if (s && !s.qualifier) s.qualifier = deck;
     } else {
       suggest({ name: c.name, qualifier: deck, source: "wiki" });

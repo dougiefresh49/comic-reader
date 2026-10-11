@@ -74,14 +74,15 @@ export function sameFirstAndLastWord(a: string, b: string): boolean {
 /**
  * The known name a Comic Vine credit is, or undefined: one whose normalized
  * form equals the credit's name, then one that equals an alias, then one that
- * shares the first and last word with the credit's name (never an alias's).
- * Known names are tried in order within each test. The lookahead's name list
- * and the characters stop's suggestions both match credits through this, and
- * neither ever matches one credit against another.
+ * shares the first and last word with the credit's name (never an alias's),
+ * unless `exactOnly`. Known names are tried in order within each test. The
+ * lookahead's name list uses all three; the characters stop's suggestions use
+ * `exactOnly`. Neither ever matches one credit against another.
  */
 export function matchCredit<T>(
   credit: Pick<ComicVineCharacter, "name" | "aliases">,
   known: { name: string; value: T }[],
+  exactOnly = false,
 ): T | undefined {
   const norms = known.map((k) => ({
     norm: normalizeCastName(k.name),
@@ -92,7 +93,9 @@ export function matchCredit<T>(
   const hit =
     equal(name) ??
     credit.aliases.map((a) => equal(normalizeCastName(a))).find(Boolean) ??
-    norms.find((k) => sameFirstAndLastWord(k.norm, name));
+    (exactOnly
+      ? undefined
+      : norms.find((k) => sameFirstAndLastWord(k.norm, name)));
   return hit?.value;
 }
 
@@ -156,13 +159,20 @@ async function get(
 function creditFromApi(row: unknown): ComicVineCharacter {
   const r = (row ?? {}) as Record<string, unknown>;
   const image = r.image as Record<string, unknown> | null | undefined;
+  const stringOrNull = (key: string) =>
+    key in r && (r[key] === null || typeof r[key] === "string");
   if (
     typeof r.id !== "number" ||
     typeof r.name !== "string" ||
     !clean(r.name) ||
-    (r.aliases != null && typeof r.aliases !== "string") ||
-    (r.deck != null && typeof r.deck !== "string") ||
-    (image != null && typeof image !== "object")
+    !stringOrNull("aliases") ||
+    !stringOrNull("deck") ||
+    !("image" in r) ||
+    (image !== null &&
+      (typeof image !== "object" ||
+        Array.isArray(image) ||
+        (image.medium_url !== undefined &&
+          typeof image.medium_url !== "string")))
   ) {
     throw new Error(`malformed character ${JSON.stringify(r.id ?? null)}`);
   }
