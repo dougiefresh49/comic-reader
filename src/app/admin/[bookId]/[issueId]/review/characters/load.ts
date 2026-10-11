@@ -515,6 +515,8 @@ export async function loadCharacters(
     wikiNames,
     known,
     voices,
+    // The read the cards' line counts come from, so a card never shows lines in faces mode.
+    hasSpeakers: lines.size > 0,
     pause,
     revoice,
   };

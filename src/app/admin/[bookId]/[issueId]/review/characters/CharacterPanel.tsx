@@ -2,7 +2,7 @@
 // names it (Rename is staged) and can say "this is character X" (#846, saves
 // at once), Voice and Faces are tabs, and the footer has the card's quick
 // actions. Voice changes are staged; the Faces work saves
-// as it is done, as it always has.
+// as it is done, as it always has. In faces mode (#854) it is Faces only.
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -37,11 +37,13 @@ const TABS: { key: PanelTab; label: string }[] = [
  * Right move between them when a tab has focus.
  */
 function TabRow({
+  tabs,
   tab,
   faces,
   idBase,
   onChange,
 }: {
+  tabs: typeof TABS;
   tab: PanelTab;
   /** Shown after the Faces label: "Faces 6". */
   faces: number;
@@ -53,8 +55,8 @@ function TabRow({
     faces: null,
   });
   const step = (from: PanelTab, dir: 1 | -1) => {
-    const i = TABS.findIndex((t) => t.key === from);
-    const next = TABS[(i + dir + TABS.length) % TABS.length]!.key;
+    const i = tabs.findIndex((t) => t.key === from);
+    const next = tabs[(i + dir + tabs.length) % tabs.length]!.key;
     onChange(next);
     refs.current[next]?.focus();
   };
@@ -64,7 +66,7 @@ function TabRow({
       aria-label="Jobs"
       className="flex gap-5 border-b border-neutral-800 px-4"
     >
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const selected = t.key === tab;
         return (
           <button
@@ -207,7 +209,9 @@ export interface CharacterPanelProps
   revoice: RevoicePlan | null;
   /** A Faces save is running. */
   busy: boolean;
-  /** The open tab, held by the screen so it survives a swap to another card. A role shows Voice whatever it says. */
+  /** Speakers exist (#854): the Voice tab, Design a voice and Sit out show. False is faces mode, Faces only. */
+  voiceMode: boolean;
+  /** The open tab, held by the screen so it survives a swap to another card. A role shows Voice whatever it says, and faces mode shows Faces. */
   tab: PanelTab;
   onTabChange: (tab: PanelTab) => void;
   /** Open with the name field: the card menu's Rename. */
@@ -237,6 +241,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
     bookId,
     revoice,
     busy,
+    voiceMode,
     tab,
     onTabChange,
     renameOnOpen,
@@ -270,7 +275,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const idBase = useId();
   const shown = card.faces.find((f) => f.id === shownId) ?? null;
   const isRole = card.group === "role";
-  const shownTab: PanelTab = isRole ? "voice" : tab;
+  const tabs = voiceMode ? TABS : TABS.filter((t) => t.key === "faces");
+  const shownTab: PanelTab = !voiceMode ? "faces" : isRole ? "voice" : tab;
 
   const closeMove = useCallback(() => {
     setMoving(null);
@@ -318,7 +324,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
     card.faces.length === 1 ? "its face" : `all ${card.faces.length} faces`;
 
   const meta = [
-    `${card.lines} ${card.lines === 1 ? "line" : "lines"}`,
+    voiceMode ? `${card.lines} ${card.lines === 1 ? "line" : "lines"}` : null,
     card.faces.length > 0
       ? `${card.faces.length} ${card.faces.length === 1 ? "face" : "faces"}`
       : null,
@@ -431,7 +437,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
 
         {!isRole && (
           <TabRow
-            tab={tab}
+            tabs={tabs}
+            tab={shownTab}
             faces={card.faces.length}
             idBase={idBase}
             onChange={onTabChange}
@@ -475,17 +482,25 @@ export function CharacterPanel(props: CharacterPanelProps) {
 
         {/* The card's quick actions. */}
         <div className="flex items-center gap-1 border-t border-neutral-800 px-3 py-2.5">
-          <button type="button" onClick={voiceProps.onDesign} className={BTN}>
-            {WandIcon} Design a voice
-          </button>
-          {state.sitOut ? (
-            <button type="button" onClick={onBackIn} className={BTN}>
-              Back in
-            </button>
-          ) : (
-            <button type="button" onClick={onSitOut} className={BTN_GHOST}>
-              {Icon.sit} Sit out this run
-            </button>
+          {voiceMode && (
+            <>
+              <button
+                type="button"
+                onClick={voiceProps.onDesign}
+                className={BTN}
+              >
+                {WandIcon} Design a voice
+              </button>
+              {state.sitOut ? (
+                <button type="button" onClick={onBackIn} className={BTN}>
+                  Back in
+                </button>
+              ) : (
+                <button type="button" onClick={onSitOut} className={BTN_GHOST}>
+                  {Icon.sit} Sit out this run
+                </button>
+              )}
+            </>
           )}
           <span className="flex-1" />
           {state.removed ? (

@@ -161,6 +161,11 @@ export interface CharactersData {
   known: KnownCharacter[];
   /** Every `voices` row except `needs_clip`. */
   voices: VoiceOption[];
+  /**
+   * A bubble of this issue has a speaker (the line count's read), so the
+   * page is in voices mode. False before get-context: faces mode (#854).
+   */
+  hasSpeakers: boolean;
   /** The paused run's step, or null when no run is paused here. */
   pause: PauseView | null;
   /** Characters whose audio in the book is from a voice they no longer have (#836). */

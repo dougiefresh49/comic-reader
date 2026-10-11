@@ -1,8 +1,10 @@
 // The casting page (#787): one page for characters and voices. A contact
-// sheet of face cards grouped by lines, a docked panel per character, the
-// account's slot strip in the header, and Review, the one list of the
-// staged moves. Every voice and cast change is staged in the browser and
-// runs at Confirm; the Faces work still saves as it is done.
+// sheet of face cards, a docked panel per character, the account's slot
+// strip in the header, and Review, the one list of the staged moves. Every
+// voice and cast change is staged in the browser and runs at Confirm; the
+// Faces work still saves as it is done. Two modes (#854): before any bubble
+// has a speaker it is faces only; once lines exist the cards group by what
+// each needs for its voice.
 "use client";
 
 import Link from "next/link";
@@ -10,6 +12,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -59,6 +62,7 @@ import {
   lockReason,
   pickMove,
   pickVoiceId,
+  slotAfter,
   slotModel,
   takesSlot,
   withoutPick,
@@ -91,25 +95,21 @@ type Toast = { text: string; bad?: boolean } | null;
 /** The DOM id of a card, so closing the panel can hand focus back to it. */
 const cardDomId = (id: string) => `cast-card-${id}`;
 
-const GROUPS = [
-  { key: "lead", label: "Leads", hint: "10+ lines" },
-  { key: "sup", label: "Supporting", hint: "3–9 lines" },
-  { key: "one", label: "One-offs", hint: "1–2 lines" },
-  { key: "silent", label: "No lines", hint: "silent here" },
-  { key: "role", label: "Roles", hint: "captions" },
-] as const;
-type GroupKey = (typeof GROUPS)[number]["key"];
+type GroupKey = "here" | "needs" | "ready" | "silent" | "role";
 
-const groupOf = (c: CharacterCard): GroupKey =>
-  c.group === "role"
-    ? "role"
-    : c.lines >= 10
-      ? "lead"
-      : c.lines >= 3
-        ? "sup"
-        : c.lines >= 1
-          ? "one"
-          : "silent";
+/** The board's groups in order: faces mode, then voices mode (#854). */
+const GROUPS: Record<"faces" | "voices", { key: GroupKey; label: string }[]> = {
+  faces: [
+    { key: "here", label: "In this issue" },
+    { key: "role", label: "Roles" },
+  ],
+  voices: [
+    { key: "needs", label: "Needs a voice" },
+    { key: "ready", label: "Ready" },
+    { key: "silent", label: "Silent here" },
+    { key: "role", label: "Roles" },
+  ],
+};
 
 /** What Approve does, for its tooltip (#757). */
 const APPROVE_DOES =
@@ -143,6 +143,7 @@ function Chip({
   slotOf,
   landing,
   outIds,
+  noSlot,
 }: {
   card: CharacterCard;
   state: CardState;
@@ -151,11 +152,14 @@ function Chip({
   landing: number | null;
   /** Voices a staged archive takes out. */
   outIds: Set<string>;
+  /** Voiced, but under Needs a voice: say "no slot" (#854). */
+  noSlot: boolean;
 }) {
   const dot = (cls: string, title?: string) => (
     <span title={title} className={`size-[7px] shrink-0 rounded-full ${cls}`} />
   );
   const dim = "truncate text-neutral-400";
+  const noSlotTag = <span className="text-[11px] text-red-400">no slot</span>;
   if (state.removed)
     return (
       <>
@@ -174,14 +178,14 @@ function Chip({
   if (v) {
     const own = v.characterId === card.id;
     const pending = state.pick !== null;
-    const slot =
-      pending && takesSlot(state.pick!.move) ? landing : slotOf.get(v.id);
+    const slot = slotAfter(state, slotOf, landing, outIds);
     const lost = !pending && outIds.has(v.id);
     if (lost)
       return (
         <>
           {dot("bg-red-400")}
           <span className="truncate text-neutral-100">lost its voice</span>
+          {noSlot && noSlotTag}
         </>
       );
     return (
@@ -205,8 +209,8 @@ function Chip({
         </span>
         {slot ? (
           <span className="font-mono text-[11px] text-neutral-500">{slot}</span>
-        ) : v.status === "archived" ? (
-          <span className="text-[11px] text-red-400">no slot</span>
+        ) : v.status === "archived" || noSlot ? (
+          noSlotTag
         ) : null}
         <span className="ml-auto">
           <PlayButton voiceId={v.id} name={v.name} size="sm" />
@@ -233,6 +237,8 @@ function Chip({
           <span className="font-mono text-[11px] text-neutral-500">
             {landing}
           </span>
+        ) : noSlot ? (
+          noSlotTag
         ) : null}
         {take?.url ? (
           <span className="ml-auto">
@@ -262,12 +268,37 @@ function Chip({
   );
 }
 
+/** A faces-mode card's line: its face count, none on a role with no faces. */
+function FaceCount({
+  faces,
+  role,
+  removed,
+}: {
+  faces: number;
+  role: boolean;
+  removed: boolean;
+}) {
+  const count =
+    faces > 0
+      ? `${faces} ${faces === 1 ? "face" : "faces"}`
+      : role
+        ? ""
+        : "no faces";
+  const text = [count, removed ? "not in issue" : ""]
+    .filter(Boolean)
+    .join(" · ");
+  return text ? (
+    <span className="truncate text-neutral-400">{text}</span>
+  ) : null;
+}
+
 function CastCard({
   card,
   state,
   isNew,
   selected,
   pages,
+  voiceMode,
   chip,
   onOpen,
   onMenu,
@@ -279,6 +310,8 @@ function CastCard({
   isNew: boolean;
   selected: boolean;
   pages: Map<number, PageView>;
+  /** Voices mode: the line badge shows and the card drags to the slot strip. */
+  voiceMode: boolean;
   chip: React.ReactNode;
   onOpen: () => void;
   onMenu: (anchor: HTMLElement) => void;
@@ -300,7 +333,7 @@ function CastCard({
       tabIndex={0}
       aria-label={state.name}
       aria-pressed={selected}
-      draggable={!state.removed}
+      draggable={voiceMode && !state.removed}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("text/plain", `char:${card.id}`);
@@ -331,16 +364,18 @@ function CastCard({
           pages={pages}
           className={`h-full w-full ${quiet ? "brightness-[.55] grayscale" : ""}`}
         />
-        <span
-          title={`${card.lines} lines`}
-          className={`absolute top-1.5 right-1.5 rounded-[5px] px-1.5 font-mono text-[11px] font-semibold ${
-            card.lines
-              ? "bg-black/45 text-white"
-              : "bg-black/30 text-neutral-400"
-          }`}
-        >
-          {card.lines}
-        </span>
+        {voiceMode && (
+          <span
+            title={`${card.lines} lines`}
+            className={`absolute top-1.5 right-1.5 rounded-[5px] px-1.5 font-mono text-[11px] font-semibold ${
+              card.lines
+                ? "bg-black/45 text-white"
+                : "bg-black/30 text-neutral-400"
+            }`}
+          >
+            {card.lines}
+          </span>
+        )}
         {isNew && (
           <span className="absolute top-1.5 left-1.5 rounded-[5px] bg-amber-400 px-1.5 text-[10px] font-semibold text-neutral-950 uppercase">
             new
@@ -674,6 +709,13 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [carry, setCarry] = useState<Carry | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   const [resumed, setResumed] = useState(false);
+  /** Silent here is folded until opened. */
+  const [silentOpen, setSilentOpen] = useState(false);
+  const silentGridId = useId();
+  /** The open card Silent here last unfolded for. */
+  const [silentPull, setSilentPull] = useState<string | null>(null);
+  /** Speakers exist (#854); before that the page is faces only. */
+  const voiceMode = data.hasSpeakers;
   const scope = useMemo(
     () => ({ bookId: data.bookId, issueId: data.issueId }),
     [data.bookId, data.issueId],
@@ -708,7 +750,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         setRosterError(err instanceof Error ? err.message : String(err)),
       );
   }, []);
-  useEffect(readRoster, [readRoster]);
+  // Faces mode shows no slots, so it reads none.
+  useEffect(() => {
+    if (voiceMode) readRoster();
+  }, [voiceMode, readRoster]);
 
   /** An immediate write (the Faces work, Approve, Continue): run, say the answer, then `onOk` on success, refresh. */
   const run = useCallback(
@@ -1090,21 +1135,58 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     setStaged((s) => s.filter((_, i) => !done.has(i)));
     say(
       result.status === "done"
-        ? "Confirmed · the account matches the strip"
+        ? voiceMode
+          ? "Confirmed · the account matches the strip"
+          : "Confirmed"
         : "Stopped · what did not run is still staged",
       result.status !== "done",
     );
-    readRoster();
+    if (voiceMode) readRoster();
     router.refresh();
   };
 
+  const landingOf = (st: CardState) =>
+    st.pick && model ? (model.landing.get(st.pick.index) ?? null) : null;
+  /** The card's group by its staged state (#854). */
+  const groupOf = (c: CharacterCard): GroupKey => {
+    if (c.group === "role") return "role";
+    if (!voiceMode) return "here";
+    const st = stateOf(c);
+    if (c.lines === 0 || st.sitOut || st.removed) return "silent";
+    if (!isVoiced(st)) return "needs";
+    if (!roster) {
+      // Slots still loading: go by the voice's status, so a card does not
+      // jump to Needs a voice and back when the roster lands.
+      const v = st.voiceId ? voiceById.get(st.voiceId) : undefined;
+      return st.pick?.move.kind === "create_design" || v?.status === "active"
+        ? "ready"
+        : "needs";
+    }
+    return slotAfter(st, slotOf, landingOf(st), outIds) !== null
+      ? "ready"
+      : "needs";
+  };
   const grouped = new Map<GroupKey, CharacterCard[]>();
   for (const c of cards) {
     const k = groupOf(c);
     grouped.set(k, [...(grouped.get(k) ?? []), c]);
   }
-  for (const list of grouped.values())
-    list.sort((a, b) => b.lines - a.lines || a.name.localeCompare(b.name));
+  // Roles keep load.ts's `ROLE_IDS` order.
+  for (const [k, list] of grouped)
+    if (k !== "role")
+      list.sort((a, b) => b.lines - a.lines || a.name.localeCompare(b.name));
+  const groupById = new Map(
+    [...grouped].flatMap(([k, list]) => list.map((c) => [c.id, k] as const)),
+  );
+  // The open card (a card just added opens) landing in Silent here unfolds
+  // it, and it stays unfolded, so closing the panel can focus the card. Only
+  // on arrival: the toggle can still fold it after.
+  const pull =
+    openId !== null && groupById.get(openId) === "silent" ? openId : null;
+  if (pull !== silentPull) {
+    setSilentPull(pull);
+    if (pull !== null) setSilentOpen(true);
+  }
 
   const pause = data.pause;
   const pauseLabel =
@@ -1153,22 +1235,26 @@ export function CastingScreen({ data }: { data: CharactersData }) {
               Faces <span className={COUNT}>{data.unknown.length}</span>
             </button>
           )}
-          <SlotStrip
-            roster={roster}
-            error={rosterError}
-            model={model}
-            staged={staged}
-            voices={voiceById}
-            speakers={speakers}
-            nameOf={nameOf}
-            onBoard={(id) => onBoard.has(id)}
-            carry={carry}
-            onCarry={setCarry}
-            onFree={freeSlot}
-            onKeep={(i) => setStaged((s) => s.filter((_, j) => j !== i))}
-            onOpen={open}
-            onDropCard={dropCard}
-          />
+          {voiceMode ? (
+            <SlotStrip
+              roster={roster}
+              error={rosterError}
+              model={model}
+              staged={staged}
+              voices={voiceById}
+              speakers={speakers}
+              nameOf={nameOf}
+              onBoard={(id) => onBoard.has(id)}
+              carry={carry}
+              onCarry={setCarry}
+              onFree={freeSlot}
+              onKeep={(i) => setStaged((s) => s.filter((_, j) => j !== i))}
+              onOpen={open}
+              onDropCard={dropCard}
+            />
+          ) : (
+            <span className="flex-1" />
+          )}
           <button
             type="button"
             onClick={(e) => setMenu({ kind: "add", anchor: e.currentTarget })}
@@ -1176,14 +1262,17 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           >
             + Add
           </button>
-          <button
-            type="button"
-            disabled={staged.length === 0}
-            onClick={() => setReviewOpen(true)}
-            className={BTN_PRIMARY}
-          >
-            Review <span className={COUNT}>{staged.length}</span>
-          </button>
+          {/* Faces mode stages only adds, renames and removals: Review shows once one is staged. */}
+          {(voiceMode || staged.length > 0) && (
+            <button
+              type="button"
+              disabled={staged.length === 0}
+              onClick={() => setReviewOpen(true)}
+              className={BTN_PRIMARY}
+            >
+              Review <span className={COUNT}>{staged.length}</span>
+            </button>
+          )}
           {resumed ? (
             <span className="rounded-md bg-emerald-700/30 px-3 py-1.5 font-medium whitespace-nowrap text-emerald-200">
               Resumed
@@ -1217,21 +1306,49 @@ export function CastingScreen({ data }: { data: CharactersData }) {
             aria-label="Cast"
             className="min-w-0 flex-1 overflow-y-auto px-[18px] pt-1.5 pb-10"
           >
-            {GROUPS.map((g) => {
+            {!voiceMode && (
+              <p className="truncate px-0.5 pt-3 text-[12px] text-neutral-500">
+                Faces · voices come after the pages stop
+              </p>
+            )}
+            {GROUPS[voiceMode ? "voices" : "faces"].map((g) => {
               const list = grouped.get(g.key) ?? [];
-              if (list.length === 0 && g.key !== "silent") return null;
+              if (list.length === 0) return null;
+              const folds = g.key === "silent";
+              const heading = (
+                <>
+                  <b className="font-semibold text-neutral-400">{g.label}</b>
+                  <span className="font-mono tracking-normal text-neutral-400">
+                    {list.length}
+                  </span>
+                </>
+              );
               return (
                 <section key={g.key} aria-label={g.label}>
                   <h2 className="flex items-baseline gap-2.5 px-0.5 pt-[18px] pb-2 text-[11px] tracking-[0.08em] text-neutral-500 uppercase">
-                    <b className="font-semibold text-neutral-400">{g.label}</b>
-                    <span className="font-mono tracking-normal text-neutral-400">
-                      {list.length}
-                    </span>
-                    <span className="tracking-normal normal-case">
-                      {g.hint}
-                    </span>
+                    {folds ? (
+                      <button
+                        type="button"
+                        aria-expanded={silentOpen}
+                        aria-controls={silentGridId}
+                        onClick={() => setSilentOpen((o) => !o)}
+                        className={`flex items-baseline gap-2.5 uppercase hover:text-neutral-300 ${FOCUS}`}
+                      >
+                        <span
+                          className={`self-center transition-transform ${silentOpen ? "rotate-90" : ""}`}
+                        >
+                          {Icon.chev}
+                        </span>
+                        {heading}
+                      </button>
+                    ) : (
+                      heading
+                    )}
                   </h2>
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5">
+                  <div
+                    id={folds ? silentGridId : undefined}
+                    className={`${folds && !silentOpen ? "hidden" : "grid"} grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5`}
+                  >
                     {list.map((c) => {
                       const st = stateOf(c);
                       return (
@@ -1242,19 +1359,28 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                           isNew={addedIds.has(c.id)}
                           selected={openId === c.id}
                           pages={pages}
+                          voiceMode={voiceMode}
                           chip={
-                            <Chip
-                              card={c}
-                              state={st}
-                              voices={voiceById}
-                              slotOf={slotOf}
-                              landing={
-                                st.pick && model
-                                  ? (model.landing.get(st.pick.index) ?? null)
-                                  : null
-                              }
-                              outIds={outIds}
-                            />
+                            voiceMode ? (
+                              <Chip
+                                card={c}
+                                state={st}
+                                voices={voiceById}
+                                slotOf={slotOf}
+                                landing={landingOf(st)}
+                                outIds={outIds}
+                                noSlot={
+                                  isVoiced(st) &&
+                                  groupById.get(c.id) === "needs"
+                                }
+                              />
+                            ) : (
+                              <FaceCount
+                                faces={c.faces.length}
+                                role={c.group === "role"}
+                                removed={st.removed}
+                              />
+                            )
                           }
                           onOpen={() =>
                             openId === c.id ? undefined : open(c.id)
@@ -1269,24 +1395,24 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                         />
                       );
                     })}
-                    {g.key === "silent" && (
-                      <button
-                        type="button"
-                        onClick={(e) =>
-                          setMenu({ kind: "add", anchor: e.currentTarget })
-                        }
-                        className={`flex min-h-[150px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-neutral-700 font-medium text-neutral-500 hover:border-neutral-500 hover:text-neutral-100 ${FOCUS}`}
-                      >
-                        <span className="grid size-[34px] place-items-center rounded-full border border-dashed border-neutral-600 text-[20px] leading-none">
-                          +
-                        </span>
-                        Add
-                      </button>
-                    )}
                   </div>
                 </section>
               );
             })}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5 pt-[18px]">
+              <button
+                type="button"
+                onClick={(e) =>
+                  setMenu({ kind: "add", anchor: e.currentTarget })
+                }
+                className={`flex min-h-[150px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-neutral-700 font-medium text-neutral-500 hover:border-neutral-500 hover:text-neutral-100 ${FOCUS}`}
+              >
+                <span className="grid size-[34px] place-items-center rounded-full border border-dashed border-neutral-600 text-[20px] leading-none">
+                  +
+                </span>
+                Add
+              </button>
+            </div>
           </main>
 
           {openCard && (
@@ -1302,6 +1428,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                 data.revoice.find((r) => r.characterId === openCard.id) ?? null
               }
               busy={busy}
+              voiceMode={voiceMode}
               tab={tab}
               onTabChange={setTab}
               renameOnOpen={renameId === openCard.id}
@@ -1405,17 +1532,19 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           <div className="px-2.5 pt-1.5 pb-1 text-[12px] font-semibold text-neutral-100">
             {nameOf(menuCard.id)}
           </div>
-          <button
-            type="button"
-            className={MENU_ITEM}
-            onClick={() => {
-              setMenu(null);
-              setDesignFor(menuCard.id);
-            }}
-          >
-            {WandIcon} Design a voice
-          </button>
-          {stateOf(menuCard).sitOut ? (
+          {voiceMode && (
+            <button
+              type="button"
+              className={MENU_ITEM}
+              onClick={() => {
+                setMenu(null);
+                setDesignFor(menuCard.id);
+              }}
+            >
+              {WandIcon} Design a voice
+            </button>
+          )}
+          {!voiceMode ? null : stateOf(menuCard).sitOut ? (
             <button
               type="button"
               className={MENU_ITEM}
@@ -1522,6 +1651,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         <ReviewSheet
           scope={scope}
           staged={staged}
+          voiceMode={voiceMode}
           names={cards.map((c) => ({ id: c.id, name: nameOf(c.id) }))}
           onUndo={undo}
           onArchiveFlags={setArchiveFlags}
