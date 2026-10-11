@@ -695,7 +695,8 @@ export async function roboflowAnalyzeBatch(
     if ("failure" in read) {
       console.warn(`[roboflow] ${pageLabel}: SAM3 workflow ${read.failure}`);
       failedPageLabels.push(pageLabel);
-      firstFailure ||= `${pageLabel}: ${read.failure}`;
+      // An error body may echo the request, key included; the run stores this.
+      firstFailure ||= `${pageLabel}: ${read.failure.replaceAll(apiKey, "[key]")}`;
       continue;
     }
 
