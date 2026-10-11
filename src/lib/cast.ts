@@ -17,6 +17,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { nameResolver, readAliases } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
+import { deckSentence, parseComicVineCharacters } from "~/lib/comicvine";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
 import {
   newestActiveVoiceOf,
@@ -453,7 +454,12 @@ async function proposeFrom(
 ): Promise<CastProposal> {
   const { bookId, resolve } = book;
   const [issue, faceRows] = await Promise.all([
-    selectIssue(client, bookId, issueId, "wiki_appearances").maybeSingle(),
+    selectIssue(
+      client,
+      bookId,
+      issueId,
+      "wiki_appearances, comicvine_characters",
+    ).maybeSingle(),
     readAll<{ character_id: string | null }>("face detections", (from, to) =>
       db(client)
         .from("panel_character_detections")
@@ -506,13 +512,29 @@ async function proposeFrom(
     const m = member(row, "cast before");
     if (!m.castNames.includes(c.display_name)) m.castNames.push(c.display_name);
   }
-  for (const { name, qualifier } of wikiNames(issue.data.wiki_appearances)) {
+  const wiki = wikiNames(issue.data.wiki_appearances);
+  for (const { name, qualifier } of wiki) {
     // "Kimberly Hart (Pink Ranger)": a name no row knows joins the row its
     // qualifier names, and does not become a second member.
     const row = resolve(name) ?? (qualifier ? resolve(qualifier) : undefined);
     const label = qualifier ? `${name} (${qualifier})` : name;
     if (row) member(row, "wiki").wikiNames.push(label);
     else suggest({ name, qualifier, source: "wiki" });
+  }
+  // Comic Vine's credits (#851) join the same list, dismissed the same way. A
+  // credit whose name or alias is a row, or a name the wiki lists, is skipped.
+  const wikiSlugs = new Set(wiki.map((w) => slugify(w.name)));
+  const comicvine =
+    parseComicVineCharacters(issue.data.comicvine_characters) ?? [];
+  for (const c of comicvine) {
+    const known = (n: string) =>
+      resolve(n) !== undefined || wikiSlugs.has(slugify(n));
+    if ([c.name, ...c.aliases].some(known)) continue;
+    suggest({
+      name: c.name,
+      qualifier: deckSentence(c.deck, 80) ?? "",
+      source: "wiki",
+    });
   }
 
   const sorted = [...members.values()].sort((a, b) => {

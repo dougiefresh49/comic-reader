@@ -13,17 +13,33 @@
  *   LIVE_API_OK=1 pnpm exec tsx --env-file=.env scripts/dry-run-lookahead-calls.ts
  * Flags: --book (default tmnt-mmpr-iii), --issue (default issue-3),
  * --pages 3,8 (default every page of the issue), --count-only.
+ *
+ * Comic Vine (#851): when `issues.comicvine_characters` is null and the book
+ * has a `comicvine_volume_id` (or `--volume <id>` gives one), the cast is
+ * fetched from Comic Vine in memory and used; nothing is written to `issues`.
+ * `--cast-only` (free, no Gemini call) prints the name list and looks hint the
+ * lookahead would build for the issue and stops; with `--volume` it reads
+ * neither new column, so it runs before the #851 migration is applied.
  */
 import sharp from "sharp";
 import * as characterIdentification from "~/lib/character-identification";
+import {
+  type ComicVineCharacter,
+  fetchComicVineCast,
+  parseComicVineCharacters,
+} from "~/lib/comicvine";
 import * as exemplarStore from "~/lib/exemplar-store";
 import * as faceExtraction from "~/lib/face-extraction";
 import * as geminiClient from "~/lib/gemini-client";
 import * as llmUsage from "~/lib/llm-usage";
+import { selectIssue } from "~/lib/issue-queries";
 import { createTypedStepClient } from "~/workflows/step-utils";
 import {
+  buildKnownCharacterListOrFatal,
+  buildLookaheadCast,
   identifyLookaheadFacesOrFatal,
   loadLookaheadPageOrFatal,
+  type LookaheadWikiAppearance,
   type IdentifiedFace,
   type LookaheadDeps,
   type LookaheadPage,
@@ -52,9 +68,100 @@ function arg(name: string): string | undefined {
 const BOOK_ID = arg("book") ?? "tmnt-mmpr-iii";
 const ISSUE_ID = arg("issue") ?? "issue-3";
 const COUNT_ONLY = process.argv.includes("--count-only");
+const CAST_ONLY = process.argv.includes("--cast-only");
+const volumeArg = arg("volume");
+const VOLUME = volumeArg === undefined ? undefined : Number(volumeArg);
+if (VOLUME !== undefined && !(Number.isInteger(VOLUME) && VOLUME > 0)) {
+  console.error(`--volume must be a Comic Vine volume id: ${volumeArg}`);
+  process.exit(1);
+}
 const startedAt = new Date().toISOString();
 
 const supabase = await createTypedStepClient();
+
+/**
+ * The issue's Comic Vine cast: the stored column when it holds one, else a
+ * fetch into memory when a volume id is known. `inMemory` marks a fetched
+ * cast, which the naming call then gets in place of the (null) column.
+ */
+async function comicvineCast(): Promise<{
+  cast: ComicVineCharacter[];
+  inMemory: boolean;
+  wiki: LookaheadWikiAppearance[];
+}> {
+  // With --cast-only and --volume, read neither #851 column.
+  const skipNewColumns = CAST_ONLY && VOLUME !== undefined;
+  const { data: issue, error } = skipNewColumns
+    ? await selectIssue(
+        supabase,
+        BOOK_ID,
+        ISSUE_ID,
+        "number, wiki_appearances",
+      ).single()
+    : await selectIssue(
+        supabase,
+        BOOK_ID,
+        ISSUE_ID,
+        "number, wiki_appearances, comicvine_characters",
+      ).single();
+  if (error) throw new Error(`issues read failed: ${error.message}`);
+  const wiki =
+    (issue.wiki_appearances as LookaheadWikiAppearance[] | null) ?? [];
+  const stored =
+    "comicvine_characters" in issue
+      ? parseComicVineCharacters(issue.comicvine_characters)
+      : null;
+  if (stored) {
+    console.log(`comicvine: ${stored.length} credit(s) stored on the issue`);
+    return { cast: stored, inMemory: false, wiki };
+  }
+
+  let volume = VOLUME;
+  if (volume === undefined) {
+    const { data: book, error: bookErr } = await supabase
+      .from("books")
+      .select("comicvine_volume_id")
+      .eq("id", BOOK_ID)
+      .single();
+    if (bookErr) throw new Error(`books read failed: ${bookErr.message}`);
+    volume = book.comicvine_volume_id ?? undefined;
+  }
+  const apiKey = process.env.COMICVINE_API_KEY;
+  if (volume === undefined || !apiKey) {
+    console.log(
+      `comicvine: none (${volume === undefined ? "no volume id" : "COMICVINE_API_KEY unset"})`,
+    );
+    return { cast: [], inMemory: false, wiki };
+  }
+  const cast = await fetchComicVineCast(apiKey, volume, Number(issue.number));
+  console.log(
+    `comicvine: ${cast.length} credit(s) fetched in memory (volume ${volume}, issue ${issue.number}), not stored`,
+  );
+  return { cast, inMemory: true, wiki };
+}
+
+const comicvine = await comicvineCast();
+
+if (CAST_ONLY) {
+  const dbCharacters = await buildKnownCharacterListOrFatal(
+    supabase,
+    BOOK_ID,
+    "cast-only",
+  );
+  const { knownCharacters, castLooks } = buildLookaheadCast(
+    dbCharacters,
+    comicvine.wiki,
+    comicvine.cast,
+  );
+  const before = buildLookaheadCast(dbCharacters, comicvine.wiki, []);
+  console.log(
+    `\nname list: ${knownCharacters.length} name(s), ${knownCharacters.length - before.knownCharacters.length} from Comic Vine`,
+  );
+  console.log(`Named characters who may appear: ${knownCharacters.join(", ")}`);
+  console.log(`\nlooks hint: ${castLooks.length} line(s)`);
+  console.log(characterIdentification.castLooksBlock(castLooks) || "(none)");
+  process.exit(0);
+}
 
 async function issuePageNumbers(): Promise<number[]> {
   const { data, error } = await supabase
@@ -211,6 +318,7 @@ for (const page of pages) {
     ISSUE_ID,
     page,
     STEP,
+    comicvine.inMemory ? comicvine.cast : undefined,
   );
   console.log(`\npage | panel | before | after`);
   const pageAfter = new Set<string>();

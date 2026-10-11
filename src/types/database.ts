@@ -182,6 +182,7 @@ export type Database = {
       };
       books: {
         Row: {
+          comicvine_volume_id: number | null;
           created_at: string | null;
           id: string;
           name: string;
@@ -195,6 +196,7 @@ export type Database = {
           wiki_title_template: string | null;
         };
         Insert: {
+          comicvine_volume_id?: number | null;
           created_at?: string | null;
           id: string;
           name: string;
@@ -208,6 +210,7 @@ export type Database = {
           wiki_title_template?: string | null;
         };
         Update: {
+          comicvine_volume_id?: number | null;
           created_at?: string | null;
           id?: string;
           name?: string;
@@ -696,6 +699,7 @@ export type Database = {
           audio_count: number;
           book_id: string;
           bubble_count: number;
+          comicvine_characters: Json | null;
           created_at: string | null;
           dismissed_wiki_names: string[];
           has_audio: boolean;
@@ -720,6 +724,7 @@ export type Database = {
           audio_count?: number;
           book_id: string;
           bubble_count?: number;
+          comicvine_characters?: Json | null;
           created_at?: string | null;
           dismissed_wiki_names?: string[];
           has_audio?: boolean;
@@ -744,6 +749,7 @@ export type Database = {
           audio_count?: number;
           book_id?: string;
           bubble_count?: number;
+          comicvine_characters?: Json | null;
           created_at?: string | null;
           dismissed_wiki_names?: string[];
           has_audio?: boolean;
