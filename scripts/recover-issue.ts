@@ -13,7 +13,7 @@
  * (book_id, issue_id, legacy_id), which #375 deleted for a fresh run. issue-4's raw JPEGs are already in
  * comic-pages-raw; it gets WebPs plus `pages` rows only.
  *
- * Never writes the `issues` row, so `has_webp` stays false on both issues.
+ * Never writes the `issues` row, so it leaves `has_webp` as it finds it.
  */
 
 import { execFileSync } from "child_process";
