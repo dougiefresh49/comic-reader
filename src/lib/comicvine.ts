@@ -49,6 +49,53 @@ export function deckSentence(deck: string | null, max: number): string | null {
   return `${(space > 0 ? cut.slice(0, space) : cut).replace(/[\s,;:]+$/, "")}…`;
 }
 
+/** A name for matching: lowercased, punctuation dropped, `-` and `_` as spaces. */
+export function normalizeCastName(name: string): string {
+  return clean(name)
+    .toLowerCase()
+    .replace(/[-_]/g, " ")
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** The wiki's first-and-last-word rule: two-plus words each, the same first and last word. */
+export function sameFirstAndLastWord(a: string, b: string): boolean {
+  const wa = a.split(" ");
+  const wb = b.split(" ");
+  return (
+    wa.length >= 2 &&
+    wb.length >= 2 &&
+    wa[0] === wb[0] &&
+    wa[wa.length - 1] === wb[wb.length - 1]
+  );
+}
+
+/**
+ * The known name a Comic Vine credit is, or undefined: one whose normalized
+ * form equals the credit's name, then one that equals an alias, then one that
+ * shares the first and last word with the credit's name (never an alias's).
+ * Known names are tried in order within each test. The lookahead's name list
+ * and the characters stop's suggestions both match credits through this, and
+ * neither ever matches one credit against another.
+ */
+export function matchCredit<T>(
+  credit: Pick<ComicVineCharacter, "name" | "aliases">,
+  known: { name: string; value: T }[],
+): T | undefined {
+  const norms = known.map((k) => ({
+    norm: normalizeCastName(k.name),
+    value: k.value,
+  }));
+  const equal = (n: string) => norms.find((k) => k.norm === n);
+  const name = normalizeCastName(credit.name);
+  const hit =
+    equal(name) ??
+    credit.aliases.map((a) => equal(normalizeCastName(a))).find(Boolean) ??
+    norms.find((k) => sameFirstAndLastWord(k.norm, name));
+  return hit?.value;
+}
+
 /** `issues.comicvine_characters` as stored credits, whatever the JSON holds; null when not fetched. */
 export function parseComicVineCharacters(
   value: unknown,
@@ -105,61 +152,95 @@ async function get(
   return body.results;
 }
 
+/** One `characters/` row as a stored credit; throws when it has the wrong shape. */
+function creditFromApi(row: unknown): ComicVineCharacter {
+  const r = (row ?? {}) as Record<string, unknown>;
+  const image = r.image as Record<string, unknown> | null | undefined;
+  if (
+    typeof r.id !== "number" ||
+    typeof r.name !== "string" ||
+    !clean(r.name) ||
+    (r.aliases != null && typeof r.aliases !== "string") ||
+    (r.deck != null && typeof r.deck !== "string") ||
+    (image != null && typeof image !== "object")
+  ) {
+    throw new Error(`malformed character ${JSON.stringify(r.id ?? null)}`);
+  }
+  const deck = typeof r.deck === "string" ? clean(r.deck) : "";
+  return {
+    id: r.id,
+    name: clean(r.name),
+    aliases:
+      typeof r.aliases === "string"
+        ? r.aliases.split(/\r?\n/).map(clean).filter(Boolean)
+        : [],
+    deck: deck || null,
+    image_url: typeof image?.medium_url === "string" ? image.medium_url : null,
+  };
+}
+
 /**
  * The issue's character credits from Comic Vine: one call for the issue id,
  * one for its credits, and one per 100 characters for their details. Throws
- * on any failure; `[]` when the issue has no credits.
+ * on any failure, including a null `results`, a missing `character_credits`
+ * array, or details that do not cover every credited id, so only a complete
+ * fetch is stored. `[]` only when Comic Vine lists the issue with no credits.
  */
 export async function fetchComicVineCast(
   apiKey: string,
   volumeId: number,
   issueNumber: number,
 ): Promise<ComicVineCharacter[]> {
-  const issues = (await get(apiKey, "issues/", {
+  const issues = await get(apiKey, "issues/", {
     filter: `volume:${volumeId},issue_number:${issueNumber}`,
     field_list: "id",
-  })) as { id?: unknown }[] | undefined;
-  const issueId = issues?.[0]?.id;
+  });
+  if (!Array.isArray(issues)) throw new Error("issues/ results not a list");
+  const issueId = (issues[0] as { id?: unknown } | undefined)?.id;
   if (typeof issueId !== "number") {
     throw new Error(`no issue ${issueNumber} in volume ${volumeId}`);
   }
 
-  const detail = (await get(apiKey, `issue/4000-${issueId}/`, {
+  const detail = await get(apiKey, `issue/4000-${issueId}/`, {
     field_list: "character_credits",
-  })) as { character_credits?: { id?: unknown }[] | null } | undefined;
-  const ids = (detail?.character_credits ?? []).flatMap((c) =>
-    typeof c.id === "number" ? [c.id] : [],
-  );
+  });
+  const credits = (detail as { character_credits?: unknown } | null)
+    ?.character_credits;
+  if (!Array.isArray(credits)) {
+    throw new Error(`issue ${issueId} has no character_credits list`);
+  }
+  const ids: number[] = [];
+  for (const c of credits as unknown[]) {
+    const id = (c as { id?: unknown } | null)?.id;
+    if (typeof id !== "number") {
+      throw new Error(`issue ${issueId} has a credit without an id`);
+    }
+    if (!ids.includes(id)) ids.push(id);
+  }
 
   const byId = new Map<number, ComicVineCharacter>();
   for (let i = 0; i < ids.length; i += PAGE_LIMIT) {
-    const rows = (await get(apiKey, "characters/", {
+    const rows = await get(apiKey, "characters/", {
       filter: `id:${ids.slice(i, i + PAGE_LIMIT).join("|")}`,
       field_list: "id,name,aliases,deck,image",
       limit: String(PAGE_LIMIT),
-    })) as {
-      id?: unknown;
-      name?: unknown;
-      aliases?: unknown;
-      deck?: unknown;
-      image?: { medium_url?: unknown } | null;
-    }[];
-    const parsed = parseComicVineCharacters(
-      rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        aliases: typeof r.aliases === "string" ? r.aliases.split(/\r?\n/) : [],
-        deck: r.deck,
-        image_url: r.image?.medium_url,
-      })),
+    });
+    if (!Array.isArray(rows)) {
+      throw new Error("characters/ results not a list");
+    }
+    for (const row of rows as unknown[]) {
+      const c = creditFromApi(row);
+      byId.set(c.id, c);
+    }
+  }
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length > 0) {
+    throw new Error(
+      `details cover ${ids.length - missing.length} of ${ids.length} credits`,
     );
-    for (const c of parsed ?? []) byId.set(c.id, c);
   }
   // Credit order, which is how Comic Vine lists the issue's cast.
-  return ids.flatMap((id) => {
-    const c = byId.get(id);
-    return c ? [c] : [];
-  });
+  return ids.map((id) => byId.get(id)!);
 }
 
 /**

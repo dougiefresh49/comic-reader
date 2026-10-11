@@ -50,7 +50,9 @@ import type {
 import {
   type ComicVineCharacter,
   deckSentence,
+  matchCredit,
   parseComicVineCharacters,
+  sameFirstAndLastWord,
 } from "~/lib/comicvine";
 import type { FaceCropResult } from "~/lib/face-extraction";
 import { groupFaces } from "~/lib/face-groups";
@@ -1244,28 +1246,15 @@ export type LookaheadWikiAppearance = { name: string; qualifier?: string };
 const normalizeName = (n: string) =>
   n.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
 
-/** Same character: equal once normalized, or two-plus words with the same first and last word. */
-function sameNormalizedName(a: string, b: string): boolean {
-  if (a === b) return true;
-  const wa = a.split(" ");
-  const wb = b.split(" ");
-  return (
-    wa.length >= 2 &&
-    wb.length >= 2 &&
-    wa[0] === wb[0] &&
-    wa[wa.length - 1] === wb[wb.length - 1]
-  );
-}
-
-/** A Comic Vine deck in the looks hint: its first sentence, at most this long. */
+/** A Comic Vine deck in the cast block: its first sentence, at most this long. */
 const CAST_LOOK_MAX_CHARS = 160;
 
 /**
- * The lookahead's name list and looks hint (#851). The list is the DB names,
+ * The lookahead's name list and cast block (#851). The list is the DB names,
  * then the wiki names a DB name does not already cover (with the wiki
- * qualifier), then the Comic Vine names no DB or wiki name covers, by name or
- * alias. The hint has one line per Comic Vine character with a deck, under
- * the label the list shows for it. Pure, so `--cast-only` in
+ * qualifier), then the Comic Vine names no DB or wiki name covers
+ * (`matchCredit`). The block has one line per Comic Vine credit with a deck,
+ * under the label the list shows for it. Pure, so `--cast-only` in
  * `scripts/dry-run-lookahead-calls.ts` prints what the step sends.
  */
 export function buildLookaheadCast(
@@ -1273,47 +1262,31 @@ export function buildLookaheadCast(
   wikiAppearances: LookaheadWikiAppearance[],
   comicvine: ComicVineCharacter[],
 ): { knownCharacters: string[]; castLooks: CastLook[] } {
-  // Every name a later name can match, with the list label it stands for.
-  const labelled = dbCharacters.map((n) => ({
+  const dbNormalized = dbCharacters.map((n) => ({
     norm: normalizeName(n),
     label: n,
   }));
-  const dbCount = labelled.length;
-  const dbMatch = (norm: string) =>
-    labelled.slice(0, dbCount).find((d) => sameNormalizedName(d.norm, norm));
+  // Every DB and wiki name a credit can match, with the list label it means.
+  const known = dbCharacters.map((n) => ({ name: n, value: n }));
 
   const wikiNames: string[] = [];
   for (const a of wikiAppearances) {
     const norm = normalizeName(a.name);
-    const db = dbMatch(norm);
-    if (db) {
-      labelled.push({ norm, label: db.label });
-      continue;
-    }
-    const label = a.qualifier ? `${a.name} (${a.qualifier})` : a.name;
-    wikiNames.push(label);
-    labelled.push({ norm, label });
+    const db = dbNormalized.find(
+      (d) => d.norm === norm || sameFirstAndLastWord(d.norm, norm),
+    );
+    const label =
+      db?.label ?? (a.qualifier ? `${a.name} (${a.qualifier})` : a.name);
+    if (!db) wikiNames.push(label);
+    known.push({ name: a.name, value: label });
   }
 
   const comicvineNames: string[] = [];
   const castLooks: CastLook[] = [];
   for (const c of comicvine) {
-    const names = [c.name, ...c.aliases];
-    const norms = names.map(normalizeName);
-    // The same spelling beats the same normalized name, which beats a
-    // first-and-last-word match; the name beats an alias.
-    const first = (
-      find: (i: number) => (typeof labelled)[number] | undefined,
-    ) => names.map((_, i) => find(i)).find((l) => l !== undefined);
-    const match =
-      first((i) => labelled.find((l) => l.label === names[i])) ??
-      first((i) => labelled.find((l) => l.norm === norms[i])) ??
-      first((i) => labelled.find((l) => sameNormalizedName(l.norm, norms[i]!)));
-    const label = match?.label ?? c.name;
-    if (!match) {
-      comicvineNames.push(c.name);
-      labelled.push({ norm: normalizeName(c.name), label });
-    }
+    const match = matchCredit(c, known);
+    const label = match ?? c.name;
+    if (match === undefined) comicvineNames.push(c.name);
     const looks = deckSentence(c.deck, CAST_LOOK_MAX_CHARS);
     if (looks && !castLooks.some((l) => l.name === label)) {
       castLooks.push({ name: label, looks });

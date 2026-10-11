@@ -17,7 +17,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { nameResolver, readAliases } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
-import { deckSentence, parseComicVineCharacters } from "~/lib/comicvine";
+import {
+  deckSentence,
+  matchCredit,
+  parseComicVineCharacters,
+} from "~/lib/comicvine";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
 import {
   newestActiveVoiceOf,
@@ -521,20 +525,39 @@ async function proposeFrom(
     if (row) member(row, "wiki").wikiNames.push(label);
     else suggest({ name, qualifier, source: "wiki" });
   }
-  // Comic Vine's credits (#851) join the same list, dismissed the same way. A
-  // credit whose name or alias is a row, or a name the wiki lists, is skipped.
-  const wikiSlugs = new Set(wiki.map((w) => slugify(w.name)));
+  // Comic Vine's credits (#851) take the wiki's path: a credit that is a
+  // `characters` row joins it as a wiki member, one the wiki already lists
+  // only lends the wiki's suggestion its deck when the wiki gave no
+  // qualifier, and the rest join the same suggestion list, dismissed the same
+  // way. `matchCredit` is the lookahead's matching, so both agree.
+  type Known = { row: CharacterRow } | { wikiName: string };
+  const known: { name: string; value: Known }[] = [];
+  for (const id of book.formOf.keys()) {
+    const row = resolve(id);
+    if (!row) continue;
+    for (const name of [row.id, row.display_name ?? "", ...row.aliases]) {
+      if (name) known.push({ name, value: { row } });
+    }
+  }
+  for (const w of wiki)
+    known.push({ name: w.name, value: { wikiName: w.name } });
+
   const comicvine =
     parseComicVineCharacters(issue.data.comicvine_characters) ?? [];
   for (const c of comicvine) {
-    const known = (n: string) =>
-      resolve(n) !== undefined || wikiSlugs.has(slugify(n));
-    if ([c.name, ...c.aliases].some(known)) continue;
-    suggest({
-      name: c.name,
-      qualifier: deckSentence(c.deck, 80) ?? "",
-      source: "wiki",
-    });
+    const deck = deckSentence(c.deck, 80) ?? "";
+    const match = matchCredit(c, known);
+    if (match && "row" in match) {
+      const m = member(match.row, "wiki");
+      if (!m.wikiNames.includes(c.name)) m.wikiNames.push(c.name);
+    } else if (match) {
+      const s = suggestions.find(
+        (x) => slugify(x.name) === slugify(match.wikiName),
+      );
+      if (s && !s.qualifier) s.qualifier = deck;
+    } else {
+      suggest({ name: c.name, qualifier: deck, source: "wiki" });
+    }
   }
 
   const sorted = [...members.values()].sort((a, b) => {

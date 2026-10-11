@@ -17,7 +17,7 @@
  * Comic Vine (#851): when `issues.comicvine_characters` is null and the book
  * has a `comicvine_volume_id` (or `--volume <id>` gives one), the cast is
  * fetched from Comic Vine in memory and used; nothing is written to `issues`.
- * `--cast-only` (free, no Gemini call) prints the name list and looks hint the
+ * `--cast-only` (free, no Gemini call) prints the name list and cast block the
  * lookahead would build for the issue and stops; with `--volume` it reads
  * neither new column, so it runs before the #851 migration is applied.
  */
@@ -158,7 +158,7 @@ if (CAST_ONLY) {
     `\nname list: ${knownCharacters.length} name(s), ${knownCharacters.length - before.knownCharacters.length} from Comic Vine`,
   );
   console.log(`Named characters who may appear: ${knownCharacters.join(", ")}`);
-  console.log(`\nlooks hint: ${castLooks.length} line(s)`);
+  console.log(`\ncast block: ${castLooks.length} line(s)`);
   console.log(characterIdentification.castLooksBlock(castLooks) || "(none)");
   process.exit(0);
 }

@@ -34,19 +34,20 @@ export function faceOutcome(result: FaceIdentification): FaceOutcome {
   return result.isFace === true ? "unnamed" : "drop";
 }
 
-/** One line of the looks hint (#851): a name as the name list shows it, and what that character is. */
+/** One line of the cast block (#851): a name as the name list shows it, and who that character is (the Comic Vine deck). */
 export interface CastLook {
   name: string;
   looks: string;
 }
 
 /**
- * The looks hint block, one line per character; "" when there is none, so a
- * prompt without Comic Vine data reads as before.
+ * The cast block, one line per character; "" when there is none. Only this
+ * block is absent from a prompt without Comic Vine data; the identification
+ * rules are the same in every call.
  */
 export function castLooksBlock(castLooks?: CastLook[]): string {
   if (!castLooks || castLooks.length === 0) return "";
-  return `Who these names are in this issue (from the issue's credits; use it to tell which name fits a face):
+  return `Who these names are in this issue (from the issue's credits):
 ${castLooks.map((c) => `- ${c.name}: ${c.looks}`).join("\n")}`;
 }
 
@@ -63,8 +64,8 @@ export interface ExemplarReference {
 const IDENTIFICATION_RULES = `IDENTIFICATION RULES:
 1. Identify based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body).
 2. If the face matches a named character from the list above, use that name.
-3. When a specific character's name from the list above fits the face's looks, use it instead of a generic descriptive name such as "Robotic Foot Soldier", "Foot Soldier" or "Soldier", even when the list has that generic name too. A robot or armored figure can be a named character.
-4. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, robot, unnamed soldier, etc.), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT try to match minions to named characters.
+3. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, rank-and-file robots, unnamed soldier, etc.), one who looks like the others in a group (several Foot Soldiers, Putties or robots in the same gear), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT give a minion a named character's name.
+4. If the figure stands apart from the group (its own design, a name in the dialogue or a caption, or a match to its line under "Who these names are in this issue"), it is a named character, robot or armored figure included: use its name from the list instead of a generic one such as "Armored Villain" or "Soldier", even when the list has the generic name too.
 5. If the crop shows only a body part (fist, arm, torso) without a visible face or head, set is_face to false and character_name to null. A masked or helmeted head counts as a face.
 6. If the crop is a face but you cannot confidently identify the character, set is_face to true and character_name to null. Do NOT guess or pick a random name from the list.
 
@@ -198,7 +199,7 @@ export async function identifyFace(
     throwOnApiError?: boolean;
     model?: string;
     thinkingLevel?: ThinkingLevel | null;
-    /** The looks hint (#851); unset or empty leaves the prompt as before. */
+    /** The cast block (#851); unset or empty leaves it out. The rules are the same either way. */
     castLooks?: CastLook[];
   },
 ): Promise<FaceIdentification> {
