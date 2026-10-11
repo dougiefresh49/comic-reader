@@ -655,6 +655,11 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [roster, setRoster] = useState<Roster | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  /** The open card now, for a save's answer that lands after a re-render (#846). */
+  const openIdRef = useRef(openId);
+  useEffect(() => {
+    openIdRef.current = openId;
+  }, [openId]);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [tab, setTab] = useState<PanelTab>("voice");
   const [menu, setMenu] = useState<
@@ -1348,9 +1353,11 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                     setStaged((s) =>
                       withoutPick(s, from).filter((x) => !forChar(from)(x)),
                     );
-                    setRenameId(null);
-                    setTab("voice");
-                    setOpenId(r.characterId);
+                    setRenameId((cur) => (cur === from ? null : cur));
+                    // Doug may have closed the panel or opened another card
+                    // while the save ran: follow only if it still shows `from`.
+                    if (openIdRef.current === from) setTab("voice");
+                    setOpenId((cur) => (cur === from ? r.characterId : cur));
                   },
                 );
               }}
