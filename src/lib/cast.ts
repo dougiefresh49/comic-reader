@@ -17,6 +17,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
 import { nameResolver, readAliases } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
+import {
+  deckSentence,
+  matchCredit,
+  parseComicVineCharacters,
+} from "~/lib/comicvine";
 import { listBookIssues, selectIssue } from "~/lib/issue-queries";
 import {
   newestActiveVoiceOf,
@@ -453,7 +458,12 @@ async function proposeFrom(
 ): Promise<CastProposal> {
   const { bookId, resolve } = book;
   const [issue, faceRows] = await Promise.all([
-    selectIssue(client, bookId, issueId, "wiki_appearances").maybeSingle(),
+    selectIssue(
+      client,
+      bookId,
+      issueId,
+      "wiki_appearances, comicvine_characters",
+    ).maybeSingle(),
     readAll<{ character_id: string | null }>("face detections", (from, to) =>
       db(client)
         .from("panel_character_detections")
@@ -506,13 +516,36 @@ async function proposeFrom(
     const m = member(row, "cast before");
     if (!m.castNames.includes(c.display_name)) m.castNames.push(c.display_name);
   }
-  for (const { name, qualifier } of wikiNames(issue.data.wiki_appearances)) {
+  const wiki = wikiNames(issue.data.wiki_appearances);
+  for (const { name, qualifier } of wiki) {
     // "Kimberly Hart (Pink Ranger)": a name no row knows joins the row its
     // qualifier names, and does not become a second member.
     const row = resolve(name) ?? (qualifier ? resolve(qualifier) : undefined);
     const label = qualifier ? `${name} (${qualifier})` : name;
     if (row) member(row, "wiki").wikiNames.push(label);
     else suggest({ name, qualifier, source: "wiki" });
+  }
+  // Comic Vine's credits (#851) take the wiki's path, on exact matches only:
+  // a credit whose name or an alias resolves to a `characters` row joins it
+  // as a wiki member; one whose name or an alias is a wiki name (normalized)
+  // only lends that wiki suggestion its deck when the wiki gave no qualifier;
+  // the rest join the same suggestion list, dismissed the same way.
+  const wikiKnown = wiki.map((w) => ({ name: w.name, value: w.name }));
+  const comicvine =
+    parseComicVineCharacters(issue.data.comicvine_characters) ?? [];
+  for (const c of comicvine) {
+    const deck = deckSentence(c.deck, 80) ?? "";
+    const row = [c.name, ...c.aliases].map(resolve).find(Boolean);
+    const wikiName = row ? undefined : matchCredit(c, wikiKnown, true);
+    if (row) {
+      const m = member(row, "wiki");
+      if (!m.wikiNames.includes(c.name)) m.wikiNames.push(c.name);
+    } else if (wikiName) {
+      const s = suggestions.find((x) => slugify(x.name) === slugify(wikiName));
+      if (s && !s.qualifier) s.qualifier = deck;
+    } else {
+      suggest({ name: c.name, qualifier: deck, source: "wiki" });
+    }
   }
 
   const sorted = [...members.values()].sort((a, b) => {

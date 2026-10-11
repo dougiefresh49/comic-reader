@@ -34,6 +34,23 @@ export function faceOutcome(result: FaceIdentification): FaceOutcome {
   return result.isFace === true ? "unnamed" : "drop";
 }
 
+/** One line of the cast block (#851): a name as the name list shows it, and who that character is (the Comic Vine deck). */
+export interface CastLook {
+  name: string;
+  looks: string;
+}
+
+/**
+ * The cast block, one line per character; "" when there is none. Only this
+ * block is absent from a prompt without Comic Vine data; the identification
+ * rules are the same in every call.
+ */
+export function castLooksBlock(castLooks?: CastLook[]): string {
+  if (!castLooks || castLooks.length === 0) return "";
+  return `Who these names are in this issue (from the issue's credits):
+${castLooks.map((c) => `- ${c.name}: ${c.looks}`).join("\n")}`;
+}
+
 export interface ExemplarReference {
   characterName: string;
   jpegBase64: string;
@@ -47,9 +64,10 @@ export interface ExemplarReference {
 const IDENTIFICATION_RULES = `IDENTIFICATION RULES:
 1. Identify based on visual features (skin color, mask, helmet, hair, costume, species) AND page context (dialogue, scene, body).
 2. If the face matches a named character from the list above, use that name.
-3. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, robot, unnamed soldier, etc.), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT try to match minions to named characters.
-4. If the crop shows only a body part (fist, arm, torso) without a visible face or head, set is_face to false and character_name to null. A masked or helmeted head counts as a face.
-5. If the crop is a face but you cannot confidently identify the character, set is_face to true and character_name to null. Do NOT guess or pick a random name from the list.
+3. If the face is a MINION or generic enemy (Foot Soldier, Putty Patroller, rank-and-file robots, unnamed soldier, etc.), one who looks like the others in a group (several Foot Soldiers, Putties or robots in the same gear), use the group name (e.g. "Foot Soldier", "Putty", "Rock Soldier"). Do NOT give a minion a named character's name.
+4. If the figure stands apart from the group (its own design, a name in the dialogue or a caption, or a match to its line under "Who these names are in this issue"), it is a named character, robot or armored figure included: use its name from the list instead of a generic one such as "Armored Villain" or "Soldier", even when the list has the generic name too.
+5. If the crop shows only a body part (fist, arm, torso) without a visible face or head, set is_face to false and character_name to null. A masked or helmeted head counts as a face.
+6. If the crop is a face but you cannot confidently identify the character, set is_face to true and character_name to null. Do NOT guess or pick a random name from the list.
 
 CONFIDENCE GUIDELINES:
 - 0.95: Unmistakable — unique visual features clearly visible (e.g. green skin + blue mask = Leonardo)
@@ -61,11 +79,13 @@ function buildIdentifyPrompt(
   knownCharacters: string[],
   hasPageContext: boolean,
   issueContext?: string,
+  castLooks?: CastLook[],
 ): string {
   const charList =
     knownCharacters.length > 0
       ? `Named characters who may appear: ${knownCharacters.join(", ")}`
       : "";
+  const looks = castLooksBlock(castLooks);
 
   const synopsis = issueContext ? `Issue synopsis: ${issueContext}` : "";
 
@@ -80,7 +100,7 @@ The crop alone may be ambiguous. Use the full page to see costume, body, dialogu
   return `You are identifying a character in a comic book panel.
 
 ${contextNote}
-${charList ? `\n${charList}` : ""}
+${charList ? `\n${charList}` : ""}${looks ? `\n\n${looks}` : ""}
 ${synopsis ? `\n${synopsis}` : ""}
 
 ${IDENTIFICATION_RULES}
@@ -179,10 +199,17 @@ export async function identifyFace(
     throwOnApiError?: boolean;
     model?: string;
     thinkingLevel?: ThinkingLevel | null;
+    /** The cast block (#851); unset or empty leaves it out. The rules are the same either way. */
+    castLooks?: CastLook[];
   },
 ): Promise<FaceIdentification> {
   const hasPage = !!pageImageBase64;
-  const prompt = buildIdentifyPrompt(knownCharacters, hasPage, issueContext);
+  const prompt = buildIdentifyPrompt(
+    knownCharacters,
+    hasPage,
+    issueContext,
+    options?.castLooks,
+  );
   const parts: Part[] = [createPartFromText(prompt)];
 
   if (pageImageBase64 && pageImageMimeType) {
@@ -248,11 +275,13 @@ function buildPanelPrompt(
   knownCharacters: string[],
   faceCount: number,
   issueContext?: string,
+  castLooks?: CastLook[],
 ): string {
   const charList =
     knownCharacters.length > 0
       ? `Named characters who may appear: ${knownCharacters.join(", ")}`
       : "";
+  const looks = castLooksBlock(castLooks);
 
   const synopsis = issueContext ? `Issue synopsis: ${issueContext}` : "";
 
@@ -264,7 +293,7 @@ You will see:
 
 A crop alone may be ambiguous. Use the full page to see costume, body, dialogue, and scene.
 The same character can appear in more than one crop. Judge each crop on its own: do not name a crop after another crop, and do not leave a name out because another crop already has it.
-${charList ? `\n${charList}` : ""}
+${charList ? `\n${charList}` : ""}${looks ? `\n\n${looks}` : ""}
 ${synopsis ? `\n${synopsis}` : ""}
 
 ${IDENTIFICATION_RULES}
@@ -355,10 +384,15 @@ export async function identifyPanelFaces(
   pageImageBase64: string,
   pageImageMimeType: string,
   issueContext?: string,
-  options?: { throwOnApiError?: boolean },
+  options?: { throwOnApiError?: boolean; castLooks?: CastLook[] },
 ): Promise<(FaceIdentification | null)[]> {
   const faceCount = faceJpegsBase64.length;
-  const prompt = buildPanelPrompt(knownCharacters, faceCount, issueContext);
+  const prompt = buildPanelPrompt(
+    knownCharacters,
+    faceCount,
+    issueContext,
+    options?.castLooks,
+  );
   const parts: Part[] = [
     createPartFromText(prompt),
     createPartFromText("FULL PAGE:"),

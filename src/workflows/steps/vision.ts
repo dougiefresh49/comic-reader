@@ -43,9 +43,17 @@ import type {
   findSimilarExemplars,
 } from "~/lib/exemplar-store";
 import type {
+  CastLook,
   FaceIdentification,
   FaceOutcome,
 } from "~/lib/character-identification";
+import {
+  type ComicVineCharacter,
+  deckSentence,
+  matchCredit,
+  parseComicVineCharacters,
+  sameFirstAndLastWord,
+} from "~/lib/comicvine";
 import type { FaceCropResult } from "~/lib/face-extraction";
 import { groupFaces } from "~/lib/face-groups";
 
@@ -1233,6 +1241,66 @@ function panelExemplars(refLists: ExemplarRef[][]): ExemplarRef[] {
     .slice(0, PANEL_EXEMPLAR_MAX);
 }
 
+export type LookaheadWikiAppearance = { name: string; qualifier?: string };
+
+const normalizeName = (n: string) =>
+  n.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim();
+
+/** A Comic Vine deck in the cast block: its first sentence, at most this long. */
+const CAST_LOOK_MAX_CHARS = 160;
+
+/**
+ * The lookahead's name list and cast block (#851). The list is the DB names,
+ * then the wiki names a DB name does not already cover (with the wiki
+ * qualifier), then the Comic Vine names no DB or wiki name covers
+ * (`matchCredit`). The block has one line per Comic Vine credit with a deck,
+ * under the label the list shows for it. Pure, so `--cast-only` in
+ * `scripts/dry-run-lookahead-calls.ts` prints what the step sends.
+ */
+export function buildLookaheadCast(
+  dbCharacters: string[],
+  wikiAppearances: LookaheadWikiAppearance[],
+  comicvine: ComicVineCharacter[],
+): { knownCharacters: string[]; castLooks: CastLook[] } {
+  const dbNormalized = dbCharacters.map((n) => ({
+    norm: normalizeName(n),
+    label: n,
+  }));
+  // Every DB and wiki name a credit can match, with the list label it means.
+  const known = dbCharacters.map((n) => ({ name: n, value: n }));
+
+  const wikiNames: string[] = [];
+  for (const a of wikiAppearances) {
+    const norm = normalizeName(a.name);
+    const db = dbNormalized.find(
+      (d) => d.norm === norm || sameFirstAndLastWord(d.norm, norm),
+    );
+    const label =
+      db?.label ?? (a.qualifier ? `${a.name} (${a.qualifier})` : a.name);
+    if (!db) wikiNames.push(label);
+    known.push({ name: a.name, value: label });
+  }
+
+  const comicvineNames: string[] = [];
+  const castLooks: CastLook[] = [];
+  for (const c of comicvine) {
+    const match = matchCredit(c, known);
+    const label = match ?? c.name;
+    if (match === undefined) comicvineNames.push(c.name);
+    const looks = deckSentence(c.deck, CAST_LOOK_MAX_CHARS);
+    if (looks && !castLooks.some((l) => l.name === label)) {
+      castLooks.push({ name: label, looks });
+    }
+  }
+
+  return {
+    knownCharacters: [
+      ...new Set([...dbCharacters, ...wikiNames, ...comicvineNames]),
+    ],
+    castLooks,
+  };
+}
+
 /**
  * One embedding per crop, then one Gemini naming call per panel (#845): a
  * panel's crops go in chunks of up to PANEL_FACE_BATCH_MAX, and a lone crop,
@@ -1247,6 +1315,8 @@ export async function identifyLookaheadFacesOrFatal(
   issueId: string,
   page: LookaheadPage,
   step = "character-lookahead",
+  /** The dry run's in-memory Comic Vine cast, used instead of the stored column. */
+  comicvineOverride?: ComicVineCharacter[],
 ): Promise<IdentifiedFace[]> {
   const { getGeminiClient, getFallbackGeminiClient } = deps.geminiClient;
   const { identifyFace, identifyPanelFaces, faceOutcome } =
@@ -1269,7 +1339,7 @@ export async function identifyLookaheadFacesOrFatal(
     supabase,
     bookId,
     issueId,
-    "wiki_summary, wiki_appearances",
+    "wiki_summary, wiki_appearances, comicvine_characters",
   ).single();
 
   if (issueErr) {
@@ -1278,43 +1348,13 @@ export async function identifyLookaheadFacesOrFatal(
     );
   }
 
-  type WikiAppearance = { name: string; qualifier?: string };
-  const wikiAppearances =
-    (issueRow?.wiki_appearances as WikiAppearance[] | null) ?? [];
-
-  const dbNormalized = new Set(
-    dbCharacters.map((n) =>
-      n.toLowerCase().replace(/[-_]/g, " ").replace(/\s+/g, " ").trim(),
-    ),
+  const { knownCharacters, castLooks } = buildLookaheadCast(
+    dbCharacters,
+    (issueRow?.wiki_appearances as LookaheadWikiAppearance[] | null) ?? [],
+    comicvineOverride ??
+      parseComicVineCharacters(issueRow?.comicvine_characters) ??
+      [],
   );
-
-  const wikiNames: string[] = [];
-  for (const a of wikiAppearances) {
-    const baseName = a.name;
-    const norm = baseName
-      .toLowerCase()
-      .replace(/[-_]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (dbNormalized.has(norm)) continue;
-    const firstLast = norm.split(" ");
-    if (
-      firstLast.length >= 2 &&
-      [...dbNormalized].some((db) => {
-        const dbWords = db.split(" ");
-        return (
-          dbWords.length >= 2 &&
-          dbWords[0] === firstLast[0] &&
-          dbWords[dbWords.length - 1] === firstLast[firstLast.length - 1]
-        );
-      })
-    ) {
-      continue;
-    }
-    wikiNames.push(a.qualifier ? `${baseName} (${a.qualifier})` : baseName);
-  }
-
-  const knownCharacters = [...new Set([...dbCharacters, ...wikiNames])];
   const wikiSummary =
     (issueRow?.wiki_summary as string | undefined) ?? undefined;
 
@@ -1369,7 +1409,7 @@ export async function identifyLookaheadFacesOrFatal(
         pageBase64,
         "image/webp",
         wikiSummary,
-        { throwOnApiError: true },
+        { throwOnApiError: true, castLooks },
       ),
     );
 
@@ -1390,7 +1430,7 @@ export async function identifyLookaheadFacesOrFatal(
           pageBase64,
           "image/webp",
           wikiSummary,
-          { throwOnApiError: true },
+          { throwOnApiError: true, castLooks },
         ),
       );
       for (const [j, i] of chunk.entries()) {
