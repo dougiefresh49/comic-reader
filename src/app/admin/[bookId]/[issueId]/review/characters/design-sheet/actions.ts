@@ -320,7 +320,10 @@ async function draftFromFace(
   }
 
   // Exact names only, as the characters stop matches, so a first-and-last-word
-  // guess never hands this character another one's deck.
+  // guess never hands this character another one's deck. A credit named this
+  // character wins over one that only lists a matching alias (Comic Vine
+  // repeats titles like "Red Ranger" across characters); two alias-only
+  // matches are a tie and send no deck.
   const known = [
     characterId,
     displayName,
@@ -330,9 +333,13 @@ async function draftFromFace(
   ]
     .filter((n) => n !== "")
     .map((n) => ({ name: n, value: true }));
-  const credit = (
-    parseComicVineCharacters(issue.data?.comicvine_characters) ?? []
-  ).find((c) => matchCredit(c, known, true));
+  const credits =
+    parseComicVineCharacters(issue.data?.comicvine_characters) ?? [];
+  const byAlias = credits.filter((c) => matchCredit(c, known, true));
+  const credit =
+    credits.find((c) =>
+      matchCredit({ name: c.name, aliases: [] }, known, true),
+    ) ?? (byAlias.length === 1 ? byAlias[0] : undefined);
   const deck = credit ? deckSentence(credit.deck, 200) : null;
 
   const prompt = faceVoicePrompt(

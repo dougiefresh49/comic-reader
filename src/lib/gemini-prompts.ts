@@ -199,7 +199,9 @@ export function faceVoicePrompt(
     ctx.qualifier
       ? `The issue's wiki lists this character as: ${ctx.name} (${ctx.qualifier})`
       : null,
-    ctx.deck ? `Comic Vine describes this character as: "${ctx.deck}"` : null,
+    ctx.deck
+      ? `Comic Vine, written for grown-up fans, describes this character as: ${ctx.deck} Take who the character is from it, not its wording.`
+      : null,
     ctx.base
       ? `A form of "${ctx.base.name}". It should sound like a variant of that character's voice, not like a new person.${ctx.base.voice ? ` That voice: "${ctx.base.voice}"` : ""}`
       : null,
@@ -212,7 +214,7 @@ export function faceVoicePrompt(
     ctx.heard.items.length > 0
       ? `How the character talks matters more than how it looks: let the ${ctx.heard.kind === "notes" ? "notes" : "lines"} lead, and use the face to fill in the rest.`
       : ctx.deck
-        ? "Use what the face shows (age, build, species or creature type, expression), the description above, and what you know of this character."
+        ? "Use what the face shows (age, build, species or creature type, expression), Comic Vine's description above, and what you know of this character."
         : "Use what the face shows (age, build, species or creature type, expression) and what you know of this character.";
 
   return `Write a voice description for ElevenLabs Voice Design, for a character in a comic that children read along with. The image is this character's face, cut from a comic page.
