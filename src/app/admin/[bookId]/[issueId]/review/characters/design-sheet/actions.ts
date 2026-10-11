@@ -14,7 +14,13 @@
 import { createPartFromBase64, createPartFromText } from "@google/genai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readBookFranchises } from "~/lib/cast";
+import { readAliases } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
+import {
+  deckSentence,
+  matchCredit,
+  parseComicVineCharacters,
+} from "~/lib/comicvine";
 import { downloadExemplarImage } from "~/lib/exemplar-store";
 import { getGeminiClient } from "~/lib/gemini-client";
 import {
@@ -233,15 +239,17 @@ function wikiQualifier(appearances: unknown, names: string[]): string | null {
 /**
  * One GEMINI_FAST call over a face crop and what places the character: its
  * names, its franchise (else the book's), the base character of a `form_of`
- * with that one's prompt on file, the issue's wiki qualifier, and its voice
- * notes or lines when it has any. The exemplar is read by id here and must
- * be this character's; the client sends only the id.
+ * with that one's prompt on file, the issue's wiki qualifier, its Comic Vine
+ * deck when one of the issue's credits is this character (#860; the credit's
+ * image is never read), and its voice notes or lines when it has any. The
+ * exemplar is read by id here and must be this character's; the client sends
+ * only the id.
  */
 async function draftFromFace(
   args: Who & { exemplarId: string; wantPreviewText: boolean },
 ): Promise<DesignResult<Draft>> {
   const { bookId, issueId, characterId, exemplarId, wantPreviewText } = args;
-  const [exemplar, character, issue, heard] = await Promise.all([
+  const [exemplar, character, issue, heard, aliases] = await Promise.all([
     db()
       .from("character_face_exemplars")
       .select("character_id, crop_path")
@@ -256,9 +264,10 @@ async function draftFromFace(
       supabaseAdmin,
       bookId,
       issueId,
-      "wiki_appearances",
+      "wiki_appearances, comicvine_characters",
     ).maybeSingle(),
     readHeard(bookId, issueId, characterId),
+    readAliases(supabaseAdmin, [characterId], bookId),
   ]);
   if (exemplar.error) throw new Error(exemplar.error.message);
   if (character.error) throw new Error(character.error.message);
@@ -310,6 +319,29 @@ async function draftFromFace(
     };
   }
 
+  // Exact names only, as the characters stop matches, so a first-and-last-word
+  // guess never hands this character another one's deck. A credit named this
+  // character wins over one that only lists a matching alias (Comic Vine
+  // repeats titles like "Red Ranger" across characters); two alias-only
+  // matches are a tie and send no deck.
+  const known = [
+    characterId,
+    displayName,
+    fullName,
+    name,
+    ...(aliases.get(characterId) ?? []),
+  ]
+    .filter((n) => n !== "")
+    .map((n) => ({ name: n, value: true }));
+  const credits =
+    parseComicVineCharacters(issue.data?.comicvine_characters) ?? [];
+  const byAlias = credits.filter((c) => matchCredit(c, known, true));
+  const credit =
+    credits.find((c) =>
+      matchCredit({ name: c.name, aliases: [] }, known, true),
+    ) ?? (byAlias.length === 1 ? byAlias[0] : undefined);
+  const deck = credit ? deckSentence(credit.deck, 200) : null;
+
   const prompt = faceVoicePrompt(
     {
       name,
@@ -322,6 +354,7 @@ async function draftFromFace(
         fullName,
         name,
       ]),
+      deck,
       heard: heard.heard,
     },
     wantPreviewText,

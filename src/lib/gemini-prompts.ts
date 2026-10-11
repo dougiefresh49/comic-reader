@@ -174,15 +174,18 @@ export interface FaceVoiceContext {
   base: { name: string; voice: string | null } | null;
   /** The issue's wiki qualifier for the character: a role, an alternate identity, "cameo". */
   qualifier: string | null;
+  /** Comic Vine's one-line description of the character (#860), from the issue's credit for it. */
+  deck: string | null;
   /** Voice notes from this issue (`kind: "notes"`), else its lines (`kind: "lines"`); may be empty. */
   heard: { kind: "notes" | "lines"; items: string[] };
 }
 
 /**
  * The design sheet's Draft with a face picked (#850): one image of the
- * character's face plus what places it. Asks for JSON
- * `{ "prompt": string, "previewText": string }`, `previewText` empty
- * unless `wantPreviewText`.
+ * character's face plus what places it (names, franchise, the wiki
+ * qualifier, Comic Vine's deck, a `form_of` base, voice notes or lines).
+ * Asks for JSON `{ "prompt": string, "previewText": string }`,
+ * `previewText` empty unless `wantPreviewText`.
  */
 export function faceVoicePrompt(
   ctx: FaceVoiceContext,
@@ -196,6 +199,9 @@ export function faceVoicePrompt(
     ctx.qualifier
       ? `The issue's wiki lists this character as: ${ctx.name} (${ctx.qualifier})`
       : null,
+    ctx.deck
+      ? `Comic Vine, written for grown-up fans, describes this character as: ${ctx.deck} Take who the character is from it, not its wording.`
+      : null,
     ctx.base
       ? `A form of "${ctx.base.name}". It should sound like a variant of that character's voice, not like a new person.${ctx.base.voice ? ` That voice: "${ctx.base.voice}"` : ""}`
       : null,
@@ -207,7 +213,9 @@ export function faceVoicePrompt(
   const lead =
     ctx.heard.items.length > 0
       ? `How the character talks matters more than how it looks: let the ${ctx.heard.kind === "notes" ? "notes" : "lines"} lead, and use the face to fill in the rest.`
-      : "Use what the face shows (age, build, species or creature type, expression) and what you know of this character.";
+      : ctx.deck
+        ? "Use what the face shows (age, build, species or creature type, expression), Comic Vine's description above, and what you know of this character."
+        : "Use what the face shows (age, build, species or creature type, expression) and what you know of this character.";
 
   return `Write a voice description for ElevenLabs Voice Design, for a character in a comic that children read along with. The image is this character's face, cut from a comic page.
 
