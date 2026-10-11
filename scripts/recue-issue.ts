@@ -14,7 +14,13 @@ import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { supabase } from "./lib/supabase.js";
 import { groupLeadId, joinGroupText } from "~/lib/balloon-groups";
-import { issueCast, loadBookCast, renderVoice } from "~/lib/cast";
+import {
+  issueCast,
+  loadBookCast,
+  proposeCast,
+  renderVoice,
+  ROLE_IDS,
+} from "~/lib/cast";
 import { cueRequest, type CuePromptInput } from "~/lib/cue-rules";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { selectIssue } from "~/lib/issue-queries";
@@ -100,9 +106,36 @@ async function cue(input: CuePromptInput): Promise<string> {
 }
 
 /**
- * The editor sends `ocr_text` as the text, the cast id when the issue's cast
- * holds it (else the raw speaker label, as `toBubble` does) and the emotion,
- * as saved (Workbench `saveFirst`).
+ * The speaker ids the review editor offers, as its loader builds them: the
+ * issue's cast (`proposeCast` when the issue has no castlist rows), then the
+ * three roles unless the cast removed one; narrator always stays.
+ */
+async function editorSpeakerIds(
+  bookId: string,
+  issueId: string,
+): Promise<Set<string>> {
+  const book = await loadBookCast(supabase, bookId);
+  const issueRows = book.rows.filter((r) => r.issue_id === issueId);
+  const ids: string[] =
+    issueRows.length > 0
+      ? issueCast(book, issueId).flatMap((r) =>
+          r.character_id ? [r.character_id] : [],
+        )
+      : (await proposeCast(supabase, bookId, issueId)).members.map((m) => m.id);
+  const removed = new Set(
+    issueRows.flatMap((r) =>
+      !r.in_issue && r.character_id ? [r.character_id] : [],
+    ),
+  );
+  for (const id of ROLE_IDS)
+    if (id === "narrator" || !removed.has(id)) ids.push(id);
+  return new Set(ids);
+}
+
+/**
+ * The editor sends `ocr_text` as the text, the cast id when the editor's
+ * speaker list holds it (else the raw speaker label, as `toBubble` does) and
+ * the emotion, as saved (Workbench `saveFirst`).
  */
 async function check(row: Row, inCast: Set<string>): Promise<Result> {
   if (!row.ocr_text?.trim())
@@ -260,11 +293,7 @@ async function main(): Promise<void> {
   if (count !== null && count > rows.length)
     throw new Error(`bubbles read: got ${rows.length} of ${count} rows`);
 
-  const inCast = new Set(
-    issueCast(await loadBookCast(supabase, bookId), issueId).map(
-      (r) => r.character_id,
-    ),
-  );
+  const inCast = await editorSpeakerIds(bookId, issueId);
   const results: Result[] = [];
   for (let i = 0; i < rows.length; i += POOL)
     results.push(
