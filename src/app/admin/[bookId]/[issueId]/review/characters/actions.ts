@@ -352,6 +352,7 @@ async function moveDetection(
   scope: Scope,
   face: { id: string; characterId: string | null; page: number },
   to: string,
+  settle = true,
 ): Promise<void> {
   // Exemplar first: a failed detection write then leaves the face on the old
   // character, so a retry redoes both instead of skipping it as moved.
@@ -375,6 +376,9 @@ async function moveDetection(
     })
     .eq("id", face.id);
   must("moving the face", moved.error);
+  // A relabel swept the old character's exemplars before any face moved, so
+  // it has none loose to settle; skipping keeps its last write the face's.
+  if (!settle) return;
   await settleLooseExemplars(scope, face.characterId, face.page, {
     kind: "move",
     to,
@@ -470,7 +474,8 @@ async function moveAll(args: {
       .eq("character_id", from);
     must("moving the character's exemplars", exemplars.error);
   }
-  for (const face of toMove) await moveDetection(scope, face, who.id);
+  for (const face of toMove)
+    await moveDetection(scope, face, who.id, from === undefined);
   revalidate(scope);
   const count = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
   return {
