@@ -1186,10 +1186,59 @@ export type IdentifiedFace = {
   characterId: string | null;
 };
 
+/** At most this many crops go in one panel naming call (#845). */
+const PANEL_FACE_BATCH_MAX = 12;
+/** At most this many exemplar references go in one panel naming call. */
+const PANEL_EXEMPLAR_MAX = 12;
+
+type PreparedCrop = {
+  faceBase64: string;
+  embedding: number[];
+  exemplarRefs: ExemplarRef[];
+};
+
+/** Crop indexes grouped by panel, in crop order within and across panels. */
+function cropIndexesByPanel(crops: FaceCropResult[]): Map<string, number[]> {
+  const byPanel = new Map<string, number[]>();
+  crops.forEach((crop, i) => {
+    const list = byPanel.get(crop.panelId);
+    if (list) list.push(i);
+    else byPanel.set(crop.panelId, [i]);
+  });
+  return byPanel;
+}
+
+function chunked<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 /**
- * One embedding and one Gemini naming call per crop, plus reads. Writes
- * nothing but the `llm_calls` rows the Gemini wrapper logs, so the #348 dry
- * run calls it as the step does.
+ * A panel chunk's exemplar references: the union of its crops' refs, one per
+ * character (the most confident), most confident first, capped.
+ */
+function panelExemplars(refLists: ExemplarRef[][]): ExemplarRef[] {
+  const best = new Map<string, ExemplarRef>();
+  for (const ref of refLists.flat()) {
+    const kept = best.get(ref.characterName);
+    if (!kept || ref.confidence > kept.confidence) {
+      best.set(ref.characterName, ref);
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, PANEL_EXEMPLAR_MAX);
+}
+
+/**
+ * One embedding per crop, then one Gemini naming call per panel (#845): a
+ * panel's crops go in chunks of up to PANEL_FACE_BATCH_MAX, and a lone crop,
+ * or one the panel reply leaves out or garbles, gets the per-face call. Plus
+ * reads. Writes nothing but the `llm_calls` rows the Gemini wrapper logs, so
+ * the dry runs call it as the step does.
  */
 export async function identifyLookaheadFacesOrFatal(
   deps: LookaheadDeps,
@@ -1200,7 +1249,8 @@ export async function identifyLookaheadFacesOrFatal(
   step = "character-lookahead",
 ): Promise<IdentifiedFace[]> {
   const { getGeminiClient, getFallbackGeminiClient } = deps.geminiClient;
-  const { identifyFace, faceOutcome } = deps.characterIdentification;
+  const { identifyFace, identifyPanelFaces, faceOutcome } =
+    deps.characterIdentification;
   const { exemplarStore } = deps;
   const { withLlmMeta } = deps.llmUsage;
 
@@ -1268,10 +1318,9 @@ export async function identifyLookaheadFacesOrFatal(
   const wikiSummary =
     (issueRow?.wiki_summary as string | undefined) ?? undefined;
 
-  // 6. Identify each face with exemplar context
+  // 6. Embed every crop and fetch its exemplar refs, in crop order
   const pageBase64 = imgBuf.toString("base64");
-  const faces: IdentifiedFace[] = [];
-
+  const prepared: PreparedCrop[] = [];
   for (const crop of page.crops) {
     const faceBase64 = crop.jpegBuffer.toString("base64");
     let embedding: number[];
@@ -1293,28 +1342,78 @@ export async function identifyLookaheadFacesOrFatal(
       bookId,
       pageLabel,
     );
+    prepared.push({ faceBase64, embedding, exemplarRefs });
+  }
 
-    // Identify with exemplar context + key failover
-    const result = await withLlmMeta(llmMeta, () =>
-      identifyFaceOrFatal(
-        (client) =>
-          identifyFace(
-            client,
-            faceBase64,
-            "image/jpeg",
-            knownCharacters,
-            exemplarRefs,
-            pageBase64,
-            "image/webp",
-            wikiSummary,
-            { throwOnApiError: true },
-          ),
-        gemini,
-        getFallbackGeminiClient,
-        pageLabel,
+  // 7. Name the crops: one Gemini call per panel chunk, the per-face call for
+  // a lone crop and for any crop the panel reply leaves out or garbles.
+  // Each call fails over to the fallback key on a 429.
+  let namingCalls = 0;
+  const nameOrFatal = async <T>(
+    run: (client: typeof gemini) => Promise<T>,
+  ): Promise<T> => {
+    // Rate limit delay between Gemini naming calls
+    if (namingCalls++ > 0) await new Promise((r) => setTimeout(r, 800));
+    return withLlmMeta(llmMeta, () =>
+      identifyFaceOrFatal(run, gemini, getFallbackGeminiClient, pageLabel),
+    );
+  };
+  const identifyOne = (i: number) =>
+    nameOrFatal((client) =>
+      identifyFace(
+        client,
+        prepared[i]!.faceBase64,
+        "image/jpeg",
+        knownCharacters,
+        prepared[i]!.exemplarRefs,
+        pageBase64,
+        "image/webp",
+        wikiSummary,
+        { throwOnApiError: true },
       ),
     );
 
+  const results = new Array<FaceIdentification>(page.crops.length);
+  for (const [panelId, indexes] of cropIndexesByPanel(page.crops)) {
+    let fellBack = 0;
+    for (const chunk of chunked(indexes, PANEL_FACE_BATCH_MAX)) {
+      if (chunk.length === 1) {
+        results[chunk[0]!] = await identifyOne(chunk[0]!);
+        continue;
+      }
+      const replies = await nameOrFatal((client) =>
+        identifyPanelFaces(
+          client,
+          chunk.map((i) => prepared[i]!.faceBase64),
+          knownCharacters,
+          panelExemplars(chunk.map((i) => prepared[i]!.exemplarRefs)),
+          pageBase64,
+          "image/webp",
+          wikiSummary,
+          { throwOnApiError: true },
+        ),
+      );
+      for (const [j, i] of chunk.entries()) {
+        const reply = replies[j];
+        if (reply) {
+          results[i] = reply;
+        } else {
+          fellBack++;
+          results[i] = await identifyOne(i);
+        }
+      }
+    }
+    if (fellBack > 0) {
+      console.log(
+        `[lookahead] ${pageLabel} panel ${page.panelSort.get(panelId) ?? "?"}: ${fellBack} crop(s) left out of the panel reply, named one by one`,
+      );
+    }
+  }
+
+  // 8. Outcome and character per crop, in crop order
+  const faces: IdentifiedFace[] = [];
+  for (const [i, crop] of page.crops.entries()) {
+    const result = results[i]!;
     const outcome = faceOutcome(result);
     const characterId =
       outcome === "named" && result.characterName
@@ -1334,14 +1433,11 @@ export async function identifyLookaheadFacesOrFatal(
         x: crop.bboxPanelLocal.x,
         y: crop.bboxPanelLocal.y,
       },
-      embedding,
+      embedding: prepared[i]!.embedding,
       result,
       outcome,
       characterId,
     });
-
-    // Rate limit delay between faces
-    await new Promise((r) => setTimeout(r, 800));
   }
 
   return faces;
