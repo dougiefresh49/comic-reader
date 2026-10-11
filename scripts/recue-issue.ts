@@ -423,17 +423,18 @@ async function apply(
   const cost = await price(bookId, issueId, changed);
   if (cost.characters > maxChars)
     throw new Error(
-      `Priced at most ${cost.characters} ElevenLabs characters over ${cost.renders} renders for ${changed.length} changed rows, above --max-chars ${maxChars}. Nothing was written or rendered.\n` +
+      `Priced at most ${cost.characters} ElevenLabs characters over ${cost.renders} renders for ${changed.length} changed rows, above --max-chars ${maxChars}. No cues were written and nothing was rendered; the Gemini calls are in llm_calls.\n` +
         `(${flagged.length} flagged, ${unchanged.length} unchanged, ${failed.length} failed replies)\n` +
         tokenLine(),
     );
 
-  // Write every new cue first. A row whose cues changed since the read (an
-  // editor save mid-run) is left alone.
+  // Write every new cue first. A row an editor changed since the read (its
+  // cues or speaker, or it went ignored or silent) is left alone, since the
+  // single render below uses the row as read.
   const outcome = new Map<string, string>();
   const written: Changed[] = [];
   for (const r of changed) {
-    const q = supabase
+    let q = supabase
       .from("bubbles")
       .update({
         text_with_cues: r.proposal,
@@ -442,17 +443,23 @@ async function apply(
       })
       .eq("book_id", bookId)
       .eq("issue_id", issueId)
-      .eq("id", r.row.id);
-    const { data, error } = await (
-      r.row.text_with_cues === null
-        ? q.is("text_with_cues", null)
-        : q.eq("text_with_cues", r.row.text_with_cues)
-    ).select("id");
+      .eq("id", r.row.id)
+      .eq("ignored", false)
+      .eq("silent", false);
+    for (const col of ["text_with_cues", "character_id", "speaker"] as const) {
+      const v = r.row[col];
+      q = v === null ? q.is(col, null) : q.eq(col, v);
+    }
+    const { data, error } = await q.select("id");
     if (error) outcome.set(r.row.id, `not written: ${error.message}`);
     else if (!data?.length)
-      outcome.set(r.row.id, "not written: its cues changed since the read");
+      outcome.set(r.row.id, "not written: the row changed since the read");
     else written.push(r);
   }
+
+  // A sibling whose write failed renders with its old cues, so price what
+  // was written before any render.
+  const repriced = await price(bookId, issueId, written);
 
   // Then render, one at a time.
   const book = await loadBookCast(supabase, bookId);
@@ -460,7 +467,10 @@ async function apply(
   let billed = 0;
   let renders = 0;
   let stalePaid = 0;
-  let stop: string | null = null;
+  let stop: string | null =
+    repriced.characters > maxChars
+      ? `not started: the written rows price at ${repriced.characters} characters, above --max-chars ${maxChars}`
+      : null;
   for (const r of written) {
     const id = r.row.id;
     const g = r.row.group_id;
@@ -547,7 +557,7 @@ async function apply(
     `- Flagged, words differ, left out: ${flagged.length}`,
     `- Empty or failed replies: ${failed.length}`,
     `- Priced before writing: at most ${cost.characters} ElevenLabs characters over ${cost.renders} renders (--max-chars ${maxChars})`,
-    `- ElevenLabs characters billed: ${billed} over ${renders} stored renders` +
+    `- ElevenLabs characters in stored renders: ${billed} over ${renders} renders (a paid call whose upload or switch failed is in llm_calls, not here)` +
       (stalePaid
         ? ` (plus ${stalePaid} stale-group renders that were paid and not stored, not in this total)`
         : "") +
