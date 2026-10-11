@@ -81,6 +81,7 @@ interface ExemplarRow {
   page_number: number;
   crop_path: string;
   is_confirmed: boolean | null;
+  confidence: number;
 }
 
 interface CharacterRow {
@@ -160,7 +161,7 @@ export async function loadCharacters(
     supabaseAdmin
       .from("character_face_exemplars")
       .select(
-        "id, character_id, suggested_name, detection_id, page_number, crop_path, is_confirmed",
+        "id, character_id, suggested_name, detection_id, page_number, crop_path, is_confirmed, confidence",
         { count: "exact" },
       )
       .eq("book_id", bookId)
@@ -245,6 +246,7 @@ export async function loadCharacters(
             id: e.id,
             confirmed: e.is_confirmed ?? false,
             cropUrl: exemplarUrl(e.crop_path),
+            confidence: e.confidence,
           }
         : null,
     };
@@ -255,6 +257,7 @@ export async function loadCharacters(
     page: e.page_number,
     confirmed: e.is_confirmed ?? false,
     cropUrl: exemplarUrl(e.crop_path),
+    confidence: e.confidence,
   });
   const loose = exemplarRows.filter((e) => !e.detection_id);
 

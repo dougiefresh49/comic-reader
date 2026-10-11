@@ -23,7 +23,13 @@ export interface FaceView {
   rect: Rect;
   confidence: number;
   verified: boolean;
-  exemplar: { id: string; confirmed: boolean; cropUrl: string } | null;
+  exemplar: {
+    id: string;
+    confirmed: boolean;
+    cropUrl: string;
+    /** `character_face_exemplars.confidence`. */
+    confidence: number;
+  } | null;
 }
 
 /** An exemplar with no `detection_id`: shown beside the faces, never acted on by face. */
@@ -32,6 +38,8 @@ export interface LooseExemplar {
   page: number;
   confirmed: boolean;
   cropUrl: string;
+  /** `character_face_exemplars.confidence`. */
+  confidence: number;
 }
 
 /** The voice the render chain finds for a character in this issue now. */
