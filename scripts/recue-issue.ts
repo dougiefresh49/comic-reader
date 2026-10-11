@@ -1,14 +1,33 @@
 #!/usr/bin/env node
 /**
- * Dry-run cue check for one issue (#840): sends every speakable bubble
- * (`ignored = false`, `silent = false`) through the call the review editor's
- * Regenerate cues makes (`cueRequest`, with the bubble's `ocr_text`, saved
- * speaker and emotion) and prints a markdown table of the bubbles whose cues
- * would change. It writes nothing to the database, not even the `llm_calls`
+ * Cue check for one issue, in two modes.
+ *
+ * Dry run (#840, the default): sends every speakable bubble (`ignored =
+ * false`, `silent = false`) through the call the review editor's Regenerate
+ * cues makes (`cueRequest`, with the bubble's `ocr_text`, saved speaker and
+ * emotion) and prints a markdown table of the bubbles whose cues would
+ * change. It writes nothing to the database, not even the `llm_calls`
  * ledger: the Gemini call goes straight to `ai.models.generateContent`, and
  * the token totals are printed instead.
  *
  *   LIVE_API_OK=1 pnpm recue-issue --book <id> --issue <id> [--limit N] [--out report.md]
+ *
+ * Apply (#844, `--apply`, paid, writes production rows): takes only the
+ * speakable bubbles whose saved cues break a written rule (`reasons()` other
+ * than "model would re-cue"), narrowed by `--only` to 8-character id
+ * prefixes. It re-proposes each through the same call, logged to
+ * `llm_calls` under step `recue-issue:apply`, and skips and lists a row
+ * whose words differ or whose proposal equals its old cues. It prices the
+ * re-render with `price()` and exits before any write when that exceeds
+ * `--max-chars`. Then it writes every new cue (`text_with_cues`,
+ * `needs_audio`, `updated_at`, only where the row's cues are still the ones
+ * it read), and renders one at a time: a joined group with two or more
+ * active members once through `renderGroupAudio`, every other row through
+ * `renderBubbleAudio`. The render loop stops once the billed characters
+ * reach `--max-chars`, or at the first render error. The report gains an
+ * "Applied" table and the totals billed.
+ *
+ *   LIVE_API_OK=1 pnpm recue-issue --book <id> --issue <id> --apply --max-chars N [--only id8,id8] [--out report.md]
  */
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -22,12 +41,21 @@ import {
   ROLE_IDS,
 } from "~/lib/cast";
 import { cueRequest, type CuePromptInput } from "~/lib/cue-rules";
+import { isDryRun } from "~/lib/fakes/dry-run";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { selectIssue } from "~/lib/issue-queries";
+import { generateContentLogged, type LlmCallMeta } from "~/lib/llm-usage";
+import {
+  BubbleRenderError,
+  renderBubbleAudio,
+} from "~/lib/render-bubble-audio";
+import { GroupRenderError, renderGroupAudio } from "~/lib/render-group-audio";
 import { buildTtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 
 const POOL = 5;
+const APPLY_STEP = "recue-issue:apply";
+const RULE_FREE = "model would re-cue";
 
 interface Row {
   id: string;
@@ -81,16 +109,21 @@ function reasons(row: Row): string {
     count(bare, /\.\.\.|…/g) < count(ocr, /\.\.\.|…/g)
   )
     out.push("— for ...");
-  return out.length > 0 ? out.join(", ") : "model would re-cue";
+  return out.length > 0 ? out.join(", ") : RULE_FREE;
 }
 
-/** One cue call, retried once on an error or an empty reply. */
-async function cue(input: CuePromptInput): Promise<string> {
+/**
+ * One cue call, retried once on an error or an empty reply. With `log` the
+ * call goes through `generateContentLogged`, so it lands in `llm_calls`.
+ */
+async function cue(input: CuePromptInput, log?: LlmCallMeta): Promise<string> {
   const ai = getGeminiClient();
   let last = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const res = await ai.models.generateContent(cueRequest(input));
+      const res = log
+        ? await generateContentLogged(ai, cueRequest(input), log)
+        : await ai.models.generateContent(cueRequest(input));
       tokens.calls++;
       tokens.prompt += res.usageMetadata?.promptTokenCount ?? 0;
       tokens.output += res.usageMetadata?.candidatesTokenCount ?? 0;
@@ -137,22 +170,70 @@ async function editorSpeakerIds(
  * speaker list holds it (else the raw speaker label, as `toBubble` does) and
  * the emotion, as saved (Workbench `saveFirst`).
  */
-async function check(row: Row, inCast: Set<string>): Promise<Result> {
+async function check(
+  row: Row,
+  inCast: Set<string>,
+  log?: LlmCallMeta,
+): Promise<Result> {
   if (!row.ocr_text?.trim())
     return { row, proposal: null, error: "Empty text" };
   try {
-    const proposal = await cue({
-      text: row.ocr_text,
-      emotion: row.emotion ?? "",
-      speaker:
-        row.character_id && inCast.has(row.character_id)
-          ? row.character_id
-          : row.speaker,
-    });
+    const proposal = await cue(
+      {
+        text: row.ocr_text,
+        emotion: row.emotion ?? "",
+        speaker:
+          row.character_id && inCast.has(row.character_id)
+            ? row.character_id
+            : row.speaker,
+      },
+      log,
+    );
     return { row, proposal };
   } catch (e) {
     return { row, proposal: null, error: (e as Error).message };
   }
+}
+
+/** `check` on every row, `POOL` at a time. */
+async function checkAll(
+  rows: Row[],
+  inCast: Set<string>,
+  log?: LlmCallMeta,
+): Promise<Result[]> {
+  const results: Result[] = [];
+  for (let i = 0; i < rows.length; i += POOL)
+    results.push(
+      ...(await Promise.all(
+        rows.slice(i, i + POOL).map((r) => check(r, inCast, log)),
+      )),
+    );
+  return results;
+}
+
+/**
+ * Splits the replies: failed (no proposal), flagged (the words must match
+ * the input and, when there are old cues, the old line), kept (the rest)
+ * and changed (kept, with a proposal other than the old cues).
+ */
+function sortResults(results: Result[]) {
+  const failed = results.filter((r) => r.proposal === null);
+  const ok = results.filter((r): r is Changed => r.proposal !== null);
+  const flagged = ok.filter((r) => {
+    const said = words(r.proposal).join(" ");
+    const old = r.row.text_with_cues;
+    return (
+      said !== words(r.row.ocr_text ?? "").join(" ") ||
+      (old !== null && said !== words(old).join(" "))
+    );
+  });
+  const kept = ok.filter((r) => !flagged.includes(r));
+  const changed = kept.filter(
+    (r) =>
+      r.row.text_with_cues === null ||
+      squash(r.proposal) !== squash(r.row.text_with_cues),
+  );
+  return { failed, flagged, kept, changed };
 }
 
 type Sibling = {
@@ -245,6 +326,276 @@ async function price(bookId: string, issueId: string, changed: Changed[]) {
 const cell = (s: string | null) =>
   s === null ? "_(null)_" : squash(s).replace(/\|/g, "\\|");
 
+const line = (r: Result, ...mid: string[]) =>
+  `| ${[r.row.page_number, cell(r.row.character_id ?? r.row.speaker), ...mid, r.row.id.slice(0, 8)].join(" | ")} |`;
+
+/** A markdown table; an empty one is left out unless `always`. */
+const table = (
+  title: string,
+  mid: string[],
+  body: string[],
+  always = false,
+) => {
+  const head = ["page", "speaker", ...mid, "bubble"];
+  return body.length === 0 && !always
+    ? []
+    : ["", `## ${title}`, "", `| ${head.join(" | ")} |`].concat(
+        `|${head.map(() => "---").join("|")}|`,
+        body,
+      );
+};
+
+const tokenLine = () =>
+  `- Gemini tokens: ${tokens.prompt} prompt, ${tokens.output} output, ${tokens.thinking} thinking, over ${tokens.calls} calls`;
+
+/** The flagged and failed tables, the same in both modes. */
+function skippedTables(flagged: Changed[], failed: Result[]): string[] {
+  return [
+    ...table(
+      "Flagged, left out (words differ)",
+      ["old cues", "input", "proposal"],
+      flagged.map((r) =>
+        line(
+          r,
+          cell(r.row.text_with_cues),
+          cell(r.row.ocr_text),
+          cell(r.proposal),
+        ),
+      ),
+    ),
+    ...table(
+      "Empty or failed",
+      ["error"],
+      failed.map((r) => line(r, cell(r.error ?? ""))),
+    ),
+  ];
+}
+
+/**
+ * The reader pages a write touched. `revalidateReaderPages` needs the
+ * Next.js runtime, so a script reaches it through the app's /api/revalidate
+ * route, as `backfill-balloon-groups.ts` and `apply-fixes.ts` do.
+ */
+async function revalidate(bookId: string, issueId: string, pages: number[]) {
+  if (pages.length === 0) return;
+  const list = [...new Set(pages)].sort((a, b) => a - b).join(", ");
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  const secret = process.env.REVALIDATE_SECRET;
+  if (baseUrl && secret) {
+    const res = await fetch(`${baseUrl}/api/revalidate`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-revalidate-secret": secret,
+      },
+      body: JSON.stringify({ bookId, issueId }),
+    });
+    console.log(
+      res.ok
+        ? `Reader pages revalidated (pages ${list} changed).`
+        : `Revalidate failed: ${res.status} ${await res.text()}`,
+    );
+  } else {
+    console.log(
+      `Pages ${list} changed. NEXT_PUBLIC_BASE_URL is not set, so nothing was revalidated. Run:\n` +
+        `  curl -X POST <app-url>/api/revalidate -H 'content-type: application/json' -H "x-revalidate-secret: $REVALIDATE_SECRET" -d '{"bookId":"${bookId}","issueId":"${issueId}"}'`,
+    );
+  }
+}
+
+/**
+ * `--apply`: re-cue the rule-backed rows, write the new cues, then render.
+ * Returns the report lines. Throws before any write when the price is over
+ * `maxChars`.
+ */
+async function apply(
+  bookId: string,
+  issueId: string,
+  targets: Row[],
+  inCast: Set<string>,
+  maxChars: number,
+): Promise<string[]> {
+  const log: LlmCallMeta = { step: APPLY_STEP, bookId, issueId };
+  const results = await checkAll(targets, inCast, log);
+  const { failed, flagged, kept, changed } = sortResults(results);
+  const unchanged = kept.filter((r) => !changed.includes(r));
+
+  const cost = await price(bookId, issueId, changed);
+  if (cost.characters > maxChars)
+    throw new Error(
+      `Priced at most ${cost.characters} ElevenLabs characters over ${cost.renders} renders for ${changed.length} changed rows, above --max-chars ${maxChars}. No cues were written and nothing was rendered; the Gemini calls are in llm_calls.\n` +
+        `(${flagged.length} flagged, ${unchanged.length} unchanged, ${failed.length} failed replies)\n` +
+        tokenLine(),
+    );
+
+  const book = await loadBookCast(supabase, bookId);
+
+  // Write every new cue first. A row an editor changed since the read (its
+  // cues or speaker, or it went ignored or silent) is left alone, since the
+  // single render below uses the row as read.
+  const outcome = new Map<string, string>();
+  const written: Changed[] = [];
+  for (const r of changed) {
+    let q = supabase
+      .from("bubbles")
+      .update({
+        text_with_cues: r.proposal,
+        needs_audio: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("id", r.row.id)
+      .eq("ignored", false)
+      .eq("silent", false);
+    for (const col of [
+      "text_with_cues",
+      "character_id",
+      "speaker",
+      "group_id",
+    ] as const) {
+      const v = r.row[col];
+      q = v === null ? q.is(col, null) : q.eq(col, v);
+    }
+    const { data, error } = await q.select("id");
+    if (error) outcome.set(r.row.id, `not written: ${error.message}`);
+    else if (!data?.length)
+      outcome.set(r.row.id, "not written: the row changed since the read");
+    else written.push(r);
+  }
+
+  // A sibling whose write failed renders with its old cues, so price what
+  // was written before any render. A failed read here must still print the
+  // report, which lists the written rows left to render.
+  let stop: string | null = null;
+  try {
+    const repriced = await price(bookId, issueId, written);
+    if (repriced.characters > maxChars)
+      stop = `not started: the written rows price at ${repriced.characters} characters, above --max-chars ${maxChars}`;
+  } catch (e) {
+    stop = `not started: re-pricing failed (${(e as Error).message})`;
+  }
+
+  // Then render, one at a time.
+  const groupOutcome = new Map<string, string>();
+  let billed = 0;
+  let renders = 0;
+  let stalePaid = 0;
+  for (const r of written) {
+    const id = r.row.id;
+    const g = r.row.group_id;
+    const done = g ? groupOutcome.get(g) : undefined;
+    if (done) {
+      outcome.set(id, done);
+      continue;
+    }
+    if (!stop && billed >= maxChars) stop = `--max-chars ${maxChars} reached`;
+    if (stop) {
+      outcome.set(id, `not rendered: ${stop}`);
+      continue;
+    }
+    try {
+      if (g) {
+        const res = await renderGroupAudio({
+          client: supabase,
+          bookId,
+          issueId,
+          groupId: g,
+          step: APPLY_STEP,
+          book,
+        });
+        let text: string | null = null;
+        if ("rendered" in res) {
+          billed += res.characters;
+          renders++;
+          text = `group of ${res.memberIds.length} rendered, ${res.characters} chars, ${res.path}`;
+        } else if (res.skipped === "stale-group") {
+          stalePaid++;
+          text = `group skipped: stale-group, paid and not stored (${res.detail})`;
+        } else if (res.skipped !== "single") {
+          text = `group skipped: ${res.skipped}${"memberId" in res ? ` (${res.memberId})` : ""}${"detail" in res ? ` (${res.detail})` : ""}`;
+        }
+        if (text) {
+          groupOutcome.set(g, text);
+          outcome.set(id, text);
+          continue;
+        }
+      }
+      const res = await renderBubbleAudio({
+        client: supabase,
+        bookId,
+        issueId,
+        bubble: { ...r.row, text_with_cues: r.proposal },
+        step: APPLY_STEP,
+        book,
+      });
+      if ("rendered" in res) {
+        billed += res.characters;
+        renders++;
+        outcome.set(id, `rendered, ${res.characters} chars, ${res.path}`);
+      } else {
+        outcome.set(
+          id,
+          `skipped: ${res.skipped}${"detail" in res ? ` (${res.detail})` : ""}`,
+        );
+      }
+    } catch (e) {
+      const stage =
+        e instanceof GroupRenderError || e instanceof BubbleRenderError
+          ? ` at ${e.stage}`
+          : "";
+      const text = `render failed${stage}: ${(e as Error).message}`;
+      outcome.set(id, text);
+      if (g) groupOutcome.set(g, text);
+      stop = "stopped after a render error";
+    }
+  }
+
+  // Best effort: the writes landed, so a failed refresh must not lose the report.
+  await revalidate(
+    bookId,
+    issueId,
+    written.map((r) => r.row.page_number),
+  ).catch((e: Error) => console.log(`Revalidate failed: ${e.message}`));
+
+  return [
+    `# Cue apply: ${bookId} ${issueId}`,
+    "",
+    `- Rule-backed bubbles re-proposed: ${targets.length}`,
+    `- Cues written: ${written.length} of ${changed.length} changed`,
+    `- Skipped, proposal equals the old cues: ${unchanged.length}`,
+    `- Flagged, words differ, left out: ${flagged.length}`,
+    `- Empty or failed replies: ${failed.length}`,
+    `- Priced before writing: at most ${cost.characters} ElevenLabs characters over ${cost.renders} renders (--max-chars ${maxChars})`,
+    `- ElevenLabs characters in stored renders: ${billed} over ${renders} renders (a paid call whose upload or switch failed is in llm_calls, not here)` +
+      (stalePaid
+        ? ` (plus ${stalePaid} stale-group renders that were paid and not stored, not in this total)`
+        : "") +
+      (stop ? `; render loop ${stop}` : ""),
+    tokenLine(),
+    ...table(
+      "Applied",
+      ["old cues", "new cues", "reason", "render result"],
+      changed.map((r) =>
+        line(
+          r,
+          cell(r.row.text_with_cues),
+          cell(r.proposal),
+          reasons(r.row),
+          cell(outcome.get(r.row.id) ?? ""),
+        ),
+      ),
+      true,
+    ),
+    ...table(
+      "Skipped, proposal equals the old cues",
+      ["old cues"],
+      unchanged.map((r) => line(r, cell(r.row.text_with_cues))),
+    ),
+    ...skippedTables(flagged, failed),
+  ];
+}
+
 async function main(): Promise<void> {
   const { values } = parseArgs({
     options: {
@@ -252,17 +603,33 @@ async function main(): Promise<void> {
       issue: { type: "string" },
       limit: { type: "string" },
       out: { type: "string" },
+      apply: { type: "boolean" },
+      "max-chars": { type: "string" },
+      only: { type: "string" },
     },
   });
   const { book: bookId, issue: issueId } = values;
   if (!bookId || !issueId) {
     throw new Error(
-      "Usage: pnpm recue-issue --book <id> --issue <id> [--limit N] [--out path]",
+      "Usage: pnpm recue-issue --book <id> --issue <id> [--limit N] [--out path] [--apply --max-chars N [--only id8,id8]]",
     );
   }
   const limit = values.limit ? Number(values.limit) : undefined;
   if (limit !== undefined && !(Number.isInteger(limit) && limit > 0))
     throw new Error(`--limit must be a positive integer, got ${values.limit}`);
+  const maxChars = Number(values["max-chars"]);
+  if (values.apply) {
+    if (!(Number.isInteger(maxChars) && maxChars > 0))
+      throw new Error(
+        `--apply needs --max-chars N, a positive integer cap on the ElevenLabs characters it may bill${values["max-chars"] ? `; got ${values["max-chars"]}` : ""}`,
+      );
+    if (isDryRun())
+      throw new Error(
+        "DRY_RUN is set, so --apply would store silent audio on a real book. Unset it.",
+      );
+  } else if (values["max-chars"] !== undefined || values.only !== undefined) {
+    throw new Error("--max-chars and --only go with --apply");
+  }
 
   const { data: issue, error: iErr } = await selectIssue(
     supabase,
@@ -293,89 +660,61 @@ async function main(): Promise<void> {
   if (count !== null && count > rows.length)
     throw new Error(`bubbles read: got ${rows.length} of ${count} rows`);
 
-  const inCast = await editorSpeakerIds(bookId, issueId);
-  const results: Result[] = [];
-  for (let i = 0; i < rows.length; i += POOL)
-    results.push(
-      ...(await Promise.all(
-        rows.slice(i, i + POOL).map((r) => check(r, inCast)),
-      )),
-    );
-
-  const failed = results.filter((r) => r.proposal === null);
-  const ok = results.filter((r): r is Changed => r.proposal !== null);
-  // The words must match the input and, when there are old cues, the old line.
-  const flagged = ok.filter((r) => {
-    const said = words(r.proposal).join(" ");
-    const old = r.row.text_with_cues;
-    return (
-      said !== words(r.row.ocr_text ?? "").join(" ") ||
-      (old !== null && said !== words(old).join(" "))
-    );
-  });
-  const kept = ok.filter((r) => !flagged.includes(r));
-  const changed = kept.filter(
-    (r) =>
-      r.row.text_with_cues === null ||
-      squash(r.proposal) !== squash(r.row.text_with_cues),
-  );
-
-  const cost = await price(bookId, issueId, changed);
-
-  const line = (r: Result, ...mid: string[]) =>
-    `| ${[r.row.page_number, cell(r.row.character_id ?? r.row.speaker), ...mid, r.row.id.slice(0, 8)].join(" | ")} |`;
-  const table = (title: string, mid: string[], body: string[]) => {
-    const head = ["page", "speaker", ...mid, "bubble"];
-    return body.length === 0 && title !== "Changed"
-      ? []
-      : ["", `## ${title}`, "", `| ${head.join(" | ")} |`].concat(
-          `|${head.map(() => "---").join("|")}|`,
-          body,
+  let lines: string[];
+  if (values.apply) {
+    let targets = rows.filter((r) => reasons(r) !== RULE_FREE);
+    if (values.only !== undefined) {
+      const only = values.only
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const missing = only.filter(
+        (p) => !targets.some((r) => r.id.startsWith(p)),
+      );
+      if (only.length === 0 || missing.length > 0)
+        throw new Error(
+          `--only: ${missing.length ? `no rule-backed bubble starts with ${missing.join(", ")}` : "no ids given"}`,
         );
-  };
-  const lines = [
-    `# Cue check: ${bookId} ${issueId}`,
-    "",
-    `- Bubbles checked: ${rows.length}${limit ? ` (--limit ${limit})` : ""}`,
-    `- Changed: ${changed.length}`,
-    `- Unchanged: ${kept.length - changed.length}`,
-    `- Flagged, words differ, left out: ${flagged.length}`,
-    `- Empty or failed replies: ${failed.length}`,
-    `- ElevenLabs characters to re-render the changed rows: at most ${cost.characters} over ${cost.renders} renders` +
-      ` (${cost.grouped} changed rows in joined groups, each group priced once` +
-      (cost.refused
-        ? `; ${cost.refused} groups left out, the render refuses a group with an ignored or silent row`
-        : "") +
-      (cost.noVoice
-        ? `; ${cost.noVoice} renders with no playable voice, counted without a prefix`
-        : "") +
-      ")",
-    `- Gemini tokens: ${tokens.prompt} prompt, ${tokens.output} output, ${tokens.thinking} thinking, over ${tokens.calls} calls`,
-    ...table(
-      "Changed",
-      ["old cues", "new cues", "reason"],
-      changed.map((r) =>
-        line(r, cell(r.row.text_with_cues), cell(r.proposal), reasons(r.row)),
-      ),
-    ),
-    ...table(
-      "Flagged, left out (words differ)",
-      ["old cues", "input", "proposal"],
-      flagged.map((r) =>
-        line(
-          r,
-          cell(r.row.text_with_cues),
-          cell(r.row.ocr_text),
-          cell(r.proposal),
+      targets = targets.filter((r) => only.some((p) => r.id.startsWith(p)));
+    }
+    const inCast = await editorSpeakerIds(bookId, issueId);
+    lines = await apply(bookId, issueId, targets, inCast, maxChars);
+  } else {
+    const inCast = await editorSpeakerIds(bookId, issueId);
+    const results = await checkAll(rows, inCast);
+    const { failed, flagged, kept, changed } = sortResults(results);
+
+    const cost = await price(bookId, issueId, changed);
+
+    lines = [
+      `# Cue check: ${bookId} ${issueId}`,
+      "",
+      `- Bubbles checked: ${rows.length}${limit ? ` (--limit ${limit})` : ""}`,
+      `- Changed: ${changed.length}`,
+      `- Unchanged: ${kept.length - changed.length}`,
+      `- Flagged, words differ, left out: ${flagged.length}`,
+      `- Empty or failed replies: ${failed.length}`,
+      `- ElevenLabs characters to re-render the changed rows: at most ${cost.characters} over ${cost.renders} renders` +
+        ` (${cost.grouped} changed rows in joined groups, each group priced once` +
+        (cost.refused
+          ? `; ${cost.refused} groups left out, the render refuses a group with an ignored or silent row`
+          : "") +
+        (cost.noVoice
+          ? `; ${cost.noVoice} renders with no playable voice, counted without a prefix`
+          : "") +
+        ")",
+      tokenLine(),
+      ...table(
+        "Changed",
+        ["old cues", "new cues", "reason"],
+        changed.map((r) =>
+          line(r, cell(r.row.text_with_cues), cell(r.proposal), reasons(r.row)),
         ),
+        true,
       ),
-    ),
-    ...table(
-      "Empty or failed",
-      ["error"],
-      failed.map((r) => line(r, cell(r.error ?? ""))),
-    ),
-  ];
+      ...skippedTables(flagged, failed),
+    ];
+  }
   const report = lines.join("\n") + "\n";
   if (values.out) {
     writeFileSync(values.out, report);
