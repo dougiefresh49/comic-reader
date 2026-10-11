@@ -1,6 +1,7 @@
 // The character panel (#787): the open card in a right column. The header
-// names it (Rename is staged), Voice and Faces are tabs, and the footer has
-// the card's quick actions. Voice changes are staged; the Faces work saves
+// names it (Rename is staged) and can say "this is character X" (#846, saves
+// at once), Voice and Faces are tabs, and the footer has the card's quick
+// actions. Voice changes are staged; the Faces work saves
 // as it is done, as it always has.
 "use client";
 
@@ -220,6 +221,8 @@ export interface CharacterPanelProps
   onConfirmFaces: () => void;
   onMove: (face: FaceView, target: NameTarget, name: string) => void;
   onMoveMany: (faces: FaceView[], target: NameTarget, name: string) => void;
+  /** "This is character X" (#846): every face of the card in this issue moves to the target. */
+  onRelabel: (target: NameTarget, name: string) => void;
   onReject: (face: FaceView) => void;
   onRejectMany: (faces: FaceView[]) => void;
 }
@@ -246,6 +249,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
     onConfirmFaces,
     onMove,
     onMoveMany,
+    onRelabel,
     onReject,
     onRejectMany,
     ...voiceProps
@@ -256,6 +260,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const [selecting, setSelecting] = useState(false);
   /** The faces the move dialog is open for; null when it is closed. */
   const [moving, setMoving] = useState<FaceView[] | null>(null);
+  /** The move dialog is the header's "this is character X": all the faces go. */
+  const [movingAll, setMovingAll] = useState(false);
   const moveOpener = useRef<HTMLElement | null>(null);
   const pencilRef = useRef<HTMLButtonElement>(null);
   const asideRef = useRef<HTMLElement>(null);
@@ -268,6 +274,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
 
   const closeMove = useCallback(() => {
     setMoving(null);
+    setMovingAll(false);
     moveOpener.current?.focus();
   }, []);
   const closeRename = useCallback(() => {
@@ -306,6 +313,9 @@ export function CharacterPanel(props: CharacterPanelProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [moving, selecting, shown, renaming, onClose, closeMove, closeRename]);
+
+  const allFaces =
+    card.faces.length === 1 ? "its face" : `all ${card.faces.length} faces`;
 
   const meta = [
     `${card.lines} ${card.lines === 1 ? "line" : "lines"}`,
@@ -392,6 +402,23 @@ export function CharacterPanel(props: CharacterPanelProps) {
               </span>
             </div>
           </div>
+          {/* A role has no faces, and a card with none has nothing to move. */}
+          {!isRole && card.faces.length > 0 && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={(e) => {
+                moveOpener.current = e.currentTarget;
+                setMovingAll(true);
+                setMoving(card.faces);
+              }}
+              aria-label={`This is another character: move ${allFaces} in this issue to it`}
+              title={`This is another character: move ${allFaces} in this issue to it`}
+              className={`${BTN_SMALL} mt-0.5`}
+            >
+              Move {allFaces}…
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -494,10 +521,13 @@ export function CharacterPanel(props: CharacterPanelProps) {
           known={known}
           pages={pages}
           busy={busy}
+          all={movingAll}
           onConfirm={(target, name) => {
             const faces = moving;
+            const all = movingAll;
             closeMove();
-            if (faces.length === 1) onMove(faces[0]!, target, name);
+            if (all) onRelabel(target, name);
+            else if (faces.length === 1) onMove(faces[0]!, target, name);
             else onMoveMany(faces, target, name);
           }}
           onCancel={closeMove}

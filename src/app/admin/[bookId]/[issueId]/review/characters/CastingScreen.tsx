@@ -35,6 +35,7 @@ import {
   rejectFace,
   rejectFaces,
   rejectGroup,
+  relabelCharacter,
   voicePreview,
   type ActionResult,
   type NameTarget,
@@ -704,14 +705,19 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   }, []);
   useEffect(readRoster, [readRoster]);
 
-  /** An immediate write (the Faces work, Approve, Continue): run, say the answer, refresh. */
+  /** An immediate write (the Faces work, Approve, Continue): run, say the answer, then `onOk` on success, refresh. */
   const run = useCallback(
-    (label: string, work: () => Promise<ActionResult>) => {
+    <R extends ActionResult>(
+      label: string,
+      work: () => Promise<R>,
+      onOk?: (r: Extract<R, { ok: true }>) => void,
+    ) => {
       say(`${label}…`);
       startTransition(async () => {
         try {
           const r = await work();
           say(r.ok ? r.message : r.error, !r.ok);
+          if (r.ok) onOk?.(r as Extract<R, { ok: true }>);
         } catch (err) {
           say(err instanceof Error ? err.message : String(err), true);
         }
@@ -1325,6 +1331,29 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                   }),
                 )
               }
+              onRelabel={(target, name) => {
+                const from = openCard.id;
+                run(
+                  `Moving all of ${openCard.name}'s faces to ${name}`,
+                  () =>
+                    relabelCharacter({
+                      scope,
+                      fromId: from,
+                      target,
+                      franchiseId: data.franchiseId,
+                    }),
+                  (r) => {
+                    // What is staged for the old card was about it, not the
+                    // target: a rename or a voice pick must not carry over.
+                    setStaged((s) =>
+                      withoutPick(s, from).filter((x) => !forChar(from)(x)),
+                    );
+                    setRenameId(null);
+                    setTab("voice");
+                    setOpenId(r.characterId);
+                  },
+                );
+              }}
               onReject={(face) =>
                 run(`Dropping the page ${face.page} face`, () =>
                   rejectFace({ scope, detectionId: face.id }),
