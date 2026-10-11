@@ -268,6 +268,30 @@ function Chip({
   );
 }
 
+/** A faces-mode card's line: its face count, none on a role with no faces. */
+function FaceCount({
+  faces,
+  role,
+  removed,
+}: {
+  faces: number;
+  role: boolean;
+  removed: boolean;
+}) {
+  const count =
+    faces > 0
+      ? `${faces} ${faces === 1 ? "face" : "faces"}`
+      : role
+        ? ""
+        : "no faces";
+  const text = [count, removed ? "not in issue" : ""]
+    .filter(Boolean)
+    .join(" · ");
+  return text ? (
+    <span className="truncate text-neutral-400">{text}</span>
+  ) : null;
+}
+
 function CastCard({
   card,
   state,
@@ -1321,60 +1345,57 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                       heading
                     )}
                   </h2>
-                  {(!folds || silentOpen) && (
-                    <div
-                      id={folds ? silentGridId : undefined}
-                      className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5"
-                    >
-                      {list.map((c) => {
-                        const st = stateOf(c);
-                        return (
-                          <CastCard
-                            key={c.id}
-                            card={c}
-                            state={st}
-                            isNew={addedIds.has(c.id)}
-                            selected={openId === c.id}
-                            pages={pages}
-                            voiceMode={voiceMode}
-                            chip={
-                              voiceMode ? (
-                                <Chip
-                                  card={c}
-                                  state={st}
-                                  voices={voiceById}
-                                  slotOf={slotOf}
-                                  landing={landingOf(st)}
-                                  outIds={outIds}
-                                  noSlot={
-                                    isVoiced(st) &&
-                                    groupById.get(c.id) === "needs"
-                                  }
-                                />
-                              ) : c.group === "role" ? null : (
-                                <span className="truncate text-neutral-400">
-                                  {c.faces.length === 0
-                                    ? "no faces"
-                                    : `${c.faces.length} ${c.faces.length === 1 ? "face" : "faces"}`}
-                                  {st.removed && " · not in issue"}
-                                </span>
-                              )
-                            }
-                            onOpen={() =>
-                              openId === c.id ? undefined : open(c.id)
-                            }
-                            onMenu={(anchor) =>
-                              setMenu({ kind: "card", id: c.id, anchor })
-                            }
-                            onDragStart={() =>
-                              setCarry({ type: "char", id: c.id })
-                            }
-                            onDragEnd={() => setCarry(null)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div
+                    id={folds ? silentGridId : undefined}
+                    className={`${folds && !silentOpen ? "hidden" : "grid"} grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-2.5`}
+                  >
+                    {list.map((c) => {
+                      const st = stateOf(c);
+                      return (
+                        <CastCard
+                          key={c.id}
+                          card={c}
+                          state={st}
+                          isNew={addedIds.has(c.id)}
+                          selected={openId === c.id}
+                          pages={pages}
+                          voiceMode={voiceMode}
+                          chip={
+                            voiceMode ? (
+                              <Chip
+                                card={c}
+                                state={st}
+                                voices={voiceById}
+                                slotOf={slotOf}
+                                landing={landingOf(st)}
+                                outIds={outIds}
+                                noSlot={
+                                  isVoiced(st) &&
+                                  groupById.get(c.id) === "needs"
+                                }
+                              />
+                            ) : (
+                              <FaceCount
+                                faces={c.faces.length}
+                                role={c.group === "role"}
+                                removed={st.removed}
+                              />
+                            )
+                          }
+                          onOpen={() =>
+                            openId === c.id ? undefined : open(c.id)
+                          }
+                          onMenu={(anchor) =>
+                            setMenu({ kind: "card", id: c.id, anchor })
+                          }
+                          onDragStart={() =>
+                            setCarry({ type: "char", id: c.id })
+                          }
+                          onDragEnd={() => setCarry(null)}
+                        />
+                      );
+                    })}
+                  </div>
                 </section>
               );
             })}
