@@ -352,16 +352,10 @@ async function moveDetection(
   scope: Scope,
   face: { id: string; characterId: string | null; page: number },
   to: string,
+  settle = true,
 ): Promise<void> {
-  const moved = await supabaseAdmin
-    .from("panel_character_detections")
-    .update({
-      character_id: to,
-      suggested_name: null,
-      human_verified: true,
-    })
-    .eq("id", face.id);
-  must("moving the face", moved.error);
+  // Exemplar first: a failed detection write then leaves the face on the old
+  // character, so a retry redoes both instead of skipping it as moved.
   const exemplar = await supabaseAdmin
     .from("character_face_exemplars")
     .update({
@@ -373,6 +367,18 @@ async function moveDetection(
     .eq("source_issue", scope.issueId)
     .eq("detection_id", face.id);
   must("moving the face's exemplar", exemplar.error);
+  const moved = await supabaseAdmin
+    .from("panel_character_detections")
+    .update({
+      character_id: to,
+      suggested_name: null,
+      human_verified: true,
+    })
+    .eq("id", face.id);
+  must("moving the face", moved.error);
+  // A relabel swept the old character's exemplars before any face moved, so
+  // it has none loose to settle; skipping keeps its last write the face's.
+  if (!settle) return;
   await settleLooseExemplars(scope, face.characterId, face.page, {
     kind: "move",
     to,
@@ -409,13 +415,80 @@ export async function moveFace(args: {
 }
 
 /**
- * Moves a selection of faces to one character (#745): every face is read
- * before anything is written (a stale id fails the whole move, not half of
- * it), the target is resolved once and joins the cast before the first
- * face moves, each face is then written as `moveFace` writes it, and the
- * page refreshes once. A face already on the target is left alone and
- * counted; when every face is, nothing is written, as in `moveFace`.
+ * Moves a set of faces to one character (#745): every face is read before
+ * anything is written (a stale id fails the whole move, not half of it), the
+ * target is resolved once and joins the cast before the first face moves,
+ * each face is then written as `moveFace` writes it, and the page refreshes
+ * once. A face already on the target is left alone and counted; when every
+ * face is, nothing is written, as in `moveFace`. Both `moveFaces` and
+ * `relabelCharacter` call this, so a relabel writes what a batch move does.
+ * With `from` set, a face the reread finds on neither `from` nor the target
+ * fails the whole move before anything is written: another session moved it.
  */
+async function moveAll(args: {
+  scope: Scope;
+  detectionIds: string[];
+  target: NameTarget;
+  franchiseId: string | null;
+  from?: string;
+}): Promise<{ id: string; message: string }> {
+  const { scope, detectionIds, target, from } = args;
+  if (detectionIds.length === 0) throw new Error("no faces were picked");
+  const faces: Awaited<ReturnType<typeof readDetection>>[] = [];
+  for (const detectionId of detectionIds)
+    faces.push(await readDetection(scope, detectionId));
+  // Checked before `resolveTarget`, which may create the character. A typed
+  // new name has no id yet, so only an existing target's faces pass here.
+  if (
+    from !== undefined &&
+    faces.some(
+      (f) =>
+        f.characterId !== from &&
+        !(target.kind === "existing" && f.characterId === target.id),
+    )
+  )
+    throw new Error("a face changed while moving; reload and try again");
+  const who = await resolveTarget(scope.bookId, args.target, args.franchiseId);
+  const toMove = faces.filter((f) => f.characterId !== who.id);
+  const skipped = faces.length - toMove.length;
+  if (toMove.length === 0)
+    return {
+      id: who.id,
+      message: `${faces.length === 1 ? "That face is" : "Those faces are"} already ${who.name}.`,
+    };
+  await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
+  if (from !== undefined) {
+    // A relabel: the whole character in this issue is the target, so all of
+    // its exemplars go, loose ones on pages with no face included. Written
+    // before any face moves, so a failed write leaves the faces on `from`
+    // and a retry redoes it (exemplar first, as in `moveDetection`).
+    const exemplars = await supabaseAdmin
+      .from("character_face_exemplars")
+      .update({
+        character_id: who.id,
+        suggested_name: null,
+        is_confirmed: true,
+      })
+      .eq("book_id", scope.bookId)
+      .eq("source_issue", scope.issueId)
+      .eq("character_id", from);
+    must("moving the character's exemplars", exemplars.error);
+  }
+  for (const face of toMove)
+    await moveDetection(scope, face, who.id, from === undefined);
+  revalidate(scope);
+  const count = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
+  return {
+    id: who.id,
+    message:
+      `Moved ${count(toMove.length)} to ${who.name}${who.created ? ", a new character" : ""}.` +
+      (skipped > 0
+        ? ` ${count(skipped)} already ${who.name}, left alone.`
+        : ""),
+  };
+}
+
+/** Moves a selection of faces to one character (#745), through `moveAll`. */
 export async function moveFaces(args: {
   scope: Scope;
   detectionIds: string[];
@@ -424,37 +497,47 @@ export async function moveFaces(args: {
 }): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const { scope, detectionIds } = args;
-    if (detectionIds.length === 0) throw new Error("no faces were picked");
-    const faces: Awaited<ReturnType<typeof readDetection>>[] = [];
-    for (const detectionId of detectionIds)
-      faces.push(await readDetection(scope, detectionId));
-    const who = await resolveTarget(
-      scope.bookId,
-      args.target,
-      args.franchiseId,
-    );
-    const toMove = faces.filter((f) => f.characterId !== who.id);
-    const skipped = faces.length - toMove.length;
-    if (toMove.length === 0)
-      return {
-        ok: true,
-        message: `${faces.length === 1 ? "That face is" : "Those faces are"} already ${who.name}.`,
-      };
-    await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
-    for (const face of toMove) await moveDetection(scope, face, who.id);
-    revalidate(scope);
-    const count = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
-    return {
-      ok: true,
-      message:
-        `Moved ${count(toMove.length)} to ${who.name}${who.created ? ", a new character" : ""}.` +
-        (skipped > 0
-          ? ` ${count(skipped)} already ${who.name}, left alone.`
-          : ""),
-    };
+    const { message } = await moveAll(args);
+    return { ok: true, message };
   } catch (err) {
     return fail("moving faces", err);
+  }
+}
+
+/** `relabelCharacter`'s answer: the move's line and the character the faces now belong to, or a failure. */
+export type RelabelResult =
+  | { ok: true; message: string; characterId: string }
+  | { ok: false; error: string };
+
+/**
+ * "This is character X" (#846): every face of `fromId` in this issue moves
+ * to the target through `moveAll`, the ids gathered here so the client never
+ * sends the list. The old character, its voices, its castlist rows and its
+ * aliases are left as they are, and no alias is written (lead calls 1 and 2
+ * on #846).
+ */
+export async function relabelCharacter(args: {
+  scope: Scope;
+  fromId: string;
+  target: NameTarget;
+  franchiseId: string | null;
+}): Promise<RelabelResult> {
+  try {
+    await requireAdmin();
+    const { scope, fromId, target, franchiseId } = args;
+    const faces = await detectionsOf(scope, fromId);
+    if (faces.length === 0)
+      throw new Error(`${fromId} has no faces in this issue to move`);
+    const moved = await moveAll({
+      scope,
+      detectionIds: faces.map((f) => f.id),
+      target,
+      franchiseId,
+      from: fromId,
+    });
+    return { ok: true, message: moved.message, characterId: moved.id };
+  } catch (err) {
+    return fail("relabelling a character", err);
   }
 }
 

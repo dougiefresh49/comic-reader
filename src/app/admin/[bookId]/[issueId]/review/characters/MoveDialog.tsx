@@ -1,4 +1,4 @@
-// The move dialog (#745): one face, or a selection, to another character of this issue, one the book knows, or a new one.
+// The move dialog (#745): one face, a selection, or all of a card's faces (#846) to another character of this issue, one the book knows, or a new one.
 "use client";
 
 import { useId, useMemo, useState } from "react";
@@ -57,7 +57,9 @@ function portraitOf(
  * pick. The search uses the name picker's matching (id, name, alias, slug)
  * and reaches the characters the book knows but this issue does not; a name
  * that matches nothing is offered as a new character. Escape is the panel's
- * (it closes this first); Enter with a pick is Move.
+ * (it closes this first); Enter with a pick is Move. With `all` it is the
+ * header's "this is character X" (#846): every face of the card moves, and
+ * the card's character itself stays as it is.
  */
 export function MoveDialog({
   card,
@@ -66,6 +68,7 @@ export function MoveDialog({
   known,
   pages,
   busy,
+  all = false,
   onConfirm,
   onCancel,
 }: {
@@ -76,6 +79,8 @@ export function MoveDialog({
   known: KnownCharacter[];
   pages: Map<number, PageView>;
   busy: boolean;
+  /** Every face of the card moves (#846), and the copy says so. */
+  all?: boolean;
   onConfirm: (target: NameTarget, name: string) => void;
   onCancel: () => void;
 }) {
@@ -134,8 +139,11 @@ export function MoveDialog({
 
   const picked = choices.find((c) => c.key === pickedKey) ?? null;
   const confirm = () => picked && onConfirm(picked.target, picked.name);
-  const what =
-    faces.length === 1
+  const what = all
+    ? faces.length === 1
+      ? "the one face"
+      : `all ${faces.length} faces`
+    : faces.length === 1
       ? `the page ${faces[0]!.page} face`
       : `${faces.length} faces`;
 
@@ -148,6 +156,13 @@ export function MoveDialog({
       <h2 id={headingId} className="text-[16px] font-medium text-neutral-100">
         Move {what} of {card.name} to…
       </h2>
+      {all && (
+        <p className="-mt-1 text-[13px] text-neutral-400">
+          Every face of {card.name} in this issue becomes the character you
+          pick. {card.name} itself, its voices and its cast rows stay as they
+          are.
+        </p>
+      )}
       <input
         value={query}
         autoFocus
@@ -250,7 +265,13 @@ export function MoveDialog({
           onClick={confirm}
           className={PRIMARY}
         >
-          {picked ? `Move to ${picked.name}` : "Move to…"}
+          {all
+            ? picked
+              ? `Move ${what} to ${picked.name}`
+              : `Move ${what} to…`
+            : picked
+              ? `Move to ${picked.name}`
+              : "Move to…"}
         </button>
       </div>
     </DialogFrame>
