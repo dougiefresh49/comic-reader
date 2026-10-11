@@ -453,6 +453,23 @@ async function moveAll(args: {
       message: `${faces.length === 1 ? "That face is" : "Those faces are"} already ${who.name}.`,
     };
   await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
+  if (from !== undefined) {
+    // A relabel: the whole character in this issue is the target, so all of
+    // its exemplars go, loose ones on pages with no face included. Written
+    // before any face moves, so a failed write leaves the faces on `from`
+    // and a retry redoes it (exemplar first, as in `moveDetection`).
+    const exemplars = await supabaseAdmin
+      .from("character_face_exemplars")
+      .update({
+        character_id: who.id,
+        suggested_name: null,
+        is_confirmed: true,
+      })
+      .eq("book_id", scope.bookId)
+      .eq("source_issue", scope.issueId)
+      .eq("character_id", from);
+    must("moving the character's exemplars", exemplars.error);
+  }
   for (const face of toMove) await moveDetection(scope, face, who.id);
   revalidate(scope);
   const count = (n: number) => `${n} ${n === 1 ? "face" : "faces"}`;
@@ -513,21 +530,6 @@ export async function relabelCharacter(args: {
       franchiseId,
       from: fromId,
     });
-    // The whole character in this issue is the target, so the exemplars no
-    // face carried over (a loose one on a page with no detection) go too.
-    if (moved.id !== fromId) {
-      const rest = await supabaseAdmin
-        .from("character_face_exemplars")
-        .update({
-          character_id: moved.id,
-          suggested_name: null,
-          is_confirmed: true,
-        })
-        .eq("book_id", scope.bookId)
-        .eq("source_issue", scope.issueId)
-        .eq("character_id", fromId);
-      must("moving the character's other exemplars", rest.error);
-    }
     return { ok: true, message: moved.message, characterId: moved.id };
   } catch (err) {
     return fail("relabelling a character", err);
