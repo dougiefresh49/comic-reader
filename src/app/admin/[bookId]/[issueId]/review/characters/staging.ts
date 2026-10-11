@@ -75,6 +75,24 @@ export interface CardState {
 export const isVoiced = (state: CardState): boolean =>
   state.voiceId !== null || state.pick?.move.kind === "create_design";
 
+/**
+ * The slot the card's voice is in once the staged moves run: where a staged
+ * pick that takes a slot lands (`landing`, null when none is left), else the
+ * account slot of the voice it rests on. Null with no voice, and for a voice
+ * a staged archive takes out (`outIds`) with no pick of its own.
+ */
+export function slotAfter(
+  state: CardState,
+  slotOf: Map<string, number>,
+  landing: number | null,
+  outIds: Set<string>,
+): number | null {
+  if (state.pick && takesSlot(state.pick.move)) return landing;
+  if (!state.voiceId) return null;
+  if (!state.pick && outIds.has(state.voiceId)) return null;
+  return slotOf.get(state.voiceId) ?? null;
+}
+
 export function cardState(card: CharacterCard, staged: Staged[]): CardState {
   const state: CardState = {
     name: card.name,
