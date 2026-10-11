@@ -611,6 +611,9 @@ export async function roboflowAnalyzeBatch(
   }
 
   const failedPageLabels: string[] = [];
+  // The first page's reason goes into the FatalError, so the Workflow
+  // dashboard shows the cause and not only the page list (#375).
+  let firstFailure = "";
 
   for (const page of pages) {
     const padded = String(page.pageNumber).padStart(2, "0");
@@ -692,6 +695,8 @@ export async function roboflowAnalyzeBatch(
     if ("failure" in read) {
       console.warn(`[roboflow] ${pageLabel}: SAM3 workflow ${read.failure}`);
       failedPageLabels.push(pageLabel);
+      // An error body may echo the request, key included; the run stores this.
+      firstFailure ||= `${pageLabel}: ${read.failure.replaceAll(apiKey, "[key]")}`;
       continue;
     }
 
@@ -920,7 +925,7 @@ export async function roboflowAnalyzeBatch(
 
   if (failedPageLabels.length > 0) {
     throw new FatalError(
-      `[roboflow] page response failed or malformed: ${failedPageLabels.join(", ")}`,
+      `[roboflow] page response failed or malformed: ${failedPageLabels.join(", ")} (first, ${firstFailure})`,
     );
   }
 }
