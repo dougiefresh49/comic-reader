@@ -172,7 +172,7 @@ export interface FaceVoiceContext {
   franchises: string[];
   /** The `form_of` character: its name, and its voice prompt when one is on file. */
   base: { name: string; voice: string | null } | null;
-  /** The issue's wiki qualifier for the character, e.g. "villain". */
+  /** The issue's wiki qualifier for the character: a role, an alternate identity, "cameo". */
   qualifier: string | null;
   /** Voice notes from this issue (`kind: "notes"`), else its lines (`kind: "lines"`); may be empty. */
   heard: { kind: "notes" | "lines"; items: string[] };
@@ -193,7 +193,9 @@ export function faceVoicePrompt(
     ctx.franchises.length > 0
       ? `Franchise: ${ctx.franchises.join(", ")}`
       : null,
-    ctx.qualifier ? `Role in this issue: ${ctx.qualifier}` : null,
+    ctx.qualifier
+      ? `The issue's wiki lists this character as: ${ctx.name} (${ctx.qualifier})`
+      : null,
     ctx.base
       ? `A form of "${ctx.base.name}". It should sound like a variant of that character's voice, not like a new person.${ctx.base.voice ? ` That voice: "${ctx.base.voice}"` : ""}`
       : null,
@@ -217,9 +219,9 @@ ${lead}
 
 ${
   wantPreviewText
-    ? `"previewText": 100 to 300 characters of something this character would say, in its own voice, as a line in a comic for children. Use simple words a young reader can follow, with no swearing and nothing scarier than a cartoon threat. Never use a real person's name. Give only the spoken words: no quotation marks, no speaker label, no stage directions.`
+    ? `"previewText": two or three full sentences, about 30 to 50 words (never under 100 or over 300 characters), of something this character would say, in its own voice, as a line in a comic for children. Use simple words a young reader can follow, with no swearing and nothing scarier than a cartoon threat. Never use a real person's name. Give only the spoken words: no quotation marks, no speaker label, no stage directions.`
     : `"previewText": always the empty string "".`
 }
 
-Return ONLY this JSON, no markdown: {"prompt": "...", "previewText": "..."}`;
+Return ONLY this JSON, no markdown: {"prompt": "...", "previewText": ${wantPreviewText ? '"..."' : '""'}}`;
 }

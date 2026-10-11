@@ -42,6 +42,8 @@ import {
 const PREVIEWS_BUCKET = "comic-voice-previews";
 /** How long a take's signed URL plays, in seconds. */
 const TAKE_URL_TTL = 3600;
+/** The longest preview text `faceVoicePrompt` asks for, in characters. */
+const DRAFT_PREVIEW_MAX = 300;
 
 interface Who {
   bookId: string;
@@ -156,6 +158,8 @@ export interface Draft {
   prompt: string;
   /** The face draft's preview text, when it was asked for and Gemini gave one. */
   previewText?: string;
+  /** Set when the asked-for preview text came back empty or outside its length. */
+  previewNote?: string;
   /** The voice snippets or lines a Gemini draft was made from; null for the prompt on file. */
   snippets: string[] | null;
 }
@@ -335,13 +339,20 @@ async function draftFromFace(
     { step: "draft-voice-prompt-face", bookId, issueId },
   );
   const draft = parseFaceDraft(response.text);
+  const n = draft.previewText.length;
+  const previewNote = !wantPreviewText
+    ? null
+    : n === 0
+      ? `The draft gave no preview text; write ${PREVIEW_MIN}+ characters`
+      : n < PREVIEW_MIN || n > DRAFT_PREVIEW_MAX
+        ? `Draft preview is ${n} characters; edit it to ${PREVIEW_MIN}–${DRAFT_PREVIEW_MAX}`
+        : null;
   return {
     ok: true,
     data: {
       prompt: draft.prompt,
-      ...(wantPreviewText && draft.previewText
-        ? { previewText: draft.previewText }
-        : {}),
+      ...(wantPreviewText && n > 0 ? { previewText: draft.previewText } : {}),
+      ...(previewNote ? { previewNote } : {}),
       snippets: heard.heard.items,
     },
   };

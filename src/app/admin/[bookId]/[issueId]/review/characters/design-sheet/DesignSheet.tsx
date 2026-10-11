@@ -71,7 +71,7 @@ function pickableFaces(card: CharacterCard): Face[] {
         id: f.exemplar.id,
         page: f.page,
         confirmed: f.exemplar.confirmed,
-        confidence: f.exemplar.confidence ?? 0,
+        confidence: f.exemplar.confidence,
         cropUrl: f.exemplar.cropUrl,
       });
   for (const e of card.looseExemplars)
@@ -80,7 +80,7 @@ function pickableFaces(card: CharacterCard): Face[] {
         id: e.id,
         page: e.page,
         confirmed: e.confirmed,
-        confidence: e.confidence ?? 0,
+        confidence: e.confidence,
         cropUrl: e.cropUrl,
       });
   return [...faces.values()].sort(
@@ -129,6 +129,8 @@ export function DesignSheet({
   /** The face Draft sends, an exemplar id: the best one to start, null once unpicked. */
   const [face, setFace] = useState<string | null>(faces[0]?.id ?? null);
   const [previewText, setPreviewText] = useState(staged?.preview_text ?? "");
+  /** Why the face draft's preview text needs an edit (empty, or the wrong length); cleared by an edit. */
+  const [previewNote, setPreviewNote] = useState<string | null>(null);
   const [ownLines, setOwnLines] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
@@ -218,9 +220,13 @@ export function DesignSheet({
     setTake(0);
   }, []);
 
+  const previewRef = useRef(previewText);
+  previewRef.current = previewText;
+
   const draft = () => {
     setDrafting(true);
     setDraftError(null);
+    setPreviewNote(null);
     draftVoicePrompt({
       ...who,
       again: prompt.trim() !== "",
@@ -232,12 +238,14 @@ export function DesignSheet({
           setDraftError(r.error);
           return;
         }
-        const { snippets, previewText: drafted } = r.data;
+        const { snippets, previewText: drafted, previewNote } = r.data;
         setPrompt(r.data.prompt);
         setDrafted(snippets && { snippets, face: face !== null });
-        // The drafted preview text fills the field only while it is empty.
-        if (drafted)
-          setPreviewText((text) => (text.trim() === "" ? drafted : text));
+        // The drafted preview text, and its note, fill the field only while it is empty.
+        if (previewRef.current.trim() === "") {
+          if (drafted) setPreviewText(drafted);
+          setPreviewNote(previewNote ?? null);
+        }
         clearTakes();
       })
       .catch((err: unknown) => setDraftError(message(err)))
@@ -396,7 +404,16 @@ export function DesignSheet({
             {draftError ? (
               <div className={`${NOTE} text-red-400`}>{draftError}</div>
             ) : drafted ? (
-              <div className={NOTE} title="voice notes from its lines">
+              <div
+                className={NOTE}
+                title={
+                  !drafted.face
+                    ? "voice notes from its lines"
+                    : drafted.snippets.length > 0
+                      ? "drafted from the picked face and its lines"
+                      : "drafted from the picked face"
+                }
+              >
                 From: {drafted.face ? "its face" : ""}
                 {drafted.face && drafted.snippets.length > 0 ? " · " : ""}
                 {drafted.snippets.length > 0
@@ -437,10 +454,14 @@ export function DesignSheet({
               readOnly={generating}
               onChange={(e) => {
                 setPreviewText(e.target.value);
+                setPreviewNote(null);
                 if (made) clearTakes();
               }}
               className={`${TEXTAREA} border-neutral-700`}
             />
+            {previewNote && (
+              <div className={`${NOTE} text-amber-300`}>{previewNote}</div>
+            )}
             <div className={NOTE}>
               {ownLines !== null && previewText === ownLines
                 ? "Its own lines · "

@@ -28,7 +28,7 @@ export interface FaceView {
     confirmed: boolean;
     cropUrl: string;
     /** `character_face_exemplars.confidence`. */
-    confidence?: number;
+    confidence: number;
   } | null;
 }
 
@@ -39,7 +39,7 @@ export interface LooseExemplar {
   confirmed: boolean;
   cropUrl: string;
   /** `character_face_exemplars.confidence`. */
-  confidence?: number;
+  confidence: number;
 }
 
 /** The voice the render chain finds for a character in this issue now. */
