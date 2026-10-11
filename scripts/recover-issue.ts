@@ -9,11 +9,11 @@
  *
  * issue-3 comes from git (`e562181^`, before assets/ left the repo): raw JPEGs
  * to comic-pages-raw/<book>/issue-3/source/, WebPs plus `pages` rows through
- * storePageImage, and the reviewed bubbles upserted on
- * (book_id, issue_id, legacy_id). issue-4's raw JPEGs are already in
+ * storePageImage, and the April bubbles upserted on
+ * (book_id, issue_id, legacy_id), which #375 deleted for a fresh run. issue-4's raw JPEGs are already in
  * comic-pages-raw; it gets WebPs plus `pages` rows only.
  *
- * Never writes the `issues` row, so `has_webp` stays false on both issues.
+ * Never writes the `issues` row, so it leaves `has_webp` as it finds it.
  */
 
 import { execFileSync } from "child_process";
@@ -51,8 +51,8 @@ const RECIPES: Record<string, Recipe> = {
     gitDir: "assets/comics/tmnt-mmpr-iii/issue-3",
     pageCount: 24,
     resume: [
-      'Resume at fromStep: "sort-page-elements", once issue-3 has panels (run #88\'s script on it first).',
-      "Never run roboflow-page-analyze or get-context on issue-3: they overwrite the reviewed bubble boxes and speakers.",
+      "Run the full pipeline from roboflow-page-analyze.",
+      "#375 deleted the April bubbles on purpose: do not --execute this recipe again, its upsert would bring them back.",
     ],
   },
   "tmnt-mmpr-iii/issue-4": {
