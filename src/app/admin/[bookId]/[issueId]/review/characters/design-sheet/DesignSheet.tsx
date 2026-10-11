@@ -1,5 +1,6 @@
 // Design a voice (#788): a sheet over the casting page. Draft a prompt (the
-// one on file, free, or a Gemini draft), edit it and the preview text,
+// one on file, free, or a Gemini draft, from a picked face when there is one:
+// #850), edit it and the preview text,
 // generate three takes (paid), play them, pick one, and Accept: that stages
 // a `create_design` move like any other pick. Nothing is saved to
 // ElevenLabs until Confirm.
@@ -52,6 +53,44 @@ function Spinner() {
 const message = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
+interface Face {
+  /** The `character_face_exemplars.id`. */
+  id: string;
+  page: number;
+  confirmed: boolean;
+  confidence: number;
+  cropUrl: string;
+}
+
+/** The faces Draft can use: the card's exemplar crops, confirmed first, then the most confident. */
+function pickableFaces(card: CharacterCard): Face[] {
+  const faces = new Map<string, Face>();
+  for (const f of card.faces)
+    if (f.exemplar)
+      faces.set(f.exemplar.id, {
+        id: f.exemplar.id,
+        page: f.page,
+        confirmed: f.exemplar.confirmed,
+        confidence: f.exemplar.confidence ?? 0,
+        cropUrl: f.exemplar.cropUrl,
+      });
+  for (const e of card.looseExemplars)
+    if (!faces.has(e.id))
+      faces.set(e.id, {
+        id: e.id,
+        page: e.page,
+        confirmed: e.confirmed,
+        confidence: e.confidence ?? 0,
+        cropUrl: e.cropUrl,
+      });
+  return [...faces.values()].sort(
+    (a, b) =>
+      Number(b.confirmed) - Number(a.confirmed) ||
+      b.confidence - a.confidence ||
+      a.page - b.page,
+  );
+}
+
 export function DesignSheet({
   scope,
   card,
@@ -81,8 +120,14 @@ export function DesignSheet({
   const [prompt, setPrompt] = useState(staged?.design_prompt ?? "");
   /** The `description` on file (else `design_prompt`), quoted by the "From:" line. */
   const [onFile, setOnFile] = useState<string | null>(null);
-  /** The voice snippets the prompt was drafted from by Gemini; null for none. */
-  const [drafted, setDrafted] = useState<string[] | null>(null);
+  /** What Gemini drafted the prompt from: the voice snippets or lines, and whether a face; null for no Gemini draft. */
+  const [drafted, setDrafted] = useState<{
+    snippets: string[];
+    face: boolean;
+  } | null>(null);
+  const [faces] = useState(() => pickableFaces(card));
+  /** The face Draft sends, an exemplar id: the best one to start, null once unpicked. */
+  const [face, setFace] = useState<string | null>(faces[0]?.id ?? null);
   const [previewText, setPreviewText] = useState(staged?.preview_text ?? "");
   const [ownLines, setOwnLines] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
@@ -176,14 +221,23 @@ export function DesignSheet({
   const draft = () => {
     setDrafting(true);
     setDraftError(null);
-    draftVoicePrompt({ ...who, again: prompt.trim() !== "" })
+    draftVoicePrompt({
+      ...who,
+      again: prompt.trim() !== "",
+      exemplarId: face,
+      wantPreviewText: previewText.trim() === "",
+    })
       .then((r) => {
         if (!r.ok) {
           setDraftError(r.error);
           return;
         }
+        const { snippets, previewText: drafted } = r.data;
         setPrompt(r.data.prompt);
-        setDrafted(r.data.snippets);
+        setDrafted(snippets && { snippets, face: face !== null });
+        // The drafted preview text fills the field only while it is empty.
+        if (drafted)
+          setPreviewText((text) => (text.trim() === "" ? drafted : text));
         clearTakes();
       })
       .catch((err: unknown) => setDraftError(message(err)))
@@ -293,6 +347,40 @@ export function DesignSheet({
                 </button>
               </div>
             </div>
+            {faces.length > 0 && (
+              <div
+                role="group"
+                aria-label="Face to draft from"
+                className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-0.5"
+              >
+                <span className="mr-0.5 shrink-0 text-[12px] text-neutral-400">
+                  From face
+                </span>
+                {faces.map((f) => {
+                  const on = face === f.id;
+                  const label = `Page ${f.page} face${f.confirmed ? ", confirmed" : ""}`;
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={label}
+                      title={`${label} · ${Math.round(f.confidence * 100)}%`}
+                      disabled={drafting}
+                      onClick={() => setFace(on ? null : f.id)}
+                      className={`size-10 shrink-0 overflow-hidden rounded-md border-2 disabled:cursor-not-allowed ${on ? "border-amber-400" : "border-transparent opacity-60 hover:opacity-100"} ${FOCUS}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={f.cropUrl}
+                        alt=""
+                        className="size-full bg-neutral-800 object-cover"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <textarea
               id={`${headingId}-prompt`}
               rows={5}
@@ -309,7 +397,11 @@ export function DesignSheet({
               <div className={`${NOTE} text-red-400`}>{draftError}</div>
             ) : drafted ? (
               <div className={NOTE} title="voice notes from its lines">
-                From: “{drafted.join(" · ")}”
+                From: {drafted.face ? "its face" : ""}
+                {drafted.face && drafted.snippets.length > 0 ? " · " : ""}
+                {drafted.snippets.length > 0
+                  ? `“${drafted.snippets.join(" · ")}”`
+                  : ""}
               </div>
             ) : onFile ? (
               <div className={NOTE} title="voices.description on file">

@@ -162,3 +162,64 @@ ${list}
 
 Return ONLY the consolidated description as plain text — no JSON, no markdown.`;
 }
+
+/** What places a character for `faceVoicePrompt`; the face crop goes beside the prompt as an image. */
+export interface FaceVoiceContext {
+  name: string;
+  /** `characters.full_name`, when set and not the same as `name`. */
+  fullName: string | null;
+  /** The character's franchise, else the book's franchises. */
+  franchises: string[];
+  /** The `form_of` character: its name, and its voice prompt when one is on file. */
+  base: { name: string; voice: string | null } | null;
+  /** The issue's wiki qualifier for the character, e.g. "villain". */
+  qualifier: string | null;
+  /** Voice notes from this issue (`kind: "notes"`), else its lines (`kind: "lines"`); may be empty. */
+  heard: { kind: "notes" | "lines"; items: string[] };
+}
+
+/**
+ * The design sheet's Draft with a face picked (#850): one image of the
+ * character's face plus what places it. Asks for JSON
+ * `{ "prompt": string, "previewText": string }`, `previewText` empty
+ * unless `wantPreviewText`.
+ */
+export function faceVoicePrompt(
+  ctx: FaceVoiceContext,
+  wantPreviewText: boolean,
+): string {
+  const facts = [
+    `Character: "${ctx.name}"${ctx.fullName ? ` (full name: "${ctx.fullName}")` : ""}`,
+    ctx.franchises.length > 0
+      ? `Franchise: ${ctx.franchises.join(", ")}`
+      : null,
+    ctx.qualifier ? `Role in this issue: ${ctx.qualifier}` : null,
+    ctx.base
+      ? `A form of "${ctx.base.name}". It should sound like a variant of that character's voice, not like a new person.${ctx.base.voice ? ` That voice: "${ctx.base.voice}"` : ""}`
+      : null,
+  ].filter((f) => f !== null);
+  const heard =
+    ctx.heard.items.length === 0
+      ? ""
+      : `\n\n${ctx.heard.kind === "notes" ? "Notes on how this character sounds" : "What this character says in this issue"}:\n${ctx.heard.items.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
+  const lead =
+    ctx.heard.items.length > 0
+      ? `How the character talks matters more than how it looks: let the ${ctx.heard.kind === "notes" ? "notes" : "lines"} lead, and use the face to fill in the rest.`
+      : "Use what the face shows (age, build, species or creature type, expression) and what you know of this character.";
+
+  return `Write a voice description for ElevenLabs Voice Design, for a character in a comic that children read along with. The image is this character's face, cut from a comic page.
+
+${facts.join("\n")}${heard}
+
+${lead}
+
+"prompt": describe the voice itself, in plain sentences: how old it sounds and its gender, pitch, accent, energy and pace, and its texture (for example raspy, nasal, smooth, booming). Keep it under 100 words. Never name an actor, a show, a film, or the character; describe the sound, not who it sounds like. Keep the register of a children's cartoon: a villain can sound sly or sinister, but not truly frightening.
+
+${
+  wantPreviewText
+    ? `"previewText": 100 to 300 characters of something this character would say, in its own voice, as a line in a comic for children. Use simple words a young reader can follow, with no swearing and nothing scarier than a cartoon threat. Never use a real person's name. Give only the spoken words: no quotation marks, no speaker label, no stage directions.`
+    : `"previewText": always the empty string "".`
+}
+
+Return ONLY this JSON, no markdown: {"prompt": "...", "previewText": "..."}`;
+}
