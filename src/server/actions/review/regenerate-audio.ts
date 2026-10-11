@@ -1,48 +1,25 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { checkAdminAuth } from "~/lib/admin-auth";
-import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { isDryRun } from "~/lib/fakes/dry-run";
-import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
-import { loadBookCast } from "~/lib/cast";
+import {
+  BubbleRenderError,
+  renderBubbleAudio,
+  type BubbleRenderResult,
+} from "~/lib/render-bubble-audio";
 import {
   GroupRenderError,
   renderGroupAudio,
   type GroupRenderResult,
 } from "~/lib/render-group-audio";
-import { loadVoiceOverrides } from "~/lib/voice-overrides";
-import { resolveSpeakerVoice } from "./resolve-castlist-row";
-
-const AUDIO_BUCKET = "comic-audio";
 
 interface Args {
   bookId: string;
   issueId: string;
   bubbleId: string;
-}
-
-interface AlignmentRaw {
-  characters?: string[];
-  character_start_times_seconds?: number[];
-  character_end_times_seconds?: number[];
-  characterStartTimesSeconds?: number[];
-  characterEndTimesSeconds?: number[];
-}
-
-function normalizeAlignment(raw: AlignmentRaw | null | undefined) {
-  if (!raw) return null;
-  return {
-    characters: raw.characters ?? [],
-    character_start_times_seconds:
-      raw.character_start_times_seconds ?? raw.characterStartTimesSeconds ?? [],
-    character_end_times_seconds:
-      raw.character_end_times_seconds ?? raw.characterEndTimesSeconds ?? [],
-  };
 }
 
 type Step = "generate" | "upload" | "switch" | "unconfirmed" | "refresh";
@@ -240,143 +217,50 @@ export async function regenerateAudio(args: Args) {
   if (!b.speaker && !b.character_id) {
     return { ok: false, error: "No speaker assigned" };
   }
-  const text = b.text_with_cues ?? b.ocr_text ?? "";
-  if (!text.trim()) {
-    return { ok: false, error: "Empty text" };
-  }
-
-  // The audio step's render chain, keyed on bubbles.character_id.
-  let book;
-  try {
-    book = await loadBookCast(supabaseAdmin, args.bookId);
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-  const resolved = resolveSpeakerVoice(book, args.issueId, {
-    speaker: b.speaker,
-    character_id: b.character_id,
-  });
-  if (!resolved.ok) {
-    return { ok: false, error: resolved.error };
-  }
-  const voiceId = resolved.voiceId;
-  // The audio step's request: same text, voice and voice settings.
-  let request;
-  try {
-    const overrides = await loadVoiceOverrides(supabaseAdmin, [voiceId]);
-    request = buildTtsRequest({
-      text,
-      voiceId,
-      override: overrides.get(voiceId),
-    });
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
-
-  // Each take goes to a path no earlier take used, so the upload never
-  // touches what the reader plays. switch_bubble_audio_take then changes the
-  // timings row and bubbles.audio_storage_path in one transaction: until it
-  // commits, the reader has the old take and its own timings. The old object
-  // is never removed: a reader page a kid loaded before the switch is still
-  // open in the browser with the old path and the old timings, and that pair
-  // keeps playing correctly.
-  const hadAudio = b.audio_storage_path != null;
-  const storagePath = `${b.id}-take-${randomUUID().slice(0, 8)}.mp3`;
-  const remotePath = `${args.bookId}/${args.issueId}/${storagePath}`;
   // A concrete URL with no type: its tag is the page's own pathname tag.
   const readerRoute = `/book/${args.bookId}/${args.issueId}/${b.page_number}`;
+  const hadAudio = b.audio_storage_path != null;
 
-  /**
-   * The switch may have saved: revalidate the reader page, so a cached one
-   * would show which.
-   */
-  function unconfirmed(message: string) {
-    try {
-      revalidatePath(readerRoute);
-    } catch (e) {
-      console.warn(
-        `[regenerate-audio] could not refresh ${readerRoute} (${(e as Error).message})`,
-      );
-    }
-    return afterSpendError("unconfirmed", b.id, hadAudio, message, readerRoute);
-  }
-
-  let step: Step = "generate";
+  let result: BubbleRenderResult;
   try {
-    const client = await getElevenLabsClient();
-    const response = await recordElevenLabsCall(
-      {
-        step: "review:regenerate-audio",
-        bookId: args.bookId,
-        issueId: args.issueId,
-        model: TTS_MODEL,
-      },
-      request.text.length,
-      () => client.textToSpeech.convertWithTimestamps(voiceId, request),
-    );
-    const audioBuffer = Buffer.from(response.audioBase64, "base64");
-
-    const alignment = normalizeAlignment(
-      response.alignment as AlignmentRaw | null | undefined,
-    );
-    const normalizedAlignment = normalizeAlignment(
-      response.normalizedAlignment as AlignmentRaw | null | undefined,
-    );
-
-    step = "upload";
-    const { error: upErr } = await supabaseAdmin.storage
-      .from(AUDIO_BUCKET)
-      .upload(remotePath, audioBuffer, {
-        contentType: "audio/mpeg",
-        upsert: false,
-      });
-    if (upErr) {
-      return afterSpendError(step, b.id, hadAudio, upErr.message);
-    }
-
-    step = "switch";
-    const { error: switchErr, status } = await supabaseAdmin.rpc(
-      "switch_bubble_audio_take",
-      {
-        p_bubble_id: b.id,
-        p_book_id: args.bookId,
-        p_issue_id: args.issueId,
-        p_audio_storage_path: storagePath,
-        p_voice_id: resolved.voiceUuid,
-        p_alignment: alignment,
-        p_normalized_alignment: normalizedAlignment,
-      },
-    );
-    if (switchErr) {
-      // Only a coded answer below 500 proves the rollback. With no code,
-      // status 0 or a 5xx the transaction may still commit, so the new take
-      // stays.
-      if (!switchErr.code || status === 0 || status >= 500) {
-        return unconfirmed(switchErr.message);
-      }
-      const { error: rmErr } = await supabaseAdmin.storage
-        .from(AUDIO_BUCKET)
-        .remove([remotePath])
-        .catch((e: Error) => ({ error: e }));
-      if (rmErr) {
+    result = await renderBubbleAudio({
+      client: supabaseAdmin,
+      bookId: args.bookId,
+      issueId: args.issueId,
+      bubble: b,
+      step: "review:regenerate-audio",
+    });
+  } catch (e) {
+    if (!(e instanceof BubbleRenderError))
+      return { ok: false, error: (e as Error).message };
+    if (e.stage === "unconfirmed") {
+      // The switch may have saved: revalidate the reader page, so a cached
+      // one would show which.
+      try {
+        revalidatePath(readerRoute);
+      } catch (re) {
         console.warn(
-          `[regenerate-audio] could not remove unused ${remotePath} (${rmErr.message})`,
+          `[regenerate-audio] could not refresh ${readerRoute} (${(re as Error).message})`,
         );
       }
-      return afterSpendError(step, b.id, hadAudio, switchErr.message);
     }
-
-    step = "refresh";
-    revalidatePath(readerRoute);
-
-    return {
-      ok: true,
-      audioStoragePath: storagePath,
-      memberIds: [b.id],
-    };
-  } catch (e) {
-    // A throw from the switch call is an unanswered call too.
-    if (step === "switch") return unconfirmed((e as Error).message);
-    return afterSpendError(step, b.id, hadAudio, (e as Error).message);
+    return afterSpendError(e.stage, b.id, hadAudio, e.message, readerRoute);
   }
+  if ("skipped" in result) {
+    return {
+      ok: false,
+      error: result.skipped === "no-text" ? "Empty text" : result.detail,
+    };
+  }
+
+  try {
+    revalidatePath(readerRoute);
+  } catch (e) {
+    return afterSpendError("refresh", b.id, hadAudio, (e as Error).message);
+  }
+  return {
+    ok: true,
+    audioStoragePath: result.path,
+    memberIds: [b.id],
+  };
 }
