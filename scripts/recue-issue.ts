@@ -13,6 +13,7 @@
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { supabase } from "./lib/supabase.js";
+import { groupLeadId, joinGroupText } from "~/lib/balloon-groups";
 import { loadBookCast, renderVoice } from "~/lib/cast";
 import { cueRequest, type CuePromptInput } from "~/lib/cue-rules";
 import { getGeminiClient } from "~/lib/gemini-client";
@@ -30,9 +31,11 @@ interface Row {
   character_id: string | null;
   speaker: string | null;
   emotion: string | null;
+  group_id: string | null;
 }
 
 type Result = { row: Row; proposal: string | null; error?: string };
+type Changed = Result & { proposal: string };
 
 const tokens = { calls: 0, prompt: 0, output: 0, thinking: 0 };
 
@@ -64,7 +67,13 @@ function reasons(row: Row): string {
     );
   });
   if (caps.length > 1) out.push("all caps");
-  if (old.includes("—") && /\.\.\.|…/.test(row.ocr_text ?? ""))
+  const count = (s: string, re: RegExp) => s.match(re)?.length ?? 0;
+  const ocr = row.ocr_text ?? "";
+  const bare = stripTags(old);
+  if (
+    count(bare, /—/g) > count(ocr, /—/g) &&
+    count(bare, /\.\.\.|…/g) < count(ocr, /\.\.\.|…/g)
+  )
     out.push("— for ...");
   return out.length > 0 ? out.join(", ") : "model would re-cue";
 }
@@ -109,6 +118,91 @@ async function check(row: Row): Promise<Result> {
   }
 }
 
+type Sibling = {
+  id: string;
+  sort_order: number;
+  character_id: string | null;
+  text_with_cues: string | null;
+  ocr_text: string | null;
+  ignored: boolean;
+  silent: boolean;
+};
+
+/**
+ * The ElevenLabs characters a re-render of the changed rows sends, voice
+ * prefix included. A bubble in a joined group (#451) with two or more active
+ * members re-renders the whole group once, as `renderGroupAudio` does: the
+ * active members in sort order, changed ones with their new cues, joined by
+ * `joinGroupText`, in the lead's voice. That render refuses a group holding
+ * an ignored or silent row, so such a group costs nothing and is counted.
+ */
+async function price(bookId: string, issueId: string, changed: Changed[]) {
+  const fresh = new Map(changed.map((r) => [r.row.id, r.proposal]));
+  const groups = new Map<string, Sibling[]>();
+  for (const g of new Set(changed.flatMap((r) => r.row.group_id ?? []))) {
+    const { data, error } = await supabase
+      .from("bubbles")
+      .select(
+        "id, sort_order, character_id, text_with_cues, ocr_text, ignored, silent",
+      )
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("group_id", g)
+      .order("sort_order")
+      .order("id");
+    if (error) throw new Error(`group ${g}: ${error.message}`);
+    groups.set(g, (data ?? []) as Sibling[]);
+  }
+
+  const units: { characterId: string | null; text: string }[] = [];
+  const priced = new Set<string>();
+  let grouped = 0;
+  let refused = 0;
+  for (const r of changed) {
+    const g = r.row.group_id;
+    const rows = g ? (groups.get(g) ?? []) : [];
+    const active = rows.filter((m) => !m.ignored && !m.silent);
+    if (!g || active.length < 2) {
+      units.push({ characterId: r.row.character_id, text: r.proposal });
+      continue;
+    }
+    grouped++;
+    if (priced.has(g)) continue;
+    priced.add(g);
+    if (active.length < rows.length) {
+      refused++;
+      continue;
+    }
+    const lead = groupLeadId(
+      active.map((m) => ({ id: m.id, sortOrder: m.sort_order })),
+    );
+    units.push({
+      characterId: active.find((m) => m.id === lead)!.character_id,
+      text: joinGroupText(
+        active.map((m) =>
+          (fresh.get(m.id) ?? m.text_with_cues ?? m.ocr_text ?? "").trim(),
+        ),
+      ),
+    });
+  }
+
+  const book = await loadBookCast(supabase, bookId);
+  const voices = units.map((u) => renderVoice(book, u.characterId, issueId));
+  const overrides = await loadVoiceOverrides(
+    supabase,
+    voices.flatMap((v) => (v.ok ? [v.elevenLabsId] : [])),
+  );
+  const characters = units.reduce((sum, u, i) => {
+    const v = voices[i]!;
+    const override = v.ok ? overrides.get(v.elevenLabsId) : undefined;
+    return (
+      sum + buildTtsRequest({ text: u.text, voiceId: "", override }).text.length
+    );
+  }, 0);
+  const noVoice = voices.filter((v) => !v.ok).length;
+  return { characters, renders: units.length, grouped, refused, noVoice };
+}
+
 const cell = (s: string | null) =>
   s === null ? "_(null)_" : squash(s).replace(/\|/g, "\\|");
 
@@ -143,7 +237,8 @@ async function main(): Promise<void> {
   let q = supabase
     .from("bubbles")
     .select(
-      "id, page_number, ocr_text, text_with_cues, character_id, speaker, emotion",
+      "id, page_number, ocr_text, text_with_cues, character_id, speaker, emotion, group_id",
+      { count: limit ? undefined : "exact" },
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
@@ -152,22 +247,28 @@ async function main(): Promise<void> {
     .order("page_number")
     .order("sort_order");
   if (limit) q = q.limit(limit);
-  const { data, error } = await q;
+  const { data, error, count } = await q;
   if (error) throw new Error(`bubbles read: ${error.message}`);
   const rows = (data ?? []) as Row[];
+  // A read the API capped would leave bubbles out without saying so.
+  if (count !== null && count > rows.length)
+    throw new Error(`bubbles read: got ${rows.length} of ${count} rows`);
 
   const results: Result[] = [];
   for (let i = 0; i < rows.length; i += POOL)
     results.push(...(await Promise.all(rows.slice(i, i + POOL).map(check))));
 
   const failed = results.filter((r) => r.proposal === null);
-  const ok = results.filter(
-    (r): r is Result & { proposal: string } => r.proposal !== null,
-  );
-  const flagged = ok.filter(
-    (r) =>
-      words(r.proposal).join(" ") !== words(r.row.ocr_text ?? "").join(" "),
-  );
+  const ok = results.filter((r): r is Changed => r.proposal !== null);
+  // The words must match the input and, when there are old cues, the old line.
+  const flagged = ok.filter((r) => {
+    const said = words(r.proposal).join(" ");
+    const old = r.row.text_with_cues;
+    return (
+      said !== words(r.row.ocr_text ?? "").join(" ") ||
+      (old !== null && said !== words(old).join(" "))
+    );
+  });
   const kept = ok.filter((r) => !flagged.includes(r));
   const changed = kept.filter(
     (r) =>
@@ -175,25 +276,7 @@ async function main(): Promise<void> {
       squash(r.proposal) !== squash(r.row.text_with_cues),
   );
 
-  // ElevenLabs characters: the request text a render of the new line sends,
-  // voice prefix included, priced per bubble.
-  const book = await loadBookCast(supabase, bookId);
-  const voices = changed.map((r) =>
-    renderVoice(book, r.row.character_id, issueId),
-  );
-  const overrides = await loadVoiceOverrides(
-    supabase,
-    voices.flatMap((v) => (v.ok ? [v.elevenLabsId] : [])),
-  );
-  const credits = changed.reduce((sum, r, i) => {
-    const v = voices[i]!;
-    const override = v.ok ? overrides.get(v.elevenLabsId) : undefined;
-    return (
-      sum +
-      buildTtsRequest({ text: r.proposal, voiceId: "", override }).text.length
-    );
-  }, 0);
-  const noVoice = voices.filter((v) => !v.ok).length;
+  const cost = await price(bookId, issueId, changed);
 
   const line = (r: Result, ...mid: string[]) =>
     `| ${[r.row.page_number, cell(r.row.character_id ?? r.row.speaker), ...mid, r.row.id.slice(0, 8)].join(" | ")} |`;
@@ -214,8 +297,15 @@ async function main(): Promise<void> {
     `- Unchanged: ${kept.length - changed.length}`,
     `- Flagged, words differ, left out: ${flagged.length}`,
     `- Empty or failed replies: ${failed.length}`,
-    `- ElevenLabs characters to re-render the changed rows: ${credits}` +
-      (noVoice ? ` (${noVoice} with no playable voice, counted bare)` : ""),
+    `- ElevenLabs characters to re-render the changed rows: ${cost.characters} over ${cost.renders} renders` +
+      ` (${cost.grouped} changed rows in joined groups, each group priced once` +
+      (cost.refused
+        ? `; ${cost.refused} groups left out, the render refuses a group with an ignored or silent row`
+        : "") +
+      (cost.noVoice
+        ? `; ${cost.noVoice} renders with no playable voice, counted without a prefix`
+        : "") +
+      ")",
     `- Gemini tokens: ${tokens.prompt} prompt, ${tokens.output} output, ${tokens.thinking} thinking, over ${tokens.calls} calls`,
     ...table(
       "Changed",
@@ -226,8 +316,15 @@ async function main(): Promise<void> {
     ),
     ...table(
       "Flagged, left out (words differ)",
-      ["input", "proposal"],
-      flagged.map((r) => line(r, cell(r.row.ocr_text), cell(r.proposal))),
+      ["old cues", "input", "proposal"],
+      flagged.map((r) =>
+        line(
+          r,
+          cell(r.row.text_with_cues),
+          cell(r.row.ocr_text),
+          cell(r.proposal),
+        ),
+      ),
     ),
     ...table(
       "Empty or failed",
