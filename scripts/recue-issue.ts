@@ -428,6 +428,8 @@ async function apply(
         tokenLine(),
     );
 
+  const book = await loadBookCast(supabase, bookId);
+
   // Write every new cue first. A row an editor changed since the read (its
   // cues or speaker, or it went ignored or silent) is left alone, since the
   // single render below uses the row as read.
@@ -446,7 +448,12 @@ async function apply(
       .eq("id", r.row.id)
       .eq("ignored", false)
       .eq("silent", false);
-    for (const col of ["text_with_cues", "character_id", "speaker"] as const) {
+    for (const col of [
+      "text_with_cues",
+      "character_id",
+      "speaker",
+      "group_id",
+    ] as const) {
       const v = r.row[col];
       q = v === null ? q.is(col, null) : q.eq(col, v);
     }
@@ -458,19 +465,22 @@ async function apply(
   }
 
   // A sibling whose write failed renders with its old cues, so price what
-  // was written before any render.
-  const repriced = await price(bookId, issueId, written);
+  // was written before any render. A failed read here must still print the
+  // report, which lists the written rows left to render.
+  let stop: string | null = null;
+  try {
+    const repriced = await price(bookId, issueId, written);
+    if (repriced.characters > maxChars)
+      stop = `not started: the written rows price at ${repriced.characters} characters, above --max-chars ${maxChars}`;
+  } catch (e) {
+    stop = `not started: re-pricing failed (${(e as Error).message})`;
+  }
 
   // Then render, one at a time.
-  const book = await loadBookCast(supabase, bookId);
   const groupOutcome = new Map<string, string>();
   let billed = 0;
   let renders = 0;
   let stalePaid = 0;
-  let stop: string | null =
-    repriced.characters > maxChars
-      ? `not started: the written rows price at ${repriced.characters} characters, above --max-chars ${maxChars}`
-      : null;
   for (const r of written) {
     const id = r.row.id;
     const g = r.row.group_id;
