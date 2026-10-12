@@ -1,7 +1,7 @@
 "use server";
 
 import { createPartFromText } from "@google/genai";
-import { franchiseSlug } from "~/lib/character-id";
+import { franchiseSlug, newRowId } from "~/lib/character-id";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
@@ -257,14 +257,34 @@ export async function createBook(
   // One `book_franchises` row per pick, `position` its place in the list; the
   // first is the default franchise for a character created in this book. An
   // existing id is linked as given and its row is never written. A new name
-  // gets its slug's row, inserted only when no row has that id yet (an
-  // existing row with that id is linked as it is). A repeat keeps its first
-  // position.
+  // gets its `newRowId`'s row, inserted only when no row has that id yet (an
+  // existing row with that id is linked as it is). A new name whose
+  // `franchiseSlug` id, the rule before #869, already has a row links that
+  // row instead. A repeat keeps its first position.
+  const legacy = franchises.flatMap((p) =>
+    "newName" in p && franchiseSlug(p.newName) !== newRowId(p.newName)
+      ? [franchiseSlug(p.newName)]
+      : [],
+  );
+  const { data: legacyRows, error: legacyError } = (
+    legacy.length > 0
+      ? await supabaseAdmin.from("franchises").select("id").in("id", legacy)
+      : { data: [], error: null }
+  ) as {
+    data: { id: string }[] | null;
+    error: { message: string } | null;
+  };
+  const legacyIds = new Set((legacyRows ?? []).map((r) => r.id));
   const links = new Map<string, number>();
   const given: string[] = [];
   const added = new Map<string, string>();
   for (const pick of franchises) {
-    const id = "id" in pick ? pick.id : franchiseSlug(pick.newName);
+    const id =
+      "id" in pick
+        ? pick.id
+        : legacyIds.has(franchiseSlug(pick.newName))
+          ? franchiseSlug(pick.newName)
+          : newRowId(pick.newName);
     if (!id) continue;
     // Every given id is checked, a repeat of a new name's slug included.
     if ("id" in pick) given.push(id);
@@ -273,6 +293,7 @@ export async function createBook(
     if (!("id" in pick)) added.set(id, pick.newName.trim());
   }
   const franchiseFailed = await (async (): Promise<string | null> => {
+    if (legacyError) return legacyError.message;
     if (links.size === 0) return null;
     if (given.length > 0) {
       const { data: found, error } = (await supabaseAdmin
