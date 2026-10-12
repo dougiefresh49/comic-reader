@@ -423,7 +423,8 @@ function AddMenu({
 }: {
   anchor: HTMLElement;
   data: CharactersData;
-  onBoard: Set<string>;
+  /** The cards on the board, id to name. */
+  onBoard: Map<string, string>;
   voices: VoiceOption[];
   onAdd: (id: string | null, name: string) => void;
   onClose: () => void;
@@ -467,9 +468,7 @@ function AddMenu({
   // The typed name is a character already on the board: nothing to add.
   const onBoardAs = q
     ? [...onBoard]
-        .map((id) =>
-          asKnown(id, data.cards.find((c) => c.id === id)?.name ?? id),
-        )
+        .map(([id, name]) => asKnown(id, name))
         .find((k) => isExactName(k, q))
     : undefined;
   const add = (id: string | null, name: string) => {
@@ -829,7 +828,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   );
   const stateOf = (c: CharacterCard) =>
     states.get(c.id) ?? cardState(c, staged);
-  const onBoard = useMemo(() => new Set(cards.map((c) => c.id)), [cards]);
+  const onBoard = useMemo(
+    () => new Map(cards.map((c) => [c.id, c.name])),
+    [cards],
+  );
   const nameOf = useCallback(
     (id: string) =>
       states.get(id)?.name ?? cards.find((c) => c.id === id)?.name ?? id,
