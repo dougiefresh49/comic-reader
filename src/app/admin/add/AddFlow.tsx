@@ -12,12 +12,15 @@ import {
   BOOK_ID,
   DISK_TYPES,
   ISSUE_ID,
+  franchiseEntries,
+  franchisePicks,
   isPickable,
   issueState,
   naturalCompare,
   nextIssueNumber,
   planSeries,
   type FlowBook,
+  type FlowFranchise,
   type FlowIssue,
   type FlowSeries,
 } from "./model";
@@ -81,6 +84,7 @@ const STEPS: Record<Step, (f: Flow) => StepView | null> = {
 export function AddFlow({
   books,
   series,
+  franchises,
   issues,
   resume,
   stopped,
@@ -89,6 +93,7 @@ export function AddFlow({
 }: {
   books: FlowBook[];
   series: FlowSeries[];
+  franchises: FlowFranchise[];
   issues: FlowIssue[];
   resume: { bookId: string; issueId: string } | null;
   stopped: { bookId: string; issueId: string } | null;
@@ -254,6 +259,7 @@ export function AddFlow({
       seriesName: r.seriesName ?? "",
       volume: r.volumeNumber != null ? String(r.volumeNumber) : "",
       attach: {},
+      franchises: franchiseEntries(franchises, r.franchises),
     });
     if (r.wikiHost && r.wikiTitleTemplate) {
       const cover = await wikiCover({
@@ -353,7 +359,7 @@ export function AddFlow({
         wikiHost: r.wikiHost,
         wikiTitleTemplate: r.wikiTitleTemplate,
         publisher: r.publisher,
-        franchises: r.franchises,
+        franchises: franchisePicks(draft.franchises),
         totalIssues: r.totalIssues,
         seriesName: seriesPlan?.series?.name ?? null,
         volumeNumber: seriesPlan?.volume ?? null,
@@ -523,6 +529,7 @@ export function AddFlow({
   const flow: Flow = {
     books,
     issues,
+    franchises,
     resume,
     stopped,
     setStep,

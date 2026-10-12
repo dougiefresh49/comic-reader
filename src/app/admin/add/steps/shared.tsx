@@ -10,7 +10,14 @@ import type { ReactNode, RefObject } from "react";
 import type { BookSearchResult } from "../../add-book/actions";
 import type { CheckedSource } from "../../add-issue/SourceConfirm";
 import type { DiskFile } from "../DiskPages";
-import type { FlowBook, FlowIssue, SeriesFields, SeriesPlan } from "../model";
+import type {
+  FlowBook,
+  FlowFranchise,
+  FlowIssue,
+  FranchiseEntry,
+  SeriesFields,
+  SeriesPlan,
+} from "../model";
 import type { PageProgress } from "../save-pages";
 import { btn } from "../ui";
 
@@ -30,6 +37,8 @@ export interface NewBook extends SeriesFields {
   result: BookSearchResult;
   id: string;
   cover: string | null;
+  /** The franchises to link, as picked; prefilled from the search. */
+  franchises: FranchiseEntry[];
 }
 
 /** The book the flow is on, saved or not. */
@@ -68,6 +77,8 @@ export interface StepView {
 export interface Flow {
   books: FlowBook[];
   issues: FlowIssue[];
+  /** Every `franchises` row, by name, for the new book's picker. */
+  franchises: FlowFranchise[];
   resume: { bookId: string; issueId: string } | null;
   /** The issue whose online download was stopped, from `?stopped=`. */
   stopped: { bookId: string; issueId: string } | null;

@@ -12,6 +12,7 @@ import {
   bookSearchReply,
   matchSeries,
   volumeOrNull,
+  type FranchisePick,
   type SeriesMatch,
 } from "../add/model";
 
@@ -137,7 +138,8 @@ interface CreateBookArgs {
   wikiHost: string | null;
   wikiTitleTemplate: string | null;
   publisher: string | null;
-  franchises: string[];
+  /** In order: the first is the book's default franchise. */
+  franchises: FranchisePick[];
   totalIssues: number | null;
   seriesName: string | null;
   volumeNumber: number | null;
@@ -252,33 +254,55 @@ export async function createBook(
     }
   }
 
-  // One `franchises` row per name (an existing id is left as it is) and one
-  // `book_franchises` row per name, `position` its index; the first name is
-  // the default franchise for a character created in this book.
-  const named = new Map<string, { name: string; position: number }>();
-  franchises.forEach((name, position) => {
-    const id = franchiseSlug(name);
-    if (id && !named.has(id)) named.set(id, { name: name.trim(), position });
-  });
-  if (named.size > 0) {
-    const { error: franchiseError } = await supabaseAdmin
-      .from("franchises")
-      .upsert(
-        [...named].map(([id, f]) => ({ id, name: f.name })),
+  // One `book_franchises` row per pick, `position` its place in the list; the
+  // first is the default franchise for a character created in this book. An
+  // existing id is linked as given and its row is never written. A new name
+  // gets its slug's row, inserted only when no row has that id yet (an
+  // existing row with that id is linked as it is). A repeat keeps its first
+  // position.
+  const links = new Map<string, number>();
+  const given: string[] = [];
+  const added = new Map<string, string>();
+  for (const pick of franchises) {
+    const id = "id" in pick ? pick.id : franchiseSlug(pick.newName);
+    if (!id || links.has(id)) continue;
+    links.set(id, links.size);
+    if ("id" in pick) given.push(id);
+    else added.set(id, pick.newName.trim());
+  }
+  const franchiseFailed = await (async (): Promise<string | null> => {
+    if (links.size === 0) return null;
+    if (given.length > 0) {
+      const { data: found, error } = (await supabaseAdmin
+        .from("franchises")
+        .select("id")
+        .in("id", given)) as {
+        data: { id: string }[] | null;
+        error: { message: string } | null;
+      };
+      if (error) return error.message;
+      const known = new Set((found ?? []).map((r) => r.id));
+      const unknown = given.find((id) => !known.has(id));
+      if (unknown) return `unknown franchise ${unknown}`;
+    }
+    if (added.size > 0) {
+      const { error } = await supabaseAdmin.from("franchises").upsert(
+        [...added].map(([id, name]) => ({ id, name })),
         { onConflict: "id", ignoreDuplicates: true },
       );
-    const { error: linkError } = franchiseError
-      ? { error: franchiseError }
-      : await supabaseAdmin.from("book_franchises").insert(
-          [...named].map(([id, f]) => ({
-            book_id: slug,
-            franchise_id: id,
-            position: f.position,
-          })),
-        );
-    if (linkError)
-      problems.push(`Franchise links not saved: ${linkError.message}`);
-  }
+      if (error) return error.message;
+    }
+    const { error } = await supabaseAdmin.from("book_franchises").insert(
+      [...links].map(([id, position]) => ({
+        book_id: slug,
+        franchise_id: id,
+        position,
+      })),
+    );
+    return error?.message ?? null;
+  })();
+  if (franchiseFailed)
+    problems.push(`Franchise links not saved: ${franchiseFailed}`);
 
   return problems.length > 0
     ? { ok: false, error: problems.join(" ") }

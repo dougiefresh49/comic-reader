@@ -11,7 +11,8 @@ import {
   Spinner,
   btn,
 } from "../ui";
-import { attachField, type SeriesFields } from "../model";
+import { attachField, franchiseProblem, type SeriesFields } from "../model";
+import { FranchisePicker } from "./FranchisePicker";
 import {
   Back,
   CARD_META,
@@ -250,6 +251,7 @@ export function newBookStep(f: Flow): StepView {
       : (r?.wikiUrl?.replace(/^https:\/\//, "") ?? null);
   const idProblem = draft ? f.bookIdProblem(draft.id) : null;
   const seriesProblem = f.seriesPlan?.problem ?? null;
+  const pickProblem = draft ? franchiseProblem(draft.franchises) : null;
   const body = (
     <>
       <Heading title="New book" sub="Searched on the wiki." />
@@ -303,7 +305,15 @@ export function newBookStep(f: Flow): StepView {
                 </>
               )}
               <span className="text-neutral-500">Franchises</span>
-              <span>{r.franchises.join(", ")}</span>
+              <FranchisePicker
+                rows={f.franchises}
+                entries={draft.franchises}
+                update={(change) =>
+                  f.setDraft((d) =>
+                    d ? { ...d, franchises: change(d.franchises) } : d,
+                  )
+                }
+              />
               {wiki && (
                 <>
                   <span className="text-neutral-500">Wiki</span>
@@ -324,10 +334,17 @@ export function newBookStep(f: Flow): StepView {
             {seriesProblem && (
               <p className="mt-2 text-[12.5px] text-red-300">{seriesProblem}</p>
             )}
+            {pickProblem && (
+              <p className="mt-2 text-[12.5px] text-red-300">{pickProblem}</p>
+            )}
             <div className="mt-4 flex items-center gap-2">
               <button
                 type="button"
-                disabled={idProblem !== null || seriesProblem !== null}
+                disabled={
+                  idProblem !== null ||
+                  seriesProblem !== null ||
+                  pickProblem !== null
+                }
                 onClick={() => f.pickBook("new")}
                 className={btn("primary")}
               >
