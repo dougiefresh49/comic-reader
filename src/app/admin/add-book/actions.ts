@@ -265,10 +265,12 @@ export async function createBook(
   const added = new Map<string, string>();
   for (const pick of franchises) {
     const id = "id" in pick ? pick.id : franchiseSlug(pick.newName);
-    if (!id || links.has(id)) continue;
-    links.set(id, links.size);
+    if (!id) continue;
+    // Every given id is checked, a repeat of a new name's slug included.
     if ("id" in pick) given.push(id);
-    else added.set(id, pick.newName.trim());
+    if (links.has(id)) continue;
+    links.set(id, links.size);
+    if (!("id" in pick)) added.set(id, pick.newName.trim());
   }
   const franchiseFailed = await (async (): Promise<string | null> => {
     if (links.size === 0) return null;

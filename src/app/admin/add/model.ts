@@ -365,20 +365,19 @@ export function franchiseEntries(
 
 /**
  * The list with entry `index` replaced by `entry`, or removed when `entry` is
- * null or names a franchise already earlier or later in the list (the other
- * one keeps its place).
+ * null. When `entry` names a franchise already in the list, the earlier of
+ * the two places keeps it and the later one goes.
  */
 export function setFranchiseEntry(
   entries: FranchiseEntry[],
   index: number,
   entry: FranchiseEntry | null,
 ): FranchiseEntry[] {
-  const taken =
-    entry !== null &&
-    entries.some((e, i) => i !== index && sameFranchise(e, entry));
-  return entry === null || taken
-    ? entries.filter((_, i) => i !== index)
-    : entries.map((e, i) => (i === index ? entry : e));
+  if (entry === null) return entries.filter((_, i) => i !== index);
+  const next = entries.map((e, i) => (i === index ? entry : e));
+  return next.filter(
+    (e, i) => next.findIndex((f) => sameFranchise(f, e)) === i,
+  );
 }
 
 /** The entries `createBook` writes, in order; suggestions are left out. */
