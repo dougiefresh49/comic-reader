@@ -49,7 +49,7 @@ import { acceptedFor } from "./design-sheet/accepted";
 import { DesignSheet, WandIcon } from "./design-sheet/DesignSheet";
 import { PlayButton, PlayerProvider } from "./player";
 import { ReviewSheet } from "./ReviewSheet";
-import { FacesPanel, NameField, matchesName } from "./shared";
+import { FacesPanel, NameField, isExactName, matchesName } from "./shared";
 import { SlotStrip, type Carry } from "./SlotStrip";
 import {
   archiveOf,
@@ -453,12 +453,25 @@ function AddMenu({
           name: k.name,
           note: archived(k.id) ? "archived voice" : "",
         });
+  // A row or card as the shared name match reads it, aliases from the book's known row.
+  const asKnown = (id: string, name: string) =>
+    data.known.find((k) => k.id === id) ?? { id, name, aliases: [] };
   const shown = rows
-    .filter((r) => !q || slugify(r.name).includes(q) || r.id?.includes(q))
+    .filter(
+      (r) => !q || matchesName(asKnown(r.id ?? slugify(r.name), r.name), q),
+    )
     .slice(0, 12);
-  const exact = shown.find(
-    (r) => slugify(r.name) === q || (r.id !== null && r.id === q),
+  const exact = shown.find((r) =>
+    isExactName(asKnown(r.id ?? slugify(r.name), r.name), q),
   );
+  // The typed name is a character already on the board: nothing to add.
+  const onBoardAs = q
+    ? [...onBoard]
+        .map((id) =>
+          asKnown(id, data.cards.find((c) => c.id === id)?.name ?? id),
+        )
+        .find((k) => isExactName(k, q))
+    : undefined;
   const add = (id: string | null, name: string) => {
     onAdd(id, name);
     onClose();
@@ -476,6 +489,7 @@ function AddMenu({
         onKeyDown={(e) => {
           if (e.key !== "Enter" || !query.trim()) return;
           e.preventDefault();
+          if (onBoardAs) return;
           if (exact) add(exact.id, exact.name);
           else if (shown.length === 1) add(shown[0]!.id, shown[0]!.name);
           else add(null, query.trim());
@@ -502,14 +516,20 @@ function AddMenu({
         ))}
       </div>
       <div className="mx-0.5 my-1 h-px bg-neutral-800" />
-      <button
-        type="button"
-        disabled={!query.trim() || exact !== undefined}
-        onClick={() => add(null, query.trim())}
-        className={MENU_ITEM}
-      >
-        {Icon.pencil} New: {query.trim() || "…"}
-      </button>
+      {onBoardAs ? (
+        <button type="button" disabled className={MENU_ITEM}>
+          Already on the board: {onBoardAs.name}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!query.trim() || exact !== undefined}
+          onClick={() => add(null, query.trim())}
+          className={MENU_ITEM}
+        >
+          {Icon.pencil} New: {query.trim() || "…"}
+        </button>
+      )}
     </Popover>
   );
 }
