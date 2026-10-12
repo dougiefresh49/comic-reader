@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { franchisePicks } from "../model";
 import { Chip, Cover, Heading, MONO, WriteList, WriteRow, btn } from "../ui";
 import {
   Back,
@@ -84,7 +85,19 @@ export function confirmStep(f: Flow): StepView | null {
   // The series fields as edited in the Book step, for a new book only.
   const plan = book.isNew && f.bookChoice === "new" ? f.seriesPlan : null;
   const series = plan?.series ?? null;
-  const seriesPart = series?.isNew ? "+ series, franchises" : "+ franchises";
+  // What else the book row brings: a new series, and its franchise links,
+  // named "new franchise" when one of them adds a `franchises` row (#858).
+  const picks = f.draft ? franchisePicks(f.draft.franchises) : [];
+  const added = picks.filter((p) => "newName" in p).length;
+  const extras = [
+    ...(series?.isNew ? ["series"] : []),
+    ...(added > 0
+      ? [added === 1 ? "new franchise" : "new franchises"]
+      : picks.length > 0
+        ? ["franchises"]
+        : []),
+  ];
+  const seriesPart = extras.length > 0 ? `+ ${extras.join(", ")}` : null;
   const body = (
     <>
       {f.issueContext}
@@ -110,7 +123,7 @@ export function confirmStep(f: Flow): StepView | null {
         >
           {fresh(book.isNew)}
           <span className={`${MONO} text-neutral-500`}>books · {book.id}</span>
-          {book.isNew && (
+          {book.isNew && seriesPart && (
             <span className={`${MONO} text-neutral-500`}>{seriesPart}</span>
           )}
         </WriteRow>

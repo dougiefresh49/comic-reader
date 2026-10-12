@@ -295,3 +295,102 @@ export function planSeries(
   })();
   return { series, volume, members, standalone, attach, problem };
 }
+
+// ─── Franchises (#858) ───────────────────────────────────────────────────────
+
+/** A `franchises` row, with how many characters it holds. */
+export interface FlowFranchise {
+  id: string;
+  name: string;
+  characters: number;
+}
+
+/** A franchise a new book links: an existing row, or a new one by name. */
+export type FranchisePick = { id: string } | { newName: string };
+
+/**
+ * One entry of the new book's franchise list, in order. A `suggested` entry
+ * is a search name that matched no row; it waits on a choice and blocks the
+ * book until then. The picks, in this order, are the `position`s `createBook`
+ * writes; the first is the default franchise for new characters.
+ */
+export type FranchiseEntry = FranchisePick | { suggested: string };
+
+/**
+ * The row a franchise name means: one whose id is the name's slug, or whose
+ * name is the same ignoring case. No fuzzy or alias matching.
+ */
+export function matchFranchise(
+  rows: FlowFranchise[],
+  name: string,
+): FlowFranchise | null {
+  const slug = franchiseSlug(name);
+  const lower = name.trim().toLowerCase();
+  return (
+    rows.find((r) => r.id === slug || r.name.toLowerCase() === lower) ?? null
+  );
+}
+
+/** Whether two entries name the same franchise row (same id, or same slug). */
+function sameFranchise(a: FranchiseEntry, b: FranchiseEntry): boolean {
+  const key = (e: FranchiseEntry) =>
+    "id" in e
+      ? `id:${e.id}`
+      : "newName" in e
+        ? `new:${franchiseSlug(e.newName)}`
+        : `suggested:${franchiseSlug(e.suggested)}`;
+  return key(a) === key(b);
+}
+
+/**
+ * The search's franchise names as entries: a name that matches a row with
+ * characters becomes that row, the rest wait as suggestions. A name with no
+ * slug is dropped, and a repeat keeps its first place.
+ */
+export function franchiseEntries(
+  rows: FlowFranchise[],
+  names: string[],
+): FranchiseEntry[] {
+  const entries: FranchiseEntry[] = [];
+  for (const name of names) {
+    if (!franchiseSlug(name)) continue;
+    const row = matchFranchise(rows, name);
+    // A row with no characters is left as a suggestion: it may be an empty
+    // duplicate of a franchise saved under another name (#858).
+    const entry: FranchiseEntry =
+      row && row.characters > 0 ? { id: row.id } : { suggested: name.trim() };
+    if (!entries.some((e) => sameFranchise(e, entry))) entries.push(entry);
+  }
+  return entries;
+}
+
+/**
+ * The list with entry `index` replaced by `entry`, or removed when `entry` is
+ * null. When `entry` names a franchise already in the list, the earlier of
+ * the two places keeps it and the later one goes.
+ */
+export function setFranchiseEntry(
+  entries: FranchiseEntry[],
+  index: number,
+  entry: FranchiseEntry | null,
+): FranchiseEntry[] {
+  if (entry === null) return entries.filter((_, i) => i !== index);
+  const next = entries.map((e, i) => (i === index ? entry : e));
+  return next.filter(
+    (e, i) => next.findIndex((f) => sameFranchise(f, e)) === i,
+  );
+}
+
+/** The entries `createBook` writes, in order; suggestions are left out. */
+export function franchisePicks(entries: FranchiseEntry[]): FranchisePick[] {
+  return entries.filter((e): e is FranchisePick => !("suggested" in e));
+}
+
+/** The one-line reason Use this book is off, or null. */
+export function franchiseProblem(entries: FranchiseEntry[]): string | null {
+  const open = entries.filter((e) => "suggested" in e).length;
+  if (open === 0) return null;
+  return open === 1
+    ? "Choose a franchise for the suggestion above, or drop it."
+    : `Choose a franchise for the ${open} suggestions above, or drop them.`;
+}
