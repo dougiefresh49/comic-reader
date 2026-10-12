@@ -1,7 +1,7 @@
 /**
  * Shared shapes and rules for the Add content flow (#793). Client-safe.
  */
-import { franchiseSlug } from "~/lib/character-id";
+import { franchiseSlug, newRowId } from "~/lib/character-id";
 import { isUnstartedStep } from "~/lib/pipeline-steps";
 
 /** A saved book, as the Book step's cards show it. */
@@ -113,21 +113,23 @@ export interface SeriesMatch {
 }
 
 /**
- * The series a book joins: an existing row whose id is the name's slug, or
- * whose name matches ignoring case, spacing and punctuation, keeps its id, so
- * a later volume lands in the same series; otherwise the id a new row would
- * get. Null when there is no name. `createBook` and the Book step both use it.
+ * The series a book joins: an existing row whose id is the name's `newRowId`
+ * or its older `franchiseSlug`, or whose name matches ignoring case, spacing
+ * and punctuation, keeps its id, so a later volume lands in the same series;
+ * otherwise the `newRowId` a new row would get. Null when there is no name.
+ * `createBook` and the Book step both use it.
  */
 export function matchSeries(
   rows: FlowSeries[],
   name: string | null | undefined,
 ): SeriesMatch | null {
   const series = name?.trim();
-  const slug = series ? franchiseSlug(series) : "";
+  const slug = series ? newRowId(series) : "";
   if (!series || !slug) return null;
+  const oldSlug = franchiseSlug(series);
   const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const existing = rows.find(
-    (r) => r.id === slug || key(r.name) === key(series),
+    (r) => r.id === slug || r.id === oldSlug || key(r.name) === key(series),
   );
   return existing
     ? { id: existing.id, name: existing.name, isNew: false }
@@ -317,35 +319,37 @@ export type FranchisePick = { id: string } | { newName: string };
 export type FranchiseEntry = FranchisePick | { suggested: string };
 
 /**
- * The row a franchise name means: one whose id is the name's slug, or whose
- * name is the same ignoring case. No fuzzy or alias matching.
+ * The row a franchise name means: one whose id is the name's `newRowId` or its
+ * older `franchiseSlug` (the rule rows made before #869 got), or whose name is
+ * the same ignoring case. No fuzzy or alias matching.
  */
 export function matchFranchise(
   rows: FlowFranchise[],
   name: string,
 ): FlowFranchise | null {
-  const slug = franchiseSlug(name);
+  const ids = [newRowId(name), franchiseSlug(name)];
   const lower = name.trim().toLowerCase();
   return (
-    rows.find((r) => r.id === slug || r.name.toLowerCase() === lower) ?? null
+    rows.find((r) => ids.includes(r.id) || r.name.toLowerCase() === lower) ??
+    null
   );
 }
 
-/** Whether two entries name the same franchise row (same id, or same slug). */
+/** Whether two entries name the same franchise row (same id or `newRowId`). */
 function sameFranchise(a: FranchiseEntry, b: FranchiseEntry): boolean {
   const key = (e: FranchiseEntry) =>
     "id" in e
       ? `id:${e.id}`
       : "newName" in e
-        ? `new:${franchiseSlug(e.newName)}`
-        : `suggested:${franchiseSlug(e.suggested)}`;
+        ? `new:${newRowId(e.newName)}`
+        : `suggested:${newRowId(e.suggested)}`;
   return key(a) === key(b);
 }
 
 /**
  * The search's franchise names as entries: a name that matches a row with
  * characters becomes that row, the rest wait as suggestions. A name with no
- * slug is dropped, and a repeat keeps its first place.
+ * `newRowId` is dropped, and a repeat keeps its first place.
  */
 export function franchiseEntries(
   rows: FlowFranchise[],
@@ -353,7 +357,7 @@ export function franchiseEntries(
 ): FranchiseEntry[] {
   const entries: FranchiseEntry[] = [];
   for (const name of names) {
-    if (!franchiseSlug(name)) continue;
+    if (!newRowId(name)) continue;
     const row = matchFranchise(rows, name);
     // A row with no characters is left as a suggestion: it may be an empty
     // duplicate of a franchise saved under another name (#858).

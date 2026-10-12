@@ -1,7 +1,7 @@
 "use server";
 
 import { createPartFromText } from "@google/genai";
-import { franchiseSlug } from "~/lib/character-id";
+import { newRowId } from "~/lib/character-id";
 import { getGeminiClient } from "~/lib/gemini-client";
 import { generateContentLogged } from "~/lib/llm-usage";
 import { GEMINI_MEDIUM } from "~/lib/models";
@@ -264,7 +264,7 @@ export async function createBook(
   const given: string[] = [];
   const added = new Map<string, string>();
   for (const pick of franchises) {
-    const id = "id" in pick ? pick.id : franchiseSlug(pick.newName);
+    const id = "id" in pick ? pick.id : newRowId(pick.newName);
     if (!id) continue;
     // Every given id is checked, a repeat of a new name's slug included.
     if ("id" in pick) given.push(id);
