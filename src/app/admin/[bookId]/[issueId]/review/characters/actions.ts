@@ -385,12 +385,17 @@ async function moveDetection(
   });
 }
 
+/** A face move's answer: its line and the character the faces now belong to, or a failure. */
+export type MoveResult =
+  | { ok: true; message: string; characterId: string }
+  | { ok: false; error: string };
+
 export async function moveFace(args: {
   scope: Scope;
   detectionId: string;
   target: NameTarget;
   franchiseId: string | null;
-}): Promise<ActionResult> {
+}): Promise<MoveResult> {
   try {
     await requireAdmin();
     const { scope, detectionId } = args;
@@ -401,13 +406,18 @@ export async function moveFace(args: {
       args.franchiseId,
     );
     if (face.characterId === who.id)
-      return { ok: true, message: `That face is already ${who.name}.` };
+      return {
+        ok: true,
+        message: `That face is already ${who.name}.`,
+        characterId: who.id,
+      };
     await moveDetection(scope, face, who.id);
     await addToCast(supabaseAdmin, scope.bookId, scope.issueId, who.id);
     revalidate(scope);
     return {
       ok: true,
       message: `Moved the page ${face.page} face to ${who.name}${who.created ? ", a new character" : ""}.`,
+      characterId: who.id,
     };
   } catch (err) {
     return fail("moving a face", err);
@@ -494,20 +504,15 @@ export async function moveFaces(args: {
   detectionIds: string[];
   target: NameTarget;
   franchiseId: string | null;
-}): Promise<ActionResult> {
+}): Promise<MoveResult> {
   try {
     await requireAdmin();
-    const { message } = await moveAll(args);
-    return { ok: true, message };
+    const { id, message } = await moveAll(args);
+    return { ok: true, message, characterId: id };
   } catch (err) {
     return fail("moving faces", err);
   }
 }
-
-/** `relabelCharacter`'s answer: the move's line and the character the faces now belong to, or a failure. */
-export type RelabelResult =
-  | { ok: true; message: string; characterId: string }
-  | { ok: false; error: string };
 
 /**
  * "This is character X" (#846): every face of `fromId` in this issue moves
@@ -521,7 +526,7 @@ export async function relabelCharacter(args: {
   fromId: string;
   target: NameTarget;
   franchiseId: string | null;
-}): Promise<RelabelResult> {
+}): Promise<MoveResult> {
   try {
     await requireAdmin();
     const { scope, fromId, target, franchiseId } = args;

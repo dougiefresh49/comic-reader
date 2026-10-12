@@ -36,6 +36,18 @@ export function characterOf(m: Move): string | null {
   return "character_id" in m ? m.character_id : null;
 }
 
+/** Points every move staged for character `from`, and every move tied to its pick, at `to`. */
+export function rekey(staged: Staged[], from: string, to: string): Staged[] {
+  return staged.map((s) => ({
+    ...s,
+    move:
+      characterOf(s.move) === from
+        ? ({ ...s.move, character_id: to } as Move)
+        : s.move,
+    pickFor: s.pickFor === from ? to : s.pickFor,
+  }));
+}
+
 export function isPick(m: Move): m is PickMove {
   return (
     (m.kind === "restore" && m.character_id !== null) ||
