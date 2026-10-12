@@ -2,6 +2,7 @@
 
 import { Chip, FIELD, btn } from "../ui";
 import {
+  matchFranchise,
   setFranchiseEntry,
   type FlowFranchise,
   type FranchiseEntry,
@@ -56,7 +57,9 @@ export function FranchisePicker({
                 >
                   <span className="text-amber-400">“{e.suggested}”</span>
                   <span className="text-xs text-neutral-400">
-                    is not a saved franchise
+                    {matchFranchise(rows, e.suggested)
+                      ? "matches a saved franchise with no characters"
+                      : "is not a saved franchise"}
                   </span>
                   <span className="basis-full" />
                   <select

@@ -343,9 +343,9 @@ function sameFranchise(a: FranchiseEntry, b: FranchiseEntry): boolean {
 }
 
 /**
- * The search's franchise names as entries: a name that matches a row becomes
- * that row, the rest wait as suggestions. A name with no slug is dropped, and
- * a repeat keeps its first place.
+ * The search's franchise names as entries: a name that matches a row with
+ * characters becomes that row, the rest wait as suggestions. A name with no
+ * slug is dropped, and a repeat keeps its first place.
  */
 export function franchiseEntries(
   rows: FlowFranchise[],
@@ -355,9 +355,10 @@ export function franchiseEntries(
   for (const name of names) {
     if (!franchiseSlug(name)) continue;
     const row = matchFranchise(rows, name);
-    const entry: FranchiseEntry = row
-      ? { id: row.id }
-      : { suggested: name.trim() };
+    // A row with no characters is left as a suggestion: it may be an empty
+    // duplicate of a franchise saved under another name (#858).
+    const entry: FranchiseEntry =
+      row && row.characters > 0 ? { id: row.id } : { suggested: name.trim() };
     if (!entries.some((e) => sameFranchise(e, entry))) entries.push(entry);
   }
   return entries;
