@@ -27,7 +27,7 @@ import type {
   RosterSlot,
   RunResult,
 } from "~/lib/casting-moves";
-import { nameWords } from "~/lib/character-aliases";
+import { nameResolver, nameWords } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import {
   approveCharacters,
@@ -50,7 +50,7 @@ import { acceptedFor } from "./design-sheet/accepted";
 import { DesignSheet, WandIcon } from "./design-sheet/DesignSheet";
 import { PlayButton, PlayerProvider } from "./player";
 import { ReviewSheet } from "./ReviewSheet";
-import { FacesPanel, NameField, isExactName, matchesName } from "./shared";
+import { FacesPanel, NameField, matchesName } from "./shared";
 import { SlotStrip, type Carry } from "./SlotStrip";
 import {
   archiveOf,
@@ -458,30 +458,29 @@ function AddMenu({
   // A row or card as the shared name match reads it, aliases from the book's known row.
   const asKnown = (id: string, name: string) =>
     data.known.find((k) => k.id === id) ?? { id, name, aliases: [] };
-  // A row whose words are an on-board card's is that card again, in any order.
-  const boardWords = new Set(
-    [...onBoard].flatMap(([id, name]) => [nameWords(id), nameWords(name)]),
+  // Who a name means, by the server's rule (`nameResolver`): a known row's id,
+  // or for a name no row has, its words in any order.
+  const resolve = useMemo(
+    () => nameResolver(data.known.map((k) => ({ ...k, display_name: k.name }))),
+    [data.known],
   );
+  const who = (name: string) => resolve(name)?.id ?? nameWords(name);
+  const board = [...onBoard].map(([id, name]) => ({
+    who: resolve(id)?.id ?? nameWords(name),
+    name,
+  }));
+  const rowWho = (r: { id: string | null; name: string }) =>
+    r.id ?? who(r.name);
   const shown = rows
-    .filter(
-      (r) =>
-        !boardWords.has(nameWords(r.id ?? r.name)) &&
-        !boardWords.has(nameWords(r.name)),
-    )
+    .filter((r) => !board.some((b) => b.who === rowWho(r)))
     .filter(
       (r) => !q || matchesName(asKnown(r.id ?? slugify(r.name), r.name), q),
     )
     .slice(0, 12);
-  // The query's own spelling wins over the same words in another order.
-  const exact =
-    shown.find((r) => slugify(r.name) === q || r.id === q) ??
-    shown.find((r) => isExactName(asKnown(r.id ?? slugify(r.name), r.name), q));
+  const meant = q ? who(query) : null;
+  const exact = shown.find((r) => rowWho(r) === meant);
   // The typed name is a character already on the board: nothing to add.
-  const onBoardAs = q
-    ? [...onBoard]
-        .map(([id, name]) => asKnown(id, name))
-        .find((k) => isExactName(k, q))
-    : undefined;
+  const onBoardAs = board.find((b) => b.who === meant);
   const add = (id: string | null, name: string) => {
     onAdd(id, name);
     onClose();
