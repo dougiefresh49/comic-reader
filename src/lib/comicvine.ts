@@ -33,6 +33,9 @@ function clean(s: string): string {
   return s.replace(/[​﻿]/g, "").trim();
 }
 
+// A period right after Dr, Mr, Mrs, Ms, St, Jr, or Sr does not end the sentence.
+const DECK_SENTENCE_END = /(?:(?<!\b(?:Dr|Mr|Mrs|Ms|St|Jr|Sr))\.|[!?])(?=\s|$)/;
+
 /**
  * The first sentence of a deck, cut at a word to at most `max` characters
  * with an ellipsis; null for an empty deck.
@@ -41,7 +44,7 @@ export function deckSentence(deck: string | null, max: number): string | null {
   if (!deck) return null;
   const text = clean(deck).replace(/\s+/g, " ");
   if (!text) return null;
-  const end = /[.!?](?=\s|$)/.exec(text);
+  const end = DECK_SENTENCE_END.exec(text);
   const sentence = end ? text.slice(0, end.index + 1) : text;
   if (sentence.length <= max) return sentence;
   const cut = sentence.slice(0, max - 1);
