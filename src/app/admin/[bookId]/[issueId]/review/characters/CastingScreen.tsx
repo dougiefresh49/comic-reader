@@ -62,6 +62,7 @@ import {
   lockReason,
   pickMove,
   pickVoiceId,
+  rekey,
   slotAfter,
   slotModel,
   takesSlot,
@@ -1072,6 +1073,17 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     setOpenId(cid);
     say(`Add ${name}`);
   };
+  // A by-name + Add card's id is its name's slug, but a move to it resolves
+  // the name and may land on a row with another id (#866): the card's staged
+  // moves, its panel and its rename follow the faces there.
+  const follow = (target: NameTarget, id: string) => {
+    if (target.kind !== "new") return;
+    const from = slugify(target.name);
+    if (from === id) return;
+    setStaged((s) => rekey(s, from, id));
+    setOpenId((cur) => (cur === from ? id : cur));
+    setRenameId((cur) => (cur === from ? id : cur));
+  };
   const freeSlot = (v: SlotView) => {
     const out = archiveOf(v.slot);
     if (!out || v.slot.lock !== "movable") return;
@@ -1444,23 +1456,29 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                 )
               }
               onMove={(face: FaceView, target: NameTarget, name: string) =>
-                run(`Moving the page ${face.page} face to ${name}`, () =>
-                  moveFace({
-                    scope,
-                    detectionId: face.id,
-                    target,
-                    franchiseId: data.franchiseId,
-                  }),
+                run(
+                  `Moving the page ${face.page} face to ${name}`,
+                  () =>
+                    moveFace({
+                      scope,
+                      detectionId: face.id,
+                      target,
+                      franchiseId: data.franchiseId,
+                    }),
+                  (r) => follow(target, r.characterId),
                 )
               }
               onMoveMany={(faces, target, name) =>
-                run(`Moving ${faces.length} faces to ${name}`, () =>
-                  moveFaces({
-                    scope,
-                    detectionIds: faces.map((f) => f.id),
-                    target,
-                    franchiseId: data.franchiseId,
-                  }),
+                run(
+                  `Moving ${faces.length} faces to ${name}`,
+                  () =>
+                    moveFaces({
+                      scope,
+                      detectionIds: faces.map((f) => f.id),
+                      target,
+                      franchiseId: data.franchiseId,
+                    }),
+                  (r) => follow(target, r.characterId),
                 )
               }
               onRelabel={(target, name) => {
@@ -1485,6 +1503,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                     // while the save ran: follow only if it still shows `from`.
                     if (openIdRef.current === from) setTab("voice");
                     setOpenId((cur) => (cur === from ? r.characterId : cur));
+                    follow(target, r.characterId);
                   },
                 );
               }}
