@@ -22,7 +22,7 @@ import type {
   PageView,
 } from "./types";
 
-/** One tile of the grid: a character of this issue, one the book knows but this issue does not, or the typed name as a new character. */
+/** One tile of the grid: a character of this issue (a just-added one has no row, so it is a new character, #866), one the book knows but this issue does not, or the typed name as a new character. */
 interface Choice {
   key: string;
   name: string;
@@ -100,7 +100,10 @@ export function MoveDialog({
       .map((c) => ({
         key: `existing:${c.id}`,
         name: c.name,
-        target: { kind: "existing", id: c.id },
+        // A just-added card has no characters row (#866); its name creates one.
+        target: c.known
+          ? { kind: "existing", id: c.id }
+          : { kind: "new", name: c.name },
         portrait: portraitOf(c, pages),
         note: null,
       }));
