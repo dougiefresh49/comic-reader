@@ -257,7 +257,7 @@ export async function createBook(
   // One `book_franchises` row per pick, `position` its place in the list; the
   // first is the default franchise for a character created in this book. An
   // existing id is linked as given and its row is never written. A new name
-  // gets its slug's row, inserted only when no row has that id yet (an
+  // gets its `newRowId`'s row, inserted only when no row has that id yet (an
   // existing row with that id is linked as it is). A repeat keeps its first
   // position.
   const links = new Map<string, number>();

@@ -28,9 +28,9 @@ export function franchiseSlug(name: string): string {
 }
 
 /**
- * The id a new `series` or `franchises` row gets from its name (#869). Each
- * apostrophe and period goes ("Children's" -> "childrens", "Dr. Who" ->
- * "dr-who"), every other run of characters that are not a-z or 0-9 becomes one
+ * The id a new `series` or `franchises` row gets from its name (#869). Accents
+ * fold ("Pokémon" -> "pokemon"), each apostrophe and period goes ("Children's"
+ * -> "childrens", "Dr. Who" -> "dr-who"), every other run of characters that are not a-z or 0-9 becomes one
  * "-", and the ends lose theirs: "Batman/Teenage Mutant Ninja Turtles" ->
  * "batman-teenage-mutant-ninja-turtles". A plain name gets what
  * `franchiseSlug` gives it, "TMNT MMPR" -> "tmnt-mmpr".
@@ -38,6 +38,8 @@ export function franchiseSlug(name: string): string {
 export function newRowId(name: string): string {
   return name
     .trim()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/['’.]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
