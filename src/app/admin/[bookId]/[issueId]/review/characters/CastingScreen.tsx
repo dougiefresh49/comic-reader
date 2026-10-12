@@ -27,6 +27,7 @@ import type {
   RosterSlot,
   RunResult,
 } from "~/lib/casting-moves";
+import { nameWords } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import {
   approveCharacters,
@@ -457,14 +458,24 @@ function AddMenu({
   // A row or card as the shared name match reads it, aliases from the book's known row.
   const asKnown = (id: string, name: string) =>
     data.known.find((k) => k.id === id) ?? { id, name, aliases: [] };
+  // A row whose words are an on-board card's is that card again, in any order.
+  const boardWords = new Set(
+    [...onBoard].flatMap(([id, name]) => [nameWords(id), nameWords(name)]),
+  );
   const shown = rows
+    .filter(
+      (r) =>
+        !boardWords.has(nameWords(r.id ?? r.name)) &&
+        !boardWords.has(nameWords(r.name)),
+    )
     .filter(
       (r) => !q || matchesName(asKnown(r.id ?? slugify(r.name), r.name), q),
     )
     .slice(0, 12);
-  const exact = shown.find((r) =>
-    isExactName(asKnown(r.id ?? slugify(r.name), r.name), q),
-  );
+  // The query's own spelling wins over the same words in another order.
+  const exact =
+    shown.find((r) => slugify(r.name) === q || r.id === q) ??
+    shown.find((r) => isExactName(asKnown(r.id ?? slugify(r.name), r.name), q));
   // The typed name is a character already on the board: nothing to add.
   const onBoardAs = q
     ? [...onBoard]
@@ -490,7 +501,12 @@ function AddMenu({
           e.preventDefault();
           if (onBoardAs) return;
           if (exact) add(exact.id, exact.name);
-          else if (shown.length === 1) add(shown[0]!.id, shown[0]!.name);
+          // A lone match is taken on Enter only as a substring; a word match is a click.
+          else if (
+            shown.length === 1 &&
+            (slugify(shown[0]!.name).includes(q) || shown[0]!.id?.includes(q))
+          )
+            add(shown[0]!.id, shown[0]!.name);
           else add(null, query.trim());
         }}
         placeholder="Name"
