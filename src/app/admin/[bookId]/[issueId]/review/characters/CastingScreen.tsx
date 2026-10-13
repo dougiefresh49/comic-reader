@@ -459,14 +459,15 @@ function AddMenu({
   const asKnown = (id: string, name: string) =>
     data.known.find((k) => k.id === id) ?? { id, name, aliases: [] };
   // Who a name means, by the server's rule (`nameResolver`): a known row's id,
-  // or for a name no row has, its words in any order.
+  // or for a name no row has, its words in any order (prefixed, so a word key
+  // never equals an id).
   const resolve = useMemo(
     () => nameResolver(data.known.map((k) => ({ ...k, display_name: k.name }))),
     [data.known],
   );
-  const who = (name: string) => resolve(name)?.id ?? nameWords(name);
+  const who = (name: string) => resolve(name)?.id ?? `words:${nameWords(name)}`;
   const board = [...onBoard].map(([id, name]) => ({
-    who: resolve(id)?.id ?? nameWords(name),
+    who: resolve(id)?.id ?? `words:${nameWords(name)}`,
     name,
   }));
   const rowWho = (r: { id: string | null; name: string }) =>
