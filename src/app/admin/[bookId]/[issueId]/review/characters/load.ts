@@ -338,7 +338,7 @@ export async function loadCharacters(
     };
   };
   // `characters.form_of` (#891), as the render chain reads it.
-  const formOfView = (id: string): CharacterCard["formOf"] => {
+  const formOfView = (id: string): KnownCharacter["formOf"] => {
     const base = book.formOf.get(id);
     return base ? { id: base, name: displayName(base) } : null;
   };
@@ -417,7 +417,6 @@ export async function loadCharacters(
         said.length > 0 ? said.map((l) => l.page) : faces.map((f) => f.page),
       ),
       samples,
-      formOf: formOfView(id),
     };
   };
 
@@ -485,6 +484,7 @@ export async function loadCharacters(
     aliases: (aliasesOf.get(c.id) ?? []).map((a) => a.alias),
     aliasRows: aliasesOf.get(c.id) ?? [],
     inBook: inBook.has(c.id),
+    formOf: formOfView(c.id),
   }));
 
   // A wiki name dismissed for this issue (#751) is not offered.

@@ -78,6 +78,7 @@ import type {
   CharacterCard,
   CharactersData,
   FaceView,
+  KnownCharacter,
   PageView,
   VoiceOption,
 } from "./types";
@@ -299,6 +300,7 @@ function FaceCount({
 function CastCard({
   card,
   state,
+  formOf,
   isNew,
   selected,
   pages,
@@ -311,6 +313,8 @@ function CastCard({
 }: {
   card: CharacterCard;
   state: CardState;
+  /** The character it is a form of (#891), from its known row. */
+  formOf: KnownCharacter["formOf"];
   isNew: boolean;
   selected: boolean;
   pages: Map<number, PageView>;
@@ -406,9 +410,9 @@ function CastCard({
           }`}
         >
           <div className="truncate">{state.name}</div>
-          {card.formOf && (
+          {formOf && (
             <div className="truncate text-[11px] font-normal text-neutral-300">
-              form of {card.formOf.name}
+              form of {formOf.name}
             </div>
           )}
         </div>
@@ -1449,6 +1453,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                           key={c.id}
                           card={c}
                           state={st}
+                          formOf={
+                            data.known.find((k) => k.id === c.id)?.formOf ??
+                            null
+                          }
                           isNew={addedIds.has(c.id)}
                           selected={openId === c.id}
                           pages={pages}

@@ -53,7 +53,7 @@ import {
   Popover,
   Portrait,
 } from "./ui";
-import { VoiceTab, type VoiceTabProps } from "./VoiceTab";
+import { speaksAsBase, VoiceTab, type VoiceTabProps } from "./VoiceTab";
 
 export type PanelTab = "voice" | "faces";
 
@@ -280,13 +280,15 @@ function AliasList({
               {rows.map((row) => {
                 const other: AliasScope =
                   row.scope === "book" ? "global" : "book";
-                const move = `Make ${row.alias} ${SCOPE_WORDS[other]}`;
+                // The name holds the visible scope, then what a click does.
+                const move = `${row.alias}: ${SCOPE_WORDS[row.scope]}. Make it ${SCOPE_WORDS[other]}`;
                 return (
                   <li
                     key={row.id}
-                    className="inline-flex h-6 max-w-full items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 pr-0.5 pl-2 text-[12px] text-neutral-200"
+                    className="inline-flex min-h-6 max-w-full items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 py-0.5 pr-0.5 pl-2 text-[12px] leading-4 text-neutral-200"
                   >
-                    <span className="truncate">{row.alias}</span>
+                    {/* Wraps rather than cutting off, so the whole alias reads. */}
+                    <span className="min-w-0 break-words">{row.alias}</span>
                     <button
                       type="button"
                       disabled={pending}
@@ -302,7 +304,7 @@ function AliasList({
                       }
                       aria-label={move}
                       title={move}
-                      className={`shrink-0 rounded px-0.5 text-[11px] text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
+                      className={`shrink-0 rounded px-0.5 text-[11px] whitespace-nowrap text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
                     >
                       · {SCOPE_WORDS[row.scope]}
                     </button>
@@ -439,12 +441,13 @@ function AliasList({
  * characters; a pick saves at once. A form speaks with its base's voice.
  */
 function FormOfControl({
-  card,
+  row,
   known,
   bookId,
   issueId,
 }: {
-  card: CharacterCard;
+  /** The character's known row: `formOf` is read from it. */
+  row: KnownCharacter;
   known: KnownCharacter[];
   bookId: string;
   issueId: string;
@@ -455,16 +458,26 @@ function FormOfControl({
   const [active, setActive] = useState(0);
   const listId = useId();
   const scope = { bookId, issueId };
-  const base = card.formOf ?? null;
+  const base = row.formOf ?? null;
+  // The render chain follows `form_of` once, so a character with forms of
+  // its own can't be a form, and a form can't be a base; `setFormOf`
+  // refuses both, and the list shows them disabled.
+  const forms = known.filter((k) => k.formOf?.id === row.id);
 
   const q = slugify(query);
   const choices = useMemo(
     () =>
       known
-        .filter((k) => k.inBook && k.id !== card.id && !isRoleId(k.id))
+        .filter((k) => k.inBook && k.id !== row.id && !isRoleId(k.id))
         .filter((k) => !q || matchesName(k, q))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [known, card.id, q],
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((k) => ({
+          k,
+          refused: k.formOf
+            ? `a form of ${k.formOf.id === row.id ? row.name : k.formOf.name}`
+            : null,
+        })),
+    [known, row.id, row.name, q],
   );
   const index = Math.min(active, Math.max(0, choices.length - 1));
   const close = useCallback(() => {
@@ -472,9 +485,10 @@ function FormOfControl({
     setQuery("");
     setActive(0);
   }, []);
-  const pick = (k: KnownCharacter) => {
+  const pick = (choice: (typeof choices)[number]) => {
+    if (choice.refused || forms.length > 0) return;
     close();
-    act(() => setFormOf({ scope, characterId: card.id, baseId: k.id }));
+    act(() => setFormOf({ scope, characterId: row.id, baseId: choice.k.id }));
   };
 
   return (
@@ -490,7 +504,7 @@ function FormOfControl({
             onClick={() => {
               setNote(null);
               act(() =>
-                setFormOf({ scope, characterId: card.id, baseId: null }),
+                setFormOf({ scope, characterId: row.id, baseId: null }),
               );
             }}
             aria-label="Clear form of"
@@ -527,7 +541,7 @@ function FormOfControl({
             aria-expanded
             aria-controls={listId}
             aria-activedescendant={
-              choices[index] ? `${listId}-${choices[index].id}` : undefined
+              choices[index] ? `${listId}-${choices[index].k.id}` : undefined
             }
             onChange={(e) => {
               setQuery(e.target.value);
@@ -540,12 +554,17 @@ function FormOfControl({
                 setActive((index + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
               } else if (e.key === "Enter") {
                 e.preventDefault();
-                const k = choices[index];
-                if (k) pick(k);
+                const choice = choices[index];
+                if (choice) pick(choice);
               }
             }}
             className={`mb-1 h-7 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 text-[13px] text-neutral-100 placeholder:text-neutral-500 ${FOCUS}`}
           />
+          {forms.length > 0 && (
+            <p className="px-2.5 py-1.5 text-[12px] whitespace-normal text-neutral-400">
+              {`${forms.map((k) => k.name).join(", ")} ${forms.length === 1 ? "is a form" : "are forms"} of ${row.name}, so ${row.name} can't be a form.`}
+            </p>
+          )}
           {choices.length === 0 ? (
             <p className="px-2.5 py-1.5 text-neutral-500">
               No character matches.
@@ -557,21 +576,31 @@ function FormOfControl({
               aria-label="Characters"
               className="max-h-64 overflow-y-auto"
             >
-              {choices.map((k, i) => (
-                <button
-                  key={k.id}
-                  id={`${listId}-${k.id}`}
-                  type="button"
-                  role="option"
-                  aria-selected={i === index}
-                  tabIndex={-1}
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => pick(k)}
-                  className={`${MENU_ITEM} ${i === index ? "bg-neutral-800" : ""}`}
-                >
-                  <span className="truncate">{k.name}</span>
-                </button>
-              ))}
+              {choices.map((choice, i) => {
+                const { k, refused } = choice;
+                const off = refused !== null || forms.length > 0;
+                return (
+                  <button
+                    key={k.id}
+                    id={`${listId}-${k.id}`}
+                    type="button"
+                    role="option"
+                    aria-selected={i === index}
+                    aria-disabled={off || undefined}
+                    tabIndex={-1}
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => pick(choice)}
+                    className={`${MENU_ITEM} ${i === index ? "bg-neutral-800" : ""} ${off ? "cursor-not-allowed text-neutral-500" : ""}`}
+                  >
+                    <span className="truncate">{k.name}</span>
+                    {refused && (
+                      <span className="ml-auto shrink-0 text-[11px] text-neutral-500">
+                        {refused}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </Popover>
@@ -646,7 +675,7 @@ function PagePreview({
 }
 
 export interface CharacterPanelProps
-  extends Omit<VoiceTabProps, "card" | "state"> {
+  extends Omit<VoiceTabProps, "card" | "state" | "formOf"> {
   card: CharacterCard;
   state: CardState;
   pages: Map<number, PageView>;
@@ -731,6 +760,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const shownTab: PanelTab = !voiceMode ? "faces" : isRole ? "voice" : tab;
   /** The card's `characters` row; none means no aliases to show. */
   const knownRow = known.find((k) => k.id === card.id);
+  const formOf = knownRow?.formOf ?? null;
 
   const closeMove = useCallback(() => {
     setMoving(null);
@@ -874,7 +904,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
             {/* `form_of` is a `characters` column; a role is never a form. */}
             {knownRow && !isRole && (
               <FormOfControl
-                card={card}
+                row={knownRow}
                 known={known}
                 bookId={bookId}
                 issueId={issueId}
@@ -931,7 +961,12 @@ export function CharacterPanel(props: CharacterPanelProps) {
                 plan={revoice}
                 voiceName={card.voice?.name ?? null}
               />
-              <VoiceTab card={card} state={state} {...voiceProps} />
+              <VoiceTab
+                card={card}
+                state={state}
+                formOf={formOf}
+                {...voiceProps}
+              />
             </>
           ) : (
             <FacesTab
@@ -957,13 +992,16 @@ export function CharacterPanel(props: CharacterPanelProps) {
         <div className="flex items-center gap-1 border-t border-neutral-800 px-3 py-2.5">
           {voiceMode && (
             <>
-              <button
-                type="button"
-                onClick={voiceProps.onDesign}
-                className={BTN}
-              >
-                {WandIcon} Design a voice
-              </button>
+              {/* A form speaking with its base's voice designs none (#891). */}
+              {!speaksAsBase(card, state, formOf) && (
+                <button
+                  type="button"
+                  onClick={voiceProps.onDesign}
+                  className={BTN}
+                >
+                  {WandIcon} Design a voice
+                </button>
+              )}
               {state.sitOut ? (
                 <button type="button" onClick={onBackIn} className={BTN}>
                   Back in

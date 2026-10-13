@@ -1087,6 +1087,11 @@ export async function setFormOf(args: {
     if (baseId && !base) throw new Error(`no character "${baseId}"`);
     const selfName = self.display_name ?? self.id;
     const baseName = base ? (base.display_name ?? base.id) : null;
+    if (base?.form_of === characterId)
+      return {
+        ok: false,
+        error: `${baseName} is a form of ${selfName}, so ${selfName} can't be a form of it.`,
+      };
     if (base?.form_of) {
       // The base's own base, by name, so the message can say whom to pick.
       const { data: root, error: rootError } = await supabaseAdmin

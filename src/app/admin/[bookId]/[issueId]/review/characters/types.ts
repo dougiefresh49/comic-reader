@@ -86,12 +86,6 @@ export interface CharacterCard {
   pages: string | null;
   /** Its first lines, up to three. */
   samples: SampleLine[];
-  /**
-   * `characters.form_of` (#891): the character this one is a form of, whose
-   * voice it speaks with; null when it is not a form. `load.ts` always sets
-   * it; optional so the blank card a staged + Add builds needs none.
-   */
-  formOf?: { id: string; name: string } | null;
 }
 
 /** A `voices` row, as the Voice tab, the slot strip and Review name it. */
@@ -127,6 +121,12 @@ export interface KnownCharacter {
   aliasRows?: AliasEntry[];
   /** In this book's cast (`proposeCast`'s members): the Form of picker's list (#891). */
   inBook?: boolean;
+  /**
+   * `characters.form_of` (#891), the one home of form data on the page: the
+   * character this one is a form of, whose voice it speaks with; null when
+   * it is not a form. `load.ts` always sets it.
+   */
+  formOf?: { id: string; name: string } | null;
 }
 
 /** Which pipeline pause the page is answering, and why its button would be refused now. */

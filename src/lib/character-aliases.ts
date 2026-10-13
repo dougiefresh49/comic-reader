@@ -309,8 +309,10 @@ export async function addAlias(
  * checked in the new scope as `addAlias` checks it, so a name another
  * character holds there is an `AliasTakenError`, and so is a row that took
  * the key after the check. Answers the alias's text, and whether the row
- * moved (false: it was already in that scope). Throws when the character has
- * no such row, or already has the same alias in the new scope.
+ * moved (false: it was already in that scope). Only a row `bookId`'s panel
+ * shows can move: a global one, or one of `bookId`'s. Throws when the
+ * character has no such row, when the row changed after it was read, or
+ * when the character already has the same alias in the new scope.
  */
 export async function setAliasScope(
   client: Client,
@@ -319,13 +321,21 @@ export async function setAliasScope(
   scope: "global" | "book",
   bookId: string,
 ): Promise<{ alias: string; moved: boolean }> {
-  const { data: row, error } = await db(client)
+  const { data: found, error } = await db(client)
     .from("aliases")
     .select("alias, scope, scope_id")
     .eq("id", aliasId)
     .eq("character_id", characterId)
     .maybeSingle();
   must(`reading alias ${aliasId} of ${characterId}`, error);
+  // Another book's row is not this book's to move. Checked here rather than
+  // in an `.or()` filter, so the book id is never spliced into filter syntax.
+  const row =
+    found &&
+    (found.scope === "global" ||
+      (found.scope === "book" && found.scope_id === bookId))
+      ? found
+      : null;
   if (!row) throw new Error(`aliases: ${characterId} has no alias ${aliasId}`);
   const scopeId = scope === "book" ? bookId : null;
   if (row.scope === scope && (row.scope_id ?? null) === scopeId)
@@ -345,17 +355,25 @@ export async function setAliasScope(
       );
   };
   await check();
-  const { data, error: writeError } = await db(client)
+  // Only while the row still has the scope it was read with.
+  const update = db(client)
     .from("aliases")
     .update({ scope, scope_id: scopeId })
     .eq("id", aliasId)
     .eq("character_id", characterId)
-    .select("id");
+    .eq("scope", row.scope);
+  const { data, error: writeError } = await (
+    row.scope_id === null
+      ? update.is("scope_id", null)
+      : update.eq("scope_id", row.scope_id)
+  ).select("id");
   // 23505: a row took the new scope's key after the check; say whose.
   if (writeError?.code === "23505") await check();
   must(`moving alias ${aliasId} of ${characterId}`, writeError);
   if (!data?.length)
-    throw new Error(`aliases: ${characterId} has no alias ${aliasId}`);
+    throw new Error(
+      `The alias "${row.alias}" changed elsewhere. Reload the page and try again.`,
+    );
   return { alias: row.alias, moved: true };
 }
 

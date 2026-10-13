@@ -19,7 +19,12 @@ import {
   type SlotModel,
   type Staged,
 } from "./staging";
-import type { CharacterCard, SampleLine, VoiceOption } from "./types";
+import type {
+  CharacterCard,
+  KnownCharacter,
+  SampleLine,
+  VoiceOption,
+} from "./types";
 import { FOCUS, Icon, LABEL } from "./ui";
 
 const TAG = "rounded px-1.5 text-[10px] font-semibold tracking-wide uppercase";
@@ -244,9 +249,34 @@ export const speakingIn = (
 ): VoiceUser[] =>
   voiceId ? (speakers.get(voiceId) ?? []).filter((u) => u.why === null) : [];
 
+/** A pick is staged for the card that Confirm would apply: another voice, or one that takes a slot. */
+function hasStagedPick(card: CharacterCard, state: CardState): boolean {
+  return (
+    state.pick !== null &&
+    (takesSlot(state.pick.move) || state.voiceId !== (card.voice?.uuid ?? null))
+  );
+}
+
+/**
+ * A form (#891) that speaks with its base's voice: it has no voice of its
+ * own (none, or the one borrowed from the base) and no pick staged here.
+ * The Voice tab then says so instead of offering voices, and the panel hides
+ * Design a voice.
+ */
+export function speaksAsBase(
+  card: CharacterCard,
+  state: CardState,
+  formOf: KnownCharacter["formOf"],
+): boolean {
+  if (!formOf || hasStagedPick(card, state)) return false;
+  return !card.voice || card.voice.borrowedFromId === formOf.id;
+}
+
 export interface VoiceTabProps {
   card: CharacterCard;
   state: CardState;
+  /** The character it is a form of (#891), from its known row. */
+  formOf: KnownCharacter["formOf"];
   staged: Staged[];
   voices: VoiceOption[];
   roster: Roster | null;
@@ -266,6 +296,7 @@ export interface VoiceTabProps {
 export function VoiceTab({
   card,
   state,
+  formOf,
   staged,
   voices,
   roster,
@@ -444,10 +475,10 @@ export function VoiceTab({
     : [];
 
   // A form (#891) speaks with its base's voice: the render chain's step 5.
-  // Its own castlist row's voice still wins (step 4), so that case keeps
-  // the choices to change or clear it.
-  const form = card.formOf ?? null;
-  if (form && (!card.voice || card.voice.borrowedFromId === form.id))
+  // Its own castlist row's voice, or a pick staged here, still wins (step
+  // 4), so those cases keep the choices to change or clear it.
+  const form = formOf ?? null;
+  if (form && speaksAsBase(card, state, form))
     return (
       <div>
         <p className={FORM_NOTE}>
@@ -461,9 +492,11 @@ export function VoiceTab({
 
   return (
     <div>
-      {form && card.voice && (
+      {form && (
         <p className={`mb-3 ${FORM_NOTE}`}>
-          {`${state.name} still has its own voice ${card.voice.name} in this book, which plays instead of ${form.name}'s.`}
+          {hasStagedPick(card, state) || !card.voice
+            ? `${state.name} has a voice picked here, which plays instead of ${form.name}'s.`
+            : `${state.name} still has its own voice ${card.voice.name} in this book, which plays instead of ${form.name}'s.`}
         </p>
       )}
       <section role="radiogroup" aria-label="Voices" onKeyDown={onRadioArrows}>
