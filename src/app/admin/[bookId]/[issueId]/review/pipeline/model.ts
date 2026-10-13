@@ -121,6 +121,8 @@ export interface StepView {
   /** A window opened and never closed while the step is no longer current. */
   unfinished: boolean;
   detail: string | null;
+  /** The characters still needing a voice, behind a disclosure on the row; set only for the casting step, when there are any. */
+  names?: string[];
 }
 
 export interface StageView {
@@ -259,10 +261,16 @@ function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
         c.wordGeometryCandidates,
         "bubbles have word boxes",
       );
-    case "casting":
-      return c.castingTasks > 0
-        ? ratio(c.castingTasksDone, c.castingTasks, "casting tasks done")
-        : `${c.castlist} ${plural(c.castlist, "speaker")} in the castlist`;
+    case "casting": {
+      // The castlist rows with no voice: the gap the stage header counts.
+      const left = c.castlist - c.castlistWithVoice;
+      if (c.castlist === 0) return "No characters in the castlist";
+      if (left > 0)
+        return `${left} ${plural(left, "character")} still ${plural(left, "needs", "need")} a voice`;
+      return c.castlist === 1
+        ? "1 character has a voice"
+        : `All ${c.castlist} characters have a voice`;
+    }
     case "generate-audio":
       return ratio(
         c.bubblesWithAudio,
@@ -294,7 +302,7 @@ function stageResult(
     case "pages":
       return `${c.bubbles} ${plural(c.bubbles, "bubble")} on ${c.pages} ${plural(c.pages, "page")}`;
     case "voices-audio":
-      return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${c.castlistWithVoice} of ${c.castlist} speakers have a voice`;
+      return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${c.castlistWithVoice} of ${c.castlist} characters have a voice`;
     case "ready":
       return `${c.panelsWithMasks} of ${c.panels} panels have masks`;
   }
@@ -374,6 +382,7 @@ export function buildHubView(
       }
 
       const parts: string[] = [];
+      let names: string[] | undefined;
       if (status === "skipped") {
         parts.push(`skipped: ${skipReasons.get(step)}`);
       } else if (step === "extract-foreground-masks" && run?.masksError) {
@@ -381,6 +390,8 @@ export function buildHubView(
       } else if (status !== "pending") {
         const progress = stepProgress(step, counts);
         if (progress) parts.push(progress);
+        if (step === "casting" && counts.castlistNeedsVoice.length > 0)
+          names = counts.castlistNeedsVoice;
       }
       if (GATE_STEPS.has(step) && run) {
         for (const w of run.gateWaits) {
@@ -404,6 +415,7 @@ export function buildHubView(
         durationMs: timing?.ms ?? null,
         unfinished: (timing?.open ?? false) && status !== "running",
         detail: parts.length > 0 ? parts.join(" · ") : null,
+        names,
       };
     });
 

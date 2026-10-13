@@ -60,10 +60,10 @@ export interface ProgressCounts {
   /** Face detections on this issue's panels plus face exemplars from it. */
   faces: number;
   facesNamed: number;
-  castingTasks: number;
-  castingTasksDone: number;
   castlist: number;
   castlistWithVoice: number;
+  /** Display names of the castlist rows with no voice, sorted: `castlist - castlistWithVoice` of them. */
+  castlistNeedsVoice: string[];
 }
 
 export interface PipelineProgress {
@@ -179,8 +179,6 @@ async function getCounts(
     wordGeometryDone,
     exemplars,
     exemplarsNamed,
-    castingTasks,
-    castingTasksDone,
     cast,
   ] = await Promise.all([
     panelsQuery,
@@ -222,12 +220,9 @@ async function getCounts(
       .eq("book_id", bookId)
       .eq("source_issue", issueId)
       .not("character_id", "is", null),
-    // select count(*) from casting_tasks where book_id = $1 and issue_id = $2
-    scoped("casting_tasks"),
-    // ... and completed_at is not null
-    scoped("casting_tasks").not("completed_at", "is", null),
-    // The castlist through `~/lib/cast`: the issue's rows, and those with an
-    // active voice or `no_audio`. A failed read throws from `~/lib/cast`.
+    // The castlist through `~/lib/cast`: the issue's rows, those with an
+    // active voice or `no_audio`, and the names of the rest. A failed read
+    // throws from `~/lib/cast`.
     countIssueCast(supabaseAdmin, bookId, issueId),
   ]);
 
@@ -278,10 +273,9 @@ async function getCounts(
     wordGeometryDone: countOf("wordGeometryDone", wordGeometryDone),
     faces: detections + countOf("exemplars", exemplars),
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
-    castingTasks: countOf("castingTasks", castingTasks),
-    castingTasksDone: countOf("castingTasksDone", castingTasksDone),
     castlist: cast.rows,
     castlistWithVoice: cast.withVoice,
+    castlistNeedsVoice: cast.needVoice,
   };
 }
 
