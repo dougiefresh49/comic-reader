@@ -249,12 +249,12 @@ export const speakingIn = (
 ): VoiceUser[] =>
   voiceId ? (speakers.get(voiceId) ?? []).filter((u) => u.why === null) : [];
 
-/** A pick is staged for the card that Confirm would apply: another voice, or one that takes a slot. */
-function hasStagedPick(card: CharacterCard, state: CardState): boolean {
-  return (
-    state.pick !== null &&
-    (takesSlot(state.pick.move) || state.voiceId !== (card.voice?.uuid ?? null))
-  );
+/**
+ * A pick is staged for the card, which Confirm applies as the character's own
+ * voice even when it is the voice the card borrows now (a form's base voice).
+ */
+function hasStagedPick(state: CardState): boolean {
+  return state.pick !== null;
 }
 
 /**
@@ -268,7 +268,7 @@ export function speaksAsBase(
   state: CardState,
   formOf: KnownCharacter["formOf"],
 ): boolean {
-  if (!formOf || hasStagedPick(card, state)) return false;
+  if (!formOf || hasStagedPick(state)) return false;
   return !card.voice || card.voice.borrowedFromId === formOf.id;
 }
 
@@ -494,7 +494,7 @@ export function VoiceTab({
     <div>
       {form && (
         <p className={`mb-3 ${FORM_NOTE}`}>
-          {hasStagedPick(card, state) || !card.voice
+          {hasStagedPick(state) || !card.voice
             ? `${state.name} has a voice picked here, which plays instead of ${form.name}'s.`
             : `${state.name} still has its own voice ${card.voice.name} in this book, which plays instead of ${form.name}'s.`}
         </p>
