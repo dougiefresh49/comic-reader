@@ -320,7 +320,12 @@ export async function loadCharacters(
     if (!v) {
       const starting = startingVoice.get(id);
       return starting
-        ? { name: starting.display_name, borrowedFrom: null, uuid: starting.id }
+        ? {
+            name: starting.display_name,
+            borrowedFrom: null,
+            borrowedFromId: null,
+            uuid: starting.id,
+          }
         : null;
     }
     const name = voiceName.get(v.voiceUuid) ?? v.elevenLabsId;
@@ -328,8 +333,14 @@ export async function loadCharacters(
     return {
       name,
       borrowedFrom: v.from === id ? null : displayName(v.from),
+      borrowedFromId: v.from === id ? null : v.from,
       uuid: v.voiceUuid,
     };
+  };
+  // `characters.form_of` (#891), as the render chain reads it.
+  const formOfView = (id: string): CharacterCard["formOf"] => {
+    const base = book.formOf.get(id);
+    return base ? { id: base, name: displayName(base) } : null;
   };
 
   const characterIds = new Set(charRows.map((c) => c.id));
@@ -406,6 +417,7 @@ export async function loadCharacters(
         said.length > 0 ? said.map((l) => l.page) : faces.map((f) => f.page),
       ),
       samples,
+      formOf: formOfView(id),
     };
   };
 
@@ -466,11 +478,13 @@ export async function loadCharacters(
       protected: isProtectedVoice(v),
     }));
 
+  const inBook = new Set(proposal.members.map((m) => m.id));
   const known: KnownCharacter[] = charRows.map((c) => ({
     id: c.id,
     name: c.display_name ?? c.id,
     aliases: (aliasesOf.get(c.id) ?? []).map((a) => a.alias),
     aliasRows: aliasesOf.get(c.id) ?? [],
+    inBook: inBook.has(c.id),
   }));
 
   // A wiki name dismissed for this issue (#751) is not offered.

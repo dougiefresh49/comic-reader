@@ -1,6 +1,7 @@
 // The panel's Voice tab (#787): every voice is a radio row and one click is
 // the pick. A pick that needs a slot shows the Slot box (Free or Swap out).
-// Then the character's first lines. Every change here is staged.
+// Then the character's first lines. Every change here is staged. A form
+// that speaks with its base's voice (#891) shows that instead of the voices.
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +26,9 @@ const TAG = "rounded px-1.5 text-[10px] font-semibold tracking-wide uppercase";
 const TAG_NOW = `${TAG} bg-emerald-400/15 text-emerald-300`;
 const TAG_NEW = `${TAG} bg-amber-400/15 text-amber-300`;
 const TAG_LAB = `${TAG} bg-sky-400/15 text-sky-300`;
+/** The line that says a form speaks with its base's voice (#891). */
+const FORM_NOTE =
+  "rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-[12.5px] text-neutral-300";
 
 const ARROWS: Record<string, number> = {
   ArrowDown: 1,
@@ -439,8 +443,29 @@ export function VoiceTab({
         .map((u) => u.name)
     : [];
 
+  // A form (#891) speaks with its base's voice: the render chain's step 5.
+  // Its own castlist row's voice still wins (step 4), so that case keeps
+  // the choices to change or clear it.
+  const form = card.formOf ?? null;
+  if (form && (!card.voice || card.voice.borrowedFromId === form.id))
+    return (
+      <div>
+        <p className={FORM_NOTE}>
+          {`${state.name} is a form of ${form.name}: it speaks with ${form.name}'s voice${
+            card.voice ? `, ${card.voice.name}` : ""
+          }.`}
+        </p>
+        <Lines card={card} />
+      </div>
+    );
+
   return (
     <div>
+      {form && card.voice && (
+        <p className={`mb-3 ${FORM_NOTE}`}>
+          {`${state.name} still has its own voice ${card.voice.name} in this book, which plays instead of ${form.name}'s.`}
+        </p>
+      )}
       <section role="radiogroup" aria-label="Voices" onKeyDown={onRadioArrows}>
         <h4 className={`mb-1.5 flex items-baseline ${LABEL}`}>
           Voices

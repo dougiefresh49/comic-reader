@@ -32,6 +32,7 @@ import {
   addAlias,
   isName,
   removeAlias,
+  setAliasScope,
 } from "~/lib/character-aliases";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
@@ -962,46 +963,170 @@ export async function makeVoiceSample(args: {
   }
 }
 
+/** Where an alias applies (#891): this book only, or every book. */
+export type AliasScope = "book" | "global";
+
+/** `AliasTakenError`'s refusal as the panel says it. */
+function taken(err: AliasTakenError): { ok: false; error: string } {
+  return {
+    ok: false,
+    error: `"${err.alias}" already means ${err.by.display_name ?? err.by.id}.`,
+  };
+}
+
+const scopeWords = (aliasScope: AliasScope) =>
+  aliasScope === "book" ? "this book" : "every book";
+
 /**
- * The panel's + Alias (#879): a global alias for the character. The name
- * check also reads this book's aliases, so a name that means someone else on
- * this board is refused, with that character's name. A name that already
- * means this character is a quiet answer, not an error.
+ * The panel's + Alias (#879): an alias for the character, in this book or
+ * every book (#891). A name another character holds in that scope is
+ * refused, with that character's name (`addAlias`). A name that already
+ * means this character there is a quiet answer, not an error.
  */
 export async function addCharacterAlias(args: {
   scope: Scope;
   characterId: string;
   alias: string;
+  aliasScope: AliasScope;
 }): Promise<ActionResult> {
-  const { scope, characterId } = args;
+  const { scope, characterId, aliasScope } = args;
   const alias = args.alias.trim();
   if (!isName(alias))
     return { ok: false, error: "Type a name with a letter or a number." };
   try {
     await requireAdmin();
-    // No write `bookId`, so the row is global; this book's aliases still
-    // count in the name check.
     const added = await addAlias(
       supabaseAdmin,
       characterId,
       alias,
-      undefined,
-      scope.bookId,
+      aliasScope === "book" ? scope.bookId : undefined,
     );
     revalidate(scope);
     return {
       ok: true,
       message: added
-        ? `Added "${alias}".`
+        ? `Added "${alias}" for ${scopeWords(aliasScope)}.`
         : `"${alias}" already means this character.`,
     };
   } catch (err) {
-    if (err instanceof AliasTakenError)
+    if (err instanceof AliasTakenError) return taken(err);
+    return fail("adding an alias", err);
+  }
+}
+
+/**
+ * The alias chip's scope switch (#891): the row moves to this book or to
+ * every book, refused like + Alias when another character holds the name
+ * there.
+ */
+export async function setCharacterAliasScope(args: {
+  scope: Scope;
+  characterId: string;
+  aliasId: number;
+  aliasScope: AliasScope;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { scope, characterId, aliasId, aliasScope } = args;
+    if (!Number.isInteger(aliasId)) throw new Error("no alias was picked");
+    const { alias, moved } = await setAliasScope(
+      supabaseAdmin,
+      aliasId,
+      characterId,
+      aliasScope,
+      scope.bookId,
+    );
+    revalidate(scope);
+    return {
+      ok: true,
+      message: moved
+        ? `"${alias}" is now for ${scopeWords(aliasScope)}.`
+        : `"${alias}" was already for ${scopeWords(aliasScope)}.`,
+    };
+  } catch (err) {
+    if (err instanceof AliasTakenError) return taken(err);
+    return fail("changing an alias's scope", err);
+  }
+}
+
+/**
+ * The panel's Form of (#891): `characters.form_of` of the character, set to
+ * `baseId` or cleared with null. A form speaks with its base's voice, and
+ * the render chain follows `form_of` once (`voiceFor`, step 5), so a base
+ * that is itself a form, or a character other characters are forms of, is
+ * refused with no write.
+ */
+export async function setFormOf(args: {
+  scope: Scope;
+  characterId: string;
+  baseId: string | null;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { scope, characterId, baseId } = args;
+    if (baseId === characterId)
+      return { ok: false, error: "A character can't be a form of itself." };
+    const [picked, formsOf] = await Promise.all([
+      supabaseAdmin
+        .from("characters")
+        .select("id, display_name, form_of")
+        .in("id", baseId ? [characterId, baseId] : [characterId]),
+      supabaseAdmin
+        .from("characters")
+        .select("id, display_name")
+        .eq("form_of", characterId)
+        .order("id"),
+    ]);
+    must("reading the characters", picked.error);
+    must("reading the character's forms", formsOf.error);
+    type Row = { id: string; display_name: string | null };
+    const rows = (picked.data ?? []) as (Row & { form_of: string | null })[];
+    const self = rows.find((r) => r.id === characterId);
+    if (!self) throw new Error(`no character "${characterId}"`);
+    const base = baseId ? rows.find((r) => r.id === baseId) : undefined;
+    if (baseId && !base) throw new Error(`no character "${baseId}"`);
+    const selfName = self.display_name ?? self.id;
+    const baseName = base ? (base.display_name ?? base.id) : null;
+    if (base?.form_of) {
+      // The base's own base, by name, so the message can say whom to pick.
+      const { data: root, error: rootError } = await supabaseAdmin
+        .from("characters")
+        .select("display_name")
+        .eq("id", base.form_of)
+        .maybeSingle();
+      must("reading the base's base", rootError);
+      const rootName =
+        (root as Pick<Row, "display_name"> | null)?.display_name ??
+        base.form_of;
       return {
         ok: false,
-        error: `"${alias}" already means ${err.by.display_name ?? err.by.id}.`,
+        error: `${baseName} is itself a form of ${rootName}. Pick ${rootName} instead.`,
       };
-    return fail("adding an alias", err);
+    }
+    const forms = (formsOf.data ?? []) as Row[];
+    if (base && forms.length > 0)
+      return {
+        ok: false,
+        error: `${selfName} has forms of its own (${forms.map((r) => r.display_name ?? r.id).join(", ")}), so it can't be a form.`,
+      };
+    if ((self.form_of ?? null) === baseId)
+      return { ok: true, message: "No change." };
+    const { data: written, error: writeError } = await supabaseAdmin
+      .from("characters")
+      .update({ form_of: baseId })
+      .eq("id", characterId)
+      .select("id");
+    must("writing form of", writeError);
+    if (!written?.length) throw new Error(`no character "${characterId}"`);
+    revalidate(scope);
+    return {
+      ok: true,
+      message: baseName
+        ? `${selfName} is now a form of ${baseName}.`
+        : `${selfName} is no longer a form.`,
+    };
+  } catch (err) {
+    return fail("setting form of", err);
   }
 }
 

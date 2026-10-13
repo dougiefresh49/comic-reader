@@ -401,11 +401,16 @@ function CastCard({
           {Icon.more}
         </button>
         <div
-          className={`absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-neutral-950/95 via-neutral-950/75 to-transparent px-2 pt-5 pb-1.5 text-[13px] leading-tight font-semibold ${
+          className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-neutral-950/95 via-neutral-950/75 to-transparent px-2 pt-5 pb-1.5 text-[13px] leading-tight font-semibold ${
             quiet ? "text-neutral-400" : "text-white"
           }`}
         >
-          {state.name}
+          <div className="truncate">{state.name}</div>
+          {card.formOf && (
+            <div className="truncate text-[11px] font-normal text-neutral-300">
+              form of {card.formOf.name}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex min-h-8 items-center gap-1.5 overflow-hidden px-2 py-1.5 text-[11.5px] whitespace-nowrap">
@@ -464,7 +469,17 @@ function AddMenu({
   // or for a name no row has, its words in any order (prefixed, so a word key
   // never equals an id).
   const resolve = useMemo(
-    () => nameResolver(data.known.map((k) => ({ ...k, display_name: k.name }))),
+    () =>
+      nameResolver(
+        data.known.map((k) => ({
+          ...k,
+          display_name: k.name,
+          // This book's aliases rank above global ones, as on the server.
+          bookAliases: (k.aliasRows ?? [])
+            .filter((a) => a.scope === "book")
+            .map((a) => a.alias),
+        })),
+      ),
     [data.known],
   );
   const who = (name: string) => resolve(name)?.id ?? `words:${nameWords(name)}`;

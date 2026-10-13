@@ -1,7 +1,8 @@
 // The character panel (#787): the open card in a right column. The header
 // names it (Rename is staged) and can say "this is character X" (#846, saves
-// at once) and lists its aliases, with add and remove (#879, saves at once),
-// Voice and Faces are tabs, and the footer has the card's quick actions.
+// at once), lists its aliases, with add, remove and scope (#879, #891, saves
+// at once), and sets Form of (#891, saves at once). Voice and Faces are
+// tabs, and the footer has the card's quick actions.
 // Voice changes are staged; the Faces work saves as it is done, as it always
 // has. In faces mode (#854) it is Faces only.
 "use client";
@@ -11,23 +12,29 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   useTransition,
 } from "react";
+import { isRoleId } from "~/lib/cast";
 import type { AliasEntry } from "~/lib/character-aliases";
+import { slugify } from "~/lib/character-id";
 import { useTabTrap } from "~/hooks/useTabTrap";
 import {
   addCharacterAlias,
   removeCharacterAlias,
+  setCharacterAliasScope,
+  setFormOf,
   type ActionResult,
+  type AliasScope,
   type NameTarget,
 } from "./actions";
 import { WandIcon } from "./design-sheet/DesignSheet";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
 import { Revoice } from "./Revoice";
-import { PageWithBox } from "./shared";
+import { matchesName, PageWithBox } from "./shared";
 import type { CardState } from "./staging";
 import type {
   CharacterCard,
@@ -36,7 +43,16 @@ import type {
   PageView,
   RevoicePlan,
 } from "./types";
-import { BTN, BTN_GHOST, BTN_SMALL, FOCUS, Icon, Portrait } from "./ui";
+import {
+  BTN,
+  BTN_GHOST,
+  BTN_SMALL,
+  FOCUS,
+  Icon,
+  MENU_ITEM,
+  Popover,
+  Portrait,
+} from "./ui";
 import { VoiceTab, type VoiceTabProps } from "./VoiceTab";
 
 export type PanelTab = "voice" | "faces";
@@ -147,41 +163,16 @@ function CloseIcon() {
 }
 
 /**
- * The header's aliases (#879): each one a chip with a remove button, a
- * book-scoped one tagged "this book", then + Alias, which adds a global one.
- * Both save at once and refresh the page, so the board, + Add and Move read
- * the new names. With no aliases only + Alias shows.
+ * A header write's state: `act` runs one server action, shows its answer
+ * in the status line, and refreshes the page so the board, + Add and Move
+ * read the change.
  */
-function AliasList({
-  characterId,
-  rows,
-  bookId,
-  issueId,
-}: {
-  characterId: string;
-  rows: AliasEntry[];
-  bookId: string;
-  issueId: string;
-}) {
+function useSave() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState("");
   const [note, setNote] = useState<{ text: string; error: boolean } | null>(
     null,
   );
-  const addRef = useRef<HTMLButtonElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  /** Focus goes back to + Alias once the running write ends. */
-  const refocus = useRef(false);
-  const scope = { bookId, issueId };
-
-  useEffect(() => {
-    if (pending || !refocus.current) return;
-    refocus.current = false;
-    addRef.current?.focus();
-  }, [pending, adding]);
-
   const act = (
     work: () => Promise<ActionResult>,
     onOk?: () => void,
@@ -208,9 +199,72 @@ function AliasList({
       router.refresh();
     });
   };
+  return { pending, note, setNote, act };
+}
+
+/** A header write's status line. Always mounted, so a screen reader hears what lands in it. */
+function SaveNote({
+  pending,
+  note,
+}: {
+  pending: boolean;
+  note: { text: string; error: boolean } | null;
+}) {
+  return (
+    <p
+      role="status"
+      className={`mt-1 text-[12px] empty:hidden ${
+        !pending && note?.error ? "text-red-400" : "text-neutral-400"
+      }`}
+    >
+      {pending ? "Saving…" : note?.text}
+    </p>
+  );
+}
+
+const SCOPE_WORDS: Record<AliasScope, string> = {
+  book: "this book",
+  global: "every book",
+};
+
+/**
+ * The header's aliases (#879): each one a chip with a remove button and its
+ * scope, "this book" or "every book", which is a button that switches it
+ * (#891). Then + Alias, whose draft picks This book (the default) or Every
+ * book. Every write saves at once and refreshes the page, so the board,
+ * + Add and Move read the new names. With no aliases only + Alias shows.
+ */
+function AliasList({
+  characterId,
+  rows,
+  bookId,
+  issueId,
+}: {
+  characterId: string;
+  rows: AliasEntry[];
+  bookId: string;
+  issueId: string;
+}) {
+  const { pending, note, setNote, act } = useSave();
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [addScope, setAddScope] = useState<AliasScope>("book");
+  const addRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  /** Focus goes back to + Alias once the running write ends. */
+  const refocus = useRef(false);
+  const scope = { bookId, issueId };
+
+  useEffect(() => {
+    if (pending || !refocus.current) return;
+    refocus.current = false;
+    addRef.current?.focus();
+  }, [pending, adding]);
+
   const closeAdd = () => {
     setAdding(false);
     setDraft("");
+    setAddScope("book");
     refocus.current = true;
   };
 
@@ -223,54 +277,86 @@ function AliasList({
               Aliases
             </span>
             <ul aria-label="Aliases" className="contents">
-              {rows.map((row) => (
-                <li
-                  key={row.id}
-                  className="inline-flex h-6 max-w-full items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 pr-0.5 pl-2 text-[12px] text-neutral-200"
-                >
-                  <span className="truncate">{row.alias}</span>
-                  {row.scope === "book" && (
-                    <span className="shrink-0 text-[11px] text-neutral-500">
-                      · this book
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => {
-                      // The chip goes, so focus lands on + Alias either way.
-                      refocus.current = true;
-                      act(() =>
-                        removeCharacterAlias({
-                          scope,
-                          characterId,
-                          aliasId: row.id,
-                        }),
-                      );
-                    }}
-                    aria-label={`Remove the alias ${row.alias}`}
-                    title={`Remove the alias ${row.alias}`}
-                    className={`inline-flex size-5 shrink-0 items-center justify-center rounded text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
+              {rows.map((row) => {
+                const other: AliasScope =
+                  row.scope === "book" ? "global" : "book";
+                const move = `Make ${row.alias} ${SCOPE_WORDS[other]}`;
+                return (
+                  <li
+                    key={row.id}
+                    className="inline-flex h-6 max-w-full items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 pr-0.5 pl-2 text-[12px] text-neutral-200"
                   >
-                    {Icon.out}
-                  </button>
-                </li>
-              ))}
+                    <span className="truncate">{row.alias}</span>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        act(() =>
+                          setCharacterAliasScope({
+                            scope,
+                            characterId,
+                            aliasId: row.id,
+                            aliasScope: other,
+                          }),
+                        )
+                      }
+                      aria-label={move}
+                      title={move}
+                      className={`shrink-0 rounded px-0.5 text-[11px] text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
+                    >
+                      · {SCOPE_WORDS[row.scope]}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => {
+                        // The chip goes, so focus lands on + Alias either way.
+                        refocus.current = true;
+                        act(() =>
+                          removeCharacterAlias({
+                            scope,
+                            characterId,
+                            aliasId: row.id,
+                          }),
+                        );
+                      }}
+                      aria-label={`Remove the alias ${row.alias}`}
+                      title={`Remove the alias ${row.alias}`}
+                      className={`inline-flex size-5 shrink-0 items-center justify-center rounded text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
+                    >
+                      {Icon.out}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}
         {adding ? (
           <form
-            className="flex items-center gap-1"
+            className="flex flex-wrap items-center gap-1"
             onSubmit={(e) => {
               e.preventDefault();
               act(
-                () => addCharacterAlias({ scope, characterId, alias: draft }),
+                () =>
+                  addCharacterAlias({
+                    scope,
+                    characterId,
+                    alias: draft,
+                    aliasScope: addScope,
+                  }),
                 closeAdd,
                 // A click on Add (disabled while saving) drops focus: put it
                 // back in the field so the name can be fixed.
                 () => inputRef.current?.focus(),
               );
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setNote(null);
+                closeAdd();
+              }
             }}
           >
             <input
@@ -283,15 +369,34 @@ function AliasList({
               aria-label="New alias"
               placeholder="Another name"
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  e.stopPropagation();
-                  setNote(null);
-                  closeAdd();
-                }
-              }}
               className={`h-6 w-40 min-w-0 rounded-md border border-neutral-700 bg-neutral-800 px-1.5 text-[12px] text-neutral-100 placeholder:text-neutral-500 ${FOCUS}`}
             />
+            <div
+              role="group"
+              aria-label="Alias scope"
+              className="inline-flex h-6 overflow-hidden rounded-md border border-neutral-700"
+            >
+              {(["book", "global"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  aria-pressed={addScope === s}
+                  onClick={() => setAddScope(s)}
+                  title={
+                    s === "book"
+                      ? "The name means this character in this book only"
+                      : "The name means this character in every book"
+                  }
+                  className={`px-1.5 text-[12px] ${FOCUS} ${
+                    addScope === s
+                      ? "bg-amber-400/15 text-neutral-100"
+                      : "bg-neutral-900 text-neutral-400 hover:text-neutral-200"
+                  }`}
+                >
+                  {s === "book" ? "This book" : "Every book"}
+                </button>
+              ))}
+            </div>
             <button type="submit" disabled={pending} className={BTN_SMALL}>
               Add
             </button>
@@ -316,22 +421,161 @@ function AliasList({
               setNote(null);
               setAdding(true);
             }}
-            title="Add another name this character goes by, in every book"
+            title="Add another name this character goes by"
             className={`${BTN_GHOST} h-6 px-1.5 text-[12px]`}
           >
             + Alias
           </button>
         )}
       </div>
-      {/* Always mounted, so a screen reader hears what lands in it. */}
-      <p
-        role="status"
-        className={`mt-1 text-[12px] empty:hidden ${
-          !pending && note?.error ? "text-red-400" : "text-neutral-400"
-        }`}
-      >
-        {pending ? "Saving…" : note?.text}
-      </p>
+      <SaveNote pending={pending} note={note} />
+    </div>
+  );
+}
+
+/**
+ * The header's Form of (#891): "form of <base>" with Clear when the
+ * character is a form, else Form of…, which opens a search over this book's
+ * characters; a pick saves at once. A form speaks with its base's voice.
+ */
+function FormOfControl({
+  card,
+  known,
+  bookId,
+  issueId,
+}: {
+  card: CharacterCard;
+  known: KnownCharacter[];
+  bookId: string;
+  issueId: string;
+}) {
+  const { pending, note, setNote, act } = useSave();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const listId = useId();
+  const scope = { bookId, issueId };
+  const base = card.formOf ?? null;
+
+  const q = slugify(query);
+  const choices = useMemo(
+    () =>
+      known
+        .filter((k) => k.inBook && k.id !== card.id && !isRoleId(k.id))
+        .filter((k) => !q || matchesName(k, q))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [known, card.id, q],
+  );
+  const index = Math.min(active, Math.max(0, choices.length - 1));
+  const close = useCallback(() => {
+    setAnchor(null);
+    setQuery("");
+    setActive(0);
+  }, []);
+  const pick = (k: KnownCharacter) => {
+    close();
+    act(() => setFormOf({ scope, characterId: card.id, baseId: k.id }));
+  };
+
+  return (
+    <div className="mt-1">
+      {base ? (
+        <div className="flex items-center gap-1 text-[12px] text-neutral-400">
+          <span className="truncate">
+            form of <span className="text-neutral-200">{base.name}</span>
+          </span>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setNote(null);
+              act(() =>
+                setFormOf({ scope, characterId: card.id, baseId: null }),
+              );
+            }}
+            aria-label="Clear form of"
+            title={`Not a form of ${base.name}: speaks with its own voice`}
+            className={`${BTN_GHOST} h-6 px-1.5 text-[12px]`}
+          >
+            Clear
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={pending}
+          aria-label="Form of"
+          aria-expanded={anchor !== null}
+          onClick={(e) => {
+            setNote(null);
+            setAnchor(anchor ? null : e.currentTarget);
+          }}
+          title="This character is a form of another one, and speaks with its voice"
+          className={`${BTN_GHOST} h-6 px-1.5 text-[12px]`}
+        >
+          Form of…
+        </button>
+      )}
+      <SaveNote pending={pending} note={note} />
+      {anchor && (
+        <Popover anchor={anchor} label="Form of" width={260} onClose={close}>
+          <input
+            value={query}
+            placeholder="Search this book's characters"
+            aria-label="Search this book's characters"
+            role="combobox"
+            aria-expanded
+            aria-controls={listId}
+            aria-activedescendant={
+              choices[index] ? `${listId}-${choices[index].id}` : undefined
+            }
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                const n = Math.max(1, choices.length);
+                setActive((index + (e.key === "ArrowDown" ? 1 : -1) + n) % n);
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const k = choices[index];
+                if (k) pick(k);
+              }
+            }}
+            className={`mb-1 h-7 w-full rounded-md border border-neutral-700 bg-neutral-950 px-2 text-[13px] text-neutral-100 placeholder:text-neutral-500 ${FOCUS}`}
+          />
+          {choices.length === 0 ? (
+            <p className="px-2.5 py-1.5 text-neutral-500">
+              No character matches.
+            </p>
+          ) : (
+            <div
+              id={listId}
+              role="listbox"
+              aria-label="Characters"
+              className="max-h-64 overflow-y-auto"
+            >
+              {choices.map((k, i) => (
+                <button
+                  key={k.id}
+                  id={`${listId}-${k.id}`}
+                  type="button"
+                  role="option"
+                  aria-selected={i === index}
+                  tabIndex={-1}
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => pick(k)}
+                  className={`${MENU_ITEM} ${i === index ? "bg-neutral-800" : ""}`}
+                >
+                  <span className="truncate">{k.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Popover>
+      )}
     </div>
   );
 }
@@ -623,6 +867,15 @@ export function CharacterPanel(props: CharacterPanelProps) {
               <AliasList
                 characterId={card.id}
                 rows={knownRow.aliasRows ?? []}
+                bookId={bookId}
+                issueId={issueId}
+              />
+            )}
+            {/* `form_of` is a `characters` column; a role is never a form. */}
+            {knownRow && !isRole && (
+              <FormOfControl
+                card={card}
+                known={known}
                 bookId={bookId}
                 issueId={issueId}
               />
