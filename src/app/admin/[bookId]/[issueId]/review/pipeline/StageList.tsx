@@ -75,7 +75,11 @@ function StepRow({ step }: { step: StepView }) {
             <summary className="w-fit cursor-pointer select-none hover:text-neutral-200">
               Show names
             </summary>
-            <p className="mt-0.5">{step.names.join(", ")}</p>
+            {step.names.map((n) => (
+              <p key={n.label} className="mt-0.5">
+                {n.label}: {n.list.join(", ")}
+              </p>
+            ))}
           </details>
         )}
       </div>

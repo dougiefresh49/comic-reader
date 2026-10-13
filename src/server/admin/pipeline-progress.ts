@@ -62,11 +62,13 @@ export interface ProgressCounts {
   faces: number;
   facesNamed: number;
   /**
-   * Display names, sorted, of the speakers the voices stop still has to
-   * settle: the voices gate's `planCastingTasks(...).unsettled`, so a
-   * character with no lines in the issue is never counted.
+   * The voices gate's `planCastingTasks(...).unsettled`, split in two, as
+   * display names sorted. A character with no lines in the issue is in
+   * neither. `needVoice`: speakers with no usable voice (`plan.noVoice`).
    */
   needVoice: string[];
+  /** The rest of `unsettled`: speakers who have a voice and an open request for a new one. */
+  newVoice: string[];
 }
 
 export interface PipelineProgress {
@@ -262,6 +264,17 @@ async function getCounts(
     detectionsNamed = countOf("detectionsNamed", named);
   }
 
+  const noVoice = new Set(plan.noVoice);
+  const namesOf = (ids: string[]) =>
+    ids
+      .map(
+        (id) =>
+          castRow(book, id, issueId)?.display_name ??
+          book.resolve(id)?.display_name ??
+          id,
+      )
+      .sort((a, b) => a.localeCompare(b));
+
   return {
     pages: countOf("pages", pages),
     panels: panelRows.length,
@@ -279,14 +292,8 @@ async function getCounts(
     wordGeometryDone: countOf("wordGeometryDone", wordGeometryDone),
     faces: detections + countOf("exemplars", exemplars),
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
-    needVoice: plan.unsettled
-      .map(
-        (id) =>
-          castRow(book, id, issueId)?.display_name ??
-          book.resolve(id)?.display_name ??
-          id,
-      )
-      .sort((a, b) => a.localeCompare(b)),
+    needVoice: namesOf(plan.noVoice),
+    newVoice: namesOf(plan.unsettled.filter((id) => !noVoice.has(id))),
   };
 }
 
