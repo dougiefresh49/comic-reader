@@ -21,6 +21,9 @@ const STEPS_WRITE_ATTEMPTS = 5;
  * its rows are in the database must read that here, not off a flag its own
  * mutator set: the mutator runs before the write, so a flag says what was
  * attempted, and a write can still fail (#255).
+ *
+ * `close` rides on the same update, so a run's closing status lands with its
+ * steps or not at all (#888).
  */
 export async function updateRunSteps(
   client: StepClient,
@@ -29,6 +32,7 @@ export async function updateRunSteps(
   runId: string,
   next: (steps: RunSteps) => RunSteps,
   logTag: string,
+  close?: { status: string; completed_at: string },
 ): Promise<boolean> {
   const where = `${bookId}/${issueId} run ${runId}`;
   for (let attempt = 1; attempt <= STEPS_WRITE_ATTEMPTS; attempt++) {
@@ -57,7 +61,7 @@ export async function updateRunSteps(
     const current = row.steps as RunSteps;
     const { data: written, error: writeErr } = await client
       .from("pipeline_runs")
-      .update({ steps: next(current) as Json })
+      .update({ ...close, steps: next(current) as Json })
       .eq("id", row.id)
       .eq("status", "running")
       .eq("steps", JSON.stringify(current))
@@ -106,29 +110,49 @@ export async function recordMasksFailure(
  * cancel-ingest already marked 'cancelled' is left alone. A run with no
  * row (trigger-ingest's insert failed) logs that and returns. A failed write
  * is logged, not thrown, so it cannot fail the run or mask its own error.
+ * An `error` lands in `steps.error`, where the pipeline page reads it, in the
+ * same write as the status; if that write fails, the row closes without it
+ * (#888).
  */
 export async function closePipelineRun(
   bookId: string,
   issueId: string,
   status: "completed" | "failed",
+  error?: string,
 ): Promise<void> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
   const { workflowRunId } = getWorkflowMetadata();
   const client = await createTypedStepClient();
 
-  const { data, error } = await client
+  const completed_at = new Date().toISOString();
+  if (
+    error !== undefined &&
+    (await updateRunSteps(
+      client,
+      bookId,
+      issueId,
+      workflowRunId,
+      (steps) => ({ ...steps, error }),
+      "pipeline-runs",
+      { status, completed_at },
+    ))
+  ) {
+    return;
+  }
+
+  const { data, error: writeErr } = await client
     .from("pipeline_runs")
-    .update({ status, completed_at: new Date().toISOString() })
+    .update({ status, completed_at })
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
     .eq("steps->>runId", workflowRunId)
     .eq("status", "running")
     .select("id");
 
-  if (error) {
+  if (writeErr) {
     console.log(
-      `[pipeline-runs] ${status} write failed for ${bookId}/${issueId} run ${workflowRunId}: ${error.message}`,
+      `[pipeline-runs] ${status} write failed for ${bookId}/${issueId} run ${workflowRunId}: ${writeErr.message}`,
     );
     return;
   }

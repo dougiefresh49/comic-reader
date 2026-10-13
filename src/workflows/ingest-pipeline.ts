@@ -346,7 +346,12 @@ export async function ingestPipeline(input: IngestInput) {
 
     return { bookId, issueId, status: "ready" };
   } catch (err) {
-    await closePipelineRun(bookId, issueId, "failed");
+    await closePipelineRun(
+      bookId,
+      issueId,
+      "failed",
+      err instanceof Error ? err.message : String(err),
+    );
     if (!ready && from !== "extract-foreground-masks") {
       // A failed failed-mark is logged, not thrown, so the run's own error
       // still reaches the caller.
