@@ -151,6 +151,13 @@ function VoiceRow({
   );
 }
 
+/**
+ * The Swap out list sits low in the tab: scroll it into view as it mounts
+ * (#882). Stable, so React calls it once per mount and not on each render.
+ */
+const intoView = (el: HTMLElement | null) =>
+  el?.scrollIntoView({ block: "nearest" });
+
 function SlotNumber({ n }: { n: number | null | undefined }) {
   return n ? (
     <span className="font-mono text-neutral-500">slot {n}</span>
@@ -362,11 +369,6 @@ export function VoiceTab({
   }, [tiedMove]);
   const mode: "free" | "swap" =
     tiedMove || swapMode || free === 0 ? "swap" : "free";
-  // The list sits low in the tab: scroll it into view when it opens (#882).
-  const swapList = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (mode === "swap") swapList.current?.scrollIntoView({ block: "nearest" });
-  }, [mode, card.id]);
   // Its own voice, unless a staged archive already frees that slot (as `pick` chooses).
   const ownSlot = model?.slots.find(
     (v) =>
@@ -621,7 +623,8 @@ export function VoiceTab({
               <div
                 role="radiogroup"
                 aria-label="Voice to swap out"
-                ref={swapList}
+                key={card.id}
+                ref={intoView}
                 onKeyDown={onRadioArrows}
                 // Grows into the space Lines' cap frees (#882): half the screen, not a fixed 230px.
                 className="max-h-[50vh] overflow-y-auto"
