@@ -70,6 +70,18 @@ function StepRow({ step }: { step: StepView }) {
         {step.detail && (
           <span className="ml-3 text-neutral-400">{step.detail}</span>
         )}
+        {step.names && (
+          <details className="mt-0.5 text-neutral-400">
+            <summary className="w-fit cursor-pointer select-none hover:text-neutral-200">
+              Show names
+            </summary>
+            {step.names.map((n) => (
+              <p key={n.label} className="mt-0.5">
+                {n.label}: {n.list.join(", ")}
+              </p>
+            ))}
+          </details>
+        )}
       </div>
       <span className="text-neutral-500 tabular-nums">
         {step.durationMs !== null

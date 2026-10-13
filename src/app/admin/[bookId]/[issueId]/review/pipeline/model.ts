@@ -121,6 +121,8 @@ export interface StepView {
   /** A window opened and never closed while the step is no longer current. */
   unfinished: boolean;
   detail: string | null;
+  /** Labelled name lists behind a disclosure on the row; set only for the casting step, and only the non-empty lists. */
+  names?: { label: string; list: string[] }[];
 }
 
 export interface StageView {
@@ -242,6 +244,25 @@ function ratio(done: number, total: number, unit: string): string {
   return `${done} of ${total} ${unit}`;
 }
 
+/**
+ * The one phrase for what the voices gate waits on, lower case; the casting
+ * row and the voices-audio header both use it, so they cannot disagree.
+ * The two parts add up to the gate's `unsettled`.
+ */
+function needVoicePhrase(c: ProgressCounts): string {
+  const n = c.needVoice.length;
+  const m = c.newVoice.length;
+  const parts: string[] = [];
+  if (n > 0)
+    parts.push(
+      `${n} ${plural(n, "character")} still ${plural(n, "needs", "need")} a voice`,
+    );
+  if (m > 0) parts.push(`${m} waiting on a new voice`);
+  return parts.length > 0
+    ? parts.join(", ")
+    : "no characters still need a voice";
+}
+
 /** The step's progress as one SELECT-backed line; null when it has no countable unit. */
 function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
   switch (step) {
@@ -259,10 +280,13 @@ function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
         c.wordGeometryCandidates,
         "bubbles have word boxes",
       );
-    case "casting":
-      return c.castingTasks > 0
-        ? ratio(c.castingTasksDone, c.castingTasks, "casting tasks done")
-        : `${c.castlist} ${plural(c.castlist, "speaker")} in the castlist`;
+    case "casting": {
+      // The speakers the voices gate still waits on (`needVoice` and
+      // `newVoice`). A "no audio" character is settled without a voice, so
+      // "none left" does not claim everyone has one.
+      const phrase = needVoicePhrase(c);
+      return phrase.charAt(0).toUpperCase() + phrase.slice(1);
+    }
     case "generate-audio":
       return ratio(
         c.bubblesWithAudio,
@@ -294,7 +318,7 @@ function stageResult(
     case "pages":
       return `${c.bubbles} ${plural(c.bubbles, "bubble")} on ${c.pages} ${plural(c.pages, "page")}`;
     case "voices-audio":
-      return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${c.castlistWithVoice} of ${c.castlist} speakers have a voice`;
+      return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${needVoicePhrase(c)}`;
     case "ready":
       return `${c.panelsWithMasks} of ${c.panels} panels have masks`;
   }
@@ -374,6 +398,7 @@ export function buildHubView(
       }
 
       const parts: string[] = [];
+      let names: StepView["names"];
       if (status === "skipped") {
         parts.push(`skipped: ${skipReasons.get(step)}`);
       } else if (step === "extract-foreground-masks" && run?.masksError) {
@@ -381,6 +406,13 @@ export function buildHubView(
       } else if (status !== "pending") {
         const progress = stepProgress(step, counts);
         if (progress) parts.push(progress);
+        if (step === "casting") {
+          const lists = [
+            { label: "Need a voice", list: counts.needVoice },
+            { label: "Waiting on a new voice", list: counts.newVoice },
+          ].filter((l) => l.list.length > 0);
+          if (lists.length > 0) names = lists;
+        }
       }
       if (GATE_STEPS.has(step) && run) {
         for (const w of run.gateWaits) {
@@ -404,6 +436,7 @@ export function buildHubView(
         durationMs: timing?.ms ?? null,
         unfinished: (timing?.open ?? false) && status !== "running",
         detail: parts.length > 0 ? parts.join(" · ") : null,
+        names,
       };
     });
 
