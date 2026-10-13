@@ -295,6 +295,52 @@ await check(
   },
 );
 
+await check(
+  "(h) deadline: a wait that would end past it rethrows, so the step ends before the 300 s kill",
+  async () => {
+    // Sol's case on #899: four 60 s calls and three 30 s waits run 330 s.
+    // The clock moves with each simulated call and wait.
+    const clock = { t: 0 };
+    const err429 = apiError(429, retryDelayBody("30s"));
+    const state = { calls: 0 };
+    const fn = async () => {
+      state.calls++;
+      clock.t += 60_000;
+      throw err429;
+    };
+    const sleeps: number[] = [];
+    const thrown = await withGeminiRetry(fn, {
+      label: "check",
+      deadline: 200_000,
+      now: () => clock.t,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+        clock.t += ms;
+      },
+    }).catch((e: unknown) => e);
+    assert.equal(thrown, err429);
+    // 60 + 30 + 60 + 30 + 60 = 240 s; the third wait would end at 270 s.
+    assert.equal(state.calls, 3);
+    assert.deepEqual(sleeps, [30_000, 30_000]);
+    assert.ok(clock.t <= 300_000, `ran ${clock.t} ms`);
+  },
+);
+
+await check(
+  "(h2) face embedding: a 429 past the deadline ends in RetryableError with no wait",
+  async () => {
+    const sleeps: number[] = [];
+    const err = await embedFaceOrFatal(
+      () => Promise.reject(apiError(429, "Resource exhausted")),
+      "page-22",
+      fastGemini(sleeps),
+      Date.now() - 1,
+    ).catch((e: unknown) => e);
+    assert.ok(RetryableError.is(err), `got ${String(err)}`);
+    assert.deepEqual(sleeps, []);
+  },
+);
+
 if (failed > 0) {
   console.log(`${failed} case(s) failed`);
   process.exit(1);

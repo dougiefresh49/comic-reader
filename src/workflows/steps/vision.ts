@@ -189,6 +189,14 @@ export type GeminiRetry = Pick<
 const GEMINI_STEP_RETRY_AFTER_MS = 60_000;
 
 /**
+ * How long into a step `withGeminiRetry` may still start a wait. A step gets
+ * 300 s on Vercel (`FLEX_DEADLINE_MS` in `~/lib/llm-usage` has the source);
+ * past this a transient error is thrown at once, so the step ends with its
+ * own error and not a kill.
+ */
+const GEMINI_RETRY_BUDGET_MS = 200_000;
+
+/**
  * The step error for a Gemini call that failed after its in-step retries: a
  * transient one (429, 5xx, timeout) makes Workflow re-run the step a minute
  * later, and pages already stored are skipped then (`hasStoredFaceDetections`);
@@ -217,6 +225,8 @@ export async function identifyFaceOrFatal<C, T>(
   getFallback: () => C | null,
   pageLabel: string,
   gemini?: GeminiRetry,
+  /** Epoch ms; no retry wait ends past it (`withGeminiRetry`'s `deadline`). */
+  deadline?: number,
 ): Promise<T> {
   const withFallback = async () => {
     try {
@@ -232,6 +242,7 @@ export async function identifyFaceOrFatal<C, T>(
     return await (gemini
       ? gemini.withGeminiRetry(withFallback, {
           label: `face identification ${pageLabel}`,
+          deadline,
         })
       : withFallback());
   } catch (err: unknown) {
@@ -252,10 +263,13 @@ export async function embedFaceOrFatal(
   embed: () => Promise<number[]>,
   pageLabel: string,
   gemini: GeminiRetry,
+  /** Epoch ms; no retry wait ends past it (`withGeminiRetry`'s `deadline`). */
+  deadline?: number,
 ): Promise<number[]> {
   try {
     return await gemini.withGeminiRetry(embed, {
       label: `face embedding ${pageLabel}`,
+      deadline,
     });
   } catch (err: unknown) {
     throw geminiStepError(
@@ -1374,6 +1388,7 @@ export async function identifyLookaheadFacesOrFatal(
   const gemini = getGeminiClient();
   const { pageNumber, pageLabel, imgBuf } = page;
   const llmMeta = { step, bookId, issueId, pageNumber };
+  const retryDeadline = Date.now() + GEMINI_RETRY_BUDGET_MS;
 
   // 5. Build known character list + wiki context
   const dbCharacters = await buildKnownCharacterListOrFatal(
@@ -1414,6 +1429,7 @@ export async function identifyLookaheadFacesOrFatal(
       () => withLlmMeta(llmMeta, () => exemplarStore.embedFace(faceBase64)),
       pageLabel,
       deps.llmUsage,
+      retryDeadline,
     );
 
     // Retrieve similar exemplars from pgvector
@@ -1444,6 +1460,7 @@ export async function identifyLookaheadFacesOrFatal(
         getFallbackGeminiClient,
         pageLabel,
         deps.llmUsage,
+        retryDeadline,
       ),
     );
   };
@@ -1969,6 +1986,7 @@ export async function getContextPage(
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
   const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
+  const retryDeadline = Date.now() + GEMINI_RETRY_BUDGET_MS;
   // The cue call's rows, apart from the OCR and speaker calls' (#437).
   const cueMeta = { ...llmMeta, step: "get-context:cues" };
 
@@ -2163,7 +2181,10 @@ export async function getContextPage(
             { model: GEMINI_FAST, contents: [ocrImagePart, ocrPrompt] },
             llmMeta,
           ),
-        { label: `get-context OCR ${pageLabel} bubble ${bubble.legacy_id}` },
+        {
+          label: `get-context OCR ${pageLabel} bubble ${bubble.legacy_id}`,
+          deadline: retryDeadline,
+        },
       );
 
       ocrText = ocrResponse.text?.trim() ?? "";
@@ -2207,6 +2228,7 @@ export async function getContextPage(
           ),
         {
           label: `get-context speaker ${pageLabel} bubble ${bubble.legacy_id}`,
+          deadline: retryDeadline,
         },
       );
 
@@ -2248,7 +2270,10 @@ export async function getContextPage(
               }),
               cueMeta,
             ),
-          { label: `get-context cues ${pageLabel} bubble ${bubble.legacy_id}` },
+          {
+            label: `get-context cues ${pageLabel} bubble ${bubble.legacy_id}`,
+            deadline: retryDeadline,
+          },
         );
         cueLine = cueResponse.text?.trim() ?? "";
       } catch (e) {

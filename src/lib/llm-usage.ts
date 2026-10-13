@@ -359,8 +359,14 @@ export function geminiRetryWait(
 export type GeminiRetryOptions = {
   /** Names the call in the retry warning. */
   label?: string;
+  /**
+   * Epoch ms after which no retry starts: a wait that would end past it
+   * rethrows instead, so a step throws before Vercel's 300 s limit kills it.
+   */
+  deadline?: number;
   sleep?: (ms: number) => Promise<void>;
   random?: () => number;
+  now?: () => number;
 };
 
 /**
@@ -368,7 +374,8 @@ export type GeminiRetryOptions = {
  * (`isTransientGeminiError`), waiting `geminiRetryWait` between attempts, so
  * a pipeline step rides out a rate limit before it fails. Wrap the whole
  * primary-then-fallback call, so every attempt tries both keys. After the
- * last attempt, or on any other error, the error is rethrown unchanged.
+ * last attempt, on any other error, or when the wait would pass `deadline`,
+ * the error is rethrown unchanged.
  */
 export async function withGeminiRetry<T>(
   fn: () => Promise<T>,
@@ -379,6 +386,8 @@ export async function withGeminiRetry<T>(
     sleep = (ms: number) =>
       new Promise<void>((resolve) => setTimeout(resolve, ms)),
     random = Math.random,
+    deadline,
+    now = Date.now,
   } = opts;
   for (let attempt = 1; ; attempt++) {
     try {
@@ -387,6 +396,7 @@ export async function withGeminiRetry<T>(
       if (attempt >= GEMINI_RETRY_MAX_ATTEMPTS || !isTransientGeminiError(err))
         throw err;
       const wait = geminiRetryWait(err, attempt, random);
+      if (deadline !== undefined && now() + wait > deadline) throw err;
       console.warn(
         `[gemini] ${label} attempt ${attempt} failed (${errorText(err).slice(0, 120)}); retry in ${wait} ms`,
       );
