@@ -156,7 +156,7 @@ function must(what: string, error: { message: string } | null): void {
   if (error) throw new Error(`cast: ${what}: ${error.message}`);
 }
 
-/** Every `characters` row, with its aliases from `~/lib/character-aliases`: global ones, and the book's with `bookId` (also in `bookAliases`, so the name rule ranks them first). */
+/** Every `characters` row, with its aliases from `~/lib/character-aliases`: global ones, and the book's with `bookId` (also in `bookAliases`, the name rule's book tier: `nameResolver` has the order). */
 async function readCharacters(
   client: Client,
   bookId?: string,

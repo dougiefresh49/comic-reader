@@ -140,36 +140,69 @@ export function nameWords(text: string): string {
 }
 
 /**
- * The one name rule for outside text (wiki names, new aliases): a name means
- * a `characters` row when, slugified, it is the row's id, display name or an
- * alias. In a book the order is: id, then display name, then a book alias of
- * that book (`bookAliases`), then a global alias, so "Dimension X Yellow
- * Ranger" can be April in one book and Michelangelo in another. Within one
- * tier the first row in `characters` wins. When none of those match, the
- * same words in another order (`nameWords`) mean that row, unless they mean
- * two rows.
+ * A name lookup over slug keys given in rank order: a name whose slug is a
+ * key means the row of the first such key; otherwise the same words in
+ * another order (`nameWords`) mean that row, unless two rows give them.
  */
-export function nameResolver<T extends NamedCharacter>(
-  characters: T[],
+function keyResolver<T>(
+  keys: Iterable<readonly [key: string, row: T]>,
 ): (name: string) => T | undefined {
   const rowByKey = new Map<string, T>();
   // null marks a word key two rows give: the fallback picks neither.
   const rowByWords = new Map<string, T | null>();
-  const index = (key: string, row: T) => {
-    if (!key) return;
+  for (const [key, row] of keys) {
+    if (!key) continue;
     if (!rowByKey.has(key)) rowByKey.set(key, row);
     const words = nameWords(key);
     const had = rowByWords.get(words);
     rowByWords.set(words, had === undefined || had === row ? row : null);
-  };
-  for (const row of characters) index(row.id, row);
-  for (const row of characters) index(slugify(row.display_name ?? ""), row);
-  for (const row of characters)
-    for (const alias of row.bookAliases ?? []) index(slugify(alias), row);
-  for (const row of characters)
-    for (const alias of row.aliases) index(slugify(alias), row);
+  }
   return (name) =>
     rowByKey.get(slugify(name)) ?? rowByWords.get(nameWords(name)) ?? undefined;
+}
+
+/** `[slug, row]` for each of a row's book aliases, the keys of the book tier. */
+function bookAliasKeys<T extends NamedCharacter>(
+  characters: T[],
+): (readonly [string, T])[] {
+  return characters.flatMap((row) =>
+    (row.bookAliases ?? []).map((alias) => [slugify(alias), row] as const),
+  );
+}
+
+/**
+ * The one name rule for outside text (wiki names, new aliases): which
+ * `characters` row a name means. The order:
+ *
+ * 1. A name that is exactly a row's `id`, as given (not slugified), is that
+ *    row, so a caller holding an id always gets its row back.
+ * 2. Slugified, a book alias of the book the rows were read for
+ *    (`bookAliases`). It outranks every global key below, so "Yellow
+ *    Dimension X Ranger" can be Michelangelo in one book though another
+ *    character has that id (#893).
+ * 3. Slugified, a row's id, then its display name, then a global alias.
+ * 4. When none of those match, the same words in another order
+ *    (`nameWords`) as any key above (ids, display names, aliases of either
+ *    scope) mean that row, unless they mean two rows.
+ *
+ * Within one tier the first row in `characters` wins. A book alias wins only
+ * on its exact slug: its words in another order go to tier 4 with the rest.
+ */
+export function nameResolver<T extends NamedCharacter>(
+  characters: T[],
+): (name: string) => T | undefined {
+  const rowById = new Map<string, T>();
+  for (const row of characters)
+    if (!rowById.has(row.id)) rowById.set(row.id, row);
+  const byKey = keyResolver([
+    ...bookAliasKeys(characters),
+    ...characters.map((row) => [row.id, row] as const),
+    ...characters.map((row) => [slugify(row.display_name ?? ""), row] as const),
+    ...characters.flatMap((row) =>
+      row.aliases.map((alias) => [slugify(alias), row] as const),
+    ),
+  ]);
+  return (name) => rowById.get(name) ?? byKey(name);
 }
 
 /** Every `characters` row's id and names, paged past the row cap. */
@@ -197,7 +230,7 @@ async function readCharacterRows(
 /**
  * Every `characters` row with its global aliases, and with `bookId` that
  * book's too (also listed in `bookAliases`), for the name rule: hand it to
- * `nameResolver`, which ranks the book's aliases first.
+ * `nameResolver`, which has the order.
  */
 export async function readNamedCharacters(
   client: Client,
@@ -220,15 +253,28 @@ export async function readNamedCharacters(
 }
 
 /**
- * Every `characters` row as an alias write in one scope checks a name: ids
- * and display names, and only that scope's aliases, the global ones or
- * `bookId`'s book ones. A global alias does not block a book alias of the
- * same name, nor a book alias a global one.
+ * The name check an alias write in one scope makes. `characters` is every
+ * `characters` row with only that scope's aliases, the global ones or
+ * `bookId`'s book ones; `means` is who already holds a name there.
+ *
+ * - Global scope: ids, display names and global aliases hold a name, by the
+ *   `nameResolver` rule over those rows.
+ * - Book scope: only `bookId`'s book aliases hold one, on the exact slug,
+ *   since that is all a book alias wins on in `nameResolver`. Another
+ *   character's id or display name does not, because in that book the alias
+ *   outranks them, and neither do the same words in another order: "Yellow
+ *   Dimension X Ranger" can be added beside "Dimension X Yellow Ranger".
+ *
+ * A global alias does not block a book alias of the same name, nor a book
+ * alias a global one.
  */
-async function readScopeCharacters(
+async function readScope(
   client: Client,
   bookId: string | null,
-): Promise<NamedCharacter[]> {
+): Promise<{
+  characters: NamedCharacter[];
+  means: (name: string) => NamedCharacter | undefined;
+}> {
   const rows = await readCharacterRows(client);
   const entries = await readAliasEntries(
     client,
@@ -236,12 +282,17 @@ async function readScopeCharacters(
     bookId ?? undefined,
   );
   const scope = bookId ? "book" : "global";
-  return rows.map((r) => ({
-    ...r,
-    aliases: (entries.get(r.id) ?? [])
+  const characters = rows.map((r) => {
+    const aliases = (entries.get(r.id) ?? [])
       .filter((e) => e.scope === scope)
-      .map((e) => e.alias),
-  }));
+      .map((e) => e.alias);
+    return { ...r, aliases, bookAliases: bookId ? aliases : undefined };
+  });
+  if (!bookId) return { characters, means: nameResolver(characters) };
+  const holder = new Map<string, NamedCharacter>();
+  for (const [key, row] of bookAliasKeys(characters))
+    if (key && !holder.has(key)) holder.set(key, row);
+  return { characters, means: (name) => holder.get(slugify(name)) };
 }
 
 /** The name rule over every `characters` row and its global aliases. */
@@ -271,12 +322,13 @@ export class AliasTakenError extends Error {
 /**
  * Makes a name resolve to a character by writing one `aliases` row,
  * `canonical` left null: a row of `bookId` when given, else a global one.
- * The name is checked in that scope only (`readScopeCharacters`): another
- * character's id or display name, or its alias in the same scope, is an
- * `AliasTakenError`; the name already meaning this character there is
- * false. True only when a row was written: when the same name landed first
- * (two adds racing), the name is checked again and answers as above, or
- * throws.
+ * The name is checked in that scope only (`readScope`): a global alias is
+ * refused when another character's id, display name or global alias holds
+ * the name, a book alias only when another character's alias of that book
+ * does. Either refusal is an `AliasTakenError`; the name already held by
+ * this character there is false. True only when a row was written: when
+ * the same name landed first (two adds racing), the name is checked again
+ * and answers as above, or throws.
  */
 export async function addAlias(
   client: Client,
@@ -286,8 +338,8 @@ export async function addAlias(
 ): Promise<boolean> {
   const name = alias.trim();
   if (!isName(name)) throw new Error(`aliases: "${name}" is not a name`);
-  const characters = await readScopeCharacters(client, bookId ?? null);
-  const means = nameResolver(characters)(name);
+  const { characters, means: holder } = await readScope(client, bookId ?? null);
+  const means = holder(name);
   if (means?.id === characterId) return false;
   if (means) throw new AliasTakenError(name, means);
   if (!characters.some((c) => c.id === characterId))
@@ -295,9 +347,7 @@ export async function addAlias(
   if (await insertAlias(client, characterId, name, bookId)) return true;
   // The row's (alias_norm, scope, scope_id) was taken after the check: say
   // who holds the name now.
-  const now = nameResolver(await readScopeCharacters(client, bookId ?? null))(
-    name,
-  );
+  const now = (await readScope(client, bookId ?? null)).means(name);
   if (now?.id === characterId) return false;
   if (now) throw new AliasTakenError(name, now);
   throw new Error(`aliases: "${name}" was not written for ${characterId}`);
@@ -306,9 +356,10 @@ export async function addAlias(
 /**
  * Moves the alias row `aliasId` of `characterId` to the other scope: `book`
  * makes it a row of `bookId`, `global` a row for every book. The name is
- * checked in the new scope as `addAlias` checks it, so a name another
- * character holds there is an `AliasTakenError`, and so is a row that took
- * the key after the check. Answers the alias's text, and whether the row
+ * checked in the new scope as `addAlias` checks it (`readScope`: in book
+ * scope only that book's aliases hold a name), so a name another character
+ * holds there is an `AliasTakenError`, and so is a row that took the key
+ * after the check. Answers the alias's text, and whether the row
  * moved (false: it was already in that scope). Only a row `bookId`'s panel
  * shows can move: a global one, or one of `bookId`'s. Throws when the
  * character has no such row, when the row changed after it was read, or
@@ -342,8 +393,8 @@ export async function setAliasScope(
     return { alias: row.alias, moved: false };
 
   const check = async () => {
-    const characters = await readScopeCharacters(client, scopeId);
-    const means = nameResolver(characters)(row.alias);
+    const { characters, means: holder } = await readScope(client, scopeId);
+    const means = holder(row.alias);
     if (means && means.id !== characterId)
       throw new AliasTakenError(row.alias, means);
     // Its own row of the same name in the new scope: the table's key allows

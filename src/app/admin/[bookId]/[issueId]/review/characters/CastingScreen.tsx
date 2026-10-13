@@ -478,7 +478,7 @@ function AddMenu({
         data.known.map((k) => ({
           ...k,
           display_name: k.name,
-          // This book's aliases rank above global ones, as on the server.
+          // This book's aliases get their own tier, as on the server (`nameResolver` has the order).
           bookAliases: (k.aliasRows ?? [])
             .filter((a) => a.scope === "book")
             .map((a) => a.alias),

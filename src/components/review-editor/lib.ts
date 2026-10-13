@@ -83,8 +83,8 @@ export function ownVoice(
 
 /**
  * The `characters` row a typed name means, by the server's name rule
- * (`nameResolver`): ids across every row first, then display names, then
- * aliases. The Save resolves the name the same way (#416).
+ * (`nameResolver`, which has the order). The Save resolves the name the
+ * same way (#416).
  */
 export function matchKnown(
   name: string,
