@@ -81,6 +81,7 @@ import type {
   PageView,
   VoiceOption,
 } from "./types";
+import type { SilentWhy, VoiceUser, VoiceUsers } from "./VoiceTab";
 import {
   BTN,
   BTN_GHOST,
@@ -877,14 +878,39 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         s.add(v.slot.holder.voiceUuid);
     return s;
   }, [model]);
-  /** Voice id to the board's characters that speak in it now. */
+  /**
+   * Voice id to the board's characters whose voice it is, once the staged
+   * moves run (#882). One speaks in it when it has lines here and is neither
+   * sitting out nor out of the issue: Silent here's rule, staged moves and
+   * picks included, so the Swap out list, Leaves X silent and the slot strip
+   * never disagree with the board. A silent one carries why.
+   */
   const speakers = useMemo(() => {
-    const m = new Map<string, string[]>();
-    for (const c of cards)
-      if (c.voice?.uuid && !c.noAudio && !c.removed)
-        m.set(c.voice.uuid, [...(m.get(c.voice.uuid) ?? []), c.name]);
+    const m: VoiceUsers = new Map();
+    const add = (voiceId: string, u: VoiceUser) =>
+      m.set(voiceId, [...(m.get(voiceId) ?? []), u]);
+    for (const c of cards) {
+      const st = states.get(c.id) ?? cardState(c, staged);
+      const why: SilentWhy | null = st.removed
+        ? "not in this issue"
+        : st.sitOut
+          ? "sitting out"
+          : null;
+      const u = { id: c.id, name: st.name, why };
+      if (why === null) {
+        if (c.lines > 0 && st.voiceId) add(st.voiceId, u);
+        continue;
+      }
+      // A saved sit-out loads with no voice (#410): name its own active ones.
+      const ids = st.voiceId
+        ? [st.voiceId]
+        : data.voices
+            .filter((v) => v.characterId === c.id && v.status === "active")
+            .map((v) => v.id);
+      for (const id of ids) add(id, u);
+    }
     return m;
-  }, [cards]);
+  }, [cards, states, staged, data.voices]);
 
   // ---- staging: every control below only edits `staged` ----
 

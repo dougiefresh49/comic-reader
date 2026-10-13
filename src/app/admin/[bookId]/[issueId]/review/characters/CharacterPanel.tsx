@@ -504,7 +504,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
     const checked = asideRef.current?.querySelector<HTMLElement>(
       '[role="radio"][aria-checked="true"]',
     );
-    (checked ?? headingRef.current)?.focus();
+    // preventScroll: the Swap out list scrolls itself into view as it mounts (#882).
+    (checked ?? headingRef.current)?.focus({ preventScroll: true });
     // Once, when the panel opens for this card.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
