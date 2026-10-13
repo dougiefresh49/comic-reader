@@ -7,7 +7,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ArchiveMove, Roster, RosterSlot } from "~/lib/casting-moves";
 import { acceptedFor } from "./design-sheet/accepted";
 import { DesignVoiceRow } from "./design-sheet/DesignSheet";
-import { PlayButton } from "./player";
+import { MakeSample, PlayButton, PreviewSource } from "./player";
 import {
   backupWord,
   freeFor,
@@ -55,7 +55,11 @@ function onRadioArrows(e: React.KeyboardEvent<HTMLElement>) {
   if (to.getAttribute("aria-checked") !== "true") to.click();
 }
 
-/** One radio row: the dot, the name, a grey line of facts, and Play. Only the group's tab stop is in the Tab order. */
+/**
+ * One radio row: the dot, the name, a grey line of facts, and Play with where
+ * its audio came from. A voice with no audio anywhere gets a line under it
+ * offering Make a sample. Only the group's tab stop is in the Tab order.
+ */
 function VoiceRow({
   name,
   sub,
@@ -128,10 +132,14 @@ function VoiceRow({
       {play ? (
         <PlayButton url={play.url} playKey={play.playKey} name={name} />
       ) : playVoiceId ? (
-        <PlayButton voiceId={playVoiceId} name={name} />
+        <span className="flex min-w-0 items-center gap-1.5">
+          <PreviewSource voiceId={playVoiceId} />
+          <PlayButton voiceId={playVoiceId} name={name} />
+        </span>
       ) : (
         <span />
       )}
+      {!play && playVoiceId && <MakeSample voiceId={playVoiceId} name={name} />}
     </div>
   );
 }

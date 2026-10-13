@@ -41,6 +41,7 @@ import {
   rejectGroup,
   relabelCharacter,
   voicePreview,
+  makeVoiceSample,
   type ActionResult,
   type NameTarget,
 } from "./actions";
@@ -1258,6 +1259,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   return (
     <PlayerProvider
       preview={(voiceId) => voicePreview({ scope, voiceId })}
+      makeSample={(voiceId) => makeVoiceSample({ scope, voiceId })}
       onError={(m) => say(m, true)}
     >
       <div className="flex h-screen flex-col bg-neutral-950 text-[13px] text-neutral-200">

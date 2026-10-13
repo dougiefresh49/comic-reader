@@ -17,6 +17,11 @@ import {
   readVoice,
 } from "~/lib/voice-slots";
 import { audioUrl } from "~/lib/storage";
+import { elevenLabsFetch, getElevenLabsClient } from "~/lib/elevenlabs-client";
+import { recordElevenLabsCall } from "~/lib/llm-usage";
+import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
+import { loadVoiceOverrides } from "~/lib/voice-overrides";
+import { VOICE_SAMPLE_LINE, voiceSamplePath } from "~/lib/voice-sample";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
@@ -31,9 +36,15 @@ export type ActionResult =
   | { ok: true; message: string }
   | { ok: false; error: string };
 
-/** `voicePreview`'s answer: a playable URL, null when the voice has no stored audio, or a failure. */
+/**
+ * `voicePreview`'s and `makeVoiceSample`'s answer: a playable URL and where
+ * it came from ("clip", "this issue", "this book", "from <book>", "sample"),
+ * or null when the voice has no audio anywhere, with whether Make a sample
+ * can render one; or a failure.
+ */
 export type PreviewResult =
-  | { ok: true; url: string | null }
+  | { ok: true; url: string; from: string }
+  | { ok: true; url: null; canMakeSample: boolean }
   | { ok: false; error: string };
 
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
@@ -692,6 +703,9 @@ export async function confirmFaces(args: {
  * castlist rows of the book that hold the voice, each (issue, character)
  * pair checked against the render chain (`voiceFor`), this issue first. A
  * bubble whose `voice_id` names another voice never plays for this one.
+ * Past this book (#880): a bubble rendered in the voice in any other book,
+ * then the sample `makeVoiceSample` stored, then the voice's own ElevenLabs
+ * `preview_url` (a free read). Each answer says where its audio came from.
  */
 export async function voicePreview(args: {
   scope: Scope;
@@ -701,13 +715,13 @@ export async function voicePreview(args: {
     await requireAdmin();
     const { scope, voiceId } = args;
     const voice = await readVoice(supabaseAdmin, voiceId);
-    if (!voice) return { ok: true, url: null };
+    if (!voice) return { ok: true, url: null, canMakeSample: false };
     if (voice.source_clip_path) {
       const signed = await supabaseAdmin.storage
         .from(VOICE_CLIPS_BUCKET)
         .createSignedUrl(clipObjectPath(voice.source_clip_path), 3600);
       if (signed.data?.signedUrl)
-        return { ok: true, url: signed.data.signedUrl };
+        return { ok: true, url: signed.data.signedUrl, from: "clip" };
       // A clip that will not sign falls through to a rendered bubble.
       console.warn(
         `characters stop, signing ${voice.source_clip_path}:`,
@@ -735,6 +749,7 @@ export async function voicePreview(args: {
         return {
           ok: true,
           url: audioUrl(scope.bookId, hit.issue_id, hit.audio_storage_path),
+          from: hit.issue_id === scope.issueId ? "this issue" : "this book",
         };
     }
     const book = await loadBookCast(supabaseAdmin, scope.bookId);
@@ -769,11 +784,171 @@ export async function voicePreview(args: {
         return {
           ok: true,
           url: audioUrl(scope.bookId, r.issue_id, row.audio_storage_path),
+          from: r.issue_id === scope.issueId ? "this issue" : "this book",
         };
     }
-    return { ok: true, url: null };
+    const elsewhere = await supabaseAdmin
+      .from("bubbles")
+      .select("book_id, issue_id, audio_storage_path")
+      .eq("voice_id", voiceId)
+      .neq("book_id", scope.bookId)
+      .eq("needs_audio", false)
+      .not("audio_storage_path", "is", null)
+      .limit(1)
+      .maybeSingle();
+    must("reading a bubble rendered in this voice elsewhere", elsewhere.error);
+    const other = elsewhere.data as {
+      book_id: string;
+      issue_id: string;
+      audio_storage_path: string | null;
+    } | null;
+    if (other?.audio_storage_path) {
+      const named = await supabaseAdmin
+        .from("books")
+        .select("name")
+        .eq("id", other.book_id)
+        .maybeSingle();
+      return {
+        ok: true,
+        url: audioUrl(other.book_id, other.issue_id, other.audio_storage_path),
+        from: `from ${(named.data as { name: string } | null)?.name ?? other.book_id}`,
+      };
+    }
+    try {
+      const stored = await storedSample(voice.id);
+      if (stored) return { ok: true, url: stored, from: "sample" };
+    } catch (err) {
+      // A sample that will not sign falls through to ElevenLabs' own.
+      console.warn(`characters stop, reading ${voice.id}'s sample:`, err);
+    }
+    const live = canRenderIn(voice);
+    if (live) {
+      const preview = await elevenLabsPreviewUrl(live);
+      if (preview) return { ok: true, url: preview, from: "sample" };
+    }
+    return { ok: true, url: null, canMakeSample: live !== null };
   } catch (err) {
     return fail("previewing a voice", err);
+  }
+}
+
+/** The ElevenLabs id a sample can be rendered in: a voice that is not archived and has one; else null. */
+function canRenderIn(voice: {
+  status: string;
+  current_elevenlabs_id: string | null;
+}): string | null {
+  return voice.status === "archived" ? null : voice.current_elevenlabs_id;
+}
+
+/**
+ * A signed URL to the voice's stored sample (`makeVoiceSample`), null when
+ * there is none. Any Storage error other than "not there" throws, so a
+ * caller about to render never mistakes it for a missing sample.
+ */
+async function storedSample(voiceId: string): Promise<string | null> {
+  const store = supabaseAdmin.storage.from(VOICE_CLIPS_BUCKET);
+  const path = voiceSamplePath(voiceId);
+  const found = await store.exists(path);
+  if (!found.data) return null;
+  const signed = await store.createSignedUrl(path, 3600);
+  if (!signed.data?.signedUrl)
+    throw new Error(
+      `signing ${VOICE_CLIPS_BUCKET}/${path}: ${signed.error?.message ?? "no URL"}`,
+    );
+  return signed.data.signedUrl;
+}
+
+/**
+ * The voice's own sample on ElevenLabs (`GET /v1/voices/{id}`
+ * `preview_url`), a free read. Null when it has none; a failed or non-OK
+ * read is logged and is null too, never a failed preview.
+ */
+async function elevenLabsPreviewUrl(
+  elevenLabsId: string,
+): Promise<string | null> {
+  try {
+    const res = await elevenLabsFetch(
+      `/v1/voices/${encodeURIComponent(elevenLabsId)}`,
+      { method: "GET" },
+    );
+    if (!res.ok) {
+      console.warn(
+        `characters stop, ElevenLabs voice ${elevenLabsId}: HTTP ${res.status}`,
+      );
+      return null;
+    }
+    const body = (await res.json()) as { preview_url?: unknown };
+    return typeof body.preview_url === "string" && body.preview_url
+      ? body.preview_url
+      : null;
+  } catch (err) {
+    console.warn(`characters stop, ElevenLabs voice ${elevenLabsId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Make a sample (#880): renders `VOICE_SAMPLE_LINE` once in the voice on
+ * `TTS_MODEL` and stores it at `voiceSamplePath` in `comic-voice-clips`, so
+ * every later preview plays the stored file for free. Idempotent: a sample
+ * already stored is returned without rendering, and an upload that lost a
+ * race to another render returns the one that won. Refuses an archived
+ * voice or one with no ElevenLabs id. Writes no `voices`, `castlist` or
+ * `bubbles` row and never touches the ElevenLabs voice itself.
+ */
+export async function makeVoiceSample(args: {
+  scope: Scope;
+  voiceId: string;
+}): Promise<PreviewResult> {
+  try {
+    await requireAdmin();
+    const { scope, voiceId } = args;
+    const voice = await readVoice(supabaseAdmin, voiceId);
+    if (!voice) throw new Error("that voice is gone");
+    const elevenLabsId = canRenderIn(voice);
+    if (!elevenLabsId)
+      throw new Error(
+        `${voice.display_name} has no live ElevenLabs voice to make a sample in`,
+      );
+    const existing = await storedSample(voice.id);
+    if (existing) return { ok: true, url: existing, from: "sample" };
+
+    const overrides = await loadVoiceOverrides(supabaseAdmin, [elevenLabsId]);
+    const request = buildTtsRequest({
+      text: VOICE_SAMPLE_LINE,
+      voiceId: elevenLabsId,
+      override: overrides.get(elevenLabsId),
+    });
+    const tts = await getElevenLabsClient();
+    const response = await recordElevenLabsCall(
+      {
+        step: "voice-sample",
+        bookId: scope.bookId,
+        issueId: scope.issueId,
+        model: TTS_MODEL,
+      },
+      request.text.length,
+      () => tts.textToSpeech.convertWithTimestamps(elevenLabsId, request),
+    );
+
+    const path = voiceSamplePath(voice.id);
+    const up = await supabaseAdmin.storage
+      .from(VOICE_CLIPS_BUCKET)
+      .upload(path, Buffer.from(response.audioBase64, "base64"), {
+        contentType: "audio/mpeg",
+        upsert: false,
+      });
+    // Already there: another click or tab stored one first; play that one.
+    if (up.error && !/exist|duplicate/i.test(up.error.message))
+      throw new Error(
+        `upload ${VOICE_CLIPS_BUCKET}/${path}: ${up.error.message}`,
+      );
+    const url = await storedSample(voice.id);
+    if (!url)
+      throw new Error(`${VOICE_CLIPS_BUCKET}/${path} is missing after upload`);
+    return { ok: true, url, from: "sample" };
+  } catch (err) {
+    return fail("making a voice sample", err);
   }
 }
 

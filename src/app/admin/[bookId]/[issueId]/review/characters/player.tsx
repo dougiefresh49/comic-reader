@@ -1,6 +1,7 @@
 // One audio element for the casting page: voice previews (`voicePreview`, a
 // free signed URL asked on the first Play) and rendered lines. Playing never
-// touches the staged moves.
+// touches the staged moves; Make a sample (`makeVoiceSample`) is the one paid
+// call here, and only on a click that names its cost.
 "use client";
 
 import {
@@ -12,6 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { VOICE_SAMPLE_CREDITS } from "~/lib/voice-sample";
 import type { PreviewResult } from "./actions";
 import { FOCUS } from "./ui";
 
@@ -20,11 +22,27 @@ interface Player {
   playing: string | null;
   /** Voice ids a preview lookup is out for. */
   loading: ReadonlySet<string>;
-  /** Voice ids with no stored audio. */
-  silent: ReadonlySet<string>;
+  /** Voice ids with no audio anywhere, each with whether Make a sample can render one. */
+  silent: ReadonlyMap<string, boolean>;
+  /** Where each played voice's preview came from ("this book", "sample", ...). */
+  sources: ReadonlyMap<string, string>;
+  /** Voice ids a Make a sample render is out for. */
+  making: ReadonlySet<string>;
   playUrl: (key: string, url: string) => void;
   playVoice: (voiceId: string) => void;
+  /** Renders and stores the voice's sample (paid), then plays it. */
+  makeSample: (voiceId: string) => void;
   stop: () => void;
+}
+
+function withId(s: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  return new Set(s).add(id);
+}
+
+function withoutId(s: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(s);
+  next.delete(id);
+  return next;
 }
 
 const PlayerContext = createContext<Player | null>(null);
@@ -37,10 +55,12 @@ export function usePlayer(): Player {
 
 export function PlayerProvider({
   preview,
+  makeSample: make,
   onError,
   children,
 }: {
   preview: (voiceId: string) => Promise<PreviewResult>;
+  makeSample: (voiceId: string) => Promise<PreviewResult>;
   onError: (message: string) => void;
   children: React.ReactNode;
 }) {
@@ -48,7 +68,13 @@ export function PlayerProvider({
   const urls = useRef(new Map<string, string | null>());
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
-  const [silent, setSilent] = useState<ReadonlySet<string>>(new Set());
+  const [silent, setSilent] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const [sources, setSources] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  );
+  const [making, setMaking] = useState<ReadonlySet<string>>(new Set());
+  // Read synchronously, so a second click before the re-render never spends twice.
+  const makingNow = useRef(new Set<string>());
 
   useEffect(() => {
     const el = new Audio();
@@ -85,40 +111,87 @@ export function PlayerProvider({
     void el.play().catch(() => setPlaying(null));
   }, []);
 
+  /** Caches a lookup's answer for the voice and plays its URL, if any. */
+  const settle = useCallback(
+    (voiceId: string, r: PreviewResult) => {
+      if (!r.ok) {
+        onError(r.error);
+        return;
+      }
+      urls.current.set(voiceId, r.url);
+      if (r.url === null) {
+        setSilent((m) => new Map(m).set(voiceId, r.canMakeSample));
+        return;
+      }
+      setSources((m) => new Map(m).set(voiceId, r.from));
+      setSilent((m) => {
+        if (!m.has(voiceId)) return m;
+        const next = new Map(m);
+        next.delete(voiceId);
+        return next;
+      });
+      playUrl(`voice:${voiceId}`, r.url);
+    },
+    [playUrl, onError],
+  );
+
   const playVoice = useCallback(
     (voiceId: string) => {
-      const key = `voice:${voiceId}`;
       const known = urls.current.get(voiceId);
-      if (known) return playUrl(key, known);
+      if (known) return playUrl(`voice:${voiceId}`, known);
       if (known === null) return;
-      setLoading((s) => new Set(s).add(voiceId));
+      setLoading((s) => withId(s, voiceId));
       void preview(voiceId)
-        .then((r) => {
-          if (!r.ok) {
-            onError(r.error);
-            return;
-          }
-          urls.current.set(voiceId, r.url);
-          if (r.url) playUrl(key, r.url);
-          else setSilent((s) => new Set(s).add(voiceId));
-        })
+        .then((r) => settle(voiceId, r))
         .catch((err: unknown) =>
           onError(err instanceof Error ? err.message : String(err)),
         )
-        .finally(() =>
-          setLoading((s) => {
-            const next = new Set(s);
-            next.delete(voiceId);
-            return next;
-          }),
-        );
+        .finally(() => setLoading((s) => withoutId(s, voiceId)));
     },
-    [preview, playUrl, onError],
+    [preview, playUrl, settle, onError],
+  );
+
+  const makeSample = useCallback(
+    (voiceId: string) => {
+      if (makingNow.current.has(voiceId)) return;
+      makingNow.current.add(voiceId);
+      setMaking((s) => withId(s, voiceId));
+      void make(voiceId)
+        .then((r) => settle(voiceId, r))
+        .catch((err: unknown) =>
+          onError(err instanceof Error ? err.message : String(err)),
+        )
+        .finally(() => {
+          makingNow.current.delete(voiceId);
+          setMaking((s) => withoutId(s, voiceId));
+        });
+    },
+    [make, settle, onError],
   );
 
   const value = useMemo(
-    () => ({ playing, loading, silent, playUrl, playVoice, stop }),
-    [playing, loading, silent, playUrl, playVoice, stop],
+    () => ({
+      playing,
+      loading,
+      silent,
+      sources,
+      making,
+      playUrl,
+      playVoice,
+      makeSample,
+      stop,
+    }),
+    [
+      playing,
+      loading,
+      silent,
+      sources,
+      making,
+      playUrl,
+      playVoice,
+      makeSample,
+      stop,
+    ],
   );
   return (
     <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>
@@ -192,5 +265,59 @@ export function PlayButton({
     >
       {isPlaying ? <StopIcon /> : <PlayIcon />}
     </button>
+  );
+}
+
+/** Where a played voice's preview came from, beside its Play; nothing before the first Play. */
+export function PreviewSource({ voiceId }: { voiceId: string }) {
+  const from = usePlayer().sources.get(voiceId);
+  return from ? (
+    <span
+      title={from}
+      className="max-w-[9rem] truncate text-[11px] text-neutral-500"
+    >
+      {from}
+    </span>
+  ) : null;
+}
+
+/**
+ * The line under a voice whose Play found no audio anywhere: "no sample
+ * yet", and Make a sample with its cost when the voice can render one. The
+ * button is off while its render is out, so a double click spends once.
+ * Never a pick: the click and keys stop at the button.
+ */
+export function MakeSample({
+  voiceId,
+  name,
+}: {
+  voiceId: string;
+  name: string;
+}) {
+  const p = usePlayer();
+  const canMake = p.silent.get(voiceId);
+  if (canMake === undefined) return null;
+  const busy = p.making.has(voiceId);
+  const cost =
+    VOICE_SAMPLE_CREDITS === null ? "paid" : `~${VOICE_SAMPLE_CREDITS} credits`;
+  return (
+    <span className="col-span-2 col-start-2 flex min-w-0 items-center gap-1.5 text-[11.5px] text-neutral-500">
+      no sample yet
+      {canMake && (
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={`Make a sample of ${name} (${cost})`}
+          onClick={(e) => {
+            e.stopPropagation();
+            p.makeSample(voiceId);
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          className={`ml-auto shrink-0 rounded-md border border-neutral-700 bg-neutral-900 px-1.5 py-0.5 text-[11px] font-medium text-neutral-200 hover:border-neutral-500 disabled:cursor-wait disabled:opacity-60 disabled:hover:border-neutral-700 ${FOCUS}`}
+        >
+          {busy ? "Making a sample…" : `Make a sample (${cost})`}
+        </button>
+      )}
+    </span>
   );
 }
