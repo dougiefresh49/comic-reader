@@ -171,6 +171,7 @@ function AliasList({
     null,
   );
   const addRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   /** Focus goes back to + Alias once the running write ends. */
   const refocus = useRef(false);
   const scope = { bookId, issueId };
@@ -181,12 +182,17 @@ function AliasList({
     addRef.current?.focus();
   }, [pending, adding]);
 
-  const act = (work: () => Promise<ActionResult>, onOk?: () => void) => {
+  const act = (
+    work: () => Promise<ActionResult>,
+    onOk?: () => void,
+    onFail?: () => void,
+  ) => {
     setNote(null);
     startTransition(async () => {
       try {
         const r = await work();
         if (r.ok) onOk?.();
+        else onFail?.();
         setNote(
           r.ok
             ? { text: r.message, error: false }
@@ -197,6 +203,7 @@ function AliasList({
           text: err instanceof Error ? err.message : String(err),
           error: true,
         });
+        onFail?.();
       }
       router.refresh();
     });
@@ -260,10 +267,14 @@ function AliasList({
               act(
                 () => addCharacterAlias({ scope, characterId, alias: draft }),
                 closeAdd,
+                // A click on Add (disabled while saving) drops focus: put it
+                // back in the field so the name can be fixed.
+                () => inputRef.current?.focus(),
               );
             }}
           >
             <input
+              ref={inputRef}
               value={draft}
               autoFocus
               // Read-only rather than disabled while saving, so a refused
@@ -474,7 +485,8 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const isRole = card.group === "role";
   const tabs = voiceMode ? TABS : TABS.filter((t) => t.key === "faces");
   const shownTab: PanelTab = !voiceMode ? "faces" : isRole ? "voice" : tab;
-  const aliasRows = known.find((k) => k.id === card.id)?.aliasRows ?? [];
+  /** The card's `characters` row; none means no aliases to show. */
+  const knownRow = known.find((k) => k.id === card.id);
 
   const closeMove = useCallback(() => {
     setMoving(null);
@@ -605,11 +617,11 @@ export function CharacterPanel(props: CharacterPanelProps) {
                 · {card.id}
               </span>
             </div>
-            {/* Only a `characters` row has aliases; a role takes none. */}
-            {card.known && !isRole && (
+            {/* Only a `characters` row has aliases; roles included. */}
+            {knownRow && (
               <AliasList
                 characterId={card.id}
-                rows={aliasRows}
+                rows={knownRow.aliasRows ?? []}
                 bookId={bookId}
                 issueId={issueId}
               />

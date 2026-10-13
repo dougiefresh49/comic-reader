@@ -30,6 +30,7 @@ import { slugify } from "~/lib/character-id";
 import {
   AliasTakenError,
   addAlias,
+  isName,
   removeAlias,
 } from "~/lib/character-aliases";
 import { deleteExemplars } from "~/lib/exemplar-store";
@@ -974,7 +975,7 @@ export async function addCharacterAlias(args: {
 }): Promise<ActionResult> {
   const { scope, characterId } = args;
   const alias = args.alias.trim();
-  if (!slugify(alias))
+  if (!isName(alias))
     return { ok: false, error: "Type a name with a letter or a number." };
   try {
     await requireAdmin();

@@ -192,6 +192,11 @@ export async function loadNameResolver(
   return nameResolver(await readNamedCharacters(client));
 }
 
+/** A name has a letter or a digit once slugified: "-" or "!!" is not one. */
+export function isName(text: string): boolean {
+  return /[a-z0-9]/.test(slugify(text));
+}
+
 /** `addAlias`'s refusal when the name already means another character, `by`. */
 export class AliasTakenError extends Error {
   readonly by: NamedCharacter;
@@ -206,8 +211,9 @@ export class AliasTakenError extends Error {
  * `canonical` left null, scope global unless `bookId` is given. False when
  * the name already means that character, an `AliasTakenError` when it means
  * another. The name check reads global aliases, plus `checkBookId`'s when
- * given (a global alias added from that book's screen). A row the table
- * already holds under (alias_norm, scope, scope_id) is left as it is.
+ * given (a global alias added from that book's screen). True only when a row
+ * was written: when the same name landed first (two adds racing), the name
+ * is checked again and answers as above, or throws.
  */
 export async function addAlias(
   client: Client,
@@ -217,15 +223,22 @@ export async function addAlias(
   checkBookId?: string,
 ): Promise<boolean> {
   const name = alias.trim();
-  if (!slugify(name)) throw new Error(`aliases: "${name}" is not a name`);
+  if (!isName(name)) throw new Error(`aliases: "${name}" is not a name`);
   const characters = await readNamedCharacters(client, checkBookId);
   const means = nameResolver(characters)(name);
   if (means?.id === characterId) return false;
   if (means) throw new AliasTakenError(name, means);
   if (!characters.some((c) => c.id === characterId))
     throw new Error(`aliases: no character ${characterId}`);
-  await writeAlias(client, characterId, name, bookId);
-  return true;
+  if (await insertAlias(client, characterId, name, bookId)) return true;
+  // The row's (alias_norm, scope, scope_id) was taken after the check: say
+  // who holds the name now, reading the scope the write was in.
+  const now = nameResolver(
+    await readNamedCharacters(client, bookId ?? checkBookId),
+  )(name);
+  if (now?.id === characterId) return false;
+  if (now) throw new AliasTakenError(name, now);
+  throw new Error(`aliases: "${name}" was not written for ${characterId}`);
 }
 
 /**
@@ -239,7 +252,17 @@ export async function writeAlias(
   alias: string,
   bookId?: string,
 ): Promise<void> {
-  const { error } = await db(client)
+  await insertAlias(client, characterId, alias, bookId);
+}
+
+/** `writeAlias`'s upsert, answering whether it inserted a row (false: the key was already held). */
+async function insertAlias(
+  client: Client,
+  characterId: string,
+  alias: string,
+  bookId?: string,
+): Promise<boolean> {
+  const { data, error } = await db(client)
     .from("aliases")
     .upsert(
       {
@@ -249,8 +272,10 @@ export async function writeAlias(
         scope_id: bookId ?? null,
       },
       { onConflict: "alias_norm,scope,scope_id", ignoreDuplicates: true },
-    );
+    )
+    .select("id");
   must(`writing the alias "${alias}" for ${characterId}`, error);
+  return (data?.length ?? 0) > 0;
 }
 
 /**
