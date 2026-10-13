@@ -1,6 +1,6 @@
 // Loads one issue for the casting page: the proposed cast with each one's lines, every face, the exemplars and the voices. SELECTs only; the writes are in actions.ts and casting-actions.ts.
 import "server-only";
-import { readAliases } from "~/lib/character-aliases";
+import { readAliasEntries } from "~/lib/character-aliases";
 import { selectIssue } from "~/lib/issue-queries";
 import { pageImageUrl } from "~/lib/storage";
 import { DEFAULT_PAGE } from "~/app/api/apply-fixes/write-rules";
@@ -179,7 +179,7 @@ export async function loadCharacters(
   const panelRows = rows<PanelRow>("panels", panelResult);
   const exemplarRows = rows<ExemplarRow>("face exemplars", exemplarResult);
   const charRows = rows<CharacterRow>("characters", charResult);
-  const aliasesOf = await readAliases(
+  const aliasesOf = await readAliasEntries(
     supabaseAdmin,
     charRows.map((c) => c.id),
     bookId,
@@ -469,7 +469,8 @@ export async function loadCharacters(
   const known: KnownCharacter[] = charRows.map((c) => ({
     id: c.id,
     name: c.display_name ?? c.id,
-    aliases: aliasesOf.get(c.id) ?? [],
+    aliases: (aliasesOf.get(c.id) ?? []).map((a) => a.alias),
+    aliasRows: aliasesOf.get(c.id) ?? [],
   }));
 
   // A wiki name dismissed for this issue (#751) is not offered.

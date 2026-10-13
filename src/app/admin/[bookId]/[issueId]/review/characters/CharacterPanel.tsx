@@ -1,13 +1,28 @@
 // The character panel (#787): the open card in a right column. The header
 // names it (Rename is staged) and can say "this is character X" (#846, saves
-// at once), Voice and Faces are tabs, and the footer has the card's quick
-// actions. Voice changes are staged; the Faces work saves
-// as it is done, as it always has. In faces mode (#854) it is Faces only.
+// at once) and lists its aliases, with add and remove (#879, saves at once),
+// Voice and Faces are tabs, and the footer has the card's quick actions.
+// Voice changes are staged; the Faces work saves as it is done, as it always
+// has. In faces mode (#854) it is Faces only.
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import type { AliasEntry } from "~/lib/character-aliases";
 import { useTabTrap } from "~/hooks/useTabTrap";
-import type { NameTarget } from "./actions";
+import {
+  addCharacterAlias,
+  removeCharacterAlias,
+  type ActionResult,
+  type NameTarget,
+} from "./actions";
 import { WandIcon } from "./design-sheet/DesignSheet";
 import { FacesTab } from "./FacesTab";
 import { MoveDialog } from "./MoveDialog";
@@ -132,6 +147,185 @@ function CloseIcon() {
 }
 
 /**
+ * The header's aliases (#879): each one a chip with a remove button, a
+ * book-scoped one tagged "this book", then + Alias, which adds a global one.
+ * Both save at once and refresh the page, so the board, + Add and Move read
+ * the new names. With no aliases only + Alias shows.
+ */
+function AliasList({
+  characterId,
+  rows,
+  bookId,
+  issueId,
+}: {
+  characterId: string;
+  rows: AliasEntry[];
+  bookId: string;
+  issueId: string;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [note, setNote] = useState<{ text: string; error: boolean } | null>(
+    null,
+  );
+  const addRef = useRef<HTMLButtonElement>(null);
+  /** Focus goes back to + Alias once the running write ends. */
+  const refocus = useRef(false);
+  const scope = { bookId, issueId };
+
+  useEffect(() => {
+    if (pending || !refocus.current) return;
+    refocus.current = false;
+    addRef.current?.focus();
+  }, [pending, adding]);
+
+  const act = (work: () => Promise<ActionResult>, onOk?: () => void) => {
+    setNote(null);
+    startTransition(async () => {
+      try {
+        const r = await work();
+        if (r.ok) onOk?.();
+        setNote(
+          r.ok
+            ? { text: r.message, error: false }
+            : { text: r.error, error: true },
+        );
+      } catch (err) {
+        setNote({
+          text: err instanceof Error ? err.message : String(err),
+          error: true,
+        });
+      }
+      router.refresh();
+    });
+  };
+  const closeAdd = () => {
+    setAdding(false);
+    setDraft("");
+    refocus.current = true;
+  };
+
+  return (
+    <div className="mt-1.5">
+      <div className="flex flex-wrap items-center gap-1">
+        {rows.length > 0 && (
+          <>
+            <span aria-hidden className="mr-0.5 text-[12px] text-neutral-500">
+              Aliases
+            </span>
+            <ul aria-label="Aliases" className="contents">
+              {rows.map((row) => (
+                <li
+                  key={row.id}
+                  className="inline-flex h-6 max-w-full items-center gap-1 rounded-md border border-neutral-700 bg-neutral-800 pr-0.5 pl-2 text-[12px] text-neutral-200"
+                >
+                  <span className="truncate">{row.alias}</span>
+                  {row.scope === "book" && (
+                    <span className="shrink-0 text-[11px] text-neutral-500">
+                      · this book
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => {
+                      // The chip goes, so focus lands on + Alias either way.
+                      refocus.current = true;
+                      act(() =>
+                        removeCharacterAlias({
+                          scope,
+                          characterId,
+                          aliasId: row.id,
+                        }),
+                      );
+                    }}
+                    aria-label={`Remove the alias ${row.alias}`}
+                    title={`Remove the alias ${row.alias}`}
+                    className={`inline-flex size-5 shrink-0 items-center justify-center rounded text-neutral-500 hover:bg-neutral-700 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS}`}
+                  >
+                    {Icon.out}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {adding ? (
+          <form
+            className="flex items-center gap-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              act(
+                () => addCharacterAlias({ scope, characterId, alias: draft }),
+                closeAdd,
+              );
+            }}
+          >
+            <input
+              value={draft}
+              autoFocus
+              // Read-only rather than disabled while saving, so a refused
+              // name leaves focus in the field to fix it.
+              readOnly={pending}
+              aria-label="New alias"
+              placeholder="Another name"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setNote(null);
+                  closeAdd();
+                }
+              }}
+              className={`h-6 w-40 min-w-0 rounded-md border border-neutral-700 bg-neutral-800 px-1.5 text-[12px] text-neutral-100 placeholder:text-neutral-500 ${FOCUS}`}
+            />
+            <button type="submit" disabled={pending} className={BTN_SMALL}>
+              Add
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setNote(null);
+                closeAdd();
+              }}
+              className={`${BTN_GHOST} h-6 px-2 text-[12px]`}
+            >
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button
+            ref={addRef}
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setNote(null);
+              setAdding(true);
+            }}
+            title="Add another name this character goes by, in every book"
+            className={`${BTN_GHOST} h-6 px-1.5 text-[12px]`}
+          >
+            + Alias
+          </button>
+        )}
+      </div>
+      {/* Always mounted, so a screen reader hears what lands in it. */}
+      <p
+        role="status"
+        className={`mt-1 text-[12px] empty:hidden ${
+          !pending && note?.error ? "text-red-400" : "text-neutral-400"
+        }`}
+      >
+        {pending ? "Saving…" : note?.text}
+      </p>
+    </div>
+  );
+}
+
+/**
  * Show: the page with the face boxed, large over the screen. Click outside,
  * the X or Escape closes it. It opens with focus on the X, keeps Tab inside,
  * and hands focus back to whatever had it before (the Show button or the
@@ -205,6 +399,8 @@ export interface CharacterPanelProps
   cards: CharacterCard[];
   known: KnownCharacter[];
   bookId: string;
+  /** For the alias writes' page refresh. */
+  issueId: string;
   /** The card's old-voice audio (#836), or null when it has none. */
   revoice: RevoicePlan | null;
   /** A Faces save is running. */
@@ -239,6 +435,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
     cards,
     known,
     bookId,
+    issueId,
     revoice,
     busy,
     voiceMode,
@@ -277,6 +474,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const isRole = card.group === "role";
   const tabs = voiceMode ? TABS : TABS.filter((t) => t.key === "faces");
   const shownTab: PanelTab = !voiceMode ? "faces" : isRole ? "voice" : tab;
+  const aliasRows = known.find((k) => k.id === card.id)?.aliasRows ?? [];
 
   const closeMove = useCallback(() => {
     setMoving(null);
@@ -407,6 +605,15 @@ export function CharacterPanel(props: CharacterPanelProps) {
                 · {card.id}
               </span>
             </div>
+            {/* Only a `characters` row has aliases; a role takes none. */}
+            {card.known && !isRole && (
+              <AliasList
+                characterId={card.id}
+                rows={aliasRows}
+                bookId={bookId}
+                issueId={issueId}
+              />
+            )}
           </div>
           {/* A role has no faces, and a card with none has nothing to move. */}
           {!isRole && card.faces.length > 0 && (

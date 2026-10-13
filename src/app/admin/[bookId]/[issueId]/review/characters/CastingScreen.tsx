@@ -1476,6 +1476,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
               cards={cards}
               known={data.known}
               bookId={data.bookId}
+              issueId={data.issueId}
               revoice={
                 data.revoice.find((r) => r.characterId === openCard.id) ?? null
               }

@@ -1,6 +1,7 @@
 // What the casting page's loader hands the browser. Every rect is in page fractions (0..1).
 
 import type { CastSource } from "~/lib/cast";
+import type { AliasEntry } from "~/lib/character-aliases";
 
 export interface Rect {
   x: number;
@@ -110,6 +111,12 @@ export interface KnownCharacter {
   id: string;
   name: string;
   aliases: string[];
+  /**
+   * The same aliases as rows, for the panel's list (#879): global ones, and
+   * this book's. `load.ts` always sets it; optional so the stand-in rows the
+   * screen and the move dialog build for a name match need none.
+   */
+  aliasRows?: AliasEntry[];
 }
 
 /** Which pipeline pause the page is answering, and why its button would be refused now. */
