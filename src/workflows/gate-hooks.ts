@@ -33,13 +33,21 @@ export async function isDeploymentGone(runId: string): Promise<boolean> {
     await world.getEncryptionKeyForRun?.(run);
     return false;
   } catch (err) {
-    // The SDK throws a plain Error here, so the message is all there is to match.
-    if (
-      err instanceof Error &&
-      err.message.includes("HTTP 404") &&
-      err.message.includes("Deployment not found")
-    ) {
-      return true;
+    // The SDK throws a plain Error here, so the message is all there is to
+    // match: its own status line for this run, then the API's JSON body. A
+    // body quoting a 404 under another status must not count.
+    const status = `Failed to fetch run key for ${run.runId} (deployment ${run.deploymentId}): HTTP 404 `;
+    const message = err instanceof Error ? err.message : "";
+    const bodyAt = message.indexOf(" — ", status.length);
+    if (message.startsWith(status) && bodyAt !== -1) {
+      try {
+        const body = JSON.parse(message.slice(bodyAt + 3)) as {
+          error?: { code?: unknown };
+        };
+        if (body.error?.code === "not_found") return true;
+      } catch {
+        // Not the API's JSON body, so not the answer this check reads.
+      }
     }
     throw err;
   }
