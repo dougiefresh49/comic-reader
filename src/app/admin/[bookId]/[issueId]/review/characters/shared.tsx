@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageCrop } from "~/components/review-editor/PageCrop";
 import { useTabTrap } from "~/hooks/useTabTrap";
+import { nameWords } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import type { NameTarget } from "./actions";
 import type {
@@ -41,22 +42,30 @@ export const SVG_ICON = {
   "aria-hidden": true,
 } as const;
 
-/** The name picker's match: a slugified query against the id, the name and the aliases. `q` is already slugified. */
+/**
+ * The name picker's match: a slugified query against the id, the name and
+ * the aliases, as a substring or word by word in any order ("dimension-x-gr"
+ * lists "Green Dimension X Ranger"). `q` is already slugified.
+ */
 export function matchesName(k: KnownCharacter, q: string): boolean {
-  return (
-    k.id.includes(q) ||
-    slugify(k.name).includes(q) ||
-    k.aliases.some((a) => slugify(a).includes(q))
-  );
+  const words = q.split("-").filter(Boolean);
+  return [k.id, k.name, ...k.aliases].some((text) => {
+    const slug = slugify(text);
+    if (slug.includes(q)) return true;
+    const own = slug.split("-");
+    return (
+      words.length > 0 && words.every((w) => own.some((o) => o.startsWith(w)))
+    );
+  });
 }
 
-/** The query names this row outright, so "New character" is not offered. */
+/** The query names this row outright, words in any order, so "New character" is not offered. */
 export function isExactName(k: KnownCharacter, q: string): boolean {
-  return (
-    k.id === q ||
-    slugify(k.name) === q ||
-    k.aliases.some((a) => slugify(a) === q)
-  );
+  const words = nameWords(q);
+  return [k.id, k.name, ...k.aliases].some((text) => {
+    const slug = slugify(text);
+    return slug === q || (words !== "" && nameWords(slug) === words);
+  });
 }
 
 /** The most portrait-like face: close to square, not panel-sized, confident. */

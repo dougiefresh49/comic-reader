@@ -27,6 +27,7 @@ import type {
   RosterSlot,
   RunResult,
 } from "~/lib/casting-moves";
+import { nameResolver, nameWords } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import {
   approveCharacters,
@@ -423,7 +424,8 @@ function AddMenu({
 }: {
   anchor: HTMLElement;
   data: CharactersData;
-  onBoard: Set<string>;
+  /** The cards on the board, id to name. */
+  onBoard: Map<string, string>;
   voices: VoiceOption[];
   onAdd: (id: string | null, name: string) => void;
   onClose: () => void;
@@ -453,12 +455,33 @@ function AddMenu({
           name: k.name,
           note: archived(k.id) ? "archived voice" : "",
         });
-  const shown = rows
-    .filter((r) => !q || slugify(r.name).includes(q) || r.id?.includes(q))
-    .slice(0, 12);
-  const exact = shown.find(
-    (r) => slugify(r.name) === q || (r.id !== null && r.id === q),
+  // A row or card as the shared name match reads it, aliases from the book's known row.
+  const asKnown = (id: string, name: string) =>
+    data.known.find((k) => k.id === id) ?? { id, name, aliases: [] };
+  // Who a name means, by the server's rule (`nameResolver`): a known row's id,
+  // or for a name no row has, its words in any order (prefixed, so a word key
+  // never equals an id).
+  const resolve = useMemo(
+    () => nameResolver(data.known.map((k) => ({ ...k, display_name: k.name }))),
+    [data.known],
   );
+  const who = (name: string) => resolve(name)?.id ?? `words:${nameWords(name)}`;
+  const board = [...onBoard].map(([id, name]) => ({
+    who: resolve(id)?.id ?? `words:${nameWords(name)}`,
+    name,
+  }));
+  const rowWho = (r: { id: string | null; name: string }) =>
+    r.id ?? who(r.name);
+  const shown = rows
+    .filter((r) => !board.some((b) => b.who === rowWho(r)))
+    .filter(
+      (r) => !q || matchesName(asKnown(r.id ?? slugify(r.name), r.name), q),
+    )
+    .slice(0, 12);
+  const meant = q ? who(query) : null;
+  const exact = shown.find((r) => rowWho(r) === meant);
+  // The typed name is a character already on the board: nothing to add.
+  const onBoardAs = board.find((b) => b.who === meant);
   const add = (id: string | null, name: string) => {
     onAdd(id, name);
     onClose();
@@ -476,8 +499,14 @@ function AddMenu({
         onKeyDown={(e) => {
           if (e.key !== "Enter" || !query.trim()) return;
           e.preventDefault();
+          if (onBoardAs) return;
           if (exact) add(exact.id, exact.name);
-          else if (shown.length === 1) add(shown[0]!.id, shown[0]!.name);
+          // A lone match is taken on Enter only as a substring; a word match is a click.
+          else if (
+            shown.length === 1 &&
+            (slugify(shown[0]!.name).includes(q) || shown[0]!.id?.includes(q))
+          )
+            add(shown[0]!.id, shown[0]!.name);
           else add(null, query.trim());
         }}
         placeholder="Name"
@@ -502,14 +531,20 @@ function AddMenu({
         ))}
       </div>
       <div className="mx-0.5 my-1 h-px bg-neutral-800" />
-      <button
-        type="button"
-        disabled={!query.trim() || exact !== undefined}
-        onClick={() => add(null, query.trim())}
-        className={MENU_ITEM}
-      >
-        {Icon.pencil} New: {query.trim() || "…"}
-      </button>
+      {onBoardAs ? (
+        <button type="button" disabled className={MENU_ITEM}>
+          Already on the board: {onBoardAs.name}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={!query.trim() || exact !== undefined}
+          onClick={() => add(null, query.trim())}
+          className={MENU_ITEM}
+        >
+          {Icon.pencil} New: {query.trim() || "…"}
+        </button>
+      )}
     </Popover>
   );
 }
@@ -809,7 +844,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   );
   const stateOf = (c: CharacterCard) =>
     states.get(c.id) ?? cardState(c, staged);
-  const onBoard = useMemo(() => new Set(cards.map((c) => c.id)), [cards]);
+  const onBoard = useMemo(
+    () => new Map(cards.map((c) => [c.id, c.name])),
+    [cards],
+  );
   const nameOf = useCallback(
     (id: string) =>
       states.get(id)?.name ?? cards.find((c) => c.id === id)?.name ?? id,

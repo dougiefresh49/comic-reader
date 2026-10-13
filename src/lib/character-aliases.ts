@@ -97,22 +97,40 @@ export interface NamedCharacter {
 }
 
 /**
+ * A name's words in sorted order, slugified: "Dimension X Green Ranger" and
+ * "Green Dimension X Ranger" both give "dimension-green-ranger-x". Two names
+ * with equal keys are the same words in another order.
+ */
+export function nameWords(text: string): string {
+  return slugify(text).split("-").filter(Boolean).sort().join("-");
+}
+
+/**
  * The one name rule for outside text (wiki names, new aliases): a name means
  * a `characters` row when, slugified, it is the row's id, display name or an
- * alias. Ids win over display names, display names over aliases.
+ * alias. Ids win over display names, display names over aliases. When none
+ * of those match, the same words in another order (`nameWords`) mean that
+ * row, unless they mean two rows.
  */
 export function nameResolver<T extends NamedCharacter>(
   characters: T[],
 ): (name: string) => T | undefined {
   const rowByKey = new Map<string, T>();
+  // null marks a word key two rows give: the fallback picks neither.
+  const rowByWords = new Map<string, T | null>();
   const index = (key: string, row: T) => {
-    if (key && !rowByKey.has(key)) rowByKey.set(key, row);
+    if (!key) return;
+    if (!rowByKey.has(key)) rowByKey.set(key, row);
+    const words = nameWords(key);
+    const had = rowByWords.get(words);
+    rowByWords.set(words, had === undefined || had === row ? row : null);
   };
   for (const row of characters) index(row.id, row);
   for (const row of characters) index(slugify(row.display_name ?? ""), row);
   for (const row of characters)
     for (const alias of row.aliases) index(slugify(alias), row);
-  return (name) => rowByKey.get(slugify(name));
+  return (name) =>
+    rowByKey.get(slugify(name)) ?? rowByWords.get(nameWords(name)) ?? undefined;
 }
 
 /** Every `characters` row with its global aliases, for the name rule. */
