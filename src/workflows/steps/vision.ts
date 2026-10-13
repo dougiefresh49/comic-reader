@@ -17,6 +17,7 @@ import {
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json, TablesInsert } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
+import { readWithRetry } from "./read-retry";
 import {
   bubbleHasContext,
   buildContextUpdate,
@@ -358,7 +359,7 @@ export async function buildKnownCharacterListOrFatal(
   return names;
 }
 
-/** `readAliases`, with a failed read fatal for the page. */
+/** `readAliases`, retried in the step, then fatal for the page. */
 async function readAliasesOrFatal(
   supabase: TypedClient,
   characterIds: string[],
@@ -366,13 +367,10 @@ async function readAliasesOrFatal(
   pageLabel: string,
 ): Promise<Map<string, string[]>> {
   const { readAliases } = await import("~/lib/character-aliases");
-  try {
-    return await readAliases(supabase, characterIds, bookId);
-  } catch (err: unknown) {
-    throw new FatalError(
-      `aliases read failed for ${pageLabel}: ${errorText(err)}`,
-    );
-  }
+  return readWithRetry("aliases", pageLabel, async () => ({
+    data: await readAliases(supabase, characterIds, bookId),
+    error: null,
+  }));
 }
 
 async function resolveCharacterIdOrFatal(
@@ -382,27 +380,14 @@ async function resolveCharacterIdOrFatal(
   pageLabel: string,
 ): Promise<string | null> {
   const directId = name.toLowerCase().replace(/\s+/g, "-");
-  const { data: direct, error: directErr } = await supabase
-    .from("characters")
-    .select("id")
-    .eq("id", directId)
-    .maybeSingle();
-  if (directErr) {
-    throw new FatalError(
-      `characters read failed for ${pageLabel}: ${directErr.message}`,
-    );
-  }
+  const direct = await readWithRetry("characters", pageLabel, () =>
+    supabase.from("characters").select("id").eq("id", directId).maybeSingle(),
+  );
   if (direct) return directId;
 
-  const { data: allChars, error: allErr } = await supabase
-    .from("characters")
-    .select("id, display_name")
-    .limit(200);
-  if (allErr) {
-    throw new FatalError(
-      `characters read failed for ${pageLabel}: ${allErr.message}`,
-    );
-  }
+  const allChars = await readWithRetry("characters", pageLabel, () =>
+    supabase.from("characters").select("id, display_name").limit(200),
+  );
 
   if (allChars) {
     const aliases = await readAliasesOrFatal(

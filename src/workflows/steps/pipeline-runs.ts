@@ -106,18 +106,31 @@ export async function recordMasksFailure(
  * cancel-ingest already marked 'cancelled' is left alone. A run with no
  * row (trigger-ingest's insert failed) logs that and returns. A failed write
  * is logged, not thrown, so it cannot fail the run or mask its own error.
+ * An `error` is written to `steps.error` first, where the pipeline page reads it (#888).
  */
 export async function closePipelineRun(
   bookId: string,
   issueId: string,
   status: "completed" | "failed",
+  error?: string,
 ): Promise<void> {
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
   const { workflowRunId } = getWorkflowMetadata();
   const client = await createTypedStepClient();
 
-  const { data, error } = await client
+  if (error !== undefined) {
+    await updateRunSteps(
+      client,
+      bookId,
+      issueId,
+      workflowRunId,
+      (steps) => ({ ...steps, error }),
+      "pipeline-runs",
+    );
+  }
+
+  const { data, error: writeErr } = await client
     .from("pipeline_runs")
     .update({ status, completed_at: new Date().toISOString() })
     .eq("book_id", bookId)
@@ -126,9 +139,9 @@ export async function closePipelineRun(
     .eq("status", "running")
     .select("id");
 
-  if (error) {
+  if (writeErr) {
     console.log(
-      `[pipeline-runs] ${status} write failed for ${bookId}/${issueId} run ${workflowRunId}: ${error.message}`,
+      `[pipeline-runs] ${status} write failed for ${bookId}/${issueId} run ${workflowRunId}: ${writeErr.message}`,
     );
     return;
   }
