@@ -56,13 +56,15 @@ function onRadioArrows(e: React.KeyboardEvent<HTMLElement>) {
 }
 
 /**
- * One radio row: the dot, the name, a grey line of facts, and Play. Once
+ * One radio row: the dot, the name, a grey line of facts, an optional note
+ * that wraps rather than cuts off, and Play. Once
  * played, a line under it says where the audio came from, or, for a voice
  * with no audio anywhere, offers Make a sample. Only the group's tab stop is in the Tab order.
  */
 function VoiceRow({
   name,
   sub,
+  note,
   on,
   tabStop,
   locked,
@@ -74,6 +76,8 @@ function VoiceRow({
 }: {
   name: string;
   sub: React.ReactNode;
+  /** A line under the facts that wraps, for text that must read in full. */
+  note?: React.ReactNode;
   on: boolean;
   /** The group's one Tab stop: the checked row, else the first. */
   tabStop: boolean;
@@ -128,6 +132,7 @@ function VoiceRow({
         <span className="flex min-w-0 items-center gap-1.5 truncate text-[11.5px] text-neutral-400">
           {sub}
         </span>
+        {note && <span className="text-[11.5px] text-neutral-400">{note}</span>}
       </span>
       {play ? (
         <PlayButton url={play.url} playKey={play.playKey} name={name} />
@@ -357,6 +362,11 @@ export function VoiceTab({
   }, [tiedMove]);
   const mode: "free" | "swap" =
     tiedMove || swapMode || free === 0 ? "swap" : "free";
+  // The list sits low in the tab: scroll it into view when it opens (#882).
+  const swapList = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mode === "swap") swapList.current?.scrollIntoView({ block: "nearest" });
+  }, [mode, card.id]);
   // Its own voice, unless a staged archive already frees that slot (as `pick` chooses).
   const ownSlot = model?.slots.find(
     (v) =>
@@ -611,6 +621,7 @@ export function VoiceTab({
               <div
                 role="radiogroup"
                 aria-label="Voice to swap out"
+                ref={swapList}
                 onKeyDown={onRadioArrows}
                 // Grows into the space Lines' cap frees (#882): half the screen, not a fixed 230px.
                 className="max-h-[50vh] overflow-y-auto"
@@ -621,12 +632,8 @@ export function VoiceTab({
                   const why = lockReason(s);
                   const g = group(s);
                   const isOwn = g === 0;
-                  const says =
-                    g === 2
-                      ? usedBy(s).map((u) => u.name)
-                      : g === 1
-                        ? freeWhy(s)
-                        : [];
+                  const says = g === 2 ? usedBy(s).map((u) => u.name) : [];
+                  const silent = g === 1 ? freeWhy(s) : [];
                   const heading =
                     HEADING[g] && (i === 0 || group(candidates[i - 1]!) !== g)
                       ? HEADING[g]
@@ -673,6 +680,7 @@ export function VoiceTab({
                             )}
                           </>
                         }
+                        note={silent.length > 0 && silent.join(", ")}
                         playVoiceId={h.voiceUuid}
                         onPick={() => onSlotSwap(s)}
                       />
