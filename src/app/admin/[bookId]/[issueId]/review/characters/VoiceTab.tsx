@@ -328,10 +328,10 @@ export function VoiceTab({
   )?.slot;
 
   const q = search.trim().toLowerCase();
-  // Who else in this issue speaks in a slot's voice.
+  // Who in this issue speaks in a slot's voice now, this character included.
   const usedBy = (s: RosterSlot) =>
     s.holder.kind !== "free" && s.holder.voiceUuid
-      ? (speakers.get(s.holder.voiceUuid) ?? []).filter((n) => n !== card.name)
+      ? (speakers.get(s.holder.voiceUuid) ?? [])
       : [];
   // The Swap out list's groups in display order: its own, movable and unused
   // here, movable and used here, then locked.
@@ -376,7 +376,10 @@ export function VoiceTab({
   const swapStop =
     candidates.find((s) => s.index === tiedSlot?.index)?.index ??
     candidates.find((s) => s.lock === "movable")?.index;
-  const silentIfSwapped = tiedSlot ? usedBy(tiedSlot) : [];
+  // This character is leaving the voice, so only the others go silent.
+  const silentIfSwapped = tiedSlot
+    ? usedBy(tiedSlot).filter((n) => n !== card.name)
+    : [];
 
   return (
     <div>
