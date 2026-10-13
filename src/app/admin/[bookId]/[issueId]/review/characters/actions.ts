@@ -27,6 +27,12 @@ import {
   voiceSamplePath,
 } from "~/lib/voice-sample";
 import { slugify } from "~/lib/character-id";
+import {
+  AliasTakenError,
+  addAlias,
+  isName,
+  removeAlias,
+} from "~/lib/character-aliases";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
   canApproveCharacters,
@@ -953,6 +959,67 @@ export async function makeVoiceSample(args: {
     return { ok: true, url, from: "sample" };
   } catch (err) {
     return fail("making a voice sample", err);
+  }
+}
+
+/**
+ * The panel's + Alias (#879): a global alias for the character. The name
+ * check also reads this book's aliases, so a name that means someone else on
+ * this board is refused, with that character's name. A name that already
+ * means this character is a quiet answer, not an error.
+ */
+export async function addCharacterAlias(args: {
+  scope: Scope;
+  characterId: string;
+  alias: string;
+}): Promise<ActionResult> {
+  const { scope, characterId } = args;
+  const alias = args.alias.trim();
+  if (!isName(alias))
+    return { ok: false, error: "Type a name with a letter or a number." };
+  try {
+    await requireAdmin();
+    // No write `bookId`, so the row is global; this book's aliases still
+    // count in the name check.
+    const added = await addAlias(
+      supabaseAdmin,
+      characterId,
+      alias,
+      undefined,
+      scope.bookId,
+    );
+    revalidate(scope);
+    return {
+      ok: true,
+      message: added
+        ? `Added "${alias}".`
+        : `"${alias}" already means this character.`,
+    };
+  } catch (err) {
+    if (err instanceof AliasTakenError)
+      return {
+        ok: false,
+        error: `"${alias}" already means ${err.by.display_name ?? err.by.id}.`,
+      };
+    return fail("adding an alias", err);
+  }
+}
+
+/** The panel's alias Remove (#879): deletes that one row of the character's. */
+export async function removeCharacterAlias(args: {
+  scope: Scope;
+  characterId: string;
+  aliasId: number;
+}): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const { scope, characterId, aliasId } = args;
+    if (!Number.isInteger(aliasId)) throw new Error("no alias was picked");
+    const alias = await removeAlias(supabaseAdmin, aliasId, characterId);
+    revalidate(scope);
+    return { ok: true, message: `Removed "${alias}".` };
+  } catch (err) {
+    return fail("removing an alias", err);
   }
 }
 

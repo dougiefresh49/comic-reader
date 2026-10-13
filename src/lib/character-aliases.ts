@@ -23,17 +23,24 @@ function must(what: string, error: { message: string } | null): void {
   if (error) throw new Error(`aliases: ${what}: ${error.message}`);
 }
 
+/** One `aliases` row of a character: `book` is a row scoped to the book it was read with. */
+export interface AliasEntry {
+  id: number;
+  alias: string;
+  scope: "global" | "book";
+}
+
 /**
- * The aliases of each character in `characterIds`, keyed by `character_id`,
- * each list in the order the rows were written. Global rows always; with
- * `bookId`, that book's rows too. A character with none is left out of the
- * map. Throws on a failed read.
+ * The alias rows of each character in `characterIds`, keyed by
+ * `character_id`, each list in the order the rows were written. Global rows
+ * always; with `bookId`, that book's rows too. A character with none is left
+ * out of the map. Throws on a failed read.
  */
-export async function readAliases(
+export async function readAliasEntries(
   client: Client,
   characterIds: Iterable<string>,
   bookId?: string,
-): Promise<Map<string, string[]>> {
+): Promise<Map<string, AliasEntry[]>> {
   const ids = [...new Set(characterIds)];
   // Two reads with `.eq()` filters rather than one `.or()` string, so the
   // book id is never spliced into PostgREST filter syntax.
@@ -46,20 +53,37 @@ export async function readAliases(
     );
   }
   rows.sort((a, b) => a.id - b.id);
-  const out = new Map<string, string[]>();
+  const out = new Map<string, AliasEntry[]>();
   for (const row of rows) {
     if (!row.character_id) continue;
     const list = out.get(row.character_id) ?? [];
-    list.push(row.alias);
+    list.push({ id: row.id, alias: row.alias, scope: row.scope });
     out.set(row.character_id, list);
   }
   return out;
+}
+
+/**
+ * The aliases of each character in `characterIds`, keyed by `character_id`:
+ * `readAliasEntries` as text only. Global rows always; with `bookId`, that
+ * book's rows too. Throws on a failed read.
+ */
+export async function readAliases(
+  client: Client,
+  characterIds: Iterable<string>,
+  bookId?: string,
+): Promise<Map<string, string[]>> {
+  const entries = await readAliasEntries(client, characterIds, bookId);
+  return new Map(
+    [...entries].map(([id, list]) => [id, list.map((e) => e.alias)]),
+  );
 }
 
 interface AliasRow {
   id: number;
   alias: string;
   character_id: string | null;
+  scope: "global" | "book";
 }
 
 /** One scope's alias rows for a set of character ids, paged past the row cap. */
@@ -82,7 +106,7 @@ async function readAliasRows(
       .range(out.length, out.length + PAGE - 1);
     must("reading aliases", error);
     const page = data ?? [];
-    out.push(...page);
+    out.push(...page.map((row) => ({ ...row, scope })));
     if (page.length < PAGE) return out;
   }
 }
@@ -133,9 +157,10 @@ export function nameResolver<T extends NamedCharacter>(
     rowByKey.get(slugify(name)) ?? rowByWords.get(nameWords(name)) ?? undefined;
 }
 
-/** Every `characters` row with its global aliases, for the name rule. */
+/** Every `characters` row with its global aliases (and with `bookId`, that book's too), for the name rule. */
 export async function readNamedCharacters(
   client: Client,
+  bookId?: string,
 ): Promise<NamedCharacter[]> {
   const rows: {
     id: string;
@@ -155,6 +180,7 @@ export async function readNamedCharacters(
   const aliases = await readAliases(
     client,
     rows.map((r) => r.id),
+    bookId,
   );
   return rows.map((r) => ({ ...r, aliases: aliases.get(r.id) ?? [] }));
 }
@@ -166,29 +192,53 @@ export async function loadNameResolver(
   return nameResolver(await readNamedCharacters(client));
 }
 
+/** A name has a letter or a digit once slugified: "-" or "!!" is not one. */
+export function isName(text: string): boolean {
+  return /[a-z0-9]/.test(slugify(text));
+}
+
+/** `addAlias`'s refusal when the name already means another character, `by`. */
+export class AliasTakenError extends Error {
+  readonly by: NamedCharacter;
+  constructor(name: string, by: NamedCharacter) {
+    super(`aliases: "${name}" already means ${by.id}`);
+    this.by = by;
+  }
+}
+
 /**
  * Makes a name resolve to a character by writing one `aliases` row,
  * `canonical` left null, scope global unless `bookId` is given. False when
- * the name already means that character, a throw when it means another. A
- * row the table already holds under (alias_norm, scope, scope_id) is left as
- * it is.
+ * the name already means that character, an `AliasTakenError` when it means
+ * another. The name check reads global aliases, plus `checkBookId`'s when
+ * given (a global alias added from that book's screen). True only when a row
+ * was written: when the same name landed first (two adds racing), the name
+ * is checked again and answers as above, or throws.
  */
 export async function addAlias(
   client: Client,
   characterId: string,
   alias: string,
   bookId?: string,
+  checkBookId?: string,
 ): Promise<boolean> {
   const name = alias.trim();
-  if (!slugify(name)) throw new Error(`aliases: "${name}" is not a name`);
-  const characters = await readNamedCharacters(client);
+  if (!isName(name)) throw new Error(`aliases: "${name}" is not a name`);
+  const characters = await readNamedCharacters(client, checkBookId);
   const means = nameResolver(characters)(name);
   if (means?.id === characterId) return false;
-  if (means) throw new Error(`aliases: "${name}" already means ${means.id}`);
+  if (means) throw new AliasTakenError(name, means);
   if (!characters.some((c) => c.id === characterId))
     throw new Error(`aliases: no character ${characterId}`);
-  await writeAlias(client, characterId, name, bookId);
-  return true;
+  if (await insertAlias(client, characterId, name, bookId)) return true;
+  // The row's (alias_norm, scope, scope_id) was taken after the check: say
+  // who holds the name now, reading the scope the write was in.
+  const now = nameResolver(
+    await readNamedCharacters(client, bookId ?? checkBookId),
+  )(name);
+  if (now?.id === characterId) return false;
+  if (now) throw new AliasTakenError(name, now);
+  throw new Error(`aliases: "${name}" was not written for ${characterId}`);
 }
 
 /**
@@ -202,7 +252,17 @@ export async function writeAlias(
   alias: string,
   bookId?: string,
 ): Promise<void> {
-  const { error } = await db(client)
+  await insertAlias(client, characterId, alias, bookId);
+}
+
+/** `writeAlias`'s upsert, answering whether it inserted a row (false: the key was already held). */
+async function insertAlias(
+  client: Client,
+  characterId: string,
+  alias: string,
+  bookId?: string,
+): Promise<boolean> {
+  const { data, error } = await db(client)
     .from("aliases")
     .upsert(
       {
@@ -212,8 +272,31 @@ export async function writeAlias(
         scope_id: bookId ?? null,
       },
       { onConflict: "alias_norm,scope,scope_id", ignoreDuplicates: true },
-    );
+    )
+    .select("id");
   must(`writing the alias "${alias}" for ${characterId}`, error);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Deletes the alias row `aliasId` when it belongs to `characterId`, and
+ * returns its text. Throws when no such row was deleted.
+ */
+export async function removeAlias(
+  client: Client,
+  aliasId: number,
+  characterId: string,
+): Promise<string> {
+  const { data, error } = await db(client)
+    .from("aliases")
+    .delete()
+    .eq("id", aliasId)
+    .eq("character_id", characterId)
+    .select("alias");
+  must(`deleting alias ${aliasId} of ${characterId}`, error);
+  const row = data?.[0];
+  if (!row) throw new Error(`aliases: ${characterId} has no alias ${aliasId}`);
+  return row.alias;
 }
 
 /** Deletes every alias scoped to a book; for a scratch book's cleanup (`scripts/smoke-ingest.ts`), never a real one. */
