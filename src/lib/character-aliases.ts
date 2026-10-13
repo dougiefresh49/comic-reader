@@ -259,9 +259,11 @@ export async function readNamedCharacters(
  *
  * - Global scope: ids, display names and global aliases hold a name, by the
  *   `nameResolver` rule over those rows.
- * - Book scope: only `bookId`'s book aliases hold one, on the exact slug or
- *   the same words. Another character's id or display name does not, because
- *   in that book the alias outranks them (`nameResolver`).
+ * - Book scope: only `bookId`'s book aliases hold one, on the exact slug,
+ *   since that is all a book alias wins on in `nameResolver`. Another
+ *   character's id or display name does not, because in that book the alias
+ *   outranks them, and neither do the same words in another order: "Yellow
+ *   Dimension X Ranger" can be added beside "Dimension X Yellow Ranger".
  *
  * A global alias does not block a book alias of the same name, nor a book
  * alias a global one.
@@ -286,10 +288,11 @@ async function readScope(
       .map((e) => e.alias);
     return { ...r, aliases, bookAliases: bookId ? aliases : undefined };
   });
-  const means = bookId
-    ? keyResolver(bookAliasKeys(characters))
-    : nameResolver(characters);
-  return { characters, means };
+  if (!bookId) return { characters, means: nameResolver(characters) };
+  const holder = new Map<string, NamedCharacter>();
+  for (const [key, row] of bookAliasKeys(characters))
+    if (key && !holder.has(key)) holder.set(key, row);
+  return { characters, means: (name) => holder.get(slugify(name)) };
 }
 
 /** The name rule over every `characters` row and its global aliases. */
