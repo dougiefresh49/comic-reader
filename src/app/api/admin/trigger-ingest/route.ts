@@ -1,9 +1,10 @@
 import "server-only";
 import { type NextRequest } from "next/server";
-import { getHookByToken, getRun, start } from "workflow/api";
-import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
+import { getRun, start } from "workflow/api";
+import { WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { ingestPipeline } from "~/workflows/ingest-pipeline";
+import { findGateHook, isDeploymentGone } from "~/workflows/gate-hooks";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
 import { STEP_ORDER, resolvePipelineStep } from "~/lib/pipeline-steps";
 import { PAUSE_TO_HOOK_STEP, ingestHookToken } from "../cancel-ingest/hooks";
@@ -147,15 +148,29 @@ export async function POST(req: NextRequest) {
   const stale: string[] = [];
 
   for (const gate of Object.keys(PAUSE_TO_HOOK_STEP)) {
+    const token = ingestHookToken(body.bookId, body.issueId, gate);
     try {
-      const hook = await getHookByToken(
-        ingestHookToken(body.bookId, body.issueId, gate),
-      );
-      return refuse(hook.runId, `paused at ${gate}`);
-    } catch (err) {
-      if (!HookNotFoundError.is(err)) {
-        return checkFailed(`a run paused at ${gate}`, err);
+      const hook = await findGateHook(token);
+      if (!hook) continue;
+      if (!(await isDeploymentGone(hook.runId))) {
+        return refuse(hook.runId, `paused at ${gate}`);
       }
+      // A run on a deleted deployment can never resume, but its hook would
+      // still kill the new run at this gate, so cancel it to free the token.
+      await getRun(hook.runId).cancel();
+      if (await findGateHook(token)) {
+        return checkFailed(
+          `a run paused at ${gate}`,
+          new Error(
+            `run ${hook.runId} is on a deleted deployment and its hook was still held after cancelling it`,
+          ),
+        );
+      }
+      stale.push(
+        `hook ${gate} held by run ${hook.runId} on a deleted deployment, cancelled`,
+      );
+    } catch (err) {
+      return checkFailed(`a run paused at ${gate}`, err);
     }
   }
   if (issue.pipeline_paused) {
@@ -172,6 +187,13 @@ export async function POST(req: NextRequest) {
     try {
       const status = await getRun(runId).status;
       if (status === "pending" || status === "running") {
+        // A run on a deleted deployment never moves again; no hook to free.
+        if (await isDeploymentGone(runId)) {
+          stale.push(
+            `running row ${row.id} whose run ${runId} is on a deleted deployment`,
+          );
+          continue;
+        }
         return refuse(
           runId,
           `${status} (pipeline_step ${issue.pipeline_step ?? "unknown"})`,
