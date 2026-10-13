@@ -396,25 +396,22 @@ export function voiceFor(
   return found.voice;
 }
 
-/** The issue hub's castlist counts: the issue's rows, those settled for audio (an active voice, or "no audio"), and the display names of the rest, sorted. */
+/** The issue hub's two castlist counts: the issue's rows, and those settled for audio (an active voice, or "no audio"). */
 export async function countIssueCast(
   client: Client,
   bookId: string,
   issueId: string,
-): Promise<{ rows: number; withVoice: number; needVoice: string[] }> {
+): Promise<{ rows: number; withVoice: number }> {
   const book = await loadBookCast(client, bookId);
   const rows = book.rows.filter((r) => r.issue_id === issueId);
-  const hasVoice = (r: CastRow) =>
-    r.no_audio ||
-    (r.voice_uuid !== null &&
-      book.voices.get(r.voice_uuid)?.status === "active");
   return {
     rows: rows.length,
-    withVoice: rows.filter(hasVoice).length,
-    needVoice: rows
-      .filter((r) => !hasVoice(r))
-      .map((r) => r.display_name)
-      .sort((a, b) => a.localeCompare(b)),
+    withVoice: rows.filter(
+      (r) =>
+        r.no_audio ||
+        (r.voice_uuid !== null &&
+          book.voices.get(r.voice_uuid)?.status === "active"),
+    ).length,
   };
 }
 

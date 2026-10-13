@@ -244,6 +244,17 @@ function ratio(done: number, total: number, unit: string): string {
   return `${done} of ${total} ${unit}`;
 }
 
+/**
+ * The one phrase for the voices gap, lower case; the casting row and the
+ * voices-audio header both use it, so they cannot disagree.
+ */
+function needVoicePhrase(c: ProgressCounts): string {
+  const n = c.needVoice.length;
+  return n === 0
+    ? "no characters still need a voice"
+    : `${n} ${plural(n, "character")} still ${plural(n, "needs", "need")} a voice`;
+}
+
 /** The step's progress as one SELECT-backed line; null when it has no countable unit. */
 function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
   switch (step) {
@@ -262,13 +273,11 @@ function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
         "bubbles have word boxes",
       );
     case "casting": {
-      // The castlist rows with no voice: the gap the stage header counts.
-      // A `no_audio` row is settled without a voice, so "none left" does not
-      // claim everyone has one.
-      const left = c.castlist - c.castlistWithVoice;
-      if (c.castlist === 0) return "No characters in the castlist";
-      if (left === 0) return "No characters still need a voice";
-      return `${left} ${plural(left, "character")} still ${plural(left, "needs", "need")} a voice`;
+      // The speakers the voices gate still waits on (`needVoice`). A "no
+      // audio" character is settled without a voice, so "none left" does
+      // not claim everyone has one.
+      const phrase = needVoicePhrase(c);
+      return phrase.charAt(0).toUpperCase() + phrase.slice(1);
     }
     case "generate-audio":
       return ratio(
@@ -301,7 +310,7 @@ function stageResult(
     case "pages":
       return `${c.bubbles} ${plural(c.bubbles, "bubble")} on ${c.pages} ${plural(c.pages, "page")}`;
     case "voices-audio":
-      return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${c.castlistWithVoice} of ${c.castlist} characters have a voice`;
+      return `${c.bubblesWithAudio} of ${c.spokenBubbles} spoken bubbles have audio, ${needVoicePhrase(c)}`;
     case "ready":
       return `${c.panelsWithMasks} of ${c.panels} panels have masks`;
   }
@@ -389,8 +398,8 @@ export function buildHubView(
       } else if (status !== "pending") {
         const progress = stepProgress(step, counts);
         if (progress) parts.push(progress);
-        if (step === "casting" && counts.castlistNeedsVoice.length > 0)
-          names = counts.castlistNeedsVoice;
+        if (step === "casting" && counts.needVoice.length > 0)
+          names = counts.needVoice;
       }
       if (GATE_STEPS.has(step) && run) {
         for (const w of run.gateWaits) {

@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
-import { countIssueCast } from "~/lib/cast";
+import { castRow, loadBookCast } from "~/lib/cast";
+import { planCastingTasks } from "~/workflows/steps/casting-tasks";
 import { whereWordGeometryCandidate } from "~/lib/word-geometry-assign";
 
 /**
@@ -60,10 +61,12 @@ export interface ProgressCounts {
   /** Face detections on this issue's panels plus face exemplars from it. */
   faces: number;
   facesNamed: number;
-  castlist: number;
-  castlistWithVoice: number;
-  /** Display names of the castlist rows with no voice, sorted: `castlist - castlistWithVoice` of them. */
-  castlistNeedsVoice: string[];
+  /**
+   * Display names, sorted, of the speakers the voices stop still has to
+   * settle: the voices gate's `planCastingTasks(...).unsettled`, so a
+   * character with no lines in the issue is never counted.
+   */
+  needVoice: string[];
 }
 
 export interface PipelineProgress {
@@ -179,7 +182,8 @@ async function getCounts(
     wordGeometryDone,
     exemplars,
     exemplarsNamed,
-    cast,
+    plan,
+    book,
   ] = await Promise.all([
     panelsQuery,
     // select count(*) from pages where book_id = $1 and issue_id = $2
@@ -220,10 +224,12 @@ async function getCounts(
       .eq("book_id", bookId)
       .eq("source_issue", issueId)
       .not("character_id", "is", null),
-    // The castlist through `~/lib/cast`: the issue's rows, those with an
-    // active voice or `no_audio`, and the names of the rest. A failed read
-    // throws from `~/lib/cast`.
-    countIssueCast(supabaseAdmin, bookId, issueId),
+    // The voices gate's own read (`readVoicesGate`): speakers in non-ignored
+    // bubbles with no usable voice and no "no audio", plus open task rows.
+    // A failed read throws from `planCastingTasks`.
+    planCastingTasks(supabaseAdmin, bookId, issueId),
+    // The book's cast, only for the unsettled characters' display names.
+    loadBookCast(supabaseAdmin, bookId),
   ]);
 
   if (panelsResult.error) countsReadFailed("panels", panelsResult.error);
@@ -273,9 +279,14 @@ async function getCounts(
     wordGeometryDone: countOf("wordGeometryDone", wordGeometryDone),
     faces: detections + countOf("exemplars", exemplars),
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
-    castlist: cast.rows,
-    castlistWithVoice: cast.withVoice,
-    castlistNeedsVoice: cast.needVoice,
+    needVoice: plan.unsettled
+      .map(
+        (id) =>
+          castRow(book, id, issueId)?.display_name ??
+          book.resolve(id)?.display_name ??
+          id,
+      )
+      .sort((a, b) => a.localeCompare(b)),
   };
 }
 
