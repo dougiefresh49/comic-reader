@@ -3,7 +3,7 @@
 // Then the character's first lines. Every change here is staged.
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ArchiveMove, Roster, RosterSlot } from "~/lib/casting-moves";
 import { acceptedFor } from "./design-sheet/accepted";
 import { DesignVoiceRow } from "./design-sheet/DesignSheet";
@@ -328,6 +328,25 @@ export function VoiceTab({
   )?.slot;
 
   const q = search.trim().toLowerCase();
+  // Who else in this issue speaks in a slot's voice.
+  const usedBy = (s: RosterSlot) =>
+    s.holder.kind !== "free" && s.holder.voiceUuid
+      ? (speakers.get(s.holder.voiceUuid) ?? []).filter((n) => n !== card.name)
+      : [];
+  // The Swap out list's groups in display order: its own, movable and unused
+  // here, movable and used here, then locked.
+  const group = (s: RosterSlot) =>
+    s.holder.kind === "repo" && s.holder.characterId === card.id
+      ? 0
+      : s.lock !== "movable"
+        ? 3
+        : usedBy(s).length > 0
+          ? 2
+          : 1;
+  const HEADING: Record<number, string> = {
+    1: "Not used in this issue",
+    2: "Used in this issue",
+  };
   const candidates = (model?.slots ?? [])
     .filter(
       (v) =>
@@ -343,15 +362,9 @@ export function VoiceTab({
           s.holder.owner.toLowerCase().includes(q)),
     )
     .sort((a, b) => {
-      const isOwn = (s: RosterSlot) =>
-        s.holder.kind === "repo" && s.holder.characterId === card.id ? 1 : 0;
-      const locked = (s: RosterSlot) => (s.lock === "movable" ? 0 : 1);
       const outside = (s: RosterSlot) => (s.holder.kind === "outside" ? 1 : 0);
       return (
-        isOwn(b) - isOwn(a) ||
-        locked(a) - locked(b) ||
-        outside(a) - outside(b) ||
-        a.index - b.index
+        group(a) - group(b) || outside(a) - outside(b) || a.index - b.index
       );
     });
   // Each radio group's one Tab stop: its checked row, else its first.
@@ -363,12 +376,7 @@ export function VoiceTab({
   const swapStop =
     candidates.find((s) => s.index === tiedSlot?.index)?.index ??
     candidates.find((s) => s.lock === "movable")?.index;
-  const silentIfSwapped =
-    tiedSlot && tiedSlot.holder.kind !== "free" && tiedSlot.holder.voiceUuid
-      ? (speakers.get(tiedSlot.holder.voiceUuid) ?? []).filter(
-          (n) => n !== card.name,
-        )
-      : [];
+  const silentIfSwapped = tiedSlot ? usedBy(tiedSlot) : [];
 
   return (
     <div>
@@ -557,48 +565,63 @@ export function VoiceTab({
                 onKeyDown={onRadioArrows}
                 className="max-h-[230px] overflow-y-auto"
               >
-                {candidates.map((s) => {
+                {candidates.map((s, i) => {
                   const h = s.holder;
                   if (h.kind === "free") return null;
                   const why = lockReason(s);
-                  const isOwn =
-                    s.holder.kind === "repo" &&
-                    s.holder.characterId === card.id;
+                  const g = group(s);
+                  const isOwn = g === 0;
+                  const says = g === 2 ? usedBy(s) : [];
+                  const heading =
+                    HEADING[g] && (i === 0 || group(candidates[i - 1]!) !== g)
+                      ? HEADING[g]
+                      : null;
                   const kind = voices.find((v) => v.id === h.voiceUuid)?.kind;
                   return (
-                    <VoiceRow
-                      key={s.index}
-                      compact
-                      name={h.name}
-                      on={tiedSlot?.index === s.index}
-                      tabStop={s.index === swapStop}
-                      locked={why !== null}
-                      lockTitle={why ?? undefined}
-                      sub={
-                        <>
-                          {s.backup && (
-                            <span
-                              title={backupWord(s.backup)}
-                              className={`size-1.5 shrink-0 rounded-full ${
-                                s.backup === "ready"
-                                  ? "bg-emerald-400"
-                                  : s.backup === "at confirm"
-                                    ? "bg-sky-400"
-                                    : "border border-red-400"
-                              }`}
-                            />
-                          )}
-                          {h.kind === "outside" && <span>{h.owner} ·</span>}
-                          {kind && <span>{kind} ·</span>}
-                          <SlotNumber n={s.index} />
-                          {s.backup && <span>· {backupWord(s.backup)}</span>}
-                          {isOwn && <span className={TAG_NOW}>its own</span>}
-                          {why && <span className="truncate">· {why}</span>}
-                        </>
-                      }
-                      playVoiceId={h.voiceUuid}
-                      onPick={() => onSlotSwap(s)}
-                    />
+                    <Fragment key={s.index}>
+                      {heading && (
+                        <div className={`mt-1.5 mb-1 first:mt-0 ${LABEL}`}>
+                          {heading}
+                        </div>
+                      )}
+                      <VoiceRow
+                        compact
+                        name={h.name}
+                        on={tiedSlot?.index === s.index}
+                        tabStop={s.index === swapStop}
+                        locked={why !== null}
+                        lockTitle={why ?? undefined}
+                        sub={
+                          <>
+                            {s.backup && (
+                              <span
+                                title={backupWord(s.backup)}
+                                className={`size-1.5 shrink-0 rounded-full ${
+                                  s.backup === "ready"
+                                    ? "bg-emerald-400"
+                                    : s.backup === "at confirm"
+                                      ? "bg-sky-400"
+                                      : "border border-red-400"
+                                }`}
+                              />
+                            )}
+                            {h.kind === "outside" && <span>{h.owner} ·</span>}
+                            {kind && <span>{kind} ·</span>}
+                            <SlotNumber n={s.index} />
+                            {s.backup && <span>· {backupWord(s.backup)}</span>}
+                            {isOwn && <span className={TAG_NOW}>its own</span>}
+                            {why && <span className="truncate">· {why}</span>}
+                            {says.length > 0 && (
+                              <span className="truncate">
+                                · {says.join(", ")}
+                              </span>
+                            )}
+                          </>
+                        }
+                        playVoiceId={h.voiceUuid}
+                        onPick={() => onSlotSwap(s)}
+                      />
+                    </Fragment>
                   );
                 })}
               </div>
