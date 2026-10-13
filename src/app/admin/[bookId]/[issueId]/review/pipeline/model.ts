@@ -263,13 +263,12 @@ function stepProgress(step: PipelineStep, c: ProgressCounts): string | null {
       );
     case "casting": {
       // The castlist rows with no voice: the gap the stage header counts.
+      // A `no_audio` row is settled without a voice, so "none left" does not
+      // claim everyone has one.
       const left = c.castlist - c.castlistWithVoice;
       if (c.castlist === 0) return "No characters in the castlist";
-      if (left > 0)
-        return `${left} ${plural(left, "character")} still ${plural(left, "needs", "need")} a voice`;
-      return c.castlist === 1
-        ? "1 character has a voice"
-        : `All ${c.castlist} characters have a voice`;
+      if (left === 0) return "No characters still need a voice";
+      return `${left} ${plural(left, "character")} still ${plural(left, "needs", "need")} a voice`;
     }
     case "generate-audio":
       return ratio(
