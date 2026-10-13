@@ -1,8 +1,9 @@
 import "server-only";
 import { type NextRequest } from "next/server";
-import { getHookByToken, getRun } from "workflow/api";
-import { HookNotFoundError, WorkflowRunNotFoundError } from "workflow/errors";
+import { getRun } from "workflow/api";
+import { WorkflowRunNotFoundError } from "workflow/errors";
 import { supabaseAdmin } from "~/lib/supabase-admin";
+import { findGateHook } from "~/workflows/gate-hooks";
 import { PAUSE_TO_HOOK_STEP, ingestHookToken } from "./hooks";
 import { selectIssue, updateIssue } from "~/lib/issue-queries";
 
@@ -22,13 +23,6 @@ type StateRun =
   | { runId: string; fromHook: boolean }
   | { error: string; status: number };
 
-function isHookNotFound(err: unknown): boolean {
-  return (
-    HookNotFoundError.is(err) ||
-    (err instanceof Error && /hook not found/i.test(err.message))
-  );
-}
-
 /** The run the issue row's current state belongs to: the pause's hook holder, else the newest running row. */
 async function findStateRun(
   bookId: string,
@@ -37,14 +31,14 @@ async function findStateRun(
 ): Promise<StateRun> {
   if (issue.pipeline_paused && issue.pipeline_paused_at) {
     try {
-      const hook = await getHookByToken(
+      const hook = await findGateHook(
         ingestHookToken(bookId, issueId, issue.pipeline_paused_at),
       );
-      return { runId: hook.runId, fromHook: true };
-    } catch (err) {
-      if (isHookNotFound(err)) {
+      if (!hook) {
         return { error: "Hook not found for this pause", status: 404 };
       }
+      return { runId: hook.runId, fromHook: true };
+    } catch (err) {
       return {
         error: err instanceof Error ? err.message : "Failed to look up hook",
         status: 500,
@@ -111,12 +105,8 @@ async function isRunOfIssue(
   if (rows && rows.length > 0) return true;
 
   for (const gate of Object.keys(PAUSE_TO_HOOK_STEP)) {
-    try {
-      const hook = await getHookByToken(ingestHookToken(bookId, issueId, gate));
-      if (hook.runId === runId) return true;
-    } catch (err) {
-      if (!isHookNotFound(err)) throw err;
-    }
+    const hook = await findGateHook(ingestHookToken(bookId, issueId, gate));
+    if (hook?.runId === runId) return true;
   }
   return false;
 }
