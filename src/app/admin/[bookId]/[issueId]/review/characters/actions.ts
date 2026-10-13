@@ -21,7 +21,11 @@ import { elevenLabsFetch, getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
-import { VOICE_SAMPLE_LINE, voiceSamplePath } from "~/lib/voice-sample";
+import {
+  sampleCredits,
+  VOICE_SAMPLE_LINE,
+  voiceSamplePath,
+} from "~/lib/voice-sample";
 import { slugify } from "~/lib/character-id";
 import { deleteExemplars } from "~/lib/exemplar-store";
 import {
@@ -39,12 +43,12 @@ export type ActionResult =
 /**
  * `voicePreview`'s and `makeVoiceSample`'s answer: a playable URL and where
  * it came from ("clip", "this issue", "this book", "from <book>", "sample"),
- * or null when the voice has no audio anywhere, with whether Make a sample
- * can render one; or a failure.
+ * or null when the voice has no audio anywhere, with what Make a sample
+ * would cost (null when the voice cannot render one); or a failure.
  */
 export type PreviewResult =
   | { ok: true; url: string; from: string }
-  | { ok: true; url: null; canMakeSample: boolean }
+  | { ok: true; url: null; sampleCredits: number | null }
   | { ok: false; error: string };
 
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
@@ -705,7 +709,9 @@ export async function confirmFaces(args: {
  * bubble whose `voice_id` names another voice never plays for this one.
  * Past this book (#880): a bubble rendered in the voice in any other book,
  * then the sample `makeVoiceSample` stored, then the voice's own ElevenLabs
- * `preview_url` (a free read). Each answer says where its audio came from.
+ * `preview_url` (a free read); when that read fails the preview fails too,
+ * so Play can be pressed again and never offers a paid sample on a guess.
+ * Each answer says where its audio came from.
  */
 export async function voicePreview(args: {
   scope: Scope;
@@ -715,7 +721,7 @@ export async function voicePreview(args: {
     await requireAdmin();
     const { scope, voiceId } = args;
     const voice = await readVoice(supabaseAdmin, voiceId);
-    if (!voice) return { ok: true, url: null, canMakeSample: false };
+    if (!voice) return { ok: true, url: null, sampleCredits: null };
     if (voice.source_clip_path) {
       const signed = await supabaseAdmin.storage
         .from(VOICE_CLIPS_BUCKET)
@@ -822,11 +828,11 @@ export async function voicePreview(args: {
       console.warn(`characters stop, reading ${voice.id}'s sample:`, err);
     }
     const live = canRenderIn(voice);
-    if (live) {
-      const preview = await elevenLabsPreviewUrl(live);
-      if (preview) return { ok: true, url: preview, from: "sample" };
-    }
-    return { ok: true, url: null, canMakeSample: live !== null };
+    if (!live) return { ok: true, url: null, sampleCredits: null };
+    const preview = await elevenLabsPreviewUrl(live);
+    if (preview) return { ok: true, url: preview, from: "sample" };
+    const request = await sampleRequest(live);
+    return { ok: true, url: null, sampleCredits: sampleCredits(request.text) };
   } catch (err) {
     return fail("previewing a voice", err);
   }
@@ -860,31 +866,34 @@ async function storedSample(voiceId: string): Promise<string | null> {
 
 /**
  * The voice's own sample on ElevenLabs (`GET /v1/voices/{id}`
- * `preview_url`), a free read. Null when it has none; a failed or non-OK
- * read is logged and is null too, never a failed preview.
+ * `preview_url`), a free read. Null when it has none; a failed read
+ * throws, since "none" would offer a paid sample.
  */
 async function elevenLabsPreviewUrl(
   elevenLabsId: string,
 ): Promise<string | null> {
-  try {
-    const res = await elevenLabsFetch(
-      `/v1/voices/${encodeURIComponent(elevenLabsId)}`,
-      { method: "GET" },
+  const res = await elevenLabsFetch(
+    `/v1/voices/${encodeURIComponent(elevenLabsId)}`,
+    { method: "GET" },
+  );
+  if (!res.ok)
+    throw new Error(
+      `ElevenLabs did not answer for this voice's sample (HTTP ${res.status}); press Play again`,
     );
-    if (!res.ok) {
-      console.warn(
-        `characters stop, ElevenLabs voice ${elevenLabsId}: HTTP ${res.status}`,
-      );
-      return null;
-    }
-    const body = (await res.json()) as { preview_url?: unknown };
-    return typeof body.preview_url === "string" && body.preview_url
-      ? body.preview_url
-      : null;
-  } catch (err) {
-    console.warn(`characters stop, ElevenLabs voice ${elevenLabsId}:`, err);
-    return null;
-  }
+  const body = (await res.json()) as { preview_url?: unknown };
+  return typeof body.preview_url === "string" && body.preview_url
+    ? body.preview_url
+    : null;
+}
+
+/** The sample's TTS request in the voice, with its own settings and line prefix. */
+async function sampleRequest(elevenLabsId: string) {
+  const overrides = await loadVoiceOverrides(supabaseAdmin, [elevenLabsId]);
+  return buildTtsRequest({
+    text: VOICE_SAMPLE_LINE,
+    voiceId: elevenLabsId,
+    override: overrides.get(elevenLabsId),
+  });
 }
 
 /**
@@ -913,12 +922,7 @@ export async function makeVoiceSample(args: {
     const existing = await storedSample(voice.id);
     if (existing) return { ok: true, url: existing, from: "sample" };
 
-    const overrides = await loadVoiceOverrides(supabaseAdmin, [elevenLabsId]);
-    const request = buildTtsRequest({
-      text: VOICE_SAMPLE_LINE,
-      voiceId: elevenLabsId,
-      override: overrides.get(elevenLabsId),
-    });
+    const request = await sampleRequest(elevenLabsId);
     const tts = await getElevenLabsClient();
     const response = await recordElevenLabsCall(
       {

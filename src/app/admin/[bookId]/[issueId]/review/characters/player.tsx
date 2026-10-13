@@ -13,7 +13,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { VOICE_SAMPLE_CREDITS } from "~/lib/voice-sample";
 import type { PreviewResult } from "./actions";
 import { FOCUS } from "./ui";
 
@@ -22,8 +21,8 @@ interface Player {
   playing: string | null;
   /** Voice ids a preview lookup is out for. */
   loading: ReadonlySet<string>;
-  /** Voice ids with no audio anywhere, each with whether Make a sample can render one. */
-  silent: ReadonlyMap<string, boolean>;
+  /** Voice ids with no audio anywhere, each with what Make a sample costs (null: it cannot make one). */
+  silent: ReadonlyMap<string, number | null>;
   /** Where each played voice's preview came from ("this book", "sample", ...). */
   sources: ReadonlyMap<string, string>;
   /** Voice ids a Make a sample render is out for. */
@@ -68,7 +67,9 @@ export function PlayerProvider({
   const urls = useRef(new Map<string, string | null>());
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
-  const [silent, setSilent] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const [silent, setSilent] = useState<ReadonlyMap<string, number | null>>(
+    new Map(),
+  );
   const [sources, setSources] = useState<ReadonlyMap<string, string>>(
     new Map(),
   );
@@ -120,7 +121,7 @@ export function PlayerProvider({
       }
       urls.current.set(voiceId, r.url);
       if (r.url === null) {
-        setSilent((m) => new Map(m).set(voiceId, r.canMakeSample));
+        setSilent((m) => new Map(m).set(voiceId, r.sampleCredits));
         return;
       }
       setSources((m) => new Map(m).set(voiceId, r.from));
@@ -268,13 +269,13 @@ export function PlayButton({
   );
 }
 
-/** Where a played voice's preview came from, beside its Play; nothing before the first Play. */
+/** Where a played voice's preview came from, a line under its row; nothing before the first Play. */
 export function PreviewSource({ voiceId }: { voiceId: string }) {
   const from = usePlayer().sources.get(voiceId);
   return from ? (
     <span
       title={from}
-      className="max-w-[9rem] truncate text-[11px] text-neutral-500"
+      className="col-span-2 col-start-2 truncate text-[11px] text-neutral-500"
     >
       {from}
     </span>
@@ -295,15 +296,14 @@ export function MakeSample({
   name: string;
 }) {
   const p = usePlayer();
-  const canMake = p.silent.get(voiceId);
-  if (canMake === undefined) return null;
+  const credits = p.silent.get(voiceId);
+  if (credits === undefined) return null;
   const busy = p.making.has(voiceId);
-  const cost =
-    VOICE_SAMPLE_CREDITS === null ? "paid" : `~${VOICE_SAMPLE_CREDITS} credits`;
+  const cost = `~${credits} credits`;
   return (
     <span className="col-span-2 col-start-2 flex min-w-0 items-center gap-1.5 text-[11.5px] text-neutral-500">
       no sample yet
-      {canMake && (
+      {credits !== null && (
         <button
           type="button"
           disabled={busy}

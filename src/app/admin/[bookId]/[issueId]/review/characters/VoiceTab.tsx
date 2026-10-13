@@ -56,9 +56,9 @@ function onRadioArrows(e: React.KeyboardEvent<HTMLElement>) {
 }
 
 /**
- * One radio row: the dot, the name, a grey line of facts, and Play with where
- * its audio came from. A voice with no audio anywhere gets a line under it
- * offering Make a sample. Only the group's tab stop is in the Tab order.
+ * One radio row: the dot, the name, a grey line of facts, and Play. Once
+ * played, a line under it says where the audio came from, or, for a voice
+ * with no audio anywhere, offers Make a sample. Only the group's tab stop is in the Tab order.
  */
 function VoiceRow({
   name,
@@ -132,14 +132,16 @@ function VoiceRow({
       {play ? (
         <PlayButton url={play.url} playKey={play.playKey} name={name} />
       ) : playVoiceId ? (
-        <span className="flex min-w-0 items-center gap-1.5">
-          <PreviewSource voiceId={playVoiceId} />
-          <PlayButton voiceId={playVoiceId} name={name} />
-        </span>
+        <PlayButton voiceId={playVoiceId} name={name} />
       ) : (
         <span />
       )}
-      {!play && playVoiceId && <MakeSample voiceId={playVoiceId} name={name} />}
+      {!play && playVoiceId && (
+        <>
+          <PreviewSource voiceId={playVoiceId} />
+          <MakeSample voiceId={playVoiceId} name={name} />
+        </>
+      )}
     </div>
   );
 }
