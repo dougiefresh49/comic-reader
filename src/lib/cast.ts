@@ -15,7 +15,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database";
-import { nameResolver, readAliases } from "~/lib/character-aliases";
+import { nameResolver, readAliasEntries } from "~/lib/character-aliases";
 import { slugify } from "~/lib/character-id";
 import {
   deckSentence,
@@ -99,6 +99,8 @@ export interface CharacterRow {
   id: string;
   display_name: string | null;
   aliases: string[];
+  /** The ones of `aliases` scoped to the book, which the name rule ranks above global ones (`nameResolver`). */
+  bookAliases?: string[];
   form_of: string | null;
 }
 
@@ -154,12 +156,12 @@ function must(what: string, error: { message: string } | null): void {
   if (error) throw new Error(`cast: ${what}: ${error.message}`);
 }
 
-/** Every `characters` row, with its aliases from `~/lib/character-aliases`: global ones, and the book's with `bookId`. */
+/** Every `characters` row, with its aliases from `~/lib/character-aliases`: global ones, and the book's with `bookId` (also in `bookAliases`, so the name rule ranks them first). */
 async function readCharacters(
   client: Client,
   bookId?: string,
 ): Promise<CharacterRow[]> {
-  const rows = await readAll<Omit<CharacterRow, "aliases">>(
+  const rows = await readAll<Omit<CharacterRow, "aliases" | "bookAliases">>(
     "characters",
     (from, to) =>
       db(client)
@@ -168,12 +170,19 @@ async function readCharacters(
         .order("id")
         .range(from, to),
   );
-  const aliases = await readAliases(
+  const entries = await readAliasEntries(
     client,
     rows.map((r) => r.id),
     bookId,
   );
-  return rows.map((r) => ({ ...r, aliases: aliases.get(r.id) ?? [] }));
+  return rows.map((r) => {
+    const list = entries.get(r.id) ?? [];
+    return {
+      ...r,
+      aliases: list.map((e) => e.alias),
+      bookAliases: list.filter((e) => e.scope === "book").map((e) => e.alias),
+    };
+  });
 }
 
 /** The castlist columns `CastRow` holds; the display name is read through `castlist_character_id_fkey`. */

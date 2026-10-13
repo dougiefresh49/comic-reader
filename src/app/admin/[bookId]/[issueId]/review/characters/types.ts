@@ -46,8 +46,10 @@ export interface LooseExemplar {
 /** The voice the render chain finds for a character in this issue now. */
 export interface VoiceView {
   name: string;
-  /** The character whose castlist row holds the voice, when it is borrowed. */
+  /** The character whose castlist row holds the voice, when it is borrowed: its name. */
   borrowedFrom: string | null;
+  /** The same character's id. */
+  borrowedFromId: string | null;
   /** The `voices` row id. */
   uuid: string | null;
 }
@@ -117,6 +119,14 @@ export interface KnownCharacter {
    * screen and the move dialog build for a name match need none.
    */
   aliasRows?: AliasEntry[];
+  /** In this book's cast (`proposeCast`'s members): the Form of picker's list (#891). */
+  inBook?: boolean;
+  /**
+   * `characters.form_of` (#891), the one home of form data on the page: the
+   * character this one is a form of, whose voice it speaks with; null when
+   * it is not a form. `load.ts` always sets it.
+   */
+  formOf?: { id: string; name: string } | null;
 }
 
 /** Which pipeline pause the page is answering, and why its button would be refused now. */
