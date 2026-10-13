@@ -17,6 +17,7 @@ import {
 } from "./staging";
 import type { VoiceOption } from "./types";
 import { FOCUS, Icon, MENU_ITEM, Popover } from "./ui";
+import { speakingIn, type VoiceUsers } from "./VoiceTab";
 
 /** What is being dragged: a character card, or a slot segment. */
 export type Carry =
@@ -78,8 +79,8 @@ export function SlotStrip({
   model: SlotModel | null;
   staged: Staged[];
   voices: Map<string, VoiceOption>;
-  /** Voice id to the names of the board's characters that speak in it now. */
-  speakers: Map<string, string[]>;
+  /** Voice id to the board's characters whose voice it is. */
+  speakers: VoiceUsers;
   /** A character's name on the board, staged renames included. */
   nameOf: (characterId: string) => string;
   onBoard: (characterId: string) => boolean;
@@ -275,7 +276,7 @@ function SlotMenu({
   v: SlotView;
   staged: Staged[];
   voices: Map<string, VoiceOption>;
-  speakers: Map<string, string[]>;
+  speakers: VoiceUsers;
   nameOf: (characterId: string) => string;
   onBoard: (characterId: string) => boolean;
   onFree: () => void;
@@ -302,7 +303,7 @@ function SlotMenu({
     );
   const h = s.holder;
   const characterId = h.kind === "repo" ? h.characterId : null;
-  const says = h.voiceUuid ? (speakers.get(h.voiceUuid) ?? []) : [];
+  const says = speakingIn(speakers, h.voiceUuid).map((u) => u.name);
   const why = lockReason(s);
   const outBy = v.outBy !== null ? staged[v.outBy] : undefined;
   const row = (k: string, val: React.ReactNode) => (

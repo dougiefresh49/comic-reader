@@ -152,18 +152,22 @@ function SlotNumber({ n }: { n: number | null | undefined }) {
   ) : null;
 }
 
-/** The lines section: page, text with its [cues] in amber, Play when the bubble has audio. */
+/**
+ * The lines section, last in the tab: page, text with its [cues] in amber,
+ * Play when the bubble has audio. At most about a quarter of the panel
+ * (#882), scrolling inside itself.
+ */
 function Lines({ card }: { card: CharacterCard }) {
   if (card.samples.length === 0) return null;
   return (
-    <section className="mt-4">
-      <h4 className={`mb-1.5 flex items-baseline ${LABEL}`}>
+    <section className="mt-4 flex max-h-[20vh] flex-col">
+      <h4 className={`mb-1.5 flex shrink-0 items-baseline ${LABEL}`}>
         Lines
         <span className="ml-auto font-normal tracking-normal text-neutral-400 normal-case">
           {card.lines} · first {card.samples.length}
         </span>
       </h4>
-      <div className="overflow-hidden rounded-lg border border-neutral-800">
+      <div className="min-h-0 overflow-y-auto rounded-lg border border-neutral-800">
         {card.samples.map((l: SampleLine) => (
           <div
             key={l.bubbleId}
@@ -199,6 +203,31 @@ function Lines({ card }: { card: CharacterCard }) {
   );
 }
 
+/** Why a character on the board is silent in this issue, as its chip says it. */
+export type SilentWhy = "sitting out" | "not in this issue";
+
+/**
+ * One character on the board whose voice a voice is, once the staged moves
+ * run (#882). `why` is null when it speaks in it here: it has lines in this
+ * issue and is neither sitting out nor out of the issue. Else it says why the
+ * character is silent, so a free voice can say who it would have been.
+ */
+export interface VoiceUser {
+  id: string;
+  name: string;
+  why: SilentWhy | null;
+}
+
+/** Voice id to the board's characters whose voice it is (CastingScreen's `speakers`). */
+export type VoiceUsers = Map<string, VoiceUser[]>;
+
+/** The characters that speak in a voice here. */
+export const speakingIn = (
+  speakers: VoiceUsers,
+  voiceId: string | null | undefined,
+): VoiceUser[] =>
+  voiceId ? (speakers.get(voiceId) ?? []).filter((u) => u.why === null) : [];
+
 export interface VoiceTabProps {
   card: CharacterCard;
   state: CardState;
@@ -206,8 +235,8 @@ export interface VoiceTabProps {
   voices: VoiceOption[];
   roster: Roster | null;
   model: SlotModel | null;
-  /** Voice id to the characters on the board whose voice it is now. */
-  speakers: Map<string, string[]>;
+  /** Voice id to the characters on the board whose voice it is. */
+  speakers: VoiceUsers;
   onPick: (voice: VoiceOption) => void;
   onSlotFree: () => void;
   onSlotSwap: (slot: RosterSlot) => void;
@@ -338,10 +367,15 @@ export function VoiceTab({
   )?.slot;
 
   const q = search.trim().toLowerCase();
-  // Who in this issue speaks in a slot's voice now, this character included.
+  // Who in this issue speaks in a slot's voice, this character included.
   const usedBy = (s: RosterSlot) =>
+    s.holder.kind !== "free" ? speakingIn(speakers, s.holder.voiceUuid) : [];
+  // A voice no one speaks in here: the board's characters it belongs to, and why each is silent.
+  const freeWhy = (s: RosterSlot) =>
     s.holder.kind !== "free" && s.holder.voiceUuid
       ? (speakers.get(s.holder.voiceUuid) ?? [])
+          .filter((u) => u.why !== null)
+          .map((u) => `${u.name} · ${u.why}`)
       : [];
   // The Swap out list's groups in display order: its own, movable and unused
   // here, movable and used here, then locked.
@@ -388,7 +422,9 @@ export function VoiceTab({
     candidates.find((s) => s.lock === "movable")?.index;
   // This character is leaving the voice, so only the others go silent.
   const silentIfSwapped = tiedSlot
-    ? usedBy(tiedSlot).filter((n) => n !== card.name)
+    ? usedBy(tiedSlot)
+        .filter((u) => u.id !== card.id)
+        .map((u) => u.name)
     : [];
 
   return (
@@ -483,9 +519,9 @@ export function VoiceTab({
         {expanded && (
           <div className="mb-2.5 pl-0">
             {[...library, ...others].map((v) => {
-              const says = (speakers.get(v.id) ?? []).filter(
-                (n) => n !== card.name,
-              );
+              const says = speakingIn(speakers, v.id)
+                .filter((u) => u.id !== card.id)
+                .map((u) => u.name);
               return (
                 <VoiceRow
                   key={v.id}
@@ -576,7 +612,8 @@ export function VoiceTab({
                 role="radiogroup"
                 aria-label="Voice to swap out"
                 onKeyDown={onRadioArrows}
-                className="max-h-[230px] overflow-y-auto"
+                // Grows into the space Lines' cap frees (#882): half the screen, not a fixed 230px.
+                className="max-h-[50vh] overflow-y-auto"
               >
                 {candidates.map((s, i) => {
                   const h = s.holder;
@@ -584,7 +621,12 @@ export function VoiceTab({
                   const why = lockReason(s);
                   const g = group(s);
                   const isOwn = g === 0;
-                  const says = g === 2 ? usedBy(s) : [];
+                  const says =
+                    g === 2
+                      ? usedBy(s).map((u) => u.name)
+                      : g === 1
+                        ? freeWhy(s)
+                        : [];
                   const heading =
                     HEADING[g] && (i === 0 || group(candidates[i - 1]!) !== g)
                       ? HEADING[g]
