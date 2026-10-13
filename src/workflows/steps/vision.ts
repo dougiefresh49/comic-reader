@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
-import { FatalError } from "workflow";
+import { FatalError, RetryableError } from "workflow";
 import {
   decodeRawImage,
   pixelBoxOf,
@@ -17,7 +17,8 @@ import {
 import { pageImageUrl, pageStoragePath } from "~/lib/storage";
 import type { Database, Json, TablesInsert } from "~/types/database";
 import type { PageMeta, BoundingBoxJson } from "./shared";
-import { readWithRetry } from "./read-retry";
+import { supabaseWithRetry } from "./read-retry";
+import type * as LlmUsage from "~/lib/llm-usage";
 import {
   bubbleHasContext,
   buildContextUpdate,
@@ -175,31 +176,106 @@ export async function roboflowTextPredictionsOrFatal(
 }
 
 /**
- * One face identification, retried on the fallback key after a 429. Any
- * other failure is fatal, so a page with a failed face stores no detections
- * and a rerun does it again.
+ * The step-level Gemini retry from `~/lib/llm-usage`, passed in by the caller
+ * so this file never imports it (it would pull the SDK into the workflow
+ * bundle; see `LookaheadDeps`).
+ */
+export type GeminiRetry = Pick<
+  typeof LlmUsage,
+  "withGeminiRetry" | "isTransientGeminiError"
+>;
+
+/** When Workflow re-runs a lookahead page whose Gemini calls stayed rate limited. */
+const GEMINI_STEP_RETRY_AFTER_MS = 60_000;
+
+/**
+ * How long into a step `withGeminiRetry` may still start a wait. A step gets
+ * 300 s on Vercel (`FLEX_DEADLINE_MS` in `~/lib/llm-usage` has the source);
+ * past this a transient error is thrown at once, so the step ends with its
+ * own error and not a kill.
+ */
+const GEMINI_RETRY_BUDGET_MS = 200_000;
+
+/**
+ * The step error for a Gemini call that failed after its in-step retries: a
+ * transient one (429, 5xx, timeout) makes Workflow re-run the step a minute
+ * later, and pages already stored are skipped then (`hasStoredFaceDetections`);
+ * anything else fails the run.
+ */
+function geminiStepError(
+  err: unknown,
+  message: string,
+  gemini: GeminiRetry | undefined,
+): Error {
+  return gemini?.isTransientGeminiError(err)
+    ? new RetryableError(message, { retryAfter: GEMINI_STEP_RETRY_AFTER_MS })
+    : new FatalError(message);
+}
+
+/**
+ * One face identification, retried on the fallback key after a 429. With
+ * `gemini`, that pair runs inside `withGeminiRetry`, and a transient error
+ * that outlasts it is a `RetryableError` (#897). Any other failure is fatal,
+ * so a page with a failed face stores no detections and a rerun does it
+ * again. Without `gemini` the pair runs once and every failure is fatal.
  */
 export async function identifyFaceOrFatal<C, T>(
   run: (client: C) => Promise<T>,
   primary: C,
   getFallback: () => C | null,
   pageLabel: string,
+  gemini?: GeminiRetry,
+  /** Epoch ms; no retry wait ends past it (`withGeminiRetry`'s `deadline`). */
+  deadline?: number,
 ): Promise<T> {
-  try {
-    return await run(primary);
-  } catch (err: unknown) {
-    let last = err;
-    const status = (err as { status?: number } | null)?.status;
-    const fallback = status === 429 ? getFallback() : null;
-    if (fallback) {
-      try {
-        return await run(fallback);
-      } catch (retryErr: unknown) {
-        last = retryErr;
-      }
+  const withFallback = async () => {
+    try {
+      return await run(primary);
+    } catch (err: unknown) {
+      const status = (err as { status?: number } | null)?.status;
+      const fallback = status === 429 ? getFallback() : null;
+      if (!fallback) throw err;
+      return await run(fallback);
     }
-    throw new FatalError(
-      `Gemini face identification failed for ${pageLabel}: ${errorText(last)}`,
+  };
+  try {
+    return await (gemini
+      ? gemini.withGeminiRetry(withFallback, {
+          label: `face identification ${pageLabel}`,
+          deadline,
+        })
+      : withFallback());
+  } catch (err: unknown) {
+    throw geminiStepError(
+      err,
+      `Gemini face identification failed for ${pageLabel}: ${errorText(err)}`,
+      gemini,
+    );
+  }
+}
+
+/**
+ * One crop's embedding (`embed` already tries the fallback key on a 429),
+ * inside `withGeminiRetry`. A transient error that outlasts the retries is a
+ * `RetryableError`; any other failure is fatal (#897).
+ */
+export async function embedFaceOrFatal(
+  embed: () => Promise<number[]>,
+  pageLabel: string,
+  gemini: GeminiRetry,
+  /** Epoch ms; no retry wait ends past it (`withGeminiRetry`'s `deadline`). */
+  deadline?: number,
+): Promise<number[]> {
+  try {
+    return await gemini.withGeminiRetry(embed, {
+      label: `face embedding ${pageLabel}`,
+      deadline,
+    });
+  } catch (err: unknown) {
+    throw geminiStepError(
+      err,
+      `face embedding failed for ${pageLabel}: ${errorText(err)}`,
+      gemini,
     );
   }
 }
@@ -367,7 +443,7 @@ async function readAliasesOrFatal(
   pageLabel: string,
 ): Promise<Map<string, string[]>> {
   const { readAliases } = await import("~/lib/character-aliases");
-  return readWithRetry("aliases", pageLabel, async () => ({
+  return supabaseWithRetry("aliases read", pageLabel, async () => ({
     data: await readAliases(supabase, characterIds, bookId),
     error: null,
   }));
@@ -380,12 +456,12 @@ async function resolveCharacterIdOrFatal(
   pageLabel: string,
 ): Promise<string | null> {
   const directId = name.toLowerCase().replace(/\s+/g, "-");
-  const direct = await readWithRetry("characters", pageLabel, () =>
+  const direct = await supabaseWithRetry("characters read", pageLabel, () =>
     supabase.from("characters").select("id").eq("id", directId).maybeSingle(),
   );
   if (direct) return directId;
 
-  const allChars = await readWithRetry("characters", pageLabel, () =>
+  const allChars = await supabaseWithRetry("characters read", pageLabel, () =>
     supabase.from("characters").select("id, display_name").limit(200),
   );
 
@@ -1312,6 +1388,7 @@ export async function identifyLookaheadFacesOrFatal(
   const gemini = getGeminiClient();
   const { pageNumber, pageLabel, imgBuf } = page;
   const llmMeta = { step, bookId, issueId, pageNumber };
+  const retryDeadline = Date.now() + GEMINI_RETRY_BUDGET_MS;
 
   // 5. Build known character list + wiki context
   const dbCharacters = await buildKnownCharacterListOrFatal(
@@ -1348,16 +1425,12 @@ export async function identifyLookaheadFacesOrFatal(
   const prepared: PreparedCrop[] = [];
   for (const crop of page.crops) {
     const faceBase64 = crop.jpegBuffer.toString("base64");
-    let embedding: number[];
-    try {
-      embedding = await withLlmMeta(llmMeta, () =>
-        exemplarStore.embedFace(faceBase64),
-      );
-    } catch (err: unknown) {
-      throw new FatalError(
-        `face embedding failed for ${pageLabel}: ${errorText(err)}`,
-      );
-    }
+    const embedding = await embedFaceOrFatal(
+      () => withLlmMeta(llmMeta, () => exemplarStore.embedFace(faceBase64)),
+      pageLabel,
+      deps.llmUsage,
+      retryDeadline,
+    );
 
     // Retrieve similar exemplars from pgvector
     const exemplarRefs = await exemplarRefsOrFatal(
@@ -1372,7 +1445,8 @@ export async function identifyLookaheadFacesOrFatal(
 
   // 7. Name the crops: one Gemini call per panel chunk, the per-face call for
   // a lone crop and for any crop the panel reply leaves out or garbles.
-  // Each call fails over to the fallback key on a 429.
+  // Each call fails over to the fallback key on a 429, and a transient
+  // failure is retried with backoff (#897).
   let namingCalls = 0;
   const nameOrFatal = async <T>(
     run: (client: typeof gemini) => Promise<T>,
@@ -1380,7 +1454,14 @@ export async function identifyLookaheadFacesOrFatal(
     // Rate limit delay between Gemini naming calls
     if (namingCalls++ > 0) await new Promise((r) => setTimeout(r, 800));
     return withLlmMeta(llmMeta, () =>
-      identifyFaceOrFatal(run, gemini, getFallbackGeminiClient, pageLabel),
+      identifyFaceOrFatal(
+        run,
+        gemini,
+        getFallbackGeminiClient,
+        pageLabel,
+        deps.llmUsage,
+        retryDeadline,
+      ),
     );
   };
   const identifyOne = (i: number) =>
@@ -1898,11 +1979,14 @@ export async function getContextPage(
   const { runRoboflowWorkflow } = await import("~/lib/roboflow-client");
   const gemini = getGemini();
   const { GEMINI_FAST } = await import("~/lib/models");
-  const { generateContentLogged } = await import("~/lib/llm-usage");
+  const { generateContentLogged, withGeminiRetry } = await import(
+    "~/lib/llm-usage"
+  );
 
   const padded = String(pageNumber).padStart(2, "0");
   const pageLabel = `page-${padded}`;
   const llmMeta = { step: "get-context", bookId, issueId, pageNumber };
+  const retryDeadline = Date.now() + GEMINI_RETRY_BUDGET_MS;
   // The cue call's rows, apart from the OCR and speaker calls' (#437).
   const cueMeta = { ...llmMeta, step: "get-context:cues" };
 
@@ -2090,10 +2174,17 @@ export async function getContextPage(
         "Extract all text from this comic book speech bubble. Return ONLY the text exactly as it appears. No explanation or formatting. Plain text only: bold, italic or larger lettering is written like any other word, with no asterisks, underscores or other markup around it.",
       );
 
-      const ocrResponse = await generateContentLogged(
-        gemini,
-        { model: GEMINI_FAST, contents: [ocrImagePart, ocrPrompt] },
-        llmMeta,
+      const ocrResponse = await withGeminiRetry(
+        () =>
+          generateContentLogged(
+            gemini,
+            { model: GEMINI_FAST, contents: [ocrImagePart, ocrPrompt] },
+            llmMeta,
+          ),
+        {
+          label: `get-context OCR ${pageLabel} bubble ${bubble.legacy_id}`,
+          deadline: retryDeadline,
+        },
       );
 
       ocrText = ocrResponse.text?.trim() ?? "";
@@ -2128,10 +2219,17 @@ export async function getContextPage(
       const pageImagePart = cpb64(imgBuf.toString("base64"), "image/webp");
       const contextTextPart = cpt(contextPrompt);
 
-      const contextResponse = await generateContentLogged(
-        gemini,
-        { model: GEMINI_FAST, contents: [pageImagePart, contextTextPart] },
-        llmMeta,
+      const contextResponse = await withGeminiRetry(
+        () =>
+          generateContentLogged(
+            gemini,
+            { model: GEMINI_FAST, contents: [pageImagePart, contextTextPart] },
+            llmMeta,
+          ),
+        {
+          label: `get-context speaker ${pageLabel} bubble ${bubble.legacy_id}`,
+          deadline: retryDeadline,
+        },
       );
 
       const responseText = contextResponse.text?.trim() ?? "";
@@ -2161,10 +2259,21 @@ export async function getContextPage(
       const { cueRequest } = await import("~/lib/cue-rules");
       let cueLine: string;
       try {
-        const cueResponse = await generateContentLogged(
-          gemini,
-          cueRequest({ text: ocrText, emotion, speaker: match?.id ?? null }),
-          cueMeta,
+        const cueResponse = await withGeminiRetry(
+          () =>
+            generateContentLogged(
+              gemini,
+              cueRequest({
+                text: ocrText,
+                emotion,
+                speaker: match?.id ?? null,
+              }),
+              cueMeta,
+            ),
+          {
+            label: `get-context cues ${pageLabel} bubble ${bubble.legacy_id}`,
+            deadline: retryDeadline,
+          },
         );
         cueLine = cueResponse.text?.trim() ?? "";
       } catch (e) {
@@ -2193,18 +2302,17 @@ export async function getContextPage(
         );
       }
 
-      const { error: updateErr } = await supabase
-        .from("bubbles")
-        .update(update)
-        .eq("id", bubble.id)
-        .is("ocr_text", null)
-        .is("text_with_cues", null)
-        .is("speaker", null);
-      if (updateErr) {
-        throw new FatalError(
-          `bubbles update failed for ${pageLabel}: ${updateErr.message}`,
-        );
-      }
+      // Retried in the step (#897): a PostgREST timeout came back as a 555
+      // on issue-4. The `is null` guards make a repeat a no-op.
+      await supabaseWithRetry("bubbles update", pageLabel, () =>
+        supabase
+          .from("bubbles")
+          .update(update)
+          .eq("id", bubble.id)
+          .is("ocr_text", null)
+          .is("text_with_cues", null)
+          .is("speaker", null),
+      );
     } catch (e) {
       if (e instanceof FatalError) throw e;
       console.warn(

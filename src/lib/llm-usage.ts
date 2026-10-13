@@ -294,6 +294,118 @@ function flexFailure(err: unknown): FlexFailure {
 }
 
 /**
+ * Step-level Gemini retry policy (#897): 4 attempts, full jitter on base 2 s,
+ * cap 20 s, or the 429 body's `retryDelay` clamped to 30 s.
+ */
+const GEMINI_RETRY_MAX_ATTEMPTS = 4;
+const GEMINI_RETRY_BASE_MS = 2_000;
+const GEMINI_RETRY_CAP_MS = 20_000;
+const GEMINI_RETRY_DELAY_MAX_MS = 30_000;
+/** `err` plus this many `cause`s under it are read for a status. */
+const GEMINI_CAUSE_DEPTH = 4;
+
+/**
+ * `err` and its `cause` chain, each read as a `FlexFailure`. A wrapper like
+ * `embedFace`'s `new Error("Gemini embedding failed: …", { cause })` keeps the
+ * SDK's `ApiError` (and its status) on `cause`.
+ */
+function failureChain(err: unknown): FlexFailure[] {
+  const chain: FlexFailure[] = [];
+  let e: unknown = err;
+  for (let i = 0; i <= GEMINI_CAUSE_DEPTH && e != null; i++) {
+    chain.push(flexFailure(e));
+    e = (e as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+/**
+ * True when a Gemini call failed with a 429, a 5xx or a client timeout, read
+ * from the first error in the `cause` chain that carries a status or timed
+ * out. Anything else (a 400, bad input, a missing key, a parse error) is not
+ * worth retrying.
+ */
+export function isTransientGeminiError(err: unknown): boolean {
+  const failure = failureChain(err).find(
+    (f) => f.status !== undefined || f.timedOut,
+  );
+  if (!failure) return false;
+  if (failure.timedOut) return true;
+  const status = failure.status!;
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
+/**
+ * Pure: the wait in ms after failed attempt `attempt` (1-based) of
+ * `withGeminiRetry`. A `retryDelay` in the error body wins, clamped to 30 s;
+ * otherwise full jitter on base 2 s, cap 20 s.
+ */
+export function geminiRetryWait(
+  err: unknown,
+  attempt: number,
+  random: () => number = Math.random,
+): number {
+  const delay = parseRetryAfter(
+    failureChain(err).find((f) => f.retryAfter)?.retryAfter,
+  );
+  if (delay !== null)
+    return Math.round(Math.min(GEMINI_RETRY_DELAY_MAX_MS, delay));
+  return Math.round(
+    random() *
+      Math.min(GEMINI_RETRY_CAP_MS, GEMINI_RETRY_BASE_MS * 2 ** (attempt - 1)),
+  );
+}
+
+export type GeminiRetryOptions = {
+  /** Names the call in the retry warning. */
+  label?: string;
+  /**
+   * Epoch ms after which no retry starts: a wait that would end past it
+   * rethrows instead, so a step throws before Vercel's 300 s limit kills it.
+   */
+  deadline?: number;
+  sleep?: (ms: number) => Promise<void>;
+  random?: () => number;
+  now?: () => number;
+};
+
+/**
+ * Runs `fn` up to 4 times while it fails with a transient Gemini error
+ * (`isTransientGeminiError`), waiting `geminiRetryWait` between attempts, so
+ * a pipeline step rides out a rate limit before it fails. Wrap the whole
+ * primary-then-fallback call, so every attempt tries both keys. After the
+ * last attempt, on any other error, or when the wait would pass `deadline`,
+ * the error is rethrown unchanged.
+ */
+export async function withGeminiRetry<T>(
+  fn: () => Promise<T>,
+  opts: GeminiRetryOptions = {},
+): Promise<T> {
+  const {
+    label = "gemini call",
+    sleep = (ms: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, ms)),
+    random = Math.random,
+    deadline,
+    now = Date.now,
+  } = opts;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= GEMINI_RETRY_MAX_ATTEMPTS || !isTransientGeminiError(err))
+        throw err;
+      const wait = geminiRetryWait(err, attempt, random);
+      if (deadline !== undefined && now() + wait > deadline) throw err;
+      console.warn(
+        `[gemini] ${label} attempt ${attempt} failed (${errorText(err).slice(0, 120)}); retry in ${wait} ms`,
+      );
+      await sleep(wait);
+    }
+  }
+}
+
+/**
  * Flex attempts with backoff, then one standard attempt. Each attempt is a
  * paid request with its own row. The SDK retries only when the client was
  * built with `httpOptions.retryOptions` (`ApiClient.apiCall`), which ours
