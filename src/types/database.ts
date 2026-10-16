@@ -236,6 +236,7 @@ export type Database = {
       bubbles: {
         Row: {
           ai_reasoning: string | null;
+          audio_hash: string | null;
           audio_storage_path: string | null;
           book_id: string;
           box_2d: Json | null;
@@ -270,6 +271,7 @@ export type Database = {
         };
         Insert: {
           ai_reasoning?: string | null;
+          audio_hash?: string | null;
           audio_storage_path?: string | null;
           book_id: string;
           box_2d?: Json | null;
@@ -304,6 +306,7 @@ export type Database = {
         };
         Update: {
           ai_reasoning?: string | null;
+          audio_hash?: string | null;
           audio_storage_path?: string | null;
           book_id?: string;
           box_2d?: Json | null;
@@ -1431,6 +1434,7 @@ export type Database = {
       switch_bubble_audio_take: {
         Args: {
           p_alignment: Json;
+          p_audio_hash?: string | null;
           p_audio_storage_path: string;
           p_book_id: string;
           p_bubble_id: string;
@@ -1443,6 +1447,7 @@ export type Database = {
       switch_group_audio_take: {
         Args: {
           p_alignment: Json;
+          p_audio_hash?: string | null;
           p_audio_storage_path: string;
           p_book_id: string;
           p_group_id: string;

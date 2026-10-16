@@ -114,6 +114,36 @@ export async function getSlotStatus(deps: VoiceSlotsDeps): Promise<SlotStatus> {
   };
 }
 
+export interface CharacterStatus {
+  /** The plan's billing allowance for the period, in credits. */
+  character_limit: number;
+  /** Credits used this period. */
+  character_count: number;
+}
+
+/**
+ * The account's billing allowance (#106), from the same free GET as
+ * `getSlotStatus`. ElevenLabs names the fields "character", but they count
+ * billed credits, which a model can bill at other than one per character.
+ */
+export async function getCharacterStatus(
+  deps: VoiceSlotsDeps,
+): Promise<CharacterStatus> {
+  const r = await el(deps, "/v1/user/subscription");
+  if (!r.ok) throw await failure(r, "GET /v1/user/subscription");
+  const body = (await r.json()) as Partial<CharacterStatus>;
+  const pick = (k: keyof CharacterStatus): number => {
+    const v = body[k];
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 0)
+      throw new Error(`GET /v1/user/subscription: no numeric ${k}`);
+    return v;
+  };
+  return {
+    character_limit: pick("character_limit"),
+    character_count: pick("character_count"),
+  };
+}
+
 /** The detail endpoint; the list endpoint leaves `samples` empty. */
 export async function getVoice(
   deps: VoiceSlotsDeps,

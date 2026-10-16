@@ -14,10 +14,18 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { groupLeadId, joinGroupText } from "~/lib/balloon-groups";
-import { loadBookCast, renderVoice, type BookCast } from "~/lib/cast";
+import {
+  loadBookCast,
+  renderVoice,
+  type BookCast,
+  type NoVoiceReason,
+  type RenderVoice,
+} from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
-import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
+import { markTakeCurrent } from "~/lib/render-bubble-audio";
+import { audioHash } from "~/lib/tts-hash";
+import { buildTtsRequest, TTS_MODEL, type TtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import {
   normalizeAlignment,
@@ -26,18 +34,8 @@ import {
 
 const AUDIO_BUCKET = "comic-audio";
 
-export type GroupRenderResult =
-  | {
-      rendered: true;
-      leadId: string;
-      memberIds: string[];
-      /** The clip's file name, as `audio_storage_path` stores it. */
-      path: string;
-      /** Characters billed: the request text, voice prefix included. */
-      characters: number;
-      /** The lead's `audio_storage_path` before the switch. */
-      previousPath: string | null;
-    }
+/** Why a group was not sent: every case `prepareGroupRender` stops on. */
+export type GroupPlanSkip =
   /** Fewer than two active members: the caller renders the bubble alone. */
   | { skipped: "single" }
   /** A member has no text to speak. */
@@ -56,12 +54,50 @@ export type GroupRenderResult =
   /** The active members have different speakers; a group has one. */
   | { skipped: "mixed-speakers"; detail: string }
   /** The lead's speaker has no voice to render with (`renderVoice`'s miss). */
-  | { skipped: "no-voice"; leadId: string; detail: string }
+  | {
+      skipped: "no-voice";
+      leadId: string;
+      reason: NoVoiceReason;
+      detail: string;
+    };
+
+/** The request a group render would send, and what its skip check reads. */
+export interface GroupPlan {
+  leadId: string;
+  memberIds: string[];
+  voice: RenderVoice & { ok: true };
+  request: TtsRequest;
+  /** `audioHash` of `request`. */
+  hash: string;
+  /** The lead's take, when every active member plays it; else null. */
+  sharedPath: string | null;
+  /** The lead's `audio_hash`. */
+  leadHash: string | null;
+}
+
+export type GroupRenderResult =
+  | {
+      rendered: true;
+      leadId: string;
+      memberIds: string[];
+      /** The clip's file name, as `audio_storage_path` stores it. */
+      path: string;
+      /** Characters billed: the request text, voice prefix included. */
+      characters: number;
+      /** The lead's `audio_storage_path` before the switch. */
+      previousPath: string | null;
+    }
+  | GroupPlanSkip
   /**
    * The rows stopped forming this group between the read and the switch (an
    * editor split or re-join). The call was paid for; the clip was removed.
    */
-  | { skipped: "stale-group"; detail: string };
+  | { skipped: "stale-group"; detail: string }
+  /**
+   * `skipIfUnchanged` was on, every active member plays the lead's take, and
+   * the lead's `audio_hash` is this request's hash, so nothing was spent.
+   */
+  | { skipped: "unchanged"; leadId: string; memberIds: string[]; path: string };
 
 /**
  * A failure at or after the paid call. `stage` says what the reader plays
@@ -82,28 +118,30 @@ export class GroupRenderError extends Error {
 /** The RPC's own raises for rows that no longer form the group. */
 const STALE = /stale render|is not the first member|group members .* found/i;
 
-export async function renderGroupAudio({
+/**
+ * Everything before the paid call: read the group, check it is one run with
+ * one speaker, pick the lead's voice and build the request. Reads only, so
+ * the casting page's estimate (`estimateIssueAudio`) counts a group from the
+ * same request a render would send.
+ */
+export async function prepareGroupRender({
   client,
   bookId,
   issueId,
   groupId,
-  step,
   book,
 }: {
-  /** A service-role client: the switch RPC is granted to service_role only. */
   client: SupabaseClient;
   bookId: string;
   issueId: string;
   groupId: string;
-  /** The `llm_calls.step` the spend is recorded under. */
-  step: string;
   /** The book's cast when the caller has it loaded already. */
   book?: BookCast;
-}): Promise<GroupRenderResult> {
+}): Promise<GroupPlanSkip | GroupPlan> {
   const { data, error } = await client
     .from("bubbles")
     .select(
-      "id, sort_order, panel_id, character_id, text_with_cues, ocr_text, ignored, silent",
+      "id, sort_order, panel_id, character_id, text_with_cues, ocr_text, ignored, silent, audio_storage_path, audio_hash",
     )
     .eq("book_id", bookId)
     .eq("issue_id", issueId)
@@ -120,6 +158,8 @@ export async function renderGroupAudio({
     ocr_text: string | null;
     ignored: boolean;
     silent: boolean;
+    audio_storage_path: string | null;
+    audio_hash: string | null;
   }[];
   const members = rows.filter((r) => !r.ignored && !r.silent);
   if (members.length < 2) return { skipped: "single" };
@@ -178,7 +218,13 @@ export async function renderGroupAudio({
 
   const cast = book ?? (await loadBookCast(client, bookId));
   const voice = renderVoice(cast, lead.character_id, issueId);
-  if (!voice.ok) return { skipped: "no-voice", leadId, detail: voice.detail };
+  if (!voice.ok)
+    return {
+      skipped: "no-voice",
+      leadId,
+      reason: voice.reason,
+      detail: voice.detail,
+    };
   const voiceId = voice.elevenLabsId;
   const overrides = await loadVoiceOverrides(client, [voiceId]);
   const request = buildTtsRequest({
@@ -186,6 +232,77 @@ export async function renderGroupAudio({
     voiceId,
     override: overrides.get(voiceId),
   });
+
+  const leadPath = lead.audio_storage_path;
+  return {
+    leadId,
+    memberIds,
+    voice,
+    request,
+    hash: audioHash(voiceId, request),
+    sharedPath:
+      leadPath && members.every((m) => m.audio_storage_path === leadPath)
+        ? leadPath
+        : null,
+    leadHash: lead.audio_hash,
+  };
+}
+
+export async function renderGroupAudio({
+  client,
+  bookId,
+  issueId,
+  groupId,
+  step,
+  book,
+  skipIfUnchanged = false,
+}: {
+  /** A service-role client: the switch RPC is granted to service_role only. */
+  client: SupabaseClient;
+  bookId: string;
+  issueId: string;
+  groupId: string;
+  /** The `llm_calls.step` the spend is recorded under. */
+  step: string;
+  /** The book's cast when the caller has it loaded already. */
+  book?: BookCast;
+  /**
+   * Skip the paid call when every active member plays the lead's take and
+   * the lead's `audio_hash` is the hash of the request this render would
+   * send. Off by default, so a caller that means to re-render always does.
+   */
+  skipIfUnchanged?: boolean;
+}): Promise<GroupRenderResult> {
+  const plan = await prepareGroupRender({
+    client,
+    bookId,
+    issueId,
+    groupId,
+    book,
+  });
+  if ("skipped" in plan) return plan;
+  const { leadId, memberIds, voice, request, hash } = plan;
+  if (skipIfUnchanged && plan.sharedPath && plan.leadHash === hash) {
+    // The clip's timings live on the lead's row. Members with the same text
+    // can swap places and change the lead while text, hash and path stay
+    // the same; with no timings row for the current lead the reader cannot
+    // play the group as one, so it renders as usual.
+    const { count, error: tsErr } = await client
+      .from("audio_timestamps")
+      .select("bubble_id", { count: "exact", head: true })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("bubble_id", leadId);
+    if (tsErr)
+      throw new Error(
+        `group ${groupId}: reading the lead's timings failed (${tsErr.message}). Nothing was spent.`,
+      );
+    if ((count ?? 0) > 0) {
+      await markTakeCurrent(client, bookId, issueId, memberIds);
+      return { skipped: "unchanged", leadId, memberIds, path: plan.sharedPath };
+    }
+  }
+  const voiceId = voice.elevenLabsId;
 
   let response;
   try {
@@ -230,6 +347,7 @@ export async function renderGroupAudio({
       p_lead_id: leadId,
       p_audio_storage_path: path,
       p_voice_id: voice.voiceUuid,
+      p_audio_hash: hash,
       p_alignment: normalizeAlignment(
         response.alignment as AlignmentRaw | null | undefined,
       ),

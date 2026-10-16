@@ -1,22 +1,14 @@
 import { FatalError } from "workflow";
-import type { Json } from "~/types/database";
-import {
-  bubbleNeedsAudio,
-  collapseAudioJobs,
-  normalizeAlignment,
-  planBubbleVoices,
-  type AlignmentRaw,
-  type AudioJob,
-} from "./audio-plan";
-import { chunk } from "~/lib/chunk";
+import { planBubbleVoices, type AudioJob } from "./audio-plan";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 
 const fatal = (err: unknown) =>
   new FatalError(err instanceof Error ? err.message : String(err));
 
 /**
- * The audio step's work: the bubbles with no audio that `bubbleNeedsAudio`,
- * as jobs (`collapseAudioJobs`). Members of a joined group (#451) with two or
+ * The audio step's work: `loadAudioJobs`, the job selection the casting
+ * page's estimate counts too (#106). The bubbles with no audio that
+ * `bubbleNeedsAudio`, as jobs; members of a joined group (#451) with two or
  * more active members fold into one job for the group.
  */
 export async function getAudioJobs(
@@ -26,54 +18,18 @@ export async function getAudioJobs(
   "use step";
   const { createTypedStepClient } = await import("../step-utils");
   const supabase = await createTypedStepClient();
+  const { loadAudioJobs } = await import("~/lib/audio-estimate");
 
-  const { data: bubbles, error } = await supabase
-    .from("bubbles")
-    .select(
-      "id, speaker, ignored, silent, audio_storage_path, text_with_cues, ocr_text, page_number, sort_order, group_id",
-    )
-    .eq("book_id", bookId)
-    .eq("issue_id", issueId)
-    .eq("ignored", false)
-    .eq("silent", false)
-    .is("audio_storage_path", null)
-    .order("page_number")
-    .order("sort_order");
-
-  if (error) throw new FatalError(error.message);
-
-  const selected = (bubbles ?? []).filter((b) => bubbleNeedsAudio(b));
-
-  // Active members per group, counted over the whole group (members that
-  // already have audio included), so a group with one member selected still
-  // renders as a group.
-  const groupIds = [
-    ...new Set(selected.flatMap((b) => (b.group_id ? [b.group_id] : []))),
-  ];
-  const activeGroupSize = new Map<string, number>();
-  for (const ids of chunk(groupIds, 100)) {
-    const { data: members, error: gErr } = await supabase
-      .from("bubbles")
-      .select("group_id")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .eq("ignored", false)
-      .eq("silent", false)
-      .in("group_id", ids);
-    if (gErr) throw new FatalError(gErr.message);
-    for (const m of members ?? []) {
-      if (m.group_id)
-        activeGroupSize.set(
-          m.group_id,
-          (activeGroupSize.get(m.group_id) ?? 0) + 1,
-        );
-    }
-  }
-
-  const jobs = collapseAudioJobs(selected, activeGroupSize);
+  const { jobs, selected } = await loadAudioJobs(
+    supabase,
+    bookId,
+    issueId,
+  ).catch((e: unknown) => {
+    throw fatal(e);
+  });
   const groups = jobs.filter((j) => "groupId" in j).length;
   console.log(
-    `[get-bubbles] ${bookId}/${issueId}: ${selected.length} bubbles need audio, ${jobs.length} jobs (${groups} joined groups)`,
+    `[get-bubbles] ${bookId}/${issueId}: ${selected} bubbles need audio, ${jobs.length} jobs (${groups} joined groups)`,
   );
   return jobs;
 }
@@ -126,19 +82,31 @@ export async function generateAudioBatch(
       console.log(
         `[audio] group ${job.groupId}: ${result.memberIds.length} balloons, ${result.characters} chars -> ${result.path}`,
       );
-    } else if (result.skipped === "single") {
-      bubbleIds.push(...job.bubbleIds);
-    } else {
-      const detail =
-        "memberId" in result
-          ? ` (member ${result.memberId})`
-          : "detail" in result
-            ? ` (${result.detail})`
-            : "";
-      console.log(
-        `[audio] skip group ${job.groupId}: ${result.skipped}${detail}`,
-      );
+      continue;
     }
+    let detail: string;
+    switch (result.skipped) {
+      case "single":
+        bubbleIds.push(...job.bubbleIds);
+        continue;
+      case "no-text":
+      case "inactive-member":
+        detail = ` (member ${result.memberId})`;
+        break;
+      case "non-adjacent":
+      case "mixed-speakers":
+      case "no-voice":
+      case "stale-group":
+        detail = ` (${result.detail})`;
+        break;
+      case "unchanged":
+        // Only with `skipIfUnchanged`, which the step does not pass.
+        detail = ` (already plays ${result.path})`;
+        break;
+    }
+    console.log(
+      `[audio] skip group ${job.groupId}: ${result.skipped}${detail}`,
+    );
   }
 
   const { data: fetched, error: bubErr } =
@@ -170,6 +138,10 @@ export async function generateAudioBatch(
     throw fatal(err);
   });
 
+  const { audioHash } = await import("~/lib/tts-hash");
+  const { BubbleRenderError, storeBubbleTake } = await import(
+    "~/lib/render-bubble-audio"
+  );
   for (const {
     bubble,
     lookup: { elevenLabsId: voiceId, voiceUuid },
@@ -193,49 +165,23 @@ export async function generateAudioBatch(
       );
     }
 
-    const audioBuffer = Buffer.from(response.audioBase64, "base64");
-    const storagePath = `${bubble.id}.mp3`;
-    const remotePath = `${bookId}/${issueId}/${storagePath}`;
-
-    const { error: upErr } = await supabase.storage
-      .from("comic-audio")
-      .upload(remotePath, audioBuffer, {
-        contentType: "audio/mpeg",
-        upsert: true,
+    // The take pattern regenerate uses: a fresh path, then one switch that
+    // writes the timings, path, voice and hash together.
+    try {
+      await storeBubbleTake({
+        client: supabase,
+        bookId,
+        issueId,
+        bubbleId: bubble.id,
+        voiceUuid,
+        hash: audioHash(voiceId, request),
+        response,
       });
-    if (upErr) throw new FatalError(`upload ${bubble.id}: ${upErr.message}`);
-
-    const alignment = normalizeAlignment(
-      response.alignment as AlignmentRaw | null | undefined,
-    );
-    const normalizedAlignment = normalizeAlignment(
-      response.normalizedAlignment as AlignmentRaw | null | undefined,
-    );
-
-    const { error: tsErr } = await supabase.from("audio_timestamps").upsert(
-      {
-        bubble_id: bubble.id,
-        book_id: bookId,
-        issue_id: issueId,
-        alignment: alignment as Json | null,
-        normalized_alignment: normalizedAlignment as Json | null,
-      },
-      { onConflict: "bubble_id" },
-    );
-    if (tsErr)
-      throw new FatalError(`timestamps ${bubble.id}: ${tsErr.message}`);
-
-    const { error: bubUpErr } = await supabase
-      .from("bubbles")
-      .update({
-        audio_storage_path: storagePath,
-        voice_id: voiceUuid,
-        needs_audio: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", bubble.id);
-    if (bubUpErr) {
-      throw new FatalError(`bubble update ${bubble.id}: ${bubUpErr.message}`);
+    } catch (e) {
+      const stage = e instanceof BubbleRenderError ? ` at ${e.stage}` : "";
+      throw new FatalError(
+        `store ${bubble.id}${stage}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
 
     generated++;
