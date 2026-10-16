@@ -15,10 +15,12 @@
  * the old path and the old timings, and that pair keeps playing correctly.
  */
 import { randomUUID } from "node:crypto";
+import type { ElevenLabs } from "@elevenlabs/elevenlabs-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBookCast, type BookCast } from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
+import { audioHash } from "~/lib/tts-hash";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import { resolveSpeakerVoice } from "~/server/actions/review/resolve-castlist-row";
@@ -40,7 +42,12 @@ export type BubbleRenderResult =
   /** Neither `text_with_cues` nor `ocr_text` has anything to speak. */
   | { skipped: "no-text" }
   /** The speaker has no voice to render with; `detail` names the case. */
-  | { skipped: "no-voice"; detail: string };
+  | { skipped: "no-voice"; detail: string }
+  /**
+   * `skipIfUnchanged` was on and the stored take was rendered from this
+   * exact request (`audio_hash`), so nothing was spent.
+   */
+  | { skipped: "unchanged" };
 
 /**
  * A failure at or after the paid call. `stage` says what the reader plays
@@ -64,6 +71,7 @@ export async function renderBubbleAudio({
   bubble,
   step,
   book,
+  skipIfUnchanged = false,
 }: {
   /** A service-role client: the switch RPC is granted to service_role only. */
   client: SupabaseClient;
@@ -75,11 +83,20 @@ export async function renderBubbleAudio({
     character_id: string | null;
     text_with_cues: string | null;
     ocr_text: string | null;
+    /** Read by `skipIfUnchanged` only; a caller that opts in selects both. */
+    audio_storage_path?: string | null;
+    audio_hash?: string | null;
   };
   /** The `llm_calls.step` the spend is recorded under. */
   step: string;
   /** The book's cast when the caller has it loaded already. */
   book?: BookCast;
+  /**
+   * Skip the paid call when the bubble has a take and its `audio_hash` is
+   * the hash of the request this render would send. Off by default, so a
+   * caller that means to re-render always does.
+   */
+  skipIfUnchanged?: boolean;
 }): Promise<BubbleRenderResult> {
   const text = bubble.text_with_cues ?? bubble.ocr_text ?? "";
   if (!text.trim()) return { skipped: "no-text" };
@@ -94,6 +111,13 @@ export async function renderBubbleAudio({
     voiceId,
     override: overrides.get(voiceId),
   });
+  const hash = audioHash(voiceId, request);
+  if (
+    skipIfUnchanged &&
+    bubble.audio_storage_path &&
+    bubble.audio_hash === hash
+  )
+    return { skipped: "unchanged" };
 
   let response;
   try {
@@ -107,7 +131,48 @@ export async function renderBubbleAudio({
     throw new BubbleRenderError("generate", (e as Error).message);
   }
 
-  const path = `${bubble.id}-take-${randomUUID().slice(0, 8)}.mp3`;
+  const path = await storeBubbleTake({
+    client,
+    bookId,
+    issueId,
+    bubbleId: bubble.id,
+    voiceUuid: resolved.voiceUuid,
+    hash,
+    response,
+  });
+  return { rendered: true, path, characters: request.text.length };
+}
+
+/**
+ * Everything after the paid call for one bubble: upload the take to a path
+ * no earlier take used (`upsert: false`), then `switch_bubble_audio_take`
+ * with its timings, voice and hash. A coded refusal below 500 proves the
+ * rollback, so the unused take is removed; any other failure keeps it,
+ * because the switch may have saved. Throws `BubbleRenderError`; returns the
+ * take's file name. `renderBubbleAudio` and the audio step both store
+ * through this.
+ */
+export async function storeBubbleTake({
+  client,
+  bookId,
+  issueId,
+  bubbleId,
+  voiceUuid,
+  hash,
+  response,
+}: {
+  /** A service-role client: the switch RPC is granted to service_role only. */
+  client: SupabaseClient;
+  bookId: string;
+  issueId: string;
+  bubbleId: string;
+  /** The `voices.id` that rendered the take. */
+  voiceUuid: string;
+  /** `audioHash` of the request that rendered it. */
+  hash: string;
+  response: ElevenLabs.AudioWithTimestampsResponse;
+}): Promise<string> {
+  const path = `${bubbleId}-take-${randomUUID().slice(0, 8)}.mp3`;
   const remotePath = `${bookId}/${issueId}/${path}`;
   try {
     const { error: upErr } = await client.storage
@@ -124,11 +189,12 @@ export async function renderBubbleAudio({
   let switched;
   try {
     switched = await client.rpc("switch_bubble_audio_take", {
-      p_bubble_id: bubble.id,
+      p_bubble_id: bubbleId,
       p_book_id: bookId,
       p_issue_id: issueId,
       p_audio_storage_path: path,
-      p_voice_id: resolved.voiceUuid,
+      p_voice_id: voiceUuid,
+      p_audio_hash: hash,
       p_alignment: normalizeAlignment(
         response.alignment as AlignmentRaw | null | undefined,
       ),
@@ -156,6 +222,5 @@ export async function renderBubbleAudio({
       );
     throw new BubbleRenderError("switch", switchErr.message);
   }
-
-  return { rendered: true, path, characters: request.text.length };
+  return path;
 }

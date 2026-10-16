@@ -61,6 +61,8 @@ export function useListen({
     null,
   );
   const activeRef = useRef(active);
+  /** Bubbles whose last audio regenerate came back unchanged: the next one sends `force`. */
+  const forceNextRef = useRef(new Set<string>());
 
   // Calls land long after the click, so they read the latest through refs.
   const pathsRef = useRef(paths);
@@ -184,8 +186,22 @@ export function useListen({
             }
             return;
           }
-          const res = await regenerateAudio({ bookId, issueId, bubbleId: id });
-          if (res.ok && res.audioStoragePath) {
+          // A Regenerate right after an "unchanged" answer on this bubble
+          // means the owner wants a new take anyway: that one call forces.
+          const force = forceNextRef.current.delete(id);
+          const res = await regenerateAudio({
+            bookId,
+            issueId,
+            bubbleId: id,
+            force,
+          });
+          if (res.ok && "unchanged" in res) {
+            forceNextRef.current.add(id);
+            note(id, {
+              tone: "ok",
+              text: "This take already matches the line, voice and settings, so nothing was spent. Regenerate again to make a new take anyway (paid).",
+            });
+          } else if (res.ok && res.audioStoragePath) {
             const path = res.audioStoragePath;
             // A joined group (#451) renders one clip that every member plays.
             const members = res.memberIds.length > 0 ? res.memberIds : [id];

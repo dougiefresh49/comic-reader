@@ -20,6 +20,11 @@ interface Args {
   bookId: string;
   issueId: string;
   bubbleId: string;
+  /**
+   * Render even when the stored take was made from this exact request. Off,
+   * an unchanged bubble or group comes back `unchanged` with nothing spent.
+   */
+  force?: boolean;
 }
 
 type Step = "generate" | "upload" | "switch" | "unconfirmed" | "refresh";
@@ -69,6 +74,12 @@ async function regenerateGroup(
 ): Promise<
   | { ok: false; error: string }
   | { ok: true; audioStoragePath: string; memberIds: string[] }
+  | {
+      ok: true;
+      unchanged: true;
+      audioStoragePath: string;
+      memberIds: string[];
+    }
 > {
   const hadAudio = b.audio_storage_path != null;
   const readerRoute = `/book/${args.bookId}/${args.issueId}/${b.page_number}`;
@@ -81,6 +92,7 @@ async function regenerateGroup(
       issueId: args.issueId,
       groupId,
       step: "review-editor:regenerate-group",
+      skipIfUnchanged: !args.force,
     });
   } catch (e) {
     if (!(e instanceof GroupRenderError))
@@ -146,6 +158,13 @@ async function regenerateGroup(
         ok: false,
         error: `The group changed while its audio was rendering (${result.detail}). ElevenLabs charged for the take, and it was not stored, so the reader plays what it played before. Regenerating will spend ElevenLabs credits again.`,
       };
+    case "unchanged":
+      return {
+        ok: true as const,
+        unchanged: true as const,
+        audioStoragePath: result.path,
+        memberIds: result.memberIds,
+      };
   }
 }
 
@@ -170,7 +189,7 @@ export async function regenerateAudio(args: Args) {
   const bubbleQ = supabaseAdmin
     .from("bubbles")
     .select(
-      "id, legacy_id, speaker, character_id, ocr_text, text_with_cues, type, ignored, audio_storage_path, page_number, book_id, issue_id, group_id",
+      "id, legacy_id, speaker, character_id, ocr_text, text_with_cues, type, ignored, audio_storage_path, audio_hash, page_number, book_id, issue_id, group_id",
     )
     .eq("book_id", args.bookId)
     .eq("issue_id", args.issueId);
@@ -191,6 +210,7 @@ export async function regenerateAudio(args: Args) {
     type: string;
     ignored: boolean | null;
     audio_storage_path: string | null;
+    audio_hash: string | null;
     page_number: number;
     group_id: string | null;
   };
@@ -229,6 +249,7 @@ export async function regenerateAudio(args: Args) {
       issueId: args.issueId,
       bubble: b,
       step: "review:regenerate-audio",
+      skipIfUnchanged: !args.force,
     });
   } catch (e) {
     if (!(e instanceof BubbleRenderError))
@@ -247,10 +268,20 @@ export async function regenerateAudio(args: Args) {
     return afterSpendError(e.stage, b.id, hadAudio, e.message, readerRoute);
   }
   if ("skipped" in result) {
-    return {
-      ok: false,
-      error: result.skipped === "no-text" ? "Empty text" : result.detail,
-    };
+    switch (result.skipped) {
+      case "no-text":
+        return { ok: false, error: "Empty text" };
+      case "no-voice":
+        return { ok: false, error: result.detail };
+      case "unchanged":
+        // Set, since the skip only happens on a bubble with a take.
+        return {
+          ok: true as const,
+          unchanged: true as const,
+          audioStoragePath: b.audio_storage_path!,
+          memberIds: [b.id],
+        };
+    }
   }
 
   try {

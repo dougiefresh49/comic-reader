@@ -52,6 +52,7 @@ import {
   type ActionResult,
   type NameTarget,
 } from "./actions";
+import { AudioEstimate, type AudioEstimateData } from "./AudioEstimate";
 import { loadRoster } from "./casting-actions";
 import { CharacterPanel, type PanelTab } from "./CharacterPanel";
 import { acceptedFor } from "./design-sheet/accepted";
@@ -859,7 +860,14 @@ function FacesDialog({
   );
 }
 
-export function CastingScreen({ data }: { data: CharactersData }) {
+export function CastingScreen({
+  data,
+  audioEstimate,
+}: {
+  data: CharactersData;
+  /** What Continue's audio step would render, and the account's credits (#106). */
+  audioEstimate: AudioEstimateData;
+}) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
   const [staged, setStagedRaw] = useState<Staged[]>([]);
@@ -1690,6 +1698,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
             </button>
           )}
         </header>
+        <AudioEstimate data={audioEstimate} />
         {voiceMode && data.round && data.round.leftovers.length > 0 && (
           <RoundBanner round={data.round} />
         )}
