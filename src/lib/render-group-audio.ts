@@ -23,6 +23,7 @@ import {
 } from "~/lib/cast";
 import { getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
+import { markTakeCurrent } from "~/lib/render-bubble-audio";
 import { audioHash } from "~/lib/tts-hash";
 import { buildTtsRequest, TTS_MODEL, type TtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
@@ -281,8 +282,26 @@ export async function renderGroupAudio({
   });
   if ("skipped" in plan) return plan;
   const { leadId, memberIds, voice, request, hash } = plan;
-  if (skipIfUnchanged && plan.sharedPath && plan.leadHash === hash)
-    return { skipped: "unchanged", leadId, memberIds, path: plan.sharedPath };
+  if (skipIfUnchanged && plan.sharedPath && plan.leadHash === hash) {
+    // The clip's timings live on the lead's row. Members with the same text
+    // can swap places and change the lead while text, hash and path stay
+    // the same; with no timings row for the current lead the reader cannot
+    // play the group as one, so it renders as usual.
+    const { count, error: tsErr } = await client
+      .from("audio_timestamps")
+      .select("bubble_id", { count: "exact", head: true })
+      .eq("book_id", bookId)
+      .eq("issue_id", issueId)
+      .eq("bubble_id", leadId);
+    if (tsErr)
+      throw new Error(
+        `group ${groupId}: reading the lead's timings failed (${tsErr.message}). Nothing was spent.`,
+      );
+    if ((count ?? 0) > 0) {
+      await markTakeCurrent(client, bookId, issueId, memberIds);
+      return { skipped: "unchanged", leadId, memberIds, path: plan.sharedPath };
+    }
+  }
   const voiceId = voice.elevenLabsId;
 
   let response;

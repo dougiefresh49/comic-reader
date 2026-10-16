@@ -195,13 +195,9 @@ export function useListen({
             bubbleId: id,
             force,
           });
-          if (res.ok && "unchanged" in res) {
-            forceNextRef.current.add(id);
-            note(id, {
-              tone: "ok",
-              text: "This take already matches the line, voice and settings, so nothing was spent. Regenerate again to make a new take anyway (paid).",
-            });
-          } else if (res.ok && res.audioStoragePath) {
+          if (res.ok && res.audioStoragePath) {
+            // An unchanged answer names the stored take too, which another
+            // flow may have switched since the editor loaded, so both apply it.
             const path = res.audioStoragePath;
             // A joined group (#451) renders one clip that every member plays.
             const members = res.memberIds.length > 0 ? res.memberIds : [id];
@@ -212,13 +208,21 @@ export function useListen({
               for (const m of members) next[m] = path;
               return next;
             });
-            note(id, {
-              tone: "ok",
-              text:
-                members.length > 1
-                  ? `New group take saved for ${members.length} balloons. L plays it.`
-                  : "New take saved. L plays it.",
-            });
+            if ("unchanged" in res) {
+              forceNextRef.current.add(id);
+              note(id, {
+                tone: "ok",
+                text: "This take already matches the line, voice and settings, so nothing was spent. Regenerate again to make a new take anyway (paid).",
+              });
+            } else {
+              note(id, {
+                tone: "ok",
+                text:
+                  members.length > 1
+                    ? `New group take saved for ${members.length} balloons. L plays it.`
+                    : "New take saved. L plays it.",
+              });
+            }
           } else {
             note(id, {
               tone: "error",

@@ -116,8 +116,10 @@ export async function renderBubbleAudio({
     skipIfUnchanged &&
     bubble.audio_storage_path &&
     bubble.audio_hash === hash
-  )
+  ) {
+    await markTakeCurrent(client, bookId, issueId, [bubble.id]);
     return { skipped: "unchanged" };
+  }
 
   let response;
   try {
@@ -141,6 +143,31 @@ export async function renderBubbleAudio({
     response,
   });
   return { rendered: true, path, characters: request.text.length };
+}
+
+/**
+ * An unchanged skip keeps the stored take, so the rows are as a switch would
+ * leave them: a Save that changed only what the request does not carry (the
+ * bubble's type) set `needs_audio`, and casting samples and previews leave a
+ * row with it set out. Clears it where set. Throws before any spend.
+ */
+export async function markTakeCurrent(
+  client: SupabaseClient,
+  bookId: string,
+  issueId: string,
+  ids: string[],
+): Promise<void> {
+  const { error } = await client
+    .from("bubbles")
+    .update({ needs_audio: false })
+    .eq("book_id", bookId)
+    .eq("issue_id", issueId)
+    .in("id", ids)
+    .eq("needs_audio", true);
+  if (error)
+    throw new Error(
+      `The take already matches, but clearing needs_audio on ${ids.join(", ")} failed (${error.message}). Nothing was spent.`,
+    );
 }
 
 /**
