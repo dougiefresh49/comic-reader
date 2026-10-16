@@ -399,14 +399,29 @@ export async function planMovesDetail(
       }
     }
   };
+  /**
+   * A pick that replaces a protected voice the character speaks with: its own
+   * voice (a starting voice included, which has no castlist row yet) or one
+   * its own rows hold. A form's card records the base's voice it borrows as
+   * replaced (#914); the pick writes only the form's rows, so it is not
+   * blocked here.
+   */
   const replacesProtected = (
     i: number,
+    characterId: string,
     m: { replaces_voice_uuid?: string | null },
   ) => {
     const row = m.replaces_voice_uuid
       ? rowById.get(m.replaces_voice_uuid)
       : null;
-    if (row && isProtectedVoice(row))
+    if (
+      row &&
+      isProtectedVoice(row) &&
+      (row.character_id === characterId ||
+        rows.some(
+          (r) => r.character_id === characterId && r.voice_uuid === row.id,
+        ))
+    )
       block(
         i,
         "protected",
@@ -643,7 +658,7 @@ export async function planMovesDetail(
         unsettled(i, m.voice_uuid);
         restoredHere.add(m.voice_uuid);
         if (m.character_id) {
-          replacesProtected(i, m);
+          replacesProtected(i, m.character_id, m);
           castAway(i, m.character_id, m.voice_uuid, "later");
         }
         if (row)
@@ -675,7 +690,7 @@ export async function planMovesDetail(
             `no free slot for ${name}'s new voice; archive a voice to make room`,
           );
         unsettled(i, `design:${m.character_id}`);
-        replacesProtected(i, m);
+        replacesProtected(i, m.character_id, m);
         castAway(i, m.character_id, null, m.run_only ? "issue" : "later");
         const key = `design:${i}`;
         setState(key, "active", key, m.run_only);
@@ -702,7 +717,7 @@ export async function planMovesDetail(
             `${row.display_name} is a protected v2 voice; it speaks only for its own character`,
           );
         unsettled(i, m.voice_uuid);
-        replacesProtected(i, m);
+        replacesProtected(i, m.character_id, m);
         castAway(
           i,
           m.character_id,
