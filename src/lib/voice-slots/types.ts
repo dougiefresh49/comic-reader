@@ -14,7 +14,12 @@ export interface VoiceRow {
   character_id: string | null;
   /** The work it was cloned from; null for a designed voice. */
   appearance_id: string | null;
-  /** The owner's default pick for the character on the voice-lab cast sheet. */
+  /**
+   * The character's default pick among its voices. The retired voice-lab cast
+   * sheets set it. `pnpm voice-lab-import` writes false on each voice it creates
+   * and leaves the flag alone on an existing row, so only rows from the cast-sheet
+   * era carry true.
+   */
   starting_pick: boolean;
   current_elevenlabs_id: string | null;
   /** Object path inside the `comic-voice-clips` bucket. */
