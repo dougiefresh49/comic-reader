@@ -330,7 +330,10 @@ export async function loadCharacters(
             from: id,
           }
         : voiceFor(book, id, held ? undefined : issueId);
-    if (!v) return null;
+    // A sitting-out form borrows its base's voice through `baseOf` once Back
+    // in is staged, not from here: on the card it would land in a pick's
+    // `replaces_voice_uuid` and trip the protected-voice check.
+    if (!v || (own?.in_issue && own.no_audio && v.from !== id)) return null;
     const name = voiceName.get(v.voiceUuid) ?? v.elevenLabsId;
     if (!name) return null;
     return {
