@@ -534,7 +534,9 @@ export function restorable(
     const who = characterOf(m);
     const why =
       voice && !have.voiceIds.has(voice)
-        ? "a voice is gone"
+        ? who !== null
+          ? `${who}'s voice is gone`
+          : `the voice to ${m.kind} is gone`
         : who !== null && !known.has(who)
           ? `${who} is no longer on the board`
           : null;
