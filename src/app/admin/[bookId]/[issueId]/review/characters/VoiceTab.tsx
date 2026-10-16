@@ -19,12 +19,7 @@ import {
   type SlotModel,
   type Staged,
 } from "./staging";
-import type {
-  CharacterCard,
-  KnownCharacter,
-  SampleLine,
-  VoiceOption,
-} from "./types";
+import type { CharacterCard, SampleLine, VoiceOption } from "./types";
 import { FOCUS, Icon, LABEL } from "./ui";
 
 const TAG = "rounded px-1.5 text-[10px] font-semibold tracking-wide uppercase";
@@ -250,33 +245,18 @@ export const speakingIn = (
   voiceId ? (speakers.get(voiceId) ?? []).filter((u) => u.why === null) : [];
 
 /**
- * A pick is staged for the card, which Confirm applies as the character's own
- * voice even when it is the voice the card borrows now (a form's base voice).
- */
-function hasStagedPick(state: CardState): boolean {
-  return state.pick !== null;
-}
-
-/**
- * A form (#891) that speaks with its base's voice: it has no voice of its
- * own (none, or the one borrowed from the base) and no pick staged here.
+ * A form (#891) that speaks with its base's voice: it has no voice or pick
+ * of its own, and the base's voice plays after the staged moves (#903).
  * The Voice tab then says so instead of offering voices, and the panel hides
- * Design a voice.
+ * Design a voice. A form whose base gives none that plays gets the choices.
  */
-export function speaksAsBase(
-  card: CharacterCard,
-  state: CardState,
-  formOf: KnownCharacter["formOf"],
-): boolean {
-  if (!formOf || hasStagedPick(state)) return false;
-  return !card.voice || card.voice.borrowedFromId === formOf.id;
+export function speaksAsBase(state: CardState): boolean {
+  return !!state.base?.via && state.base.why === null;
 }
 
 export interface VoiceTabProps {
   card: CharacterCard;
   state: CardState;
-  /** The character it is a form of (#891), from its known row. */
-  formOf: KnownCharacter["formOf"];
   staged: Staged[];
   voices: VoiceOption[];
   roster: Roster | null;
@@ -296,7 +276,6 @@ export interface VoiceTabProps {
 export function VoiceTab({
   card,
   state,
-  formOf,
   staged,
   voices,
   roster,
@@ -476,27 +455,49 @@ export function VoiceTab({
 
   // A form (#891) speaks with its base's voice: the render chain's step 5.
   // Its own castlist row's voice, or a pick staged here, still wins (step
-  // 4), so those cases keep the choices to change or clear it.
-  const form = formOf ?? null;
-  if (form && speaksAsBase(card, state, form))
+  // 4), so those cases keep the choices to change or clear it, and so does
+  // a form whose base has no voice to give (#903).
+  const form = state.base;
+  const designed = form?.pick?.move.kind === "create_design";
+  const voiceName =
+    voices.find((v) => v.id === state.voiceId)?.name ??
+    (form?.pick ? undefined : card.voice?.name);
+  if (form && speaksAsBase(state))
     return (
       <div>
         <p className={FORM_NOTE}>
-          {`${state.name} is a form of ${form.name}: it speaks with ${form.name}'s voice${
-            card.voice ? `, ${card.voice.name}` : ""
-          }.`}
+          {designed
+            ? `${state.name} is a form of ${form.name}: it speaks with the voice being designed for ${form.name}.`
+            : `${state.name} is a form of ${form.name}: it speaks with ${form.name}'s voice${
+                voiceName ? `, ${voiceName}` : ""
+              }.`}
         </p>
         <Lines card={card} />
       </div>
     );
+  const instead =
+    form?.why === null ? `, which plays instead of ${form.name}'s` : "";
+  // Why the base gives this form no voice that plays (#903).
+  const noVoice = (base: string, why: NonNullable<typeof form>["why"]) => {
+    const name = state.name;
+    if (why === "removed")
+      return `${base} isn't in this issue, so ${name} has no voice. Pick one here, or put ${base} back.`;
+    if (why === "sitting out")
+      return `${base} is sitting out this issue, so ${name} has no voice. Pick one here, or bring ${base} back in.`;
+    if (why === "no slot")
+      return `${designed ? `The voice being designed for ${base}` : `${base}'s voice${voiceName ? `, ${voiceName},` : ""}`} has no slot, so ${name} can't speak yet. Pick a voice for ${name} here, or give ${base}'s voice a slot.`;
+    return `${base} has no voice yet, so ${name} has none either. Pick a voice for ${name} here, or give ${base} one.`;
+  };
 
   return (
     <div>
       {form && (
         <p className={`mb-3 ${FORM_NOTE}`}>
-          {hasStagedPick(state) || !card.voice
-            ? `${state.name} has a voice picked here, which plays instead of ${form.name}'s.`
-            : `${state.name} still has its own voice ${card.voice.name} in this book, which plays instead of ${form.name}'s.`}
+          {state.pick
+            ? `${state.name} has a voice picked here${instead}.`
+            : card.voice && card.voice.borrowedFromId !== form.id
+              ? `${state.name} still has its own voice ${card.voice.name} in this book${instead}.`
+              : noVoice(form.name, form.why)}
         </p>
       )}
       <section role="radiogroup" aria-label="Voices" onKeyDown={onRadioArrows}>

@@ -64,12 +64,15 @@ import {
   lockReason,
   pickMove,
   pickVoiceId,
+  plays,
   rekey,
   slotAfter,
   slotModel,
   takesSlot,
+  voicePick,
   withoutPick,
   type CardState,
+  type FormBase,
   type SlotModel,
   type SlotView,
   type Staged,
@@ -182,7 +185,7 @@ function Chip({
   const v = state.voiceId ? voices.get(state.voiceId) : undefined;
   if (v) {
     const own = v.characterId === card.id;
-    const pending = state.pick !== null;
+    const pending = voicePick(state) !== null;
     const slot = slotAfter(state, slotOf, landing, outIds);
     const lost = !pending && outIds.has(v.id);
     if (lost)
@@ -223,8 +226,8 @@ function Chip({
       </>
     );
   }
-  const design =
-    state.pick?.move.kind === "create_design" ? state.pick.move : null;
+  const vp = voicePick(state);
+  const design = vp?.move.kind === "create_design" ? vp.move : null;
   if (design) {
     const accepted = acceptedFor(design);
     const take = accepted?.takes.find(
@@ -859,20 +862,9 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     () => new Set(addedCards.map((c) => c.id)),
     [addedCards],
   );
-  const states = useMemo(
-    () => new Map(cards.map((c) => [c.id, cardState(c, staged)])),
-    [cards, staged],
-  );
-  const stateOf = (c: CharacterCard) =>
-    states.get(c.id) ?? cardState(c, staged);
   const onBoard = useMemo(
     () => new Map(cards.map((c) => [c.id, c.name])),
     [cards],
-  );
-  const nameOf = useCallback(
-    (id: string) =>
-      states.get(id)?.name ?? cards.find((c) => c.id === id)?.name ?? id,
-    [states, cards],
   );
 
   const model: SlotModel | null = useMemo(
@@ -897,6 +889,37 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         s.add(v.slot.holder.voiceUuid);
     return s;
   }, [model]);
+  /** Whether a card's voice plays after the staged moves: Ready or Needs a voice. */
+  const playsNow = useMemo(() => {
+    const slots = model ? { slotOf, outIds, landing: model.landing } : null;
+    return (st: CardState) =>
+      plays(st, slots, (id) => voiceById.get(id)?.status);
+  }, [model, slotOf, outIds, voiceById]);
+  /** A form's base (#891) for `cardState`, with its card when it is on the board. */
+  const formBaseOf = useMemo(() => {
+    // A base out of this issue may have no card on the board, only an
+    // earlier issue's: it still says why the form has no voice.
+    const byId = new Map(
+      [...data.earlierCast, ...cards].map((c) => [c.id, c] as const),
+    );
+    const formOf = new Map(data.known.map((k) => [k.id, k.formOf ?? null]));
+    return (c: CharacterCard): FormBase | null => {
+      const f = formOf.get(c.id);
+      return f ? { ...f, card: byId.get(f.id), plays: playsNow } : null;
+    };
+  }, [cards, data.earlierCast, data.known, playsNow]);
+  const states = useMemo(
+    () =>
+      new Map(cards.map((c) => [c.id, cardState(c, staged, formBaseOf(c))])),
+    [cards, staged, formBaseOf],
+  );
+  const stateOf = (c: CharacterCard) =>
+    states.get(c.id) ?? cardState(c, staged, formBaseOf(c));
+  const nameOf = useCallback(
+    (id: string) =>
+      states.get(id)?.name ?? cards.find((c) => c.id === id)?.name ?? id,
+    [states, cards],
+  );
   /**
    * Voice id to the board's characters whose voice it is, once the staged
    * moves run (#882). One speaks in it when it has lines here and is neither
@@ -909,7 +932,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     const add = (voiceId: string, u: VoiceUser) =>
       m.set(voiceId, [...(m.get(voiceId) ?? []), u]);
     for (const c of cards) {
-      const st = states.get(c.id) ?? cardState(c, staged);
+      const st = states.get(c.id) ?? cardState(c, staged, formBaseOf(c));
       const why: SilentWhy | null = st.removed
         ? "not in this issue"
         : st.sitOut
@@ -929,7 +952,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
       for (const id of ids) add(id, u);
     }
     return m;
-  }, [cards, states, staged, data.voices]);
+  }, [cards, states, staged, formBaseOf, data.voices]);
 
   // ---- staging: every control below only edits `staged` ----
 
@@ -943,7 +966,8 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   ) => {
     const { slot } = opts;
     const st = stateOf(card);
-    const base = card.voice?.uuid ?? null;
+    // Only a voice the card owns: one it borrows from its base is a new pick.
+    const base = card.voice?.borrowedFromId ? null : (card.voice?.uuid ?? null);
     const design = "generated_voice_id" in choice ? choice : null;
     const voice = design ? null : (choice as VoiceOption);
     if (
@@ -1241,26 +1265,20 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     router.refresh();
   };
 
-  const landingOf = (st: CardState) =>
-    st.pick && model ? (model.landing.get(st.pick.index) ?? null) : null;
+  // A form speaking with its base's staged pick lands where that pick does.
+  const landingOf = (st: CardState) => {
+    const p = voicePick(st);
+    return p && model ? (model.landing.get(p.index) ?? null) : null;
+  };
   /** The card's group by its staged state (#854). */
   const groupOf = (c: CharacterCard): GroupKey => {
     if (c.group === "role") return "role";
     if (!voiceMode) return "here";
     const st = stateOf(c);
     if (c.lines === 0 || st.sitOut || st.removed) return "silent";
-    if (!isVoiced(st)) return "needs";
-    if (!roster) {
-      // Slots still loading: go by the voice's status, so a card does not
-      // jump to Needs a voice and back when the roster lands.
-      const v = st.voiceId ? voiceById.get(st.voiceId) : undefined;
-      return st.pick?.move.kind === "create_design" || v?.status === "active"
-        ? "ready"
-        : "needs";
-    }
-    return slotAfter(st, slotOf, landingOf(st), outIds) !== null
-      ? "ready"
-      : "needs";
+    // Slots still loading go by the voice's status (`plays`), so a card does
+    // not jump to Needs a voice and back when the roster lands.
+    return playsNow(st) ? "ready" : "needs";
   };
   const grouped = new Map<GroupKey, CharacterCard[]>();
   for (const c of cards) {
