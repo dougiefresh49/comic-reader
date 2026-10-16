@@ -134,10 +134,15 @@ export interface KnownCharacter {
   formOf?: { id: string; name: string } | null;
 }
 
-/** Which pipeline pause the page is answering, and why its button would be refused now. */
+/**
+ * Which pipeline pause the page is answering, and why its button would be
+ * refused now. `waitedAt`: the open gate wait's start on the newest run row,
+ * which tells one pause from the next at the same stop (a later voices
+ * round, #358); null when no open wait was recorded.
+ */
 export type PauseView =
-  | { step: "review-clusters"; blocker: string | null }
-  | { step: "casting"; blocker: string | null };
+  | { step: "review-clusters"; blocker: string | null; waitedAt: string | null }
+  | { step: "casting"; blocker: string | null; waitedAt: string | null };
 
 /** One render Re-voice makes (#836): a bubble, or a joined group's first member. */
 export interface RevoiceUnit {

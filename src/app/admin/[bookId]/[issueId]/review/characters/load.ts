@@ -28,6 +28,7 @@ import {
 } from "~/workflows/steps/casting-tasks";
 import { planRevoice } from "./revoice-plan";
 import { readVoicesGate } from "~/server/admin/voices-gate";
+import { getLatestRunIds } from "~/server/admin/queries";
 import {
   unknownFaceGroups,
   type UnknownDetection,
@@ -113,6 +114,15 @@ function rows<T>(
     );
   }
   return data;
+}
+
+/** The open gate wait's `waitedAt` on the issue's newest run row (`PauseView.waitedAt`). */
+async function openWaitAt(
+  bookId: string,
+  issueId: string,
+): Promise<string | null> {
+  const latest = await getLatestRunIds({ bookId, issueId });
+  return latest.get(`${bookId}/${issueId}`)?.openGateWaitAt ?? null;
 }
 
 function exemplarUrl(cropPath: string): string {
@@ -516,6 +526,7 @@ export async function loadCharacters(
     const faces = unnamed.length;
     pause = {
       step: "review-clusters",
+      waitedAt: await openWaitAt(bookId, issueId),
       blocker:
         unknown.length > 0
           ? `${unknown.length} unknown face ${unknown.length === 1 ? "group" : "groups"} (${faces} ${faces === 1 ? "face" : "faces"}) still ${unknown.length === 1 ? "needs" : "need"} a name, or "Not a character".`
@@ -529,6 +540,7 @@ export async function loadCharacters(
     pause = {
       step: "casting",
       blocker: gate.verdict.ok ? null : gate.verdict.reason,
+      waitedAt: await openWaitAt(bookId, issueId),
     };
   }
 

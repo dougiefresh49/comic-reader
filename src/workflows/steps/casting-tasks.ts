@@ -26,6 +26,8 @@ export interface SpeakerLine {
   /** `text_with_cues`, else `ocr_text`. */
   text: string;
   emotion: string | null;
+  /** The bubble has stored audio (`audio_storage_path` set), from any voice. */
+  hasAudio: boolean;
   /** `bubbles.voice_id` (a `voices.id`) of the stored audio; null when the bubble has no audio. */
   audioVoiceId: string | null;
   /**
@@ -62,7 +64,7 @@ export interface CastingPlan {
   /** Every character the voices stop must settle: `open` rows and `noVoice` speakers. */
   unsettled: string[];
   /**
-   * Characters with a text line that has no audio from their voice, who sit
+   * Characters with a text line that has no audio at all, who sit
    * out ("no audio" on their row, not removed) or have no usable voice
    * (#358). The voices stop comes back for them once audio has started.
    */
@@ -74,7 +76,7 @@ export interface CastingPlan {
 /** A character whose lines would play nothing (#358). */
 export interface Leftover {
   characterId: string;
-  /** Text lines with no audio from the character's voice. */
+  /** Text lines with no audio at all. */
   lines: number;
   /** Sitting out ("no audio"), or no usable voice. */
   why: "sitting out" | "no voice";
@@ -128,6 +130,11 @@ export function allLinesRendered(lines: SpeakerLine[] | undefined): boolean {
 /** Text lines with no audio from the character's voice. */
 export function unrenderedLines(lines: SpeakerLine[] | undefined): number {
   return (lines ?? []).filter((l) => !l.rendered).length;
+}
+
+/** Text lines with no audio at all, from any voice: the ones that play nothing. */
+export function linesWithoutAudio(lines: SpeakerLine[] | undefined): number {
+  return (lines ?? []).filter((l) => l.text && !l.hasAudio).length;
 }
 
 /**
@@ -185,6 +192,7 @@ export async function readSpeakerLines(
         page: b.page_number,
         text: (b.text_with_cues ?? b.ocr_text ?? "").trim(),
         emotion: b.emotion,
+        hasAudio: b.audio_storage_path !== null,
         audioVoiceId: b.audio_storage_path ? b.voice_id : null,
       };
       list.push({
@@ -220,10 +228,12 @@ export function voicesWithLinesDone(
 }
 
 /**
- * The leftovers (#358): characters with an unrendered text line who sit out
- * ("no audio", not removed) or have no usable voice. Removed characters and
- * voiced ones are never leftovers; the audio step renders a voiced
- * character's missing lines on its own.
+ * The leftovers (#358): characters with a text line that has no audio at
+ * all (`linesWithoutAudio`) who sit out ("no audio", not removed) or have no
+ * usable voice. A line rendered before its character sat out still plays,
+ * so it is not left over. Removed characters and voiced ones are never
+ * leftovers; the audio step renders a voiced character's missing lines on
+ * its own.
  */
 export function leftoversOf(
   book: BookCast,
@@ -232,7 +242,7 @@ export function leftoversOf(
 ): Leftover[] {
   const out: Leftover[] = [];
   for (const id of [...lines.keys()].sort()) {
-    const n = unrenderedLines(lines.get(id));
+    const n = linesWithoutAudio(lines.get(id));
     if (n === 0) continue;
     const r = renderVoice(book, id, issueId);
     if (r.ok || r.reason === "removed") continue;

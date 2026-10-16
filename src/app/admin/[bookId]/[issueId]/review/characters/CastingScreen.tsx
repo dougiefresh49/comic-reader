@@ -846,7 +846,14 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [designFor, setDesignFor] = useState<string | null>(null);
   const [carry, setCarry] = useState<Carry | null>(null);
   const [toast, setToast] = useState<Toast>(null);
-  const [resumed, setResumed] = useState(false);
+  // The pause this page resumed, by its gate wait (#358): a later pause at
+  // the same stop (the next voices round) shows the controls again. Only a
+  // newer wait counts, since the run releases the gate before it clears the
+  // issue row's pause (as `PipelineActions` reads it). ISO timestamps, so
+  // string order is time order.
+  const [resumedFor, setResumedFor] = useState<{
+    waitedAt: string | null;
+  } | null>(null);
   /** Silent here is folded until opened. */
   const [silentOpen, setSilentOpen] = useState(false);
   const silentGridId = useId();
@@ -1462,6 +1469,14 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   }
 
   const pause = data.pause;
+  const resumed =
+    resumedFor !== null &&
+    !(
+      pause?.waitedAt &&
+      (resumedFor.waitedAt === null || pause.waitedAt > resumedFor.waitedAt)
+    );
+  const markResumed = () =>
+    setResumedFor({ waitedAt: pause?.waitedAt ?? null });
   const pauseLabel =
     pause?.step === "casting" ? "Continue" : "Approve the cast";
   const pauseWhy =
@@ -1578,7 +1593,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                       pause.step === "casting"
                         ? await continueRun(scope)
                         : await approveCharacters(scope);
-                    if (r.ok) setResumed(true);
+                    if (r.ok) markResumed();
                     return r;
                   })
                 }
@@ -1601,7 +1616,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                 if (!window.confirm(skipConfirm(data.round))) return;
                 run("Skip and finish", async () => {
                   const r = await skipVoicesAndFinish(scope);
-                  if (r.ok) setResumed(true);
+                  if (r.ok) markResumed();
                   return r;
                 });
               }}

@@ -855,17 +855,13 @@ export async function planMovesDetail(
       continue;
     }
     if (r.reason !== "no voice" && r.reason !== "not in a slot") continue;
-    // #790's rule, from its one home (`lineRendered`, #358): archiving the
-    // voice leaves nothing silent when every line has no text or audio that
-    // voice rendered. It applies to every plan now; `renderedLinesVoiced`
-    // is no longer read.
+    // #790's rule, from its one home (`lineRendered`, #358): a voice out of
+    // its slot leaves nothing silent when every line has no text or audio
+    // that voice rendered, whether this plan archives it or it was archived
+    // before. It applies to every plan now; `renderedLinesVoiced` is no
+    // longer read.
     const gone = r.reason === "not in a slot" ? r.voice?.voiceUuid : undefined;
-    if (
-      gone &&
-      archivedHere.has(gone) &&
-      list.every((l) => lineRendered(l, gone))
-    )
-      continue;
+    if (gone && list.every((l) => lineRendered(l, gone))) continue;
     const culprit =
       (r.voice ? archivedHere.get(r.voice.voiceUuid)?.moveIndex : undefined) ??
       [...moves.keys()].reverse().find((j) => {
