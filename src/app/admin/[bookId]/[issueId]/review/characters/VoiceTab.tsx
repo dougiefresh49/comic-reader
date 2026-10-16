@@ -579,11 +579,19 @@ export function VoiceTab({
               {otherOn ? `as ${otherOn.name}` : "Another voice"}
             </span>
             <span className="truncate text-[11.5px] text-neutral-400">
-              {otherOn
-                ? otherOn.status === "library"
-                  ? "library · no slot"
-                  : "stand-in · no slot"
-                : `${others.length} active · ${library.length} library`}
+              {otherOn ? (
+                otherOn.status === "library" ? (
+                  "library · no slot"
+                ) : slotFor(otherOn) ? (
+                  <>
+                    stand-in · <SlotNumber n={slotFor(otherOn)} />
+                  </>
+                ) : (
+                  "stand-in · no slot"
+                )
+              ) : (
+                `${others.length} active · ${library.length} library`
+              )}
             </span>
           </span>
         </div>

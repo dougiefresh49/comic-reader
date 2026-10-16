@@ -3,7 +3,8 @@
 /**
  * The casting page's immediate writes: the Faces work (each saves the
  * moment it is made and answers with a line the screen shows), the free
- * voice preview, and the two pipeline pauses' buttons. Everything else on
+ * voice preview, the two pipeline pauses' buttons, and `readPause`, the
+ * read that notices the next pause. Everything else on
  * the page is staged and goes through `casting-actions.ts` at Confirm.
  * Faces and exemplars are written here, by the row that was clicked (#349:
  * never "the first detection on that page").
@@ -42,6 +43,9 @@ import {
 import { canContinueVoices } from "~/server/admin/voices-gate";
 import { requireAdmin } from "~/server/admin/require-admin";
 import { hookToken } from "~/lib/ingest-hooks";
+import { selectIssue } from "~/lib/issue-queries";
+import { openWaitAt, pausedStop } from "./load";
+import type { PauseView } from "./types";
 
 export type ActionResult =
   | { ok: true; message: string }
@@ -1150,6 +1154,47 @@ export async function removeCharacterAlias(args: {
     return { ok: true, message: `Removed "${alias}".` };
   } catch (err) {
     return fail("removing an alias", err);
+  }
+}
+
+/**
+ * `readPause`'s answer: the stop the issue is paused at with its open gate
+ * wait (`PauseView`'s `step` and `waitedAt`), and whether the run is over
+ * (`complete`, or `failed:<step>` from a failure or a cancel).
+ */
+export type PauseState =
+  | {
+      ok: true;
+      stop: PauseView["step"] | null;
+      waitedAt: string | null;
+      done: boolean;
+    }
+  | { ok: false; error: string };
+
+/** The issue row's pause, so the page notices the run is back at a stop (#917). Reads only. */
+export async function readPause(scope: Scope): Promise<PauseState> {
+  try {
+    await requireAdmin();
+    const { data, error } = await selectIssue(
+      supabaseAdmin,
+      scope.bookId,
+      scope.issueId,
+      "pipeline_step, pipeline_paused",
+    ).maybeSingle();
+    must("reading the issue", error);
+    if (!data) throw new Error("no such issue");
+    const stop = pausedStop(data);
+    const step = data.pipeline_step;
+    return {
+      ok: true,
+      stop,
+      waitedAt: stop ? await openWaitAt(scope.bookId, scope.issueId) : null,
+      done:
+        !data.pipeline_paused &&
+        (step === "complete" || (step?.startsWith("failed:") ?? false)),
+    };
+  } catch (err) {
+    return fail("reading the pause", err);
   }
 }
 

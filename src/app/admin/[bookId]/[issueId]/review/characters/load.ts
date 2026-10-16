@@ -117,12 +117,24 @@ function rows<T>(
 }
 
 /** The open gate wait's `waitedAt` on the issue's newest run row (`PauseView.waitedAt`). */
-async function openWaitAt(
+export async function openWaitAt(
   bookId: string,
   issueId: string,
 ): Promise<string | null> {
   const latest = await getLatestRunIds({ bookId, issueId });
   return latest.get(`${bookId}/${issueId}`)?.openGateWaitAt ?? null;
+}
+
+/** The stop this page pauses at, from the issue row: `review-clusters` or `casting` while paused there, else null. */
+export function pausedStop(issue: {
+  pipeline_paused: boolean;
+  pipeline_step: string | null;
+}): PauseView["step"] | null {
+  if (!issue.pipeline_paused) return null;
+  return issue.pipeline_step === "review-clusters" ||
+    issue.pipeline_step === "casting"
+    ? issue.pipeline_step
+    : null;
 }
 
 function exemplarUrl(cropPath: string): string {
@@ -521,7 +533,8 @@ export async function loadCharacters(
 
   let pause: PauseView | null = null;
   let gatePlan: CastingPlan | null = null;
-  if (issue.pipeline_paused && issue.pipeline_step === "review-clusters") {
+  const stop = pausedStop(issue);
+  if (stop === "review-clusters") {
     const inCast = cards.filter((c) => !c.removed).length;
     const faces = unnamed.length;
     pause = {
@@ -534,7 +547,7 @@ export async function loadCharacters(
             ? "The cast is empty: add at least one character."
             : null,
     };
-  } else if (issue.pipeline_paused && issue.pipeline_step === "casting") {
+  } else if (stop === "casting") {
     const gate = await readVoicesGate(bookId, issueId);
     gatePlan = gate.plan;
     pause = {
