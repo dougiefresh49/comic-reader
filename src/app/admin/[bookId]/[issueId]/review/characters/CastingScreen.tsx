@@ -887,18 +887,18 @@ export function CastingScreen({ data }: { data: CharactersData }) {
       } satisfies Draft);
   }, [draft, restoredFor, staged]);
 
-  /** Re-reads voices and characters (`router.refresh` keeps the staged list); says so once the refresh lands. */
-  const [reloading, setReloading] = useState(false);
+  /** Re-reads voices and characters (`router.refresh` keeps the staged list); says so once the new `data` lands. */
+  const reloadAsked = useRef(false);
   const reloadVoices = () => {
-    setReloading(true);
+    reloadAsked.current = true;
     startTransition(() => router.refresh());
     if (voiceMode) readRoster();
   };
   useEffect(() => {
-    if (!reloading || busy) return;
-    setReloading(false);
+    if (!reloadAsked.current) return;
+    reloadAsked.current = false;
     say("Reloaded");
-  }, [reloading, busy, say]);
+  }, [data, say]);
   const discardStaged = () => {
     if (
       !window.confirm(
