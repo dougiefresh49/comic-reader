@@ -2,6 +2,7 @@
 
 import type { CastSource } from "~/lib/cast";
 import type { AliasEntry } from "~/lib/character-aliases";
+import type { TtsCreditRate } from "~/lib/tts-credit-rate";
 
 export interface Rect {
   x: number;
@@ -152,8 +153,11 @@ export interface RevoiceUnit {
   sortOrder: number;
   /** Bubbles the render replaces: 1, or the group's members. */
   bubbles: number;
-  /** ElevenLabs characters the request bills. */
-  credits: number;
+  /**
+   * Characters in the request text, voice prefix included. Not credits:
+   * `estimateCredits` turns them into credits at the measured rate.
+   */
+  characters: number;
 }
 
 /** A character's old-voice audio across the book, per issue and in total. */
@@ -163,12 +167,19 @@ export interface RevoicePlan {
     issueId: string;
     number: number;
     bubbles: number;
-    credits: number;
+    /** Request characters across the issue's units (not credits). */
+    characters: number;
   }[];
   /** In play order: issue, page, then sort order. */
   units: RevoiceUnit[];
   bubbles: number;
-  credits: number;
+  /** Request characters across every unit (not credits). */
+  characters: number;
+  /**
+   * The billed credits per character of the newest renders (#838), the same
+   * on every plan; null when none are logged or the page did not read it.
+   */
+  rate: TtsCreditRate | null;
 }
 
 export interface CharactersData {

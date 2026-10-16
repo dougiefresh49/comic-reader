@@ -12,6 +12,7 @@ import {
   renderVoice,
   type BookCast,
 } from "~/lib/cast";
+import type { TtsCreditRate } from "~/lib/tts-credit-rate";
 import { buildTtsRequest } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
 import type { RevoicePlan, RevoiceUnit } from "./types";
@@ -166,13 +167,18 @@ type GroupMember = Pick<
  * could not render it either. A render is what Regenerate makes for the
  * bubble: a joined group (#451) with two or more active members is one
  * render of every active member, priced on their joined text; anything else
- * is the bubble alone. Credits are the request text `buildTtsRequest` makes,
- * voice prefix included.
+ * is the bubble alone. A unit's `characters` are the request text
+ * `buildTtsRequest` makes, voice prefix included; `opts.rate` (the page's
+ * `loadTtsCreditRate`) goes on every plan so the box can show credits.
  */
 export async function planRevoice(
   client: SupabaseClient,
   bookId: string,
-  opts: { characterIds?: string[]; book?: BookCast } = {},
+  opts: {
+    characterIds?: string[];
+    book?: BookCast;
+    rate?: TtsCreditRate | null;
+  } = {},
 ): Promise<RevoicePlan[]> {
   const [book, rows] = await Promise.all([
     opts.book ?? loadBookCast(client, bookId),
@@ -246,7 +252,7 @@ export async function planRevoice(
             ),
           )
         : (first.text_with_cues ?? first.ocr_text ?? "");
-    const credits = buildTtsRequest({
+    const characters = buildTtsRequest({
       text,
       voiceId: unit.elevenLabsId,
       override: overrides.get(unit.elevenLabsId),
@@ -256,7 +262,8 @@ export async function planRevoice(
       issues: [],
       units: [],
       bubbles: 0,
-      credits: 0,
+      characters: 0,
+      rate: opts.rate ?? null,
     };
     plans.set(unit.characterId, plan);
     const u: RevoiceUnit = {
@@ -265,11 +272,11 @@ export async function planRevoice(
       page: first.page_number,
       sortOrder: first.sort_order,
       bubbles: unit.members.length,
-      credits,
+      characters,
     };
     plan.units.push(u);
     plan.bubbles += u.bubbles;
-    plan.credits += u.credits;
+    plan.characters += u.characters;
   }
 
   for (const plan of plans.values()) {
@@ -286,12 +293,12 @@ export async function planRevoice(
           issueId: u.issueId,
           number: issueNumber(u.issueId),
           bubbles: 0,
-          credits: 0,
+          characters: 0,
         };
         plan.issues.push(issue);
       }
       issue.bubbles += u.bubbles;
-      issue.credits += u.credits;
+      issue.characters += u.characters;
     }
   }
   return [...plans.values()].sort((a, b) =>
