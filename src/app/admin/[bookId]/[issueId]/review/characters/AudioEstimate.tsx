@@ -2,6 +2,8 @@
 // render now, and what the ElevenLabs account has left. Read-only; the page
 // computes both on the server.
 import type { AudioEstimate as Estimate } from "~/lib/audio-estimate";
+import { ELEVENLABS_USD_PER_CHARACTER } from "~/lib/models";
+import { estimateCredits, type TtsCreditRate } from "~/lib/tts-credit-rate";
 import type { CharacterStatus } from "~/lib/voice-slots/elevenlabs";
 
 export interface AudioEstimateData {
@@ -11,17 +13,25 @@ export interface AudioEstimateData {
   /** Null when the subscription read failed; `accountError` says why. */
   account: CharacterStatus | null;
   accountError: string | null;
+  /** The billed rate of recent renders (#838); null shows characters only. */
+  rate: TtsCreditRate | null;
 }
 
 const n = (v: number) => v.toLocaleString("en-US");
 const lines = (v: number) => `${n(v)} ${v === 1 ? "line" : "lines"}`;
 
 export function AudioEstimate({ data }: { data: AudioEstimateData }) {
-  const { estimate, account } = data;
+  const { estimate, account, rate } = data;
   const parts: string[] = [];
   if (estimate) {
+    // `usd_est` in `llm_calls` is credits times the same per-unit price.
+    const credits = rate ? estimateCredits(estimate.characters, rate) : null;
     parts.push(
-      `Audio to render: ${lines(estimate.lines)}, about ${n(estimate.characters)} characters of text.`,
+      `Audio to render: ${lines(estimate.lines)}, about ${n(estimate.characters)} characters of text${
+        credits == null
+          ? "."
+          : `, about ${n(credits)} credits ($${(credits * ELEVENLABS_USD_PER_CHARACTER).toFixed(2)}) at the rate of the last ${rate!.renders} renders.`
+      }`,
     );
     if (estimate.waiting > 0)
       parts.push(
