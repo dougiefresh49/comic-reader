@@ -394,6 +394,19 @@ export interface SlotModel {
   landing: Map<number, number | null>;
 }
 
+/** The voices a staged archive takes out of their slot: `slotAfter`'s `outIds`. */
+export function outIdsOf(model: SlotModel | null): Set<string> {
+  const s = new Set<string>();
+  for (const v of model?.slots ?? [])
+    if (
+      v.outBy !== null &&
+      v.slot.holder.kind !== "free" &&
+      v.slot.holder.voiceUuid
+    )
+      s.add(v.slot.holder.voiceUuid);
+  return s;
+}
+
 /**
  * Where the staged moves land on the account's slots. A guess the plan may
  * not follow (a move names no slot number), close enough for the strip:

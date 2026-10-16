@@ -77,6 +77,7 @@ import {
   rekey,
   restorable,
   slotAfter,
+  outIdsOf,
   slotModel,
   takesSlot,
   voicePick,
@@ -1085,17 +1086,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         m.set(s.holder.voiceUuid, s.index);
     return m;
   }, [roster]);
-  const outIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const v of model?.slots ?? [])
-      if (
-        v.outBy !== null &&
-        v.slot.holder.kind !== "free" &&
-        v.slot.holder.voiceUuid
-      )
-        s.add(v.slot.holder.voiceUuid);
-    return s;
-  }, [model]);
+  const outIds = useMemo(() => outIdsOf(model), [model]);
   /** Whether a card's voice plays after the staged moves: Ready or Needs a voice. */
   const playsNow = useMemo(() => {
     const slots = model ? { slotOf, outIds, landing: model.landing } : null;
@@ -1516,10 +1507,12 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     resumedFor !== null && !newerWait(pause?.waitedAt, resumedFor.waitedAt);
   const markResumed = () =>
     setResumedFor({ waitedAt: pause?.waitedAt ?? null });
-  // While resumed (#917): read the issue row's pause until the run is back at
-  // a stop with a newer gate wait, or is over, then re-read the page once
-  // the way Reload voices does; `resumed` then shows the new pause's
-  // controls. Hidden-tab ticks are skipped; a failed read waits for the next.
+  // While resumed (#917): read the issue row's pause and re-read the page the
+  // way Reload voices does once the run is back at a stop with a newer gate
+  // wait, or is over. A newer wait re-reads on every tick until the loaded
+  // pause turns `resumed` false and this effect stops, so a refresh that
+  // failed or landed early is retried; the run's end re-reads once. Hidden-tab
+  // ticks are skipped; a failed read waits for the next.
   useEffect(() => {
     if (!resumed || resumedFor === null) return;
     let stopped = false;
@@ -1531,8 +1524,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         .then((r) => {
           if (stopped || !r.ok) return;
           if (!newerWait(r.waitedAt, resumedFor.waitedAt) && !r.done) return;
-          stopped = true;
-          clearInterval(id);
+          if (r.done) {
+            stopped = true;
+            clearInterval(id);
+          }
           startTransition(() => router.refresh());
           if (voiceMode) readRoster();
         })
