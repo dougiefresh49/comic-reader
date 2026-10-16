@@ -45,6 +45,7 @@ import {
   rejectFace,
   rejectFaces,
   rejectGroup,
+  readPause,
   relabelCharacter,
   voicePreview,
   makeVoiceSample,
@@ -76,6 +77,7 @@ import {
   rekey,
   restorable,
   slotAfter,
+  outIdsOf,
   slotModel,
   takesSlot,
   voicePick,
@@ -119,6 +121,22 @@ function savedWhen(iso: string): string {
     ? "an earlier visit"
     : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
+
+/**
+ * A gate wait newer than the one this page resumed (#358): only a newer wait
+ * is a new pause, since the run releases the gate before it clears the issue
+ * row's pause (as `PipelineActions` reads it). ISO timestamps, so string
+ * order is time order.
+ */
+function newerWait(
+  waitedAt: string | null | undefined,
+  resumedAt: string | null,
+): boolean {
+  return !!waitedAt && (resumedAt === null || waitedAt > resumedAt);
+}
+
+/** How often a resumed page reads the issue row's pause (#917). */
+const PAUSE_POLL_MS = 5000;
 
 /** The DOM id of a card, so closing the panel can hand focus back to it. */
 const cardDomId = (id: string) => `cast-card-${id}`;
@@ -873,10 +891,8 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [carry, setCarry] = useState<Carry | null>(null);
   const [toast, setToast] = useState<Toast>(null);
   // The pause this page resumed, by its gate wait (#358): a later pause at
-  // the same stop (the next voices round) shows the controls again. Only a
-  // newer wait counts, since the run releases the gate before it clears the
-  // issue row's pause (as `PipelineActions` reads it). ISO timestamps, so
-  // string order is time order.
+  // the same stop (the next voices round) shows the controls again
+  // (`newerWait`).
   const [resumedFor, setResumedFor] = useState<{
     waitedAt: string | null;
   } | null>(null);
@@ -1070,17 +1086,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
         m.set(s.holder.voiceUuid, s.index);
     return m;
   }, [roster]);
-  const outIds = useMemo(() => {
-    const s = new Set<string>();
-    for (const v of model?.slots ?? [])
-      if (
-        v.outBy !== null &&
-        v.slot.holder.kind !== "free" &&
-        v.slot.holder.voiceUuid
-      )
-        s.add(v.slot.holder.voiceUuid);
-    return s;
-  }, [model]);
+  const outIds = useMemo(() => outIdsOf(model), [model]);
   /** Whether a card's voice plays after the staged moves: Ready or Needs a voice. */
   const playsNow = useMemo(() => {
     const slots = model ? { slotOf, outIds, landing: model.landing } : null;
@@ -1498,13 +1504,43 @@ export function CastingScreen({ data }: { data: CharactersData }) {
 
   const pause = data.pause;
   const resumed =
-    resumedFor !== null &&
-    !(
-      pause?.waitedAt &&
-      (resumedFor.waitedAt === null || pause.waitedAt > resumedFor.waitedAt)
-    );
+    resumedFor !== null && !newerWait(pause?.waitedAt, resumedFor.waitedAt);
   const markResumed = () =>
     setResumedFor({ waitedAt: pause?.waitedAt ?? null });
+  // While resumed (#917): read the issue row's pause and re-read the page the
+  // way Reload voices does once the run is back at a stop with a newer gate
+  // wait, or is over. A newer wait re-reads on every tick until the loaded
+  // pause turns `resumed` false and this effect stops, so a refresh that
+  // failed or landed early is retried; the run's end re-reads once. Hidden-tab
+  // ticks are skipped; a failed read waits for the next.
+  useEffect(() => {
+    if (!resumed || resumedFor === null) return;
+    let stopped = false;
+    let reading = false;
+    const id = setInterval(() => {
+      if (stopped || reading || document.visibilityState !== "visible") return;
+      reading = true;
+      readPause(scope)
+        .then((r) => {
+          if (stopped || !r.ok) return;
+          if (!newerWait(r.waitedAt, resumedFor.waitedAt) && !r.done) return;
+          if (r.done) {
+            stopped = true;
+            clearInterval(id);
+          }
+          startTransition(() => router.refresh());
+          if (voiceMode) readRoster();
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          reading = false;
+        });
+    }, PAUSE_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [resumed, resumedFor, scope, voiceMode, readRoster, router]);
   const pauseLabel =
     pause?.step === "casting" ? "Continue" : "Approve the cast";
   const pauseWhy =

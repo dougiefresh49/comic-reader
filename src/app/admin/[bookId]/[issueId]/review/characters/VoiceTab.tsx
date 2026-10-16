@@ -16,6 +16,8 @@ import {
   lockReason,
   takesSlot,
   type CardState,
+  outIdsOf,
+  slotAfter,
   type SlotModel,
   type Staged,
 } from "./staging";
@@ -311,6 +313,9 @@ export function VoiceTab({
       : undefined;
   const landing =
     pick && model ? (model.landing.get(pick.index) ?? null) : null;
+  const outIds = useMemo(() => outIdsOf(model), [model]);
+  /** The stand-in's slot, by the card's rule (`slotAfter`): none once a staged archive takes it out. */
+  const otherSlot = slotAfter(state, slotOf, landing, outIds);
   const slotFor = (v: VoiceOption) =>
     pick?.move.kind === "restore" && pick.move.voice_uuid === v.id
       ? landing
@@ -579,11 +584,19 @@ export function VoiceTab({
               {otherOn ? `as ${otherOn.name}` : "Another voice"}
             </span>
             <span className="truncate text-[11.5px] text-neutral-400">
-              {otherOn
-                ? otherOn.status === "library"
-                  ? "library · no slot"
-                  : "stand-in · no slot"
-                : `${others.length} active · ${library.length} library`}
+              {otherOn ? (
+                otherOn.status === "library" ? (
+                  "library · no slot"
+                ) : otherSlot ? (
+                  <>
+                    stand-in · <SlotNumber n={otherSlot} />
+                  </>
+                ) : (
+                  "stand-in · no slot"
+                )
+              ) : (
+                `${others.length} active · ${library.length} library`
+              )}
             </span>
           </span>
         </div>
