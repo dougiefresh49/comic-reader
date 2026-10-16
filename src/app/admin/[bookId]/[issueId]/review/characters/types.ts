@@ -95,7 +95,7 @@ export interface VoiceOption {
   status: "active" | "archived" | "needs_clip" | "library";
   characterId: string | null;
   kind: "clone" | "designed" | "library";
-  /** `starting_pick`: set only on rows from the retired voice-lab cast sheets; the import now writes false. */
+  /** `starting_pick`: true only on rows from the retired voice-lab cast sheets; the import creates voices with false. */
   labPick: boolean;
   /** One of the owner's v2 voices: never swapped out, never cast for another character. */
   protected: boolean;

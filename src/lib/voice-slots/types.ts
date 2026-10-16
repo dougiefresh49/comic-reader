@@ -16,8 +16,9 @@ export interface VoiceRow {
   appearance_id: string | null;
   /**
    * The character's default pick among its voices. The retired voice-lab cast
-   * sheets set it; `pnpm voice-lab-import` now always writes false, so only rows
-   * imported before that carry true.
+   * sheets set it. `pnpm voice-lab-import` writes false on each voice it creates
+   * and leaves the flag alone on an existing row, so only rows from the cast-sheet
+   * era carry true.
    */
   starting_pick: boolean;
   current_elevenlabs_id: string | null;
