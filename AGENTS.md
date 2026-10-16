@@ -141,8 +141,8 @@ Half the point of this list is that your reports read the way I think.
 - **voice-lab**: the sibling project that owns clip extraction. Its
   clips reach comic-reader only through `pnpm voice-lab-import`, which
   reads voice-lab's clone-source index (`scripts/voice-lab-import.ts`
-  has the flags). Its checkout is read-only from here: when voice-lab
-  needs a change, say what in your report.
+  has the flags). Its checkout is read-only from here, files included
+  (config): when voice-lab needs a change, say what in your report.
 
 ## Verify before you assert
 
