@@ -206,6 +206,22 @@ function blankCard(id: string, name: string, known: boolean): CharacterCard {
   };
 }
 
+/**
+ * Every text line of the card has audio from the voice it rests on, and no
+ * voice change is staged for it (#358): its lines play, so a voice out of
+ * its slot leaves nothing to do. The same strict count as the "rendered n/n"
+ * chip.
+ */
+function linesDoneOn(card: CharacterCard, state: CardState): boolean {
+  return (
+    voicePick(state) === null &&
+    state.voiceId !== null &&
+    state.voiceId === card.voice?.uuid &&
+    card.rendered.of > 0 &&
+    card.rendered.done === card.rendered.of
+  );
+}
+
 /** The card's voice chip: kind and slot, `as X`, `no voice`, `sitting out`. */
 function Chip({
   card,
@@ -230,7 +246,15 @@ function Chip({
     <span title={title} className={`size-[7px] shrink-0 rounded-full ${cls}`} />
   );
   const dim = "truncate text-neutral-400";
-  const noSlotTag = <span className="text-[11px] text-red-400">no slot</span>;
+  // A done card's voice may hold no slot (#358): said in a neutral color.
+  const done = linesDoneOn(card, state);
+  const noSlotTag = done ? (
+    <span className="truncate text-[11px] text-neutral-500">
+      lines done · no slot
+    </span>
+  ) : (
+    <span className="text-[11px] text-red-400">no slot</span>
+  );
   if (state.removed)
     return (
       <>
@@ -250,7 +274,7 @@ function Chip({
     const own = v.characterId === card.id;
     const pending = voicePick(state) !== null;
     const slot = slotAfter(state, slotOf, landing, outIds);
-    const lost = !pending && outIds.has(v.id);
+    const lost = !pending && !done && outIds.has(v.id);
     if (lost)
       return (
         <>
@@ -267,7 +291,9 @@ function Chip({
             : v.status === "library"
               ? "bg-neutral-300"
               : !slot && slotOf.size > 0
-                ? "bg-red-400"
+                ? done
+                  ? "bg-neutral-500"
+                  : "bg-red-400"
                 : own
                   ? "bg-emerald-400"
                   : "bg-sky-400",
@@ -280,7 +306,7 @@ function Chip({
         </span>
         {slot ? (
           <span className="font-mono text-[11px] text-neutral-500">{slot}</span>
-        ) : v.status === "archived" || noSlot ? (
+        ) : v.status === "archived" || noSlot || (done && outIds.has(v.id)) ? (
           noSlotTag
         ) : null}
         <span className="ml-auto">
@@ -1443,8 +1469,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     const st = stateOf(c);
     if (c.lines === 0 || st.sitOut || st.removed) return "silent";
     // Slots still loading go by the voice's status (`plays`), so a card does
-    // not jump to Needs a voice and back when the roster lands.
-    return playsNow(st) ? "ready" : "needs";
+    // not jump to Needs a voice and back when the roster lands. A card whose
+    // lines are all rendered by its voice is Ready even when that voice holds
+    // no slot (#358), as the gate counts it.
+    return playsNow(st) || linesDoneOn(c, st) ? "ready" : "needs";
   };
   const grouped = new Map<GroupKey, CharacterCard[]>();
   for (const c of cards) {
