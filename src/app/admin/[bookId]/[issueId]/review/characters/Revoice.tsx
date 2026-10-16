@@ -123,8 +123,9 @@ export function Revoice({
     <section className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/5 p-3">
       <h4 className={`mb-1 ${LABEL}`}>Old-voice audio</h4>
       <p className="text-[12.5px] text-neutral-300">
-        {lines(plan.bubbles)} still play a voice this character no longer has.
-        Re-voice renders them again
+        {lines(plan.bubbles)} still {plan.bubbles === 1 ? "plays" : "play"} a
+        voice this character no longer has. Re-voice renders{" "}
+        {plan.bubbles === 1 ? "it" : "them"} again
         {voiceName ? ` in ${voiceName}` : " in its current voice"}.
       </p>
       <ul className="mt-2 text-[12.5px] text-neutral-200">
@@ -146,7 +147,7 @@ export function Revoice({
       <p className="mt-1 text-[11.5px] text-neutral-400">
         {plan.rate
           ? `At the billed rate of the last ${plan.rate.renders} ${plan.rate.renders === 1 ? "render" : "renders"}: ${plan.rate.perCharacter.toFixed(2)} credits per character.`
-          : "No billed renders are logged yet, so these are characters, not credits."}
+          : "No billed rate could be read, so these are characters, not credits."}
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -163,7 +164,9 @@ export function Revoice({
         {phase.kind === "confirm" && (
           <>
             <span className="text-[12.5px] text-amber-200">
-              Spend {cost(plan.characters, plan.rate)} on {lines(plan.bubbles)}?
+              {plan.rate
+                ? `Spend ${cost(plan.characters, plan.rate)} on ${lines(plan.bubbles)}?`
+                : `Re-voice ${lines(plan.bubbles)} (${cost(plan.characters, null)})? The credit cost is unknown.`}
             </span>
             <button
               type="button"
