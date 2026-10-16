@@ -60,6 +60,7 @@ import {
   type Recorder as OpRecorder,
 } from "~/lib/voice-slots/operation";
 import {
+  allLinesRendered,
   ownRowStop,
   readSpeakerLines,
   silencedIn,
@@ -239,10 +240,9 @@ export async function planVoiceWork(
     issueNeeds(sb, { bookId, issueId }),
   ]);
   // Lines per character: the voices gate's own rule (#406).
+  const spoken = await readSpeakerLines(sb, bookId, issueId, book);
   const lines = new Map(
-    [...(await readSpeakerLines(sb, bookId, issueId))].map(
-      ([id, list]) => [id, list.length] as const,
-    ),
+    [...spoken].map(([id, list]) => [id, list.length] as const),
   );
   const voiceById = new Map(voices.map((v) => [v.id, v]));
   const candidatesOf = new Map<string, VoiceWorkItem["candidates"]>();
@@ -310,6 +310,8 @@ export async function planVoiceWork(
     if (voice) {
       const row = voice.voiceUuid ? voiceById.get(voice.voiceUuid) : null;
       if (row?.status !== "archived") continue;
+      // Every line already plays in that voice (#358): no restore to ask for.
+      if (allLinesRendered(spoken.get(id))) continue;
       items.push({
         ...base(id),
         source: "archived voice",

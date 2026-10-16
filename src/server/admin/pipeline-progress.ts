@@ -1,7 +1,11 @@
 import "server-only";
 import { supabaseAdmin } from "~/lib/supabase-admin";
 import { castRow, loadBookCast } from "~/lib/cast";
-import { planCastingTasks } from "~/workflows/steps/casting-tasks";
+import { selectIssue } from "~/lib/issue-queries";
+import {
+  planCastingTasks,
+  type CastingPlan,
+} from "~/workflows/steps/casting-tasks";
 import { whereWordGeometryCandidate } from "~/lib/word-geometry-assign";
 
 /**
@@ -69,6 +73,18 @@ export interface ProgressCounts {
   needVoice: string[];
   /** The rest of `unsettled`: speakers who have a voice and an open request for a new one. */
   newVoice: string[];
+  /**
+   * The gate's `leftovers` once some bubble has audio (#358), else empty:
+   * characters sitting out or with no usable voice whose text lines have no
+   * audio. Display names sorted, with the counts the Voices row shows.
+   */
+  leftovers: {
+    names: string[];
+    sittingOut: number;
+    noVoice: number;
+    /** Their text lines with no audio. */
+    lines: number;
+  };
 }
 
 export interface PipelineProgress {
@@ -186,6 +202,7 @@ async function getCounts(
     exemplarsNamed,
     plan,
     book,
+    issueRow,
   ] = await Promise.all([
     panelsQuery,
     // select count(*) from pages where book_id = $1 and issue_id = $2
@@ -232,7 +249,13 @@ async function getCounts(
     planCastingTasks(supabaseAdmin, bookId, issueId),
     // The book's cast, only for the unsettled characters' display names.
     loadBookCast(supabaseAdmin, bookId),
+    // select pipeline_step from issues where book_id = $1 and id = $2
+    selectIssue(supabaseAdmin, bookId, issueId, "pipeline_step").maybeSingle(),
   ]);
+  if (issueRow.error) countsReadFailed("issue", issueRow.error);
+  const complete =
+    (issueRow.data as { pipeline_step: string | null } | null)
+      ?.pipeline_step === "complete";
 
   if (panelsResult.error) countsReadFailed("panels", panelsResult.error);
   const panelRows = (panelsResult.data ?? []) as {
@@ -265,6 +288,7 @@ async function getCounts(
   }
 
   const noVoice = new Set(plan.noVoice);
+  const left = shownLeftovers(plan, complete);
   const namesOf = (ids: string[]) =>
     ids
       .map(
@@ -294,7 +318,26 @@ async function getCounts(
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
     needVoice: namesOf(plan.noVoice),
     newVoice: namesOf(plan.unsettled.filter((id) => !noVoice.has(id))),
+    leftovers: {
+      names: namesOf(left.map((l) => l.characterId)),
+      sittingOut: left.filter((l) => l.why === "sitting out").length,
+      noVoice: left.filter((l) => l.why === "no voice").length,
+      lines: left.reduce((n, l) => n + l.lines, 0),
+    },
   };
+}
+
+/**
+ * The leftovers the hub shows (#358). Before the issue completes, only once
+ * audio has started, as the gate counts them, so a first pass is unchanged.
+ * On a complete issue always, so one whose every line was skipped (no audio
+ * at all) still offers a Voices round.
+ */
+export function shownLeftovers(
+  plan: Pick<CastingPlan, "leftovers" | "audioStarted">,
+  complete: boolean,
+): CastingPlan["leftovers"] {
+  return complete || plan.audioStarted ? plan.leftovers : [];
 }
 
 export async function getPipelineProgress(

@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     bookId: unknown;
     issueId: unknown;
     step: unknown;
+    skip?: unknown;
   };
 
   // Strings only: an array step would skip the checks below and still
@@ -38,8 +39,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // "Skip and finish" (#358) exists only at the voices stop: the run goes on
+  // without the check below, renders what has a voice, and never comes back
+  // to Voices this run.
+  if (body.skip !== undefined && body.skip !== false) {
+    if (body.skip !== true || body.step !== "casting") {
+      return Response.json(
+        { error: "skip is true or absent, and only for the casting step" },
+        { status: 400 },
+      );
+    }
+  }
+  const skip = body.skip === true;
+
   // The voices stop (#353): the same check the screen's Continue runs.
-  if (body.step === "casting") {
+  if (body.step === "casting" && !skip) {
     const verdict = await canContinueVoices(body.bookId, body.issueId);
     if (!verdict.ok) {
       return Response.json({ error: verdict.reason }, { status: 409 });
@@ -58,7 +72,10 @@ export async function POST(req: NextRequest) {
   const token = hookToken(body.bookId, body.issueId, body.step);
 
   try {
-    const result = await resumeHook(token, { approved: true });
+    const result = await resumeHook(
+      token,
+      skip ? { approved: true, skip: true } : { approved: true },
+    );
     return Response.json({
       ok: true,
       runId: result.runId,

@@ -38,6 +38,7 @@ import {
   approveCharacters,
   confirmFaces,
   continueRun,
+  skipVoicesAndFinish,
   moveFace,
   moveFaces,
   nameGroup,
@@ -142,6 +143,48 @@ const GROUPS: Record<"faces" | "voices", { key: GroupKey; label: string }[]> = {
 const APPROVE_DOES =
   "Seeds the cast as shown and resumes the paused run: Gemini then reads every page (paid).";
 
+/** The Skip and finish confirm (#358): what stays silent. */
+function skipConfirm(round: CharactersData["round"]): string {
+  const left = round?.leftovers ?? [];
+  const lines = left.reduce((n, l) => n + l.lines, 0);
+  const which =
+    left.length > 0
+      ? `${lines} ${lines === 1 ? "line" : "lines"} of ${left.map((l) => l.name).join(", ")} will play nothing.`
+      : "Every line of a character with no voice or sitting out will play nothing.";
+  return `Skip and finish? Audio renders the lines that have a voice. ${which} The run finishes without coming back to Voices.`;
+}
+
+/** The voices round banner (#358): who still plays nothing after audio. */
+function RoundBanner({
+  round,
+}: {
+  round: NonNullable<CharactersData["round"]>;
+}) {
+  const left = round.leftovers;
+  const sitting = left.filter((l) => l.why === "sitting out").length;
+  const lines = left.reduce((n, l) => n + l.lines, 0);
+  const names = left.map((l) => `${l.name} ${l.lines} (${l.why})`).join(" · ");
+  return (
+    <div
+      role="status"
+      aria-label="Voices round"
+      className="flex shrink-0 items-baseline gap-3 border-b border-amber-400/20 bg-amber-400/5 px-[18px] py-1.5 text-[12px] text-amber-100"
+    >
+      <b className="font-semibold whitespace-nowrap">Voices · round</b>
+      <span className="whitespace-nowrap text-amber-200/80">
+        {sitting > 0 ? `${sitting} sitting out · ` : ""}
+        {lines} {lines === 1 ? "line" : "lines"} without audio
+        {round.linesDone.length > 0
+          ? ` · ${round.linesDone.length} ${round.linesDone.length === 1 ? "voice has" : "voices have"} every line done here`
+          : ""}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-amber-200/70" title={names}>
+        {names}
+      </span>
+    </div>
+  );
+}
+
 /** A card for a character + Add brings in that has no card here. */
 function blankCard(id: string, name: string, known: boolean): CharacterCard {
   return {
@@ -159,7 +202,24 @@ function blankCard(id: string, name: string, known: boolean): CharacterCard {
     lines: 0,
     pages: null,
     samples: [],
+    rendered: { done: 0, of: 0 },
   };
+}
+
+/**
+ * Every text line of the card has audio from the voice it rests on, and no
+ * voice change is staged for it (#358): its lines play, so a voice out of
+ * its slot leaves nothing to do. The same strict count as the "rendered n/n"
+ * chip.
+ */
+function linesDoneOn(card: CharacterCard, state: CardState): boolean {
+  return (
+    voicePick(state) === null &&
+    state.voiceId !== null &&
+    state.voiceId === card.voice?.uuid &&
+    card.rendered.of > 0 &&
+    card.rendered.done === card.rendered.of
+  );
 }
 
 /** The card's voice chip: kind and slot, `as X`, `no voice`, `sitting out`. */
@@ -186,7 +246,15 @@ function Chip({
     <span title={title} className={`size-[7px] shrink-0 rounded-full ${cls}`} />
   );
   const dim = "truncate text-neutral-400";
-  const noSlotTag = <span className="text-[11px] text-red-400">no slot</span>;
+  // A done card's voice may hold no slot (#358): said in a neutral color.
+  const done = linesDoneOn(card, state);
+  const noSlotTag = done ? (
+    <span className="truncate text-[11px] text-neutral-500">
+      lines done · no slot
+    </span>
+  ) : (
+    <span className="text-[11px] text-red-400">no slot</span>
+  );
   if (state.removed)
     return (
       <>
@@ -206,7 +274,7 @@ function Chip({
     const own = v.characterId === card.id;
     const pending = voicePick(state) !== null;
     const slot = slotAfter(state, slotOf, landing, outIds);
-    const lost = !pending && outIds.has(v.id);
+    const lost = !pending && !done && outIds.has(v.id);
     if (lost)
       return (
         <>
@@ -223,7 +291,9 @@ function Chip({
             : v.status === "library"
               ? "bg-neutral-300"
               : !slot && slotOf.size > 0
-                ? "bg-red-400"
+                ? done
+                  ? "bg-neutral-500"
+                  : "bg-red-400"
                 : own
                   ? "bg-emerald-400"
                   : "bg-sky-400",
@@ -236,7 +306,7 @@ function Chip({
         </span>
         {slot ? (
           <span className="font-mono text-[11px] text-neutral-500">{slot}</span>
-        ) : v.status === "archived" || noSlot ? (
+        ) : v.status === "archived" || noSlot || (done && outIds.has(v.id)) ? (
           noSlotTag
         ) : null}
         <span className="ml-auto">
@@ -327,6 +397,7 @@ function CastCard({
   selected,
   pages,
   voiceMode,
+  round,
   chip,
   onOpen,
   onMenu,
@@ -342,6 +413,8 @@ function CastCard({
   pages: Map<number, PageView>;
   /** Voices mode: the line badge shows and the card drags to the slot strip. */
   voiceMode: boolean;
+  /** A voices round (#358): the card shows how many of its lines are rendered. */
+  round: boolean;
   chip: React.ReactNode;
   onOpen: () => void;
   onMenu: (anchor: HTMLElement) => void;
@@ -404,6 +477,18 @@ function CastCard({
             }`}
           >
             {card.lines}
+          </span>
+        )}
+        {voiceMode && round && card.rendered.of > 0 && (
+          <span
+            title={`${card.rendered.done} of ${card.rendered.of} lines have audio from this character's voice`}
+            className={`absolute top-7 right-1.5 rounded-[5px] px-1.5 text-[10px] font-semibold whitespace-nowrap ${
+              card.rendered.done === card.rendered.of
+                ? "bg-emerald-900/80 text-emerald-200"
+                : "bg-black/60 text-amber-200"
+            }`}
+          >
+            rendered {card.rendered.done}/{card.rendered.of}
           </span>
         )}
         {isNew && (
@@ -787,7 +872,14 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [designFor, setDesignFor] = useState<string | null>(null);
   const [carry, setCarry] = useState<Carry | null>(null);
   const [toast, setToast] = useState<Toast>(null);
-  const [resumed, setResumed] = useState(false);
+  // The pause this page resumed, by its gate wait (#358): a later pause at
+  // the same stop (the next voices round) shows the controls again. Only a
+  // newer wait counts, since the run releases the gate before it clears the
+  // issue row's pause (as `PipelineActions` reads it). ISO timestamps, so
+  // string order is time order.
+  const [resumedFor, setResumedFor] = useState<{
+    waitedAt: string | null;
+  } | null>(null);
   /** Silent here is folded until opened. */
   const [silentOpen, setSilentOpen] = useState(false);
   const silentGridId = useId();
@@ -795,6 +887,11 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   const [silentPull, setSilentPull] = useState<string | null>(null);
   /** Speakers exist (#854); before that the page is faces only. */
   const voiceMode = data.hasSpeakers;
+  // A voices round (#358): voices whose every line here is rendered.
+  const linesDone = useMemo(
+    () => new Set(data.round?.linesDone ?? []),
+    [data.round],
+  );
   const scope = useMemo(
     () => ({ bookId: data.bookId, issueId: data.issueId }),
     [data.bookId, data.issueId],
@@ -1372,8 +1469,10 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     const st = stateOf(c);
     if (c.lines === 0 || st.sitOut || st.removed) return "silent";
     // Slots still loading go by the voice's status (`plays`), so a card does
-    // not jump to Needs a voice and back when the roster lands.
-    return playsNow(st) ? "ready" : "needs";
+    // not jump to Needs a voice and back when the roster lands. A card whose
+    // lines are all rendered by its voice is Ready even when that voice holds
+    // no slot (#358), as the gate counts it.
+    return playsNow(st) || linesDoneOn(c, st) ? "ready" : "needs";
   };
   const grouped = new Map<GroupKey, CharacterCard[]>();
   for (const c of cards) {
@@ -1398,6 +1497,14 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   }
 
   const pause = data.pause;
+  const resumed =
+    resumedFor !== null &&
+    !(
+      pause?.waitedAt &&
+      (resumedFor.waitedAt === null || pause.waitedAt > resumedFor.waitedAt)
+    );
+  const markResumed = () =>
+    setResumedFor({ waitedAt: pause?.waitedAt ?? null });
   const pauseLabel =
     pause?.step === "casting" ? "Continue" : "Approve the cast";
   const pauseWhy =
@@ -1447,6 +1554,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           )}
           {voiceMode ? (
             <SlotStrip
+              linesDone={linesDone}
               roster={roster}
               error={rosterError}
               model={model}
@@ -1513,7 +1621,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                       pause.step === "casting"
                         ? await continueRun(scope)
                         : await approveCharacters(scope);
-                    if (r.ok) setResumed(true);
+                    if (r.ok) markResumed();
                     return r;
                   })
                 }
@@ -1523,7 +1631,32 @@ export function CastingScreen({ data }: { data: CharactersData }) {
               </button>
             )
           )}
+          {!resumed && pause?.step === "casting" && (
+            <button
+              type="button"
+              disabled={busy || staged.length > 0}
+              title={
+                staged.length > 0
+                  ? "Confirm or undo the staged moves first"
+                  : "Resumes the run without the voice check: audio renders what has a voice, the rest stays silent, and the run finishes"
+              }
+              onClick={() => {
+                if (!window.confirm(skipConfirm(data.round))) return;
+                run("Skip and finish", async () => {
+                  const r = await skipVoicesAndFinish(scope);
+                  if (r.ok) markResumed();
+                  return r;
+                });
+              }}
+              className={BTN_GHOST}
+            >
+              Skip and finish
+            </button>
+          )}
         </header>
+        {voiceMode && data.round && data.round.leftovers.length > 0 && (
+          <RoundBanner round={data.round} />
+        )}
         {restoreNote && (
           <div
             role="status"
@@ -1606,6 +1739,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
                           selected={openId === c.id}
                           pages={pages}
                           voiceMode={voiceMode}
+                          round={data.round !== null}
                           chip={
                             voiceMode ? (
                               <Chip

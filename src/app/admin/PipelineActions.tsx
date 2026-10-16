@@ -40,6 +40,11 @@ interface PipelineActionsProps {
    * it draws its own gate button.
    */
   gateLink?: boolean;
+  /**
+   * Characters whose lines play nothing after audio (the voices gate's
+   * leftovers, #358). A complete issue with some offers a Voices round.
+   */
+  voiceLeftovers?: number;
 }
 
 /** How often the row refreshes while it follows a run this tab triggered or resumed. */
@@ -187,6 +192,7 @@ export function PipelineActions({
   latestRunId,
   openGateWaitAt,
   gateLink = true,
+  voiceLeftovers = 0,
 }: PipelineActionsProps) {
   const [loading, setLoading] = useState(false);
   // The run this tab started, until the props catch up with it and it leaves
@@ -424,13 +430,35 @@ export function PipelineActions({
   }
 
   if (isComplete) {
-    return (
+    const read = (
       <a
         href={`/book/${bookId}/${issueId}/1`}
         className="rounded bg-emerald-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-emerald-600"
       >
         Read &rarr;
       </a>
+    );
+    if (voiceLeftovers === 0) return read;
+    // A Voices round (#358): restart from the voices stop, as the other
+    // restarts do. The issue stays readable while the round runs.
+    const voicesRound = () => {
+      const ok = window.confirm(
+        `Restart from casting? This starts a new run and re-runs paid steps.`,
+      );
+      if (ok) void handleTrigger("casting");
+    };
+    return withRefusal(
+      <span className="inline-flex flex-wrap items-center gap-1.5">
+        <button
+          onClick={voicesRound}
+          disabled={busy}
+          title={`${voiceLeftovers} ${voiceLeftovers === 1 ? "character's lines play" : "characters' lines play"} nothing: go back to Voices for them`}
+          className="rounded bg-amber-700 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+        >
+          {loading ? "..." : "Voices round"}
+        </button>
+        {read}
+      </span>,
     );
   }
 

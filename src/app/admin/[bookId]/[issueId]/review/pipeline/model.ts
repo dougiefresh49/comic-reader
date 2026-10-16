@@ -258,6 +258,10 @@ function needVoicePhrase(c: ProgressCounts): string {
       `${n} ${plural(n, "character")} still ${plural(n, "needs", "need")} a voice`,
     );
   if (m > 0) parts.push(`${m} waiting on a new voice`);
+  // The leftovers after audio (#358): "4 sitting out, 18 lines without audio".
+  const { sittingOut, lines } = c.leftovers;
+  if (sittingOut > 0) parts.push(`${sittingOut} sitting out`);
+  if (lines > 0) parts.push(`${lines} ${plural(lines, "line")} without audio`);
   return parts.length > 0
     ? parts.join(", ")
     : "no characters still need a voice";
@@ -410,6 +414,7 @@ export function buildHubView(
           const lists = [
             { label: "Need a voice", list: counts.needVoice },
             { label: "Waiting on a new voice", list: counts.newVoice },
+            { label: "Lines without audio", list: counts.leftovers.names },
           ].filter((l) => l.list.length > 0);
           if (lists.length > 0) names = lists;
         }
