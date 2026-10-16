@@ -897,13 +897,17 @@ export function CastingScreen({ data }: { data: CharactersData }) {
   }, [model, slotOf, outIds, voiceById]);
   /** A form's base (#891) for `cardState`, with its card when it is on the board. */
   const formBaseOf = useMemo(() => {
-    const byId = new Map(cards.map((c) => [c.id, c]));
+    // A base out of this issue may have no card on the board, only an
+    // earlier issue's: it still says why the form has no voice.
+    const byId = new Map(
+      [...data.earlierCast, ...cards].map((c) => [c.id, c] as const),
+    );
     const formOf = new Map(data.known.map((k) => [k.id, k.formOf ?? null]));
     return (c: CharacterCard): FormBase | null => {
       const f = formOf.get(c.id);
       return f ? { ...f, card: byId.get(f.id), plays: playsNow } : null;
     };
-  }, [cards, data.known, playsNow]);
+  }, [cards, data.earlierCast, data.known, playsNow]);
   const states = useMemo(
     () =>
       new Map(cards.map((c) => [c.id, cardState(c, staged, formBaseOf(c))])),
