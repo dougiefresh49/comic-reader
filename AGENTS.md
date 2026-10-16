@@ -138,8 +138,11 @@ Half the point of this list is that your reports read the way I think.
   MEDIUM is vision work (OCR, reading order, voice descriptions), FAST is
   rule-based cleanup that needs no reasoning. Code names the tier, never
   the model.
-- **voice-lab**: the sibling project that owns clip extraction and
-  casting. Its handoffs land here under `data/casting/`.
+- **voice-lab**: the sibling project that owns clip extraction. Its
+  clips reach comic-reader only through `pnpm voice-lab-import`, which
+  reads voice-lab's clone-source index (`scripts/voice-lab-import.ts`
+  has the flags). Its checkout is read-only from here: when voice-lab
+  needs a change, say what in your report.
 
 ## Verify before you assert
 

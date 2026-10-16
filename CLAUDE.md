@@ -357,4 +357,4 @@ row 9.
 - Every delegate brief restates four AGENTS.md rules (config): copy `.env` into the worktree, never set `SKIP_ENV_VALIDATION`, the Spend line (no Gemini, ElevenLabs or Roboflow call unless the task is that spend or the brief hands over a share of the PR's paid-check budget), and `pnpm format:write` before commit.
 - Review lanes (config): a Gemini prompt or kid-facing copy goes to the fable `reviewer` agent; pipeline and credit logic go to Astra (`codex-review`).
 - DB reads go through Supabase MCP as SELECTs (config). Schema changes are migration files under `supabase/migrations/`, applied by the lead under the standing approvals in AGENTS.md ("Verifying here"), never by a delegate.
-- voice-lab boundary (config): its handoffs arrive under `data/casting/`. Never edit the voice-lab checkout; say what it needs in your report.
+- voice-lab boundary: the rule is the "voice-lab" entry in the AGENTS.md glossary.
