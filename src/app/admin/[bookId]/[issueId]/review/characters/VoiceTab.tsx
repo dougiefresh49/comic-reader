@@ -13,7 +13,6 @@ import {
   backupWord,
   freeFor,
   holderName,
-  isVoiced,
   lockReason,
   takesSlot,
   type CardState,
@@ -247,12 +246,12 @@ export const speakingIn = (
 
 /**
  * A form (#891) that speaks with its base's voice: it has no voice or pick
- * of its own, and the base has a voice now or after the staged moves (#903).
+ * of its own, and the base's voice plays after the staged moves (#903).
  * The Voice tab then says so instead of offering voices, and the panel hides
- * Design a voice. A form whose base has none gets the choices.
+ * Design a voice. A form whose base gives none that plays gets the choices.
  */
 export function speaksAsBase(state: CardState): boolean {
-  return !!state.base?.via && isVoiced(state);
+  return !!state.base?.via && state.base.why === null;
 }
 
 export interface VoiceTabProps {
@@ -459,11 +458,11 @@ export function VoiceTab({
   // 4), so those cases keep the choices to change or clear it, and so does
   // a form whose base has no voice to give (#903).
   const form = state.base;
-  if (form && speaksAsBase(state)) {
-    const designed = form.pick?.move.kind === "create_design";
-    const voiceName =
-      voices.find((v) => v.id === state.voiceId)?.name ??
-      (form.pick ? undefined : card.voice?.name);
+  const designed = form?.pick?.move.kind === "create_design";
+  const voiceName =
+    voices.find((v) => v.id === state.voiceId)?.name ??
+    (form?.pick ? undefined : card.voice?.name);
+  if (form && speaksAsBase(state))
     return (
       <div>
         <p className={FORM_NOTE}>
@@ -476,8 +475,19 @@ export function VoiceTab({
         <Lines card={card} />
       </div>
     );
-  }
-  const instead = form?.voiced ? `, which plays instead of ${form.name}'s` : "";
+  const instead =
+    form?.why === null ? `, which plays instead of ${form.name}'s` : "";
+  // Why the base gives this form no voice that plays (#903).
+  const noVoice = (base: string, why: NonNullable<typeof form>["why"]) => {
+    const name = state.name;
+    if (why === "removed")
+      return `${base} isn't in this issue, so ${name} has no voice. Pick one here, or put ${base} back.`;
+    if (why === "sitting out")
+      return `${base} is sitting out this issue, so ${name} has no voice. Pick one here, or bring ${base} back in.`;
+    if (why === "no slot")
+      return `${designed ? `The voice being designed for ${base}` : `${base}'s voice${voiceName ? `, ${voiceName},` : ""}`} has no slot, so ${name} can't speak yet. Pick a voice for ${name} here, or give ${base}'s voice a slot.`;
+    return `${base} has no voice yet, so ${name} has none either. Pick a voice for ${name} here, or give ${base} one.`;
+  };
 
   return (
     <div>
@@ -487,7 +497,7 @@ export function VoiceTab({
             ? `${state.name} has a voice picked here${instead}.`
             : card.voice && card.voice.borrowedFromId !== form.id
               ? `${state.name} still has its own voice ${card.voice.name} in this book${instead}.`
-              : `${form.name} has no voice yet, so ${state.name} has none either. Pick a voice for ${state.name} here, or give ${form.name} one.`}
+              : noVoice(form.name, form.why)}
         </p>
       )}
       <section role="radiogroup" aria-label="Voices" onKeyDown={onRadioArrows}>
