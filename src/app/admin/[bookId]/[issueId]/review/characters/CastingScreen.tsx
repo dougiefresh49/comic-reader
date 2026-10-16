@@ -18,6 +18,11 @@ import {
   useState,
   useTransition,
 } from "react";
+import {
+  clearLocal,
+  readLocal,
+  writeLocal,
+} from "~/components/review-editor/storage";
 import { useTabTrap } from "~/hooks/useTabTrap";
 import type {
   ArchiveMove,
@@ -55,8 +60,10 @@ import { FacesPanel, NameField, matchesName } from "./shared";
 import { SlotStrip, type Carry } from "./SlotStrip";
 import {
   archiveOf,
+  asDraft,
   cardState,
   characterOf,
+  draftKey,
   freeFor,
   isPick,
   isVoiced,
@@ -66,12 +73,14 @@ import {
   pickVoiceId,
   plays,
   rekey,
+  restorable,
   slotAfter,
   slotModel,
   takesSlot,
   voicePick,
   withoutPick,
   type CardState,
+  type Draft,
   type FormBase,
   type SlotModel,
   type SlotView,
@@ -99,6 +108,16 @@ import {
 } from "./ui";
 
 type Toast = { text: string; bad?: boolean } | null;
+
+const moves = (n: number) => `${n} staged ${n === 1 ? "move" : "moves"}`;
+
+/** A draft's `savedAt` in local time. */
+function savedWhen(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? "an earlier visit"
+    : d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
 
 /** The DOM id of a card, so closing the panel can hand focus back to it. */
 const cardDomId = (id: string) => `cast-card-${id}`;
@@ -815,6 +834,82 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     if (voiceMode) readRoster();
   }, [voiceMode, readRoster]);
 
+  // The staged list as a browser draft (#904). Restored in an effect, not
+  // during render (the page is server rendered), then written on every
+  // change; writes wait for the restore, so the first render's empty list
+  // never overwrites a stored draft.
+  const draft = draftKey(data.bookId, data.issueId);
+  const [restoredFor, setRestoredFor] = useState<string | null>(null);
+  /** The list the restore set: not written back, so the draft keeps its time. */
+  const restoredList = useRef<Staged[] | null>(null);
+  /** What the restore brought back and dropped; stays until dismissed. */
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (restoredFor === draft) return;
+    const saved = asDraft(readLocal(draft));
+    const { keep, dropped, reasons } = restorable(saved?.staged ?? [], {
+      voiceIds: new Set(data.voices.map((v) => v.id)),
+      characterIds: new Set(
+        [...data.cards, ...data.earlierCast, ...data.known].map((c) => c.id),
+      ),
+    });
+    const next = oneEach(keep);
+    restoredList.current = next;
+    setStagedRaw(next);
+    if (saved && dropped > 0) {
+      if (next.length) writeLocal(draft, { ...saved, staged: next });
+      else clearLocal(draft);
+    }
+    setRestoreNote(
+      saved && saved.staged.length > 0
+        ? `Restored ${moves(next.length)} from ${savedWhen(saved.savedAt)}${
+            dropped > 0 ? ` · dropped ${dropped}: ${reasons.join("; ")}` : ""
+          }`
+        : null,
+    );
+    setRestoredFor(draft);
+  }, [
+    draft,
+    restoredFor,
+    data.voices,
+    data.cards,
+    data.earlierCast,
+    data.known,
+  ]);
+  useEffect(() => {
+    if (restoredFor !== draft || staged === restoredList.current) return;
+    if (staged.length === 0) clearLocal(draft);
+    else
+      writeLocal(draft, {
+        v: 1,
+        savedAt: new Date().toISOString(),
+        staged,
+      } satisfies Draft);
+  }, [draft, restoredFor, staged]);
+
+  /** Re-reads voices and characters (`router.refresh` keeps the staged list); says so once the refresh lands. */
+  const [reloading, setReloading] = useState(false);
+  const reloadVoices = () => {
+    setReloading(true);
+    startTransition(() => router.refresh());
+    if (voiceMode) readRoster();
+  };
+  useEffect(() => {
+    if (!reloading || busy) return;
+    setReloading(false);
+    say("Reloaded");
+  }, [reloading, busy, say]);
+  const discardStaged = () => {
+    if (
+      !window.confirm(
+        `Discard all ${moves(staged.length)}? Nothing has been confirmed.`,
+      )
+    )
+      return;
+    setStaged([]);
+    setRestoreNote(null);
+  };
+
   /** An immediate write (the Faces work, Approve, Continue): run, say the answer, then `onOk` on success, refresh. */
   const run = useCallback(
     <R extends ActionResult>(
@@ -1377,6 +1472,20 @@ export function CastingScreen({ data }: { data: CharactersData }) {
           >
             + Add
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            title="Re-read voices and characters from the database; staged moves stay"
+            onClick={reloadVoices}
+            className={BTN_GHOST}
+          >
+            Reload voices
+          </button>
+          {staged.length > 0 && (
+            <button type="button" onClick={discardStaged} className={BTN_GHOST}>
+              Discard staged
+            </button>
+          )}
           {/* Faces mode stages only adds, renames and removals: Review shows once one is staged. */}
           {(voiceMode || staged.length > 0) && (
             <button
@@ -1415,6 +1524,24 @@ export function CastingScreen({ data }: { data: CharactersData }) {
             )
           )}
         </header>
+        {restoreNote && (
+          <div
+            role="status"
+            className="flex shrink-0 items-center gap-2 border-b border-neutral-800 bg-neutral-900/60 px-[18px] py-1 text-[12px] text-neutral-400"
+          >
+            <span className="min-w-0 flex-1 truncate" title={restoreNote}>
+              {restoreNote}
+            </span>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => setRestoreNote(null)}
+              className={`${BTN_GHOST} size-6 justify-center px-0`}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         <div className="flex min-h-0 flex-1">
           <main

@@ -1,7 +1,8 @@
 // The casting page's staged moves (#787): an ordered list of `Move`s held in
 // the browser, and what the board, the panel and the slot strip read from it.
-// Nothing here writes; Review sends the moves to `reviewMoves`, Confirm to
-// `confirmMoves`.
+// Nothing here writes to the DB; Review sends the moves to `reviewMoves`,
+// Confirm to `confirmMoves`. The page keeps the list in localStorage as a
+// draft (`draftKey`, #904) so a reload brings it back, filtered by `restorable`.
 
 import type {
   ArchiveMove,
@@ -485,3 +486,65 @@ export const backupWord = (b: RosterSlot["backup"]) =>
       : b === "lossy"
         ? "no backup"
         : "";
+
+/** The localStorage key of an issue's staged-moves draft (#904). */
+export const draftKey = (bookId: string, issueId: string) =>
+  `casting:v1:staged:${bookId}/${issueId}`;
+
+/** The stored draft: the staged list as the page last held it. */
+export interface Draft {
+  v: 1;
+  savedAt: string;
+  staged: Staged[];
+}
+
+/** A stored value as a draft; null when it is missing or the wrong shape. */
+export function asDraft(raw: unknown): Draft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const d = raw as Partial<Draft>;
+  if (d.v !== 1 || !Array.isArray(d.staged)) return null;
+  const staged = d.staged.filter(
+    (s): s is Staged =>
+      !!s && typeof s === "object" && typeof s.move?.kind === "string",
+  );
+  return { v: 1, savedAt: String(d.savedAt ?? ""), staged };
+}
+
+/**
+ * A restored draft without the moves that no longer apply: a move whose
+ * voice is not a `voices` row the page has, or whose character the page does
+ * not know (an `add_character` in the draft brings its own in, and is always
+ * kept). A dropped pick takes the moves tied to it, as `withoutPick` does.
+ * An archive by `elevenlabs_id` and a design stay: Review and Confirm check
+ * those against the account. `reasons` has one line per distinct cause;
+ * `dropped` counts every move left out.
+ */
+export function restorable(
+  staged: Staged[],
+  have: { voiceIds: Set<string>; characterIds: Set<string> },
+): { keep: Staged[]; dropped: number; reasons: string[] } {
+  const known = new Set(have.characterIds);
+  for (const { move } of staged)
+    if (move.kind === "add_character") known.add(characterOf(move)!);
+  const reasons = new Set<string>();
+  const lostPicks = new Set<string>();
+  const kept = staged.filter(({ move: m }) => {
+    if (m.kind === "add_character") return true;
+    const voice = "voice_uuid" in m ? m.voice_uuid : null;
+    const who = characterOf(m);
+    const why =
+      voice && !have.voiceIds.has(voice)
+        ? "a voice is gone"
+        : who !== null && !known.has(who)
+          ? `${who} is no longer on the board`
+          : null;
+    if (!why) return true;
+    reasons.add(why);
+    if (isPick(m) && who !== null) lostPicks.add(who);
+    return false;
+  });
+  const keep = kept.filter(
+    (s) => s.pickFor === undefined || !lostPicks.has(s.pickFor),
+  );
+  return { keep, dropped: staged.length - keep.length, reasons: [...reasons] };
+}
