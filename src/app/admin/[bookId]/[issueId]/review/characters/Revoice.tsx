@@ -1,12 +1,15 @@
 // Re-voice (#836): a character whose bubbles still play a voice it no longer
-// has gets this box on the Voice tab. It shows the lines per issue and the
-// credits before anything runs, and renders only after Confirm, one line (or
-// joined group) at a time through the review editor's Regenerate.
+// has gets this box on the Voice tab. It shows the lines per issue and what
+// they cost before anything runs, and renders only after Confirm, one line (or
+// joined group) at a time through the review editor's Regenerate. The cost is
+// credits at the billed rate of the newest renders (#838), or the request's
+// characters when no billed render is logged: never characters called credits.
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { revoiceUnit } from "./revoice-actions";
+import { estimateCredits, type TtsCreditRate } from "~/lib/tts-credit-rate";
 import type { RevoicePlan } from "./types";
 import { BTN, BTN_GHOST, BTN_PRIMARY, LABEL } from "./ui";
 
@@ -24,7 +27,11 @@ interface Tally {
 }
 
 const lines = (n: number) => `${n} ${n === 1 ? "line" : "lines"}`;
-const credits = (n: number) => `≈${n.toLocaleString()} credits`;
+/** `≈N credits` at the measured rate, else the request's `N characters`. */
+const cost = (characters: number, rate: TtsCreditRate | null) =>
+  rate
+    ? `≈${estimateCredits(characters, rate).toLocaleString()} credits`
+    : `${characters.toLocaleString()} characters`;
 
 export function Revoice({
   bookId,
@@ -116,8 +123,9 @@ export function Revoice({
     <section className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/5 p-3">
       <h4 className={`mb-1 ${LABEL}`}>Old-voice audio</h4>
       <p className="text-[12.5px] text-neutral-300">
-        {lines(plan.bubbles)} still play a voice this character no longer has.
-        Re-voice renders them again
+        {lines(plan.bubbles)} still {plan.bubbles === 1 ? "plays" : "play"} a
+        voice this character no longer has. Re-voice renders{" "}
+        {plan.bubbles === 1 ? "it" : "them"} again
         {voiceName ? ` in ${voiceName}` : " in its current voice"}.
       </p>
       <ul className="mt-2 text-[12.5px] text-neutral-200">
@@ -125,17 +133,22 @@ export function Revoice({
           <li key={i.issueId} className="flex gap-2">
             <span>Issue {i.number || i.issueId}</span>
             <span className="text-neutral-400">
-              {lines(i.bubbles)} · {credits(i.credits)}
+              {lines(i.bubbles)} · {cost(i.characters, plan.rate)}
             </span>
           </li>
         ))}
         <li className="mt-1 flex gap-2 font-semibold">
           <span>Total</span>
           <span>
-            {lines(plan.bubbles)} · {credits(plan.credits)}
+            {lines(plan.bubbles)} · {cost(plan.characters, plan.rate)}
           </span>
         </li>
       </ul>
+      <p className="mt-1 text-[11.5px] text-neutral-400">
+        {plan.rate
+          ? `At the billed rate of the last ${plan.rate.renders} ${plan.rate.renders === 1 ? "render" : "renders"}: ${plan.rate.perCharacter.toFixed(2)} credits per character.`
+          : "No billed rate could be read, so these are characters, not credits."}
+      </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {(phase.kind === "idle" ||
@@ -151,7 +164,9 @@ export function Revoice({
         {phase.kind === "confirm" && (
           <>
             <span className="text-[12.5px] text-amber-200">
-              Spend {credits(plan.credits)} on {lines(plan.bubbles)}?
+              {plan.rate
+                ? `Spend ${cost(plan.characters, plan.rate)} on ${lines(plan.bubbles)}?`
+                : `Re-voice ${lines(plan.bubbles)} (${cost(plan.characters, null)})? The credit cost is unknown.`}
             </span>
             <button
               type="button"

@@ -27,6 +27,7 @@ import {
   voicesWithLinesDone,
 } from "~/workflows/steps/casting-tasks";
 import { planRevoice } from "./revoice-plan";
+import { loadTtsCreditRate } from "~/lib/tts-credit-rate";
 import { readVoicesGate } from "~/server/admin/voices-gate";
 import { getLatestRunIds } from "~/server/admin/queries";
 import {
@@ -160,6 +161,8 @@ export async function loadCharacters(
   if (!issue) return null;
 
   const bookRead = loadBookCast(supabaseAdmin, bookId);
+  // Re-voice's credits per character (#838); never rejects, null on a failed read.
+  const rateRead = loadTtsCreditRate(supabaseAdmin);
   const [
     book,
     proposal,
@@ -576,7 +579,10 @@ export async function loadCharacters(
       };
   }
 
-  const revoice = await planRevoice(supabaseAdmin, bookId, { book });
+  const revoice = await planRevoice(supabaseAdmin, bookId, {
+    book,
+    rate: await rateRead,
+  });
 
   return {
     bookId,
