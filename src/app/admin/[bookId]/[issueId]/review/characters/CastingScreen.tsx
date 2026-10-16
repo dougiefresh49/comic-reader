@@ -68,8 +68,10 @@ import {
   slotAfter,
   slotModel,
   takesSlot,
+  voicePick,
   withoutPick,
   type CardState,
+  type FormBase,
   type SlotModel,
   type SlotView,
   type Staged,
@@ -182,7 +184,7 @@ function Chip({
   const v = state.voiceId ? voices.get(state.voiceId) : undefined;
   if (v) {
     const own = v.characterId === card.id;
-    const pending = state.pick !== null;
+    const pending = voicePick(state) !== null;
     const slot = slotAfter(state, slotOf, landing, outIds);
     const lost = !pending && outIds.has(v.id);
     if (lost)
@@ -223,8 +225,8 @@ function Chip({
       </>
     );
   }
-  const design =
-    state.pick?.move.kind === "create_design" ? state.pick.move : null;
+  const vp = voicePick(state);
+  const design = vp?.move.kind === "create_design" ? vp.move : null;
   if (design) {
     const accepted = acceptedFor(design);
     const take = accepted?.takes.find(
@@ -859,12 +861,22 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     () => new Set(addedCards.map((c) => c.id)),
     [addedCards],
   );
+  /** A form's base (#891) for `cardState`, with its card when it is on the board. */
+  const formBaseOf = useMemo(() => {
+    const byId = new Map(cards.map((c) => [c.id, c]));
+    const formOf = new Map(data.known.map((k) => [k.id, k.formOf ?? null]));
+    return (c: CharacterCard): FormBase | null => {
+      const f = formOf.get(c.id);
+      return f ? { ...f, card: byId.get(f.id) } : null;
+    };
+  }, [cards, data.known]);
   const states = useMemo(
-    () => new Map(cards.map((c) => [c.id, cardState(c, staged)])),
-    [cards, staged],
+    () =>
+      new Map(cards.map((c) => [c.id, cardState(c, staged, formBaseOf(c))])),
+    [cards, staged, formBaseOf],
   );
   const stateOf = (c: CharacterCard) =>
-    states.get(c.id) ?? cardState(c, staged);
+    states.get(c.id) ?? cardState(c, staged, formBaseOf(c));
   const onBoard = useMemo(
     () => new Map(cards.map((c) => [c.id, c.name])),
     [cards],
@@ -909,7 +921,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     const add = (voiceId: string, u: VoiceUser) =>
       m.set(voiceId, [...(m.get(voiceId) ?? []), u]);
     for (const c of cards) {
-      const st = states.get(c.id) ?? cardState(c, staged);
+      const st = states.get(c.id) ?? cardState(c, staged, formBaseOf(c));
       const why: SilentWhy | null = st.removed
         ? "not in this issue"
         : st.sitOut
@@ -929,7 +941,7 @@ export function CastingScreen({ data }: { data: CharactersData }) {
       for (const id of ids) add(id, u);
     }
     return m;
-  }, [cards, states, staged, data.voices]);
+  }, [cards, states, staged, formBaseOf, data.voices]);
 
   // ---- staging: every control below only edits `staged` ----
 
@@ -1241,8 +1253,11 @@ export function CastingScreen({ data }: { data: CharactersData }) {
     router.refresh();
   };
 
-  const landingOf = (st: CardState) =>
-    st.pick && model ? (model.landing.get(st.pick.index) ?? null) : null;
+  // A form speaking with its base's staged pick lands where that pick does.
+  const landingOf = (st: CardState) => {
+    const p = voicePick(st);
+    return p && model ? (model.landing.get(p.index) ?? null) : null;
+  };
   /** The card's group by its staged state (#854). */
   const groupOf = (c: CharacterCard): GroupKey => {
     if (c.group === "role") return "role";
@@ -1254,7 +1269,8 @@ export function CastingScreen({ data }: { data: CharactersData }) {
       // Slots still loading: go by the voice's status, so a card does not
       // jump to Needs a voice and back when the roster lands.
       const v = st.voiceId ? voiceById.get(st.voiceId) : undefined;
-      return st.pick?.move.kind === "create_design" || v?.status === "active"
+      return voicePick(st)?.move.kind === "create_design" ||
+        v?.status === "active"
         ? "ready"
         : "needs";
     }

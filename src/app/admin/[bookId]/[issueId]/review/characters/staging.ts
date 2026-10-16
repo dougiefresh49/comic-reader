@@ -83,20 +83,37 @@ export interface CardState {
   voiceId: string | null;
   /** Any move about it is staged. */
   pending: boolean;
+  /** A form's base (#891) once the staged moves run; null when the card is not a form. */
+  base: {
+    id: string;
+    name: string;
+    /** The base has a voice for its forms, as the render chain's step 5 finds it (`voiceFor`). */
+    voiced: boolean;
+    /** The card speaks with the base's voice: it has no pick or voice of its own. `voiceId` is then the base's. */
+    via: boolean;
+    /** The base's staged pick, when `via` and the base's voice comes from one. */
+    pick: { index: number; move: PickMove } | null;
+  } | null;
 }
+
+/** The staged pick the card's voice comes from: its own, else its base's (#903). */
+export const voicePick = (state: CardState) =>
+  state.pick ?? state.base?.pick ?? null;
 
 /**
  * True when the card will speak: it has a voice id, or a staged design that
  * makes one at Confirm. A null `voiceId` alone is not "no voice".
  */
 export const isVoiced = (state: CardState): boolean =>
-  state.voiceId !== null || state.pick?.move.kind === "create_design";
+  state.voiceId !== null || voicePick(state)?.move.kind === "create_design";
 
 /**
  * The slot the card's voice is in once the staged moves run: where a staged
  * pick that takes a slot lands (`landing`, null when none is left), else the
- * account slot of the voice it rests on. Null with no voice, and for a voice
- * a staged archive takes out (`outIds`) with no pick of its own.
+ * account slot of the voice it rests on. A form speaking with its base's
+ * staged pick lands where that pick does (`landing` is the base pick's).
+ * Null with no voice, and for a voice a staged archive takes out (`outIds`)
+ * with no pick of its own.
  */
 export function slotAfter(
   state: CardState,
@@ -104,13 +121,30 @@ export function slotAfter(
   landing: number | null,
   outIds: Set<string>,
 ): number | null {
-  if (state.pick && takesSlot(state.pick.move)) return landing;
+  const pick = voicePick(state);
+  if (pick && takesSlot(pick.move)) return landing;
   if (!state.voiceId) return null;
-  if (!state.pick && outIds.has(state.voiceId)) return null;
+  if (!pick && outIds.has(state.voiceId)) return null;
   return slotOf.get(state.voiceId) ?? null;
 }
 
-export function cardState(card: CharacterCard, staged: Staged[]): CardState {
+/** A form's base (#891), from the form's known row, with the base's card when it is on the board. */
+export interface FormBase {
+  id: string;
+  name: string;
+  card: CharacterCard | undefined;
+}
+
+/**
+ * What the board shows for one card once the staged moves run. A form
+ * (`formOf`) with no pick or voice of its own takes its base's voice after
+ * the base's staged moves, or none when the base has none to give (#903).
+ */
+export function cardState(
+  card: CharacterCard,
+  staged: Staged[],
+  formOf: FormBase | null = null,
+): CardState {
   const state: CardState = {
     name: card.name,
     removed: card.removed,
@@ -119,6 +153,7 @@ export function cardState(card: CharacterCard, staged: Staged[]): CardState {
     pick: null,
     voiceId: card.voice?.uuid ?? null,
     pending: false,
+    base: null,
   };
   staged.forEach(({ move: m }, index) => {
     if (characterOf(m) !== card.id) return;
@@ -133,7 +168,42 @@ export function cardState(card: CharacterCard, staged: Staged[]): CardState {
     else if (isPick(m)) state.pick = { index, move: m };
   });
   if (state.pick) state.voiceId = pickVoiceId(state.pick.move);
+  if (formOf) state.base = baseOf(card, state, formOf, staged);
   return state;
+}
+
+/**
+ * A form's base once the staged moves run, and the form's voice through it.
+ * Mirrors `voiceFor`'s step 5: the base gives its own voice in this issue,
+ * none when it is out of the issue or sitting out, and never one it borrows
+ * in turn. A base with no card here has no staged moves: the form's loaded
+ * voice says what it gives.
+ */
+function baseOf(
+  card: CharacterCard,
+  state: CardState,
+  formOf: FormBase,
+  staged: Staged[],
+): NonNullable<CardState["base"]> {
+  const b = formOf.card ? cardState(formOf.card, staged) : null;
+  const voiced = b
+    ? !b.removed &&
+      !b.sitOut &&
+      isVoiced(b) &&
+      (b.pick !== null || !formOf.card?.voice?.borrowedFromId)
+    : card.voice?.borrowedFromId === formOf.id;
+  const ownVoice = !!card.voice && card.voice.borrowedFromId !== formOf.id;
+  const borrows = !state.pick && !ownVoice;
+  if (borrows)
+    state.voiceId = !voiced ? null : b ? b.voiceId : (card.voice?.uuid ?? null);
+  const via = borrows && voiced;
+  return {
+    id: formOf.id,
+    name: b?.name ?? formOf.name,
+    voiced,
+    via,
+    pick: via ? (b?.pick ?? null) : null,
+  };
 }
 
 /**

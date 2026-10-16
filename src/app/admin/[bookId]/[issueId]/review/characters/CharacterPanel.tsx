@@ -675,7 +675,7 @@ function PagePreview({
 }
 
 export interface CharacterPanelProps
-  extends Omit<VoiceTabProps, "card" | "state" | "formOf"> {
+  extends Omit<VoiceTabProps, "card" | "state"> {
   card: CharacterCard;
   state: CardState;
   pages: Map<number, PageView>;
@@ -760,7 +760,6 @@ export function CharacterPanel(props: CharacterPanelProps) {
   const shownTab: PanelTab = !voiceMode ? "faces" : isRole ? "voice" : tab;
   /** The card's `characters` row; none means no aliases to show. */
   const knownRow = known.find((k) => k.id === card.id);
-  const formOf = knownRow?.formOf ?? null;
 
   const closeMove = useCallback(() => {
     setMoving(null);
@@ -961,12 +960,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
                 plan={revoice}
                 voiceName={card.voice?.name ?? null}
               />
-              <VoiceTab
-                card={card}
-                state={state}
-                formOf={formOf}
-                {...voiceProps}
-              />
+              <VoiceTab card={card} state={state} {...voiceProps} />
             </>
           ) : (
             <FacesTab
@@ -993,7 +987,7 @@ export function CharacterPanel(props: CharacterPanelProps) {
           {voiceMode && (
             <>
               {/* A form speaking with its base's voice designs none (#891). */}
-              {!speaksAsBase(card, state, formOf) && (
+              {!speaksAsBase(state) && (
                 <button
                   type="button"
                   onClick={voiceProps.onDesign}
