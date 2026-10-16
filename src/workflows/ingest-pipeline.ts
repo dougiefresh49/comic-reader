@@ -33,7 +33,11 @@ import { wordGeometryPage } from "./steps/word-geometry";
 import { getAudioJobs, generateAudioBatch } from "./steps/generation";
 import { archiveRunOnlyVoices } from "./steps/run-only-archive";
 import { generateManifest } from "./steps/publishing";
-import { createCastingTasks } from "./steps/casting-tasks";
+import {
+  countVoiceLeftovers,
+  createCastingTasks,
+  voicesRoundAgain,
+} from "./steps/casting-tasks";
 import { recordGateSkip, recordGateWait } from "./steps/gate-checks";
 import { closePipelineRun, recordMasksFailure } from "./steps/pipeline-runs";
 
@@ -238,49 +242,80 @@ export async function ingestPipeline(input: IngestInput) {
       await recordStepEnd(bookId, issueId, currentStep, timing);
     }
 
-    // ── Phase 6: Casting ──────────────────────────────────────────────
-    if (run("casting")) {
-      currentStep = "casting";
-      // The voices stop (#353): it pauses while a voice request is open or a
-      // speaker has no voice and no "no audio this run" marker. The resume
-      // route checks canContinueVoices, so the run goes on only once every
-      // item is settled; nothing is written here after the hook.
-      const timing = await recordStepStart(bookId, issueId, currentStep);
-      const casting = await createCastingTasks(bookId, issueId);
-      const unresolved = casting.unresolved.length;
-      if (casting.pending === 0) {
-        const reason =
-          casting.cast === casting.speakers
-            ? "all speakers cast"
-            : "no voice work left";
-        await updatePipelineStep(bookId, issueId, currentStep);
-        await recordGateSkip(bookId, issueId, "casting", reason, {
-          speakers: casting.speakers,
-          cast: casting.cast,
-          pending: casting.pending,
-          unresolved,
-        });
-        console.log(
-          `[casting] skipped: ${reason} (${casting.cast} of ${casting.speakers} cast, 0 unresolved)`,
-        );
-        await recordStepEnd(bookId, issueId, currentStep, timing);
-      } else {
-        console.log(
-          `[casting] paused: ${casting.cast} of ${casting.speakers} cast, ${casting.pending} pending, ${unresolved} unresolved${unresolved > 0 ? `: ${casting.unresolved.join(", ")}` : ""}`,
-        );
-        await recordStepEnd(bookId, issueId, currentStep, timing);
-        await updatePipelineStep(bookId, issueId, currentStep, true);
-        await recordGateWait(bookId, issueId, currentStep, "open");
-        using castingHook = createHook<{ approved: boolean }>({
-          token: hookToken(bookId, issueId, "casting"),
-        });
-        await castingHook;
-        await recordGateWait(bookId, issueId, currentStep, "close");
+    // ── Phases 6–7: Voices and audio, in rounds (#358) ───────────────
+    // After each audio pass the run counts the leftovers (characters with a
+    // line that plays nothing: sitting out, or no voice) and goes back to
+    // the voices stop while there are some and the last round shrank them.
+    // Every round waits on the owner's Continue; nothing loops unattended.
+    // "Skip and finish" at any stop goes on without the check and never
+    // comes back to Voices this run.
+    let round = 0;
+    let previousLeftovers: number | null = null;
+    let skipVoices = false;
+    for (;;) {
+      round++;
+      // A later round always goes back to Voices, even when the run started
+      // at audio: the loop is "after each audio pass".
+      if ((round > 1 || run("casting")) && !skipVoices) {
+        currentStep = "casting";
+        // The voices stop (#353): it pauses while a voice request is open or
+        // a speaker has no voice and no "no audio this run" marker, and, once
+        // audio has started, while a leftover remains. The resume route
+        // checks canContinueVoices (unless the owner skips), so the run goes
+        // on only once every item is settled; nothing is written here after
+        // the hook.
+        const timing = await recordStepStart(bookId, issueId, currentStep);
+        const casting = await createCastingTasks(bookId, issueId);
+        const unresolved = casting.unresolved.length;
+        // From round 2 on the loop came back for leftovers, so it stops even
+        // when no bubble has audio yet.
+        const holds = casting.holds || (round > 1 && casting.leftovers > 0);
+        if (!holds) {
+          const reason =
+            casting.cast === casting.speakers
+              ? "all speakers cast"
+              : "no voice work left";
+          await updatePipelineStep(bookId, issueId, currentStep);
+          await recordGateSkip(bookId, issueId, "casting", reason, {
+            speakers: casting.speakers,
+            cast: casting.cast,
+            pending: casting.pending,
+            unresolved,
+            leftovers: casting.leftovers,
+            round,
+          });
+          console.log(
+            `[casting] skipped: ${reason} (${casting.cast} of ${casting.speakers} cast, 0 unresolved)`,
+          );
+          await recordStepEnd(bookId, issueId, currentStep, timing);
+        } else {
+          console.log(
+            `[casting] paused, round ${round}: ${casting.cast} of ${casting.speakers} cast, ${casting.pending} pending, ${casting.leftovers} leftovers, ${unresolved} unresolved${unresolved > 0 ? `: ${casting.unresolved.join(", ")}` : ""}`,
+          );
+          await recordStepEnd(bookId, issueId, currentStep, timing);
+          await updatePipelineStep(bookId, issueId, currentStep, true);
+          await recordGateWait(bookId, issueId, currentStep, "open");
+          // One hook per round on the same token: the previous round's hook
+          // was disposed at the end of its block, which frees the token.
+          using castingHook = createHook<{
+            approved: boolean;
+            skip?: boolean;
+          }>({
+            token: hookToken(bookId, issueId, "casting"),
+          });
+          const answer = await castingHook;
+          if (answer.skip === true) {
+            skipVoices = true;
+            console.log(
+              `[casting] skipped by the owner at round ${round}: the leftovers stay silent`,
+            );
+          }
+          await recordGateWait(bookId, issueId, currentStep, "close");
+        }
       }
-    }
 
-    // ── Phase 7: Audio ────────────────────────────────────────────────
-    if (run("generate-audio")) {
+      // ── Phase 7: Audio ──────────────────────────────────────────────
+      if (!run("generate-audio")) break;
       currentStep = "generate-audio";
       await updatePipelineStep(bookId, issueId, currentStep);
       const timing = await recordStepStart(bookId, issueId, currentStep);
@@ -292,6 +327,19 @@ export async function ingestPipeline(input: IngestInput) {
       }
       await archiveRunOnlyVoices(bookId, issueId);
       await recordStepEnd(bookId, issueId, currentStep, timing);
+
+      if (skipVoices) break;
+      const leftovers = await countVoiceLeftovers(bookId, issueId);
+      if (!voicesRoundAgain(leftovers, previousLeftovers)) {
+        console.log(
+          `[casting] ${leftovers} leftovers after round ${round}; going on to the counts`,
+        );
+        break;
+      }
+      console.log(
+        `[casting] ${leftovers} leftovers after round ${round}; back to the voices stop`,
+      );
+      previousLeftovers = leftovers;
     }
 
     // ── Phase 8: Publishing ───────────────────────────────────────────

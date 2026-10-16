@@ -86,6 +86,11 @@ export interface CharacterCard {
   pages: string | null;
   /** Its first lines, up to three. */
   samples: SampleLine[];
+  /**
+   * Its text lines, and how many have audio from its voice now
+   * (`SpeakerLine.rendered`, #358). The card's "rendered 9/9" chip.
+   */
+  rendered: { done: number; of: number };
 }
 
 /** A `voices` row, as the Voice tab, the slot strip and Review name it. */
@@ -187,4 +192,13 @@ export interface CharactersData {
   pause: PauseView | null;
   /** Characters whose audio in the book is from a voice they no longer have (#836). */
   revoice: RevoicePlan[];
+  /**
+   * A voices round (#358): set once some bubble of the issue has audio.
+   * `leftovers` are the gate's (sitting out or no voice, with a line that
+   * plays nothing); `linesDone` the voices whose every line here is rendered.
+   */
+  round: {
+    leftovers: { id: string; name: string; lines: number; why: string }[];
+    linesDone: string[];
+  } | null;
 }

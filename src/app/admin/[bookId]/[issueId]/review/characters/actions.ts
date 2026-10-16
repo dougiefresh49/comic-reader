@@ -1222,3 +1222,36 @@ export async function continueRun(scope: Scope): Promise<ActionResult> {
     return fail("continuing", err);
   }
 }
+
+/**
+ * Skip and finish (#358): the `casting` hook resumes with `skip`, with no
+ * gate check. Audio renders what has a voice, the leftovers' lines stay
+ * silent, and the run finishes without coming back to Voices. Writes no
+ * castlist row and touches no slot.
+ */
+export async function skipVoicesAndFinish(scope: Scope): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const token = hookToken(scope.bookId, scope.issueId, "casting");
+    try {
+      const { resumeHook } = await import(
+        /* webpackIgnore: true */
+        /* turbopackIgnore: true */
+        "workflow/api"
+      );
+      await resumeHook(token, { approved: true, skip: true });
+    } catch (err) {
+      revalidate(scope);
+      const message = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: `No paused run took the skip: ${message}` };
+    }
+    revalidate(scope);
+    return {
+      ok: true,
+      message:
+        "Skipped. The pipeline renders the voiced lines and finishes; the rest stay silent.",
+    };
+  } catch (err) {
+    return fail("skipping", err);
+  }
+}

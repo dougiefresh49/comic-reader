@@ -93,6 +93,7 @@ export default async function PipelineReviewPage({ params }: Params) {
                 latestRunId={latestRun?.runId ?? null}
                 openGateWaitAt={latestRun?.openGateWaitAt ?? null}
                 gateLink={false}
+                voiceLeftovers={progress.counts.leftovers.names.length}
               />
               {view.refreshMs !== null && (
                 <span className="text-sm text-neutral-500">

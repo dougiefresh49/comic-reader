@@ -6,6 +6,7 @@ import {
   lastUsedByVoice,
   readCastlist,
   readVoices,
+  voicesWithOpenLines,
 } from "./registry";
 import type {
   ArchiveRefusal,
@@ -24,19 +25,24 @@ export interface PlanFreeSlotsOptions extends IssueTarget {
  * Policy order for archive candidates. Tier 0: a parked book's generated
  * voices, meaning every book that casts the voice is not the target and the
  * voice has a `design_prompt` (it comes back as a cloned IVC from its
- * preview sample at the same slot cost, decision 2). Then least recently
- * used, never-cast voices first; `display_name` breaks ties.
+ * preview sample at the same slot cost, decision 2). Tier 1 (#358): voices
+ * with no unrendered line in any issue, the ones not in `openLines`
+ * (`voicesWithOpenLines`); archiving them leaves nothing silent. Then least
+ * recently used, never-cast voices first; `display_name` breaks ties.
+ * Without `openLines` there is no tier 1.
  */
 export function orderCandidates(
   voices: VoiceRow[],
   castlist: CastlistRow[],
   lastUsed: Map<string, string | null>,
   targetBookId: string,
+  openLines?: Set<string>,
 ): VoiceRow[] {
   const tier = (v: VoiceRow): number => {
     const books = booksUsingVoice(v.id, castlist);
     const parked = books.length > 0 && books.every((b) => b !== targetBookId);
-    return parked && v.design_prompt ? 0 : 1;
+    if (parked && v.design_prompt) return 0;
+    return openLines && !openLines.has(v.id) ? 1 : 2;
   };
   return [...voices].sort((a, b) => {
     const t = tier(a) - tier(b);
@@ -66,10 +72,15 @@ export async function planFreeSlots(
     readCastlist(deps.supabase),
     issueNeeds(deps.supabase, target),
   ]);
-  const lastUsed = await lastUsedByVoice(deps.supabase, castlist);
-
   const freeNow = Math.max(0, status.voice_limit - status.voice_slots_used);
   const toArchive = Math.max(0, n - freeNow);
+  // The rendered tier reads every issue's lines, so only when a pick is due.
+  const [lastUsed, openLines] = await Promise.all([
+    lastUsedByVoice(deps.supabase, castlist),
+    toArchive > 0
+      ? voicesWithOpenLines(deps.supabase, castlist)
+      : Promise.resolve(undefined),
+  ]);
   const guard = { needs, excludeIds: opts.excludeIds };
 
   const refused: { voice: VoiceRow; refusals: ArchiveRefusal[] }[] = [];
@@ -81,7 +92,13 @@ export async function planFreeSlots(
     else candidates.push(v);
   }
 
-  const ordered = orderCandidates(candidates, castlist, lastUsed, opts.bookId);
+  const ordered = orderCandidates(
+    candidates,
+    castlist,
+    lastUsed,
+    opts.bookId,
+    openLines,
+  );
   const pick: VoiceRow[] = [];
   const spare: VoiceRow[] = [];
   for (const v of ordered) {

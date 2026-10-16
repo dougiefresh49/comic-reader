@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadBookCast, readCastVoiceLinks, voiceFor } from "~/lib/cast";
 import { listAllIssues } from "~/lib/issue-queries";
+import {
+  allLinesRendered,
+  readSpeakerLines,
+  unrenderedLines,
+} from "~/workflows/steps/casting-tasks";
 import { noActiveVoiceClaimFilter } from "./claim";
 import { firstStoredDesign, readCharacterVoices } from "./lookup";
 import type { CastlistRow, IssueTarget, VoiceRow } from "./types";
@@ -117,22 +122,57 @@ async function readIssueBubbles(
  * The `voices.id` set the target issue needs (decisions row 28): the voice
  * the render chain (`voiceFor`) finds for each character its bubbles name by
  * `character_id`. An archived pick stays needed; a chain that stops ("no
- * audio", removed, no voice) needs nothing (#429).
+ * audio", removed, no voice) needs nothing (#429). A character whose lines
+ * here are all rendered by that voice (`allLinesRendered`, #358) needs it no
+ * more: archiving it leaves nothing in this issue silent.
  */
 export async function issueNeeds(
   supabase: SupabaseClient,
   target: IssueTarget,
 ): Promise<Set<string>> {
-  const [bubbles, book] = await Promise.all([
+  const book = await loadBookCast(supabase, target.bookId);
+  const [bubbles, lines] = await Promise.all([
     readIssueBubbles(supabase, target),
-    loadBookCast(supabase, target.bookId),
+    readSpeakerLines(supabase, target.bookId, target.issueId, book),
   ]);
   const needed = new Set<string>();
   for (const id of new Set(bubbles.map((b) => b.character_id))) {
     const voice = id ? voiceFor(book, id, target.issueId) : null;
-    if (voice) needed.add(voice.voiceUuid);
+    if (voice && !allLinesRendered(lines.get(id!))) needed.add(voice.voiceUuid);
   }
   return needed;
+}
+
+/**
+ * The voices that still have an unrendered line somewhere (#358): in any
+ * issue of a book the castlist names, a character whose render chain gives
+ * it the voice and who has a text line with no audio from it
+ * (`unrenderedLines`). Archiving a voice outside this set costs nothing
+ * later, so `orderCandidates` offers those first. Reads only.
+ */
+export async function voicesWithOpenLines(
+  supabase: SupabaseClient,
+  castlist: CastlistRow[],
+): Promise<Set<string>> {
+  const open = new Set<string>();
+  const books = [...new Set(castlist.map((c) => c.book_id))].sort();
+  for (const bookId of books) {
+    const book = await loadBookCast(supabase, bookId);
+    const issues = [...book.issueNumber.keys()];
+    const perIssue = await Promise.all(
+      issues.map((issueId) =>
+        readSpeakerLines(supabase, bookId, issueId, book),
+      ),
+    );
+    issues.forEach((issueId, i) => {
+      for (const [id, list] of perIssue[i]!) {
+        if (unrenderedLines(list) === 0) continue;
+        const voice = voiceFor(book, id, issueId)?.voiceUuid;
+        if (voice) open.add(voice);
+      }
+    });
+  }
+  return open;
 }
 
 /**

@@ -18,7 +18,10 @@ import {
   type VoiceSlotsDeps,
 } from "~/lib/voice-slots/types";
 import { ROOM_CONSUMER } from "~/lib/voice-slots/archive";
-import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
+import {
+  lineRendered,
+  readSpeakerLines,
+} from "~/workflows/steps/casting-tasks";
 import {
   holdsSlot,
   readAccountOwners,
@@ -260,18 +263,20 @@ export async function planMovesDetail(
   bookId: string,
   issueId: string,
   moves: Move[],
-  opts: PlanOptions = {},
+  // `renderedLinesVoiced` is the shared rule now (#358); no option is read.
+  _opts: PlanOptions = {},
 ): Promise<PlanDetail> {
   const sb = deps.supabase;
   const needAccount = moves.some(
     (m) => m?.kind === "archive" && !m.voice_uuid && m.elevenlabs_id,
   );
+  const bookRead = loadBookCast(sb, bookId);
   const [status, voices, book, lines, owners, castlist, account, unresolved] =
     await Promise.all([
       getSlotStatus(deps),
       readVoices(sb),
-      loadBookCast(sb, bookId),
-      readSpeakerLines(sb, bookId, issueId),
+      bookRead,
+      bookRead.then((b) => readSpeakerLines(sb, bookId, issueId, b)),
       readAccountOwners(sb),
       readCastlist(sb),
       needAccount ? readAccountVoices(deps) : Promise.resolve(null),
@@ -841,25 +846,6 @@ export async function planMovesDetail(
     await placeOther(i, m);
   }
 
-  // With `renderedLinesVoiced`: this issue's bubbles with audio rendered by a
-  // voice this plan archives, as bubble id to `voices.id`.
-  const renderedBy = new Map<string, string>();
-  if (opts.renderedLinesVoiced && archivedHere.size > 0) {
-    const { data, error } = await sb
-      .from("bubbles")
-      .select("id, voice_id")
-      .eq("book_id", bookId)
-      .eq("issue_id", issueId)
-      .not("audio_storage_path", "is", null)
-      .in("voice_id", [...archivedHere.keys()]);
-    if (error)
-      throw new Error(
-        `casting moves: reading rendered bubbles: ${error.message}`,
-      );
-    for (const b of (data ?? []) as { id: string; voice_id: string }[])
-      renderedBy.set(b.id, b.voice_id);
-  }
-
   // Speakers after every move: each must render, sit out, or be removed.
   const needsAfter = new Set<string>();
   for (const [id, list] of lines) {
@@ -869,13 +855,15 @@ export async function planMovesDetail(
       continue;
     }
     if (r.reason !== "no voice" && r.reason !== "not in a slot") continue;
-    // A line with no text never gets audio (`bubbleNeedsAudio`).
+    // #790's rule, from its one home (`lineRendered`, #358): archiving the
+    // voice leaves nothing silent when every line has no text or audio that
+    // voice rendered. It applies to every plan now; `renderedLinesVoiced`
+    // is no longer read.
     const gone = r.reason === "not in a slot" ? r.voice?.voiceUuid : undefined;
     if (
       gone &&
       archivedHere.has(gone) &&
-      opts.renderedLinesVoiced &&
-      list.every((l) => !l.text || renderedBy.get(l.bubbleId) === gone)
+      list.every((l) => lineRendered(l, gone))
     )
       continue;
     const culprit =

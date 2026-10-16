@@ -69,6 +69,18 @@ export interface ProgressCounts {
   needVoice: string[];
   /** The rest of `unsettled`: speakers who have a voice and an open request for a new one. */
   newVoice: string[];
+  /**
+   * The gate's `leftovers` once some bubble has audio (#358), else empty:
+   * characters sitting out or with no usable voice whose text lines have no
+   * audio. Display names sorted, with the counts the Voices row shows.
+   */
+  leftovers: {
+    names: string[];
+    sittingOut: number;
+    noVoice: number;
+    /** Their text lines with no audio. */
+    lines: number;
+  };
 }
 
 export interface PipelineProgress {
@@ -265,6 +277,8 @@ async function getCounts(
   }
 
   const noVoice = new Set(plan.noVoice);
+  // Leftovers count once audio has started, as the gate counts them.
+  const left = plan.audioStarted ? plan.leftovers : [];
   const namesOf = (ids: string[]) =>
     ids
       .map(
@@ -294,6 +308,12 @@ async function getCounts(
     facesNamed: detectionsNamed + countOf("exemplarsNamed", exemplarsNamed),
     needVoice: namesOf(plan.noVoice),
     newVoice: namesOf(plan.unsettled.filter((id) => !noVoice.has(id))),
+    leftovers: {
+      names: namesOf(left.map((l) => l.characterId)),
+      sittingOut: left.filter((l) => l.why === "sitting out").length,
+      noVoice: left.filter((l) => l.why === "no voice").length,
+      lines: left.reduce((n, l) => n + l.lines, 0),
+    },
   };
 }
 

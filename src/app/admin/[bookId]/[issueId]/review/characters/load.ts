@@ -21,13 +21,18 @@ import { chunk } from "~/lib/chunk";
 import { readVoices, type VoiceRow } from "~/lib/voice-slots";
 import { isProtectedVoice } from "~/lib/voice-slots/types";
 import { audioUrl } from "~/lib/storage";
-import { readSpeakerLines } from "~/workflows/steps/casting-tasks";
+import {
+  planCastingTasks,
+  readSpeakerLines,
+  voicesWithLinesDone,
+} from "~/workflows/steps/casting-tasks";
 import { planRevoice } from "./revoice-plan";
 import { readVoicesGate } from "~/server/admin/voices-gate";
 import {
   unknownFaceGroups,
   type UnknownDetection,
 } from "~/server/admin/characters-gate";
+import type { CastingPlan } from "~/workflows/steps/casting-tasks";
 import type {
   CharacterCard,
   CharactersData,
@@ -132,6 +137,7 @@ export async function loadCharacters(
   const issue = issueResult.data as unknown as IssueRow | null;
   if (!issue) return null;
 
+  const bookRead = loadBookCast(supabaseAdmin, bookId);
   const [
     book,
     proposal,
@@ -143,7 +149,7 @@ export async function loadCharacters(
     franchises,
     lines,
   ] = await Promise.all([
-    loadBookCast(supabaseAdmin, bookId),
+    bookRead,
     proposeCast(supabaseAdmin, bookId, issueId),
     supabaseAdmin
       .from("pages")
@@ -173,7 +179,7 @@ export async function loadCharacters(
       .order("id"),
     readVoices(supabaseAdmin),
     readBookFranchises(supabaseAdmin, bookId),
-    readSpeakerLines(supabaseAdmin, bookId, issueId),
+    bookRead.then((b) => readSpeakerLines(supabaseAdmin, bookId, issueId, b)),
   ]);
   const pageRows = rows<PageRow>("pages", pageResult);
   const panelRows = rows<PanelRow>("panels", panelResult);
@@ -423,6 +429,10 @@ export async function loadCharacters(
         said.length > 0 ? said.map((l) => l.page) : faces.map((f) => f.page),
       ),
       samples,
+      rendered: {
+        done: said.filter((l) => l.text && l.rendered).length,
+        of: said.filter((l) => l.text).length,
+      },
     };
   };
 
@@ -500,6 +510,7 @@ export async function loadCharacters(
     .map((s) => s.name);
 
   let pause: PauseView | null = null;
+  let gatePlan: CastingPlan | null = null;
   if (issue.pipeline_paused && issue.pipeline_step === "review-clusters") {
     const inCast = cards.filter((c) => !c.removed).length;
     const faces = unnamed.length;
@@ -514,10 +525,30 @@ export async function loadCharacters(
     };
   } else if (issue.pipeline_paused && issue.pipeline_step === "casting") {
     const gate = await readVoicesGate(bookId, issueId);
+    gatePlan = gate.plan;
     pause = {
       step: "casting",
       blocker: gate.verdict.ok ? null : gate.verdict.reason,
     };
+  }
+
+  // A voices round (#358): the gate's leftovers, once audio has started.
+  let round: CharactersData["round"] = null;
+  if (lines.size > 0) {
+    const plan =
+      gatePlan ?? (await planCastingTasks(supabaseAdmin, bookId, issueId));
+    if (plan.audioStarted)
+      round = {
+        leftovers: plan.leftovers.map((l) => ({
+          id: l.characterId,
+          name:
+            castRow(book, l.characterId, issueId)?.display_name ??
+            displayName(l.characterId),
+          lines: l.lines,
+          why: l.why,
+        })),
+        linesDone: [...voicesWithLinesDone(book, lines, issueId)],
+      };
   }
 
   const revoice = await planRevoice(supabaseAdmin, bookId, { book });
@@ -540,5 +571,6 @@ export async function loadCharacters(
     hasSpeakers: lines.size > 0,
     pause,
     revoice,
+    round,
   };
 }

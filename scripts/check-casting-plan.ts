@@ -9,6 +9,7 @@ import { supabase } from "./lib/supabase.js";
 import {
   pendingFromPlan,
   planCastingTasks,
+  voicesStopHolds,
 } from "~/workflows/steps/casting-tasks";
 
 function parseArgs(): { book: string; issue: string } {
@@ -45,11 +46,14 @@ async function main() {
   const plan = await planCastingTasks(supabase, book, issue);
   const wouldCreate = plan.toCreate.length;
   const pending = pendingFromPlan(plan);
-  const casting = pending === 0 ? "skip" : "pause";
+  const casting = voicesStopHolds(plan) ? "pause" : "skip";
 
   console.log(
-    `speakers=${plan.speakers} cast=${plan.cast} unresolved=${plan.unresolved.length} would_create=${wouldCreate} casting=${casting}`,
+    `speakers=${plan.speakers} cast=${plan.cast} unresolved=${plan.unresolved.length} would_create=${wouldCreate} pending=${pending} leftovers=${plan.leftovers.length} audio_started=${plan.audioStarted} casting=${casting}`,
   );
+  for (const l of plan.leftovers) {
+    console.log(`leftover=${l.characterId} lines=${l.lines} why=${l.why}`);
+  }
 
   if (plan.unresolved.length > 0) {
     console.log(`unresolved_speakers=${plan.unresolved.join(",")}`);

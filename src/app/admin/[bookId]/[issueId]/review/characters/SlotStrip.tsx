@@ -58,7 +58,24 @@ function segmentTitle(v: SlotView, voices: Map<string, VoiceOption>): string {
     .join(" · ");
 }
 
+/** The slot's voice has every line in this issue rendered (#358). */
+function isLinesDone(v: SlotView, linesDone: Set<string>): boolean {
+  return (
+    v.slot.holder.kind === "repo" && linesDone.has(v.slot.holder.voiceUuid)
+  );
+}
+
+/** "Lines done" slots first, the rest in their own order (a stable sort). */
+function byLinesDone(slots: SlotView[], linesDone: Set<string>): SlotView[] {
+  if (linesDone.size === 0) return slots;
+  return [...slots].sort(
+    (a, b) =>
+      Number(isLinesDone(b, linesDone)) - Number(isLinesDone(a, linesDone)),
+  );
+}
+
 export function SlotStrip({
+  linesDone,
   roster,
   error,
   model,
@@ -74,6 +91,8 @@ export function SlotStrip({
   onOpen,
   onDropCard,
 }: {
+  /** Voices whose every line in this issue is rendered (#358): marked, and first. */
+  linesDone: Set<string>;
   roster: Roster | null;
   error: string | null;
   model: SlotModel | null;
@@ -138,8 +157,9 @@ export function SlotStrip({
             : "border-transparent"
         }`}
       >
-        {model.slots.map((v) => {
-          const title = segmentTitle(v, voices);
+        {byLinesDone(model.slots, linesDone).map((v) => {
+          const done = isLinesDone(v, linesDone);
+          const title = `${segmentTitle(v, voices)}${done ? " · lines done" : ""}`;
           return (
             <button
               key={v.slot.index}
@@ -175,7 +195,7 @@ export function SlotStrip({
                 over === v.slot.index
                   ? "outline-2 outline-offset-1 outline-amber-400"
                   : ""
-              } ${carry?.type === "char" && !droppable(v) ? "opacity-35" : ""} ${FOCUS}`}
+              } ${done ? "ring-1 ring-lime-300 ring-inset" : ""} ${carry?.type === "char" && !droppable(v) ? "opacity-35" : ""} ${FOCUS}`}
             />
           );
         })}
@@ -238,6 +258,7 @@ export function SlotStrip({
         >
           <SlotMenu
             v={open}
+            done={isLinesDone(open, linesDone)}
             staged={staged}
             voices={voices}
             speakers={speakers}
@@ -264,6 +285,7 @@ export function SlotStrip({
 
 function SlotMenu({
   v,
+  done,
   staged,
   voices,
   speakers,
@@ -274,6 +296,8 @@ function SlotMenu({
   onOpen,
 }: {
   v: SlotView;
+  /** Every line this voice speaks here is rendered (#358). */
+  done: boolean;
   staged: Staged[];
   voices: Map<string, VoiceOption>;
   speakers: VoiceUsers;
@@ -320,6 +344,7 @@ function SlotMenu({
         row("kind", voices.get(h.voiceUuid)?.kind ?? "voice")}
       {s.backup && row("backup", backupWord(s.backup))}
       {says.length > 0 && row("speaks", says.join(", "))}
+      {done && row("lines", "done here: every line has audio")}
       <div className="mx-0.5 my-1 h-px bg-neutral-800" />
       {characterId && onBoard(characterId) && (
         <button
