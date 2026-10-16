@@ -13,7 +13,7 @@ import {
   ROLE_IDS,
   voiceFor,
   castRow,
-  isNoAudio,
+  latestVoicedRow,
   type RoleId,
 } from "~/lib/cast";
 import { slugify } from "~/lib/character-id";
@@ -292,7 +292,9 @@ export async function loadCharacters(
   const voiceName = new Map(voiceRows.map((v) => [v.id, v.display_name]));
   const displayName = (id: string) => book.resolve(id)?.display_name ?? id;
   // A member with no castlist row yet gets the voice `seedCast` will start it
-  // with: its latest active `voices` row, so the card does not change on Approve.
+  // with (`startingVoice` in cast.ts): its latest voiced row in the book, else
+  // its newest active `voices` row (`newestActiveVoiceOf`), so the card does
+  // not change on Approve.
   const startingVoice = new Map<string, VoiceRow>();
   for (const v of voiceRows
     .filter((v) => v.status === "active" && !v.run_only && v.character_id)
@@ -301,33 +303,37 @@ export async function loadCharacters(
       startingVoice.set(v.character_id!, v);
   }
   const voiceView = (id: string): VoiceView | null => {
-    // A "no audio" row is silent: no voice of its own, and no fallback (#410).
-    if (isNoAudio(book, id, issueId)) return null;
-    // A removed member's card still shows the voice it would come back with:
-    // its own row's voice (a "this run only" one included, #806), else the
-    // one it inherits.
     const own = castRow(book, id, issueId);
-    const removed = own?.in_issue === false;
+    // No row: what `seedCast` inserts. Only with no voiced row in the book
+    // does the active `voices` row come before what the chain borrows.
+    if (!own && !latestVoicedRow(book, id)) {
+      const starting = startingVoice.get(id);
+      if (starting)
+        return {
+          name: starting.display_name,
+          borrowedFrom: null,
+          borrowedFromId: null,
+          uuid: starting.id,
+        };
+    }
+    // A removed or "no audio" member's card shows the voice its row plays
+    // once Add or Back in clears that (#909): its own row's voice (a "this
+    // run only" one included, #806), else the one it inherits. Whether it
+    // plays now is the card's `removed` and `noAudio`.
+    const held = own !== undefined && (!own.in_issue || own.no_audio);
     const v =
-      removed && own.voice_uuid
+      held && own.voice_uuid
         ? {
             voiceUuid: own.voice_uuid,
             elevenLabsId:
               book.voices.get(own.voice_uuid)?.current_elevenlabs_id ?? null,
             from: id,
           }
-        : voiceFor(book, id, removed ? undefined : issueId);
-    if (!v) {
-      const starting = startingVoice.get(id);
-      return starting
-        ? {
-            name: starting.display_name,
-            borrowedFrom: null,
-            borrowedFromId: null,
-            uuid: starting.id,
-          }
-        : null;
-    }
+        : voiceFor(book, id, held ? undefined : issueId);
+    // A sitting-out form borrows its base's voice through `baseOf` once Back
+    // in is staged, not from here: on the card it would land in a pick's
+    // `replaces_voice_uuid` and trip the protected-voice check.
+    if (!v || (own?.in_issue && own.no_audio && v.from !== id)) return null;
     const name = voiceName.get(v.voiceUuid) ?? v.elevenLabsId;
     if (!name) return null;
     return {

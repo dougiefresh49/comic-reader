@@ -186,7 +186,7 @@ export function cardState(
     sitOut: card.noAudio,
     added: false,
     pick: null,
-    voiceId: card.voice?.uuid ?? null,
+    voiceId: null,
     pending: false,
     base: null,
   };
@@ -202,9 +202,21 @@ export function cardState(
     else if (m.kind === "rename") state.name = m.name;
     else if (isPick(m)) state.pick = { index, move: m };
   });
-  if (state.pick) state.voiceId = pickVoiceId(state.pick.move);
-  if (formOf) state.base = baseOf(card, state, formOf, staged);
+  const voice = loadedVoice(card, state);
+  state.voiceId = state.pick
+    ? pickVoiceId(state.pick.move)
+    : (voice?.uuid ?? null);
+  if (formOf) state.base = baseOf(voice, state, formOf, staged);
   return state;
+}
+
+/**
+ * The card's loaded voice as the board reads it. A row marked no audio
+ * loads with the voice it plays once Back in clears that (#909); until Back
+ * in is staged the card has none, so it shows and counts as it always has.
+ */
+function loadedVoice(card: CharacterCard, state: CardState) {
+  return card.noAudio && state.sitOut ? null : card.voice;
 }
 
 /**
@@ -215,7 +227,7 @@ export function cardState(
  * voice says what it gives.
  */
 function baseOf(
-  card: CharacterCard,
+  voice: CharacterCard["voice"],
   state: CardState,
   formOf: FormBase,
   staged: Staged[],
@@ -226,7 +238,7 @@ function baseOf(
     removed: false,
     sitOut: false,
     pick: null,
-    voiceId: card.voice?.borrowedFromId === formOf.id ? card.voice.uuid : null,
+    voiceId: voice?.borrowedFromId === formOf.id ? voice.uuid : null,
   };
   const borrowsInTurn =
     b !== null && b.pick === null && !!formOf.card?.voice?.borrowedFromId;
@@ -239,7 +251,7 @@ function baseOf(
         : formOf.plays(given)
           ? null
           : "no slot";
-  const ownVoice = !!card.voice && card.voice.borrowedFromId !== formOf.id;
+  const ownVoice = !!voice && voice.borrowedFromId !== formOf.id;
   const borrows = !state.pick && !ownVoice;
   const via = borrows && (why === null || why === "no slot");
   if (borrows) state.voiceId = via ? given.voiceId : null;
