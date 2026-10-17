@@ -22,6 +22,7 @@ import { elevenLabsFetch, getElevenLabsClient } from "~/lib/elevenlabs-client";
 import { recordElevenLabsCall } from "~/lib/llm-usage";
 import { buildTtsRequest, TTS_MODEL } from "~/lib/tts-request";
 import { loadVoiceOverrides } from "~/lib/voice-overrides";
+import { loadTtsCreditRate } from "~/lib/tts-credit-rate";
 import {
   sampleCredits,
   VOICE_SAMPLE_LINE,
@@ -55,11 +56,17 @@ export type ActionResult =
  * `voicePreview`'s and `makeVoiceSample`'s answer: a playable URL and where
  * it came from ("clip", "this issue", "this book", "from <book>", "sample"),
  * or null when the voice has no audio anywhere, with what Make a sample
- * would cost (null when the voice cannot render one); or a failure.
+ * would cost: its characters, and its credits at the measured rate or null
+ * when none is measured (#921). `sample` is null when the voice cannot render
+ * one. Or a failure.
  */
 export type PreviewResult =
   | { ok: true; url: string; from: string }
-  | { ok: true; url: null; sampleCredits: number | null }
+  | {
+      ok: true;
+      url: null;
+      sample: { characters: number; credits: number | null } | null;
+    }
   | { ok: false; error: string };
 
 /** Who an unknown group, a face or a wiki name is named as: a `characters` row, or a new one by name. */
@@ -732,7 +739,7 @@ export async function voicePreview(args: {
     await requireAdmin();
     const { scope, voiceId } = args;
     const voice = await readVoice(supabaseAdmin, voiceId);
-    if (!voice) return { ok: true, url: null, sampleCredits: null };
+    if (!voice) return { ok: true, url: null, sample: null };
     if (voice.source_clip_path) {
       const signed = await supabaseAdmin.storage
         .from(VOICE_CLIPS_BUCKET)
@@ -839,11 +846,21 @@ export async function voicePreview(args: {
       console.warn(`characters stop, reading ${voice.id}'s sample:`, err);
     }
     const live = canRenderIn(voice);
-    if (!live) return { ok: true, url: null, sampleCredits: null };
+    if (!live) return { ok: true, url: null, sample: null };
     const preview = await elevenLabsPreviewUrl(live);
     if (preview) return { ok: true, url: preview, from: "sample" };
-    const request = await sampleRequest(live);
-    return { ok: true, url: null, sampleCredits: sampleCredits(request.text) };
+    const [request, rate] = await Promise.all([
+      sampleRequest(live),
+      loadTtsCreditRate(supabaseAdmin),
+    ]);
+    return {
+      ok: true,
+      url: null,
+      sample: {
+        characters: request.text.length,
+        credits: sampleCredits(request.text, rate),
+      },
+    };
   } catch (err) {
     return fail("previewing a voice", err);
   }
