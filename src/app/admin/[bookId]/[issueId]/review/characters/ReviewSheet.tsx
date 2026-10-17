@@ -66,7 +66,7 @@ export function ReviewSheet({
     patch: Partial<Pick<ArchiveMove, "backup" | "lossy_ok">>,
   ) => void;
   onSitOut: (characterId: string) => void;
-  /** Confirm finished (done or stopped): the moves it carried out. */
+  /** Confirm finished (done or stopped): the moves it carried out. Called as soon as the run returns, while the sheet still shows the result. */
   onRan: (result: RunResult) => void;
   onClose: () => void;
 }) {
@@ -133,10 +133,9 @@ export function ReviewSheet({
     phase.kind === "ran" && phase.result.status !== "refused"
       ? phase.result
       : null;
-  /** Every way out: a finished run hands its result over first. */
+  /** Every way out. A finished run already handed its result over in `confirm`. */
   const close = () => {
     if (phase.kind === "running") return;
-    if (outcome) onRan(outcome);
     onClose();
   };
   const closeRef2 = useRef(close);
@@ -155,7 +154,14 @@ export function ReviewSheet({
             kind: "plan",
             plan: { ...plan, blockers: r.data.blockers },
           });
-        else setPhase({ kind: "ran", result: r.data });
+        else {
+          // Hand the result over now, not on close, so the done moves leave
+          // the staged list (and its saved draft) even if the page reloads
+          // while this sheet still shows Done (#922). The sheet keeps
+          // showing `phase.result`; `ran` stops the re-plan.
+          setPhase({ kind: "ran", result: r.data });
+          onRan(r.data);
+        }
       })
       .catch((err: unknown) =>
         setPhase({
