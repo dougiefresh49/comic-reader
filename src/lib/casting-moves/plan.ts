@@ -129,15 +129,20 @@ export interface PlanDetail {
 export type CastScope = "issue" | "later";
 
 /**
- * Why casting `to` for the character would replace one of the owner's v2
- * voices, or null. It reads every castlist row of the character the cast
- * writes (this issue's, and for `later` the book's later issues'), whatever
- * their `no_audio` or `in_issue`, and the voice the issue inherits when its
- * own row holds none, also read past `no_audio` and `in_issue`.
+ * Why casting `to` for the character would replace one of its own v2 voices
+ * (a protected voice whose `voices.character_id` is this character), or
+ * null. It reads every castlist row of the character the cast writes (this
+ * issue's, and for `later` the book's later issues'), whatever their
+ * `no_audio` or `in_issue`, and the voice the issue inherits when its own row
+ * holds none, also read past `no_audio` and `in_issue`. A character that
+ * borrows another character's protected voice moves off it freely (#939).
+ * `protectedRow` returns the voice's row when it is protected, else null.
  */
 export function castAwayReason(
   book: BookCast,
-  protectedName: (voiceUuid: string) => string | null,
+  protectedRow: (
+    voiceUuid: string,
+  ) => Pick<VoiceRow, "display_name" | "character_id"> | null,
   characterId: string,
   issueId: string,
   scope: CastScope,
@@ -166,9 +171,9 @@ export function castAwayReason(
   }
   for (const uuid of held) {
     if (uuid === to) continue;
-    const name = protectedName(uuid);
-    if (name)
-      return `${name} is a protected v2 voice; ${characterId}'s cast in it is never replaced`;
+    const row = protectedRow(uuid);
+    if (row?.character_id === characterId)
+      return `${row.display_name} is a protected v2 voice; ${characterId}'s cast in it is never replaced`;
   }
   return null;
 }
@@ -373,9 +378,9 @@ export async function planMovesDetail(
   const block = (moveIndex: number | null, code: BlockerCode, reason: string) =>
     blockers.push({ moveIndex, code, reason });
 
-  const protectedName = (uuid: string) => {
+  const protectedRow = (uuid: string) => {
     const row = rowById.get(uuid);
-    return row && isProtectedVoice(row) ? row.display_name : null;
+    return row && isProtectedVoice(row) ? row : null;
   };
   /** Cast-away (#786 decision 5): see `castAwayReason`. */
   const castAway = (
@@ -386,7 +391,7 @@ export async function planMovesDetail(
   ) => {
     const why = castAwayReason(
       sim,
-      protectedName,
+      protectedRow,
       characterId,
       issueId,
       scope,
@@ -405,11 +410,12 @@ export async function planMovesDetail(
     }
   };
   /**
-   * A pick that replaces a protected voice the character speaks with: its own
-   * voice (a starting voice included, which has no castlist row yet) or one
-   * its own rows hold. A form's card records the base's voice it borrows as
-   * replaced (#914); the pick writes only the form's rows, so it is not
-   * blocked here.
+   * A pick that replaces one of the character's own protected voices (its
+   * `voices.character_id` is this character; a starting voice included,
+   * which has no castlist row yet). A form's card records the base's voice
+   * it borrows as replaced (#914), and a character cast in another's
+   * protected voice records that voice (#939); either pick writes only the
+   * picking character's rows, so it is not blocked here.
    */
   const replacesProtected = (
     i: number,
@@ -419,14 +425,7 @@ export async function planMovesDetail(
     const row = m.replaces_voice_uuid
       ? rowById.get(m.replaces_voice_uuid)
       : null;
-    if (
-      row &&
-      isProtectedVoice(row) &&
-      (row.character_id === characterId ||
-        rows.some(
-          (r) => r.character_id === characterId && r.voice_uuid === row.id,
-        ))
-    )
+    if (row && isProtectedVoice(row) && row.character_id === characterId)
       block(
         i,
         "protected",
@@ -714,13 +713,9 @@ export async function planMovesDetail(
         order.push(i);
         const row = rowById.get(m.voice_uuid);
         const name = charName(m.character_id);
+        // A protected voice may speak for another character too (#939): the
+        // cast writes only that character's castlist rows.
         if (!row) block(i, "invalid", `no voice ${m.voice_uuid}`);
-        else if (isProtectedVoice(row) && row.character_id !== m.character_id)
-          block(
-            i,
-            "protected",
-            `${row.display_name} is a protected v2 voice; it speaks only for its own character`,
-          );
         unsettled(i, m.voice_uuid);
         replacesProtected(i, m.character_id, m);
         castAway(
