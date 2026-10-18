@@ -54,15 +54,17 @@ export function bubbleText(bubble: AssignableBubble): string {
 /**
  * Uppercase, ’ to ', then split on every character but A-Z, 0-9 and ', so a
  * hyphen separates tokens (FLEET- / FOOTED still matches FLEET-FOOTED) and
- * DON'T stays one token. Repeated letters collapse: GRRRR and GRR are GR (#934).
+ * DON'T stays one token. A token with a run of three of one letter is a shout
+ * and has every run collapsed, so GRRRR and GRRRRR are both GR, while TOO and
+ * BEE stay as they are (#934).
  */
 function tokens(text: string): string[] {
   return text
     .toUpperCase()
     .replace(/’/g, "'")
-    .replace(/([A-Z])\1+/g, "$1")
     .split(/[^A-Z0-9']+/)
-    .filter((t) => /[A-Z0-9]/.test(t));
+    .filter((t) => /[A-Z0-9]/.test(t))
+    .map((t) => (/([A-Z])\1\1/.test(t) ? t.replace(/([A-Z])\1+/g, "$1") : t));
 }
 
 export function lineText(line: Line): string {
@@ -162,8 +164,8 @@ export type PageAssignment<B extends AssignableBubble> = {
  * centre and whose unclaimed text tokens still include all of the word's, so
  * a line Cloud Vision runs across two bubbles reaches both (#933). A word
  * with no tokens follows the word before it if its centre is in that bubble;
- * flat lines are not split. Tokens compare with repeated letters collapsed
- * (#934).
+ * flat lines are not split. A shout token compares with its repeated letters
+ * collapsed (#934).
  */
 export function assignLinesToBubbles<B extends AssignableBubble>(
   bubbles: B[],
