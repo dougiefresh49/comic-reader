@@ -40,11 +40,11 @@ export const PLAYBACK_RATE_MIN = 0.75;
 export const PLAYBACK_RATE_MAX = 2.0;
 
 function readWordHighlightMode(): WordHighlightMode {
-  if (typeof window === "undefined") return "both";
+  if (typeof window === "undefined") return "bubble";
   const stored = window.localStorage.getItem(WORD_HIGHLIGHT_KEY);
   if (stored === "bubble" || stored === "caption" || stored === "both")
     return stored;
-  return "both";
+  return "bubble";
 }
 
 const subscribeToNothing = () => () => undefined;
@@ -94,15 +94,16 @@ export function useSettings() {
   );
 
   const [autoAdvancePage, setAutoAdvancePage] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(AUTO_ADVANCE_PAGE_KEY) === "true";
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(AUTO_ADVANCE_PAGE_KEY);
+    return stored !== null ? stored === "true" : true;
   });
 
   const [wordHighlightMode, setWordHighlightModeState] =
     useState<WordHighlightMode>(readWordHighlightMode);
 
-  // Nothing stored: derive from the highlight mode, so an existing reader on
-  // "Both" (or nothing) sees no change and "In bubble" starts with the bar off.
+  // Nothing stored: derive from the highlight mode, so "In bubble" (the default)
+  // starts with the bar off and a stored "Both" or caption mode starts with it on.
   const [storedCaptionBar, setCaptionBar] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(CAPTION_BAR_KEY);
@@ -126,8 +127,9 @@ export function useSettings() {
   });
 
   const [voicesOnly, setVoicesOnly] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(VOICES_ONLY_KEY) === "true";
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(VOICES_ONLY_KEY);
+    return stored !== null ? stored === "true" : true;
   });
 
   const [playbackRate, setPlaybackRate] = useState<number>(() => {
