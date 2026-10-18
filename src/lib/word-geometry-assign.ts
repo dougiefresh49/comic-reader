@@ -159,7 +159,9 @@ export type PageAssignment<B extends AssignableBubble> = {
  * larger overlap. Watermark lines are dropped. A line no bubble claims is then
  * split word by word, each word going to a bubble whose padded rect holds its
  * centre and whose unclaimed text tokens still include all of the word's, so
- * a line Cloud Vision runs across two bubbles reaches both (#933).
+ * a line Cloud Vision runs across two bubbles reaches both (#933). A word
+ * with no tokens follows the word before it if its centre is in that bubble;
+ * flat lines are not split.
  */
 export function assignLinesToBubbles<B extends AssignableBubble>(
   bubbles: B[],
@@ -226,16 +228,22 @@ export function assignLinesToBubbles<B extends AssignableBubble>(
   );
   const unclaimed: Line[] = [];
   for (const line of unassigned) {
+    // A flat line's words all carry the line box, so they can't be split.
+    if (flat.includes(line)) {
+      unclaimed.push(line);
+      continue;
+    }
     const owners: (Entry | null)[] = [];
     for (const word of line.words) {
       const wt = tokens(word.t);
+      const cx = word.box[0] + word.box[2] / 2;
+      const cy = word.box[1] + word.box[3] / 2;
       if (!wt.length) {
-        owners.push(owners.at(-1) ?? null);
+        const prev = owners.at(-1);
+        owners.push(prev?.rect && contains(prev.rect, cx, cy) ? prev : null);
         continue;
       }
       const need = [...tokenPool(wt)];
-      const cx = word.box[0] + word.box[2] / 2;
-      const cy = word.box[1] + word.box[3] / 2;
       let best: { entry: Entry; area: number } | null = null;
       for (const entry of entries) {
         const pool = pools.get(entry)!;
