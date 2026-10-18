@@ -380,7 +380,7 @@ async function protectedOwnVoice(
     book,
     (uuid) => {
       const row = byId.get(uuid);
-      return row && isProtectedVoice(row) ? row.display_name : null;
+      return row && isProtectedVoice(row) ? row : null;
     },
     characterId,
     ctx.issueId,
@@ -777,11 +777,9 @@ async function runCastMove(
     case "cast":
     case "stand_in": {
       const voice = await readVoice(sb, m.voice_uuid);
+      // A protected voice may speak for another character (#939); the
+      // re-check below still keeps the owner's own cast.
       if (!voice) return failed(`no voice ${m.voice_uuid}`);
-      if (isProtectedVoice(voice) && voice.character_id !== m.character_id)
-        return failed(
-          `${voice.display_name} is a protected v2 voice; it speaks only for its own character`,
-        );
       const why = await protectedOwnVoice(
         ctx,
         m.character_id,

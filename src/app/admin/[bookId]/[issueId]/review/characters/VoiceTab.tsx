@@ -335,9 +335,7 @@ export function VoiceTab({
         a.name.localeCompare(b.name),
     );
   const others = voices
-    .filter(
-      (v) => v.status === "active" && v.characterId !== card.id && !v.protected,
-    )
+    .filter((v) => v.status === "active" && v.characterId !== card.id)
     .sort((a, b) => a.name.localeCompare(b.name));
   const library = voices
     .filter((v) => v.status === "library")
@@ -616,6 +614,14 @@ export function VoiceTab({
                       <span>{v.status === "library" ? "library" : v.kind}</span>
                       {slotOf.get(v.id) && <span>·</span>}
                       <SlotNumber n={slotOf.get(v.id)} />
+                      {v.protected && (
+                        <span
+                          title="v2 voice, locked"
+                          className="text-neutral-500"
+                        >
+                          {Icon.lock}
+                        </span>
+                      )}
                       {says.length > 0 && (
                         <span className="truncate text-neutral-500">
                           · {says.join(", ")}
