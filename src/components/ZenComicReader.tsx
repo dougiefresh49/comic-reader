@@ -59,6 +59,9 @@ import {
   usePrefersReducedMotion,
 } from "./zen-comic-reader/PanelView";
 
+/** How long panel auto-play holds a panel with no voiced bubbles and no estimated duration before advancing. */
+const SILENT_PANEL_DWELL_MS = 4000;
+
 /**
  * The page a panel-view page turn is headed for while "Read to me" is on, or
  * null (#530). A page turn remounts the reader, so this carries read-aloud
@@ -694,7 +697,7 @@ export default function ZenComicReader({
       const ms =
         panel.estimatedDurationSeconds != null
           ? Math.max(600, panel.estimatedDurationSeconds * 1000)
-          : 2000;
+          : SILENT_PANEL_DWELL_MS;
       panelTimerRef.current = setTimeout(() => {
         goNextPanelRef.current();
       }, ms);
