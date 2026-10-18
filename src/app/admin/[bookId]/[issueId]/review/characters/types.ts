@@ -103,7 +103,7 @@ export interface VoiceOption {
   kind: "clone" | "designed" | "library";
   /** `starting_pick`: true only on rows from the retired voice-lab cast sheets; the import creates voices with false. */
   labPick: boolean;
-  /** One of the owner's v2 voices: never swapped out, never cast for another character. */
+  /** One of the owner's v2 voices: never swapped out or archived; another character may borrow it (#939). */
   protected: boolean;
 }
 
