@@ -20,11 +20,11 @@ command -v tizen >/dev/null || fail "tizen CLI not found -- add ~/tizen-studio/t
 java -version >/dev/null 2>&1 || fail "no Java runtime -- the Tizen CLI needs JDK 17 on PATH (see docs/tizen.md)"
 
 # --- stage -----------------------------------------------------------------
-# Only the two app files go in, so nothing else in tizen/ (scripts, old builds)
+# Only the app files go in, so nothing else in tizen/ (scripts, old builds)
 # ends up inside the package.
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
-cp "$DIR/config.xml" "$DIR/index.html" "$BUILD/"
+cp "$DIR/config.xml" "$DIR/index.html" "$DIR/app.js" "$DIR/app.css" "$BUILD/"
 
 tizen build-web -- "$BUILD"
 [ -d "$RESULT" ] || fail "tizen build-web produced no $RESULT"
@@ -39,8 +39,13 @@ fi
 
 tizen package -t wgt -s "$CERT_PROFILE" -- "$RESULT"
 
-WGT="$(find "$RESULT" -name '*.wgt' | head -1)"
-[ -n "$WGT" ] || fail "packaging finished but produced no .wgt"
+PACKAGED="$(find "$RESULT" -name '*.wgt' | head -1)"
+[ -n "$PACKAGED" ] || fail "packaging finished but produced no .wgt"
+
+# tizen package names the file after <name>, "Comic Reader.wgt", and the TV's
+# installer fails on the space with no log line. Ship it without one.
+WGT="$RESULT/ComicReader.wgt"
+mv "$PACKAGED" "$WGT"
 
 echo
 echo "built: $WGT"
