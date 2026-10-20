@@ -9,6 +9,8 @@
     <name>Comic Reader</name>
     <description>Thin launcher for the hosted Comic Reader.</description>
     <content src="index.html"/>
+    <!-- The site's logo (public/logo.png) at 512x512, the size jellyfin-tizen ships on this TV. -->
+    <icon src="icon.png"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>
     <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution" value="fullscreen"/>
     <tizen:profile name="tv"/>

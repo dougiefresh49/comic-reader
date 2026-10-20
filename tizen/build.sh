@@ -24,7 +24,7 @@ java -version >/dev/null 2>&1 || fail "no Java runtime -- the Tizen CLI needs JD
 # ends up inside the package.
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
-cp "$DIR/config.xml" "$DIR/index.html" "$DIR/app.js" "$DIR/app.css" "$BUILD/"
+cp "$DIR/config.xml" "$DIR/index.html" "$DIR/app.js" "$DIR/app.css" "$DIR/icon.png" "$BUILD/"
 
 tizen build-web -- "$BUILD"
 [ -d "$RESULT" ] || fail "tizen build-web produced no $RESULT"
