@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Comic Reader on Samsung TV: a thin launcher. index.html redirects to the
+  hosted reader, so reader changes reach the TV with no reinstall. See
+  docs/tizen.md. Modelled on jellyfin-tizen's config.xml.
+-->
+<widget xmlns:tizen="http://tizen.org/ns/widgets" xmlns="http://www.w3.org/ns/widgets" id="https://comic-reader-eta.vercel.app/ComicReader" version="0.1.0" viewmodes="fullscreen">
+    <tizen:application id="CmcRdrTV01.ComicReader" package="CmcRdrTV01" required_version="2.3"/>
+    <name>Comic Reader</name>
+    <description>Thin launcher for the hosted Comic Reader.</description>
+    <content src="index.html"/>
+    <feature name="http://tizen.org/feature/screen.size.all"/>
+    <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution" value="fullscreen"/>
+    <tizen:profile name="tv"/>
+
+    <!-- The reader itself (pages, JS, CSS, and the Geist font, which next/font self-hosts). -->
+    <access origin="https://comic-reader-eta.vercel.app" subdomains="false"></access>
+    <!-- Page images and bubble audio come from Supabase Storage on <project-ref>.supabase.co. -->
+    <access origin="https://supabase.co" subdomains="true"></access>
+    <!-- Lets the main frame leave the packaged index.html for the hosted reader. -->
+    <tizen:allow-navigation>comic-reader-eta.vercel.app</tizen:allow-navigation>
+
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>
