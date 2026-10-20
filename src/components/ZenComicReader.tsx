@@ -59,6 +59,9 @@ import {
   usePrefersReducedMotion,
 } from "./zen-comic-reader/PanelView";
 
+/** How long panel auto-play holds a panel with no voiced bubbles and no estimated duration before advancing. */
+const SILENT_PANEL_DWELL_MS = 4000;
+
 /**
  * The page a panel-view page turn is headed for while "Read to me" is on, or
  * null (#530). A page turn remounts the reader, so this carries read-aloud
@@ -694,7 +697,7 @@ export default function ZenComicReader({
       const ms =
         panel.estimatedDurationSeconds != null
           ? Math.max(600, panel.estimatedDurationSeconds * 1000)
-          : 2000;
+          : SILENT_PANEL_DWELL_MS;
       panelTimerRef.current = setTimeout(() => {
         goNextPanelRef.current();
       }, ms);
@@ -783,8 +786,12 @@ export default function ZenComicReader({
   // The caption bar is a setting (#607). With it off, a bubble whose words
   // cannot light up on the art (no word boxes, or the "Caption" mode) still
   // shows the caption while it plays, and the card goes away when playback
-  // ends. One boolean, read everywhere the bar's content is drawn.
-  const captionShown = captionBar || (isPlaying && !showInBubble);
+  // ends. In the "In bubble" mode a bubble with no word boxes plays with no
+  // caption at all (#934). One boolean, read everywhere the bar's content is
+  // drawn.
+  const captionShown =
+    captionBar ||
+    (isPlaying && !showInBubble && wordHighlightMode !== "bubble");
   const pageAspect = (() => {
     const image = selectedBubble?.textGeometry?.image;
     return image && image.w > 0 && image.h > 0 ? image.h / image.w : 1;

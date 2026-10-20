@@ -91,27 +91,30 @@ export default async function LibraryPage() {
   );
 }
 
-/** Centered hero treatment for a 1–2 book library. */
+/**
+ * Centered hero treatment for a 1–2 book library at `sm` and up. Below `sm`
+ * it takes `BookGrid`'s two-column mobile look instead.
+ */
 function FeaturedBooks({ items }: { items: ShelfItem[] }) {
   return (
-    <div className="flex flex-wrap items-start justify-center gap-8 pt-4 sm:pt-8">
+    <div className="grid grid-cols-2 gap-5 sm:flex sm:flex-wrap sm:items-start sm:justify-center sm:gap-8 sm:pt-8">
       {items.map((item) => (
         <Link
           key={item.key}
           href={item.href}
-          className="group flex w-60 flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10 hover:ring-2 hover:ring-cyan-400/60 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none sm:w-72"
+          className="group flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-2.5 transition hover:bg-white/10 hover:ring-2 hover:ring-cyan-400/60 focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:outline-none sm:w-72 sm:gap-3 sm:p-3"
         >
           <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-neutral-900">
             <CoverImage
               src={item.cover}
               alt={item.name}
               fallbackLabel={monogram(item.name)}
-              sizes="288px"
+              sizes="(max-width: 640px) 50vw, 288px"
               priority
               className="transition-transform duration-300 group-hover:scale-[1.02]"
             />
           </div>
-          <div className="flex items-center justify-between gap-3 px-1 pb-1">
+          <div className="flex flex-col items-start gap-1 px-1 pb-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             {item.isSeries ? (
               <div>
                 <SeriesLabel />

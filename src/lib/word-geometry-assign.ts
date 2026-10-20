@@ -54,14 +54,17 @@ export function bubbleText(bubble: AssignableBubble): string {
 /**
  * Uppercase, ’ to ', then split on every character but A-Z, 0-9 and ', so a
  * hyphen separates tokens (FLEET- / FOOTED still matches FLEET-FOOTED) and
- * DON'T stays one token.
+ * DON'T stays one token. A token with a run of three of one letter is a shout
+ * and has every run collapsed, so GRRRR and GRRRRR are both GR, while TOO and
+ * BEE stay as they are (#934).
  */
 function tokens(text: string): string[] {
   return text
     .toUpperCase()
     .replace(/’/g, "'")
     .split(/[^A-Z0-9']+/)
-    .filter((t) => /[A-Z0-9]/.test(t));
+    .filter((t) => /[A-Z0-9]/.test(t))
+    .map((t) => (/([A-Z])\1\1/.test(t) ? t.replace(/([A-Z])\1+/g, "$1") : t));
 }
 
 export function lineText(line: Line): string {
@@ -102,10 +105,26 @@ function sameBox(a: Box, b: Box): boolean {
   return a.every((v, i) => v === b[i]);
 }
 
+/** The box around `boxes`, rounded like the OCR boxes (4 decimals). */
+function union(boxes: Box[]): Box {
+  const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
+  const x0 = Math.min(...boxes.map((b) => b[0]));
+  const y0 = Math.min(...boxes.map((b) => b[1]));
+  const x1 = Math.max(...boxes.map((b) => b[0] + b[2]));
+  const y1 = Math.max(...boxes.map((b) => b[1] + b[3]));
+  return [r4(x0), r4(y0), r4(x1 - x0), r4(y1 - y0)];
+}
+
+/** `ts` as a multiset: token to count. */
+function tokenPool(ts: string[]): Map<string, number> {
+  const pool = new Map<string, number>();
+  for (const t of ts) pool.set(t, (pool.get(t) ?? 0) + 1);
+  return pool;
+}
+
 /** How many of `want` (a multiset) appear in `have`, each used once. */
 function covered(want: string[], have: string[]): number {
-  const pool = new Map<string, number>();
-  for (const t of have) pool.set(t, (pool.get(t) ?? 0) + 1);
+  const pool = tokenPool(have);
   let hits = 0;
   for (const t of want) {
     const left = pool.get(t) ?? 0;
@@ -140,7 +159,13 @@ export type PageAssignment<B extends AssignableBubble> = {
  * Gives each OCR line of one page to at most one of that page's bubbles: the
  * line's centre must sit in the bubble's padded rect and at least
  * `MIN_COVER` of its tokens must appear in the bubble's text; ties go to the
- * larger overlap. Watermark lines are dropped.
+ * larger overlap. Watermark lines are dropped. A line no bubble claims is then
+ * split word by word, each word going to a bubble whose padded rect holds its
+ * centre and whose unclaimed text tokens still include all of the word's, so
+ * a line Cloud Vision runs across two bubbles reaches both (#933). A word
+ * with no tokens follows the word before it if its centre is in that bubble;
+ * flat lines are not split. A shout token compares with its repeated letters
+ * collapsed (#934).
  */
 export function assignLinesToBubbles<B extends AssignableBubble>(
   bubbles: B[],
@@ -192,6 +217,71 @@ export function assignLinesToBubbles<B extends AssignableBubble>(
     else unassigned.push(line);
   }
 
+  // Word pass over the unclaimed lines; each bubble's pool is its text tokens
+  // minus those of the lines it already holds and the words it takes here.
+  type Entry = (typeof entries)[number];
+  type Word = Line["words"][number];
+  const pools = new Map(
+    entries.map((e) => {
+      const pool = tokenPool(e.tokens);
+      for (const t of e.lines.flatMap(lineTokens)) {
+        if (pool.get(t)) pool.set(t, pool.get(t)! - 1);
+      }
+      return [e, pool] as const;
+    }),
+  );
+  const unclaimed: Line[] = [];
+  for (const line of unassigned) {
+    // A flat line's words all carry the line box, so they can't be split.
+    if (flat.includes(line)) {
+      unclaimed.push(line);
+      continue;
+    }
+    const owners: (Entry | null)[] = [];
+    for (const word of line.words) {
+      const wt = tokens(word.t);
+      const cx = word.box[0] + word.box[2] / 2;
+      const cy = word.box[1] + word.box[3] / 2;
+      if (!wt.length) {
+        const prev = owners.at(-1);
+        owners.push(prev?.rect && contains(prev.rect, cx, cy) ? prev : null);
+        continue;
+      }
+      const need = [...tokenPool(wt)];
+      let best: { entry: Entry; area: number } | null = null;
+      for (const entry of entries) {
+        const pool = pools.get(entry)!;
+        if (!entry.rect || !contains(entry.rect, cx, cy)) continue;
+        if (need.some(([t, n]) => (pool.get(t) ?? 0) < n)) continue;
+        const area = intersection(entry.rect, word.box);
+        if (!best || area > best.area) best = { entry, area };
+      }
+      if (best) {
+        const pool = pools.get(best.entry)!;
+        for (const t of wt) pool.set(t, pool.get(t)! - 1);
+      }
+      owners.push(best?.entry ?? null);
+    }
+    if (owners.every((o) => !o)) {
+      unclaimed.push(line);
+      continue;
+    }
+    const rest: Word[] = [];
+    let run: Word[] = [];
+    line.words.forEach((word, i) => {
+      const owner = owners[i];
+      if (!owner) rest.push(word);
+      else run.push(word);
+      if (owner && owners[i + 1] !== owner) {
+        owner.lines.push({ box: union(run.map((w) => w.box)), words: run });
+        run = [];
+      }
+    });
+    if (rest.length) {
+      unclaimed.push({ box: union(rest.map((w) => w.box)), words: rest });
+    }
+  }
+
   return {
     bubbles: entries.map((entry) => {
       entry.lines.sort((a, b) => a.box[1] - b.box[1] || a.box[0] - b.box[0]);
@@ -204,7 +294,7 @@ export function assignLinesToBubbles<B extends AssignableBubble>(
         wordsTotal: entry.tokens.length,
       };
     }),
-    unassigned,
+    unassigned: unclaimed,
     dropped,
     flat,
   };
