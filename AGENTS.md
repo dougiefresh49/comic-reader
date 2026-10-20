@@ -463,6 +463,7 @@ No test suite. The gate for a code change is `pnpm format:write`, then `pnpm typ
 - Review editor and admin saves are prod writes, local dev server included.
 - The Gemini prompts (speaker ID, voice descriptions, reading order) decide what a kid hears and reads. Editing one is kid-facing taste work, not a refactor.
 - Every query on `issues` filters by `book_id` AND `id`. The primary key is `(book_id, id)`, and `issue-1` exists in more than one book.
+- A migration that creates a table, function or serial sequence in `public` grants it in the same file. Production's default privileges give `anon`, `authenticated` and `service_role` nothing on a new object, the Supabase default for every project from 2026-10-30, and a preview branch replays under the same defaults. A missing grant answers "permission denied" (42501). Grant what the code uses and no more: `service_role` gets what the server code does, usually `select, insert, update, delete`; `anon` gets `select` only on what the reader shows; `anon` and `authenticated` never get writes. `20261009195847_casting_moves.sql` is the pattern; why this is a rule and not a default privilege is `docs/decisions.md` row 465.
 - If I ask for too much in one go, say so before you start.
 
 ## Workflow
