@@ -1519,8 +1519,9 @@ export function CastingScreen({
   // way Reload voices does once the run is back at a stop with a newer gate
   // wait, or is over. A newer wait re-reads on every tick until the loaded
   // pause turns `resumed` false and this effect stops, so a refresh that
-  // failed or landed early is retried; the run's end re-reads once. Hidden-tab
-  // ticks are skipped; a failed read waits for the next.
+  // failed or landed early is retried; the run's end re-reads once. A pause
+  // at a stop this page doesn't own stops the poll without a re-read (#947).
+  // Hidden-tab ticks are skipped; a failed read waits for the next.
   useEffect(() => {
     if (!resumed || resumedFor === null) return;
     let stopped = false;
@@ -1531,6 +1532,11 @@ export function CastingScreen({
       readPause(scope)
         .then((r) => {
           if (stopped || !r.ok) return;
+          if (r.paused && r.stop === null) {
+            stopped = true;
+            clearInterval(id);
+            return;
+          }
           if (!newerWait(r.waitedAt, resumedFor.waitedAt) && !r.done) return;
           if (r.done) {
             stopped = true;
