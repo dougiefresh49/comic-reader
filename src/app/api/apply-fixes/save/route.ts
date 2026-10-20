@@ -66,14 +66,16 @@ function fail(error: string, status: number) {
  * `text_geometry` word boxes, read in one query (#672); an inserted row has none. A failed
  * geometry read logs a warning and samples unmasked. A page that fails to
  * download or decode logs a warning and writes null on its rows; the Save
- * still goes through.
+ * still goes through. Returns each downloaded page's bytes, so the word-box
+ * refresh after the commit reuses them instead of downloading again (#943).
  */
 async function setFillColors(
   bookId: string,
   issueId: string,
   byPage: Map<number, Record<string, unknown>[]>,
   updateIds: Map<Record<string, unknown>, string>,
-) {
+): Promise<Map<number, Uint8Array>> {
+  const pageImages = new Map<number, Uint8Array>();
   const ids = [...byPage.values()]
     .flat()
     .flatMap((row) => updateIds.get(row) ?? []);
@@ -100,9 +102,9 @@ async function setFillColors(
           .from("comic-pages")
           .download(pageStoragePath(bookId, issueId, page));
         if (error || !data) throw new Error(error?.message ?? "no image");
-        const image = await decodeRawImage(
-          new Uint8Array(await data.arrayBuffer()),
-        );
+        const bytes = new Uint8Array(await data.arrayBuffer());
+        pageImages.set(page, bytes);
+        const image = await decodeRawImage(bytes);
         for (const row of rows) {
           const box = pixelBoxOf(row.box_2d);
           const id = updateIds.get(row);
@@ -122,6 +124,7 @@ async function setFillColors(
       }
     }),
   );
+  return pageImages;
 }
 
 /**
@@ -393,7 +396,7 @@ export async function POST(req: NextRequest) {
         : [],
     ),
   );
-  await setFillColors(bookId, issueId, boxRows, updateIds);
+  const pageImages = await setFillColors(bookId, issueId, boxRows, updateIds);
 
   const { error, status } = await supabaseAdmin.rpc("save_review_edits", {
     p_book_id: bookId,
@@ -417,7 +420,8 @@ export async function POST(req: NextRequest) {
   // engine returns no lines and the refresh would write null word boxes over
   // every candidate on the page, so the page is reported instead of run; the
   // check sits inside the settled promise so that its own throw (DRY_RUN on
-  // a deployment) is reported the same way.
+  // a deployment) is reported the same way. A page the fill colours already
+  // downloaded is passed through; one whose download failed is tried again.
   const refreshPages = wordBoxPages(boxRows, updateIds, ctx);
   const refreshed = await Promise.allSettled(
     refreshPages.map(async (page) => {
@@ -429,6 +433,7 @@ export async function POST(req: NextRequest) {
         bookId,
         issueId,
         page,
+        pageImages.get(page),
       );
     }),
   );
