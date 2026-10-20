@@ -365,14 +365,15 @@ async function runClaimed(
 
 /** `castAwayReason` on the cast and voices as they are now: the re-check before a cast write or an add. */
 async function protectedOwnVoice(
-  ctx: Ctx,
+  sb: SupabaseClient,
+  bookId: string,
+  issueId: string,
   characterId: string,
   to: string | null,
   scope: CastScope,
 ): Promise<string | null> {
-  const sb = ctx.deps.supabase;
   const [book, voices] = await Promise.all([
-    loadBookCast(sb, ctx.bookId),
+    loadBookCast(sb, bookId),
     readVoices(sb),
   ]);
   const byId = new Map(voices.map((v) => [v.id, v]));
@@ -383,7 +384,7 @@ async function protectedOwnVoice(
       return row && isProtectedVoice(row) ? row : null;
     },
     characterId,
-    ctx.issueId,
+    issueId,
     scope,
     to,
   );
@@ -541,7 +542,11 @@ async function runArchive(
 /**
  * Records a voice an add made on ElevenLabs: the restored row's new id, or
  * a designed voice's row (the character's stored design row when it has
- * one), then the cast. Safe to repeat; `reconcileRun` calls it too.
+ * one), then the cast. Before the cast write it re-checks the cast as it is
+ * now (`protectedOwnVoice`): when the character's own protected voice holds
+ * it, the cast is skipped and `castRefused` says why, so the caller leaves
+ * the move `needs_attention`. The voice rows are recorded either way, since
+ * the voice exists on ElevenLabs. Safe to repeat; `reconcileRun` calls it too.
  */
 export async function finishAdd(
   deps: VoiceSlotsDeps,
@@ -549,7 +554,7 @@ export async function finishAdd(
   m: AddMove,
   elevenLabsId: string,
   recorded: boolean,
-): Promise<string> {
+): Promise<{ voiceUuid: string; castRefused: string | null }> {
   const sb = deps.supabase;
   let voiceUuid: string;
   if (m.kind === "restore") {
@@ -592,7 +597,17 @@ export async function finishAdd(
   }
   const characterId = m.character_id;
   if (characterId) {
-    if (m.kind === "create_design" && m.run_only)
+    const issueOnly = m.kind === "create_design" && m.run_only;
+    const why = await protectedOwnVoice(
+      sb,
+      scope.bookId,
+      scope.issueId,
+      characterId,
+      voiceUuid,
+      issueOnly ? "issue" : "later",
+    );
+    if (why) return { voiceUuid, castRefused: why };
+    if (issueOnly)
       await setIssueVoice(
         sb,
         scope.bookId,
@@ -609,7 +624,7 @@ export async function finishAdd(
         voiceUuid,
       );
   }
-  return voiceUuid;
+  return { voiceUuid, castRefused: null };
 }
 
 async function runAdd(
@@ -643,7 +658,9 @@ async function runAdd(
     async () => {
       if (m.character_id) {
         const why = await protectedOwnVoice(
-          ctx,
+          sb,
+          ctx.bookId,
+          ctx.issueId,
           m.character_id,
           m.kind === "restore" ? m.voice_uuid : null,
           m.kind === "create_design" && m.run_only ? "issue" : "later",
@@ -747,13 +764,19 @@ async function runAdd(
       const elevenLabsId = added.elevenLabsId;
       await rec.record({ phase: "added", elevenLabsId });
       try {
-        const voiceUuid = await finishAdd(
+        const { voiceUuid, castRefused } = await finishAdd(
           deps,
           { bookId: ctx.bookId, issueId: ctx.issueId, rowId },
           m,
           elevenLabsId,
           added.recorded,
         );
+        if (castRefused)
+          return attention(
+            castRefused,
+            `${elevenLabsId} is recorded as voice ${voiceUuid} but was not cast`,
+            ...warnings,
+          );
         return done(warnings, { voiceUuid, elevenLabsId });
       } catch (err) {
         return attention(
@@ -781,7 +804,9 @@ async function runCastMove(
       // re-check below still keeps the owner's own cast.
       if (!voice) return failed(`no voice ${m.voice_uuid}`);
       const why = await protectedOwnVoice(
-        ctx,
+        sb,
+        bookId,
+        issueId,
         m.character_id,
         m.voice_uuid,
         m.kind === "cast" ? "later" : "issue",
