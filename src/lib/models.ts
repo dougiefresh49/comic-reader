@@ -57,14 +57,15 @@ export const GEMINI_EMBEDDING_USD_PER_IMAGE = 0.00012;
 export const ELEVENLABS_USD_PER_CHARACTER = 0.00008;
 
 // Fallback credits per character when `character-cost` is absent (#251).
-// TTS eleven_v4: `GET /v1/models` reports `character_cost_multiplier: 1.0`
-// on this account (#213 probe, 2026-09-28).
+// TTS eleven_v4 is absent on purpose (#921): it bills well under the 1.0
+// `character_cost_multiplier` that `GET /v1/models` reports, and its billed
+// rate moves, so a row with no header logs credits null rather than a guess
+// that would skew the measured rate in `tts-credit-rate.ts`.
 // Voice Design v3 bills preview text once for all three samples. Its FAQ says
 // credits equal preview characters and calls this the single-credit rule:
 // https://elevenlabs.io/blog/voice-design-v3
 // https://help.elevenlabs.io/hc/en-us/articles/29315418701073-How-much-does-Voice-Design-cost
 // Models without a documented rate keep credits null.
 export const ELEVENLABS_CREDITS_PER_CHARACTER: Record<string, number> = {
-  eleven_v4: 1,
   eleven_ttv_v3: 1,
 };
