@@ -43,9 +43,12 @@ export interface ReconcileOutcome {
  *   writes are finished), failed when it is still there.
  * - `archived`: the registry writes are finished; done.
  * - `adding`: the voice carrying the add's token is adopted and the rows
- *   finished (done); a `back` add (restoring an archived voice after a
- *   refused add) is adopted onto that voice's row, and the move failed.
- * - `added`: the rows are finished; done.
+ *   finished as for `added`; a `back` add (restoring an archived voice after
+ *   a refused add) is adopted onto that voice's row, and the move failed.
+ * - `added`: the rows are finished; done. When the character's own protected
+ *   voice holds the cast now, the voice is recorded, the cast is skipped and
+ *   the move is left `needs_attention` at `added`; each later reconcile
+ *   refuses again until the cast changes.
  *
  * Moves a stopped run never started stay `pending` with no record.
  */
@@ -105,13 +108,19 @@ async function reconcileMove(
   };
   const archivedRow = op.archived ? await readVoice(sb, op.archived) : null;
   const finish = async (elevenLabsId: string) => {
-    await finishAdd(
+    const { castRefused } = await finishAdd(
       deps,
       { bookId: row.book_id, issueId: row.issue_id, rowId: row.id },
       row.payload as AddMove,
       elevenLabsId,
       false,
     );
+    if (castRefused)
+      return settle(
+        "needs_attention",
+        castRefused,
+        `recorded ${elevenLabsId}; it was not cast`,
+      );
     return settle("done", `recorded ${elevenLabsId}`);
   };
 
