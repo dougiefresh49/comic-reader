@@ -93,13 +93,17 @@ export const DASHBOARD_BADGES: Record<
   },
 };
 
-/** Poll interval per state: fast while a step works, slow while the hub waits for a button or a person, none when done. */
+/**
+ * Poll interval per state: 5 s while a step works, none otherwise. The other
+ * states change only when a person acts, so the page refreshes once when its
+ * tab comes back instead (`LiveRefresh`'s `refreshOnReturn`, #946).
+ */
 const REFRESH_MS: Record<RunState, number | null> = {
   running: 5000,
-  waiting: 15000,
-  failed: 15000,
-  cancelled: 15000,
-  "not-started": 15000,
+  waiting: null,
+  failed: null,
+  cancelled: null,
+  "not-started": null,
   ready: null,
 };
 
@@ -146,7 +150,7 @@ export interface HubView {
   /** How long the owner has had the open gate. */
   waitingMs: number | null;
   stages: StageView[];
-  /** How often the page re-fetches itself; null once the run is done. */
+  /** How often the page re-fetches itself; null when nothing is running. */
   refreshMs: number | null;
   /** The Run fact's word: RUN_WORDS for the state, but "Running" while masks still run on a ready issue. */
   runWord: string;

@@ -44,7 +44,7 @@ export default async function PipelineReviewPage({ params }: Params) {
 
   return (
     <main className="min-h-screen bg-neutral-950 px-6 py-10 text-neutral-100">
-      <LiveRefresh intervalMs={view.refreshMs} />
+      <LiveRefresh intervalMs={view.refreshMs} refreshOnReturn />
       <div className="mx-auto max-w-4xl">
         <div className="mb-8 flex items-center justify-between text-sm">
           <Link
