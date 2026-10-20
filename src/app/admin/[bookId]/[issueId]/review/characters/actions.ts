@@ -1176,14 +1176,17 @@ export async function removeCharacterAlias(args: {
 
 /**
  * `readPause`'s answer: the stop the issue is paused at with its open gate
- * wait (`PauseView`'s `step` and `waitedAt`), and whether the run is over
- * (`complete`, or `failed:<step>` from a failure or a cancel).
+ * wait (`PauseView`'s `step` and `waitedAt`), whether the run is paused at
+ * any stop (`paused`, so the page can tell a stop it doesn't own, #947), and
+ * whether the run is over (`complete`, or `failed:<step>` from a failure or a
+ * cancel).
  */
 export type PauseState =
   | {
       ok: true;
       stop: PauseView["step"] | null;
       waitedAt: string | null;
+      paused: boolean;
       done: boolean;
     }
   | { ok: false; error: string };
@@ -1206,6 +1209,7 @@ export async function readPause(scope: Scope): Promise<PauseState> {
       ok: true,
       stop,
       waitedAt: stop ? await openWaitAt(scope.bookId, scope.issueId) : null,
+      paused: data.pipeline_paused,
       done:
         !data.pipeline_paused &&
         (step === "complete" || (step?.startsWith("failed:") ?? false)),
