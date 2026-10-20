@@ -48,6 +48,7 @@
     "migrate-to-db": "tsx --env-file=.env scripts/migrate-to-db.ts",
     "recover-issue": "tsx --conditions=react-server --env-file=.env scripts/recover-issue.ts",
     "fix-page-watermarks": "tsx --conditions=react-server --env-file=.env scripts/fix-page-watermarks.ts",
+    "reencode-pages": "tsx --conditions=react-server --env-file=.env scripts/reencode-pages.ts",
     "backfill-panels": "tsx --env-file=.env scripts/backfill-panels.ts",
     "sweep-thresholds": "tsx --env-file=.env scripts/sweep-thresholds.ts",
     "upload-to-storage": "tsx --env-file=.env scripts/upload-to-storage.ts",

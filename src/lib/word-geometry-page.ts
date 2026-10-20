@@ -36,12 +36,16 @@ export class WordGeometryDataError extends Error {
  * A bubble given word boxes has its `fill_color` resampled from the pixels
  * inside them (#672), in the same update. A page image that fails to decode logs one
  * warning and leaves every fill as it was; a null-geometry bubble keeps its.
+ *
+ * `pageImage` is the stored page's bytes when the caller already downloaded
+ * them (the review editor's Save, #943); without it the page is downloaded here.
  */
 export async function wordGeometryForPage(
   supabase: SupabaseClient<Database>,
   bookId: string,
   issueId: string,
   pageNumber: number,
+  pageImage?: Uint8Array,
 ) {
   const pageLabel = `page-${String(pageNumber).padStart(2, "0")}`;
 
@@ -63,15 +67,18 @@ export async function wordGeometryForPage(
     return { candidates: 0, withGeometry: 0 };
   }
 
-  const { data: imageBlob, error: downloadErr } = await supabase.storage
-    .from("comic-pages")
-    .download(pageStoragePath(bookId, issueId, pageNumber));
-  if (downloadErr || !imageBlob) {
-    throw new WordGeometryDataError(
-      `comic-pages download failed for ${pageLabel}: ${downloadErr?.message ?? "no image"}`,
-    );
+  let image = pageImage;
+  if (!image) {
+    const { data: imageBlob, error: downloadErr } = await supabase.storage
+      .from("comic-pages")
+      .download(pageStoragePath(bookId, issueId, pageNumber));
+    if (downloadErr || !imageBlob) {
+      throw new WordGeometryDataError(
+        `comic-pages download failed for ${pageLabel}: ${downloadErr?.message ?? "no image"}`,
+      );
+    }
+    image = new Uint8Array(await imageBlob.arrayBuffer());
   }
-  const image = new Uint8Array(await imageBlob.arrayBuffer());
 
   // A Cloud Vision HTTP error is a plain Error, which the runtime retries.
   const geometry = await cloudVisionGeometry(image);

@@ -10,11 +10,18 @@ import {
 
 const WEBP_BUCKET = "comic-pages";
 export const WEBP_QUALITY = 82;
+/**
+ * The longest edge a stored page may have, in pixels (#943). A larger page is
+ * scaled down to it, aspect kept; a smaller one is stored at its own size.
+ */
+export const PAGE_MAX_EDGE = 2000;
 
 /**
  * How every stored page is encoded, scripts included (#541). smartSubsample
  * keeps re-encode noise on saturated edges under the 32 the watermark diff
- * allows: without it 12 of 76 stored pages moved a pixel by up to 42.
+ * allows: without it 12 of 76 stored pages moved a pixel by up to 42. It keeps
+ * the input's size, because `scripts/fix-page-watermarks.ts` diffs its output
+ * pixel by pixel against the input; the size cap is `capPageSize`, run first.
  */
 export function encodePageWebp(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
@@ -23,9 +30,36 @@ export function encodePageWebp(buffer: Buffer): Promise<Buffer> {
 }
 
 /**
- * Remove the source watermark (#541), convert the page to WebP, upload to the
- * flat comic-pages key, and upsert the matching `pages` row. Throws on any
- * storage or DB error, and when the clean changed the image's size.
+ * Scales a page down so its long edge is at most PAGE_MAX_EDGE (#943), with
+ * sharp's default lanczos3. A page already within the cap comes back as the
+ * same buffer. A scaled page comes back as an uncompressed PNG, so the only
+ * lossy step stays `encodePageWebp`. `width` and `height` are the returned
+ * image's.
+ */
+export async function capPageSize(
+  buffer: Buffer,
+): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const { width = 0, height = 0 } = await sharp(buffer).metadata();
+  if (Math.max(width, height) <= PAGE_MAX_EDGE) {
+    return { buffer, width, height };
+  }
+  const { data, info } = await sharp(buffer)
+    .resize({
+      width: PAGE_MAX_EDGE,
+      height: PAGE_MAX_EDGE,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .png({ compressionLevel: 0 })
+    .toBuffer({ resolveWithObject: true });
+  return { buffer: data, width: info.width, height: info.height };
+}
+
+/**
+ * Remove the source watermark (#541), scale the page down to PAGE_MAX_EDGE
+ * (#943), convert it to WebP, upload to the flat comic-pages key, and upsert
+ * the matching `pages` row with the stored size. Throws on any storage or DB
+ * error, and when the clean changed the image's size.
  */
 export async function storePageImage(args: {
   bookId: string;
@@ -33,6 +67,7 @@ export async function storePageImage(args: {
   pageNumber: number;
   buffer: Buffer;
 }): Promise<{
+  /** The stored page's size, after the cap. */
   width: number;
   height: number;
   storagePath: string;
@@ -57,7 +92,8 @@ export async function storePageImage(args: {
     }
   }
 
-  const webpBuffer = await encodePageWebp(buffer);
+  const stored = await capPageSize(buffer);
+  const webpBuffer = await encodePageWebp(stored.buffer);
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from(WEBP_BUCKET)
@@ -76,8 +112,8 @@ export async function storePageImage(args: {
       book_id: bookId,
       issue_id: issueId,
       number: pageNumber,
-      width,
-      height,
+      width: stored.width,
+      height: stored.height,
       storage_path: storagePath,
     },
     { onConflict: "book_id,issue_id,number" },
@@ -88,5 +124,11 @@ export async function storePageImage(args: {
     );
   }
 
-  return { width, height, storagePath, fixes, failures };
+  return {
+    width: stored.width,
+    height: stored.height,
+    storagePath,
+    fixes,
+    failures,
+  };
 }
