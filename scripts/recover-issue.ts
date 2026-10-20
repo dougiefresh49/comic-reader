@@ -14,6 +14,11 @@
  * comic-pages-raw; it gets WebPs plus `pages` rows only.
  *
  * Never writes the `issues` row, so it leaves `has_webp` as it finds it.
+ *
+ * The add-issue upload deletes an issue's comic-pages-raw/<book>/<issue>/source/
+ * objects once its last finalize batch stores every page (#959), so this script
+ * finds no raw pages for an issue added after that. issue-3's git source is
+ * unaffected.
  */
 
 import { execFileSync } from "child_process";
@@ -260,6 +265,11 @@ async function planFromRawStorage(
     .from(RAW_BUCKET)
     .list(folder, { limit: 1000 });
   if (error) throw new Error(`list ${RAW_BUCKET}/${folder}: ${error.message}`);
+  if (data.length === 0) {
+    throw new Error(
+      `${RAW_BUCKET}/${folder}/ is empty: raw pages are deleted once an add-issue upload finishes (#959).`,
+    );
+  }
 
   return data
     .filter((f) => /^page-\d+\.jpe?g$/i.test(f.name))

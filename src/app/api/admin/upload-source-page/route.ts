@@ -108,7 +108,8 @@ interface FinalizeBody {
 //             saved, and returns `resumeFrom`; 409 if the issue has pages
 // url       → returns signed upload URL for one file
 // finalize  → convert raw pages from..to to WebP and upsert their pages rows;
-//             the batch ending at count sets page_count and pipeline_step
+//             the batch ending at count sets page_count and pipeline_step,
+//             then deletes the issue's raw pages (#959)
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as
     | ({ mode: "url" } & CreateUrlBody)
@@ -282,7 +283,12 @@ export async function POST(req: NextRequest) {
 
     const prefix = `${body.bookId}/${body.issueId}/source`;
     const listLimit = 1000;
-    const files: { name: string; updated_at?: string | null }[] = [];
+    // A sub-folder entry has a null `id`; every object has one.
+    const files: {
+      id?: string | null;
+      name: string;
+      updated_at?: string | null;
+    }[] = [];
     for (let offset = 0; ; offset += listLimit) {
       const { data: page, error: listError } = await supabaseAdmin.storage
         .from(RAW_BUCKET)
@@ -413,6 +419,25 @@ export async function POST(req: NextRequest) {
       );
       if (issueErr) {
         return Response.json({ error: issueErr.message }, { status: 500 });
+      }
+
+      // Every page is stored and the row says so: nothing reads the raw
+      // pages now (#959). Every object listed goes, leftovers past count
+      // included, in requests of `listLimit`, the most one removal takes. A
+      // failed removal leaves them and only warns.
+      const rawPaths = files
+        .filter((f) => f.id != null)
+        .map((f) => `${prefix}/${f.name}`);
+      for (let i = 0; i < rawPaths.length; i += listLimit) {
+        const { error: removeErr } = await supabaseAdmin.storage
+          .from(RAW_BUCKET)
+          .remove(rawPaths.slice(i, i + listLimit));
+        if (removeErr) {
+          const warning = `raw pages left in ${RAW_BUCKET}: ${removeErr.message}`;
+          console.warn(`[upload-source-page] ${body.issueId}: ${warning}`);
+          warnings.push(warning);
+          break;
+        }
       }
     }
 
