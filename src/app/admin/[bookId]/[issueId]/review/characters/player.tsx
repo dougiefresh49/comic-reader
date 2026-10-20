@@ -16,13 +16,16 @@ import {
 import type { PreviewResult } from "./actions";
 import { FOCUS } from "./ui";
 
+/** Make a sample's price: its characters, and its credits when a rate is measured (#921). */
+type SamplePrice = { characters: number; credits: number | null };
+
 interface Player {
   /** The key of what is playing now. */
   playing: string | null;
   /** Voice ids a preview lookup is out for. */
   loading: ReadonlySet<string>;
   /** Voice ids with no audio anywhere, each with what Make a sample costs (null: it cannot make one). */
-  silent: ReadonlyMap<string, number | null>;
+  silent: ReadonlyMap<string, SamplePrice | null>;
   /** Where each played voice's preview came from ("this book", "sample", ...). */
   sources: ReadonlyMap<string, string>;
   /** Voice ids a Make a sample render is out for. */
@@ -67,7 +70,7 @@ export function PlayerProvider({
   const urls = useRef(new Map<string, string | null>());
   const [playing, setPlaying] = useState<string | null>(null);
   const [loading, setLoading] = useState<ReadonlySet<string>>(new Set());
-  const [silent, setSilent] = useState<ReadonlyMap<string, number | null>>(
+  const [silent, setSilent] = useState<ReadonlyMap<string, SamplePrice | null>>(
     new Map(),
   );
   const [sources, setSources] = useState<ReadonlyMap<string, string>>(
@@ -121,7 +124,7 @@ export function PlayerProvider({
       }
       urls.current.set(voiceId, r.url);
       if (r.url === null) {
-        setSilent((m) => new Map(m).set(voiceId, r.sampleCredits));
+        setSilent((m) => new Map(m).set(voiceId, r.sample));
         return;
       }
       setSources((m) => new Map(m).set(voiceId, r.from));
@@ -284,8 +287,10 @@ export function PreviewSource({ voiceId }: { voiceId: string }) {
 
 /**
  * The line under a voice whose Play found no audio anywhere: "no sample
- * yet", and Make a sample with its cost when the voice can render one. The
- * button is off while its render is out, so a double click spends once.
+ * yet", and Make a sample with its cost when the voice can render one: in
+ * credits at the measured rate, or in characters when no rate is measured
+ * (#921). The button is off while its render is out, so a double click
+ * spends once.
  * Never a pick: the click and keys stop at the button.
  */
 export function MakeSample({
@@ -296,14 +301,19 @@ export function MakeSample({
   name: string;
 }) {
   const p = usePlayer();
-  const credits = p.silent.get(voiceId);
-  if (credits === undefined) return null;
+  const sample = p.silent.get(voiceId);
+  if (sample === undefined) return null;
   const busy = p.making.has(voiceId);
-  const cost = `~${credits} credits`;
+  // Null when the voice cannot render a sample: no button.
+  const cost =
+    sample &&
+    (sample.credits !== null
+      ? `~${sample.credits} credits`
+      : `${sample.characters} characters`);
   return (
     <span className="col-span-2 col-start-2 flex min-w-0 items-center gap-1.5 text-[11.5px] text-neutral-500">
       no sample yet
-      {credits !== null && (
+      {cost && (
         <button
           type="button"
           disabled={busy}
