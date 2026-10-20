@@ -13,6 +13,7 @@ Currently live with TMNT × MMPR issues. Powered by a pipeline that goes from ra
 - **Voice**: ElevenLabs (PVC for main characters, Voice Design for minor)
 - **Image processing**: sharp (JPEG → WebP)
 - **Deployed**: Vercel
+- **Samsung TV**: a Tizen launcher for the hosted reader, see [docs/tizen.md](docs/tizen.md)
 
 ## Pipeline
 

@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Comic Reader</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #0b0b0f;
+        color: #e5e5e5;
+        font-family: sans-serif;
+      }
+      #debug {
+        position: absolute;
+        left: 48px;
+        bottom: 48px;
+        right: 48px;
+        font-size: 20px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="debug">Loading...</div>
+    <script>
+      // The only setting: where the TV goes. Plain ES5 on purpose, so this page
+      // runs on any Tizen engine.
+      var READER_URL = "https://comic-reader-eta.vercel.app/";
+      var DELAY_MS = 5000;
+
+      // The TV has no console, so this block is the only on-screen diagnostics.
+      // The 5 s pause is there so it can be read or photographed.
+      var ua = navigator.userAgent || "";
+      var chrome = ua.match(/(?:Chrome|Chromium)\/([0-9.]+)/);
+      var tizenType = "error";
+      var hasInput = "error";
+      try {
+        tizenType = typeof tizen;
+        hasInput =
+          typeof tizen !== "undefined" && !!tizen.tvinputdevice ? "yes" : "no";
+      } catch (e) {
+        tizenType = "error: " + e;
+      }
+
+      document.getElementById("debug").textContent =
+        "userAgent: " +
+        ua +
+        "\nChrome: " +
+        (chrome ? chrome[1] : "not found") +
+        "\ntypeof tizen: " +
+        tizenType +
+        "\ntizen.tvinputdevice: " +
+        hasInput +
+        "\ntarget: " +
+        READER_URL +
+        "\n\nOpening in 5 s. Press Enter to go now.";
+
+      var gone = false;
+      function go() {
+        if (gone) return;
+        gone = true;
+        location.replace(READER_URL);
+      }
+      setTimeout(go, DELAY_MS);
+      document.addEventListener("keydown", function (e) {
+        if (e.keyCode === 13) go();
+      });
+    </script>
+  </body>
+</html>
