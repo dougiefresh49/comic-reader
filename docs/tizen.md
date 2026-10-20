@@ -87,13 +87,16 @@ DevTools route above.
 - Engine: Tizen 9.0, Chromium 120.0.6099.5, 1920x1080 CSS pixels at DPR 1.
   The user agent has no `Chrome/` token:
   `Mozilla/5.0 (SMART-TV; LINUX; Tizen 9.0) AppleWebKit/537.36 (KHTML, like Gecko) 120.0.6099.5/9.0 TV Safari/537.36`.
-  A TV check in the reader matches `SMART-TV` or `Tizen`, not a Chrome version.
+  A TV check added to the reader should match `SMART-TV` or `Tizen`, not a
+  Chrome version (the reader has no such check yet).
 - On the launcher page, `tizen` and `tizen.tvinputdevice` exist. After the
   redirect to the reader, `typeof tizen` and `typeof webapis` are
   `undefined`: the hosted reader gets no Tizen APIs, as Samsung's hosted-app
   FAQ says.
-- The redirect works: `location.replace` takes the main frame to the reader,
-  and the requests to the Vercel host and `*.supabase.co` go out.
+- The navigation itself is allowed: calling the launcher's `go()` from
+  DevTools ran `location.replace`, which took the main frame to the reader,
+  and the requests to the Vercel host and `*.supabase.co` went out. The
+  5-second timer never fired on its own, because the app was hidden (below).
 - On the reader origin, `CSS.supports` is true for `oklch()`,
   `color-mix()` and nesting, and `CSSLayerBlockRule` and `CSSPropertyRule`
   exist, so Tailwind 4's output is within this engine. `navigator.serviceWorker`

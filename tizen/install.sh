@@ -24,7 +24,7 @@ echo "connecting to $TV_IP"
 sdb connect "$TV_IP:26101"
 
 # Name the target explicitly: sdb happily lists a stale device and installs nowhere.
-TARGET="$(sdb devices | awk -v ip="$TV_IP" '$0 ~ ip { print $NF; exit }')"
+TARGET="$(sdb devices | awk -v serial="$TV_IP:26101" '$1 == serial { print $NF; exit }')"
 [ -n "$TARGET" ] || { echo "error: TV did not appear in 'sdb devices' -- is Developer Mode on, with this Mac's IP as host?" >&2; exit 1; }
 
 # tizen install, never sdb install: the latter pushes the file, reports success,
