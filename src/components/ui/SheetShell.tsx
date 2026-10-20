@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useTvMode } from "~/hooks/useTvMode";
+import { firstStop, useTvArrowFocus } from "~/hooks/useTvArrowFocus";
 
 interface SheetShellProps {
   isOpen: boolean;
@@ -42,14 +44,35 @@ export function SheetShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
 
+  // TV mode (#951): the remote has no Tab, so focus moves to the sheet's
+  // first control as it opens and the arrows work its controls. Back closes
+  // it (the reader's Back handler), and focus goes back to the button that
+  // opened it.
+  const tv = useTvMode();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  useTvArrowFocus(panelRef, tv && isOpen);
+  useEffect(() => {
+    if (!tv || !isOpen || !panelRef.current) return;
+    const opener = document.activeElement;
+    firstStop(panelRef.current, closeRef.current)?.focus();
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, [tv, isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
+      data-tv-sheet={tv ? "" : undefined}
     >
       <div
+        ref={panelRef}
         className={`w-full rounded-t-3xl border border-white/10 bg-neutral-950/95 px-4 pt-3 shadow-[0_-10px_40px_rgba(0,0,0,0.45)] ${panelClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -61,6 +84,7 @@ export function SheetShell({
             {titleExtra}
           </div>
           <button
+            ref={closeRef}
             onClick={onClose}
             className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-white/10 hover:text-white"
             aria-label={closeLabel}

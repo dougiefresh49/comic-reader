@@ -167,3 +167,91 @@
     transform: translate(2px, -1px);
   }
 }
+
+/* TV mode (#951): the reader and the list pages on a 1920x1080 TV, driven by
+   the remote. Components render the data-tv-* attributes only in TV mode, and
+   every rule here also needs html.layout-tv, so no other device sees them.
+   Overscan inset: 5%, 96px a side and 54px top and bottom. The reader's bars
+   scale by zoom, so their insets are written in the bar's zoomed pixels. */
+html.layout-tv {
+  --tv-chrome-zoom: 1.5;
+}
+
+/* The focus ring: cyan-400 (the selected-bubble color) with a dark halo
+   outside it, so it reads on light and dark art. It shows at once: the
+   controls' color transitions would otherwise fade it in from white. */
+html.layout-tv:has([data-tv-reader])
+  :is(button, a[href], input, select):focus-visible,
+html.layout-tv:has([data-tv-grid])
+  :is(button, a[href], input, select):focus-visible {
+  outline: 6px solid var(--color-cyan-400, oklch(78.9% 0.154 211.53));
+  outline-offset: 0;
+  box-shadow: 0 0 0 10px rgb(0 0 0 / 0.8);
+  transition: none;
+}
+
+/* The top bar stays up in TV mode, so the page starts below it. */
+html.layout-tv [data-tv-stage] {
+  padding: calc(54px + 3.5rem * var(--tv-chrome-zoom)) 96px 54px;
+}
+
+/* Page mode fits the frame to the stage, not to 100vh - 140px. */
+html.layout-tv [data-tv-frame-box] {
+  container-type: size;
+}
+
+html.layout-tv [data-tv-frame] {
+  max-height: 100cqh;
+  max-width: min(100cqw, calc(100cqh * var(--tv-frame-aspect))) !important;
+}
+
+html.layout-tv [data-tv-bar] {
+  zoom: var(--tv-chrome-zoom);
+}
+
+html.layout-tv [data-tv-bar="top"] {
+  height: calc(3.5rem + 54px / var(--tv-chrome-zoom));
+  padding: calc(54px / var(--tv-chrome-zoom))
+    calc(96px / var(--tv-chrome-zoom)) 0;
+}
+
+html.layout-tv div[data-tv-bar="bottom"] {
+  padding: 0 calc(96px / var(--tv-chrome-zoom))
+    calc(54px / var(--tv-chrome-zoom));
+}
+
+/* The floating play, above the bottom inset; its inline bottom wins otherwise. */
+html.layout-tv button[data-tv-bar="bottom"] {
+  bottom: calc(80px / var(--tv-chrome-zoom)) !important;
+}
+
+/* Caption text at 32px on screen, inside the zoomed bottom bar. */
+html.layout-tv [data-tv-caption] {
+  font-size: calc(32px / var(--tv-chrome-zoom));
+}
+
+html.layout-tv [data-tv-sheet] {
+  padding: 54px 96px;
+}
+
+/* List pages: inside the overscan inset, the card grid on the header's left
+   edge, and card titles sized for 10 feet. */
+html.layout-tv main:has([data-tv-grid]) {
+  padding: 54px 96px;
+}
+
+html.layout-tv [data-tv-grid] {
+  justify-content: flex-start;
+}
+
+html.layout-tv [data-tv-grid] :is(h2, h3) {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+/* A featured card's title row: the issue chip goes under the larger title
+   instead of being pushed past the card's edge. */
+html.layout-tv [data-tv-grid] > a > div:last-child {
+  flex-direction: column;
+  align-items: flex-start;
+}

@@ -6,6 +6,7 @@ import { pageImageUrl } from "~/lib/storage";
 import { getIssueOfflineUrls } from "~/server/offline";
 import { IssueGrid, MetaChip } from "~/components/IssueCards";
 import { CoverImage } from "~/components/ui/CoverImage";
+import { TvListNav } from "~/components/TvList";
 
 interface SeriesDetailProps {
   params: Promise<{
@@ -57,6 +58,7 @@ export default async function SeriesDetailPage({ params }: SeriesDetailProps) {
 
   return (
     <main className="relative min-h-screen bg-neutral-950 text-neutral-100">
+      <TvListNav backHref="/" />
       {/* Subtle cyan glow at the top, matching the reader chrome */}
       <div
         aria-hidden

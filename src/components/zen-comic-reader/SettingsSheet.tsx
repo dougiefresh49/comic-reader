@@ -8,6 +8,7 @@ import {
   type WordHighlightMode,
 } from "~/hooks/useSettings";
 import { SheetShell } from "~/components/ui/SheetShell";
+import { useTvMode } from "~/hooks/useTvMode";
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -291,6 +292,8 @@ function PlaybackRateRow({
   onChange: (n: number) => void;
 }) {
   const presets = [0.75, 1.0, 1.2, 1.5, 2.0];
+  // TV mode (#951): marks the selected preset, where the remote's focus lands.
+  const tv = useTvMode();
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
       <div className="mb-2 flex items-center justify-between">
@@ -319,6 +322,7 @@ function PlaybackRateRow({
             key={p}
             type="button"
             onClick={() => onChange(p)}
+            data-tv-selected={tv && Math.abs(value - p) < 0.01 ? "" : undefined}
             className={`rounded px-2 py-0.5 text-xs ${
               Math.abs(value - p) < 0.01
                 ? "bg-cyan-600 text-white"

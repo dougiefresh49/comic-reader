@@ -20,6 +20,8 @@ interface ControlBarProps {
   reducedMotion?: boolean;
   /** Keyboard focus inside a hidden overlay bar brings the chrome back. */
   onFocusCapture?: () => void;
+  /** TV mode (#951): marks the bar for the remote's focus and TV sizing. */
+  tv?: boolean;
 }
 
 export function ControlBar({
@@ -32,6 +34,7 @@ export function ControlBar({
   visible = true,
   reducedMotion = false,
   onFocusCapture,
+  tv = false,
 }: ControlBarProps) {
   const progress = pageCount > 0 ? pageNumber / pageCount : 0;
   const placement = overlay
@@ -44,6 +47,7 @@ export function ControlBar({
     <div
       className={`z-50 flex flex-col border-t border-white/5 bg-neutral-950/95 backdrop-blur ${placement}`}
       onFocusCapture={onFocusCapture}
+      data-tv-bar={tv ? "bottom" : undefined}
     >
       {children != null && (
         <div className="flex min-h-[72px] items-center px-4 py-2">

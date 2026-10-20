@@ -3,6 +3,7 @@ import { getManifest } from "~/server";
 import { monogram } from "~/lib/monogram";
 import { pageImageUrl } from "~/lib/storage";
 import { CoverImage } from "~/components/ui/CoverImage";
+import { TvGrid, TvListNav } from "~/components/TvList";
 import type { BookManifest, Manifest } from "~/types/manifest";
 
 export const revalidate = 3600;
@@ -63,6 +64,7 @@ export default async function LibraryPage() {
 
   return (
     <main className="relative min-h-screen bg-neutral-950 text-neutral-100">
+      <TvListNav backHref={null} />
       {/* Subtle cyan glow at the top, matching the reader chrome */}
       <div
         aria-hidden
@@ -97,7 +99,7 @@ export default async function LibraryPage() {
  */
 function FeaturedBooks({ items }: { items: ShelfItem[] }) {
   return (
-    <div className="grid grid-cols-2 gap-5 sm:flex sm:flex-wrap sm:items-start sm:justify-center sm:gap-8 sm:pt-8">
+    <TvGrid className="grid grid-cols-2 gap-5 sm:flex sm:flex-wrap sm:items-start sm:justify-center sm:gap-8 sm:pt-8">
       {items.map((item) => (
         <Link
           key={item.key}
@@ -131,14 +133,14 @@ function FeaturedBooks({ items }: { items: ShelfItem[] }) {
           </div>
         </Link>
       ))}
-    </div>
+    </TvGrid>
   );
 }
 
 /** Standard grid for 3+ books. */
 function BookGrid({ items }: { items: ShelfItem[] }) {
   return (
-    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+    <TvGrid className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {items.map((item) => (
         <Link
           key={item.key}
@@ -165,7 +167,7 @@ function BookGrid({ items }: { items: ShelfItem[] }) {
           </div>
         </Link>
       ))}
-    </div>
+    </TvGrid>
   );
 }
 

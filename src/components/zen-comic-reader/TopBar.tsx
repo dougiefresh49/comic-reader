@@ -13,6 +13,8 @@ interface TopBarProps {
   panelViewMode: boolean;
   hasPanels: boolean;
   onTogglePanelView: () => void;
+  /** TV mode (#951): marks the bar for the remote's focus and TV sizing. */
+  tv?: boolean;
 }
 
 export function TopBar({
@@ -24,10 +26,12 @@ export function TopBar({
   panelViewMode,
   hasPanels,
   onTogglePanelView,
+  tv = false,
 }: TopBarProps) {
   const issueLabel = `Issue ${issueNumber}`;
   return (
     <div
+      data-tv-bar={tv ? "top" : undefined}
       className={`absolute top-0 right-0 left-0 z-50 flex h-14 items-center gap-2 border-b border-white/5 bg-neutral-950/90 px-3 backdrop-blur transition-transform duration-300 ${
         visible ? "translate-y-0" : "-translate-y-full"
       }`}
