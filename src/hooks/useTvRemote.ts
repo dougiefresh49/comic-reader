@@ -113,12 +113,12 @@ export function useTvRemote({
       if (isTvBackKey(e)) {
         if (e.key === "Backspace" && isTextField(e.target)) return;
         e.preventDefault();
-        // On a bar control, Back returns to the page first.
-        const bar = navEnabledRef.current
-          ? barOf(document.activeElement)
-          : null;
-        if (bar && bubbleButtons().length) {
-          backToPage(bar === "top" ? "first" : "last");
+        // On the top bar, Back returns to the page first. From the bottom
+        // bar it acts at once, so one Back leaves panel view from its HUD.
+        const onTopBar =
+          navEnabledRef.current && barOf(document.activeElement) === "top";
+        if (onTopBar && bubbleButtons().length) {
+          backToPage("first");
           return;
         }
         onBackRef.current();

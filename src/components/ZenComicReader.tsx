@@ -841,8 +841,16 @@ export default function ZenComicReader({
     else if (isSettingsOpen) setIsSettingsOpen(false);
     else if (isEndScreenOpen) closeEndScreen();
     else if (isOnboardingOpen) dismissOnboarding();
-    else if (panelViewMode) exitPanelView();
-    else router.push("/");
+    else if (panelViewMode) {
+      // Not back to the button that opened panel view: focus leaves for the
+      // body, and useTvRemote's focus effect then lands it on the page's
+      // first bubble, so the next Back leaves the reader.
+      focusBeforePanelRef.current = null;
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      exitPanelView();
+    } else router.push("/");
   }, [
     isPageSheetOpen,
     isSettingsOpen,

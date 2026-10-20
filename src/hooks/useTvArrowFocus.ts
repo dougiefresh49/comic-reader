@@ -49,7 +49,16 @@ function stops(box: HTMLElement): HTMLElement[][] {
 
 /** Where focus lands in a stop: its pressed member, else its first. */
 function landing(stop: HTMLElement[]): HTMLElement | undefined {
-  return stop.find((m) => m.getAttribute("aria-pressed") === "true") ?? stop[0];
+  return (
+    stop.find(
+      (m) =>
+        m.getAttribute("aria-pressed") === "true" ||
+        m.hasAttribute("data-tv-selected") ||
+        // The Pages sheet: the thumbnail of the page being read.
+        (m instanceof HTMLAnchorElement &&
+          m.pathname === window.location.pathname),
+    ) ?? stop[0]
+  );
 }
 
 /** The first control of `box`, skipping `skip` (a sheet's close button). */

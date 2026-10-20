@@ -43,9 +43,10 @@ export function useTvGridFocus(enabled: boolean, backHref: string | null) {
           target.tagName === "TEXTAREA" ||
           target.isContentEditable);
       if (isTvBackKey(e)) {
-        if (!backHref || (e.key === "Backspace" && inTextField)) return;
+        if (e.key === "Backspace" && inTextField) return;
+        // Cancelled on the library too, so the TV does nothing there.
         e.preventDefault();
-        router.push(backHref);
+        if (backHref) router.push(backHref);
         return;
       }
       const dir = DIRECTIONS[e.key];
