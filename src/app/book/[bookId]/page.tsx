@@ -6,6 +6,7 @@ import { pageImageUrl } from "~/lib/storage";
 import { getIssueOfflineUrls } from "~/server/offline";
 import { IssueGrid, MetaChip } from "~/components/IssueCards";
 import { CoverImage } from "~/components/ui/CoverImage";
+import { TvListNav } from "~/components/TvList";
 
 interface BookDetailProps {
   params: Promise<{
@@ -50,6 +51,7 @@ export default async function BookDetailPage({ params }: BookDetailProps) {
 
   return (
     <main className="relative min-h-screen bg-neutral-950 text-neutral-100">
+      <TvListNav backHref={backHref} />
       {/* Subtle cyan glow at the top, matching the reader chrome */}
       <div
         aria-hidden

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
 import { highlightColorFor } from "~/lib/highlight-color";
@@ -16,6 +16,8 @@ import { usePanelNavigation } from "~/hooks/usePanelNavigation";
 import { useDoubleTap } from "~/hooks/useDoubleTap";
 import { useChromeAutoHide } from "~/hooks/useChromeAutoHide";
 import { useWordHighlightSelector } from "~/hooks/useWordHighlight";
+import { useTvMode } from "~/hooks/useTvMode";
+import { useTvRemote } from "~/hooks/useTvRemote";
 import { TopBar } from "./zen-comic-reader/TopBar";
 import { ControlBar } from "./zen-comic-reader/ControlBar";
 import { SpeechBox } from "./zen-comic-reader/SpeechBox";
@@ -177,10 +179,10 @@ export default function ZenComicReader({
   const anySheetOpen = isPageSheetOpen || isSettingsOpen;
   const { chromeVisible, showChrome, toggleChrome, lockChrome } =
     useChromeAutoHide();
-
-  useEffect(() => {
-    lockChrome(anySheetOpen);
-  }, [anySheetOpen, lockChrome]);
+  // TV mode (#951): every TV-only attribute and listener below is gated on
+  // this, so tablet, phone and desktop render and behave as before.
+  const tvMode = useTvMode();
+  const router = useRouter();
 
   const {
     autoPlayEnabled,
@@ -833,6 +835,39 @@ export default function ZenComicReader({
     panelContainerRef.current.focus();
   }, [panelViewMode, panelContainerRef, panelIndex]);
 
+  // Back on the remote closes the topmost layer, or leaves for the library.
+  const handleTvBack = useCallback(() => {
+    if (isPageSheetOpen) setIsPageSheetOpen(false);
+    else if (isSettingsOpen) setIsSettingsOpen(false);
+    else if (isEndScreenOpen) closeEndScreen();
+    else if (isOnboardingOpen) dismissOnboarding();
+    else if (panelViewMode) exitPanelView();
+    else router.push("/");
+  }, [
+    isPageSheetOpen,
+    isSettingsOpen,
+    isEndScreenOpen,
+    isOnboardingOpen,
+    panelViewMode,
+    closeEndScreen,
+    dismissOnboarding,
+    exitPanelView,
+    router,
+  ]);
+  // Called after the panel-container focus effect above, so a panel turn
+  // lands on the panel's first bubble.
+  const { barFocused: tvBarFocused } = useTvRemote({
+    enabled: tvMode,
+    navEnabled: !anySheetOpen && !isOnboardingOpen && !isEndScreenOpen,
+    focusKey: panelViewMode ? `panel:${panelIndex}` : "page",
+    onBack: handleTvBack,
+  });
+
+  // A sheet holds the chrome up; in TV mode so does focus on a bar control.
+  useEffect(() => {
+    lockChrome(anySheetOpen || tvBarFocused);
+  }, [anySheetOpen, tvBarFocused, lockChrome]);
+
   const gestureProps = gestureBind();
 
   // Narration is content: SpeechBox (or its empty-state card) sits below the
@@ -850,9 +885,13 @@ export default function ZenComicReader({
       isPlaying={isPlaying}
       onTogglePlay={panelViewMode ? undefined : togglePlayPause}
       voiced={selectedBubble ? hasAudio(selectedBubble) : true}
+      tv={tvMode}
     />
   ) : (
-    <div className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 p-3 text-sm text-neutral-400">
+    <div
+      className="flex min-h-[78px] w-full items-center justify-center rounded-2xl border border-white/10 bg-black/70 p-3 text-sm text-neutral-400"
+      data-tv-caption={tvMode ? "" : undefined}
+    >
       Tap a bubble to hear it
     </div>
   );
@@ -888,9 +927,12 @@ export default function ZenComicReader({
       <div
         className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black"
         inert={isOnboardingOpen || isEndScreenOpen}
+        data-tv-reader={tvMode ? "" : undefined}
       >
         <TopBar
-          visible={chromeVisible}
+          // TV mode pins the top bar: the remote's route to Panel view and
+          // Settings, and the page sits below it there.
+          visible={tvMode || chromeVisible}
           bookName={bookName}
           issueNumber={issueNumber}
           onOpenPages={() => setIsPageSheetOpen(true)}
@@ -898,9 +940,13 @@ export default function ZenComicReader({
           panelViewMode={panelViewMode}
           hasPanels={panels.length > 0}
           onTogglePanelView={handleTogglePanelView}
+          tv={tvMode}
         />
 
-        <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
+        <div
+          className="relative flex flex-1 items-center justify-center overflow-hidden p-4"
+          data-tv-stage={tvMode ? "" : undefined}
+        >
           <div
             ref={panelContainerRef}
             tabIndex={panelViewMode ? 0 : -1}
@@ -913,6 +959,7 @@ export default function ZenComicReader({
           >
             <div
               {...doubleTapProps}
+              data-tv-frame-box={tvMode ? "" : undefined}
               className="relative flex h-full w-full flex-col items-center justify-center"
               style={{
                 transform: panelViewMode
@@ -935,6 +982,7 @@ export default function ZenComicReader({
                 spreadAspect={
                   spread ? spread.size.w / spread.size.h : undefined
                 }
+                tv={tvMode}
               >
                 {panelViewMode && activePanel?.foregroundPolygons ? (
                   <LayeredPanel
@@ -1000,6 +1048,7 @@ export default function ZenComicReader({
                     <button
                       key={bubble.id}
                       type="button"
+                      data-tv-bubble={tvMode ? "" : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleBubbleClick(bubble);
@@ -1059,6 +1108,7 @@ export default function ZenComicReader({
             visible={chromeVisible}
             onFocusCapture={showChrome}
             reducedMotion={cameraOff}
+            tv={tvMode}
           >
             <div className="flex min-h-0 w-full flex-1 flex-col justify-center gap-2 overflow-hidden">
               <PanelViewHud
@@ -1083,6 +1133,7 @@ export default function ZenComicReader({
             pageNumber={progressPage}
             pageCount={pageCount}
             pageLabel={counterLabel}
+            tv={tvMode}
           >
             {captionShown ? (
               <div className="flex w-full items-center gap-2">
@@ -1125,6 +1176,7 @@ export default function ZenComicReader({
               pageBeingRead ? handleFloatingPause : handleFloatingResumeOrPlay
             }
             aria-label={pageBeingRead ? "Pause" : "Read this page to me"}
+            data-tv-bar={tvMode ? "bottom" : undefined}
             className="absolute left-1/2 z-50 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-neutral-950/90 text-white backdrop-blur transition-colors hover:bg-neutral-900"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
           >

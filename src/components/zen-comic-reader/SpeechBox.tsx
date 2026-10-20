@@ -20,6 +20,8 @@ interface SpeechBoxProps {
   onTogglePlay?: () => void;
   /** False: the bubble has no clip, so a "No voice yet" note replaces Play. */
   voiced?: boolean;
+  /** TV mode (#951): marks the caption text for its 10-foot size. */
+  tv?: boolean;
 }
 
 export function SpeechBox({
@@ -32,6 +34,7 @@ export function SpeechBox({
   isPlaying,
   onTogglePlay,
   voiced = true,
+  tv = false,
 }: SpeechBoxProps) {
   // Subscribed here, not in the reader, so a word change re-renders only
   // this caption (#87).
@@ -185,6 +188,7 @@ export function SpeechBox({
       <div
         ref={containerRef}
         className="max-h-24 overflow-y-auto text-base leading-relaxed text-white/90"
+        data-tv-caption={tv ? "" : undefined}
       >
         {/* key={text} remounts the pill per bubble so it never slides between captions */}
         <div key={text} className="relative">

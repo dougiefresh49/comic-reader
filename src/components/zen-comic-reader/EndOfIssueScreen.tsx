@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useDrag } from "@use-gesture/react";
 import { useTabTrap } from "~/hooks/useTabTrap";
+import { useTvMode } from "~/hooks/useTvMode";
+import { useTvArrowFocus } from "~/hooks/useTvArrowFocus";
 
 /** Where a reader can go from the last page of an issue (#830). */
 export interface EndOfIssue {
@@ -37,6 +39,8 @@ export function EndOfIssueScreen({
 }: EndOfIssueScreenProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   useTabTrap(rootRef);
+  // TV mode (#951): Up/Down move between the choices, as Tab does.
+  useTvArrowFocus(rootRef, useTvMode());
 
   // Focus lands on the first choice, the biggest button. React's `autoFocus`
   // only covers form controls, and these are links.

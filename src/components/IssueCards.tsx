@@ -2,6 +2,7 @@ import Link from "next/link";
 import { pageImageUrl } from "~/lib/storage";
 import { OfflineDownload } from "~/components/OfflineDownload";
 import { CoverImage } from "~/components/ui/CoverImage";
+import { TvGrid } from "~/components/TvList";
 import type { IssueManifest } from "~/types/manifest";
 
 /** "Issue 3" / "issue-3" → "#3"; falls back to a short monogram. */
@@ -30,7 +31,7 @@ export function IssueGrid({
   return issues.length === 0 ? (
     <p className="text-sm text-neutral-400">No issues available.</p>
   ) : (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <TvGrid className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
       {issues.map((issue) =>
         issue.hasWebP ? (
           <AvailableIssueCard
@@ -44,7 +45,7 @@ export function IssueGrid({
           <ComingSoonIssueCard key={issue.id} bookId={bookId} issue={issue} />
         ),
       )}
-    </div>
+    </TvGrid>
   );
 }
 

@@ -133,6 +133,12 @@ interface PanelViewFrameProps {
    * aspect instead of the 2:3 single-page frame. Omit it for a single page.
    */
   spreadAspect?: number;
+  /**
+   * TV mode (#951): page mode sizes the frame to the reader area it sits
+   * in, since the TV chrome and overscan inset outgrow the 140px the
+   * viewport-based frame reserves.
+   */
+  tv?: boolean;
   children: React.ReactNode;
 }
 
@@ -151,6 +157,7 @@ export function PanelViewFrame({
   dimOutsideFocus = false,
   cameraEffects = true,
   spreadAspect,
+  tv = false,
   children,
 }: PanelViewFrameProps) {
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -289,12 +296,21 @@ export function PanelViewFrame({
         maxWidth: `min(100%, calc((100vh - 140px) * ${spreadAspect}))`,
       }
     : undefined;
+  // The TV rule in globals.css reads the frame's aspect from this variable.
+  const tvFrame = tv && !panelViewMode;
+  const tvFrameStyle = tvFrame
+    ? ({
+        ...frameStyle,
+        "--tv-frame-aspect": `${spreadAspect ?? 2 / 3}`,
+      } as React.CSSProperties)
+    : frameStyle;
 
   return (
     <div
       ref={viewportRef}
       className={`relative overflow-hidden select-none ${frameSizeClass}`}
-      style={frameStyle}
+      style={tvFrameStyle}
+      data-tv-frame={tvFrame ? "" : undefined}
     >
       <div ref={transformRef} className="relative h-full w-full">
         <div
