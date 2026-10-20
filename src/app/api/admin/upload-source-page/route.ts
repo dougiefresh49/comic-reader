@@ -423,18 +423,20 @@ export async function POST(req: NextRequest) {
 
       // Every page is stored and the row says so: nothing reads the raw
       // pages now (#959). Every object listed goes, leftovers past count
-      // included. A failed removal leaves them and only warns.
+      // included, in requests of `listLimit`, the most one removal takes. A
+      // failed removal leaves them and only warns.
       const rawPaths = files
         .filter((f) => f.id != null)
         .map((f) => `${prefix}/${f.name}`);
-      if (rawPaths.length > 0) {
+      for (let i = 0; i < rawPaths.length; i += listLimit) {
         const { error: removeErr } = await supabaseAdmin.storage
           .from(RAW_BUCKET)
-          .remove(rawPaths);
+          .remove(rawPaths.slice(i, i + listLimit));
         if (removeErr) {
           const warning = `raw pages left in ${RAW_BUCKET}: ${removeErr.message}`;
           console.warn(`[upload-source-page] ${body.issueId}: ${warning}`);
           warnings.push(warning);
+          break;
         }
       }
     }
