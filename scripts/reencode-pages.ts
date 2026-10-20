@@ -6,15 +6,19 @@
  *   pnpm reencode-pages -- --book <id> [--issue <issue-id>] [--page N]
  *     [--from webp|raw] [--apply] [--allow-ingested]
  *
- * --from webp (default, free): downloads the comic-pages object, skips it when
- * its long edge is already within the cap, else scales it down, re-encodes it
- * with `encodePageWebp`, upserts it to the same key and updates only that
- * page's `pages.width` and `pages.height`. No watermark call.
+ * --from webp (default, free): downloads the comic-pages object. Within the
+ * cap it is skipped, or, when its `pages` row says another size, only the row
+ * is updated to the stored size (a reconcile after a run that failed on the
+ * row). Over the cap it is scaled down, re-encoded with `encodePageWebp`,
+ * upserted to the same key, and only that page's `pages.width` and
+ * `pages.height` are updated. No watermark call.
  *
  * --from raw (paid with --apply): stores the page's newest comic-pages-raw
  * object (under `issues.source_pages_path`) through `storePageImage`, so the
  * watermark clean runs again: one Gemini detect call per page and an image
- * edit per overlay. --apply needs LIVE_API_OK=1. Its dry run calls no API: it
+ * edit per overlay. A page whose clean leaves a watermark, or whose Gemini
+ * call fails, stops the run before it is stored, so the cleaned page stays.
+ * --apply needs LIVE_API_OK=1. Its dry run calls no API: it
  * scales and encodes the raw page as it is, before any clean, so its new
  * bytes are an estimate.
  *
@@ -237,9 +241,26 @@ async function fromWebp(
   totals.oldBytes += input.length;
   if (Math.max(meta.width ?? 0, meta.height ?? 0) <= PAGE_MAX_EDGE) {
     totals.newBytes += input.length;
+    if (!rowNote) {
+      console.log(
+        `${head}: ${kb(input.length)} ${dims(meta.width, meta.height)}, within ${PAGE_MAX_EDGE} px, skipped`,
+      );
+      return;
+    }
+    // An earlier run uploaded this page and then failed on its row: the row
+    // takes the stored image's size, with no upload.
     console.log(
-      `${head}: ${kb(input.length)} ${dims(meta.width, meta.height)}${rowNote}, within ${PAGE_MAX_EDGE} px, skipped`,
+      `${head}: ${kb(input.length)} ${dims(meta.width, meta.height)}${rowNote}, within ${PAGE_MAX_EDGE} px, reconcile the row to the stored size`,
     );
+    if (args.apply) {
+      await updatePageDims(
+        args.book,
+        issueId,
+        row.number,
+        meta.width ?? 0,
+        meta.height ?? 0,
+      );
+    }
     return;
   }
   const capped = await capPageSize(input);
@@ -254,13 +275,19 @@ async function fromWebp(
     .from(PAGES_BUCKET)
     .upload(key, webp, { contentType: "image/webp", upsert: true });
   if (error) throw new Error(`upload ${PAGES_BUCKET}/${key}: ${error.message}`);
-  await updatePageDims(
-    args.book,
-    issueId,
-    row.number,
-    capped.width,
-    capped.height,
-  );
+  try {
+    await updatePageDims(
+      args.book,
+      issueId,
+      row.number,
+      capped.width,
+      capped.height,
+    );
+  } catch (err) {
+    throw new Error(
+      `page ${row.number} of ${issueId}: the smaller WebP is uploaded but its pages row still says ${dims(row.width, row.height)} (${(err as Error).message}). Re-run the same command: it reconciles the row.`,
+    );
+  }
 }
 
 async function fromRaw(
@@ -301,12 +328,13 @@ async function fromRaw(
     issueId,
     pageNumber: row.number,
     buffer: raw,
+    // The stored page is already clean: a clean that left a watermark, or a
+    // failed Gemini call, must not overwrite it.
+    rejectCleanFailures: true,
   });
   totals.resized++;
   const watermark =
-    stored.fixes.length + stored.failures.length > 0
-      ? `, watermark: ${stored.fixes.length} fixed, ${stored.failures.length} left${stored.failures.length > 0 ? ` (${stored.failures.map((f) => f.reason).join(", ")})` : ""}`
-      : "";
+    stored.fixes.length > 0 ? `, watermark: ${stored.fixes.length} fixed` : "";
   console.log(
     `${head}: ${kb(oldBytes)} ${dims(row.width, row.height)} -> ${dims(stored.width, stored.height)}${watermark}`,
   );

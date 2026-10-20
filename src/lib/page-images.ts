@@ -59,13 +59,17 @@ export async function capPageSize(
  * Remove the source watermark (#541), scale the page down to PAGE_MAX_EDGE
  * (#943), convert it to WebP, upload to the flat comic-pages key, and upsert
  * the matching `pages` row with the stored size. Throws on any storage or DB
- * error, and when the clean changed the image's size.
+ * error, and when the clean changed the image's size. With
+ * `rejectCleanFailures`, also throws before any write when the clean left a
+ * watermark (a failed Gemini call included), so a page that is already clean
+ * is never overwritten by one that is not (#943).
  */
 export async function storePageImage(args: {
   bookId: string;
   issueId: string;
   pageNumber: number;
   buffer: Buffer;
+  rejectCleanFailures?: boolean;
 }): Promise<{
   /** The stored page's size, after the cap. */
   width: number;
@@ -83,6 +87,11 @@ export async function storePageImage(args: {
   const height = metadata.height ?? 0;
 
   const { buffer, fixes, failures } = await cleanPageWatermarks(args);
+  if (args.rejectCleanFailures && failures.length > 0) {
+    throw new Error(
+      `watermark clean left ${failures.length} on ${storagePath}, nothing stored: ${failures.map((f) => f.reason).join("; ")}`,
+    );
+  }
   if (fixes.length > 0) {
     const cleaned = await sharp(buffer).metadata();
     if (cleaned.width !== width || cleaned.height !== height) {
