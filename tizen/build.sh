@@ -25,8 +25,6 @@ java -version >/dev/null 2>&1 || fail "no Java runtime -- the Tizen CLI needs JD
 rm -rf "$BUILD"
 mkdir -p "$BUILD"
 cp "$DIR/config.xml" "$DIR/index.html" "$DIR/app.js" "$DIR/app.css" "$DIR/icon.png" "$BUILD/"
-# The Smart Hub Preview service (config.xml's <tizen:service>).
-cp -R "$DIR/service" "$BUILD/service"
 
 tizen build-web -- "$BUILD"
 [ -d "$RESULT" ] || fail "tizen build-web produced no $RESULT"

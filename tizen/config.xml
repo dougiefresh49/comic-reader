@@ -15,33 +15,14 @@
     <tizen:metadata key="http://tizen.org/metadata/app_ui_type/base_screen_resolution" value="fullscreen"/>
     <tizen:profile name="tv"/>
 
-    <!--
-      Smart Hub Preview (#980): tiles on the home bar come from the service
-      below, which calls webapis.preview.setPreviewData(). Per Samsung's
-      personal preview guide; the id is [package].[service name], as in
-      Samsung's sample. The launcher starts it on every launch.
-    -->
-    <tizen:metadata key="http://samsung.com/tv/metadata/use.preview" value="bg_service"/>
-    <tizen:service id="CmcRdrTV01.ComicReaderService" auto-restart="false">
-        <tizen:content src="service/service.js"/>
-        <tizen:name>ComicReaderService</tizen:name>
-        <tizen:icon src="icon.png"/>
-        <tizen:description>Sets the Smart Hub Preview tiles.</tizen:description>
-        <tizen:category name="http://tizen.org/category/service"/>
-    </tizen:service>
-
     <!-- The reader itself (pages, JS, CSS, and the Geist font, which next/font self-hosts). -->
     <access origin="https://comic-reader-eta.vercel.app" subdomains="false"></access>
     <!-- Page images and bubble audio come from Supabase Storage on <project-ref>.supabase.co. -->
     <access origin="https://supabase.co" subdomains="true"></access>
-    <!-- A preview tile's cover comes through this image proxy (service/service.js). Smart Hub fetches it, not the app; listed in case Smart Hub honors this list. -->
-    <access origin="https://wsrv.nl" subdomains="false"></access>
     <!-- Lets the main frame leave the packaged index.html for the hosted reader. -->
     <tizen:allow-navigation>comic-reader-eta.vercel.app</tizen:allow-navigation>
 
     <tizen:privilege name="http://tizen.org/privilege/internet"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
-    <!-- tizen.application.launchAppControl(), which starts the preview service. -->
-    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <tizen:setting screen-orientation="landscape" context-menu="enable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
 </widget>
