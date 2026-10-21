@@ -190,6 +190,49 @@ html.layout-tv:has([data-tv-grid])
   transition: none;
 }
 
+/* Bubbles get a quieter cue than the controls (#962): a thin soft cyan
+   outline with a low glow, following the balloon's shape. It fades in and
+   out over 120ms and hides while a bubble plays (data-tv-cue-hidden), so the
+   word highlight is the only cue then. */
+html.layout-tv [data-tv-reader] [data-tv-bubble] {
+  outline: 3px solid transparent;
+  outline-offset: 2px;
+  border-radius: 8px;
+  transition-duration: 120ms;
+}
+
+html.layout-tv [data-tv-reader] [data-tv-bubble="balloon"] {
+  border-radius: 50%;
+}
+
+html.layout-tv:has([data-tv-reader])
+  [data-tv-reader]
+  button[data-tv-bubble]:focus-visible {
+  outline: 3px solid
+    color-mix(
+      in oklab,
+      var(--color-cyan-300, oklch(86.5% 0.127 207.078)) 75%,
+      transparent
+    );
+  outline-offset: 2px;
+  box-shadow: 0 0 14px
+    color-mix(
+      in oklab,
+      var(--color-cyan-400, oklch(78.9% 0.154 211.53)) 35%,
+      transparent
+    );
+  transition:
+    outline-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+}
+
+html.layout-tv:has([data-tv-reader])
+  [data-tv-reader][data-tv-cue-hidden]
+  button[data-tv-bubble]:focus-visible {
+  outline-color: transparent;
+  box-shadow: 0 0 0 transparent;
+}
+
 /* The top bar stays up in TV mode, so the page starts below it. */
 html.layout-tv [data-tv-stage] {
   padding: calc(54px + 3.5rem * var(--tv-chrome-zoom)) 96px 54px;

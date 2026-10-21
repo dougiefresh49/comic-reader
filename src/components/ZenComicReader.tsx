@@ -954,6 +954,23 @@ export default function ZenComicReader({
   // the page turn: the floating button is a pause, so it does not flash to
   // play at every bubble boundary (#706).
   const pageBeingRead = isPlaying || autoPlayPending;
+
+  // TV mode (#962): the bubble focus cue hides while bubbles are being read,
+  // the gaps between them included (page auto-play's, or panel read-aloud's,
+  // which a pause turns off), so the word highlight is the only cue. An Up or
+  // Down press brings it back until the next bubble starts; a stop brings it
+  // back too.
+  const beingRead = pageBeingRead || (panelViewMode && panelAutoPlay);
+  const [cueShownFor, setCueShownFor] = useState<{ id: string | null } | null>(
+    null,
+  );
+  if (!beingRead && cueShownFor !== null) setCueShownFor(null);
+  const tvCueHidden = tvMode && beingRead && cueShownFor?.id !== speakingId;
+  const showCueOnArrow = (e: React.KeyboardEvent) => {
+    if (beingRead && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      setCueShownFor({ id: speakingId });
+    }
+  };
   // Pause holds the clip where it is, so play picks it up from that word
   // (#714). In auto-play's gap there is no clip to hold: cancelling the gap
   // leaves nothing paused, and play then starts the page over.
@@ -974,6 +991,8 @@ export default function ZenComicReader({
         className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black"
         inert={isOnboardingOpen || isEndScreenOpen}
         data-tv-reader={tvMode ? "" : undefined}
+        data-tv-cue-hidden={tvCueHidden ? "" : undefined}
+        onKeyDownCapture={tvMode ? showCueOnArrow : undefined}
       >
         <TopBar
           // TV mode pins the top bar: the remote's route to Panel view and
@@ -1098,7 +1117,14 @@ export default function ZenComicReader({
                     <button
                       key={bubble.id}
                       type="button"
-                      data-tv-bubble={tvMode ? "" : undefined}
+                      // The value picks the TV focus cue's shape (#962).
+                      data-tv-bubble={
+                        tvMode
+                          ? bubble.type === "SPEECH"
+                            ? "balloon"
+                            : "box"
+                          : undefined
+                      }
                       onClick={(e) => {
                         e.stopPropagation();
                         handleBubbleClick(bubble);
