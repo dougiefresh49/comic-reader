@@ -117,8 +117,11 @@ DevTools route above.
   was true with Settings > Connection > Network > Expert Settings > IP Remote
   turned on, and with Access Notification set to "First Time Only".
 - One media decoder at a time: when a second `<audio>` starts, the voice
-  that was playing drops to readyState 1 and never fires `ended`. TV mode
-  plays only the bubble voice (#962, #965).
+  that was playing drops to readyState 1 and never fires `ended` (#962).
+  Web Audio buffers don't take that decoder: TV mode plays panel music, SFX
+  and ambience as `decodeAudioData` buffers, and the voice `<audio>` still
+  plays to `ended` and auto-advances under looping music. A 30 s library
+  track fetches and decodes in about 0.9 s (#965).
 - Full-size page images are the bottleneck in panel view. Camera motion
   re-rastered the 1988x3057 WebP every frame (about 4.7 s per panel move),
   and with motion off every panel move still re-decoded it (about 1.2 s),
