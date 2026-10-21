@@ -101,11 +101,34 @@ interface Entry {
   info?: TvPageImage;
   /** Set until the job starts. */
   job?: Job;
+  /**
+   * The copy, decoded ahead (#978): kept so its bitmap stays in the TV's
+   * decode cache and a page-view turn doesn't wait ~400 ms on the first
+   * decode. Set only on prefetches made while decodeAhead is on.
+   */
+  decoded?: HTMLImageElement;
   /** Mounted images using the URL; a pinned entry is never revoked. */
   pins: number;
 }
 
 const cache = new Map<string, Entry>();
+
+let decodeAhead = false;
+
+/**
+ * Turns decoding prefetched copies ahead on or off. Page view only: in
+ * panel view the TV re-decodes at panel scale, and the early decode slowed
+ * each page's first panel move by ~270 ms (#978).
+ */
+export function setTvDecodeAhead(on: boolean): void {
+  decodeAhead = on;
+  if (on) return;
+  for (const entry of cache.values()) {
+    if (!entry.decoded) continue;
+    entry.decoded.src = "";
+    entry.decoded = undefined;
+  }
+}
 
 // One downscale at a time, so a spread turn never decodes four full pages
 // at once. On-screen requests run before prefetches.
@@ -135,6 +158,10 @@ function evict(keep?: string): void {
     if (entry.pins > 0 || !entry.info || src === keep) continue;
     cache.delete(src);
     unpinned--;
+    if (entry.decoded) {
+      entry.decoded.src = "";
+      entry.decoded = undefined;
+    }
     if (entry.info.url !== src) URL.revokeObjectURL(entry.info.url);
   }
 }
@@ -162,8 +189,19 @@ function request(src: string, prefetch: boolean): Entry {
         width: 0,
         height: 0,
       }));
+      // Resolve first, so a page pinned on screen meanwhile shows at once.
       entry.info = info;
       resolve(info);
+      // Decode inside the job (#978), so the queue still runs one page at a
+      // time. A page on screen skips it: it is drawn next anyway.
+      if (decodeAhead && job.prefetch && entry.pins === 0 && info.url !== src) {
+        const img = new Image();
+        img.src = info.url;
+        await img.decode().catch(() => undefined);
+        // Turned off or evicted while decoding: let the bitmap go.
+        if (decodeAhead && cache.get(src) === entry) entry.decoded = img;
+        else img.src = "";
+      }
       evict(src);
     },
   };

@@ -13,7 +13,11 @@ import {
   type ReaderSpread,
 } from "~/lib/spreads";
 import { pageImageUrl } from "~/lib/storage";
-import { prefetchTvPageImages, tvPageImageInfo } from "~/lib/tv-page-image";
+import {
+  prefetchTvPageImages,
+  setTvDecodeAhead,
+  tvPageImageInfo,
+} from "~/lib/tv-page-image";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
@@ -265,6 +269,11 @@ export default function ZenComicReader({
         .flatMap(imagesOf),
     );
   }, [tvMode, bookId, issueId, pageNumber, pageCount, spreadStarts]);
+
+  // Neighbour copies are decoded ahead in TV page view only (#978).
+  useEffect(() => {
+    setTvDecodeAhead(tvMode && !panelViewMode);
+  }, [tvMode, panelViewMode]);
 
   const clearPanelTimer = useCallback(() => {
     if (panelTimerRef.current !== null) {

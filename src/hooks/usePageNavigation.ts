@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { PrefetchKind } from "next/dist/client/components/router-reducer/router-reducer-types";
+import { useTvMode } from "~/hooks/useTvMode";
 
 interface UsePageNavigationOptions {
   prevPageLink?: string | null;
@@ -25,6 +27,16 @@ export function usePageNavigation({
   keyboardEnabled = false,
 }: UsePageNavigationOptions) {
   const router = useRouter();
+  const tvMode = useTvMode();
+
+  // Each turn on the TV otherwise waits ~320 ms for the new page's RSC
+  // payload (#978), so fetch both neighbours' payloads ahead.
+  useEffect(() => {
+    if (!tvMode) return;
+    for (const link of [nextPageLink, prevPageLink]) {
+      if (link) router.prefetch(link, { kind: PrefetchKind.FULL });
+    }
+  }, [tvMode, nextPageLink, prevPageLink, router]);
 
   const navigatePrev = useCallback(() => {
     if (prevPageLink) router.push(prevPageLink);
