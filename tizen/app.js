@@ -22,6 +22,21 @@ try {
   tizenType = "error: " + e;
 }
 
+// The remote's media keys reach a page only once registered, and only this
+// page has `tizen` to register them; the reader handles them (#991).
+var mediaKeys = "not registered";
+try {
+  if (hasInput === "yes") {
+    tizen.tvinputdevice.registerKey("MediaPlayPause");
+    mediaKeys = "MediaPlayPause";
+    tizen.tvinputdevice.registerKey("MediaPlay");
+    tizen.tvinputdevice.registerKey("MediaPause");
+    mediaKeys = "MediaPlayPause, MediaPlay, MediaPause";
+  }
+} catch (e) {
+  mediaKeys += " (error: " + e + ")";
+}
+
 var debug = document.getElementById("debug");
 if (debug)
   debug.textContent =
@@ -33,6 +48,8 @@ if (debug)
     tizenType +
     "\ntizen.tvinputdevice: " +
     hasInput +
+    "\nmedia keys: " +
+    mediaKeys +
     "\ntarget: " +
     READER_URL +
     "\n\nOpening in 5 s. Press Enter to go now.";

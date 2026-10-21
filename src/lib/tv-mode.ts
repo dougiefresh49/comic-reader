@@ -43,6 +43,26 @@ export function isTvBackKey(e: { keyCode: number; key: string }): boolean {
   return e.keyCode === TIZEN_BACK_KEY_CODE || e.key === "Backspace";
 }
 
+/** The remote's media keys (#991), by Tizen key name and key code. */
+export type TvMediaKey = "playPause" | "play" | "pause";
+
+const TV_MEDIA_KEYS: [TvMediaKey, string, number][] = [
+  ["playPause", "MediaPlayPause", 10252],
+  ["play", "MediaPlay", 415],
+  ["pause", "MediaPause", 19],
+];
+
+/** Which media key a keydown is, by `key` or `keyCode`; null for any other key. */
+export function tvMediaKey(e: {
+  keyCode: number;
+  key: string;
+}): TvMediaKey | null {
+  const hit = TV_MEDIA_KEYS.find(
+    ([, key, code]) => e.key === key || e.keyCode === code,
+  );
+  return hit ? hit[0] : null;
+}
+
 /**
  * The index one step from `current` in a list of `count`, or null past
  * either end (no wrap). With nothing focused (`current` -1), a step forward

@@ -20,7 +20,10 @@ interface SpeechBoxProps {
   onTogglePlay?: () => void;
   /** False: the bubble has no clip, so a "No voice yet" note replaces Play. */
   voiced?: boolean;
-  /** TV mode (#951): marks the caption text for its 10-foot size. */
+  /**
+   * TV mode (#951): marks the caption text for its 10-foot size, and the
+   * Play/Pause as the bar's play/pause for the remote (#991).
+   */
   tv?: boolean;
 }
 
@@ -155,6 +158,7 @@ export function SpeechBox({
             onClick={onTogglePlay}
             className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
             aria-label={isPlaying ? "Pause" : "Play"}
+            data-tv-play={tv ? "" : undefined}
           >
             {isPlaying ? (
               <svg
