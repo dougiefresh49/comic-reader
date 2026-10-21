@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import Image from "next/image";
+import { useTvMode } from "~/hooks/useTvMode";
 import { useTvPageImage } from "~/hooks/useTvPageImage";
 import type { ReaderSpread } from "~/lib/spreads";
 import type {
@@ -19,6 +20,43 @@ interface PageArtProps {
 }
 
 /**
+ * TV mode's page image: a plain <img> with the box next/image's `fill`
+ * gives. next/image calls `img.decode()` on every mount, a full-size decode
+ * on the TV that a panel-view page turn waited on behind the decode for
+ * the drawn size, about 500 ms (#986).
+ */
+function TvImg({
+  src,
+  alt,
+  className,
+  style,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      decoding="async"
+      className={className}
+      style={{
+        position: "absolute",
+        height: "100%",
+        width: "100%",
+        inset: 0,
+        color: "transparent",
+        ...style,
+      }}
+      aria-hidden={alt ? undefined : true}
+    />
+  );
+}
+
+/**
  * In TV mode the src is the downscaled copy, and nothing renders until it
  * is made (#962). Off TV mode these render the same <Image> as before.
  */
@@ -31,8 +69,14 @@ function SinglePageImage({
   alt: string;
   style?: React.CSSProperties;
 }) {
+  const tvMode = useTvMode();
   const url = useTvPageImage(src);
   if (url === null) return null;
+  if (tvMode) {
+    return (
+      <TvImg src={url} alt={alt} className="object-contain" style={style} />
+    );
+  }
   return (
     <Image
       src={url}
@@ -47,8 +91,10 @@ function SinglePageImage({
 }
 
 function SpreadHalfImage({ src }: { src: string }) {
+  const tvMode = useTvMode();
   const url = useTvPageImage(src);
   if (url === null) return null;
+  if (tvMode) return <TvImg src={url} alt="" className="object-fill" />;
   return <Image src={url} alt="" fill className="object-fill" priority />;
 }
 
