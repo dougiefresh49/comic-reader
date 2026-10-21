@@ -1114,21 +1114,6 @@ export default function ZenComicReader({
                     />
                   </>
                 )}
-                {/* The TV runs one media decoder at a time: an <audio>
-                    music track stalled the bubble voice mid-clip (#962), so
-                    TV mode plays panel audio as Web Audio buffers (#965). */}
-                <PanelAudio
-                  panel={activePanel}
-                  active={panelViewMode && panelAutoPlay}
-                  muted={!panelAutoPlay}
-                  newScene={activePanel?.isNewScene ?? false}
-                  sceneId={activePanel?.sceneId ?? null}
-                  volume={{
-                    ambience: effectiveVolumes.ambience,
-                    sfx: effectiveVolumes.sfx,
-                    music: effectiveVolumes.music,
-                  }}
-                />
                 {showInBubble && selectedBubble && speech ? (
                   <BubbleWordHighlight
                     key={selectedBubble.id}
@@ -1191,6 +1176,21 @@ export default function ZenComicReader({
                   );
                 })}
               </PanelViewFrame>
+              {/* The TV runs one media decoder at a time: an <audio>
+                  music track stalled the bubble voice mid-clip (#962), so
+                  TV mode plays panel audio as Web Audio buffers (#965). */}
+              <PanelAudio
+                panel={activePanel}
+                active={panelViewMode && panelAutoPlay}
+                muted={!panelAutoPlay}
+                newScene={activePanel?.isNewScene ?? false}
+                sceneId={activePanel?.sceneId ?? null}
+                volume={{
+                  ambience: effectiveVolumes.ambience,
+                  sfx: effectiveVolumes.sfx,
+                  music: effectiveVolumes.music,
+                }}
+              />
             </div>
           </div>
 
