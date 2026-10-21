@@ -131,3 +131,29 @@ DevTools route above.
   in page view (#962).
 - CSS `zoom` is the legacy kind in Chromium 120: `getBoundingClientRect()`
   on a zoomed element is in unzoomed units.
+
+## Home screen
+
+Research only, 2026-10-21 (#979), from Samsung's developer docs; nothing
+here has run on the TV yet.
+
+- No public API feeds the home screen's Continue Watching row. Samsung's
+  [Product API index](https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references.html)
+  has no module for it, so a web app can't put a book there.
+- The documented option is [Smart Hub Preview](https://developer.samsung.com/smarttv/develop/guides/smart-hub-preview.html):
+  up to 40 tiles that show "when the user hovers over your application icon
+  in the launcher", each deep-linking into the app. A personal preview comes
+  from a service app in the same package that calls
+  `webapis.preview.setPreviewData()`, declared with the
+  `http://samsung.com/tv/metadata/use.preview` = `bg_service` metadata
+  ([personal preview guide](https://developer.samsung.com/smarttv/develop/guides/smart-hub-preview/implementing-personal-preview.html)).
+  The docs name no privilege and no partner or store requirement for it.
+- Samsung's guide says "All Samsung TVs from 2016 through 2021 support Smart
+  Hub Preview" and says nothing about later years, so whether this 2024
+  Tizen 9 TV shows the tiles is unknown until a build tries it.
+- The service runs on the package's origin, not the reader's, so it can't
+  read the reader's `localStorage`. In-progress books would have to reach it
+  through the server. A tile's `action_data` arrives on the packaged page as
+  the `PAYLOAD` app-control entry, which the launcher would turn into a
+  reader path before its redirect
+  ([public preview guide](https://developer.samsung.com/smarttv/develop/guides/smart-hub-preview/implementing-public-preview.html)).
