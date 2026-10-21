@@ -168,10 +168,16 @@ export default function ZenComicReader({
       img.onload = () =>
         setPageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
       img.src = pageImage;
+      return img;
     };
     if (!tvMode) {
-      probe();
-      return;
+      const img = probe();
+      // A hard load renders once before TV mode turns on (#962): the re-run
+      // then stops this probe's full-size download.
+      return () => {
+        img.onload = null;
+        img.src = "";
+      };
     }
     // TV mode (#962): the size comes from the downscale, which reads the
     // original's, so the TV never loads the full image a second time. The

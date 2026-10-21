@@ -196,6 +196,10 @@ export function retainTvPageImage(src: string): {
       if (released) return;
       released = true;
       entry.pins--;
+      // Off screen and not started: back behind the visible page, where a
+      // prefetch cancel can drop it. A remount asks again and re-promotes
+      // it; a job already running finishes as it is.
+      if (entry.pins === 0 && entry.job) entry.job.prefetch = true;
       // After the commit: a remount pins the same entry again first.
       queueMicrotask(() => evict());
     },
