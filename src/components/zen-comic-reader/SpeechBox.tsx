@@ -155,6 +155,7 @@ export function SpeechBox({
             onClick={onTogglePlay}
             className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
             aria-label={isPlaying ? "Pause" : "Play"}
+            data-tv-play={tv ? "" : undefined}
           >
             {isPlaying ? (
               <svg

@@ -395,6 +395,8 @@ interface PanelViewHudProps {
   panelAutoPlay: boolean;
   onTogglePanelAutoPlay: () => void;
   announceText: string;
+  /** TV mode: marks Read/Pause as the bar's play/pause for the remote. */
+  tv?: boolean;
   /**
    * Caption slot (SpeechBox / empty state) — content sits below the chrome
    * row, above the progress bar. Omitted when the caption bar is off (#607).
@@ -413,6 +415,7 @@ export function PanelViewHud({
   panelAutoPlay,
   onTogglePanelAutoPlay,
   announceText,
+  tv = false,
   children,
 }: PanelViewHudProps) {
   const humanIndex = panelCount > 0 ? panelIndex + 1 : 0;
@@ -492,6 +495,7 @@ export function PanelViewHud({
               panelAutoPlay ? "Pause reading aloud" : "Read panels aloud"
             }
             aria-pressed={panelAutoPlay}
+            data-tv-play={tv ? "" : undefined}
           >
             {panelAutoPlay ? (
               <svg

@@ -926,20 +926,6 @@ export default function ZenComicReader({
     exitPanelView,
     router,
   ]);
-  // Called after the panel-container focus effect above, so a panel turn
-  // lands on the panel's first bubble.
-  const { barFocused: tvBarFocused } = useTvRemote({
-    enabled: tvMode,
-    navEnabled: !anySheetOpen && !isOnboardingOpen && !isEndScreenOpen,
-    focusKey: panelViewMode ? `panel:${panelIndex}` : "page",
-    onBack: handleTvBack,
-  });
-
-  // A sheet holds the chrome up; in TV mode so does focus on a bar control.
-  useEffect(() => {
-    lockChrome(anySheetOpen || tvBarFocused);
-  }, [anySheetOpen, tvBarFocused, lockChrome]);
-
   const gestureProps = gestureBind();
 
   // Narration is content: SpeechBox (or its empty-state card) sits below the
@@ -983,41 +969,10 @@ export default function ZenComicReader({
 
   // TV mode (#962): the bubble focus cue hides while bubbles are being read,
   // the gaps between them included (page auto-play's, or panel read-aloud's,
-  // which a pause turns off), so the word highlight is the only cue. An Up or
-  // Down press that moves bubble focus brings it back until the next bubble
-  // starts: a new clip, or another member of a joined group lighting up. A
-  // stop brings it back too.
+  // which a pause turns off), so the word highlight is the only cue. The
+  // arrows then wake the controls instead of moving bubble focus (#991).
   const beingRead = pageBeingRead || (panelViewMode && panelAutoPlay);
-  // The bubble lit at the arrow press (null: none, as in a gap or a clip
-  // with no word timings); null itself means no press since the last start.
-  const [cueShownFor, setCueShownFor] = useState<{ id: string | null } | null>(
-    null,
-  );
-  useEffect(() => {
-    // A stop clears the press, and so does the next bubble starting while a
-    // clip plays: a new clip (isPlaying turning true) or a joined group's
-    // next member (speakingId changing). A clip ending into the gap does not.
-    if (!beingRead || isPlaying) setCueShownFor(null);
-  }, [beingRead, isPlaying, speakingId]);
-  const tvCueHidden =
-    tvMode &&
-    beingRead &&
-    (cueShownFor === null ||
-      (speakingId !== null && cueShownFor.id !== speakingId));
-  const remoteNavOpen = !anySheetOpen && !isOnboardingOpen && !isEndScreenOpen;
-  const showCueOnArrow = (e: React.KeyboardEvent) => {
-    if (!beingRead || !remoteNavOpen) return;
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
-    // Only a press that moves bubble focus: from a bubble, or from a bar
-    // back to the bubbles (useTvRemote).
-    const from = e.target;
-    if (
-      from instanceof Element &&
-      (from.matches("[data-tv-bubble]") || from.closest("[data-tv-bar]"))
-    ) {
-      setCueShownFor({ id: speakingId });
-    }
-  };
+  const tvCueHidden = tvMode && beingRead;
   // Pause holds the clip where it is, so play picks it up from that word
   // (#714). In auto-play's gap there is no clip to hold: cancelling the gap
   // leaves nothing paused, and play then starts the page over.
@@ -1032,6 +987,27 @@ export default function ZenComicReader({
     else handleFloatingPlay();
   };
 
+  // Called after the panel-container focus effect above, so a panel turn
+  // lands on the panel's first bubble. The remote's play/pause (Enter while
+  // reading, the media keys) does what the bar's play/pause does (#991).
+  const { barFocused: tvBarFocused } = useTvRemote({
+    enabled: tvMode,
+    navEnabled: !anySheetOpen && !isOnboardingOpen && !isEndScreenOpen,
+    focusKey: panelViewMode ? `panel:${panelIndex}` : "page",
+    onBack: handleTvBack,
+    reading: beingRead,
+    onPlayPause: panelViewMode
+      ? togglePanelAutoPlay
+      : pageBeingRead
+        ? handleFloatingPause
+        : handleFloatingResumeOrPlay,
+  });
+
+  // A sheet holds the chrome up; in TV mode so does focus on a bar control.
+  useEffect(() => {
+    lockChrome(anySheetOpen || tvBarFocused);
+  }, [anySheetOpen, tvBarFocused, lockChrome]);
+
   return (
     <>
       <div
@@ -1039,7 +1015,6 @@ export default function ZenComicReader({
         inert={isOnboardingOpen || isEndScreenOpen}
         data-tv-reader={tvMode ? "" : undefined}
         data-tv-cue-hidden={tvCueHidden ? "" : undefined}
-        onKeyDownCapture={tvMode ? showCueOnArrow : undefined}
       >
         <TopBar
           // TV mode pins the top bar: the remote's route to Panel view and
@@ -1245,6 +1220,7 @@ export default function ZenComicReader({
                 panelAutoPlay={panelAutoPlay || isPlaying}
                 onTogglePanelAutoPlay={togglePanelAutoPlay}
                 announceText={announceText}
+                tv={tvMode}
               >
                 {captionShown ? caption : undefined}
               </PanelViewHud>
@@ -1299,6 +1275,7 @@ export default function ZenComicReader({
             }
             aria-label={pageBeingRead ? "Pause" : "Read this page to me"}
             data-tv-bar={tvMode ? "bottom" : undefined}
+            data-tv-play={tvMode ? "" : undefined}
             className="absolute left-1/2 z-50 flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/10 bg-neutral-950/90 text-white backdrop-blur transition-colors hover:bg-neutral-900"
             style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)" }}
           >

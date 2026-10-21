@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { isTvBackKey, stepFocusIndex } from "~/lib/tv-mode";
+import { isTvBackKey, stepFocusIndex, tvMediaKey } from "~/lib/tv-mode";
 import { focusableIn } from "~/hooks/useTvArrowFocus";
 
 // The reader renders these attributes only in TV mode.
@@ -23,6 +23,12 @@ function barControls(bar: Bar): HTMLElement[] {
         : [root]
       : focusableIn(root),
   );
+}
+
+/** Where focus enters the bottom bar: its play/pause, else its first control. */
+function bottomEntry(): HTMLElement | undefined {
+  const items = barControls("bottom");
+  return items.find((el) => el.matches("[data-tv-play]")) ?? items[0];
 }
 
 function barOf(el: Element | null): Bar | null {
@@ -70,34 +76,54 @@ interface UseTvRemoteOptions {
   focusKey: string;
   /** Back on the remote: closes the topmost layer, or leaves the reader. */
   onBack: () => void;
+  /** The page or panel is being read: a clip sounds, or auto-play waits. */
+  reading: boolean;
+  /** What the bottom bar's play/pause control does in the current view. */
+  onPlayPause: () => void;
 }
 
 /**
  * The reader's remote control in TV mode (#951). Up and Down walk the
  * bubbles in render order (the order playback uses), and past either end
- * into the top or bottom bar. In a bar, Left and Right move between its
- * controls instead of turning the page, and Down/Up or Back return to the
- * bubble focus left from. On a panel with no bubbles, Down/Up from a bar go
- * to the panel container instead (#964): Left and Right there turn panels,
- * and Up/Down move on to the bars. Enter needs nothing here: a focused
- * bubble is a button, and Enter clicks it. Returns whether focus is on a bar control, so
- * the reader can hold the chrome up.
+ * into the top or bottom bar; the bottom bar is entered on its play/pause.
+ * In a bar, Left and Right move between its controls instead of turning the
+ * page, and Down/Up or Back return to the bubble focus left from. On a panel
+ * with no bubbles, Down/Up from a bar go to the panel container instead
+ * (#964): Left and Right there turn panels, and Up/Down move on to the bars.
+ * Off a bar, Enter clicks the focused bubble.
+ *
+ * While the page is being read the remote works like a video player's
+ * (#991): Up or Down off a bar wakes the controls, with focus on play/pause,
+ * and Enter off a bar pauses. The next Enter resumes, until focus moves or
+ * an arrow is pressed. The Play/Pause media keys do what play/pause does.
+ * Returns whether focus is on a bar control, so the reader can hold the
+ * chrome up.
  */
 export function useTvRemote({
   enabled,
   navEnabled,
   focusKey,
   onBack,
+  reading,
+  onPlayPause,
 }: UseTvRemoteOptions) {
   const [barFocused, setBarFocused] = useState(false);
   const onBackRef = useRef(onBack);
   const navEnabledRef = useRef(navEnabled);
+  const readingRef = useRef(reading);
+  const onPlayPauseRef = useRef(onPlayPause);
   useEffect(() => {
     onBackRef.current = onBack;
   }, [onBack]);
   useEffect(() => {
     navEnabledRef.current = navEnabled;
   }, [navEnabled]);
+  useEffect(() => {
+    readingRef.current = reading;
+  }, [reading]);
+  useEffect(() => {
+    onPlayPauseRef.current = onPlayPause;
+  }, [onPlayPause]);
 
   useEffect(() => {
     if (!enabled) {
@@ -106,11 +132,14 @@ export function useTvRemote({
     }
     // The bubble focus last left from, so a bar hands focus back to it.
     let lastBubble: HTMLElement | null = null;
+    // Where focus was at an Enter pause, so the next Enter there resumes.
+    let enterPausedAt: Element | null = null;
     const sync = () => {
       const active = document.activeElement;
       if (active instanceof HTMLElement && active.matches(BUBBLE)) {
         lastBubble = active;
       }
+      if (active !== enterPausedAt) enterPausedAt = null;
       setBarFocused(barOf(active) !== null);
     };
     const backToPage = (fallback: "first" | "last") => {
@@ -148,7 +177,40 @@ export function useTvRemote({
           : null;
       const bar = barOf(active);
 
+      const media = tvMediaKey(e);
+      if (media) {
+        e.preventDefault();
+        const isReading = readingRef.current;
+        if (
+          media === "playPause" ||
+          (media === "play" && !isReading) ||
+          (media === "pause" && isReading)
+        ) {
+          onPlayPauseRef.current();
+        }
+        return;
+      }
+
+      if (e.key === "Enter") {
+        // On a bar control, Enter presses it.
+        if (bar) return;
+        const pausing = readingRef.current;
+        const resuming =
+          !pausing &&
+          enterPausedAt !== null &&
+          enterPausedAt === document.activeElement;
+        if (!pausing && !resuming) return;
+        // No click on the focused bubble: Enter is play/pause here.
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.repeat) return;
+        enterPausedAt = pausing ? document.activeElement : null;
+        onPlayPauseRef.current();
+        return;
+      }
+
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        enterPausedAt = null;
         // Off a bar, the page and panel hooks turn the page.
         if (!bar || !active) return;
         e.preventDefault();
@@ -167,7 +229,13 @@ export function useTvRemote({
 
       if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
       e.preventDefault();
+      enterPausedAt = null;
       const down = e.key === "ArrowDown";
+      if (!bar && readingRef.current) {
+        // Being read, the arrows wake the controls: one press to play/pause.
+        focus(bottomEntry());
+        return;
+      }
       const bubbles = bubbleButtons();
       if (bar) {
         // Away from the bubbles goes nowhere; toward them returns to the
@@ -175,7 +243,10 @@ export function useTvRemote({
         // to the panel container in panel view, else to the other bar.
         if ((bar === "top") !== down) return;
         if (bubbles.length) backToPage(down ? "first" : "last");
-        else focus(panelContainer() ?? barControls(down ? "bottom" : "top")[0]);
+        else
+          focus(
+            panelContainer() ?? (down ? bottomEntry() : barControls("top")[0]),
+          );
         return;
       }
       const next = stepFocusIndex(
@@ -184,7 +255,11 @@ export function useTvRemote({
         down ? 1 : -1,
       );
       focus(
-        next !== null ? bubbles[next] : barControls(down ? "bottom" : "top")[0],
+        next !== null
+          ? bubbles[next]
+          : down
+            ? bottomEntry()
+            : barControls("top")[0],
       );
     };
 
