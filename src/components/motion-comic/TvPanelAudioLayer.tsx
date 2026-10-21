@@ -41,19 +41,26 @@ function loadBuffer(ctx: AudioContext, url: string) {
 interface Playing {
   source: AudioBufferSourceNode;
   gain: GainNode;
+  /** Context time the source starts at; a crossfade schedules it ahead. */
+  at: number;
 }
 
-/** Stops `p` once its gain has ramped to 0 over `fadeS` (0 = now). */
+/**
+ * Stops `p` once its gain has ramped to 0 over `fadeS` (0 = now). The fade
+ * holds the gain where its automation is now rather than reading
+ * `gain.value`, which lags the ramps. A source not started yet is silent,
+ * so it stops at once.
+ */
 function release(p: Playing, fadeS: number) {
   const now = p.source.context.currentTime;
-  if (fadeS > 0) {
+  const fade = p.at < now ? fadeS : 0;
+  if (fade > 0) {
     const g = p.gain.gain;
-    g.cancelScheduledValues(now);
-    g.setValueAtTime(g.value, now);
-    g.linearRampToValueAtTime(0, now + fadeS);
+    g.cancelAndHoldAtTime(now);
+    g.linearRampToValueAtTime(0, now + fade);
   }
-  p.source.stop(now + fadeS);
-  if (fadeS === 0) {
+  p.source.stop(now + fade);
+  if (fade === 0) {
     p.source.disconnect();
     p.gain.disconnect();
   }
@@ -68,6 +75,8 @@ function createLayer(level: () => number) {
   let gen = 0;
   let url: string | null = null;
   let playing: Playing | null = null;
+  // Sources still fading out after a crossfade, so `stop` can cut them too.
+  const fading = new Set<Playing>();
 
   return {
     get url() {
@@ -83,10 +92,18 @@ function createLayer(level: () => number) {
       const my = ++gen;
       url = next;
       const startAt = playing ? ctx.currentTime + fadeS : 0;
-      if (playing) release(playing, fadeS);
+      if (playing) {
+        release(playing, fadeS);
+        fading.add(playing);
+      }
       playing = null;
       void loadBuffer(ctx, next).then((buffer) => {
-        if (!buffer || my !== gen) return;
+        if (my !== gen) return;
+        // Clear the URL so the next play of this track tries again.
+        if (!buffer) {
+          url = null;
+          return;
+        }
         const source = ctx.createBufferSource();
         const gain = ctx.createGain();
         source.buffer = buffer;
@@ -99,10 +116,11 @@ function createLayer(level: () => number) {
         } else {
           gain.gain.value = level();
         }
-        const p = { source, gain };
+        const p = { source, gain, at };
         source.onended = () => {
           source.disconnect();
           gain.disconnect();
+          fading.delete(p);
           if (playing === p) playing = null;
         };
         source.start(at);
@@ -114,6 +132,8 @@ function createLayer(level: () => number) {
       url = null;
       if (playing) release(playing, 0);
       playing = null;
+      for (const p of fading) release(p, 0);
+      fading.clear();
     },
     /** Lands on the current level, cutting short any fade-in. */
     applyLevel(): void {
