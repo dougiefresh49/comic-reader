@@ -30,6 +30,19 @@ function barOf(el: Element | null): Bar | null {
   return side === "top" || side === "bottom" ? side : null;
 }
 
+/**
+ * Panel view's container (#964): the focusable ancestor of the frame
+ * PanelViewFrame marks in TV panel mode. With focus there, Left and Right
+ * reach the panel hooks. None outside panel view.
+ */
+function panelContainer(): HTMLElement | undefined {
+  return (
+    document
+      .querySelector("[data-tv-panel-frame]")
+      ?.closest<HTMLElement>('[tabindex="0"]') ?? undefined
+  );
+}
+
 function focus(el: HTMLElement | undefined) {
   // The top bar slides off screen while hidden; focusing it must not scroll
   // the reader's overflow-hidden root.
@@ -64,8 +77,10 @@ interface UseTvRemoteOptions {
  * bubbles in render order (the order playback uses), and past either end
  * into the top or bottom bar. In a bar, Left and Right move between its
  * controls instead of turning the page, and Down/Up or Back return to the
- * bubble focus left from. Enter needs nothing here: a focused bubble is a
- * button, and Enter clicks it. Returns whether focus is on a bar control, so
+ * bubble focus left from. On a panel with no bubbles, Down/Up from a bar go
+ * to the panel container instead (#964): Left and Right there turn panels,
+ * and Up/Down move on to the bars. Enter needs nothing here: a focused
+ * bubble is a button, and Enter clicks it. Returns whether focus is on a bar control, so
  * the reader can hold the chrome up.
  */
 export function useTvRemote({
@@ -156,11 +171,11 @@ export function useTvRemote({
       const bubbles = bubbleButtons();
       if (bar) {
         // Away from the bubbles goes nowhere; toward them returns to the
-        // bubble focus left from (else the nearest end), or crosses to the
-        // other bar on a page with none.
+        // bubble focus left from (else the nearest end). With none, it goes
+        // to the panel container in panel view, else to the other bar.
         if ((bar === "top") !== down) return;
         if (bubbles.length) backToPage(down ? "first" : "last");
-        else focus(barControls(down ? "bottom" : "top")[0]);
+        else focus(panelContainer() ?? barControls(down ? "bottom" : "top")[0]);
         return;
       }
       const next = stepFocusIndex(

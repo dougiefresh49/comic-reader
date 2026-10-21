@@ -258,6 +258,21 @@ html.layout-tv [data-tv-frame] {
   max-width: min(100cqw, calc(100cqh * var(--tv-frame-aspect))) !important;
 }
 
+/* Panel view (#964): the HUD stays up and takes its place in the reader's
+   column, so the frame stops above it instead of running behind it, and
+   sits centered between the top bar and the HUD. Off TV it is an overlay
+   that slides away with the chrome. */
+html.layout-tv
+  [data-tv-reader]:has([data-tv-panel-frame])
+  div[data-tv-bar="bottom"] {
+  position: relative;
+  translate: none;
+}
+
+html.layout-tv [data-tv-stage]:has([data-tv-panel-frame]) {
+  padding-bottom: 0;
+}
+
 html.layout-tv [data-tv-bar] {
   zoom: var(--tv-chrome-zoom);
 }

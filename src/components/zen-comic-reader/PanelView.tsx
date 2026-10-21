@@ -136,7 +136,9 @@ interface PanelViewFrameProps {
   /**
    * TV mode (#951): page mode sizes the frame to the reader area it sits
    * in, since the TV chrome and overscan inset outgrow the 140px the
-   * viewport-based frame reserves.
+   * viewport-based frame reserves. Panel mode marks the frame instead
+   * (#964), so the TV rules can fit the panel-view HUD and the remote can
+   * find the panel container.
    */
   tv?: boolean;
   children: React.ReactNode;
@@ -311,6 +313,7 @@ export function PanelViewFrame({
       className={`relative overflow-hidden select-none ${frameSizeClass}`}
       style={tvFrameStyle}
       data-tv-frame={tvFrame ? "" : undefined}
+      data-tv-panel-frame={tv && panelViewMode ? "" : undefined}
     >
       <div ref={transformRef} className="relative h-full w-full">
         <div
