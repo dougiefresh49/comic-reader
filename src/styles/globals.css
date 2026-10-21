@@ -190,6 +190,59 @@ html.layout-tv:has([data-tv-grid])
   transition: none;
 }
 
+/* Bubbles get a quieter cue than the controls (#962): a thin soft cyan ring
+   with a low glow, following the balloon's shape (a pill for speech, 8px
+   for captions). It lives on ::after, so the bubble button keeps its own
+   radius and transitions: the caption-fallback selection box stays a
+   rectangle with its 300ms fade. The ring fades in and out over 120ms and
+   hides while bubbles are read (data-tv-cue-hidden), so the word highlight
+   is the only cue then. */
+html.layout-tv:has([data-tv-reader])
+  [data-tv-reader]
+  button[data-tv-bubble]:focus-visible {
+  /* Undo the controls' ring and dark halo; keep the button's own styles. */
+  outline: none;
+  box-shadow: revert-layer;
+  transition: revert-layer;
+}
+
+html.layout-tv [data-tv-reader] button[data-tv-bubble]::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 3px
+      color-mix(
+        in oklab,
+        var(--color-cyan-400, oklch(78.9% 0.154 211.53)) 75%,
+        transparent
+      ),
+    0 0 14px
+      color-mix(
+        in oklab,
+        var(--color-cyan-300, oklch(86.5% 0.127 207.078)) 35%,
+        transparent
+      );
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+  pointer-events: none;
+}
+
+html.layout-tv [data-tv-reader] button[data-tv-bubble="balloon"]::after {
+  border-radius: 9999px;
+}
+
+html.layout-tv [data-tv-reader] button[data-tv-bubble]:focus-visible::after {
+  opacity: 1;
+}
+
+html.layout-tv
+  [data-tv-reader][data-tv-cue-hidden]
+  button[data-tv-bubble]:focus-visible::after {
+  opacity: 0;
+}
+
 /* The top bar stays up in TV mode, so the page starts below it. */
 html.layout-tv [data-tv-stage] {
   padding: calc(54px + 3.5rem * var(--tv-chrome-zoom)) 96px 54px;
