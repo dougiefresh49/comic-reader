@@ -201,8 +201,10 @@ export function TvPanelAudioLayer({
     musicLevel = musicVolume;
     layers.ambience.applyLevel();
     layers.sfx.applyLevel();
-    music.applyLevel();
-  }, [ambienceLevel, sfxLevel, musicVolume, layers]);
+    // Only the owner re-applies the shared music level: on a new page's
+    // mount it would cancel a carried source's fade-in.
+    if (musicCarry.owns(carryOwner)) music.applyLevel();
+  }, [ambienceLevel, sfxLevel, musicVolume, layers, carryOwner]);
 
   // ── Ambience: loop, swap on tag change ─────────────────────────────────
   useEffect(() => {

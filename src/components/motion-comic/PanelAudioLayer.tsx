@@ -112,8 +112,10 @@ export function PanelAudioLayer({
     levelsRef.current = levels;
     applyLevel(ambienceRef.current, levels.ambience);
     applyLevel(sfxRef.current, levels.sfx);
-    applyLevel(musicEl, levels.music);
-  }, [muted, volume]);
+    // Only the owner sets the shared music level: a page that has not
+    // claimed it would undo a pending stop's fade-out.
+    if (musicCarry.owns(carryOwner)) applyLevel(musicEl, levels.music);
+  }, [muted, volume, carryOwner]);
 
   // ── Ambience: swap source on tag change, loop, play when active ────────
   useEffect(() => {
