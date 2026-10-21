@@ -21,6 +21,7 @@ interface SettingsSheetProps {
   onToggleVoicesOnly: () => void;
   volumes: LayerVolumes;
   onSetLayerVolume: (layer: keyof LayerVolumes, value: number) => void;
+  onToggleLayerMute: (layer: keyof LayerVolumes) => void;
   onResetVolumes: () => void;
   autoAdvancePage: boolean;
   onToggleAutoAdvancePage: () => void;
@@ -134,6 +135,7 @@ export function SettingsSheet({
   onToggleVoicesOnly,
   volumes,
   onSetLayerVolume,
+  onToggleLayerMute,
   onResetVolumes,
   autoAdvancePage,
   onToggleAutoAdvancePage,
@@ -182,6 +184,7 @@ export function SettingsSheet({
             <VolumeSection
               volumes={volumes}
               onChange={onSetLayerVolume}
+              onToggleMute={onToggleLayerMute}
               onReset={onResetVolumes}
               disabled={muteAll || voicesOnly}
             />
@@ -448,11 +451,13 @@ function MotionRow({
 function VolumeSection({
   volumes,
   onChange,
+  onToggleMute,
   onReset,
   disabled = false,
 }: {
   volumes: LayerVolumes;
   onChange: (k: keyof LayerVolumes, v: number) => void;
+  onToggleMute: (k: keyof LayerVolumes) => void;
   onReset: () => void;
   disabled?: boolean;
 }) {
@@ -485,7 +490,7 @@ function VolumeSection({
             <div key={layer.key} className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => onChange(layer.key, muted ? 0.5 : 0)}
+                onClick={() => onToggleMute(layer.key)}
                 className={`w-9 shrink-0 rounded px-1 py-0.5 text-[10px] ${
                   muted
                     ? "bg-red-900/60 text-red-200"

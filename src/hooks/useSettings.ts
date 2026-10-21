@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 const AUTOPLAY_KEY = "zen-reader-autoplay";
 const VOLUMES_KEY = "zen-reader-volumes";
+const PREMUTE_VOLUMES_KEY = "zen-reader-premute-volumes";
 const PLAYBACK_RATE_KEY = "zen-reader-playback-rate";
 const PANEL_VIEW_PREFERRED_KEY = "zen-reader-panel-view-preferred";
 const MOTION_INTENSITY_KEY = "zen-reader-motion-intensity";
@@ -68,6 +69,34 @@ function readVolumes(): LayerVolumes {
   }
 }
 
+/**
+ * Each layer's level from before its mute button was pressed (#989), so
+ * Unmute puts it back. Only the mute button writes an entry; any other
+ * change to the layer clears it.
+ */
+type PreMuteVolumes = Partial<LayerVolumes>;
+
+function readPreMuteVolumes(): PreMuteVolumes {
+  if (typeof window === "undefined") return {};
+  try {
+    const stored = window.localStorage.getItem(PREMUTE_VOLUMES_KEY);
+    if (stored == null) return {};
+    return JSON.parse(stored) as PreMuteVolumes;
+  } catch {
+    return {};
+  }
+}
+
+function withoutLayer(
+  prev: PreMuteVolumes,
+  layer: keyof LayerVolumes,
+): PreMuteVolumes {
+  if (!(layer in prev)) return prev;
+  const next = { ...prev };
+  delete next[layer];
+  return next;
+}
+
 export function useSettings() {
   const [autoPlayEnabled, setAutoPlayEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -76,6 +105,8 @@ export function useSettings() {
   });
 
   const [volumes, setVolumes] = useState<LayerVolumes>(readVolumes);
+  const [preMuteVolumes, setPreMuteVolumes] =
+    useState<PreMuteVolumes>(readPreMuteVolumes);
 
   const [panelViewPreferred, setPanelViewPreferred] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -149,6 +180,13 @@ export function useSettings() {
   }, [volumes]);
 
   useEffect(() => {
+    window.localStorage.setItem(
+      PREMUTE_VOLUMES_KEY,
+      JSON.stringify(preMuteVolumes),
+    );
+  }, [preMuteVolumes]);
+
+  useEffect(() => {
     window.localStorage.setItem(PLAYBACK_RATE_KEY, String(playbackRate));
   }, [playbackRate]);
 
@@ -215,11 +253,38 @@ export function useSettings() {
         ...prev,
         [layer]: Math.max(0, Math.min(1, value)),
       }));
+      setPreMuteVolumes((prev) => withoutLayer(prev, layer));
     },
     [],
   );
 
-  const resetVolumes = useCallback(() => setVolumes(DEFAULT_VOLUMES), []);
+  // Mute remembers the layer's level; Unmute restores it, or the layer's
+  // default when nothing is remembered (e.g. the slider was dragged to 0).
+  const toggleLayerMute = useCallback(
+    (layer: keyof LayerVolumes) => {
+      const current = volumes[layer];
+      if (current === 0) {
+        const restored = preMuteVolumes[layer];
+        setVolumes((prev) => ({
+          ...prev,
+          [layer]:
+            typeof restored === "number" && restored > 0 && restored <= 1
+              ? restored
+              : DEFAULT_VOLUMES[layer],
+        }));
+        setPreMuteVolumes((prev) => withoutLayer(prev, layer));
+      } else {
+        setPreMuteVolumes((prev) => ({ ...prev, [layer]: current }));
+        setVolumes((prev) => ({ ...prev, [layer]: 0 }));
+      }
+    },
+    [volumes, preMuteVolumes],
+  );
+
+  const resetVolumes = useCallback(() => {
+    setVolumes(DEFAULT_VOLUMES);
+    setPreMuteVolumes({});
+  }, []);
 
   const effectiveVolumes: LayerVolumes = muteAll
     ? { dialogue: 0, ambience: 0, sfx: 0, music: 0 }
@@ -235,6 +300,7 @@ export function useSettings() {
     volumes,
     effectiveVolumes,
     setLayerVolume,
+    toggleLayerMute,
     resetVolumes,
     muteAll,
     toggleMuteAll,

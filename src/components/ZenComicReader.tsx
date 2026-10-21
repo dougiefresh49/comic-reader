@@ -229,6 +229,7 @@ export default function ZenComicReader({
     volumes,
     effectiveVolumes,
     setLayerVolume,
+    toggleLayerMute,
     resetVolumes,
     muteAll,
     toggleMuteAll,
@@ -1353,6 +1354,7 @@ export default function ZenComicReader({
           onToggleVoicesOnly={toggleVoicesOnly}
           volumes={volumes}
           onSetLayerVolume={setLayerVolume}
+          onToggleLayerMute={toggleLayerMute}
           onResetVolumes={resetVolumes}
           autoAdvancePage={autoAdvancePage}
           onToggleAutoAdvancePage={toggleAutoAdvancePage}
