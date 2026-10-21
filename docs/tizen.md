@@ -119,9 +119,10 @@ DevTools route above.
 - One media decoder at a time: when a second `<audio>` starts, the voice
   that was playing drops to readyState 1 and never fires `ended`. TV mode
   plays only the bubble voice (#962, #965).
-- Full-size page images are the bottleneck in panel view. Each zoom step
-  re-decoded the 1988x3057 WebP (about 1.2 s), and camera motion re-rastered
-  it every frame (about 4.7 s per panel move). TV mode turns motion off and
+- Full-size page images are the bottleneck in panel view. Camera motion
+  re-rastered the 1988x3057 WebP every frame (about 4.7 s per panel move),
+  and with motion off every panel move still re-decoded it (about 1.2 s),
+  because the page plane remounts. TV mode turns motion off and
   shows a copy with its long edge capped at 2448 px, which stays in the
   decode cache: about 160 ms per panel move and about 35 ms per arrow press
   in page view (#962).
