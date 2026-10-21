@@ -271,10 +271,10 @@ export default function ZenComicReader({
     );
   }, [tvMode, bookId, issueId, pageNumber, pageCount, spreadStarts]);
 
-  // Neighbour copies are decoded ahead in TV page view only (#978).
+  // Neighbour copies are decoded ahead in TV mode, page and panel view (#978, #992).
   useEffect(() => {
-    setTvDecodeAhead(tvMode && !panelViewMode);
-  }, [tvMode, panelViewMode]);
+    setTvDecodeAhead(tvMode);
+  }, [tvMode]);
 
   const clearPanelTimer = useCallback(() => {
     if (panelTimerRef.current !== null) {

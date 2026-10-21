@@ -116,9 +116,8 @@ const cache = new Map<string, Entry>();
 let decodeAhead = false;
 
 /**
- * Turns decoding prefetched copies ahead on or off. Page view only: in
- * panel view the TV re-decodes at panel scale, and the early decode slowed
- * each page's first panel move by ~270 ms (#978).
+ * Turns decoding prefetched copies ahead on or off. On in TV mode (page and
+ * panel view, #992); off everywhere else.
  */
 export function setTvDecodeAhead(on: boolean): void {
   decodeAhead = on;
