@@ -1,7 +1,7 @@
 // @ts-nocheck -- TV-only ES5 for the Tizen service runtime (Node), which reads the globals `tizen` and `webapis`.
 // Smart Hub Preview test (#980 Part 1): one hardcoded section, so a missing
 // tile on the home bar means the TV shows no previews, not that a fetch
-// failed. The tile titles carry the result of one fetch to the reader's
+// failed. The tile title carries the result of one fetch to the reader's
 // host, because Part 2 needs the service to reach it.
 // Samsung's guide: HTTP from a service must go through Node, not XHR.
 var https = require("https");
@@ -9,15 +9,11 @@ var https = require("https");
 var PROBE_URL = "https://comic-reader-eta.vercel.app/logo.png";
 var TIMEOUT_MS = 10000;
 var ACTION_DATA = JSON.stringify({ path: "/book/tmnt-mmpr-iii/issue-1/4" });
-// tmnt-mmpr-iii issue-1 page 1, scaled to the tiles' fixed 250 px height.
-// The guide shows only https image URLs, and Supabase Storage here has no
-// resizing, so one tile uses a proxy that returns a 250 px JPG.
-var HTTPS_COVER =
-  "https://wsrv.nl/?url=sinmmbxrsbpjneccykwd.supabase.co/storage/v1/object/public/comic-pages/tmnt-mmpr-iii/issue-1/page-01.webp&h=250&output=jpg";
-// The same image packaged in the .wgt. The guide doesn't say whether a
-// local image_url works; this tile answers that.
-var LOCAL_COVER =
-  typeof __dirname === "string" ? "file://" + __dirname + "/cover.jpg" : "";
+// tmnt-mmpr-iii issue-1 page 1 at 167x250, the smallest size Samsung allows
+// for a 2by3 tile (167x250 to 240x360). Supabase Storage here has no
+// resizing and the covers are WebP, so the tile goes through an image proxy.
+var COVER_URL =
+  "https://wsrv.nl/?url=sinmmbxrsbpjneccykwd.supabase.co/storage/v1/object/public/comic-pages/tmnt-mmpr-iii/issue-1/page-01.webp&w=167&h=250&fit=cover&output=jpg";
 
 var running = false;
 
@@ -109,27 +105,13 @@ function send(tiles, callback) {
 }
 
 function setPreview(result, caller) {
-  var title = "Fetch: " + result;
-  var httpsTile = tile(title, "https cover, by " + caller, HTTPS_COVER);
-  var tiles = [httpsTile];
-  if (LOCAL_COVER) tiles.push(tile(title, "packaged cover", LOCAL_COVER));
+  var tiles = [tile("Fetch: " + result, "launched by " + caller, COVER_URL)];
   console.log("setPreviewData: " + result + ", caller " + caller);
-  // Exit after the last callback either way: a service that doesn't exit is
+  // Exit after the callback either way: a service that doesn't exit is
   // killed after 5 minutes, and Samsung wants 10 minutes between calls.
   send(tiles, function (err) {
-    if (!err) {
-      console.log("setPreviewData ok, " + tiles.length + " tiles");
-      return exit();
-    }
-    console.log("setPreviewData failed: " + err);
-    if (tiles.length === 1) return exit();
-    // If the local image_url is what got the data refused, one retry without
-    // it keeps the test from reading as "this TV shows no previews".
-    httpsTile.subtitle = "local tile refused: " + err;
-    send([httpsTile], function (retryErr) {
-      console.log("retry: " + (retryErr || "ok"));
-      exit();
-    });
+    console.log("setPreviewData " + (err ? "failed: " + err : "ok"));
+    exit();
   });
 }
 
