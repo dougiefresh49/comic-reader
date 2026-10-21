@@ -907,8 +907,9 @@ export default function ZenComicReader({
     else if (isOnboardingOpen) dismissOnboarding();
     else if (panelViewMode) {
       // Not back to the button that opened panel view: focus leaves for the
-      // body, and useTvRemote's focus effect then lands it on the page's
-      // first bubble, so the next Back leaves the reader.
+      // body, and useTvRemote lands it on a bubble (the one left from when
+      // read-aloud was on, else the page's first), so the next Back leaves
+      // the reader.
       focusBeforePanelRef.current = null;
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();

@@ -272,11 +272,10 @@ export function useTvRemote({
 
     // A pause can unmount the control focus was on (the caption's Pause when
     // only playback shows it): focus goes back to the bubble left from, and
-    // an Enter pause made there still resumes.
+    // Enter there resumes what is held (`resumable` says whether anything is).
     restoreFocusRef.current = () => {
-      const lost = enterPausedAt?.isConnected === false;
       backToPage("first");
-      if (lost) enterPausedAt = document.activeElement;
+      enterPausedAt = document.activeElement;
       sync();
     };
 
@@ -289,9 +288,13 @@ export function useTvRemote({
     };
   }, [enabled]);
 
+  // Only when reading stops, not on mount.
+  const wasReadingRef = useRef(reading);
   useEffect(() => {
+    const stopped = wasReadingRef.current && !reading;
+    wasReadingRef.current = reading;
     const active = document.activeElement;
-    if (!enabled || !navEnabledRef.current || reading) return;
+    if (!enabled || !navEnabledRef.current || !stopped) return;
     if (!active || active === document.body) restoreFocusRef.current();
   }, [enabled, reading]);
 
