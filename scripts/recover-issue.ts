@@ -16,9 +16,9 @@
  * Never writes the `issues` row, so it leaves `has_webp` as it finds it.
  *
  * The add-issue upload deletes an issue's comic-pages-raw/<book>/<issue>/source/
- * objects once its last finalize batch stores every page (#959), so this script
- * finds no raw pages for an issue added after that. issue-3's git source is
- * unaffected.
+ * objects once its last finalize batch stores every page (#959), and an online
+ * download never writes raw pages (#960), so this script finds no raw pages for
+ * an issue added after those. issue-3's git source is unaffected.
  */
 
 import { execFileSync } from "child_process";
@@ -267,7 +267,7 @@ async function planFromRawStorage(
   if (error) throw new Error(`list ${RAW_BUCKET}/${folder}: ${error.message}`);
   if (data.length === 0) {
     throw new Error(
-      `${RAW_BUCKET}/${folder}/ is empty: raw pages are deleted once an add-issue upload finishes (#959).`,
+      `${RAW_BUCKET}/${folder}/ is empty: raw pages are deleted once an add-issue upload finishes (#959), and an online download never writes them (#960).`,
     );
   }
 

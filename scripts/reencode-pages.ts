@@ -18,9 +18,10 @@
  * watermark clean runs again: one Gemini detect call per page and an image
  * edit per overlay. A page whose clean leaves a watermark, or whose Gemini
  * call fails, stops the run before it is stored, so the cleaned page stays.
- * --apply needs LIVE_API_OK=1. Its dry run calls no API: it
- * scales and encodes the raw page as it is, before any clean, so its new
- * bytes are an estimate.
+ * An issue added from disk after #959 or online after #960 has no raw pages,
+ * so `--from raw` skips its pages. --apply needs LIVE_API_OK=1. Its dry run
+ * calls no API: it scales and encodes the raw page as it is, before any
+ * clean, so its new bytes are an estimate.
  *
  * An issue with `bubbles` or `panels` rows is refused under --apply unless
  * --allow-ingested is passed, because their stored positions were made on the
