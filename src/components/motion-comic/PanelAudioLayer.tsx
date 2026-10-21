@@ -29,9 +29,10 @@ function playLayer(el: HTMLAudioElement, level: number) {
 }
 
 /**
- * Three-track audio mix for a single panel. Mounts inside <PanelViewFrame>
- * as a sibling to <PanelEffectsOverlay>. No <audio> tags are visible —
- * this component just side-effects three refs.
+ * Three-track audio mix for a single panel. Mounts outside the panel-keyed
+ * plane (sibling of <PanelViewFrame>) so it stays mounted across panel
+ * moves (#974). No <audio> tags are visible — this component just
+ * side-effects three refs.
  *
  * Audio sources resolve to library URLs by tag (see src/lib/audio-library.ts).
  * If a tag has no cached file in the bucket the corresponding <audio> errors
