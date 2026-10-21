@@ -133,23 +133,32 @@ export function useAudioPlayback({
     stopHighlight,
   } = useWordHighlight();
 
-  const stopAll = useCallback(() => {
+  // Stops the current clip where it is. playBubble needs no more than this,
+  // because it throws the element away; stopAll adds the rewind.
+  const stopCurrent = useCallback(() => {
     armedRef.current = false;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
+    audioRef.current?.pause();
     stopHighlight();
     setIsPlaying(false);
     setPausedBubbleId(null);
   }, [stopHighlight]);
+
+  const stopAll = useCallback(() => {
+    stopCurrent();
+    // Rewind a clip stopped mid-line so the play control replays it from the
+    // start. An ended clip is skipped: play() restarts it from 0 anyway, and
+    // on the TV's single hardware decoder, seeking a clip that is being
+    // stopped sounds its first moment (#977).
+    const audio = audioRef.current;
+    if (audio && !audio.ended) audio.currentTime = 0;
+  }, [stopCurrent]);
 
   const playBubble = useCallback(
     (
       bubble: Bubble,
       { startAt = 0, words: chosenWords, spans }: PlayOptions = {},
     ) => {
-      stopAll();
+      stopCurrent();
       // Either branch below replaces the current clip for good, so its nodes
       // are unwired here and the element can be collected (#611).
       if (audioRef.current) disconnect(audioRef.current);
@@ -211,7 +220,7 @@ export function useAudioPlayback({
       audio.addEventListener("pause", () => setIsPlaying(false));
       // Every start (first play, replay after `ended`, resume) restarts the
       // highlight loop. `play` events are queued, so one from a clip that
-      // stopAll already replaced must not take the loop from the current clip.
+      // a newer playBubble replaced must not take the loop from the current clip.
       audio.addEventListener("play", () => {
         setIsPlaying(true);
         if (words.length && audioRef.current === audio) {
@@ -222,7 +231,7 @@ export function useAudioPlayback({
       if (startAt > 0) seekWhenReady(audio, startAt);
       audio.play().catch((err: unknown) => {
         const name = err instanceof DOMException ? err.name : undefined;
-        // stopAll paused this clip before play() resolved: it was replaced.
+        // A newer playBubble or stopAll paused this clip before play() resolved.
         if (name === "AbortError") return;
         // Autoplay blocked for lack of a gesture. Skipping here would race
         // through the page in silence, so only drop the play state.
@@ -238,7 +247,7 @@ export function useAudioPlayback({
       issueId,
       timestamps,
       startHighlight,
-      stopAll,
+      stopCurrent,
       stopHighlight,
       volume,
       playbackRate,
