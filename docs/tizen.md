@@ -134,8 +134,8 @@ DevTools route above.
 
 ## Home screen
 
-Research only, 2026-10-21 (#979), from Samsung's developer docs; nothing
-here has run on the TV yet.
+Research from Samsung's developer docs, 2026-10-21 (#979), then one test
+build on the TV the same day (#980, the last bullet).
 
 - No public API feeds the home screen's Continue Watching row. Samsung's
   [Product API index](https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references.html)
@@ -152,10 +152,23 @@ here has run on the TV yet.
   for it.
 - Samsung's guide says "All Samsung TVs from 2016 through 2021 support Smart
   Hub Preview" and says nothing about later years, so whether this 2024
-  Tizen 9 TV shows the tiles is unknown until a build tries it.
+  Tizen 9 TV shows the tiles was unknown until the #980 build tried it.
 - The service is a separate app from the hosted reader, and the reader's
   `localStorage` belongs to the Vercel origin, so in-progress books would
   have to reach the service through the server. A tile's `action_data`
   arrives on the packaged page as the `PAYLOAD` app-control entry, which the
   launcher would turn into a reader path before its redirect
   ([public preview guide](https://developer.samsung.com/smarttv/develop/guides/smart-hub-preview/implementing-public-preview.html)).
+- Tried on the TV, 2026-10-21 (#980): no preview row shows. The test build
+  ([PR #984](https://github.com/dougiefresh49/comic-reader/pull/984), not
+  merged) added a `bg_service` service that set one hardcoded section with
+  one https tile at 167x250, the smallest 2:3 size the guide allows. The TV
+  installed the service as its own app (`sdb shell 0 applist` listed it),
+  and the launcher started it with `launchAppControl`. With the Comic
+  Reader icon focused on the home bar and left there, Doug saw no row. The
+  service's log could not be read: `sdb dlog -d` printed nothing and
+  `sdb shell 0 debug <service id>` printed `closed` with no DevTools port.
+  So this build cannot say whether the TV ignores previews from a
+  sideloaded app or `setPreviewData` failed, only that no tile reaches the
+  home bar. In-progress books on the home screen are dropped for this TV;
+  the test service's code stays in that PR's commits.
