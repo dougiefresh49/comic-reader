@@ -11,7 +11,7 @@ export const TV_PAGE_MAX_EDGE = 2448;
 
 const JPEG_QUALITY = 0.9;
 
-/** How many page URLs to keep: a spread plus both neighbors is six. */
+/** Unpinned copies to keep: a spread plus both neighbors is six. */
 const CACHE_LIMIT = 8;
 
 /**
@@ -29,6 +29,16 @@ export function tvTargetSize(
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
   };
+}
+
+/**
+ * A page's TV copy: the URL to render, and the original image's natural
+ * size. On failure the URL is the original src and the size is 0 x 0.
+ */
+export interface TvPageImage {
+  url: string;
+  width: number;
+  height: number;
 }
 
 async function encodeJpeg(bitmap: ImageBitmap): Promise<Blob> {
@@ -55,72 +65,163 @@ async function encodeJpeg(bitmap: ImageBitmap): Promise<Blob> {
   );
 }
 
-async function downscale(src: string): Promise<string> {
+async function downscale(src: string): Promise<TvPageImage> {
   const res = await fetch(src, { mode: "cors" });
   if (!res.ok) throw new Error(`fetch ${res.status}`);
   const full = await createImageBitmap(await res.blob());
-  const size = tvTargetSize(full.width, full.height);
-  let bitmap = full;
+  // Each bitmap is closed once: a second close() throws on the TV.
+  let small: ImageBitmap | null = null;
   try {
-    if (size.width !== full.width || size.height !== full.height) {
-      bitmap = await createImageBitmap(full, {
+    const { width, height } = full;
+    const size = tvTargetSize(width, height);
+    if (size.width !== width || size.height !== height) {
+      small = await createImageBitmap(full, {
         resizeWidth: size.width,
         resizeHeight: size.height,
         resizeQuality: "high",
       });
     }
-    return URL.createObjectURL(await encodeJpeg(bitmap));
+    const blob = await encodeJpeg(small ?? full);
+    return { url: URL.createObjectURL(blob), width, height };
   } finally {
-    bitmap.close();
+    small?.close();
     full.close();
   }
 }
 
+interface Job {
+  /** False once something on screen asked for it: it then runs first. */
+  prefetch: boolean;
+  run: () => Promise<void>;
+}
+
 interface Entry {
-  promise: Promise<string>;
-  /** Set once the promise settles: the blob URL, or `src` on failure. */
-  url?: string;
+  promise: Promise<TvPageImage>;
+  /** Set once the copy is made (or failed). */
+  info?: TvPageImage;
+  /** Set until the job starts. */
+  job?: Job;
+  /** Mounted images using the URL; a pinned entry is never revoked. */
+  pins: number;
 }
 
 const cache = new Map<string, Entry>();
 
-function evict(): void {
-  // Oldest first; an in-flight entry stays until it settles.
+// One downscale at a time, so a spread turn never decodes four full pages
+// at once. On-screen requests run before prefetches.
+const queue: Job[] = [];
+let running = false;
+
+function pump(): void {
+  if (running || queue.length === 0) return;
+  const onScreen = queue.findIndex((job) => !job.prefetch);
+  const [job] = queue.splice(onScreen >= 0 ? onScreen : 0, 1);
+  if (!job) return;
+  running = true;
+  void job.run().finally(() => {
+    running = false;
+    pump();
+  });
+}
+
+function evict(keep?: string): void {
+  let unpinned = 0;
+  for (const entry of cache.values()) {
+    if (entry.pins === 0 && entry.info) unpinned++;
+  }
+  // Oldest first; pinned and in-flight entries stay.
   for (const [src, entry] of cache) {
-    if (cache.size <= CACHE_LIMIT) return;
-    if (entry.url === undefined) continue;
+    if (unpinned <= CACHE_LIMIT) return;
+    if (entry.pins > 0 || !entry.info || src === keep) continue;
     cache.delete(src);
-    if (entry.url !== src) URL.revokeObjectURL(entry.url);
+    unpinned--;
+    if (entry.info.url !== src) URL.revokeObjectURL(entry.info.url);
   }
 }
 
-/**
- * The TV copy of a page image: a blob URL of the downscaled JPEG, or `src`
- * itself when anything fails. One fetch per src; the 8 most recent are kept.
- */
-export function tvPageImageUrl(src: string): Promise<string> {
+function request(src: string, prefetch: boolean): Entry {
   const hit = cache.get(src);
   if (hit) {
     // Most recent last, so eviction drops the oldest page first.
     cache.delete(src);
     cache.set(src, hit);
-    return hit.promise;
+    if (!prefetch && hit.job) hit.job.prefetch = false;
+    return hit;
   }
+  let resolve: (info: TvPageImage) => void = () => undefined;
   const entry: Entry = {
-    promise: downscale(src)
-      .catch(() => src)
-      .then((url) => {
-        entry.url = url;
-        evict();
-        return url;
-      }),
+    promise: new Promise((r) => (resolve = r)),
+    pins: 0,
   };
+  const job: Job = {
+    prefetch,
+    run: async () => {
+      entry.job = undefined;
+      const info = await downscale(src).catch(() => ({
+        url: src,
+        width: 0,
+        height: 0,
+      }));
+      entry.info = info;
+      resolve(info);
+      evict(src);
+    },
+  };
+  entry.job = job;
   cache.set(src, entry);
-  evict();
-  return entry.promise;
+  queue.push(job);
+  pump();
+  return entry;
+}
+
+/** The TV copy of a page on screen, made ahead of any prefetch. */
+export function tvPageImageInfo(src: string): Promise<TvPageImage> {
+  return request(src, false).promise;
+}
+
+/**
+ * Asks for the TV copy of a page on screen and keeps its URL alive until
+ * the returned release runs.
+ */
+export function retainTvPageImage(src: string): {
+  promise: Promise<TvPageImage>;
+  release: () => void;
+} {
+  const entry = request(src, false);
+  entry.pins++;
+  let released = false;
+  return {
+    promise: entry.promise,
+    release: () => {
+      if (released) return;
+      released = true;
+      entry.pins--;
+      // After the commit: a remount pins the same entry again first.
+      queueMicrotask(() => evict());
+    },
+  };
+}
+
+/**
+ * Queues the TV copies of nearby pages behind anything on screen. The
+ * returned cancel drops those not started yet.
+ */
+export function prefetchTvPageImages(srcs: string[]): () => void {
+  for (const src of srcs) request(src, true);
+  return () => {
+    for (const src of srcs) {
+      const entry = cache.get(src);
+      const job = entry?.job;
+      if (!job?.prefetch) continue;
+      const at = queue.indexOf(job);
+      if (at < 0) continue;
+      queue.splice(at, 1);
+      cache.delete(src);
+    }
+  };
 }
 
 /** The TV copy's URL if it is already made, else null. Never starts work. */
 export function peekTvPageImageUrl(src: string): string | null {
-  return cache.get(src)?.url ?? null;
+  return cache.get(src)?.info?.url ?? null;
 }

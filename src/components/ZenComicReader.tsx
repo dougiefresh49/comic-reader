@@ -13,7 +13,7 @@ import {
   type ReaderSpread,
 } from "~/lib/spreads";
 import { pageImageUrl } from "~/lib/storage";
-import { tvPageImageUrl } from "~/lib/tv-page-image";
+import { prefetchTvPageImages, tvPageImageInfo } from "~/lib/tv-page-image";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
@@ -155,16 +155,37 @@ export default function ZenComicReader({
       lastPanelLandingTo = null;
     };
   }, []);
+  // TV mode (#951): every TV-only attribute and listener below is gated on
+  // this, so tablet, phone and desktop render and behave as before.
+  const tvMode = useTvMode();
   const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     // A spread's plane size comes from its stored page sizes.
     if (spread) return;
-    const img = new window.Image();
-    img.onload = () =>
-      setPageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-    img.src = pageImage;
-  }, [pageImage, spread]);
+    const probe = () => {
+      const img = new window.Image();
+      img.onload = () =>
+        setPageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+      img.src = pageImage;
+    };
+    if (!tvMode) {
+      probe();
+      return;
+    }
+    // TV mode (#962): the size comes from the downscale, which reads the
+    // original's, so the TV never loads the full image a second time. The
+    // probe runs only when the downscale failed.
+    let live = true;
+    void tvPageImageInfo(pageImage).then(({ width, height }) => {
+      if (!live) return;
+      if (width > 0 && height > 0) setPageNaturalSize({ w: width, h: height });
+      else probe();
+    });
+    return () => {
+      live = false;
+    };
+  }, [pageImage, spread, tvMode]);
   const pageSize = spread ? spread.size : pageNaturalSize;
   // The counter's number: "8–9" on either half of a spread.
   const counterLabel = pageLabel(pageNumber, spreadStarts);
@@ -186,9 +207,6 @@ export default function ZenComicReader({
   const anySheetOpen = isPageSheetOpen || isSettingsOpen;
   const { chromeVisible, showChrome, toggleChrome, lockChrome } =
     useChromeAutoHide();
-  // TV mode (#951): every TV-only attribute and listener below is gated on
-  // this, so tablet, phone and desktop render and behave as before.
-  const tvMode = useTvMode();
   const router = useRouter();
 
   const {
@@ -222,8 +240,9 @@ export default function ZenComicReader({
     tvMode || systemReducedMotion || motionIntensity !== "full";
   const cameraOff = tvMode || systemReducedMotion || motionIntensity === "off";
 
-  // TV mode (#962): warm the downscaled copies of the previous and next
-  // pages once this page's own are made, so a page turn shows art at once.
+  // TV mode (#962): queue the downscaled copies of the next and previous
+  // pages behind this page's own, so a page turn shows art at once. Leaving
+  // the page drops the ones not started yet.
   useEffect(() => {
     if (!tvMode) return;
     const imagesOf = (page: number) => {
@@ -231,24 +250,13 @@ export default function ZenComicReader({
       const pages = halves ? [halves.left, halves.right] : [page];
       return pages.map((n) => pageImageUrl(bookId, issueId, n));
     };
-    const own = spread ? [spread.left.image, spread.right.image] : [pageImage];
     const turns = spreadPageTurns(pageNumber, spreadStarts, pageCount);
-    const neighbors = [turns.next, turns.prev]
-      .filter((n): n is number => n !== null)
-      .flatMap(imagesOf);
-    void Promise.all(own.map(tvPageImageUrl)).then(() => {
-      for (const src of neighbors) void tvPageImageUrl(src);
-    });
-  }, [
-    tvMode,
-    bookId,
-    issueId,
-    pageNumber,
-    pageCount,
-    pageImage,
-    spread,
-    spreadStarts,
-  ]);
+    return prefetchTvPageImages(
+      [turns.next, turns.prev]
+        .filter((n): n is number => n !== null)
+        .flatMap(imagesOf),
+    );
+  }, [tvMode, bookId, issueId, pageNumber, pageCount, spreadStarts]);
 
   const clearPanelTimer = useCallback(() => {
     if (panelTimerRef.current !== null) {
@@ -958,16 +966,37 @@ export default function ZenComicReader({
   // TV mode (#962): the bubble focus cue hides while bubbles are being read,
   // the gaps between them included (page auto-play's, or panel read-aloud's,
   // which a pause turns off), so the word highlight is the only cue. An Up or
-  // Down press brings it back until the next bubble starts; a stop brings it
-  // back too.
+  // Down press that moves bubble focus brings it back until the next bubble
+  // starts: a new clip, or another member of a joined group lighting up. A
+  // stop brings it back too.
   const beingRead = pageBeingRead || (panelViewMode && panelAutoPlay);
+  // The bubble lit at the arrow press (null: none, as in a gap or a clip
+  // with no word timings); null itself means no press since the last start.
   const [cueShownFor, setCueShownFor] = useState<{ id: string | null } | null>(
     null,
   );
-  if (!beingRead && cueShownFor !== null) setCueShownFor(null);
-  const tvCueHidden = tvMode && beingRead && cueShownFor?.id !== speakingId;
+  useEffect(() => {
+    // A stop clears the press, and so does the next bubble starting while a
+    // clip plays: a new clip (isPlaying turning true) or a joined group's
+    // next member (speakingId changing). A clip ending into the gap does not.
+    if (!beingRead || isPlaying) setCueShownFor(null);
+  }, [beingRead, isPlaying, speakingId]);
+  const tvCueHidden =
+    tvMode &&
+    beingRead &&
+    (cueShownFor === null ||
+      (speakingId !== null && cueShownFor.id !== speakingId));
+  const remoteNavOpen = !anySheetOpen && !isOnboardingOpen && !isEndScreenOpen;
   const showCueOnArrow = (e: React.KeyboardEvent) => {
-    if (beingRead && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+    if (!beingRead || !remoteNavOpen) return;
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    // Only a press that moves bubble focus: from a bubble, or from a bar
+    // back to the bubbles (useTvRemote).
+    const from = e.target;
+    if (
+      from instanceof Element &&
+      (from.matches("[data-tv-bubble]") || from.closest("[data-tv-bar]"))
+    ) {
       setCueShownFor({ id: speakingId });
     }
   };
