@@ -13,8 +13,6 @@ import { isPublicHttpUrl } from "~/lib/add-content/public-url";
 // A browser read plus three-at-a-time storage can run for minutes.
 export const maxDuration = 300;
 
-const RAW_BUCKET = "comic-pages-raw";
-
 interface ProgressEvent {
   type: "status" | "page" | "done" | "error";
   message: string;
@@ -149,9 +147,6 @@ export async function POST(req: NextRequest) {
         const storeOne = async (imgUrl: string, i: number) => {
           const num = String(i + 1).padStart(2, "0");
           const pageNumber = i + 1;
-          const ext = extFromUrl(imgUrl);
-          const rawFilename = `page-${num}.${ext}`;
-          const rawPath = `${body.bookId}/${body.issueId}/source/${rawFilename}`;
 
           try {
             const imgResponse = await fetch(imgUrl);
@@ -179,24 +174,8 @@ export async function POST(req: NextRequest) {
               return;
             }
 
+            // WebP from the fetch buffer only; no comic-pages-raw write (#960).
             const buffer = Buffer.from(await imgResponse.arrayBuffer());
-            const contentType =
-              imgResponse.headers.get("content-type") ??
-              `image/${ext === "jpg" ? "jpeg" : ext}`;
-
-            const rawResult = await supabaseAdmin.storage
-              .from(RAW_BUCKET)
-              .upload(rawPath, buffer, { contentType, upsert: true });
-
-            if (rawResult.error) {
-              send({
-                type: "page",
-                message: `Page ${num} not saved: ${rawResult.error.message}`,
-                current: ++finished,
-                total: collectedUrls.length,
-              });
-              return;
-            }
 
             try {
               const { failures } = await storePageImage({
@@ -278,10 +257,4 @@ export async function POST(req: NextRequest) {
       Connection: "keep-alive",
     },
   });
-}
-
-function extFromUrl(url: string): string {
-  const clean = url.split("?")[0] ?? url;
-  const match = /\.(jpe?g|png|webp|gif)$/i.exec(clean);
-  return match ? match[1]!.toLowerCase().replace("jpeg", "jpg") : "jpg";
 }
