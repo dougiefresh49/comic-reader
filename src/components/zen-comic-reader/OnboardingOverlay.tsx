@@ -92,6 +92,14 @@ export function OnboardingOverlay({ onDismiss }: OnboardingOverlayProps) {
         e.preventDefault();
         onDismiss();
       } else if (e.key === "Enter" || e.key === "ArrowRight") {
+        // Enter on a focused button runs that button's own click (Skip, Back).
+        if (
+          e.key === "Enter" &&
+          (e.target instanceof HTMLButtonElement ||
+            document.activeElement instanceof HTMLButtonElement)
+        ) {
+          return;
+        }
         e.preventDefault();
         goNext();
       } else if (e.key === "ArrowLeft") {
