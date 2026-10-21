@@ -206,13 +206,11 @@ export function TvPanelAudioLayer({
 
   // ── SFX: one-shot on panel entry ───────────────────────────────────────
   useEffect(() => {
-    if (!active || muted) {
+    if (!active || muted || !sfxTag) {
       layers.sfx.stop();
       return;
     }
-    if (sfxTag) {
-      layers.sfx.play(audioLibraryUrl("sfx", sfxTag), { restart: true });
-    }
+    layers.sfx.play(audioLibraryUrl("sfx", sfxTag), { restart: true });
   }, [sfxTag, active, muted, panel?.id, layers]);
 
   // ── Music: crossfade on new scene; otherwise continue current bed ──────

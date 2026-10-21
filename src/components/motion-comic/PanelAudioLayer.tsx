@@ -92,7 +92,11 @@ export function PanelAudioLayer({
   // ── SFX: one-shot on panel entry ───────────────────────────────────────
   useEffect(() => {
     const el = sfxRef.current;
-    if (!el || !active || !sfxTag || muted) return;
+    if (!el) return;
+    if (!active || !sfxTag || muted) {
+      el.pause();
+      return;
+    }
     el.src = audioLibraryUrl("sfx", sfxTag);
     el.currentTime = 0;
     playLayer(el, levelsRef.current.sfx);
