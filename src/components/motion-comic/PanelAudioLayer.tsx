@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { audioLibraryUrl } from "~/lib/audio-library";
-import { applyLevel, ensureConnected, resumeContext } from "~/lib/audio-graph";
+import {
+  applyLevel,
+  disconnect,
+  ensureConnected,
+  resumeContext,
+} from "~/lib/audio-graph";
+import { createMusicCarry } from "~/lib/music-carry";
 import type { PageDirectedPanel } from "~/types/panels";
 
 export interface Props {
@@ -21,6 +27,7 @@ export interface Props {
 
 const DEFAULT_VOLUME = { ambience: 0.25, sfx: 0.5, music: 0.2 };
 const FADE_MS = 800;
+const FADE_STEPS = 16;
 
 function playLayer(el: HTMLAudioElement, level: number) {
   ensureConnected(el, level);
@@ -29,10 +36,46 @@ function playLayer(el: HTMLAudioElement, level: number) {
 }
 
 /**
+ * The music player outlives a page's mount, so a page turn can carry the
+ * track (#983, `~/lib/music-carry`). Created on first use, never at import:
+ * this module also loads on the server. Never disconnected.
+ */
+let musicEl: HTMLAudioElement | null = null;
+function getMusicEl() {
+  if (!musicEl) {
+    musicEl = new Audio();
+    musicEl.crossOrigin = "anonymous";
+    musicEl.loop = true;
+    musicEl.preload = "none";
+  }
+  return musicEl;
+}
+
+/** The pending stop's fade-out; a claim cuts it short. */
+let musicStopFade: ReturnType<typeof setInterval> | undefined;
+const musicCarry = createMusicCarry(() => {
+  const el = musicEl;
+  if (!el || el.paused) return;
+  const gain = ensureConnected(el, 0);
+  const startVol = gain.gain.value;
+  let i = 0;
+  clearInterval(musicStopFade);
+  musicStopFade = setInterval(() => {
+    i++;
+    gain.gain.value = Math.max(0, startVol * (1 - i / FADE_STEPS));
+    if (i >= FADE_STEPS) {
+      clearInterval(musicStopFade);
+      el.pause();
+    }
+  }, FADE_MS / FADE_STEPS);
+});
+
+/**
  * Three-track audio mix for a single panel. Mounts outside the panel-keyed
  * plane (sibling of <PanelViewFrame>) so it stays mounted across panel
- * moves (#974). No <audio> tags are visible — this component just
- * side-effects three refs.
+ * moves (#974). No <audio> tags are visible: ambience and SFX are two
+ * per-mount refs, and music is the module-scoped player above, which a page
+ * turn carries (#983).
  *
  * Audio sources resolve to library URLs by tag (see src/lib/audio-library.ts).
  * If a tag has no cached file in the bucket the corresponding <audio> errors
@@ -48,9 +91,8 @@ export function PanelAudioLayer({
 }: Props) {
   const ambienceRef = useRef<HTMLAudioElement | null>(null);
   const sfxRef = useRef<HTMLAudioElement | null>(null);
-  const musicRef = useRef<HTMLAudioElement | null>(null);
-  const lastMusicTagRef = useRef<string | null>(null);
-  const lastSceneIdRef = useRef<string | null>(null);
+  // This mount's identity for the music carry.
+  const [carryOwner] = useState(() => ({}));
   // Effective per-layer levels, read by the play paths so a slider move
   // never re-triggers the one-shot sfx effect.
   const levelsRef = useRef({ ambience: 0, sfx: 0, music: 0 });
@@ -70,8 +112,10 @@ export function PanelAudioLayer({
     levelsRef.current = levels;
     applyLevel(ambienceRef.current, levels.ambience);
     applyLevel(sfxRef.current, levels.sfx);
-    applyLevel(musicRef.current, levels.music);
-  }, [muted, volume]);
+    // Only the owner sets the shared music level: a page that has not
+    // claimed it would undo a pending stop's fade-out.
+    if (musicCarry.owns(carryOwner)) applyLevel(musicEl, levels.music);
+  }, [muted, volume, carryOwner]);
 
   // ── Ambience: swap source on tag change, loop, play when active ────────
   useEffect(() => {
@@ -104,17 +148,22 @@ export function PanelAudioLayer({
 
   // ── Music: crossfade on new scene; otherwise continue current bed ──────
   useEffect(() => {
-    const el = musicRef.current;
-    if (!el) return;
     const targetVol = (volume.music ?? DEFAULT_VOLUME.music) * (muted ? 0 : 1);
 
-    if (!active || !musicTag) {
+    if (!active) {
+      if (musicCarry.owns(carryOwner)) musicEl?.pause();
+      return;
+    }
+    musicCarry.claim(carryOwner);
+    clearInterval(musicStopFade);
+    const el = getMusicEl();
+    if (!musicTag) {
       el.pause();
       return;
     }
 
-    const sameScene = sceneId != null && lastSceneIdRef.current === sceneId;
-    const sameMood = lastMusicTagRef.current === musicTag;
+    const sameScene = sceneId != null && musicCarry.lastSceneId === sceneId;
+    const sameMood = musicCarry.lastTag === musicTag;
     const continuePlaying = sameScene || (sameMood && !newScene);
     const url = audioLibraryUrl("music", musicTag);
     const gain = ensureConnected(el, targetVol);
@@ -124,35 +173,34 @@ export function PanelAudioLayer({
       // the target rather than staying quieter than the settings ask for.
       gain.gain.value = targetVol;
       if (el.paused) playLayer(el, targetVol);
-      lastSceneIdRef.current = sceneId;
-      lastMusicTagRef.current = musicTag;
+      musicCarry.lastSceneId = sceneId;
+      musicCarry.lastTag = musicTag;
       return;
     }
 
     // Crossfade: fade out current → swap → fade in
     const startVol = gain.gain.value;
-    const fadeOutSteps = 16;
-    const stepMs = FADE_MS / fadeOutSteps;
+    const stepMs = FADE_MS / FADE_STEPS;
     let i = 0;
     let fadeIn: ReturnType<typeof setInterval> | undefined;
     const fadeOut = setInterval(() => {
       i++;
-      gain.gain.value = Math.max(0, startVol * (1 - i / fadeOutSteps));
-      if (i >= fadeOutSteps) {
+      gain.gain.value = Math.max(0, startVol * (1 - i / FADE_STEPS));
+      if (i >= FADE_STEPS) {
         clearInterval(fadeOut);
         el.pause();
         el.src = url;
         el.load();
         gain.gain.value = 0;
         playLayer(el, 0);
-        lastMusicTagRef.current = musicTag;
-        lastSceneIdRef.current = sceneId;
+        musicCarry.lastTag = musicTag;
+        musicCarry.lastSceneId = sceneId;
 
         let j = 0;
         fadeIn = setInterval(() => {
           j++;
-          gain.gain.value = Math.min(targetVol, targetVol * (j / fadeOutSteps));
-          if (j >= fadeOutSteps) clearInterval(fadeIn);
+          gain.gain.value = Math.min(targetVol, targetVol * (j / FADE_STEPS));
+          if (j >= FADE_STEPS) clearInterval(fadeIn);
         }, stepMs);
       }
     }, stepMs);
@@ -160,13 +208,27 @@ export function PanelAudioLayer({
       clearInterval(fadeOut);
       clearInterval(fadeIn);
     };
-  }, [musicTag, active, muted, newScene, sceneId, volume.music]);
+  }, [musicTag, active, muted, newScene, sceneId, volume.music, carryOwner]);
+
+  // ── Unmount: hand the music to its pending stop, unwire the rest ───────
+  useEffect(() => {
+    const ambience = ambienceRef.current;
+    const sfx = sfxRef.current;
+    return () => {
+      musicCarry.release(carryOwner);
+      // An element bound to the graph can never be bound again, so unwire
+      // only one React has taken out of the page. A StrictMode or Fast
+      // Refresh pass runs this with the element still in place.
+      for (const el of [ambience, sfx]) {
+        if (el && !el.isConnected) disconnect(el);
+      }
+    };
+  }, [carryOwner]);
 
   return (
     <>
       <audio ref={ambienceRef} crossOrigin="anonymous" loop preload="none" />
       <audio ref={sfxRef} crossOrigin="anonymous" preload="none" />
-      <audio ref={musicRef} crossOrigin="anonymous" loop preload="none" />
     </>
   );
 }

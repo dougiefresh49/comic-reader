@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { audioLibraryUrl } from "~/lib/audio-library";
 import { getAudioContext } from "~/lib/audio-graph";
+import { createMusicCarry } from "~/lib/music-carry";
 import type { Props } from "./PanelAudioLayer";
 
 const DEFAULT_VOLUME = { ambience: 0.25, sfx: 0.5, music: 0.2 };
@@ -127,11 +128,16 @@ function createLayer(level: () => number) {
         playing = p;
       });
     },
-    stop(): void {
+    /** `fadeS` fades the source out; sources already fading run on. */
+    stop(fadeS = 0): void {
       gen++;
       url = null;
-      if (playing) release(playing, 0);
+      if (playing) {
+        release(playing, fadeS);
+        if (fadeS > 0) fading.add(playing);
+      }
       playing = null;
+      if (fadeS > 0) return;
       for (const p of fading) release(p, 0);
       fading.clear();
     },
@@ -145,6 +151,15 @@ function createLayer(level: () => number) {
     },
   };
 }
+
+/**
+ * The music layer outlives a page's mount, so a page turn can carry the
+ * track (#983, `~/lib/music-carry`); ambience and SFX stay per mount. Its
+ * level is the latest mount's music setting.
+ */
+let musicLevel = 0;
+const music = createLayer(() => musicLevel);
+const musicCarry = createMusicCarry(() => music.stop(FADE_S));
 
 /**
  * TV-mode twin of `PanelAudioLayer`, same props and same behavior, played
@@ -163,14 +178,13 @@ export function TvPanelAudioLayer({
 }: Props) {
   // Effective per-layer levels, read when a source starts, so a slider
   // move never re-fires the one-shot sfx or restarts a crossfade.
-  const levelsRef = useRef({ ambience: 0, sfx: 0, music: 0 });
+  const levelsRef = useRef({ ambience: 0, sfx: 0 });
   const [layers] = useState(() => ({
     ambience: createLayer(() => levelsRef.current.ambience),
     sfx: createLayer(() => levelsRef.current.sfx),
-    music: createLayer(() => levelsRef.current.music),
   }));
-  const lastMusicTagRef = useRef<string | null>(null);
-  const lastSceneIdRef = useRef<string | null>(null);
+  // This mount's identity for the music carry.
+  const [carryOwner] = useState(() => ({}));
 
   const ambienceTag = panel?.audioTags.ambience[0] ?? null;
   const sfxTag = panel?.audioTags.sfx[0] ?? null;
@@ -179,19 +193,18 @@ export function TvPanelAudioLayer({
   const on = muted ? 0 : 1;
   const ambienceLevel = (volume.ambience ?? DEFAULT_VOLUME.ambience) * on;
   const sfxLevel = (volume.sfx ?? DEFAULT_VOLUME.sfx) * on;
-  const musicLevel = (volume.music ?? DEFAULT_VOLUME.music) * on;
+  const musicVolume = (volume.music ?? DEFAULT_VOLUME.music) * on;
 
   // ── Volumes ────────────────────────────────────────────────────────────
   useEffect(() => {
-    levelsRef.current = {
-      ambience: ambienceLevel,
-      sfx: sfxLevel,
-      music: musicLevel,
-    };
+    levelsRef.current = { ambience: ambienceLevel, sfx: sfxLevel };
+    musicLevel = musicVolume;
     layers.ambience.applyLevel();
     layers.sfx.applyLevel();
-    layers.music.applyLevel();
-  }, [ambienceLevel, sfxLevel, musicLevel, layers]);
+    // Only the owner re-applies the shared music level: on a new page's
+    // mount it would cancel a carried source's fade-in.
+    if (musicCarry.owns(carryOwner)) music.applyLevel();
+  }, [ambienceLevel, sfxLevel, musicVolume, layers, carryOwner]);
 
   // ── Ambience: loop, swap on tag change ─────────────────────────────────
   useEffect(() => {
@@ -215,31 +228,37 @@ export function TvPanelAudioLayer({
 
   // ── Music: crossfade on new scene; otherwise continue current bed ──────
   useEffect(() => {
-    const music = layers.music;
-    if (!active || !musicTag) {
+    // A stop discards the source, so the next play starts at 0 s: a new
+    // page's inactive first render leaves the music to its owner.
+    if (!active) {
+      if (musicCarry.owns(carryOwner)) music.stop();
+      return;
+    }
+    musicCarry.claim(carryOwner);
+    if (!musicTag) {
       music.stop();
       return;
     }
-    const sameScene = sceneId != null && lastSceneIdRef.current === sceneId;
-    const sameMood = lastMusicTagRef.current === musicTag;
+    const sameScene = sceneId != null && musicCarry.lastSceneId === sceneId;
+    const sameMood = musicCarry.lastTag === musicTag;
     const url = audioLibraryUrl("music", musicTag);
     if (sameScene || (sameMood && !newScene)) {
       if (!music.url) music.play(url, { loop: true });
     } else {
       music.play(url, { loop: true, restart: true, fadeS: FADE_S });
     }
-    lastMusicTagRef.current = musicTag;
-    lastSceneIdRef.current = sceneId;
-  }, [musicTag, active, newScene, sceneId, layers]);
+    musicCarry.lastTag = musicTag;
+    musicCarry.lastSceneId = sceneId;
+  }, [musicTag, active, newScene, sceneId, carryOwner]);
 
-  // ── Unmount: stop and unwire every source ──────────────────────────────
+  // ── Unmount: stop ambience and SFX; music gets a pending stop ──────────
   useEffect(
     () => () => {
       layers.ambience.stop();
       layers.sfx.stop();
-      layers.music.stop();
+      musicCarry.release(carryOwner);
     },
-    [layers],
+    [layers, carryOwner],
   );
 
   return null;
