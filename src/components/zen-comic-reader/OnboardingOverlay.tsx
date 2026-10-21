@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTvMode } from "~/hooks/useTvMode";
 
 const ONBOARDING_KEY = "comic-reader.onboarding.v1";
 
@@ -71,6 +72,9 @@ interface OnboardingOverlayProps {
 export function OnboardingOverlay({ onDismiss }: OnboardingOverlayProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const isLastStep = stepIndex === STEPS.length - 1;
+  const isTv = useTvMode();
+  const nextRef = useRef<HTMLButtonElement>(null);
+  const skipRef = useRef<HTMLButtonElement>(null);
 
   const goNext = useCallback(() => {
     setStepIndex((i) => {
@@ -105,11 +109,15 @@ export function OnboardingOverlay({ onDismiss }: OnboardingOverlayProps) {
       } else if (e.key === "ArrowLeft") {
         e.preventDefault();
         goBack();
+      } else if (isTv && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        // The remote has no Tab: Down reaches Skip, Up returns to Next.
+        e.preventDefault();
+        (e.key === "ArrowDown" ? skipRef : nextRef).current?.focus();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onDismiss, goNext, goBack]);
+  }, [onDismiss, goNext, goBack, isTv]);
 
   const step = STEPS[stepIndex];
   if (!step) return null;
@@ -156,6 +164,7 @@ export function OnboardingOverlay({ onDismiss }: OnboardingOverlayProps) {
           ) : null}
           <button
             type="button"
+            ref={nextRef}
             onClick={goNext}
             autoFocus
             className="flex h-12 flex-1 items-center justify-center rounded-xl bg-cyan-500 text-sm font-semibold text-neutral-950 transition-colors hover:bg-cyan-400"
@@ -165,6 +174,7 @@ export function OnboardingOverlay({ onDismiss }: OnboardingOverlayProps) {
         </div>
 
         <button
+          ref={skipRef}
           type="button"
           onClick={onDismiss}
           className="mt-3 flex h-10 items-center justify-center rounded-lg text-xs font-semibold tracking-[0.08em] text-neutral-500 uppercase transition-colors hover:text-neutral-300"
