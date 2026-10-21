@@ -63,6 +63,7 @@ import {
 } from "./zen-comic-reader/BubbleWordHighlight";
 import { PanelEffectsOverlay } from "./motion-comic/effects/PanelEffectsOverlay";
 import { PanelAudioLayer } from "./motion-comic/PanelAudioLayer";
+import { TvPanelAudioLayer } from "./motion-comic/TvPanelAudioLayer";
 import {
   PanelViewHud,
   usePrefersReducedMotion,
@@ -158,6 +159,7 @@ export default function ZenComicReader({
   // TV mode (#951): every TV-only attribute and listener below is gated on
   // this, so tablet, phone and desktop render and behave as before.
   const tvMode = useTvMode();
+  const PanelAudio = tvMode ? TvPanelAudioLayer : PanelAudioLayer;
   const [pageNaturalSize, setPageNaturalSize] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
@@ -1112,22 +1114,21 @@ export default function ZenComicReader({
                     />
                   </>
                 )}
-                {/* The TV runs one media decoder at a time: the layer's
-                    music stalled the bubble voice mid-clip (#962). */}
-                {tvMode ? null : (
-                  <PanelAudioLayer
-                    panel={activePanel}
-                    active={panelViewMode && panelAutoPlay}
-                    muted={!panelAutoPlay}
-                    newScene={activePanel?.isNewScene ?? false}
-                    sceneId={activePanel?.sceneId ?? null}
-                    volume={{
-                      ambience: effectiveVolumes.ambience,
-                      sfx: effectiveVolumes.sfx,
-                      music: effectiveVolumes.music,
-                    }}
-                  />
-                )}
+                {/* The TV runs one media decoder at a time: an <audio>
+                    music track stalled the bubble voice mid-clip (#962), so
+                    TV mode plays panel audio as Web Audio buffers (#965). */}
+                <PanelAudio
+                  panel={activePanel}
+                  active={panelViewMode && panelAutoPlay}
+                  muted={!panelAutoPlay}
+                  newScene={activePanel?.isNewScene ?? false}
+                  sceneId={activePanel?.sceneId ?? null}
+                  volume={{
+                    ambience: effectiveVolumes.ambience,
+                    sfx: effectiveVolumes.sfx,
+                    music: effectiveVolumes.music,
+                  }}
+                />
                 {showInBubble && selectedBubble && speech ? (
                   <BubbleWordHighlight
                     key={selectedBubble.id}

@@ -5,7 +5,7 @@ import { audioLibraryUrl } from "~/lib/audio-library";
 import { applyLevel, ensureConnected, resumeContext } from "~/lib/audio-graph";
 import type { PageDirectedPanel } from "~/types/panels";
 
-interface Props {
+export interface Props {
   panel: PageDirectedPanel | null;
   /** True only in panel-view auto-play mode; otherwise everything is paused. */
   active: boolean;

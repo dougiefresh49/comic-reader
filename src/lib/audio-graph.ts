@@ -52,6 +52,17 @@ export function ensureConnected(el: HTMLAudioElement, level: number): GainNode {
 }
 
 /**
+ * The shared context, for layers that play decoded buffers rather than an
+ * element (the TV panel layer, #965). Same rules as `ensureConnected`:
+ * created on first play, never at render or mount, resumed on each call.
+ */
+export function getAudioContext(): AudioContext {
+  sharedCtx ??= new AudioContext();
+  resumeContext();
+  return sharedCtx;
+}
+
+/**
  * Unwires `el` so the destination no longer holds its gain and source, and
  * the element can be collected. An element bound to a
  * MediaElementAudioSourceNode never outputs on its own again, so call this
