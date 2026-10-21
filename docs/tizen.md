@@ -101,8 +101,30 @@ DevTools route above.
   `color-mix()` and nesting, and `CSSLayerBlockRule` and `CSSPropertyRule`
   exist, so Tailwind 4's output is within this engine. `navigator.serviceWorker`
   exists and the origin is a secure context.
-- Not yet observed: the library and a reader page rendering on screen, arrow
-  keys turning pages, Enter playing a bubble, and the service worker
-  registering. The app was not in the foreground during this install (most
-  likely the screen was off), so the page stayed hidden and never finished
-  loading.
+- On screen, 2026-10-20 and 21 (#951, #962): the library and reader pages
+  render, the arrows move focus and turn pages, Enter plays a bubble with the
+  words lighting, and the service worker registers and controls the page.
+  On the first install the page never got past loading, because the app was
+  not in the foreground (most likely the screen was off) and stayed hidden.
+- Keys from DevTools: `sdb shell 0 debug` launches the app in debug mode, so
+  it is a way to start the app as well as to inspect it. Over the forwarded
+  port, CDP `Input.dispatchKeyEvent` drives the reader like the remote. Back
+  is `windowsVirtualKeyCode` 10009. Doug's physical remote reaches the
+  reader's arrow keys.
+- The network remote does not pair. A socket on `wss://<tv-ip>:8002` (or
+  `ws://` on 8001) to `samsung.remote.control` opens, but the TV sends no
+  frame: no `ms.channel.connect`, no `unauthorized`, no Allow prompt. This
+  was true with Settings > Connection > Network > Expert Settings > IP Remote
+  turned on, and with Access Notification set to "First Time Only".
+- One media decoder at a time: when a second `<audio>` starts, the voice
+  that was playing drops to readyState 1 and never fires `ended`. TV mode
+  plays only the bubble voice (#962, #965).
+- Full-size page images are the bottleneck in panel view. Camera motion
+  re-rastered the 1988x3057 WebP every frame (about 4.7 s per panel move),
+  and with motion off every panel move still re-decoded it (about 1.2 s),
+  because the page plane remounts. TV mode turns motion off and
+  shows a copy with its long edge capped at 2448 px, which stays in the
+  decode cache: about 160 ms per panel move and about 35 ms per arrow press
+  in page view (#962).
+- CSS `zoom` is the legacy kind in Chromium 120: `getBoundingClientRect()`
+  on a zoomed element is in unzoomed units.
