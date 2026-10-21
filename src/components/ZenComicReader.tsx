@@ -6,7 +6,14 @@ import type { Bubble, AudioTimestamps } from "~/types";
 import type { PageDirectedPanel } from "~/types/panels";
 import { highlightColorFor } from "~/lib/highlight-color";
 import { sortPanelsForReading } from "~/lib/panel-reading-order";
-import { pageLabel, type ReaderSpread } from "~/lib/spreads";
+import {
+  pageLabel,
+  spreadPagesFor,
+  spreadPageTurns,
+  type ReaderSpread,
+} from "~/lib/spreads";
+import { pageImageUrl } from "~/lib/storage";
+import { tvPageImageUrl } from "~/lib/tv-page-image";
 import { useSettings } from "~/hooks/useSettings";
 import { hasAudio, useAudioPlayback } from "~/hooks/useAudioPlayback";
 import { useAutoPlay } from "~/hooks/useAutoPlay";
@@ -209,8 +216,39 @@ export default function ZenComicReader({
     setCaptionBar,
   } = useSettings();
 
-  const effectsOff = systemReducedMotion || motionIntensity !== "full";
-  const cameraOff = systemReducedMotion || motionIntensity === "off";
+  // The TV runs camera motion and panel effects at a few frames a second,
+  // so TV mode turns both off whatever Settings says (#962).
+  const effectsOff =
+    tvMode || systemReducedMotion || motionIntensity !== "full";
+  const cameraOff = tvMode || systemReducedMotion || motionIntensity === "off";
+
+  // TV mode (#962): warm the downscaled copies of the previous and next
+  // pages once this page's own are made, so a page turn shows art at once.
+  useEffect(() => {
+    if (!tvMode) return;
+    const imagesOf = (page: number) => {
+      const halves = spreadPagesFor(page, spreadStarts);
+      const pages = halves ? [halves.left, halves.right] : [page];
+      return pages.map((n) => pageImageUrl(bookId, issueId, n));
+    };
+    const own = spread ? [spread.left.image, spread.right.image] : [pageImage];
+    const turns = spreadPageTurns(pageNumber, spreadStarts, pageCount);
+    const neighbors = [turns.next, turns.prev]
+      .filter((n): n is number => n !== null)
+      .flatMap(imagesOf);
+    void Promise.all(own.map(tvPageImageUrl)).then(() => {
+      for (const src of neighbors) void tvPageImageUrl(src);
+    });
+  }, [
+    tvMode,
+    bookId,
+    issueId,
+    pageNumber,
+    pageCount,
+    pageImage,
+    spread,
+    spreadStarts,
+  ]);
 
   const clearPanelTimer = useCallback(() => {
     if (panelTimerRef.current !== null) {
@@ -1020,18 +1058,22 @@ export default function ZenComicReader({
                     />
                   </>
                 )}
-                <PanelAudioLayer
-                  panel={activePanel}
-                  active={panelViewMode && panelAutoPlay}
-                  muted={!panelAutoPlay}
-                  newScene={activePanel?.isNewScene ?? false}
-                  sceneId={activePanel?.sceneId ?? null}
-                  volume={{
-                    ambience: effectiveVolumes.ambience,
-                    sfx: effectiveVolumes.sfx,
-                    music: effectiveVolumes.music,
-                  }}
-                />
+                {/* The TV runs one media decoder at a time: the layer's
+                    music stalled the bubble voice mid-clip (#962). */}
+                {tvMode ? null : (
+                  <PanelAudioLayer
+                    panel={activePanel}
+                    active={panelViewMode && panelAutoPlay}
+                    muted={!panelAutoPlay}
+                    newScene={activePanel?.isNewScene ?? false}
+                    sceneId={activePanel?.sceneId ?? null}
+                    volume={{
+                      ambience: effectiveVolumes.ambience,
+                      sfx: effectiveVolumes.sfx,
+                      music: effectiveVolumes.music,
+                    }}
+                  />
+                )}
                 {showInBubble && selectedBubble && speech ? (
                   <BubbleWordHighlight
                     key={selectedBubble.id}

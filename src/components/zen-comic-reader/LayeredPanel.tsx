@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import Image from "next/image";
+import { useTvPageImage } from "~/hooks/useTvPageImage";
 import type { ReaderSpread } from "~/lib/spreads";
 import type {
   PanelBoundingBox,
@@ -18,6 +19,40 @@ interface PageArtProps {
 }
 
 /**
+ * In TV mode the src is the downscaled copy, and nothing renders until it
+ * is made (#962). Off TV mode these render the same <Image> as before.
+ */
+function SinglePageImage({
+  src,
+  alt,
+  style,
+}: {
+  src: string;
+  alt: string;
+  style?: React.CSSProperties;
+}) {
+  const url = useTvPageImage(src);
+  if (url === null) return null;
+  return (
+    <Image
+      src={url}
+      alt={alt}
+      fill
+      className="object-contain"
+      style={style}
+      priority
+      aria-hidden={alt ? undefined : true}
+    />
+  );
+}
+
+function SpreadHalfImage({ src }: { src: string }) {
+  const url = useTvPageImage(src);
+  if (url === null) return null;
+  return <Image src={url} alt="" fill className="object-fill" priority />;
+}
+
+/**
  * The page art filling the page plane. A single page is the one image it
  * always was; a spread is its two images side by side, the left one across
  * `leftShare` of the plane and the right one across the rest, meeting at
@@ -25,17 +60,7 @@ interface PageArtProps {
  */
 export function PageArt({ pageImage, spread, alt, style }: PageArtProps) {
   if (!spread) {
-    return (
-      <Image
-        src={pageImage}
-        alt={alt}
-        fill
-        className="object-contain"
-        style={style}
-        priority
-        aria-hidden={alt ? undefined : true}
-      />
-    );
+    return <SinglePageImage src={pageImage} alt={alt} style={style} />;
   }
   const share = spread.leftShare * 100;
   return (
@@ -58,13 +83,7 @@ export function PageArt({ pageImage, spread, alt, style }: PageArtProps) {
           className="absolute inset-y-0"
           style={{ left, width }}
         >
-          <Image
-            src={page.image}
-            alt=""
-            fill
-            className="object-fill"
-            priority
-          />
+          <SpreadHalfImage src={page.image} />
         </div>
       ))}
     </div>
