@@ -78,6 +78,8 @@ interface UseTvRemoteOptions {
   onBack: () => void;
   /** The page or panel is being read: a clip sounds, or auto-play waits. */
   reading: boolean;
+  /** Something is held, so Enter right after an Enter pause resumes it. */
+  resumable: boolean;
   /** What the bottom bar's play/pause control does in the current view. */
   onPlayPause: () => void;
 }
@@ -105,6 +107,7 @@ export function useTvRemote({
   focusKey,
   onBack,
   reading,
+  resumable,
   onPlayPause,
 }: UseTvRemoteOptions) {
   const [barFocused, setBarFocused] = useState(false);
@@ -112,6 +115,8 @@ export function useTvRemote({
   const navEnabledRef = useRef(navEnabled);
   const readingRef = useRef(reading);
   const onPlayPauseRef = useRef(onPlayPause);
+  const resumableRef = useRef(resumable);
+  const restoreFocusRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     onBackRef.current = onBack;
   }, [onBack]);
@@ -120,7 +125,8 @@ export function useTvRemote({
   }, [navEnabled]);
   useEffect(() => {
     readingRef.current = reading;
-  }, [reading]);
+    resumableRef.current = resumable;
+  }, [reading, resumable]);
   useEffect(() => {
     onPlayPauseRef.current = onPlayPause;
   }, [onPlayPause]);
@@ -197,6 +203,7 @@ export function useTvRemote({
         const pausing = readingRef.current;
         const resuming =
           !pausing &&
+          resumableRef.current &&
           enterPausedAt !== null &&
           enterPausedAt === document.activeElement;
         if (!pausing && !resuming) return;
@@ -263,6 +270,16 @@ export function useTvRemote({
       );
     };
 
+    // A pause can unmount the control focus was on (the caption's Pause when
+    // only playback shows it): focus goes back to the bubble left from, and
+    // an Enter pause made there still resumes.
+    restoreFocusRef.current = () => {
+      const lost = enterPausedAt?.isConnected === false;
+      backToPage("first");
+      if (lost) enterPausedAt = document.activeElement;
+      sync();
+    };
+
     window.addEventListener("keydown", onKeyDown, true);
     document.addEventListener("focusin", sync);
     sync();
@@ -271,6 +288,12 @@ export function useTvRemote({
       document.removeEventListener("focusin", sync);
     };
   }, [enabled]);
+
+  useEffect(() => {
+    const active = document.activeElement;
+    if (!enabled || !navEnabledRef.current || reading) return;
+    if (!active || active === document.body) restoreFocusRef.current();
+  }, [enabled, reading]);
 
   // On mount (a page turn remounts the reader), on a panel turn, and when a
   // layer closes: focus the first bubble, unless focus is already on a

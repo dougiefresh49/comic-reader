@@ -928,6 +928,11 @@ export default function ZenComicReader({
   ]);
   const gestureProps = gestureBind();
 
+  // A clip plays, or auto-play waits out the gap before the next bubble or
+  // the page turn: the floating button is a pause, so it does not flash to
+  // play at every bubble boundary (#706).
+  const pageBeingRead = isPlaying || autoPlayPending;
+
   // Narration is content: SpeechBox (or its empty-state card) sits below the
   // panel chrome row, above the progress bar. In panel mode the HUD play is
   // the ONLY play control, so SpeechBox gets no onTogglePlay there.
@@ -940,8 +945,14 @@ export default function ZenComicReader({
       wordHighlight={wordHighlight}
       // "In bubble" drops the caption pill only where the art lights up.
       showWordPill={!(wordMatch && wordHighlightMode === "bubble")}
-      isPlaying={isPlaying}
-      onTogglePlay={panelViewMode ? undefined : togglePlayPause}
+      isPlaying={tvMode ? pageBeingRead : isPlaying}
+      onTogglePlay={
+        panelViewMode
+          ? undefined
+          : tvMode && pageBeingRead
+            ? handleFloatingPause
+            : togglePlayPause
+      }
       voiced={selectedBubble ? hasAudio(selectedBubble) : true}
       tv={tvMode}
     />
@@ -962,10 +973,6 @@ export default function ZenComicReader({
     !captionShown &&
     panels.length > 0 &&
     voicedBubbles.length > 0;
-  // A clip plays, or auto-play waits out the gap before the next bubble or
-  // the page turn: the floating button is a pause, so it does not flash to
-  // play at every bubble boundary (#706).
-  const pageBeingRead = isPlaying || autoPlayPending;
 
   // TV mode (#962): the bubble focus cue hides while bubbles are being read,
   // the gaps between them included (page auto-play's, or panel read-aloud's,
@@ -976,10 +983,10 @@ export default function ZenComicReader({
   // Pause holds the clip where it is, so play picks it up from that word
   // (#714). In auto-play's gap there is no clip to hold: cancelling the gap
   // leaves nothing paused, and play then starts the page over.
-  const handleFloatingPause = () => {
+  function handleFloatingPause() {
     if (isPlaying) togglePlayPause();
     cancelPending();
-  };
+  }
   // A paused clip resumes in page view; its `ended` hands on to auto-play as
   // usual. A page turn, a tap on another bubble or panel view clears it.
   const handleFloatingResumeOrPlay = () => {
@@ -996,6 +1003,7 @@ export default function ZenComicReader({
     focusKey: panelViewMode ? `panel:${panelIndex}` : "page",
     onBack: handleTvBack,
     reading: beingRead,
+    resumable: panelViewMode || pausedBubbleId !== null,
     onPlayPause: panelViewMode
       ? togglePanelAutoPlay
       : pageBeingRead

@@ -20,7 +20,10 @@ interface SpeechBoxProps {
   onTogglePlay?: () => void;
   /** False: the bubble has no clip, so a "No voice yet" note replaces Play. */
   voiced?: boolean;
-  /** TV mode (#951): marks the caption text for its 10-foot size. */
+  /**
+   * TV mode (#951): marks the caption text for its 10-foot size, and the
+   * Play/Pause as the bar's play/pause for the remote (#991).
+   */
   tv?: boolean;
 }
 
