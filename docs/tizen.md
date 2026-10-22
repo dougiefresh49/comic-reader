@@ -79,6 +79,19 @@ foreground (the TV screen off, or another app in front) reports
 `visibilityState: hidden` and its subresource loads never finish, so check
 `document.visibilityState` before you read anything into a stalled page.
 
+With the app already open, the debug launch can hang and print nothing: both
+tries for #992 did, and #986's hung the same way. On 2026-10-21 every launch
+that printed a port came right after an install or a kill. Close the app
+first, which keeps its storage:
+
+```sh
+sdb -s <tv-ip>:26101 shell 0 kill CmcRdrTV01   # the package id; prints "Pkgid: CmcRdrTV01 is Terminated"
+```
+
+A debug launch right after printed its port in about a second (#992). The
+kill closes the app on screen, so it is TV work: take the lock first, and
+only when nobody is watching.
+
 ## Findings
 
 First install, 2026-10-20, on the UN60DU7200FXZA (#950). Read through the
