@@ -297,6 +297,12 @@ function ResizeHandle({
 
 const BAR_BUTTON =
   "flex h-6 items-center gap-1.5 rounded-sm border border-neutral-800 px-2 text-neutral-300 hover:border-neutral-600 hover:text-white disabled:text-neutral-600 disabled:hover:border-neutral-800";
+/** The reader route for one page: public when published, the admin preview otherwise. */
+function previewHref(data: EditorData, pageNumber: number): string {
+  const base = data.published ? "/book" : "/admin/preview";
+  return `${base}/${data.bookId}/${data.issueId}/${pageNumber}`;
+}
+
 const FLOAT =
   "rounded-sm border border-neutral-700 bg-neutral-950/90 text-neutral-400";
 
@@ -1856,6 +1862,21 @@ function Editor({ data, initialPage }: WorkbenchProps) {
             Discard edits
           </button>
         )}
+        <a
+          href={previewHref(data, pageNumber)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${BAR_BUTTON} shrink-0`}
+          title={
+            toWrite > 0
+              ? `Opens the saved version of page ${pageNumber} in a new tab. Your unsaved edits are not in it; Save first to see them.`
+              : `Open page ${pageNumber} in the reader in a new tab${
+                  data.published ? "" : " (unpublished preview)"
+                }`
+          }
+        >
+          {toWrite > 0 ? "Preview saved" : "Preview"}
+        </a>
         <button
           type="button"
           disabled={toWrite === 0 || !!lockReason || kept === "stale"}

@@ -35,7 +35,8 @@ interface IssueRow {
   name: string;
   pipeline_step: string | null;
   pipeline_paused: boolean | null;
-  books: { name: string } | null;
+  status: string;
+  books: { name: string; published: boolean } | null;
 }
 
 interface PageRow {
@@ -135,7 +136,7 @@ export async function loadEditor(
     supabaseAdmin,
     bookId,
     issueId,
-    "name, pipeline_step, pipeline_paused, books(name)",
+    "name, pipeline_step, pipeline_paused, status, books(name, published)",
   ).maybeSingle();
   if (issueResult.error) {
     console.error("review editor loader, the issue:", issueResult.error);
@@ -442,5 +443,7 @@ export async function loadEditor(
     slotsTotal: VOICE_SLOTS_TOTAL,
     atPagesGate:
       issue.pipeline_step === "review-pages" && issue.pipeline_paused === true,
+    // The reader's own rule for a public page (`getManifest` in `src/server/pages/queries.ts`).
+    published: issue.books?.published === true && issue.status !== "pending",
   };
 }
