@@ -1869,7 +1869,9 @@ function Editor({ data, initialPage }: WorkbenchProps) {
           className={`${BAR_BUTTON} shrink-0`}
           title={
             toWrite > 0
-              ? `Opens the saved version of page ${pageNumber} in a new tab. Your unsaved edits are not in it; Save first to see them.`
+              ? `Opens the saved version of page ${pageNumber} in a new tab. Your unsaved edits are not in it${
+                  kept === "stale" ? "." : "; Save first to see them."
+                }`
               : `Open page ${pageNumber} in the reader in a new tab${
                   data.published ? "" : " (unpublished preview)"
                 }`
