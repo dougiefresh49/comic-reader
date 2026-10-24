@@ -113,4 +113,6 @@ export interface EditorData {
   slotsTotal: number;
   /** The issue's run is paused at the pages gate (`review-pages`), so "Approve issue" shows. */
   atPagesGate: boolean;
+  /** The book is published and the issue is not `pending`: the reader serves it on `/book/...`. */
+  published: boolean;
 }
