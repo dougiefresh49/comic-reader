@@ -58,7 +58,6 @@ supabase/.temp
 .agents/
 .claude/worktrees/
 .claude/skills/*
-!.claude/skills/autopilot/
 .cursor/mcp.json
 .cursor/mcp.json.*
 .cursor/settings.json
