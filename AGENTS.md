@@ -1,9 +1,9 @@
 <!-- fleet corefile: AGENTS-base.md
      Copy to a new repo's root as AGENTS.md and fill every [FILL-IN] slot;
-     delete slots that don't apply. The shared sections ship as-is: A note
-     from Doug, the glossary's core entries, Verify before you assert,
-     Answer the question that was asked, Stay in scope, Push back on the
-     spec, The config-mutation gate, Don't repeat a failing call. If one
+     delete slots that don't apply. The shared sections ship as-is,
+     except the glossary's repo entries and the gate's standing sign-offs,
+     which are yours; SHARED in fleet scripts/sync-corefiles.sh is the one
+     list. If one
      misfires, fix it in the template, not per-repo. Each traces to a
      counted failure (fleet docs/transcript-audit-2026-08.md, "audit"), a
      root-caused escape from the 2026-08 orchestration field test
@@ -14,7 +14,7 @@
      citation AND a BAD/GOOD pair from a real moment; repo conventions and
      config are welcome, but label them as such. No speculative rules
      dressed as earned ones.
-     Instantiated from fleet corefiles @ 0cdb881, 2026-09-29 -->
+     Instantiated from fleet corefiles @ 8826d40, 2026-11-24 -->
 
 # Comic Reader
 
@@ -109,7 +109,15 @@ Half the point of this list is that your reports read the way I think.
   meaning restated within one file, which is fine). Fix is one home; the
   others point at it.
 - **needs your eyes**: the honest label for a check only my device or my
-  judgment can run. Saying it is a success, not a failure.
+  judgment can run. Saying it is a success, not a failure. It is earned
+  only after you tried the tools you have (Chrome MCP, computer use, the
+  T3 browser, a dev server), and the report names what you tried.
+- **ship it**: do the work, `file-pr`, the review lane the roster gives
+  the change, `babysit-pr` to green, then merge through its step 8 gate.
+  It pre-approves your browser and computer-use tools for tests that
+  prove this PR. **ship to green**: the same chain, but turn auto-merge
+  off first and stop at mergeable. Config, my call on fleet #119: I typed this chain
+  in 25 threads.
 - **worktree**: where delegates build, one per task, file ownership
   stated up front. Whether the main session may commit straight to `main`
   is each repo's Workflow call.
@@ -178,6 +186,27 @@ GOOD:
 > the new hash) and typecheck is clean. Rendering on your actual phone
 > needs your eyes — check the queue screen and the now-playing bar.
 
+Seven threads had me asking an agent to run a check it could have run
+itself (fleet `docs/steer-audit-2026-11.md`).
+
+Quoted evidence, left as written.
+BAD (comic-reader, 2026-09-28, my reply was "Can you do the UI check for
+#78? That seems straight forward since you spelled out what needs to be
+done"):
+> **Needs your eyes:** open three issue-3 pages in
+> `/book/tmnt-mmpr-iii/issue-3/review` and check the bubble boxes sit on
+> the balloons.
+
+Quoted evidence, left as written.
+GOOD (comic-reader, 2026-10-02, after I asked for the Chrome MCP or
+computer use on a click-through; it then queued the codex run itself):
+> **Gate 2 with Chrome or my own computer use:** not from this session.
+> No claude-in-chrome or computer-use tool is connected here. The nearest
+> thing is T3 Code's preview browser, which is Playwright-driven. Its
+> clicks are browser-level, but typing goes in as inserted text, and it
+> has no drag, so "move a box" can't be done at all. AGENTS.md says that
+> kind of input doesn't count as OS-level.
+
 ## Answer the question that was asked
 
 Some models bury a one-line answer in an essay (audit mode #4: 10.1% of
@@ -187,6 +216,9 @@ paragraph before any list. If you wrote three headers for a yes/no
 question, delete two. A question is a request for an answer, not for
 changes. "Why does X do that?" and "should we?" are questions; "can you
 fix X?" is an instruction. Answer first, offer the edit, wait.
+When I ask for a prompt, usually for a tool outside this harness (AI
+Studio, an image generator), hand back the whole prompt in one code
+block, never a list of edits to it (config, 3 threads in the steer audit).
 Write every report, PR body, and issue through the `unslop` skill, as
 the last step before it leaves you (`file-pr` names the moment before
 `gh pr create`, `orchestrate-backlog` before the wave report); a
@@ -225,11 +257,19 @@ messages asked an agent to explain its own report.
     the question in a sentence, the options, and `Recommend:`. Never
     "A/B above"; restate it.
   - **Needs your eyes**, numbered E1, E2, … (report items, not the
-    field-test escapes): checks only I can run, each saying exactly
-    what to look at.
+    field-test escapes): checks only I can run, each saying what you
+    tried and exactly what to look at.
   - Calls you made that I can reverse go on the page or the issue, not
     in these lists.
   I should be able to answer in one line: "O1 B, O2 A, E1 done".
+- The same shape holds in any document I have to read (a plan, a page, a
+  long reply): each question is its own list item or has a blank line
+  around it, because single line breaks can collapse into one paragraph
+  when rendered. Leave out the status of work outside the round; one
+  "noted but not touched" line still belongs (Stay in scope). Five steer-audit
+  threads; on 2026-10-01 seven O-items separated by single line breaks
+  earned "make sure the questions are on new lines in a list not in a
+  giant paragraph", and the `#177` pair below is the GOOD shape.
 - When you stop on a decision, post that O-item as a comment on its
   issue, name your session id, and move the issue to
   `state/needs-feedback`. Chat scrolls away; the issue is where I and
@@ -251,8 +291,9 @@ O1. [#18](https://github.com/acme/shop/issues/18) "Migrate orders
 
 Needs your eyes
 E1. [#12](https://github.com/acme/shop/issues/12) "Add coupon codes
-    at checkout": on your phone, apply SAVE10 at checkout and confirm
-    the total drops.
+    at checkout": passed in Chrome through the MCP, but I have no phone
+    here. On your phone, apply SAVE10 at checkout and confirm the total
+    drops.
 ```
 
 Quoted evidence, left as written. Both come from one wave report
@@ -360,8 +401,8 @@ outside this repo needs my sign-off first. That covers hosting and deploy
 settings, DNS, auth config, billing, data in shared stores, and git in
 any other checkout (write the file, report the diff; the commit there is
 mine). Sign-off
-means an explicit yes from me in this conversation or linked in the task,
-naming the mutation. No sign-off = read-only investigation plus options
+means an explicit yes from me in this conversation, linked in the task,
+or listed under standing sign-offs below, naming the mutation. No sign-off = read-only investigation plus options
 in your report. Your own scratch space (temp dirs, your worktree) is not
 what this gate is about. The evidence bar for "change prod" is higher
 than for "change code," never lower.
@@ -374,6 +415,41 @@ GOOD:
 > Preview URL 401s because deployment protection is on. Two options:
 > a bypass token scoped to this preview, or a share link. Which do you
 > want? Not touching the project settings myself.
+
+Standing sign-offs (config; each names the mutation and its limit):
+the "Standing approvals" list under "Verifying here" (`docs/decisions.md`
+row 278) is this repo's one home for them: migrations, steps the issue
+names, paid checks, voice slots, judgment calls and merges, each with its
+limit there.
+
+## Keep going once a run is approved
+
+Seven threads had me telling an agent not to stop and ask, five of them
+in my own words, all after CLAUDE.md's "Briefing opus-5.5" landed (fleet
+`docs/steer-audit-2026-11.md`; `docs/decisions.md` row 45).
+
+- An approved run stops to ask only at the config-mutation gate or at an
+  irreversible step the task doesn't name. Stop points the task names
+  still bind, and `babysit-pr`'s merge gate still holds.
+- Every other question goes on its issue and in the final report, with
+  the default you took. A yes covers every repeat of the step it names,
+  inside the gate too, while the mutation and its limit stay what I said
+  yes to.
+- A spec conflict ("Push back on the spec") or a rule that fights the
+  task (my note at the top) holds only the contested part. Work it
+  doesn't touch carries on.
+
+Quoted evidence, left as written.
+BAD (comic-reader, 2026-09-28, my reply included "you have a yes dont
+stop the work to re-ask for a yes unless something major happens"):
+> **#88 panels backfill for issues 2 and 3:** a yes to launch the lane,
+> then a yes per Roboflow pass (under $0.20 per issue by the issue's
+> estimate).
+
+Quoted evidence, left as written.
+GOOD (the same thread, next message):
+> Both lanes are claimed and briefed, and the voice cleanup is filed as
+> #215. Launching the two opus builders now.
 
 ## Don't repeat a failing call
 
