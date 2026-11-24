@@ -14,7 +14,7 @@
      citation AND a BAD/GOOD pair from a real moment; repo conventions and
      config are welcome, but label them as such. No speculative rules
      dressed as earned ones.
-     Instantiated from fleet corefiles @ 8826d40, 2026-11-24 -->
+     Instantiated from fleet corefiles @ 4d64341, 2026-11-24 -->
 
 # Comic Reader
 
@@ -418,15 +418,13 @@ GOOD:
 
 Standing sign-offs (config; each names the mutation and its limit):
 the "Standing approvals" list under "Verifying here" (`docs/decisions.md`
-row 278) is this repo's one home for them: migrations, steps the issue
-names, paid checks, voice slots, judgment calls and merges, each with its
-limit there.
+row 278).
 
 ## Keep going once a run is approved
 
 Seven threads had me telling an agent not to stop and ask, five of them
-in my own words, all after CLAUDE.md's "Briefing opus-5.5" landed (fleet
-`docs/steer-audit-2026-11.md`; `docs/decisions.md` row 45).
+in my own words, all after the roster's "Briefing opus-5.5" landed (fleet
+`docs/steer-audit-2026-11.md` and fleet `docs/decisions.md` row 45).
 
 - An approved run stops to ask only at the config-mutation gate or at an
   irreversible step the task doesn't name. Stop points the task names
